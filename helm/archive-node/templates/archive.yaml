@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: archive-node-{{ .Values.archive.nodeName }}
+  name: {{ template "archive-node.fullname" . }}
   labels:
-    app: archive-node-{{ .Values.archive.nodeName }}
+    app: {{ template "archive-node.fullname" . }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: archive-node-{{ .Values.archive.nodeName }}
+      app: {{ template "archive-node.fullname" . }}
   template:
     metadata:
       labels:
-        app: archive-node-{{ .Values.archive.nodeName }}
+        app: {{ template "archive-node.fullname" . }}
         testnet: {{ .Values.testnetName }}
         role: archive-node
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: '10000'
+        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
@@ -66,15 +66,17 @@ spec:
         - name: DAEMON_ARCHIVE_PORT
           value: {{ .Values.archive.ports.server | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ .Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
           value: {{ .Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.external | quote }}
+          value: {{ .Values.coda.ports.p2p | quote }}
+        - name: CODA_CLIENT_TRUSTLIST
+          value: "10.0.0.0/8"
         ports:
-        - name: p2p-port
+        - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
+          containerPort: {{ .Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.graphql }}
@@ -83,7 +85,7 @@ spec:
           containerPort: {{ .Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.external }}
+          containerPort: {{ .Values.coda.ports.p2p }}
           hostPort: {{ .Values.coda.ports.external }}
 {{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
@@ -97,9 +99,22 @@ spec:
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ "coda-archive -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port {{ .Values.archive.ports.server }}" ]
+        args: [ 
+          "coda-archive",
+          "run",
+          "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
+          {{- if .Values.coda.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          {{- end }}
+          "-server-port", "{{ .Values.archive.ports.server }}"
+        ]
         env:
         imagePullPolicy: Always
+        {{- if .Values.coda.runtimeConfig }}
+        volumeMounts:
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
         ports:
         - name: archive-port
           protocol: TCP
@@ -107,7 +122,7 @@ spec:
         - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
-{{- include "healthcheck.archive.allChecks" .Values | indent 8 }}
+{{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
       - name: config-dir
@@ -115,5 +130,5 @@ spec:
       {{- if .Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: archive-daemon-config
+          name: "{{ template "archive-node.fullname" . }}-daemon-config"
       {{- end }}

@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
+open Mina_base
 
 type exn += Genesis_state_initialization_error
 
@@ -56,7 +56,7 @@ let file_exists ?follow_symlinks filename =
 module Accounts = struct
   module Single = struct
     let to_account_with_pk :
-        Runtime_config.Accounts.Single.t -> Coda_base.Account.t Or_error.t =
+        Runtime_config.Accounts.Single.t -> Mina_base.Account.t Or_error.t =
      fun t ->
       let open Or_error.Let_syntax in
       let%bind pk =
@@ -75,22 +75,23 @@ module Accounts = struct
       in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
-          ~f:Coda_base.Token_id.of_uint64
+          ~f:Mina_base.Token_id.of_uint64
       in
-      let account_id = Coda_base.Account_id.create pk token_id in
+      let account_id = Mina_base.Account_id.create pk token_id in
       let account =
         match t.timing with
         | Some
             { initial_minimum_balance
             ; cliff_time
+            ; cliff_amount
             ; vesting_period
             ; vesting_increment } ->
-            Coda_base.Account.create_timed account_id t.balance
-              ~initial_minimum_balance ~cliff_time ~vesting_period
-              ~vesting_increment
+            Mina_base.Account.create_timed account_id t.balance
+              ~initial_minimum_balance ~cliff_time ~cliff_amount
+              ~vesting_period ~vesting_increment
             |> Or_error.ok_exn
         | None ->
-            Coda_base.Account.create account_id t.balance
+            Mina_base.Account.create account_id t.balance
       in
       let permissions =
         match t.permissions with
@@ -108,7 +109,7 @@ module Accounts = struct
               match a with
               | Runtime_config.Accounts.Single.Permissions.Auth_required.None
                 ->
-                  Coda_base.Permissions.Auth_required.None
+                  Mina_base.Permissions.Auth_required.None
               | Either ->
                   Either
               | Proof ->
@@ -120,7 +121,7 @@ module Accounts = struct
               | Impossible ->
                   Impossible
             in
-            { Coda_base.Permissions.Poly.stake
+            { Mina_base.Permissions.Poly.stake
             ; edit_state= auth_required edit_state
             ; send= auth_required send
             ; receive= auth_required receive
@@ -132,7 +133,7 @@ module Accounts = struct
         Option.value_map t.token_permissions ~default:account.token_permissions
           ~f:(fun {token_owned; disable_new_accounts; account_disabled} ->
             if token_owned then
-              Coda_base.Token_permissions.Token_owned {disable_new_accounts}
+              Mina_base.Token_permissions.Token_owned {disable_new_accounts}
             else Not_owned {account_disabled} )
       in
       let%map snapp =
@@ -188,15 +189,15 @@ module Accounts = struct
       ; receipt_chain_hash=
           Option.value_map t.receipt_chain_hash
             ~default:account.receipt_chain_hash
-            ~f:Coda_base.Receipt.Chain_hash.of_base58_check_exn
+            ~f:Mina_base.Receipt.Chain_hash.of_base58_check_exn
       ; voting_for=
           Option.value_map ~default:account.voting_for
-            ~f:Coda_base.State_hash.of_base58_check_exn t.voting_for
+            ~f:Mina_base.State_hash.of_base58_check_exn t.voting_for
       ; snapp
       ; permissions }
 
     let of_account :
-           Coda_base.Account.t
+           Mina_base.Account.t
         -> Signature_lib.Private_key.t option
         -> Runtime_config.Accounts.Single.t =
      fun account sk ->
@@ -209,12 +210,13 @@ module Accounts = struct
               { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                   t.initial_minimum_balance
               ; cliff_time= t.cliff_time
+              ; cliff_amount= t.cliff_amount
               ; vesting_period= t.vesting_period
               ; vesting_increment= t.vesting_increment }
       in
       let token_permissions =
         match account.token_permissions with
-        | Coda_base.Token_permissions.Token_owned {disable_new_accounts} ->
+        | Mina_base.Token_permissions.Token_owned {disable_new_accounts} ->
             Some
               { Runtime_config.Accounts.Single.Token_permissions.token_owned=
                   true
@@ -229,7 +231,7 @@ module Accounts = struct
       let permissions =
         let auth_required a =
           match a with
-          | Coda_base.Permissions.Auth_required.None ->
+          | Mina_base.Permissions.Auth_required.None ->
               Runtime_config.Accounts.Single.Permissions.Auth_required.None
           | Either ->
               Either
@@ -242,7 +244,7 @@ module Accounts = struct
           | Impossible ->
               Impossible
         in
-        let { Coda_base.Permissions.Poly.stake
+        let { Mina_base.Permissions.Poly.stake
             ; edit_state
             ; send
             ; receive
@@ -284,15 +286,15 @@ module Accounts = struct
           Option.map ~f:Signature_lib.Public_key.Compressed.to_base58_check
             account.delegate
       ; timing
-      ; token= Some (Coda_base.Token_id.to_uint64 account.token_id)
+      ; token= Some (Mina_base.Token_id.to_uint64 account.token_id)
       ; token_permissions
       ; nonce= account.nonce
       ; receipt_chain_hash=
           Some
-            (Coda_base.Receipt.Chain_hash.to_base58_check
+            (Mina_base.Receipt.Chain_hash.to_base58_check
                account.receipt_chain_hash)
       ; voting_for=
-          Some (Coda_base.State_hash.to_base58_check account.voting_for)
+          Some (Mina_base.State_hash.to_base58_check account.voting_for)
       ; snapp
       ; permissions }
   end
@@ -422,8 +424,8 @@ module Ledger = struct
          match the account record format.
       *)
       hash
-      ^ Bin_prot.Writer.to_string Coda_base.Account.Stable.Latest.bin_writer_t
-          Coda_base.Account.empty
+      ^ Bin_prot.Writer.to_string Mina_base.Account.Stable.Latest.bin_writer_t
+          Mina_base.Account.empty
     in
     ledger_name_prefix ^ "_"
     ^ Blake2.to_hex (Blake2.digest_string str)
@@ -439,11 +441,11 @@ module Ledger = struct
         ; List.to_string balances ~f:(fun (i, balance) ->
               sprintf "%i %s" i (Currency.Balance.to_string balance) )
         ; (* Distinguish ledgers when the hash function is different. *)
-          Snark_params.Tick.Field.to_string Coda_base.Account.empty_digest
+          Snark_params.Tick.Field.to_string Mina_base.Account.empty_digest
         ; (* Distinguish ledgers when the account record layout has changed. *)
           Bin_prot.Writer.to_string
-            Coda_base.Account.Stable.Latest.bin_writer_t
-            Coda_base.Account.empty ]
+            Mina_base.Account.Stable.Latest.bin_writer_t
+            Mina_base.Account.empty ]
     in
     ledger_name_prefix ^ "_" ^ name ^ "_"
     ^ Blake2.(to_hex (digest_string str))
@@ -952,7 +954,7 @@ module Genesis_proof = struct
           ; genesis_epoch_data= inputs.genesis_epoch_data
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
-          ; genesis_proof= Coda_base.Proof.blockchain_dummy }
+          ; genesis_proof= Mina_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -1147,12 +1149,13 @@ let make_constraint_constants
       ( match config.fork with
       | None ->
           default.fork
-      | Some {previous_state_hash; previous_length} ->
+      | Some {previous_state_hash; previous_length; previous_global_slot} ->
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length } )
-  }
+            ; previous_length= Coda_numbers.Length.of_int previous_length
+            ; previous_global_slot=
+                Coda_numbers.Global_slot.of_int previous_global_slot } ) }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =

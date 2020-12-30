@@ -1,7 +1,7 @@
 open Core_kernel
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 module Intf = Intf
 
 let account_with_timing account_id balance (timing : Intf.Timing.t) =
@@ -13,10 +13,11 @@ let account_with_timing account_id balance (timing : Intf.Timing.t) =
         Currency.Balance.of_int t.initial_minimum_balance
       in
       let cliff_time = Coda_numbers.Global_slot.of_int t.cliff_time in
+      let cliff_amount = Currency.Amount.of_int t.cliff_amount in
       let vesting_increment = Currency.Amount.of_int t.vesting_increment in
       let vesting_period = Coda_numbers.Global_slot.of_int t.vesting_period in
       Account.create_timed account_id balance ~initial_minimum_balance
-        ~cliff_time ~vesting_period ~vesting_increment
+        ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       |> Or_error.ok_exn
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
@@ -44,7 +45,7 @@ module Public_accounts (Accounts : Intf.Public_accounts.S) = struct
         (None, {base_acct with delegate= Option.value ~default:pk delegate}) )
 end
 
-(** Generate a ledger using the sample keypairs from [Coda_base] with the given
+(** Generate a ledger using the sample keypairs from [Mina_base] with the given
     balances.
 *)
 module Balances (Balances : Intf.Named_balances_intf) = struct
@@ -56,7 +57,7 @@ module Balances (Balances : Intf.Named_balances_intf) = struct
     let accounts =
       let open Lazy.Let_syntax in
       let%map balances = Balances.balances
-      and keypairs = Coda_base.Sample_keypairs.keypairs in
+      and keypairs = Mina_base.Sample_keypairs.keypairs in
       List.mapi balances ~f:(fun i b ->
           { balance= b
           ; pk= fst keypairs.(i)

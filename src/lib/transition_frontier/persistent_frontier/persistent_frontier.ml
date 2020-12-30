@@ -1,6 +1,6 @@
 open Async_kernel
 open Core
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Frontier_base
@@ -63,14 +63,14 @@ let construct_staged_ledger_at_root
                txn.data
            in
            let computed_status =
-             Ledger.Undo.user_command_status txn_with_info
+             Ledger.Transaction_applied.user_command_status txn_with_info
            in
-           if User_command_status.equal txn.status computed_status then
+           if Transaction_status.equal txn.status computed_status then
              Or_error.return ()
            else
              Or_error.errorf
                !"Mismatched user command status. Expected: %{sexp: \
-                 User_command_status.t} Got: %{sexp: User_command_status.t}"
+                 Transaction_status.t} Got: %{sexp: Transaction_status.t}"
                txn.status computed_status )
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
@@ -189,7 +189,9 @@ module Instance = struct
         , [`Invalid_genesis_protocol_state] )
         Result.t =
       let open Result.Let_syntax in
-      let transition, _ = External_transition.Validated.erase transition in
+      let transition =
+        External_transition.Validation.forget_validation_with_hash transition
+      in
       let%map t =
         External_transition.Validation.wrap transition
         |> External_transition.skip_time_received_validation
@@ -281,12 +283,16 @@ module Instance = struct
                    Error (`Fatal_error (Invalid_genesis_state_hash transition))
                    |> Deferred.return
              in
+             (* we're loading transitions from persistent storage,
+                don't assign a timestamp
+             *)
+             let transition_receipt_time = None in
              let%bind breadcrumb =
                Breadcrumb.build ~skip_staged_ledger_verification:true
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None ()
+                 ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))

@@ -2,7 +2,7 @@
 
 open Core_kernel
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Blockchain_snark
 
@@ -14,12 +14,12 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_commands :
-         Coda_base.User_command.Verifiable.t list
-      -> [ `Valid of Coda_base.User_command.Valid.t
+         Mina_base.User_command.Verifiable.t list
+      -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Coda_base.Snapp_statement.t
+           * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list ]
          list
@@ -125,7 +125,7 @@ module Worker = struct
             | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
-              * Coda_base.Snapp_statement.t
+              * Mina_base.Snapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list ]
             list )
@@ -189,7 +189,7 @@ module Worker = struct
                   | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
-                    * Coda_base.Snapp_statement.Stable.Latest.t
+                    * Mina_base.Snapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list ]
                   list]
@@ -299,7 +299,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         in
         let new_worker =
           let%bind res = Process.wait process in
-          [%log info] "prover successfully stopped"
+          [%log info] "verifier successfully stopped"
             ~metadata:
               [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
               ; ("exit_status", `String (Unix.Exit_or_signal.to_string_hum res))

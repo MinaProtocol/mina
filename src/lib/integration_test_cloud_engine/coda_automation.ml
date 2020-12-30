@@ -2,7 +2,7 @@ open Core
 open Async
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 open Integration_test_lib
 open Unix
 
@@ -23,6 +23,7 @@ module Network_config = struct
     { cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
+    ; k8s_context: string
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -84,7 +85,8 @@ module Network_config = struct
     let user_sanitized =
       Str.global_replace (Str.regexp "\\W|_") "" user_from_env
     in
-    let user = String.sub user_sanitized ~pos:0 ~len:5 in
+    let user_len = Int.min 5 (String.length user_sanitized) in
+    let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let time_now = Unix.gmtime (Unix.gettimeofday ()) in
     let timestr =
       string_of_int time_now.tm_mday
@@ -99,6 +101,7 @@ module Network_config = struct
     let project_id = "o1labs-192920" in
     let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
     let cluster_name = "mina-integration-west1" in
+    let k8s_context = cluster_id in
     let cluster_region = "us-west1" in
     let seed_zone = "us-west1-a" in
     let seed_region = "us-west1" in
@@ -120,6 +123,7 @@ module Network_config = struct
                   { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                       t.initial_minimum_balance
                   ; cliff_time= t.cliff_time
+                  ; cliff_amount= t.cliff_amount
                   ; vesting_period= t.vesting_period
                   ; vesting_increment= t.vesting_increment }
           in
@@ -216,6 +220,7 @@ module Network_config = struct
         ; testnet_name
         ; seed_zone
         ; seed_region
+        ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots

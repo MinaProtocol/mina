@@ -252,6 +252,7 @@ module Helper = struct
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable banned_ips: Unix.Inet_addr.t list
     ; mutable peer_connected_callback: (string -> unit) option
+    ; mutable peer_disconnected_callback: (string -> unit) option
     ; mutable finished: bool }
 
   and 'a subscription =
@@ -514,16 +515,24 @@ module Helper = struct
   end
 
   let gating_config_to_helper_format (config : connection_gating) =
+    let trusted_ips =
+      List.map
+        ~f:(fun p -> Unix.Inet_addr.to_string p.host)
+        config.trusted_peers
+    in
+    let banned_ips =
+      let trusted = String.Set.of_list trusted_ips in
+      List.filter_map
+        ~f:(fun p ->
+          let p = Unix.Inet_addr.to_string p.host in
+          (* Trusted peers cannot be banned. *)
+          if Set.mem trusted p then None else Some p )
+        config.banned_peers
+    in
     Rpcs.Set_gater_config.
-      { banned_ips=
-          List.map
-            ~f:(fun p -> Unix.Inet_addr.to_string p.host)
-            config.banned_peers
+      { banned_ips
       ; banned_peers= List.map ~f:(fun p -> p.peer_id) config.banned_peers
-      ; trusted_ips=
-          List.map
-            ~f:(fun p -> Unix.Inet_addr.to_string p.host)
-            config.trusted_peers
+      ; trusted_ips
       ; trusted_peers= List.map ~f:(fun p -> p.peer_id) config.trusted_peers
       ; isolate= config.isolate }
 
@@ -808,6 +817,10 @@ module Helper = struct
       type t = {upcall: string; peer_id: string} [@@deriving yojson]
     end
 
+    module Peer_disconnected = struct
+      type t = {upcall: string; peer_id: string} [@@deriving yojson]
+    end
+
     let or_error (t : ('a, string) Result.t) =
       match t with
       | Ok a ->
@@ -1034,6 +1047,9 @@ module Helper = struct
     | "peerConnected" ->
         let%map p = Peer_connected.of_yojson v |> or_error in
         Option.iter t.peer_connected_callback ~f:(fun cb -> cb p.peer_id)
+    | "peerDisconnected" ->
+        let%map p = Peer_disconnected.of_yojson v |> or_error in
+        Option.iter t.peer_disconnected_callback ~f:(fun cb -> cb p.peer_id)
     (* Received a message on some stream *)
     | "incomingStreamMsg" -> (
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
@@ -1282,16 +1298,22 @@ let list_peers net =
                  (Unix.Inet_addr.of_string host)
                  ~libp2p_port
                  ~peer_id:(Peer.Id.unsafe_of_string peer_id)) )
-  | Error _ ->
+  | Error error ->
+      [%log' error net.logger]
+        "Encountered $error while asking libp2p_helper for peers"
+        ~metadata:[("error", Error_json.error_to_yojson error)] ;
       []
 
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
-    ~metrics_port ~on_peer_connected ~unsafe_no_trust_ip ~flooding
-    ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
+    ~metrics_port ~on_peer_connected ~on_peer_disconnected ~unsafe_no_trust_ip
+    ~flooding ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
     ~max_connections ~validation_queue_size =
   net.Helper.peer_connected_callback
   <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
+  net.Helper.peer_disconnected_callback
+  <- Some
+       (fun peer_id -> on_peer_disconnected (Peer.Id.unsafe_of_string peer_id)) ;
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1540,6 +1562,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
         ; subscriptions= Hashtbl.create (module Int)
         ; streams= Hashtbl.create (module Int)
         ; peer_connected_callback= None
+        ; peer_disconnected_callback= None
         ; protocol_handlers= Hashtbl.create (module String)
         ; seqno= 1
         ; finished= false }
@@ -1642,8 +1665,9 @@ let%test_module "coda network tests" =
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_peer_connected:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~seed_peers:[] ~on_peer_connected:Fn.ignore
+          ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
+          ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
@@ -1659,8 +1683,9 @@ let%test_module "coda network tests" =
       let%bind () =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
+          ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}
@@ -1668,8 +1693,9 @@ let%test_module "coda network tests" =
       and () =
         configure c ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_c
           ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore ~flooding:false
-          ~metrics_port:None ~unsafe_no_trust_ip:true ~max_connections:50
+          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
+          ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
           ~initial_gating_config:
             {trusted_peers= []; banned_peers= []; isolate= false}

@@ -1,7 +1,7 @@
 open Core
 open Pickles_types
 open Import
-open Zexe_backend.Tweedle
+open Zexe_backend.Pasta
 
 module Data = struct
   [%%versioned
@@ -20,7 +20,7 @@ module Repr = struct
     module V1 = struct
       type t =
         { commitments:
-            Dee.Affine.Stable.V1.t array
+            Backend.Tock.Curve.Affine.Stable.V1.t array
             Plonk_verification_key_evals.Stable.V1.t
         ; step_domains: Domains.Stable.V1.t array
         ; data: Data.Stable.V1.t }
@@ -34,7 +34,8 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      { commitments: Dee.Affine.t array Plonk_verification_key_evals.t
+      { commitments:
+          Backend.Tock.Curve.Affine.t array Plonk_verification_key_evals.t
       ; step_domains: Domains.t array
       ; index: Impls.Wrap.Verification_key.t
       ; data: Data.t }
@@ -103,9 +104,9 @@ let dummy =
          let max_degree = Common.Max_degree.wrap in
          Int.round_up rows ~to_multiple_of:max_degree / max_degree
        in
-       Array.create ~len Dee.(to_affine_exn one)
+       Array.create ~len Backend.Tock.Curve.(to_affine_exn one)
      in
      { Repr.commitments= dummy_commitments g
      ; step_domains= [||]
      ; data= {constraints= rows} }
-     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Tweedle_fp_urs.create 1))
+     |> Stable.Latest.of_repr (Marlin_plonk_bindings.Pasta_fq_urs.create 1))

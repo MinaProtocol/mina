@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
+open Mina_base
 open Pipe_lib
 
 module Api = struct
@@ -95,17 +95,6 @@ module Api = struct
   let new_user_command t i public_key =
     run_online_worker
       ~f:(fun worker -> Coda_process.new_user_command_exn worker public_key)
-      t i
-
-  let get_all_user_commands t i public_key =
-    run_online_worker
-      ~f:(fun worker ->
-        Coda_process.get_all_user_commands_exn worker public_key )
-      t i
-
-  let get_all_transitions t i public_key =
-    run_online_worker
-      ~f:(fun worker -> Coda_process.get_all_transitions worker public_key)
       t i
 
   let start t i =
@@ -333,7 +322,7 @@ type user_cmd_status =
 let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
-         | `Root (worker_id, ({commands; root_length} : Coda_lib.Root_diff.t))
+         | `Root (worker_id, ({commands; root_length} : Mina_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
@@ -562,9 +551,6 @@ module Payments : sig
     -> keypairs:Keypair.t list
     -> n:int
     -> Signed_command.t list Deferred.t
-
-  val assert_retrievable_payments :
-    Api.t -> Signed_command.t list -> unit Deferred.t
 end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
@@ -665,49 +651,6 @@ end = struct
         in
         assert result ;
         user_command )
-
-  let query_relevant_payments (testnet : Api.t) worker_index public_keys =
-    Deferred.List.concat_map public_keys ~f:(fun public_key ->
-        let%map payments =
-          Api.get_all_user_commands testnet worker_index public_key
-        in
-        Option.value_exn payments )
-    >>| Signed_command.Set.of_list
-
-  let check_all_nodes_received_payments (testnet : Api.t) public_keys
-      (expected_payments : Signed_command.t list) =
-    Deferred.List.init ~how:`Parallel (Array.length testnet.workers)
-      ~f:(fun worker_index ->
-        let%map node_payments =
-          query_relevant_payments testnet worker_index public_keys
-        in
-        List.for_all expected_payments
-          ~f:(Signed_command.Set.mem node_payments) )
-    >>| List.for_all ~f:Fn.id
-
-  let assert_retrievable_payments (testnet : Api.t)
-      (expected_payments : Signed_command.t list) =
-    let senders, receivers =
-      List.map expected_payments ~f:(fun user_command ->
-          match user_command.payload.body with
-          | Payment payment_payload ->
-              ( Public_key.compress user_command.signer
-              , payment_payload.receiver_pk )
-          | Stake_delegation _
-          | Create_new_token _
-          | Create_token_account _
-          | Mint_tokens _ ->
-              failwith "Expected a list of payments" )
-      |> List.unzip
-    in
-    let%bind has_all_sender_payments =
-      check_all_nodes_received_payments testnet senders expected_payments
-    in
-    assert has_all_sender_payments ;
-    let%map has_all_receiver_payments =
-      check_all_nodes_received_payments testnet receivers expected_payments
-    in
-    assert has_all_receiver_payments
 end
 
 module Restarts : sig

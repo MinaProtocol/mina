@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 module type S = sig
   type t [@@deriving compare, sexp, yojson]
@@ -9,7 +9,7 @@ module type S = sig
     [@@@no_toplevel_latest_type]
 
     module V1 : sig
-      type nonrec t = t [@@deriving compare, sexp, to_yojson]
+      type nonrec t = t [@@deriving compare, sexp, yojson]
 
       val to_latest : t -> t
 

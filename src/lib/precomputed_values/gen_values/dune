@@ -6,7 +6,7 @@
    core
    ;; libraries
    blockchain_snark
-   coda_base
+   mina_base
    genesis_proof
    global_signer_private_key
    ppxlib

@@ -22,6 +22,8 @@ let main () =
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
     ~delete_older_than:None
+    ~runtime_config_opt:
+      (Some (Lazy.force Runtime_config.Test_configs.transactions))
   |> don't_wait_for ;
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
@@ -63,9 +65,7 @@ let main () =
             in
             Archive_lib.Processor.For_test.assert_parent_exist conn ~parent_id
               ~parent_hash:
-                transition
-                  .Auxiliary_database.Filtered_external_transition
-                   .protocol_state
+                transition.Filtered_external_transition.protocol_state
                   .previous_state_hash
         | None ->
             failwith "Failed to find saved block in database"
