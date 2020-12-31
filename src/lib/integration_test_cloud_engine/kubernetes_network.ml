@@ -256,9 +256,7 @@ module Node = struct
       | Some peer ->
           Malleable_error.return peer#peerId
     in
-    (* [%log info] "get_peer_id, self_id is: %s" self_id ; *)
     let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
-    (* [%log info] "get_peer_id, got the list of peers" ; *)
     let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
     [%log info]
       "get_peer_id, result of graphql querry (self_id,[peers]) (%s,%s)" self_id

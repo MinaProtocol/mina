@@ -12,8 +12,6 @@ PG_PORT=5432
 PG_PASSWORD=somepassword
 PG_CONN=postgres://postgres:$PG_PASSWORD@localhost:$PG_PORT/$DB
 
-echo $PG_CONN
-
 SOCKET_DIR=/var/run/postgresql
 
 function cleanup () {
