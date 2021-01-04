@@ -1351,6 +1351,118 @@ module Make (Inputs : Inputs) = struct
     end
   end
 
+  module type Steps = sig
+    include Step_keys
+
+    val prove :
+         ?handler:(   Snarky_backendless.Request.request
+                   -> Snarky_backendless.Request.response)
+      -> (prev_values, widths, heights) H3.T(Statement_with_proof).t
+      -> A_value.t
+      -> (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t
+  end
+
+  module Steps_m = struct
+    type ('prev_vars, 'prev_values, 'widths, 'heights) t =
+      (module Steps
+         with type prev_vars = 'prev_vars
+          and type prev_values = 'prev_values
+          and type widths = 'widths
+          and type heights = 'heights)
+  end
+
+  let steps =
+    let T = Max_branching.eq in
+    let module S = Step.Make (A) (A_value) (Max_branching) in
+    let module M =
+      H4.Map (Step_keys_m) (Steps_m)
+        (struct
+          let f (type prev_vars prev_values widths heights)
+              (( module
+                Step ) :
+                (prev_vars, prev_values, widths, heights) Step_keys_m.t) :
+              (prev_vars, prev_values, widths, heights) Steps_m.t =
+            ( module struct
+              include Step
+
+              let prove =
+                let wrap_vk =
+                  ( Wrap_keys.Keys.Verification.registered_key_lazy
+                    :> Verification_key.t Lazy.t )
+                in
+                let (T b as branch_data) = Step.branch_data in
+                let step_pk = Step.Keys.Proving.registered_key_lazy in
+                let step_vk = Step.Keys.Verification.registered_key_lazy in
+                let step_pk = (step_pk :> Impls.Step.Proving_key.t Lazy.t) in
+                let step_vk =
+                  (step_vk :> Impls.Step.Verification_key.t Lazy.t)
+                in
+                let (module Requests) = b.requests in
+                let _, prev_vars_length = b.branching in
+                let pairing_vk = Lazy.force step_vk in
+                let wrap ?handler prevs next_state =
+                  let wrap_vk = Lazy.force wrap_vk in
+                  let wrap_pk =
+                    ( Wrap_keys.Keys.Proving.registered_key_lazy
+                      :> Impls.Wrap.Proving_key.t Lazy.t )
+                  in
+                  let prevs =
+                    let module M =
+                      H3.Map (Statement_with_proof) (P.With_data)
+                        (struct
+                          let f
+                              ((app_state, T proof) : _ Statement_with_proof.t)
+                              =
+                            P.T
+                              { proof with
+                                statement=
+                                  { proof.statement with
+                                    pass_through=
+                                      { proof.statement.pass_through with
+                                        app_state } } }
+                        end)
+                    in
+                    M.f prevs
+                  in
+                  let%bind.Async proof =
+                    S.f ?handler branch_data next_state
+                      ~prevs_length:prev_vars_length ~self ~step_domains
+                      ~self_dlog_plonk_index:wrap_vk.commitments
+                      ~maxes:(module Maxes)
+                      (Lazy.force step_pk) wrap_vk.index prevs
+                  in
+                  let proof =
+                    { proof with
+                      statement=
+                        { proof.statement with
+                          pass_through=
+                            pad_pass_throughs
+                              (module Maxes)
+                              proof.statement.pass_through } }
+                  in
+                  let%map.Async proof =
+                    Wrap.wrap ~max_branching:Max_branching.n
+                      full_signature.maxes Wrap_keys.requests
+                      ~dlog_plonk_index:wrap_vk.commitments Wrap_keys.main
+                      A_value.to_field_elements ~pairing_vk
+                      ~step_domains:b.domains
+                      ~pairing_plonk_indices:step_vk_commitments ~wrap_domains
+                      (Lazy.force wrap_pk) proof
+                  in
+                  Proof.T
+                    { proof with
+                      statement=
+                        { proof.statement with
+                          pass_through=
+                            {proof.statement.pass_through with app_state= ()}
+                        } }
+                in
+                wrap
+            end )
+        end)
+    in
+    M.f steps_keys
+
   let compile :
          cache:Key_cache.Spec.t list
       -> unit
@@ -1412,93 +1524,18 @@ module Make (Inputs : Inputs) = struct
         :> Verification_key.t Lazy.t )
     in
     let provers =
-      let f : type prev_vars prev_values local_widths local_heights.
-             (prev_vars, prev_values, local_widths, local_heights) Step_keys_m.t
-          -> ?handler:(   Snarky_backendless.Request.request
-                       -> Snarky_backendless.Request.response)
-          -> ( prev_values
-             , local_widths
-             , local_heights )
-             H3.T(Statement_with_proof).t
-          -> A_value.t
-          -> (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t =
-       fun (module Step) ->
-        let (T b as branch_data) = Step.branch_data in
-        let step_pk = Step.Keys.Proving.registered_key_lazy in
-        let step_vk = Step.Keys.Verification.registered_key_lazy in
-        let step_pk = (step_pk :> Impls.Step.Proving_key.t Lazy.t) in
-        let step_vk = (step_vk :> Impls.Step.Verification_key.t Lazy.t) in
-        let (module Requests) = b.requests in
-        let _, prev_vars_length = b.branching in
-        let step handler prevs next_state =
-          let wrap_vk = Lazy.force wrap_vk in
-          S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
-            ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
-            (Lazy.force step_pk) wrap_vk.index prevs
-        in
-        let pairing_vk = Lazy.force step_vk in
-        let wrap ?handler prevs next_state =
-          let wrap_vk = Lazy.force wrap_vk in
-          let wrap_pk =
-            ( Wrap_keys.Keys.Proving.registered_key_lazy
-              :> Impls.Wrap.Proving_key.t Lazy.t )
-          in
-          let prevs =
-            let module M =
-              H3.Map (Statement_with_proof) (P.With_data)
-                (struct
-                  let f ((app_state, T proof) : _ Statement_with_proof.t) =
-                    P.T
-                      { proof with
-                        statement=
-                          { proof.statement with
-                            pass_through=
-                              {proof.statement.pass_through with app_state} }
-                      }
-                end)
-            in
-            M.f prevs
-          in
-          let%bind.Async proof =
-            step handler ~maxes:(module Maxes) prevs next_state
-          in
-          let proof =
-            { proof with
-              statement=
-                { proof.statement with
-                  pass_through=
-                    pad_pass_throughs
-                      (module Maxes)
-                      proof.statement.pass_through } }
-          in
-          let%map.Async proof =
-            Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
-              Wrap_keys.requests ~dlog_plonk_index:wrap_vk.commitments
-              Wrap_keys.main A_value.to_field_elements ~pairing_vk
-              ~step_domains:b.domains
-              ~pairing_plonk_indices:step_vk_commitments ~wrap_domains
-              (Lazy.force wrap_pk) proof
-          in
-          Proof.T
-            { proof with
-              statement=
-                { proof.statement with
-                  pass_through=
-                    {proof.statement.pass_through with app_state= ()} } }
-        in
-        wrap
-      in
       let rec go : type xs1 xs2 xs3 xs4.
-             (xs1, xs2, xs3, xs4) H4.T(Step_keys_m).t
+             (xs1, xs2, xs3, xs4) H4.T(Steps_m).t
           -> ( xs2
              , xs3
              , xs4
              , A_value.t
              , (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t )
              H3_2.T(Prover).t =
-       fun bs -> match bs with [] -> [] | b :: bs -> f b :: go bs
+       fun bs ->
+        match bs with [] -> [] | (module Step) :: bs -> Step.prove :: go bs
       in
-      go steps_keys
+      go steps
     in
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
