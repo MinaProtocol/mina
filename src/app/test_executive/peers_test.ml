@@ -30,6 +30,17 @@ module Make (Engine : Engine_intf) = struct
 
   let expected_error_event_reprs = []
 
+  let rec to_string_query_results query_results str =
+    match query_results with
+    | element :: tail ->
+        let node_id, peer_list = element in
+        to_string_query_results tail
+          ( str
+          ^ Printf.sprintf "( %s, [%s]) " node_id
+              (String.concat ~sep:", " peer_list) )
+    | [] ->
+        str
+
   let run network log_engine =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -52,7 +63,9 @@ module Make (Engine : Engine_intf) = struct
     let%bind (query_results : (string * string list) list) =
       Malleable_error.List.map peer_list ~f:get_peer_id_partial
     in
-    [%log info] "mina_peers_test: successfully made graphql query" ;
+    [%log info]
+      "mina_peers_test: successfully made graphql query.  query_results: %s"
+      (to_string_query_results query_results "") ;
     let expected_peers, _ = List.unzip query_results in
     let test_compare_func (node_peer_id, visible_peers_of_node) =
       let expected_peers_of_node : string list =
@@ -61,8 +74,13 @@ module Make (Engine : Engine_intf) = struct
           expected_peers
         (* expected_peers_of_node is just expected_peers but with the peer_id of the given node removed from the list *)
       in
-      List.iter visible_peers_of_node ~f:(fun p ->
-          assert (List.exists expected_peers_of_node ~f:(String.equal p)) )
+      [%log info] "node_peer_id: %s" node_peer_id ;
+      [%log info] "expected_peers_of_node: %s"
+        (String.concat ~sep:" " expected_peers_of_node) ;
+      [%log info] "visible_peers_of_node: %s"
+        (String.concat ~sep:" " visible_peers_of_node) ;
+      List.iter expected_peers_of_node ~f:(fun p ->
+          assert (List.exists visible_peers_of_node ~f:(String.equal p)) )
       (* loop through visible_peers_of_node and make sure everything in that list is also in expected_peers_of_node *)
     in
     [%log info] "mina_peers_test: making assertions" ;

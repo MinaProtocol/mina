@@ -55,7 +55,11 @@ module type Engine_intf = sig
   end
 
   module Node : sig
-    type t
+    type t =
+      { cluster: string
+      ; namespace: string
+      ; pod_id: string
+      ; node_graphql_port: int }
 
     val start : fresh_state:bool -> t -> unit Malleable_error.t
 

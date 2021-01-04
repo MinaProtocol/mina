@@ -184,11 +184,9 @@ let get_status ~flag t =
   in
   let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
-  let%map peers = Mina_lib.peers t in
-  let peers =
-    List.map peers ~f:(fun peer ->
-        Network_peer.Peer.to_discovery_host_and_port peer
-        |> Host_and_port.to_string )
+  let%map peers =
+    let%map undisplay_peers = Mina_lib.peers t in
+    List.map ~f:Network_peer.Peer.to_display undisplay_peers
   in
   let user_commands_sent = !txn_count in
   let snark_worker =

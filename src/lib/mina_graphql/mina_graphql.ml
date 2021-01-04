@@ -289,12 +289,12 @@ module Types = struct
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
-               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~peers:(id ~typ:(non_null (list (non_null peer))))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
                ~block_production_keys:
-                 (id ~typ:Schema.(non_null @@ list (non_null string)))
+                 (id ~typ:(non_null @@ list (non_null Schema.string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
                ~global_slot_since_genesis_best_tip:int
