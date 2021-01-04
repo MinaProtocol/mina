@@ -9,7 +9,7 @@ open Signature_lib
 open Pipe_lib
 open O1trace
 open Init
-open Coda_numbers
+open Mina_numbers
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -175,7 +175,7 @@ let run_test () : unit Deferred.t =
       in
       let fee n =
         Currency.Fee.of_int
-          (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + n)
+          (Currency.Fee.to_int Mina_compile_config.minimum_user_command_fee + n)
       in
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
@@ -364,7 +364,7 @@ let run_test () : unit Deferred.t =
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
               receiver (f_amount i) acc
-              Coda_compile_config.minimum_user_command_fee )
+              Mina_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
         Mina_lib.best_protocol_state t

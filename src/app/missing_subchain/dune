@@ -10,7 +10,7 @@
    caqti-driver-postgresql
    archive_lib
    block_time
-   coda_numbers
+   mina_numbers
    logger
    mina_base)
  (preprocessor_deps ../../config.mlh)

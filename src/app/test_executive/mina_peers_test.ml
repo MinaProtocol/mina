@@ -16,9 +16,9 @@ module Make (Engine : Engine_intf) = struct
     let timing : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= Balance.of_int 1000
-        ; cliff_time= Coda_numbers.Global_slot.of_int 4
+        ; cliff_time= Mina_numbers.Global_slot.of_int 4
         ; cliff_amount= Amount.zero
-        ; vesting_period= Coda_numbers.Global_slot.of_int 2
+        ; vesting_period= Mina_numbers.Global_slot.of_int 2
         ; vesting_increment= Amount.of_int 50_000_000_000 }
     in
     { default with

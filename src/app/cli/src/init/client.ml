@@ -436,7 +436,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
+      ; valid_until: Mina_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -454,7 +454,7 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until= Some (Coda_numbers.Global_slot.random ())
+          ; valid_until= Some (Mina_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -737,7 +737,7 @@ let cancel_transaction_graphql =
            int_of_string nonce
          in
          let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int
+           Mina_numbers.Account_nonce.to_int
              (Signed_command.nonce user_command)
          in
          let inferred_nonce =
@@ -767,7 +767,7 @@ let cancel_transaction_graphql =
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
-                  (Coda_numbers.Account_nonce.to_uint32
+                  (Mina_numbers.Account_nonce.to_uint32
                      (Signed_command.nonce user_command)))
              ()
          in
@@ -1349,7 +1349,7 @@ let create_hd_account =
              (response#createHDAccount)#public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
-           (Coda_numbers.Hd_index.to_string hd_index)
+           (Mina_numbers.Hd_index.to_string hd_index)
            pk_string ))
 
 let unlock_account =

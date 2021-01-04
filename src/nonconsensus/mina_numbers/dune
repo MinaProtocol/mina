@@ -1,6 +1,6 @@
 (library
- (name coda_numbers_nonconsensus)
- (public_name coda_numbers_nonconsensus)
+ (name mina_numbers_nonconsensus)
+ (public_name mina_numbers_nonconsensus)
  (inline_tests)
  (library_flags -linkall)
  (libraries fold_lib tuple_lib bignum_bigint snark_bits_nonconsensus unsigned_extended_nonconsensus random_oracle_nonconsensus

@@ -1153,9 +1153,9 @@ let make_constraint_constants
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length
+            ; previous_length= Mina_numbers.Length.of_int previous_length
             ; previous_global_slot=
-                Coda_numbers.Global_slot.of_int previous_global_slot } ) }
+                Mina_numbers.Global_slot.of_int previous_global_slot } ) }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -1319,7 +1319,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
-           { base= Named Coda_compile_config.genesis_ledger
+           { base= Named Mina_compile_config.genesis_ledger
            ; num_accounts= None
            ; balances= []
            ; hash= None

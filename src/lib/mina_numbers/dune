@@ -1,6 +1,6 @@
 (library
- (name coda_numbers)
- (public_name coda_numbers)
+ (name mina_numbers)
+ (public_name mina_numbers)
  (inline_tests)
  (library_flags -linkall)
  (libraries fold_lib tuple_lib snark_bits snark_params unsigned_extended
