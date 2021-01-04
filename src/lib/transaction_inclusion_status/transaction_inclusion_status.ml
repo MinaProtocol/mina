@@ -64,7 +64,7 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
 let%test_module "transaction_status" =
   ( module struct
     open Async
-    open Coda_numbers
+    open Mina_numbers
 
     let max_length = 10
 

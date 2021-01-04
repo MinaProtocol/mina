@@ -436,7 +436,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
+      ; valid_until: Mina_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -454,7 +454,7 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until= Some (Coda_numbers.Global_slot.random ())
+          ; valid_until= Some (Mina_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -631,8 +631,8 @@ let create_new_account_graphql =
                Deferred.return token_owner
            | None when Token_id.(equal default) token ->
                (* NOTE: Doesn't matter who we say the owner is for the default
-                  token, arbitrarily choose the receiver.
-               *)
+                        token, arbitrarily choose the receiver.
+                  *)
                Deferred.return receiver
            | None -> (
                let%map token_owner =
@@ -737,7 +737,7 @@ let cancel_transaction_graphql =
            int_of_string nonce
          in
          let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int
+           Mina_numbers.Account_nonce.to_int
              (Signed_command.nonce user_command)
          in
          let inferred_nonce =
@@ -767,7 +767,7 @@ let cancel_transaction_graphql =
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
-                  (Coda_numbers.Account_nonce.to_uint32
+                  (Mina_numbers.Account_nonce.to_uint32
                      (Signed_command.nonce user_command)))
              ()
          in
@@ -1349,7 +1349,7 @@ let create_hd_account =
              (response#createHDAccount)#public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
-           (Coda_numbers.Hd_index.to_string hd_index)
+           (Mina_numbers.Hd_index.to_string hd_index)
            pk_string ))
 
 let unlock_account =
@@ -1422,18 +1422,18 @@ let generate_libp2p_keypair =
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
-            Coda_net2.create ~logger ~conf_dir:tmpd
+            Mina_net2.create ~logger ~conf_dir:tmpd
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
           with
           | Ok net ->
-              let%bind me = Coda_net2.Keypair.random net in
-              let%bind () = Coda_net2.shutdown net in
+              let%bind me = Mina_net2.Keypair.random net in
+              let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
                   me
               in
-              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
                 ~metadata:[("error", Error_json.error_to_yojson e)] ;
@@ -1527,8 +1527,8 @@ let add_peers_graphql =
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
                match
-                 Coda_net2.Multiaddr.of_string peer
-                 |> Coda_net2.Multiaddr.to_peer
+                 Mina_net2.Multiaddr.of_string peer
+                 |> Mina_net2.Multiaddr.to_peer
                  |> Option.map ~f:Network_peer.Peer.to_display
                with
                | Some peer ->
@@ -1729,7 +1729,7 @@ let archive_precomputed_blocks =
            | None ->
                (* Send the requests over GraphQL. *)
                let block =
-                 Coda_transition.External_transition.Precomputed_block
+                 Mina_transition.External_transition.Precomputed_block
                  .to_yojson block
                  |> Yojson.Safe.to_basic
                in
@@ -1756,7 +1756,7 @@ let archive_precomputed_blocks =
                  |> Deferred.return
                in
                let%bind precomputed_block =
-                 Coda_transition.External_transition.Precomputed_block
+                 Mina_transition.External_transition.Precomputed_block
                  .of_yojson precomputed_block_json
                  |> Result.map_error ~f:(fun err ->
                         Error.tag_arg (Error.of_string err)

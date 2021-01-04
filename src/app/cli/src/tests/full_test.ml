@@ -4,12 +4,12 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
 open Pipe_lib
 open O1trace
 open Init
-open Coda_numbers
+open Mina_numbers
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -175,7 +175,7 @@ let run_test () : unit Deferred.t =
       in
       let fee n =
         Currency.Fee.of_int
-          (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + n)
+          (Currency.Fee.to_int Mina_compile_config.minimum_user_command_fee + n)
       in
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
@@ -224,7 +224,7 @@ let run_test () : unit Deferred.t =
       let balance_change_or_timeout ~initial_receiver_balance receiver_id =
         let cond t =
           match
-            Coda_commands.get_balance t receiver_id
+            Mina_commands.get_balance t receiver_id
             |> Participating_state.active_exn
           with
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
@@ -237,7 +237,7 @@ let run_test () : unit Deferred.t =
       in
       let assert_balance account_id amount =
         match
-          Coda_commands.get_balance coda account_id
+          Mina_commands.get_balance coda account_id
           |> Participating_state.active_exn
         with
         | Some balance ->
@@ -258,8 +258,8 @@ let run_test () : unit Deferred.t =
       (* No proof emitted by the parallel scan at the begining *)
       assert (Option.is_none @@ Mina_lib.staged_ledger_ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
-       *       payment replays being prohibited
-      *)
+         *       payment replays being prohibited
+        *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
@@ -284,7 +284,7 @@ let run_test () : unit Deferred.t =
       in
       let assert_ok x = ignore (Or_error.ok_exn x) in
       let send_payment (payment : User_command_input.t) =
-        Coda_commands.setup_and_submit_user_command coda payment
+        Mina_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
         |> Deferred.map ~f:Or_error.join
       in
@@ -298,11 +298,11 @@ let run_test () : unit Deferred.t =
         in
         let prev_sender_balance =
           Option.value_exn
-            ( Coda_commands.get_balance coda sender_id
+            ( Mina_commands.get_balance coda sender_id
             |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
-          Coda_commands.get_balance coda receiver_id
+          Mina_commands.get_balance coda receiver_id
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
@@ -310,7 +310,7 @@ let run_test () : unit Deferred.t =
         assert_ok p1_res ;
         let user_cmd = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
-           because the nonce is wrong *)
+             because the nonce is wrong *)
         let payment' =
           build_payment
             ~nonce:(Signed_command.nonce user_cmd)
@@ -364,7 +364,7 @@ let run_test () : unit Deferred.t =
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
               receiver (f_amount i) acc
-              Coda_compile_config.minimum_user_command_fee )
+              Mina_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
         Mina_lib.best_protocol_state t
@@ -405,7 +405,7 @@ let run_test () : unit Deferred.t =
           (Public_key.compress receiver_keypair.public_key)
       in
       (*Need some accounts from the genesis ledger to test payment replays and
-        sending multiple payments*)
+          sending multiple payments*)
       let receiver_keypair =
         let receiver =
           Genesis_ledger.find_new_account_record_exn

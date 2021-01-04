@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Frontier_base
 module Database = Database
 
