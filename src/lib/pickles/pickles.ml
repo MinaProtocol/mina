@@ -1035,18 +1035,6 @@ module Make (Inputs : Inputs) = struct
     let module V = H4.To_vector (Vk) in
     lazy (V.f prev_varss_length (M.f steps_keys))
 
-  module Lazy_ (A : T0) = struct
-    type t = A.t Lazy.t
-  end
-
-  module Lazy_keys = struct
-    type t =
-      (Impls.Step.Proving_key.t * Dirty.t) Lazy.t
-      * (Marlin_plonk_bindings.Pasta_fp_verifier_index.t * Dirty.t) Lazy.t
-
-    (* TODO Think this is right.. *)
-  end
-
   let compile :
          cache:Key_cache.Spec.t list
       -> unit
@@ -1064,34 +1052,21 @@ module Make (Inputs : Inputs) = struct
     let cache_handle = ref (Lazy.return `Cache_hit) in
     let accum_dirty t = cache_handle := Cache_handle.(!cache_handle + t) in
     Timer.clock __LOC__ ;
-    let step_keypairs =
+    let () =
       let module M =
-        H4.Map
+        H4.Iter
           (Step_keys_m)
-          (E04 (Lazy_keys))
           (struct
             let f (type prev_vars prev_values widths heights)
                 (( module
                   Step ) :
-                  (prev_vars, prev_values, widths, heights) Step_keys_m.t) :
-                Lazy_keys.t =
+                  (prev_vars, prev_values, widths, heights) Step_keys_m.t) =
               Step.Keys.use_key_cache cache ;
-              let pk, vk = Step.Keys.read_or_generate_from_cache cache in
-              let pk =
-                Lazy.map pk
-                  ~f:
-                    (Tuple.T2.map_fst ~f:(fun (x : Step.Keys.Proving.t) ->
-                         (x :> Impls.Step.Proving_key.t) ))
+              let pk_cache, vk_cache =
+                Step.Keys.read_or_generate_from_cache cache
               in
-              let vk =
-                Lazy.map vk
-                  ~f:
-                    (Tuple.T2.map_fst ~f:(fun (x : Step.Keys.Verification.t) ->
-                         (x :> Impls.Step.Verification_key.t) ))
-              in
-              accum_dirty (Lazy.map pk ~f:snd) ;
-              accum_dirty (Lazy.map vk ~f:snd) ;
-              (pk, vk)
+              accum_dirty (Lazy.map pk_cache ~f:snd) ;
+              accum_dirty (Lazy.map vk_cache ~f:snd)
           end)
       in
       M.f steps_keys
@@ -1175,10 +1150,8 @@ module Make (Inputs : Inputs) = struct
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
     let module S = Step.Make (A) (A_value) (Max_branching) in
     let provers =
-      let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
       let f : type prev_vars prev_values local_widths local_heights.
-             (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
-          -> Lazy_keys.t
+             (prev_vars, prev_values, local_widths, local_heights) Step_keys_m.t
           -> ?handler:(   Snarky_backendless.Request.request
                        -> Snarky_backendless.Request.response)
           -> ( prev_values
@@ -1187,17 +1160,21 @@ module Make (Inputs : Inputs) = struct
              H3.T(Statement_with_proof).t
           -> A_value.t
           -> (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t =
-       fun (T b as branch_data) (step_pk, step_vk) ->
+       fun (module Step) ->
+        let (T b as branch_data) = Step.branch_data in
+        let step_pk = Step.Keys.Proving.registered_key_lazy in
+        let step_vk = Step.Keys.Verification.registered_key_lazy in
+        let step_pk = (step_pk :> Impls.Step.Proving_key.t Lazy.t) in
+        let step_vk = (step_vk :> Impls.Step.Verification_key.t Lazy.t) in
         let (module Requests) = b.requests in
         let _, prev_vars_length = b.branching in
         let step handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
             ~self ~step_domains ~self_dlog_plonk_index:wrap_vk.commitments
-            (fst (Lazy.force step_pk))
-            wrap_vk.index prevs
+            (Lazy.force step_pk) wrap_vk.index prevs
         in
-        let pairing_vk = fst (Lazy.force step_vk) in
+        let pairing_vk = Lazy.force step_vk in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           let prevs =
@@ -1246,22 +1223,16 @@ module Make (Inputs : Inputs) = struct
         wrap
       in
       let rec go : type xs1 xs2 xs3 xs4.
-             (xs1, xs2, xs3, xs4) H4.T(Branch_data).t
-          -> (xs1, xs2, xs3, xs4) H4.T(E04(Lazy_keys)).t
+             (xs1, xs2, xs3, xs4) H4.T(Step_keys_m).t
           -> ( xs2
              , xs3
              , xs4
              , A_value.t
              , (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t )
              H3_2.T(Prover).t =
-       fun bs ks ->
-        match (bs, ks) with
-        | [], [] ->
-            []
-        | b :: bs, k :: ks ->
-            f b k :: go bs ks
+       fun bs -> match bs with [] -> [] | b :: bs -> f b :: go bs
       in
-      go step_data step_keypairs
+      go steps_keys
     in
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
