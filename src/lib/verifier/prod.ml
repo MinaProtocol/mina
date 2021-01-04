@@ -299,7 +299,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         in
         let new_worker =
           let%bind res = Process.wait process in
-          [%log info] "prover successfully stopped"
+          [%log info] "verifier successfully stopped"
             ~metadata:
               [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
               ; ("exit_status", `String (Unix.Exit_or_signal.to_string_hum res))

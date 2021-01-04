@@ -2,5 +2,7 @@ module T = Nat.Make32 ()
 
 include T
 
-(* Needs to be string not int since we use unsigned uint32 *)
+(* while we could use an int encoding for yojson (an OCaml int is 63-bits)
+   we've committed to a string encoding
+*)
 include Codable.Make_of_string (T)
