@@ -1035,6 +1035,90 @@ module Make (Inputs : Inputs) = struct
     let module V = H4.To_vector (Vk) in
     lazy (V.f prev_varss_length (M.f steps_keys))
 
+  module Wrap_keys = struct
+    let requests, main =
+      Timer.clock __LOC__ ;
+      let prev_wrap_domains =
+        let module M =
+          H4.Map
+            (IR)
+            (H4.T
+               (E04 (Domains)))
+               (struct
+                 let f : type a b c d.
+                     (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
+                  fun rule ->
+                   let module M =
+                     H4.Map
+                       (Tag)
+                       (E04 (Domains))
+                       (struct
+                         let f (type a b c d) (t : (a, b, c, d) Tag.t) :
+                             Domains.t =
+                           Types_map.lookup_map t ~self:self.id
+                             ~default:wrap_domains ~f:(function
+                             | `Compiled d ->
+                                 d.wrap_domains
+                             | `Side_loaded _ ->
+                                 Common.wrap_domains )
+                       end)
+                   in
+                   M.f rule.Inductive_rule.prevs
+               end)
+        in
+        M.f choices
+      in
+      Timer.clock __LOC__ ;
+      Wrap_main.wrap_main full_signature prev_varss_length step_vk_commitments
+        step_widths step_domains prev_wrap_domains
+        (module Max_branching)
+
+    let constraint_system =
+      let open Impls.Wrap in
+      lazy
+        (let (T (typ, conv)) = input () in
+         let main x () : unit = main (conv x) in
+         let () = if debug then Debug.log_wrap main typ name self.id in
+         constraint_system ~exposing:[typ] main)
+
+    let constraint_system_digest =
+      Lazy.map ~f:Impls.Wrap.R1CS_constraint_system.digest constraint_system
+
+    let constraint_system_hash =
+      Lazy.map ~f:Md5.to_hex constraint_system_digest
+
+    module Keys = struct
+      module Proving = struct
+        let kind =
+          {Snark_keys_header.Kind.type_= "wrap-proving-key"; identifier= name}
+
+        let header_template =
+          Lazy.map constraint_system_hash ~f:(fun cs_hash ->
+              snark_keys_header kind cs_hash )
+
+        let cache_key =
+          let%map.Lazy.Let_syntax cs = constraint_system
+          and header = header_template in
+          (Type_equal.Id.uid self.id, header, cs)
+      end
+
+      module Verification = struct
+        let kind =
+          { Snark_keys_header.Kind.type_= "wrap-verification-key"
+          ; identifier= name }
+
+        let header_template =
+          Lazy.map constraint_system_hash ~f:(fun cs_hash ->
+              snark_keys_header kind cs_hash )
+
+        let cache_key =
+          let%map.Lazy.Let_syntax cs_hash = constraint_system_digest
+          and header = header_template in
+          (Type_equal.Id.uid self.id, header, cs_hash)
+      end
+    end
+  end
+
   let compile :
          cache:Key_cache.Spec.t list
       -> unit
@@ -1072,70 +1156,12 @@ module Make (Inputs : Inputs) = struct
       M.f steps_keys
     in
     Timer.clock __LOC__ ;
-    let wrap_requests, wrap_main =
-      Timer.clock __LOC__ ;
-      let prev_wrap_domains =
-        let module M =
-          H4.Map
-            (IR)
-            (H4.T
-               (E04 (Domains)))
-               (struct
-                 let f : type a b c d.
-                     (a, b, c, d) IR.t -> (a, b, c, d) H4.T(E04(Domains)).t =
-                  fun rule ->
-                   let module M =
-                     H4.Map
-                       (Tag)
-                       (E04 (Domains))
-                       (struct
-                         let f (type a b c d) (t : (a, b, c, d) Tag.t) :
-                             Domains.t =
-                           Types_map.lookup_map t ~self:self.id
-                             ~default:wrap_domains ~f:(function
-                             | `Compiled d ->
-                                 d.wrap_domains
-                             | `Side_loaded _ ->
-                                 Common.wrap_domains )
-                       end)
-                   in
-                   M.f rule.Inductive_rule.prevs
-               end)
-        in
-        M.f choices
-      in
-      Timer.clock __LOC__ ;
-      Wrap_main.wrap_main full_signature prev_varss_length step_vk_commitments
-        step_widths step_domains prev_wrap_domains
-        (module Max_branching)
-    in
-    Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
-      let main x () : unit = wrap_main (conv x) in
-      let () = if debug then Debug.log_wrap main typ name self.id in
-      let self_id = Type_equal.Id.uid self.id in
-      let disk_key_prover =
-        lazy
-          (let cs = constraint_system ~exposing:[typ] main in
-           let cs_hash = Md5.to_hex (R1CS_constraint_system.digest cs) in
-           ( self_id
-           , snark_keys_header
-               {type_= "wrap-proving-key"; identifier= name}
-               cs_hash
-           , cs ))
-      in
-      let disk_key_verifier =
-        lazy
-          (let id, _header, cs = Lazy.force disk_key_prover in
-           let digest = R1CS_constraint_system.digest cs in
-           ( id
-           , snark_keys_header
-               {type_= "wrap-verification-key"; identifier= name}
-               (Md5.to_hex digest)
-           , digest ))
-      in
+      let main x () : unit = Wrap_keys.main (conv x) in
+      let disk_key_prover = Wrap_keys.Keys.Proving.cache_key in
+      let disk_key_verifier = Wrap_keys.Keys.Verification.cache_key in
       let r =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate
@@ -1207,8 +1233,9 @@ module Make (Inputs : Inputs) = struct
           in
           let%map.Async proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
-              wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
-              A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
+              Wrap_keys.requests ~dlog_plonk_index:wrap_vk.commitments
+              Wrap_keys.main A_value.to_field_elements ~pairing_vk
+              ~step_domains:b.domains
               ~pairing_plonk_indices:step_vk_commitments ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
               proof
