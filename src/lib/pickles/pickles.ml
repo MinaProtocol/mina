@@ -1388,25 +1388,29 @@ module Make (Inputs : Inputs) = struct
       M.f steps_keys
     in
     Timer.clock __LOC__ ;
-    let (wrap_pk, wrap_vk), disk_key =
+    let disk_key =
       let open Impls.Wrap in
       let (T (typ, conv)) = input () in
       let main x () : unit = Wrap_keys.main (conv x) in
       let disk_key_prover = Wrap_keys.Keys.Proving.cache_key in
       let disk_key_verifier = Wrap_keys.Keys.Verification.cache_key in
-      let r =
+      Wrap_keys.Keys.use_key_cache cache ;
+      let wrap_pk, wrap_vk =
         Common.time "wrap read or generate " (fun () ->
             Cache.Wrap.read_or_generate
               (Vector.to_array step_domains)
               cache disk_key_prover disk_key_verifier typ main )
       in
-      (r, disk_key_verifier)
+      Timer.clock __LOC__ ;
+      accum_dirty (Lazy.map wrap_pk ~f:snd) ;
+      accum_dirty (Lazy.map wrap_vk ~f:snd) ;
+      disk_key_verifier
     in
-    Timer.clock __LOC__ ;
-    accum_dirty (Lazy.map wrap_pk ~f:snd) ;
-    accum_dirty (Lazy.map wrap_vk ~f:snd) ;
-    let wrap_vk = Lazy.map wrap_vk ~f:fst in
     let module S = Step.Make (A) (A_value) (Max_branching) in
+    let wrap_vk =
+      ( Wrap_keys.Keys.Verification.registered_key_lazy
+        :> Verification_key.t Lazy.t )
+    in
     let provers =
       let f : type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Step_keys_m.t
@@ -1435,6 +1439,10 @@ module Make (Inputs : Inputs) = struct
         let pairing_vk = Lazy.force step_vk in
         let wrap ?handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
+          let wrap_pk =
+            ( Wrap_keys.Keys.Proving.registered_key_lazy
+              :> Impls.Wrap.Proving_key.t Lazy.t )
+          in
           let prevs =
             let module M =
               H3.Map (Statement_with_proof) (P.With_data)
@@ -1469,8 +1477,7 @@ module Make (Inputs : Inputs) = struct
               Wrap_keys.main A_value.to_field_elements ~pairing_vk
               ~step_domains:b.domains
               ~pairing_plonk_indices:step_vk_commitments ~wrap_domains
-              (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
-              proof
+              (Lazy.force wrap_pk) proof
           in
           Proof.T
             { proof with
