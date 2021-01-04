@@ -990,98 +990,7 @@ module Make (Inputs : Inputs) = struct
     let module V = H4.To_vector (Vk) in
     lazy (V.f prev_varss_length (M.f steps_keys))
 
-  module type Wrap_keys = sig
-    val requests : (Max_branching.n, maxes_ns) Requests.Wrap.t
-
-    val main :
-         ( Impls.Wrap_impl.field Snarky_backendless.Cvar.t
-         , Impls.Wrap_impl.Field.t Pickles_types.Scalar_challenge.t
-         , Wrap_main.Other_field.Packed.t Pickles_types.Shifted_value.t
-         , Impls.Wrap_impl.Field.t (* Unused *)
-         , Impls.Wrap_impl.Field.t
-         , Impls.Wrap_impl.Field.t
-         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
-         , ( Impls.Wrap_impl.Field.t Wrap_main.SC.t
-             Import.Types.Bulletproof_challenge.t
-           , Nat.z Backend.Tick.Rounds.plus_n )
-           Pickles_types.Vector.t
-         , Impls.Wrap_impl.field Snarky_backendless.Cvar.t )
-         Dlog_based.Statement.In_circuit.t
-      -> unit
-
-    val constraint_system : Impls.Wrap.R1CS_constraint_system.t Lazy.t
-
-    val constraint_system_digest : Md5.t Lazy.t
-
-    val constraint_system_hash : string Lazy.t
-
-    module Keys : sig
-      module Proving : sig
-        type t = private Tock.Proving_key.t
-
-        val header_template : Snark_keys_header.t Lazy.t
-
-        val cache_key : Cache.Wrap.Key.Proving.t Lazy.t
-
-        val check_header : string -> Snark_keys_header.t Or_error.t
-
-        val read_with_header : string -> (Snark_keys_header.t * t) Or_error.t
-
-        val write_with_header : string -> t -> unit Or_error.t
-
-        (** Set or get the [registered_key]. This is implicitly called by
-            [use_key_cache]; care should be taken to ensure that this is not
-            set when that will also be called.
-        *)
-        val registered_key : t Lazy.t Set_once.t
-
-        (** Lazy proxy to the [registered_key] value. *)
-        val registered_key_lazy : t Lazy.t
-
-        val of_raw_key : Tock.Proving_key.t -> t
-      end
-
-      module Verification : sig
-        type t = private Verification_key.t
-
-        val header_template : Snark_keys_header.t Lazy.t
-
-        val cache_key : Cache.Wrap.Key.Verification.t Lazy.t
-
-        val check_header : string -> Snark_keys_header.t Or_error.t
-
-        val read_with_header : string -> (Snark_keys_header.t * t) Or_error.t
-
-        val write_with_header : string -> t -> unit Or_error.t
-
-        (** Set or get the [registered_key]. This is implicitly called by
-            [use_key_cache]; care should be taken to ensure that this is not
-            set when that will also be called.
-        *)
-        val registered_key : t Lazy.t Set_once.t
-
-        (** Lazy proxy to the [registered_key] value. *)
-        val registered_key_lazy : t Lazy.t
-
-        val of_raw_key : Verification_key.t -> t
-      end
-
-      val generate : unit -> Proving.t * Verification.t
-
-      val read_or_generate_from_cache :
-           Key_cache.Spec.t list
-        -> (Proving.t * Dirty.t) Lazy.t * (Verification.t * Dirty.t) Lazy.t
-
-      (** Register the key cache as the source for the keys.
-          This may be called instead of setting [Proving.registered_key] and
-          [Verification.registered_key].
-          If either key has already been registered, this function will fail
-      *)
-      val use_key_cache : Key_cache.Spec.t list -> unit
-    end
-  end
-
-  module Wrap_keys : Wrap_keys = struct
+  module Wrap_keys = struct
     let requests, main =
       Timer.clock __LOC__ ;
       let prev_wrap_domains =
@@ -1387,8 +1296,7 @@ module Make (Inputs : Inputs) = struct
 
               let prove =
                 let wrap_vk =
-                  ( Wrap_keys.Keys.Verification.registered_key_lazy
-                    :> Verification_key.t Lazy.t )
+                  Wrap_keys.Keys.Verification.registered_key_lazy
                 in
                 let (T b as branch_data) = Step.branch_data in
                 let step_pk = Step.Keys.Proving.registered_key_lazy in
@@ -1402,10 +1310,7 @@ module Make (Inputs : Inputs) = struct
                 let pairing_vk = Lazy.force step_vk in
                 let wrap ?handler prevs next_state =
                   let wrap_vk = Lazy.force wrap_vk in
-                  let wrap_pk =
-                    ( Wrap_keys.Keys.Proving.registered_key_lazy
-                      :> Impls.Wrap.Proving_key.t Lazy.t )
-                  in
+                  let wrap_pk = Wrap_keys.Keys.Proving.registered_key_lazy in
                   let prevs =
                     let module M =
                       H3.Map (Statement_with_proof) (P.With_data)
@@ -1463,6 +1368,56 @@ module Make (Inputs : Inputs) = struct
     in
     M.f steps_keys
 
+  let data : _ Types_map.Compiled.t =
+    let wrap_vk = Wrap_keys.Keys.Verification.registered_key_lazy in
+    { branches= Branches.n
+    ; branchings= step_widths
+    ; max_branching= (module Max_branching)
+    ; typ
+    ; value_to_field_elements= A_value.to_field_elements
+    ; var_to_field_elements= A.to_field_elements
+    ; wrap_key= Lazy.map wrap_vk ~f:Verification_key.commitments
+    ; wrap_vk= Lazy.map wrap_vk ~f:Verification_key.index
+    ; wrap_domains
+    ; step_domains }
+
+  let () =
+    Timer.clock __LOC__ ;
+    Types_map.add_exn self data
+
+  module P = Proof
+
+  module Proof = ( val let T = Max_branching.eq in
+                       ( module struct
+                         type statement = A_value.t
+
+                         module Max_local_max_branching = Max_branching
+                         module Max_branching_vec = Nvector (Max_branching)
+                         include Proof.Make
+                                   (Max_branching)
+                                   (Max_local_max_branching)
+
+                         let verification_key =
+                           Wrap_keys.Keys.Verification.registered_key_lazy
+
+                         let id = Wrap_keys.Keys.Verification.cache_key
+
+                         let verify ts =
+                           verify
+                             (module Max_branching)
+                             (module A_value)
+                             (Lazy.force verification_key)
+                             ts
+
+                         let statement (T p : t) =
+                           p.statement.pass_through.app_state
+                       end )
+                     : Proof_intf
+                     with type t = (Max_branching.n, Max_branching.n) Proof.t
+                      and type statement = A_value.t )
+
+  let verify = Proof.verify
+
   let compile :
          cache:Key_cache.Spec.t list
       -> unit
@@ -1470,7 +1425,7 @@ module Make (Inputs : Inputs) = struct
          , widthss
          , heightss
          , A_value.t
-         , (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t )
+         , (Max_branching.n, Max_branching.n) P.t Async.Deferred.t )
          H3_2.T(Prover).t
          * _
          * _
@@ -1519,10 +1474,7 @@ module Make (Inputs : Inputs) = struct
       disk_key_verifier
     in
     let module S = Step.Make (A) (A_value) (Max_branching) in
-    let wrap_vk =
-      ( Wrap_keys.Keys.Verification.registered_key_lazy
-        :> Verification_key.t Lazy.t )
-    in
+    let wrap_vk = Wrap_keys.Keys.Verification.registered_key_lazy in
     let provers =
       let rec go : type xs1 xs2 xs3 xs4.
              (xs1, xs2, xs3, xs4) H4.T(Steps_m).t
@@ -1530,7 +1482,7 @@ module Make (Inputs : Inputs) = struct
              , xs3
              , xs4
              , A_value.t
-             , (Max_branching.n, Max_branching.n) Proof.t Async.Deferred.t )
+             , (Max_branching.n, Max_branching.n) P.t Async.Deferred.t )
              H3_2.T(Prover).t =
        fun bs ->
         match bs with [] -> [] | (module Step) :: bs -> Step.prove :: go bs
@@ -1538,21 +1490,11 @@ module Make (Inputs : Inputs) = struct
       go steps
     in
     Timer.clock __LOC__ ;
-    let data : _ Types_map.Compiled.t =
-      { branches= Branches.n
-      ; branchings= step_widths
-      ; max_branching= (module Max_branching)
-      ; typ
-      ; value_to_field_elements= A_value.to_field_elements
-      ; var_to_field_elements= A.to_field_elements
-      ; wrap_key= Lazy.map wrap_vk ~f:Verification_key.commitments
-      ; wrap_vk= Lazy.map wrap_vk ~f:Verification_key.index
-      ; wrap_domains
-      ; step_domains }
-    in
-    Timer.clock __LOC__ ;
-    Types_map.add_exn self data ;
     (provers, wrap_vk, disk_key, !cache_handle)
+
+  let use_cache cache =
+    let _, _, _, cache_handle = compile ~cache () in
+    cache_handle
 end
 
 module Side_loaded = struct
