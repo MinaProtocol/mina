@@ -16,10 +16,10 @@ spec:
         app: {{tpl .Values.coordinator.fullname .}}
         testnet: {{ .Values.testnetName }}
         role: snark-coordinator
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 }}
+        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: '10000'
+        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
@@ -34,7 +34,6 @@ spec:
           "-log-level", "Debug",
           "-log-json",
           "-config-directory", "/root/.coda-config",
-          "-log-received-blocks", "true",
           "-log-snark-work-gossip", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -56,11 +55,11 @@ spec:
         - name: "RAYON_NUM_THREADS"
           value: "7"
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coordinator.ports.graphql | quote }}
+          value: {{ .Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coordinator.ports.p2p | quote }}
+          value: {{ .Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coordinator.ports.metrics | quote }}
+          value: {{ .Values.coda.ports.metrics | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CODA_SNARK_KEY
@@ -68,23 +67,23 @@ spec:
         - name: CODA_SNARK_FEE
           value: {{ .Values.coordinator.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coordinator.ports.external | quote }}
+          value: {{ .Values.coda.ports.p2p | quote }}
         - name: WORK_SELECTION
           value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
         ports:
-        - name: p2p-port
+        - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coordinator.ports.p2p }}
+          containerPort: {{ .Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coordinator.ports.graphql }}
+          containerPort: {{ .Values.coda.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coordinator.ports.metrics }}
+          containerPort: {{ .Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coordinator.ports.external }}
-          hostPort: {{ .Values.coordinator.ports.external }}
+          containerPort: {{ .Values.coda.ports.p2p }}
+          hostPort: {{ .Values.coda.ports.p2p }}
 {{- include "healthcheck.snarkCoordinator.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
       {{- if .Values.coda.runtimeConfig }}

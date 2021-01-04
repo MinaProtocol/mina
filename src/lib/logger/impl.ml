@@ -67,11 +67,15 @@ module Metadata = struct
 
   let of_yojson = Stable.Latest.of_yojson
 
+  let of_alist_exn = String.Map.of_alist_exn
+
   let mem = String.Map.mem
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
         String.Map.set acc ~key ~data )
+
+  let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
 end
 
 let global_metadata = ref []
@@ -320,12 +324,24 @@ let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     =
+  let global_metadata' =
+    let m = !global_metadata in
+    let key_cmp (k1, _) (k2, _) = String.compare k1 k2 in
+    match List.find_all_dups m ~compare:key_cmp with
+    | [] ->
+        m
+    | dups ->
+        ("$duplicated_keys", `List (List.map ~f:(fun (s, _) -> `String s) dups))
+        :: List.dedup_and_sort m ~compare:key_cmp
+  in
   { Message.timestamp= Time.now ()
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata=
-      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata
+      Metadata.extend
+        (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+        metadata
   ; event_id }
 
 let raw ({id; _} as t) msg =

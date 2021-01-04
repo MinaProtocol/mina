@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
+open Mina_base
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -75,7 +75,7 @@ let get_balance_graphql =
          match response#account with
          | Some account ->
              if Token_id.(equal default) token then
-               printf "Balance: %s coda\n"
+               printf "Balance: %s mina\n"
                  (Currency.Balance.to_formatted_string (account#balance)#total)
              else
                printf "Balance: %s tokens\n"
@@ -799,7 +799,7 @@ module Export_logs = struct
 
   let export_locally =
     let run ~tarfile ~conf_dir =
-      let open Coda_lib in
+      let open Mina_lib in
       let conf_dir = Conf_dir.compute_conf_dir conf_dir in
       fun () ->
         match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
@@ -827,7 +827,7 @@ let get_transaction_status =
                Daemon_rpcs.Get_transaction_status.rpc user_command port
                ~success:(fun status ->
                  sprintf !"Transaction status : %s\n"
-                 @@ Transaction_status.State.to_string status )
+                 @@ Transaction_inclusion_status.State.to_string status )
                ~error:(fun e ->
                  sprintf "Failed to get transaction status : %s"
                    (Error.to_string_hum e) )
@@ -866,36 +866,50 @@ let dump_keypair =
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
 
+let handle_dump_ledger_response ~json = function
+  | Error e ->
+      Daemon_rpcs.Client.print_rpc_error e
+  | Ok (Error e) ->
+      printf !"Ledger not found: %s\n" (Error.to_string_hum e)
+  | Ok (Ok accounts) ->
+      if json then (
+        Yojson.Safe.pretty_print Format.std_formatter
+          (Runtime_config.Accounts.to_yojson
+             (List.map accounts ~f:(fun a ->
+                  Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
+        printf "\n" )
+      else printf !"%{sexp:Account.t list}\n" accounts
+
 let dump_ledger =
   let sl_hash_flag =
     Command.Param.(
-      flag "staged-ledger-hash (default: hash of best staged ledger)"
-        ~doc:"STAGED-LEDGER-HASH Staged ledger hash" (optional string))
+      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+        (optional string))
   in
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 sl_hash_flag json_flag in
   Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (sl_hash, json) ->
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
-         let staged_ledger_hash =
-           Option.map sl_hash ~f:(fun s ->
-               Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp
-           )
-         in
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
-           staged_ledger_hash port
-         >>| function
-         | Error e ->
-             Daemon_rpcs.Client.print_rpc_error e
-         | Ok (Error e) ->
-             printf !"Ledger not found: %s\n" (Error.to_string_hum e)
-         | Ok (Ok accounts) ->
-             if json then
-               List.iter accounts ~f:(fun acct ->
-                   printf "%s\n"
-                     (Yojson.Safe.to_string
-                        (Account.Stable.Latest.to_yojson acct)) )
-             else printf !"%{sexp:Account.t list}\n" accounts ))
+         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
+         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
+         >>| handle_dump_ledger_response ~json ))
+
+let dump_staking_ledger =
+  let which =
+    let t =
+      Command.Param.Arg_type.of_alist_exn
+        [("current", Daemon_rpcs.Get_staking_ledger.Current); ("next", Next)]
+    in
+    Command.Param.(anon ("current|next" %: t))
+  in
+  Command.async ~summary:"Print either the staking or next epoch ledger"
+    (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)
+       ~f:(fun port (which, json) ->
+         (* TODO: allow input in Base58Check format: issue #3036 *)
+         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
+           port
+         >>| handle_dump_ledger_response ~json ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1011,7 +1025,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Coda_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_string
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id= w#work_id
@@ -1656,7 +1670,7 @@ let telemetry =
              List.iter all_telem_data ~f:(fun peer_telem_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Coda_networking.Rpcs.Get_telemetry_data
+                   @@ Mina_networking.Rpcs.Get_telemetry_data
                       .response_to_yojson peer_telem_data ) )
          | Error err ->
              printf "Failed to get telemetry data: %s\n%!"
@@ -1690,6 +1704,75 @@ let object_lifetime_statistics =
          | Error err ->
              printf "Failed to get object lifetime statistics: %s\n%!"
                (Error.to_string_hum err) ))
+
+let archive_precomputed_blocks =
+  let archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
+  let files =
+    Command.Param.anon
+      Command.Anons.(sequence ("FILES" %: Command.Param.string))
+  in
+  Command.async
+    ~summary:
+      "Archive a precomputed block from a file.\n\n\
+       If an archive address is given, this process will communicate with the \
+       archive node directly; otherwise it will communicate through the \
+       daemon over the rest-server"
+    (Cli_lib.Background_daemon.graphql_init
+       (Command.Param.both archive_process_location files)
+       ~f:(fun graphql_endpoint (archive_process_location, files) ->
+         let send_block block =
+           match archive_process_location with
+           | Some archive_process_location ->
+               (* Connect directly to the archive node. *)
+               Mina_lib.Archive_client.dispatch_precomputed_block
+                 archive_process_location block
+           | None ->
+               (* Send the requests over GraphQL. *)
+               let block =
+                 Coda_transition.External_transition.Precomputed_block
+                 .to_yojson block
+                 |> Yojson.Safe.to_basic
+               in
+               let%map _res =
+                 (* Don't catch this error: [query_exn] already handles
+                    printing etc.
+                 *)
+                 Graphql_client.query_exn
+                   (Graphql_queries.Archive_precomputed_block.make ~block ())
+                   graphql_endpoint
+               in
+               Ok ()
+         in
+         Deferred.List.iter files ~f:(fun path ->
+             match%map
+               let open Deferred.Or_error.Let_syntax in
+               let%bind precomputed_block_json =
+                 Or_error.try_with (fun () ->
+                     In_channel.with_file path ~f:(fun in_channel ->
+                         Yojson.Safe.from_channel in_channel ) )
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg err "Could not parse JSON from file" path
+                          String.sexp_of_t )
+                 |> Deferred.return
+               in
+               let%bind precomputed_block =
+                 Coda_transition.External_transition.Precomputed_block
+                 .of_yojson precomputed_block_json
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg (Error.of_string err)
+                          "Could not parse JSON as a precomputed block from \
+                           file"
+                          path String.sexp_of_t )
+                 |> Deferred.return
+               in
+               send_block precomputed_block
+             with
+             | Ok () ->
+                 Format.printf "Sent block to archive node from %s@." path
+             | Error err ->
+                 Format.eprintf
+                   "Failed to send block to archive node from %s. Error:@.%s@."
+                   path (Error.to_string_hum err) ) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1784,6 +1867,7 @@ let advanced =
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
+    ; ("dump-staking-ledger", dump_staking_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
@@ -1801,4 +1885,5 @@ let advanced =
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
-    ; ("object-lifetime-statistics", object_lifetime_statistics) ]
+    ; ("object-lifetime-statistics", object_lifetime_statistics)
+    ; ("archive-precomputed-blocks", archive_precomputed_blocks) ]

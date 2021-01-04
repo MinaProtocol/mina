@@ -52,7 +52,7 @@ let hashes =
 module Dummy = struct
   let loc = Ppxlib.Location.none
 
-  let base_proof_expr = Async.return [%expr Coda_base.Proof.blockchain_dummy]
+  let base_proof_expr = Async.return [%expr Mina_base.Proof.blockchain_dummy]
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
@@ -162,11 +162,11 @@ module Make_real () = struct
     let%map.Async compiled_values = compiled_values in
     [%expr
       Core.Binable.of_string
-        (module Coda_base.Proof.Stable.Latest)
+        (module Mina_base.Proof.Stable.Latest)
         [%e
           estring
             (Binable.to_string
-               (module Coda_base.Proof.Stable.Latest)
+               (module Mina_base.Proof.Stable.Latest)
                compiled_values.genesis_proof)]]
 end
 
@@ -209,7 +209,7 @@ let main () =
            ; genesis_epoch_data= Consensus.Genesis_epoch_data.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
-           ; genesis_proof= Coda_base.Proof.blockchain_dummy })
+           ; genesis_proof= Mina_base.Proof.blockchain_dummy })
 
       let key_hashes = [%e M.key_hashes]
 

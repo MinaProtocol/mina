@@ -7,7 +7,7 @@ same transgressions as the Coda network.
 
 ## Motivation
 
-There are several points in the code marked *TODO:punish*, but to
+There are several points in the code marked _TODO:punish_, but to
 date, there hasn't been a systematic review of how the behaviors at
 those points should contribute to ban scoring. A good scoring system
 should minimize the bad effects of malicious or buggy nodes, while
@@ -20,7 +20,7 @@ allowing honest nodes to remain active in the network.
 In Bitcoin, certain kinds of misbehavior increase a node's ban score.
 If a nodes score exceeds a threshold, by default equal to 100, the
 node is banned from the network. A node can be trustlisted, exempting
-it from such banning.  A node can also be manually banlisted even in
+it from such banning. A node can also be manually banlisted even in
 the absence of observable misbehavior.
 
 In the Bitcoin C++ implementation, there's an API "Misbehaving" to
@@ -51,10 +51,10 @@ For a score of 20:
 
 And a score of of 1:
 
- - missing "version" or "verack" messages, duplicate "version" message
+- missing "version" or "verack" messages, duplicate "version" message
 
 In several places in the code, the "DoS" value is checked, and if
-positive, it's added to the ban score.  The DoS score can be
+positive, it's added to the ban score. The DoS score can be
 incremented when a transaction is rejected. Many reasons for rejecting
 a transaction add 100 to the DoS value (too many to enumerate
 here). Those include items like transaction fees out of range, missing
@@ -82,6 +82,7 @@ datatype:
         | Trivial
   end
 ```
+
 A slightly finer gradation could be used, if desired. The banlisting system
 could translate these constructors into numerical scores. Let's call these
 constructors SEV, MOD, and TRV.
@@ -92,18 +93,18 @@ Let's classify those places where punishment has been flagged, and annotate
 them with suggested constructors:
 
 - in `bootstrap_controller.ml`, for bad proofs (SEV), and a validation error when
-    building a breadcrumb (SEV)
-- in `coda_networking.ml`, when an invalid staged ledger hash is received (SEV), or
-    when a transition sender does not return ancestors (MOD)
+  building a breadcrumb (SEV)
+- in `mina_networking.ml`, when an invalid staged ledger hash is received (SEV), or
+  when a transition sender does not return ancestors (MOD)
 - in `ledger_catchup.ml`, when a root hash can't be found (SEV), or a peer returns an empty list
-    of transitions (instead of `None`) (TRV)
+  of transitions (instead of `None`) (TRV)
 - in `linked_tree.ml`, for peers requesting nonexistent ancestor paths (MOD)
 - in `parallel_scan.ml`, in `update_new_job` for unneeded merges (?) (SEV)
 - in `staged_ledger.ml`, when a bad signature is encountered when applying a pre-diff (SEV)
 - in `syncable_ledger.ml`, in `num_accounts`, when a content hash doesn't match a stored root hash (SEV),
-    and in `main_loop`, when a child hash can't be added (MOD)
+  and in `main_loop`, when a child hash can't be added (MOD)
 - in `catchup_scheduler.ml` and `processor.ml`, when a breadcrumb can't be built from a
-    transition (SEV) (same failure as in `bootstrap_controller.ml`, above)
+  transition (SEV) (same failure as in `bootstrap_controller.ml`, above)
 - in `ledger_catchup.ml`, a transition could not be validated (SEV)
 - in `transaction_pool.ml`, a payment check fails (SEV)
 
@@ -138,7 +139,7 @@ flagged with `TODO` or `faulty_peer`. There may be other code
 locations where punishment is warranted.
 
 In the current code, there are often calls to the logger where
-punishment is mentioned in a `TODO`.  There could be an API that calls
+punishment is mentioned in a `TODO`. There could be an API that calls
 the logger and the banlist API, to guarantee there's an inspectible
 history leading to a ban score.
 

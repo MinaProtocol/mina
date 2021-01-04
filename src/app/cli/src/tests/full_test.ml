@@ -3,7 +3,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Signature_lib
 open Pipe_lib
@@ -110,27 +110,6 @@ let run_test () : unit Deferred.t =
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
-      let%bind receipt_chain_dir_name =
-        Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
-      in
-      let%bind transaction_database_dir =
-        Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
-      in
-      trace_database_initialization "transaction_database" __LOC__
-        receipt_chain_dir_name ;
-      let transaction_database =
-        Auxiliary_database.Transaction_database.create ~logger
-          transaction_database_dir
-      in
-      let%bind external_transition_database_dir =
-        Async.Unix.mkdtemp (temp_conf_dir ^/ "external_transition_database")
-      in
-      trace_database_initialization "external_transition_database" __LOC__
-        external_transition_database_dir ;
-      let external_transition_database =
-        Auxiliary_database.External_transition_database.create ~logger
-          external_transition_database_dir
-      in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let epoch_ledger_location = temp_conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
@@ -166,10 +145,12 @@ let run_test () : unit Deferred.t =
               ; libp2p_port
               ; client_port }
           ; trust_system
+          ; max_connections= 50
+          ; validation_queue_size= 150
           ; keypair= None }
       in
       let net_config =
-        Coda_networking.Config.
+        Mina_networking.Config.
           { logger
           ; trust_system
           ; time_controller
@@ -183,7 +164,7 @@ let run_test () : unit Deferred.t =
               ; transaction_pool_diff= false
               ; new_state= false }
           ; creatable_gossip_net=
-              Coda_networking.Gossip_net.(
+              Mina_networking.Gossip_net.(
                 Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
           }
       in
@@ -199,9 +180,10 @@ let run_test () : unit Deferred.t =
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
+      let start_time = Time.now () in
       let%bind coda =
-        Coda_lib.create
-          (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
+        Mina_lib.create
+          (Mina_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
              ~gossip_net_params ~is_seed:true ~disable_telemetry:true
              ~initial_protocol_version:Protocol_version.zero
@@ -210,7 +192,7 @@ let run_test () : unit Deferred.t =
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_config:
-               Coda_lib.Config.Snark_worker_config.
+               Mina_lib.Config.Snark_worker_config.
                  { initial_snark_worker_key=
                      Some
                        (Public_key.compress largest_account_keypair.public_key)
@@ -221,16 +203,16 @@ let run_test () : unit Deferred.t =
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~epoch_ledger_location ~time_controller ~snark_work_fee
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~work_reassignment_wait:420000
-             ~precomputed_values ())
+             ~consensus_local_state ~work_reassignment_wait:420000
+             ~precomputed_values ~start_time ~log_precomputed_blocks:false
+             ~upload_blocks_to_gcloud:false ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
-           (Coda_lib.validated_transitions coda)
+           (Mina_lib.validated_transitions coda)
            ~f:ignore) ;
-      let%bind () = Ivar.read @@ Coda_lib.initialization_finish_signal coda in
-      let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout_min : Float.t) =
+      let%bind () = Ivar.read @@ Mina_lib.initialization_finish_signal coda in
+      let wait_until_cond ~(f : Mina_lib.t -> bool) ~(timeout_min : Float.t) =
         let rec go () =
           if f coda then return ()
           else
@@ -270,11 +252,11 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Account_id.t}" account_id)
       in
       Coda_run.setup_local_server coda ;
-      let%bind () = Coda_lib.start coda in
+      let%bind () = Mina_lib.start coda in
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)
-      assert (Option.is_none @@ Coda_lib.staged_ledger_ledger_proof coda) ;
+      assert (Option.is_none @@ Mina_lib.staged_ledger_ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
        *       payment replays being prohibited
       *)
@@ -385,12 +367,12 @@ let run_test () : unit Deferred.t =
               Coda_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
-        Coda_lib.best_protocol_state t
+        Mina_lib.best_protocol_state t
         |> Participating_state.active_exn |> Protocol_state.consensus_state
         |> Consensus.Data.Consensus_state.blockchain_length
       in
       let wait_for_proof_or_timeout timeout_min () =
-        let cond t = Option.is_some @@ Coda_lib.staged_ledger_ledger_proof t in
+        let cond t = Option.is_some @@ Mina_lib.staged_ledger_ledger_proof t in
         wait_until_cond ~f:cond ~timeout_min
       in
       let test_multiple_payments accounts ~txn_count timeout_min =
@@ -407,7 +389,7 @@ let run_test () : unit Deferred.t =
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
         let%map () = wait_for_proof_or_timeout timeout_min () in
-        assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
+        assert (Option.is_some @@ Mina_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
             let account_id = Account_id.create key Token_id.default in
             assert_balance account_id data ) ;

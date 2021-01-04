@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 
 (* do not expose refer to types in here directly; use allocation functor version instead *)

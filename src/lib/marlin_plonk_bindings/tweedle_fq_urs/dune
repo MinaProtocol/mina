@@ -8,4 +8,5 @@
    marlin_plonk_bindings_tweedle_fq
    marlin_plonk_bindings_tweedle_dum)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version)))
+ (inline_tests)
+ (preprocess (pps ppx_version ppx_inline_test)))

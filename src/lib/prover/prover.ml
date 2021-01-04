@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Coda_state
 open Coda_transition
 open Blockchain_snark
@@ -178,7 +178,7 @@ module Worker_state = struct
                  Deferred.return
                  @@ Ok
                       (Blockchain_snark.Blockchain.create
-                         ~proof:Coda_base.Proof.blockchain_dummy
+                         ~proof:Mina_base.Proof.blockchain_dummy
                          ~state:next_state)
 
                let verify _ _ = true
@@ -381,7 +381,7 @@ let prove t ~prev_state ~prev_state_proof ~next_state
       (Internal_transition.prover_state transition)
       pending_coinbase
   in
-  Coda_metrics.(
+  Mina_metrics.(
     Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   Blockchain_snark.Blockchain.proof chain

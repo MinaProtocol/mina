@@ -1,6 +1,6 @@
 open Async_kernel
 open Core_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 
 module Validate_content = struct
@@ -98,7 +98,7 @@ Raw_versioned__.
   , set_validation_callback )]
 
 [%%define_locally
-Stable.V1.(create, sexp_of_t, t_of_sexp)]
+Stable.Latest.(create, sexp_of_t, t_of_sexp)]
 
 type external_transition = t
 
@@ -112,6 +112,135 @@ type t_ = Raw_versioned__.t =
   ; proposed_protocol_version_opt: Protocol_version.t option
   ; mutable validation_callback: Validate_content.t }
 *)
+
+module Precomputed_block = struct
+  module Proof = struct
+    type t = Proof.t
+
+    let to_bin_string proof =
+      let proof_string =
+        Binable.to_string (module Proof.Stable.Latest) proof
+      in
+      (* We use base64 with the uri-safe alphabet to ensure that encoding and
+         decoding is cheap, and that the proof can be easily sent over http
+         etc. without escaping or re-encoding.
+      *)
+      Base64.encode_string ~alphabet:Base64.uri_safe_alphabet proof_string
+
+    let of_bin_string str =
+      let str = Base64.decode_exn ~alphabet:Base64.uri_safe_alphabet str in
+      Binable.of_string (module Proof.Stable.Latest) str
+
+    let sexp_of_t proof = Sexp.Atom (to_bin_string proof)
+
+    let _sexp_of_t_structured = Proof.sexp_of_t
+
+    (* Supports decoding base64-encoded and structure encoded proofs. *)
+    let t_of_sexp = function
+      | Sexp.Atom str ->
+          of_bin_string str
+      | sexp ->
+          Proof.t_of_sexp sexp
+
+    let to_yojson proof = `String (to_bin_string proof)
+
+    let _to_yojson_structured = Proof.to_yojson
+
+    let of_yojson = function
+      | `String str ->
+          Or_error.try_with (fun () -> of_bin_string str)
+          |> Result.map_error ~f:(fun err ->
+                 sprintf
+                   "External_transition.Precomputed_block.Proof.of_yojson: %s"
+                   (Error.to_string_hum err) )
+      | json ->
+          Proof.of_yojson json
+  end
+
+  module T = struct
+    type t =
+      { scheduled_time: Block_time.t
+      ; protocol_state: Protocol_state.value
+      ; protocol_state_proof: Proof.t
+      ; staged_ledger_diff: Staged_ledger_diff.t
+      ; delta_transition_chain_proof:
+          Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+    [@@deriving sexp, yojson]
+  end
+
+  include T
+
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = T.t =
+        { scheduled_time: Block_time.Stable.V1.t
+        ; protocol_state: Protocol_state.Value.Stable.V1.t
+        ; protocol_state_proof: Mina_base.Proof.Stable.V1.t
+        ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+        ; delta_transition_chain_proof:
+            Frozen_ledger_hash.Stable.V1.t
+            * Frozen_ledger_hash.Stable.V1.t list }
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let of_external_transition ~scheduled_time (t : external_transition) =
+    { scheduled_time
+    ; protocol_state= t.protocol_state
+    ; protocol_state_proof= t.protocol_state_proof
+    ; staged_ledger_diff= t.staged_ledger_diff
+    ; delta_transition_chain_proof= t.delta_transition_chain_proof }
+
+  (* NOTE: This serialization is used externally and MUST NOT change.
+     If the underlying types change, you should write a conversion, or add
+     optional fields and handle them appropriately.
+  *)
+  let%test_unit "Sexp serialization is stable" =
+    let serialized_block =
+      External_transition_sample_precomputed_block.sample_block_sexp
+    in
+    ignore @@ t_of_sexp @@ Sexp.of_string serialized_block
+
+  let%test_unit "Sexp serialization roundtrips" =
+    let serialized_block =
+      External_transition_sample_precomputed_block.sample_block_sexp
+    in
+    let sexp = Sexp.of_string serialized_block in
+    let sexp_roundtrip = sexp_of_t @@ t_of_sexp sexp in
+    [%test_eq: Sexp.t] sexp sexp_roundtrip
+
+  (* NOTE: This serialization is used externally and MUST NOT change.
+     If the underlying types change, you should write a conversion, or add
+     optional fields and handle them appropriately.
+  *)
+  let%test_unit "JSON serialization is stable" =
+    let serialized_block =
+      External_transition_sample_precomputed_block.sample_block_json
+    in
+    match of_yojson @@ Yojson.Safe.from_string serialized_block with
+    | Ok _ ->
+        ()
+    | Error err ->
+        failwith err
+
+  let%test_unit "JSON serialization roundtrips" =
+    let serialized_block =
+      External_transition_sample_precomputed_block.sample_block_json
+    in
+    let json = Yojson.Safe.from_string serialized_block in
+    let json_roundtrip =
+      match Result.map ~f:to_yojson @@ of_yojson json with
+      | Ok json ->
+          json
+      | Error err ->
+          failwith err
+    in
+    assert (Yojson.Safe.equal json json_roundtrip)
+end
 
 let consensus_state = Fn.compose Protocol_state.consensus_state protocol_state
 
@@ -131,7 +260,18 @@ let consensus_time_produced_at =
 let global_slot =
   Fn.compose Consensus.Data.Consensus_state.curr_global_slot consensus_state
 
-let block_producer = Fn.compose Staged_ledger_diff.creator staged_ledger_diff
+let block_producer =
+  Fn.compose Consensus.Data.Consensus_state.block_creator consensus_state
+
+let coinbase_receiver =
+  Fn.compose Consensus.Data.Consensus_state.coinbase_receiver consensus_state
+
+let supercharge_coinbase =
+  Fn.compose Consensus.Data.Consensus_state.supercharge_coinbase
+    consensus_state
+
+let block_winner =
+  Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
 
 let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
 
@@ -154,7 +294,16 @@ let equal =
 
 let transactions ~constraint_constants t =
   let open Staged_ledger.Pre_diff_info in
-  match get_transactions ~constraint_constants (staged_ledger_diff t) with
+  let coinbase_receiver =
+    Consensus.Data.Consensus_state.coinbase_receiver (consensus_state t)
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase (consensus_state t)
+  in
+  match
+    get_transactions ~constraint_constants ~coinbase_receiver
+      ~supercharge_coinbase (staged_ledger_diff t)
+  with
   | Ok transactions ->
       transactions
   | Error e ->
@@ -730,6 +879,12 @@ module With_validation = struct
 
   let block_producer t = lift block_producer t
 
+  let block_winner t = lift block_winner t
+
+  let coinbase_receiver t = lift coinbase_receiver t
+
+  let supercharge_coinbase t = lift supercharge_coinbase t
+
   let commands t = lift commands t
 
   let transactions ~constraint_constants t =
@@ -896,6 +1051,9 @@ module Validated = struct
     , parent_hash
     , consensus_time_produced_at
     , block_producer
+    , block_winner
+    , coinbase_receiver
+    , supercharge_coinbase
     , transactions
     , commands
     , payments
@@ -926,16 +1084,13 @@ let genesis ~precomputed_values =
   let protocol_state_proof =
     Precomputed_values.genesis_proof precomputed_values
   in
-  let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; commands= []
-          ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-        , None )
-    ; creator
-    ; coinbase_receiver= creator
-    ; supercharge_coinbase= false }
+          ; coinbase= Staged_ledger_diff.At_most_two.Zero
+          ; internal_command_balances= [] }
+        , None ) }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -983,13 +1138,13 @@ struct
       ~logger ~frontier =
     let open Result.Let_syntax in
     let hash = With_hash.hash t in
-    let protocol_state = protocol_state (With_hash.data t) in
-    let parent_hash = Protocol_state.previous_state_hash protocol_state in
-    let root_protocol_state =
+    let root_transition =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.validated_transition
-      |> Validated.protocol_state
+      |> Validation.forget_validation_with_hash
     in
+    let protocol_state = protocol_state (With_hash.data t) in
+    let parent_hash = Protocol_state.previous_state_hash protocol_state in
     let%bind () =
       Result.ok_if_true
         (Transition_frontier.find frontier hash |> Option.is_none)
@@ -1007,8 +1162,8 @@ struct
                    , `String
                        "External_transition.Transition_frontier_validation.validate_frontier_dependencies"
                    ) ])
-            ~existing:(Protocol_state.consensus_state root_protocol_state)
-            ~candidate:(Protocol_state.consensus_state protocol_state) )
+            ~existing:(With_hash.map ~f:consensus_state root_transition)
+            ~candidate:(With_hash.map ~f:consensus_state t) )
         ~error:`Not_selected_over_frontier_root
     in
     let%map () =
@@ -1066,6 +1221,11 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
+    let coinbase_receiver = coinbase_receiver transition in
+    let supercharge_coinbase =
+      consensus_state transition
+      |> Consensus.Data.Consensus_state.supercharge_coinbase
+    in
     let apply_start_time = Core.Time.now () in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
@@ -1082,6 +1242,7 @@ module Staged_ledger_validation = struct
            in
            ( Protocol_state.hash_with_body parent_protocol_state ~body_hash
            , body_hash ))
+        ~coinbase_receiver ~supercharge_coinbase
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

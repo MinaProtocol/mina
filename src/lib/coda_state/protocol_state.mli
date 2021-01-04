@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Snark_params.Tick
 
 module Poly : sig
@@ -123,7 +123,7 @@ val consensus_state : (_, (_, _, 'a, _) Body.t) Poly.t -> 'a
 val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one :
-     genesis_ledger:Coda_base.Ledger.t Lazy.t
+     genesis_ledger:Mina_base.Ledger.t Lazy.t
   -> genesis_epoch_data:Consensus.Genesis_epoch_data.t
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t

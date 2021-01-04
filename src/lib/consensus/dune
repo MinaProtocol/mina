@@ -3,12 +3,11 @@
  (public_name consensus)
  (inline_tests)
  (modules (:standard \ proof_of_stake_fuzzer))
- (flags (-w -37))
  (library_flags (-linkall))
  (libraries
    snarky_taylor
    core_kernel
-   coda_base
+   mina_base
    block_time
    with_hash
    test_genesis_ledger
@@ -21,7 +20,7 @@
    global_signer_private_key
    non_zero_curve_point
    yojson
-   coda_metrics
+   mina_metrics
    graphql_lib
    inline_test_quiet_logs)
  (preprocessor_deps "../../config.mlh")

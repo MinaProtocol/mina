@@ -3,7 +3,7 @@
 
 open Core
 open Async
-open Coda_base
+open Mina_base
 open Cli_lib
 open Signature_lib
 open Init
@@ -222,6 +222,29 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
+  and max_connections =
+    flag "max-connections"
+      ~doc:
+        (Printf.sprintf
+           "NN max number of connections that this peer will have to \
+            neighbors in the gossip network. Tuning this higher will \
+            strengthen your connection to the network in exchange for using \
+            more RAM (default: %d)"
+           Cli_lib.Default.max_connections)
+      (optional int)
+  and validation_queue_size =
+    flag "validation-queue-size"
+      ~doc:
+        (Printf.sprintf
+           "NN size of the validation queue in the p2p network used to buffer \
+            messages (like blocks and transactions received on the gossip \
+            network) while validation is pending. If a transaction, for \
+            example, is invalid, we don't forward the message on the gossip \
+            net. If this queue is too small, we will drop messages without \
+            validating them. If it is too large, we are susceptible to DoS \
+            attacks on memory. (default: %d)"
+           Cli_lib.Default.validation_queue_size)
+      (optional int)
   and direct_peers_raw =
     flag "direct-peer"
       ~doc:
@@ -275,10 +298,25 @@ let setup_daemon logger =
     flag "proof-level"
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
       ~doc:"full|check|none"
-  and plugins = plugin_flag in
+  and plugins = plugin_flag
+  and precomputed_blocks_path =
+    flag "precomputed-blocks-file" (optional string)
+      ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
+  and log_precomputed_blocks =
+    flag "log-precomputed-blocks"
+      (optional_with_default true bool)
+      ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and upload_blocks_to_gcloud =
+    flag "upload-blocks-to-gcloud"
+      (optional_with_default false bool)
+      ~doc:
+        "true|false upload blocks to gcloud storage. Requires the environment \
+         variables GCLOUD_KEYFILE, NETWORK_NAME, and \
+         GCLOUD_BLOCK_UPLOAD_BUCKET"
+  in
   fun () ->
     let open Deferred.Let_syntax in
-    let conf_dir = Coda_lib.Conf_dir.compute_conf_dir conf_dir in
+    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
@@ -309,13 +347,12 @@ let setup_daemon logger =
       [ ("commit", `String Coda_version.commit_id)
       ; ("branch", `String Coda_version.branch)
       ; ("commit_date", `String Coda_version.commit_date)
-      ; ("marlin_commit", `String Coda_version.marlin_commit_id)
-      ; ("zexe_commit", `String Coda_version.zexe_commit_id) ]
+      ; ("marlin_commit", `String Coda_version.marlin_commit_id) ]
     in
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:version_metadata ;
-    let%bind () = Coda_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
+    let%bind () = Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[("exp", `String daemon_expiry)] ;
@@ -652,7 +689,7 @@ let setup_daemon logger =
           ~default:true log_block_creation
       in
       let log_gossip_heard =
-        { Coda_networking.Config.snark_pool_diff= log_received_snark_pool_diff
+        { Mina_networking.Config.snark_pool_diff= log_received_snark_pool_diff
         ; transaction_pool_diff= log_transaction_pool_diff
         ; new_state= true }
       in
@@ -782,7 +819,7 @@ let setup_daemon logger =
           [%log debug]
             ~metadata:[("long_async_cycle", `Float secs)]
             "Long async cycle, $long_async_cycle seconds" ;
-          Coda_metrics.(
+          Mina_metrics.(
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
           ) ;
       Stream.iter
@@ -800,7 +837,7 @@ let setup_daemon logger =
                              (Execution_context.backtrace_history context)
                              2))) ) ]
             "Long async job, $long_async_job seconds" ;
-          Coda_metrics.(
+          Mina_metrics.(
             Runtime.Long_job_histogram.observe Runtime.long_async_job secs) ) ;
       let trace_database_initialization typ location =
         (* can't use %log ppx here, because we're using the passed-in location *)
@@ -872,6 +909,14 @@ let setup_daemon logger =
       let direct_peers =
         List.map ~f:Coda_net2.Multiaddr.of_string direct_peers_raw
       in
+      let max_connections =
+        or_from_config YJ.Util.to_int_option "max-connections"
+          ~default:Cli_lib.Default.max_connections max_connections
+      in
+      let validation_queue_size =
+        or_from_config YJ.Util.to_int_option "validation-queue-size"
+          ~default:Cli_lib.Default.validation_queue_size validation_queue_size
+      in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers then
@@ -897,11 +942,13 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
           ; peer_exchange= Option.value ~default:false peer_exchange
+          ; max_connections
+          ; validation_queue_size
           ; isolate= Option.value ~default:false isolate
           ; keypair= libp2p_keypair }
       in
       let net_config =
-        { Coda_networking.Config.logger
+        { Mina_networking.Config.logger
         ; trust_system
         ; time_controller
         ; consensus_local_state
@@ -910,49 +957,13 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         ; log_gossip_heard
         ; is_seed
         ; creatable_gossip_net=
-            Coda_networking.Gossip_net.(
+            Mina_networking.Gossip_net.(
               Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
         }
       in
-      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-      let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-      let transaction_database_dir = conf_dir ^/ "transaction" in
-      let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
-      let transaction_database =
-        Auxiliary_database.Transaction_database.create ~logger
-          transaction_database_dir
-      in
-      trace_database_initialization "transaction_database" __LOC__
-        transaction_database_dir ;
-      let external_transition_database_dir =
-        conf_dir ^/ "external_transition_database"
-      in
-      let%bind external_transition_database =
-        let create_db () =
-          let%map () =
-            Async.Unix.mkdir ~p:() external_transition_database_dir
-          in
-          Auxiliary_database.External_transition_database.create ~logger
-            external_transition_database_dir
-        in
-        match%bind Deferred.Or_error.try_with create_db with
-        | Ok res ->
-            return res
-        | Error err ->
-            [%log warn]
-              "Encountered an error $err while creating the external \
-               transition database. Retrying."
-              ~metadata:[("err", Error_json.error_to_yojson err)] ;
-            let%bind () =
-              File_system.remove_dir external_transition_database_dir
-            in
-            create_db ()
-      in
-      trace_database_initialization "external_transition_database" __LOC__
-        external_transition_database_dir ;
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
-      let coinbase_receiver =
+      let coinbase_receiver : Consensus.Coinbase_receiver.t =
         Option.value_map coinbase_receiver_flag ~default:`Producer
           ~f:(fun pk -> `Other pk)
       in
@@ -965,9 +976,10 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
         Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
           proposed_protocol_version
       in
+      let start_time = Time.now () in
       let%map coda =
-        Coda_lib.create ~wallets
-          (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
+        Mina_lib.create ~wallets
+          (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
              ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
              ~net_config ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
@@ -976,7 +988,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
                (Cli_lib.Arg_type.work_selection_method_to_module
                   work_selection_method)
              ~snark_worker_config:
-               { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
+               { Mina_lib.Config.Snark_worker_config.initial_snark_worker_key=
                    run_snark_worker_flag
                ; shutdown_on_disconnect= true
                ; num_threads= snark_worker_parallelism_flag }
@@ -987,15 +999,15 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~persistent_frontier_location:(conf_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
              ~time_controller ~initial_block_production_keypairs ~monitor
-             ~consensus_local_state ~transaction_database
-             ~external_transition_database ~is_archive_rocksdb
-             ~work_reassignment_wait ~archive_process_location
-             ~log_block_creation ~precomputed_values ())
+             ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
+             ~archive_process_location ~log_block_creation ~precomputed_values
+             ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
+             ~upload_blocks_to_gcloud ())
       in
       {Coda_initialization.coda; client_trustlist; rest_server_port}
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
-    let coda_ref : Coda_lib.t option ref = ref None in
+    let coda_ref : Mina_lib.t option ref = ref None in
     Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
       ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
@@ -1007,13 +1019,13 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
     (*This pipe is consumed only by integration tests*)
     don't_wait_for
       (Pipe_lib.Strict_pipe.Reader.iter_without_pushback
-         (Coda_lib.validated_transitions coda)
+         (Mina_lib.validated_transitions coda)
          ~f:ignore) ;
     Coda_run.setup_local_server ?client_trustlist ~rest_server_port
       ~insecure_rest_server coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
-          Coda_metrics.server ~port ~logger >>| ignore )
+          Mina_metrics.server ~port ~logger >>| ignore )
       |> Option.value ~default:Deferred.unit
     in
     let () = Coda_plugins.init_plugins ~logger coda plugins in
@@ -1025,7 +1037,7 @@ let daemon logger =
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
          let%bind coda = setup_daemon () in
-         let%bind () = Coda_lib.start coda in
+         let%bind () = Mina_lib.start coda in
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ))
 
@@ -1035,26 +1047,49 @@ let replay_blocks logger =
     flag "-blocks-filename" (required string)
       ~doc:"PATH The file to read the precomputed blocks from"
   in
+  let read_kind =
+    let open Command.Param in
+    flag "-format" (optional string)
+      ~doc:"json|sexp The format to read lines of the file in (default: json)"
+  in
   Command.async ~summary:"Start coda daemon with blocks replayed from a file"
-    (Command.Param.map2 replay_flag (setup_daemon logger)
-       ~f:(fun blocks_filename setup_daemon () ->
+    (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
+       ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
          Block_time.Controller.enable_setting_offset () ;
+         let read_block_line =
+           match Option.map ~f:String.lowercase read_kind with
+           | Some "json" | None -> (
+               fun line ->
+                 match
+                   Yojson.Safe.from_string line
+                   |> Coda_transition.External_transition.Precomputed_block
+                      .of_yojson
+                 with
+                 | Ok block ->
+                     block
+                 | Error err ->
+                     failwithf "Could not read block: %s" err () )
+           | Some "sexp" ->
+               fun line ->
+                 Sexp.of_string_conv_exn line
+                   Coda_transition.External_transition.Precomputed_block
+                   .t_of_sexp
+           | _ ->
+               failwith "Expected one of 'json', 'sexp' for -format flag"
+         in
          let blocks =
            Sequence.unfold ~init:(In_channel.create blocks_filename)
              ~f:(fun blocks_file ->
                match In_channel.input_line blocks_file with
                | Some line ->
-                   Some
-                     ( Sexp.of_string_conv_exn line
-                         Block_producer.Precomputed_block.t_of_sexp
-                     , blocks_file )
+                   Some (read_block_line line, blocks_file)
                | None ->
                    In_channel.close blocks_file ;
                    None )
          in
          let%bind coda = setup_daemon () in
-         let%bind () = Coda_lib.start_with_precomputed_blocks coda blocks in
+         let%bind () = Mina_lib.start_with_precomputed_blocks coda blocks in
          [%log info]
            "Daemon ready, replayed precomputed blocks. Clients can now connect" ;
          Async.never () ))
@@ -1351,14 +1386,12 @@ let coda_commands logger =
         ; (module Coda_restart_node_test)
         ; (module Coda_restarts_and_txns_holy_grail)
         ; (module Coda_bootstrap_test)
-        ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
         ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
-        ; (module Coda_archive_node_test)
         ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in

@@ -286,7 +286,7 @@ yy yy ...    #     (little endian) (same represenation as above Fq.t above)
              #
 A4 43 D4 ... # the bool list compacted into a bitstring, pad the last 1 byte with
              # extra zeros on the right if necessary
-             
+
 // Note: Edited on 8/18 to include 4-byte length of bits in the bitstring to remove any ambiguity between the zero-padding and true zeros in the bitstring
 ```
 
@@ -389,7 +389,7 @@ The combine endpoint [encodes the signed transaction](#encoded-signed-transactio
 
 [via Hash](#hash)
 
-The hash endpoint takes the signed transaction and returns the hash. This can be done by pulling in `Coda_base` into Rosetta and calling hash on the transaction.
+The hash endpoint takes the signed transaction and returns the hash. This can be done by pulling in `Mina_base` into Rosetta and calling hash on the transaction.
 
 #### Audit transaction broadcast
 
