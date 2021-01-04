@@ -3,9 +3,9 @@ open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Pipe_lib.Strict_pipe
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type Structured_log_events.t += Bootstrap_complete
@@ -557,7 +557,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       [ ("time_elapsed", time_to_yojson time_elapsed)
       ; ( "bootstrap_stats"
         , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) ) ] ;
-  Coda_metrics.(
+  Mina_metrics.(
     Gauge.set Bootstrap.bootstrap_time_ms
       Core.Time.(Span.to_ms @@ time_elapsed)) ;
   result
@@ -748,7 +748,7 @@ let%test_module "Bootstrap_controller tests" =
           let open Result.Let_syntax in
           let%map () =
             Result.ok_if_true
-              Coda_numbers.Length.(
+              Mina_numbers.Length.(
                 blockchain_length max_acc <= blockchain_length transition)
               ~error:
                 (Error.of_string

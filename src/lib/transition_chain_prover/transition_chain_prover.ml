@@ -1,14 +1,14 @@
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_chain_prover_intf
+  Mina_intf.Transition_chain_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 

@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Frontier_base
 module Database = Database
 
@@ -63,14 +63,14 @@ let construct_staged_ledger_at_root
                txn.data
            in
            let computed_status =
-             Ledger.Undo.user_command_status txn_with_info
+             Ledger.Transaction_applied.user_command_status txn_with_info
            in
-           if User_command_status.equal txn.status computed_status then
+           if Transaction_status.equal txn.status computed_status then
              Or_error.return ()
            else
              Or_error.errorf
                !"Mismatched user command status. Expected: %{sexp: \
-                 User_command_status.t} Got: %{sexp: User_command_status.t}"
+                 Transaction_status.t} Got: %{sexp: Transaction_status.t}"
                txn.status computed_status )
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash

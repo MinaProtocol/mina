@@ -11,12 +11,12 @@
    transition_handler
    consensus
    core_kernel
-   coda_intf
+   mina_intf
    pipe_lib
    syncable_ledger
    merkle_address
    mina_base
-   coda_metrics
+   mina_metrics
    transition_chain_verifier
    mina_networking
    fake_network))

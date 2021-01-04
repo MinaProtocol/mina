@@ -1054,7 +1054,7 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
             let actual_status = cmd_with_status.With_status.status in
             let applied =
               match actual_status with
-              | User_command_status.Applied _ ->
+              | Transaction_status.Applied _ ->
                   true
               | _ ->
                   false
@@ -1077,11 +1077,11 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
                     , `String (Public_key.Compressed.to_string receiver) )
                   ; ("amount", `String (Currency.Amount.to_string amount))
                   ; ( "actual_user_command_status"
-                    , User_command_status.to_yojson actual_status ) ] ;
+                    , Transaction_status.to_yojson actual_status ) ] ;
               Error.raise
                 (Error.of_string
                    (sprintf "Unexpected status in matching payment: %s"
-                      ( User_command_status.to_yojson actual_status
+                      ( Transaction_status.to_yojson actual_status
                       |> Yojson.Safe.to_string ))) )
           else (
             [%log info]

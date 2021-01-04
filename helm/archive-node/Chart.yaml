@@ -2,14 +2,14 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.3.2
+version: 0.4.4
 appVersion: 1.16.0
 dependencies:
   - name: postgresql
     version: "*"
     repository: "https://charts.bitnami.com/bitnami"
   - name: common-utilities
-    version: 0.0.4
+    version: 0.0.7
     repository: "https://coda-charts.storage.googleapis.com"
 icon: https://github.com/MinaProtocol/mina/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
 keywords:

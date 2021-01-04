@@ -6,7 +6,7 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
-open Coda_state
+open Mina_state
 
 (* TODO: refactor to do compile time selection *)
 [%%if
@@ -192,7 +192,7 @@ let main () =
       let for_unit_tests =
         lazy
           (let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t
+             Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
                ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
                ~constraint_constants:
@@ -229,7 +229,7 @@ let main () =
                ~protocol_constants:genesis_constants.protocol
            in
            let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t
+             Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
                ~constraint_constants ~consensus_constants
            in

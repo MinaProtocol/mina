@@ -101,7 +101,7 @@ module type S = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * Coda_net2.Validation_callback.t )
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
@@ -116,13 +116,35 @@ end
 module type Transition_frontier_intf = sig
   type t
 
+  type staged_ledger
+
+  module Breadcrumb : sig
+    type t
+
+    val staged_ledger : t -> staged_ledger
+  end
+
+  type best_tip_diff
+
+  val best_tip : t -> Breadcrumb.t
+
+  val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
+
   val snark_pool_refcount_pipe :
        t
     -> (int * int Transaction_snark_work.Statement.Table.t)
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Transition_frontier : Transition_frontier_intf) = struct
+module Make
+    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+        type t
+
+        val ledger : t -> Base_ledger.t
+    end)
+    (Transition_frontier : Transition_frontier_intf
+                           with type staged_ledger := Staged_ledger.t) =
+struct
   module Resource_pool = struct
     module T = struct
       let label = "snark_pool"
@@ -136,14 +158,18 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
       end
 
       type transition_frontier_diff =
-        int * int Transaction_snark_work.Statement.Table.t
+        [ `New_refcount_table of
+          int * int Transaction_snark_work.Statement.Table.t
+        | `New_best_tip of Base_ledger.t ]
 
       type t =
         { snark_tables: Snark_tables.t
+        ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
         ; mutable ref_table: int Statement_table.t option
         ; config: Config.t
         ; logger: Logger.t sexp_opaque
         ; mutable removed_counter: int
+        ; account_creation_fee: Currency.Fee.t
               (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
         ; batcher: Batcher.Snark_pool.t }
       [@@deriving sexp]
@@ -155,9 +181,21 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
 
       let removed_breadcrumb_wait = 10
 
-      let of_serializable tables ~config ~logger : t =
+      let get_best_tip_ledger ~frontier_broadcast_pipe () =
+        Option.map (Broadcast_pipe.Reader.peek frontier_broadcast_pipe)
+          ~f:(fun tf ->
+            Transition_frontier.best_tip tf
+            |> Transition_frontier.Breadcrumb.staged_ledger
+            |> Staged_ledger.ledger )
+
+      let of_serializable tables ~constraint_constants ~frontier_broadcast_pipe
+          ~config ~logger : t =
         { snark_tables= Snark_tables.of_serializable tables
+        ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
         ; batcher= Batcher.Snark_pool.create config.verifier
+        ; account_creation_fee=
+            constraint_constants
+              .Genesis_constants.Constraint_constants.account_creation_fee
         ; ref_table= None
         ; config
         ; logger
@@ -198,24 +236,49 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
           | Some _ ->
               true )
 
-      let handle_transition_frontier_diff (removed, refcount_table) t =
-        t.ref_table <- Some refcount_table ;
-        t.removed_counter <- t.removed_counter + removed ;
-        if t.removed_counter < removed_breadcrumb_wait then return ()
-        else (
-          t.removed_counter <- 0 ;
-          Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
-            ~f:(fun work ->
-              (* Rebroadcastable should always be a subset of all. *)
-              assert (Hashtbl.mem t.snark_tables.all work) ;
-              work_is_referenced t work ) ;
-          Statement_table.filter_keys_inplace t.snark_tables.all
-            ~f:(work_is_referenced t) ;
-          return
-            (*when snark works removed from the pool*)
-            Coda_metrics.(
-              Gauge.set Snark_work.snark_pool_size
-                (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
+      let fee_is_sufficient t ~fee ~prover ~best_tip_ledger =
+        let open Mina_base in
+        Currency.Fee.(fee >= t.account_creation_fee)
+        ||
+        match best_tip_ledger with
+        | None ->
+            false
+        | Some l ->
+            Option.(
+              is_some
+                ( Base_ledger.location_of_account l
+                    (Account_id.create prover Token_id.default)
+                >>= Base_ledger.get l ))
+
+      let handle_transition_frontier_diff u t =
+        match u with
+        | `New_best_tip l ->
+            Statement_table.filteri_inplace t.snark_tables.all
+              ~f:(fun ~key ~data:{fee= {fee; prover}; _} ->
+                let keep =
+                  fee_is_sufficient t ~fee ~prover ~best_tip_ledger:(Some l)
+                in
+                if not keep then
+                  Hashtbl.remove t.snark_tables.rebroadcastable key ;
+                keep ) ;
+            return ()
+        | `New_refcount_table (removed, refcount_table) ->
+            t.ref_table <- Some refcount_table ;
+            t.removed_counter <- t.removed_counter + removed ;
+            if t.removed_counter < removed_breadcrumb_wait then return ()
+            else (
+              t.removed_counter <- 0 ;
+              Statement_table.filter_keys_inplace t.snark_tables.all
+                ~f:(fun k ->
+                  let keep = work_is_referenced t k in
+                  if not keep then
+                    Hashtbl.remove t.snark_tables.rebroadcastable k ;
+                  keep ) ;
+              return
+                (*when snark works removed from the pool*)
+                Mina_metrics.(
+                  Gauge.set Snark_work.snark_pool_size
+                    (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
 
       (*TODO? add referenced statements from the transition frontier to ref_table here otherwise the work referenced in the root and not in any of the successor blocks will never be included. This may not be required because the chances of a new block from the root is very low (root's existing successor is 1 block away from finality)*)
       let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
@@ -228,9 +291,19 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                 (* Start the count at the max so we flush after reconstructing
                    the transition_frontier *)
                 t.removed_counter <- removed_breadcrumb_wait ;
-                let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
-                Broadcast_pipe.Reader.iter pipe
-                  ~f:(Strict_pipe.Writer.write tf_diff_writer)
+                Broadcast_pipe.Reader.iter
+                  (Transition_frontier.snark_pool_refcount_pipe tf)
+                  ~f:(fun x ->
+                    Strict_pipe.Writer.write tf_diff_writer
+                      (`New_refcount_table x) )
+                |> Deferred.don't_wait_for ;
+                Broadcast_pipe.Reader.iter
+                  (Transition_frontier.best_tip_diff_pipe tf) ~f:(fun _ ->
+                    Strict_pipe.Writer.write tf_diff_writer
+                      (`New_best_tip
+                        ( Transition_frontier.best_tip tf
+                        |> Transition_frontier.Breadcrumb.staged_ledger
+                        |> Staged_ledger.ledger )) )
                 |> Deferred.don't_wait_for ;
                 return ()
             | None ->
@@ -239,17 +312,21 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~constraint_constants:_ ~consensus_constants:_
+      let create ~constraint_constants ~consensus_constants:_
           ~time_controller:_ ~frontier_broadcast_pipe ~config ~logger
           ~tf_diff_writer =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
               ; rebroadcastable= Statement_table.create () }
+          ; best_tip_ledger= get_best_tip_ledger ~frontier_broadcast_pipe
           ; batcher= Batcher.Snark_pool.create config.verifier
           ; logger
           ; config
           ; ref_table= None
+          ; account_creation_fee=
+              constraint_constants
+                .Genesis_constants.Constraint_constants.account_creation_fee
           ; removed_counter= removed_breadcrumb_wait }
         in
         listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t
@@ -264,7 +341,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
-          Diff.unsafe_apply which calls this function*)
+            Diff.unsafe_apply which calls this function*)
           Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
           if is_local then
             Hashtbl.set t.snark_tables.rebroadcastable ~key:work
@@ -275,10 +352,10 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                statement. *)
             Hashtbl.remove t.snark_tables.rebroadcastable work ;
           (*when snark work is added to the pool*)
-          Coda_metrics.(
+          Mina_metrics.(
             Gauge.set Snark_work.snark_pool_size
               (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
-          Coda_metrics.(
+          Mina_metrics.(
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
               ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
@@ -294,6 +371,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
           `Statement_not_referenced
 
       let verify_and_act t ~work ~sender =
+        let best_tip_ledger = t.best_tip_ledger () in
         let statements, priced_proof = work in
         let {Priced_proof.proof= proofs; fee= {prover; fee}} = priced_proof in
         let trust_record =
@@ -318,6 +396,9 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
           else Deferred.return ()
         in
         let message = Mina_base.Sok_message.create ~fee ~prover in
+        let prover_account_ok =
+          fee_is_sufficient t ~fee ~prover ~best_tip_ledger
+        in
         let verify proofs =
           let open Deferred.Let_syntax in
           let%bind statement_check =
@@ -337,7 +418,11 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
                   Error e )
           in
           let work = One_or_two.map proofs ~f:snd in
-          if not (work_is_referenced t work) then (
+          if not prover_account_ok then (
+            [%log' debug t.logger] "Prover did not have sufficient balance"
+              ~metadata:[] ;
+            return false )
+          else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
               ~metadata:
                 [ ( "stmt"
@@ -436,7 +521,7 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
             (Snark_tables.to_serializable t.snark_tables)
         in
         let elapsed = Time.(diff (now ()) before |> Span.to_ms) in
-        Coda_metrics.(
+        Mina_metrics.(
           Snark_work.Snark_pool_serialization_ms_histogram.observe
             Snark_work.snark_pool_serialization_ms elapsed) ;
         [%log' debug t.logger] "SNARK pool serialization took $time ms"
@@ -461,7 +546,8 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
       with
       | Ok snark_table ->
           let pool =
-            Resource_pool.of_serializable snark_table ~config ~logger
+            Resource_pool.of_serializable snark_table ~constraint_constants
+              ~config ~logger ~frontier_broadcast_pipe
           in
           let network_pool =
             of_resource_pool_and_diffs pool ~logger ~constraint_constants
@@ -480,12 +566,18 @@ module Make (Transition_frontier : Transition_frontier_intf) = struct
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
-include Make (struct
-  include Transition_frontier
+include Make (Mina_base.Ledger) (Staged_ledger)
+          (struct
+            include Transition_frontier
 
-  let snark_pool_refcount_pipe t =
-    Extensions.(get_view_pipe (extensions t) Snark_pool_refcount)
-end)
+            type best_tip_diff = Extensions.Best_tip_diff.view
+
+            let best_tip_diff_pipe t =
+              Extensions.(get_view_pipe (extensions t) Best_tip_diff)
+
+            let snark_pool_refcount_pipe t =
+              Extensions.(get_view_pipe (extensions t) Snark_pool_refcount)
+          end)
 
 module Diff_versioned = struct
   [%%versioned
@@ -521,7 +613,12 @@ let%test_module "random set test" =
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants = precomputed_values.constraint_constants
+    (* SNARK work is rejected if the prover doesn't have an account and the fee
+       is below the account creation fee. So, just to make generating valid SNARK
+       work easier for testing, we set the account creation fee to 0. *)
+    let constraint_constants =
+      { precomputed_values.constraint_constants with
+        account_creation_fee= Currency.Fee.zero }
 
     let consensus_constants = precomputed_values.consensus_constants
 
@@ -531,7 +628,9 @@ let%test_module "random set test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
-    module Mock_snark_pool = Make (Mocks.Transition_frontier)
+    module Mock_snark_pool =
+      Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
+        (Mocks.Transition_frontier)
     open Ledger_proof.For_tests
 
     let apply_diff resource_pool work
@@ -846,7 +945,7 @@ let%test_module "random set test" =
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
                    ( Envelope.Incoming.local work
-                   , Coda_net2.Validation_callback.create_without_expiration ()
+                   , Mina_net2.Validation_callback.create_without_expiration ()
                    ) )
             |> List.iter ~f:(fun diff ->
                    Strict_pipe.Writer.write pool_writer diff

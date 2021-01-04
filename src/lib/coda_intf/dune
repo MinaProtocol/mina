@@ -1,8 +1,0 @@
-(library
- (public_name coda_intf)
- (name coda_intf)
- (libraries core async_kernel currency truth gadt_lib
-            signature_lib cache_lib mina_base coda_state snark_work_lib
-            proof_carrying_data coda_incremental blockchain_snark transaction_snark coda_transition)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_deriving.std ppx_deriving_yojson)))

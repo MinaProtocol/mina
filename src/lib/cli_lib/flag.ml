@@ -297,7 +297,7 @@ let signed_command_common : signed_command_common Command.Param.t =
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
-              Coda_compile_config.default_transaction_fee)
+              Mina_compile_config.default_transaction_fee)
            (Currency.Fee.to_formatted_string
               Mina_base.Signed_command.minimum_fee))
       (optional txn_fee)
@@ -314,7 +314,7 @@ let signed_command_common : signed_command_common Command.Param.t =
       (optional string)
   in
   { sender
-  ; fee= Option.value fee ~default:Coda_compile_config.default_transaction_fee
+  ; fee= Option.value fee ~default:Mina_compile_config.default_transaction_fee
   ; nonce
   ; memo }
 
@@ -344,7 +344,7 @@ module Signed_command = struct
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
-              Coda_compile_config.default_transaction_fee)
+              Mina_compile_config.default_transaction_fee)
            (Currency.Fee.to_formatted_string
               Mina_base.Signed_command.minimum_fee))
       (optional txn_fee)

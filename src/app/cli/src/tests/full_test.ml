@@ -4,12 +4,12 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
 open Pipe_lib
 open O1trace
 open Init
-open Coda_numbers
+open Mina_numbers
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -175,15 +175,15 @@ let run_test () : unit Deferred.t =
       in
       let fee n =
         Currency.Fee.of_int
-          (Currency.Fee.to_int Coda_compile_config.minimum_user_command_fee + n)
+          (Currency.Fee.to_int Mina_compile_config.minimum_user_command_fee + n)
       in
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
       let start_time = Time.now () in
       let%bind coda =
-        Coda_lib.create
-          (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
+        Mina_lib.create
+          (Mina_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
              ~gossip_net_params ~is_seed:true ~disable_telemetry:true
              ~initial_protocol_version:Protocol_version.zero
@@ -192,7 +192,7 @@ let run_test () : unit Deferred.t =
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_config:
-               Coda_lib.Config.Snark_worker_config.
+               Mina_lib.Config.Snark_worker_config.
                  { initial_snark_worker_key=
                      Some
                        (Public_key.compress largest_account_keypair.public_key)
@@ -204,14 +204,15 @@ let run_test () : unit Deferred.t =
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
-             ~precomputed_values ~start_time ())
+             ~precomputed_values ~start_time ~log_precomputed_blocks:false
+             ~upload_blocks_to_gcloud:false ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
-           (Coda_lib.validated_transitions coda)
+           (Mina_lib.validated_transitions coda)
            ~f:ignore) ;
-      let%bind () = Ivar.read @@ Coda_lib.initialization_finish_signal coda in
-      let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout_min : Float.t) =
+      let%bind () = Ivar.read @@ Mina_lib.initialization_finish_signal coda in
+      let wait_until_cond ~(f : Mina_lib.t -> bool) ~(timeout_min : Float.t) =
         let rec go () =
           if f coda then return ()
           else
@@ -223,7 +224,7 @@ let run_test () : unit Deferred.t =
       let balance_change_or_timeout ~initial_receiver_balance receiver_id =
         let cond t =
           match
-            Coda_commands.get_balance t receiver_id
+            Mina_commands.get_balance t receiver_id
             |> Participating_state.active_exn
           with
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
@@ -236,7 +237,7 @@ let run_test () : unit Deferred.t =
       in
       let assert_balance account_id amount =
         match
-          Coda_commands.get_balance coda account_id
+          Mina_commands.get_balance coda account_id
           |> Participating_state.active_exn
         with
         | Some balance ->
@@ -251,14 +252,14 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Account_id.t}" account_id)
       in
       Coda_run.setup_local_server coda ;
-      let%bind () = Coda_lib.start coda in
+      let%bind () = Mina_lib.start coda in
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)
-      assert (Option.is_none @@ Coda_lib.staged_ledger_ledger_proof coda) ;
+      assert (Option.is_none @@ Mina_lib.staged_ledger_ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
-       *       payment replays being prohibited
-      *)
+         *       payment replays being prohibited
+        *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment ?nonce amount sender_sk receiver_pk fee =
@@ -283,7 +284,7 @@ let run_test () : unit Deferred.t =
       in
       let assert_ok x = ignore (Or_error.ok_exn x) in
       let send_payment (payment : User_command_input.t) =
-        Coda_commands.setup_and_submit_user_command coda payment
+        Mina_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
         |> Deferred.map ~f:Or_error.join
       in
@@ -297,11 +298,11 @@ let run_test () : unit Deferred.t =
         in
         let prev_sender_balance =
           Option.value_exn
-            ( Coda_commands.get_balance coda sender_id
+            ( Mina_commands.get_balance coda sender_id
             |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
-          Coda_commands.get_balance coda receiver_id
+          Mina_commands.get_balance coda receiver_id
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
@@ -309,7 +310,7 @@ let run_test () : unit Deferred.t =
         assert_ok p1_res ;
         let user_cmd = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
-           because the nonce is wrong *)
+             because the nonce is wrong *)
         let payment' =
           build_payment
             ~nonce:(Signed_command.nonce user_cmd)
@@ -363,15 +364,15 @@ let run_test () : unit Deferred.t =
             in
             send_payment_update_balance_sheet keypair.private_key sender_pk
               receiver (f_amount i) acc
-              Coda_compile_config.minimum_user_command_fee )
+              Mina_compile_config.minimum_user_command_fee )
       in
       let blockchain_length t =
-        Coda_lib.best_protocol_state t
+        Mina_lib.best_protocol_state t
         |> Participating_state.active_exn |> Protocol_state.consensus_state
         |> Consensus.Data.Consensus_state.blockchain_length
       in
       let wait_for_proof_or_timeout timeout_min () =
-        let cond t = Option.is_some @@ Coda_lib.staged_ledger_ledger_proof t in
+        let cond t = Option.is_some @@ Mina_lib.staged_ledger_ledger_proof t in
         wait_until_cond ~f:cond ~timeout_min
       in
       let test_multiple_payments accounts ~txn_count timeout_min =
@@ -388,7 +389,7 @@ let run_test () : unit Deferred.t =
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
         let%map () = wait_for_proof_or_timeout timeout_min () in
-        assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
+        assert (Option.is_some @@ Mina_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
             let account_id = Account_id.create key Token_id.default in
             assert_balance account_id data ) ;
@@ -404,7 +405,7 @@ let run_test () : unit Deferred.t =
           (Public_key.compress receiver_keypair.public_key)
       in
       (*Need some accounts from the genesis ledger to test payment replays and
-        sending multiple payments*)
+          sending multiple payments*)
       let receiver_keypair =
         let receiver =
           Genesis_ledger.find_new_account_record_exn

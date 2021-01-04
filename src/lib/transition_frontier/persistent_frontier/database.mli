@@ -10,7 +10,7 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Frontier_base
 
 type t
@@ -31,7 +31,9 @@ module Error : sig
 
   type not_found = [`Not_found of not_found_member]
 
-  type t = [not_found | `Invalid_version]
+  type raised = [`Raised of Error.t]
+
+  type t = [not_found | raised | `Invalid_version]
 
   val not_found_message : not_found -> string
 
@@ -58,7 +60,8 @@ val check :
             | `Root_transition
             | `Transition of State_hash.t
             | `Arcs of State_hash.t
-            | `Protocol_states_for_root_scan_state ] ] ] )
+            | `Protocol_states_for_root_scan_state ]
+         | `Raised of Core_kernel.Error.t ] ] )
      Result.t
 
 val initialize : t -> root_data:Root_data.Limited.t -> unit
@@ -95,7 +98,7 @@ val get_root : t -> (Root_data.Minimal.t, [> `Not_found of [> `Root]]) Result.t
 
 val get_protocol_states_for_root_scan_state :
      t
-  -> ( Coda_state.Protocol_state.value list
+  -> ( Mina_state.Protocol_state.value list
      , [> `Not_found of [> `Protocol_states_for_root_scan_state]] )
      Result.t
 

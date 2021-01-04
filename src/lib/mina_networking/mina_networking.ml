@@ -1,8 +1,8 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Network_peer
 open Network_pool
 open Pipe_lib
@@ -125,7 +125,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.t
           * Ledger_hash.t
           * Pending_coinbase.t
-          * Coda_state.Protocol_state.value list )
+          * Mina_state.Protocol_state.value list )
           option
       end
 
@@ -150,7 +150,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t
-          * Coda_state.Protocol_state.Value.Stable.V1.t list )
+          * Mina_state.Protocol_state.Value.Stable.V1.t list )
           option
         [@@deriving bin_io, version {rpc}]
 
@@ -545,7 +545,7 @@ module Rpcs = struct
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
-            ; uptime: string }
+            ; uptime_minutes: int }
           [@@deriving to_yojson]
 
           let to_latest = Fn.id
@@ -728,15 +728,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
       ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
@@ -1109,7 +1109,7 @@ let create (config : Config.t)
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
         block announcment).
-     *)
+  *)
   let received_gossips, online_notifier =
     Strict_pipe.Reader.Fork.two
       (Gossip_net.Any.received_message_reader gossip_net)
@@ -1123,7 +1123,7 @@ let create (config : Config.t)
     Strict_pipe.Reader.partition_map3 received_gossips
       ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
-        Coda_metrics.(Counter.inc_one Network.gossip_messages_received) ;
+        Mina_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"
@@ -1150,7 +1150,7 @@ let create (config : Config.t)
                   [%str_log debug]
                     (Snark_work_received
                        {work; sender= Envelope.Incoming.sender envelope}) ) ;
-            Coda_metrics.(
+            Mina_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
             `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
@@ -1356,7 +1356,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
             Trust_system.(
               record t.trust_system t.logger peer
                 Actions.
-                  ( Violated_protocol
+                  ( No_reply_from_preferred_peer
                   , Some ("When querying preferred peer, got no response", [])
                   ))
         | Local ->
@@ -1427,8 +1427,8 @@ let glue_sync_ledger :
                   %{sexp: Ledger_hash.t}"
                 peer (fst query) ;
               (* TODO : here is a place where an envelope could contain
-                    a Peer.t, and not just an IP address, if desired
-                 *)
+                a Peer.t, and not just an IP address, if desired
+            *)
               Some (Envelope.Incoming.wrap ~data:answer ~sender)
           | Connected {data= Ok (Error e); _} ->
               [%log' info t.logger]

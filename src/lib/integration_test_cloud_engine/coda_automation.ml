@@ -85,7 +85,8 @@ module Network_config = struct
     let user_sanitized =
       Str.global_replace (Str.regexp "\\W|_") "" user_from_env
     in
-    let user = String.sub user_sanitized ~pos:0 ~len:5 in
+    let user_len = Int.min 5 (String.length user_sanitized) in
+    let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let time_now = Unix.gmtime (Unix.gettimeofday ()) in
     let timestr =
       string_of_int time_now.tm_mday

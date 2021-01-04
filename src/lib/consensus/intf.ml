@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_numbers
+open Mina_numbers
 open Async
 open Currency
 open Signature_lib
@@ -256,6 +256,8 @@ module type State_hooks = sig
                                      , Mina_base.State_hash.t )
                                      With_hash.t
           -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+          -> coinbase_receiver:Public_key.Compressed.t
+          -> supercharge_coinbase:bool
           -> consensus_state)
          Quickcheck.Generator.t
   end
@@ -430,7 +432,7 @@ module type S = sig
 
       val end_time : constants:Constants.t -> t -> Block_time.t
 
-      val to_global_slot : t -> Coda_numbers.Global_slot.t
+      val to_global_slot : t -> Mina_numbers.Global_slot.t
 
       val zero : constants:Constants.t -> t
     end
@@ -446,7 +448,7 @@ module type S = sig
 
         module For_tests : sig
           val with_global_slot_since_genesis :
-            t -> Coda_numbers.Global_slot.t -> t
+            t -> Mina_numbers.Global_slot.t -> t
         end
       end
 
@@ -524,12 +526,12 @@ module type S = sig
 
       val curr_slot : Value.t -> Slot.t
 
-      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
+      val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 
-      val global_slot_since_genesis : Value.t -> Coda_numbers.Global_slot.t
+      val global_slot_since_genesis : Value.t -> Mina_numbers.Global_slot.t
 
       val global_slot_since_genesis_var :
-        var -> Coda_numbers.Global_slot.Checked.t
+        var -> Mina_numbers.Global_slot.Checked.t
 
       val is_genesis_state : Value.t -> bool
 
@@ -545,11 +547,11 @@ module type S = sig
 
       val epoch_ledger : t -> Mina_base.Sparse_ledger.t
 
-      val global_slot : t -> Coda_numbers.Global_slot.t
+      val global_slot : t -> Mina_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
 
-      val global_slot_since_genesis : t -> Coda_numbers.Global_slot.t
+      val global_slot_since_genesis : t -> Mina_numbers.Global_slot.t
 
       val coinbase_receiver : t -> Public_key.Compressed.t
     end
