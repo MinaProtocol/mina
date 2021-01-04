@@ -378,7 +378,7 @@ let setup_daemon logger =
     let%bind libp2p_keypair =
       let libp2p_keypair_old_format =
         Option.bind libp2p_keypair ~f:(fun s ->
-            match Coda_net2.Keypair.of_string s with
+            match Mina_net2.Keypair.of_string s with
             | Ok kp ->
                 Some kp
             | Error _ ->
@@ -614,8 +614,8 @@ let setup_daemon logger =
             Some v
         | None ->
             (* Load value from the latest config file that both
-             * has the key we are looking for, and
-             * has the key in a format that [f] can parse.
+           * has the key we are looking for, and
+           * has the key in a format that [f] can parse.
           *)
             let%map config_file, data =
               List.find_map rev_daemon_configs
@@ -886,7 +886,7 @@ let setup_daemon logger =
             | Ok contents ->
                 String.split ~on:'\n' contents
                 |> List.filter ~f:(fun s -> not (String.is_empty s))
-                |> List.map ~f:Coda_net2.Multiaddr.of_string
+                |> List.map ~f:Mina_net2.Multiaddr.of_string
                 |> return
             | Error _ ->
                 Mina_user_error.raisef
@@ -898,16 +898,16 @@ let setup_daemon logger =
       in
       let initial_peers =
         List.concat
-          [ List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+          [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
           ; peer_list_file_contents_or_empty
-          ; List.map ~f:Coda_net2.Multiaddr.of_string
+          ; List.map ~f:Mina_net2.Multiaddr.of_string
             @@ or_from_config
                  (Fn.compose Option.some
                     (YJ.Util.convert_each YJ.Util.to_string))
                  "peers" None ~default:[] ]
       in
       let direct_peers =
-        List.map ~f:Coda_net2.Multiaddr.of_string direct_peers_raw
+        List.map ~f:Mina_net2.Multiaddr.of_string direct_peers_raw
       in
       let max_connections =
         or_from_config YJ.Util.to_int_option "max-connections"

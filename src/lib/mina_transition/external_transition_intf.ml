@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
 
 module type External_transition_common_intf = sig
@@ -59,7 +59,7 @@ module type External_transition_common_intf = sig
 
   val don't_broadcast : t -> unit
 
-  val poke_validation_callback : t -> Coda_net2.Validation_callback.t -> unit
+  val poke_validation_callback : t -> Mina_net2.Validation_callback.t -> unit
 end
 
 module type External_transition_base_intf = sig
@@ -323,7 +323,7 @@ module type S = sig
     -> protocol_state_proof:Proof.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-    -> validation_callback:Coda_net2.Validation_callback.t
+    -> validation_callback:Mina_net2.Validation_callback.t
     -> ?proposed_protocol_version_opt:Protocol_version.t
     -> unit
     -> t
@@ -336,7 +336,7 @@ module type S = sig
       -> protocol_state_proof:Proof.t
       -> staged_ledger_diff:Staged_ledger_diff.t
       -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
-      -> validation_callback:Coda_net2.Validation_callback.t
+      -> validation_callback:Mina_net2.Validation_callback.t
       -> ?proposed_protocol_version_opt:Protocol_version.t
       -> unit
       -> t

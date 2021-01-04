@@ -67,7 +67,7 @@ module Input = struct
                           ; peer_ids= String.Set.singleton peer_id }
                         in
                         let parent_hash =
-                          Coda_state.Protocol_state.previous_state_hash
+                          Mina_state.Protocol_state.previous_state_hash
                             tr.protocol_state
                         in
                         let new_state_hash = tr.state_hash in
@@ -140,7 +140,7 @@ module Output = struct
       List.fold (Hashtbl.data input.init_states) ~init:State_hash.Map.empty
         ~f:(fun map root_state ->
           Map.update map
-            (Coda_state.Protocol_state.previous_state_hash
+            (Mina_state.Protocol_state.previous_state_hash
                root_state.state.protocol_state) ~f:(function
             | Some peer_ids ->
                 Set.union peer_ids root_state.peer_ids
@@ -233,11 +233,11 @@ module Compact_display = struct
                     { current= t.state.state_hash
                     ; parent= t.state.protocol_state.previous_state_hash
                     ; blockchain_length=
-                        Coda_state.Protocol_state.consensus_state
+                        Mina_state.Protocol_state.consensus_state
                           t.state.protocol_state
                         |> Consensus.Data.Consensus_state.blockchain_length
                     ; global_slot=
-                        Coda_state.Protocol_state.consensus_state
+                        Mina_state.Protocol_state.consensus_state
                           t.state.protocol_state
                         |> Consensus.Data.Consensus_state.curr_global_slot }
                 in

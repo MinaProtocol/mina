@@ -47,7 +47,7 @@ module Schema = struct
     | Root : Root_data.Minimal.t t
     | Best_tip : State_hash.t t
     | Protocol_states_for_root_scan_state
-        : Coda_state.Protocol_state.value list t
+        : Mina_state.Protocol_state.value list t
 
   let to_string : type a. a t -> string = function
     | Db_version ->
@@ -75,7 +75,7 @@ module Schema = struct
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.Latest.t]
     | Protocol_states_for_root_scan_state ->
-        [%bin_type_class: Coda_state.Protocol_state.Value.Stable.Latest.t list]
+        [%bin_type_class: Mina_state.Protocol_state.Value.Stable.Latest.t list]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :
@@ -274,7 +274,7 @@ let check t ~genesis_state_hash =
       let%bind () =
         let persisted_genesis_state_hash =
           External_transition.protocol_state root_transition
-          |> Coda_state.Protocol_state.genesis_state_hash
+          |> Mina_state.Protocol_state.genesis_state_hash
         in
         if State_hash.equal persisted_genesis_state_hash genesis_state_hash
         then Ok ()

@@ -1,6 +1,6 @@
 open Core
 open Mina_base
-open Coda_state
+open Mina_state
 open Mina_transition
 
 module type Inputs_intf = sig

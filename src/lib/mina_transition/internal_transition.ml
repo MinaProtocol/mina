@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_state
+open Mina_state
 
 module type S = sig
   type t [@@deriving sexp, to_yojson]

@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Mina_transition
 open Blockchain_snark
 
