@@ -273,7 +273,8 @@ let check t ~genesis_state_hash =
       Ok ()
     else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
   in
-  check_arcs root_hash
+  let%map () = check_arcs root_hash in
+  root_hash
 
 let initialize t ~root_data =
   let open Root_data.Limited in

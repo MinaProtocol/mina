@@ -203,6 +203,9 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
       [%log warn]
         "Fast forward has not been implemented. Bootstrapping instead." ;
       None
+  | Error `Snarked_ledger_mismatch ->
+      [%log warn] "Persistent database is out of sync with snarked_ledger" ;
+      None
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
 

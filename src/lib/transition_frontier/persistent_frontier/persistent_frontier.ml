@@ -367,4 +367,4 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
                    "genesis state mismatch"
                | `Corrupt err ->
                    Database.Error.message err )
-          |> Result.ok_or_failwith ) )
+          |> Result.ok_or_failwith |> ignore ) )

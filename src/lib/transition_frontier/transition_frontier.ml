@@ -155,24 +155,30 @@ let rec load_with_max_length :
      ~precomputed_values () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
-  let continue persistent_frontier_instance ~ignore_consensus_local_state =
-    let persistent_root_instance =
-      Persistent_root.create_instance_exn persistent_root
-    in
-    match%bind
-      load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
-        ~max_length ~persistent_root ~persistent_root_instance
-        ~persistent_frontier ~persistent_frontier_instance ~precomputed_values
-        ignore_consensus_local_state
-    with
-    | Ok _ as result ->
-        return result
+  let continue persistent_frontier_instance ~ignore_consensus_local_state
+      ~merkle_root =
+    match Persistent_root.load_from_disk_exn persistent_root ~merkle_root with
     | Error _ as err ->
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
         in
-        Persistent_root.Instance.destroy persistent_root_instance ;
         err
+    | Ok persistent_root_instance -> (
+        match%bind
+          load_from_persistence_and_start ~logger ~verifier
+            ~consensus_local_state ~max_length ~persistent_root
+            ~persistent_root_instance ~persistent_frontier
+            ~persistent_frontier_instance ~precomputed_values
+            ignore_consensus_local_state
+        with
+        | Ok _ as result ->
+            return result
+        | Error _ as err ->
+            let%map () =
+              Persistent_frontier.Instance.destroy persistent_frontier_instance
+            in
+            Persistent_root.Instance.destroy persistent_root_instance ;
+            err )
   in
   let persistent_frontier_instance =
     Persistent_frontier.create_instance_exn persistent_frontier
@@ -191,9 +197,23 @@ let rec load_with_max_length :
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
     in
-    continue
-      (Persistent_frontier.create_instance_exn persistent_frontier)
-      ~ignore_consensus_local_state:false
+    let persistent_root_instance =
+      Persistent_root.create_instance_exn persistent_root
+    in
+    match%bind
+      load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
+        ~max_length ~persistent_root ~persistent_root_instance
+        ~persistent_frontier ~persistent_frontier_instance ~precomputed_values
+        false
+    with
+    | Ok _ as result ->
+        return result
+    | Error _ as err ->
+        let%map () =
+          Persistent_frontier.Instance.destroy persistent_frontier_instance
+        in
+        Persistent_root.Instance.destroy persistent_root_instance ;
+        err
   in
   match
     Persistent_frontier.Instance.check_database
@@ -243,10 +263,10 @@ let rec load_with_max_length :
               | err ->
                   err ) )
       else return (Error `Persistent_frontier_malformed)
-  | Ok () -> (
+  | Ok merkle_root -> (
       match%bind
         continue persistent_frontier_instance
-          ~ignore_consensus_local_state:true
+          ~ignore_consensus_local_state:true ~merkle_root
       with
       | Error (`Failure err) when retry_with_fresh_db ->
           [%log error]
@@ -669,6 +689,8 @@ module For_tests = struct
           fail "bootstrap required"
       | Error `Persistent_frontier_malformed ->
           fail "persistent frontier malformed"
+      | Error `Snarked_ledger_mismatch ->
+          fail "persistent frontier is out of sync with snarked ledger"
       | Error (`Failure msg) ->
           fail msg
       | Ok frontier ->

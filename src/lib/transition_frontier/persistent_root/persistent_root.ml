@@ -92,9 +92,39 @@ module Instance = struct
     write_potential_snarked_ledgers_to_disk t
 
   let destroy_potential_snarked_ledgers potential_snarked_ledgers =
-    List.iter (Queue.to_list potential_snarked_ledgers) ~f:File_system.rmrf
+    List.iter potential_snarked_ledgers ~f:File_system.rmrf
 
-  let create factory =
+  let create_from_scratch factory =
+    let potential_snarked_ledger_filenames_location =
+      Locations.potential_snarked_ledgers factory.directory
+    in
+    let () =
+      if Sys.file_exists potential_snarked_ledger_filenames_location = `Yes
+      then
+        let json =
+          Yojson.Safe.from_file potential_snarked_ledger_filenames_location
+        in
+        let potential_snarked_ledgers =
+          potential_snarked_ledgers_of_yojson json
+        in
+        destroy_potential_snarked_ledgers potential_snarked_ledgers
+      else ()
+    in
+    File_system.rmrf (Locations.potential_snarked_ledger factory.directory) ;
+    File_system.rmrf (Locations.snarked_ledger factory.directory) ;
+    let snarked_ledger =
+      Ledger.Db.create ~depth:factory.ledger_depth
+        ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
+        ()
+    in
+    {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
+
+  (** When we load from disk,
+      1. check the potential_snarked_ledgers to see if any one of those matches the one in persistent_frontier;
+      2. if none of those works, we load the old snarked_ledger and check if the old snarked_ledger matchees with the persistent_frontier
+      3. if not, we just reset all the persisted data and start from genesis 
+  *)
+  let load_from_disk factory ~merkle_root =
     let potential_snarked_ledger_filenames_location =
       Locations.potential_snarked_ledgers factory.directory
     in
@@ -104,38 +134,56 @@ module Instance = struct
         let json =
           Yojson.Safe.from_file potential_snarked_ledger_filenames_location
         in
-        Queue.of_list @@ potential_snarked_ledgers_of_yojson json
-      else Queue.of_list []
+        potential_snarked_ledgers_of_yojson json
+      else []
     in
     let snarked_ledger =
-      match Queue.dequeue potential_snarked_ledgers with
-      | Some most_recent_snarked_ledger_filename ->
-          let most_recent_snarked_ledger =
-            Ledger.of_database
-            @@ Ledger.Db.create ~depth:factory.ledger_depth
-                 ~directory_name:most_recent_snarked_ledger_filename ()
-          in
-          let snarked_ledger =
+      List.fold_until potential_snarked_ledgers ~init:None
+        ~f:(fun _ location ->
+          let ledger =
             Ledger.Db.create ~depth:factory.ledger_depth
-              ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
-              ()
+              ~directory_name:location ()
           in
-          ignore
-          @@ Ledger_transfer.transfer_accounts ~src:most_recent_snarked_ledger
-               ~dest:snarked_ledger ;
-          File_system.rmrf @@ Locations.snarked_ledger factory.directory ;
-          Sys.rename
-            (Locations.tmp_snarked_ledger factory.directory)
-            (Locations.snarked_ledger factory.directory) ;
-          File_system.rmrf @@ most_recent_snarked_ledger_filename ;
+          if State_hash.equal (Ledger.Db.merkle_root ledger) merkle_root then (
+            let snarked_ledger =
+              Ledger.Db.create ~depth:factory.ledger_depth
+                ~directory_name:
+                  (Locations.tmp_snarked_ledger factory.directory)
+                ()
+            in
+            ignore
+            @@ Ledger_transfer.transfer_accounts
+                 ~src:(Ledger.of_database ledger)
+                 ~dest:snarked_ledger ;
+            Ledger.Db.close ledger ;
+            File_system.rmrf @@ Locations.snarked_ledger factory.directory ;
+            Sys.rename
+              (Locations.tmp_snarked_ledger factory.directory)
+              (Locations.snarked_ledger factory.directory) ;
+            destroy_potential_snarked_ledgers potential_snarked_ledgers ;
+            File_system.rmrf location ;
+            Stop (Some snarked_ledger) )
+          else Continue None )
+        ~finish:(fun _ ->
           destroy_potential_snarked_ledgers potential_snarked_ledgers ;
-          snarked_ledger
-      | None ->
+          None )
+    in
+    match snarked_ledger with
+    | None ->
+        let snarked_ledger =
           Ledger.Db.create ~depth:factory.ledger_depth
             ~directory_name:(Locations.snarked_ledger factory.directory)
             ()
-    in
-    {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
+        in
+        if State_hash.equal (Ledger.Db.merkle_root snarked_ledger) merkle_root
+        then
+          Ok
+            { snarked_ledger
+            ; factory
+            ; potential_snarked_ledgers= Queue.create () }
+        else Error `Snarked_ledger_mismatch
+    | Some snarked_ledger ->
+        Ok {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
 
   let destroy t =
     Ledger.Db.close t.snarked_ledger ;
@@ -181,9 +229,16 @@ type t = Factory_type.t
 let create ~logger ~directory ~ledger_depth =
   {directory; logger; instance= None; ledger_depth}
 
+let load_from_disk_exn t ~merkle_root =
+  let open Result.Let_syntax in
+  assert (t.instance = None) ;
+  let%map instance = Instance.load_from_disk t ~merkle_root in
+  t.instance <- Some instance ;
+  instance
+
 let create_instance_exn t =
   assert (t.instance = None) ;
-  let instance = Instance.create t in
+  let instance = Instance.create_from_scratch t in
   t.instance <- Some instance ;
   instance
 

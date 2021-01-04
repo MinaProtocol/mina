@@ -495,6 +495,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     "bootstrap still required (indicates logical error in code)"
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
+              | Error `Snarked_ledger_mismatch ->
+                  failwith
+                    "this should not happen, because we just reset the \
+                     snarked_ledger"
             in
             [%str_log info] Bootstrap_complete ;
             let collected_transitions =
