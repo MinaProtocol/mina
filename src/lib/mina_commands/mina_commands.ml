@@ -120,7 +120,7 @@ let setup_and_submit_user_commands t user_command_list =
   [%log' warn (Mina_lib.top_level_logger t)]
     "batch-send-payments does not yet report errors"
     ~metadata:
-      [("coda_command", `String "scheduling a batch of user transactions")] ;
+      [("mina_command", `String "scheduling a batch of user transactions")] ;
   Mina_lib.add_transactions t user_command_list
 
 module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
@@ -182,7 +182,7 @@ let get_status ~flag t =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
-  let commit_id = Coda_version.commit_id in
+  let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
   let%map peers = Mina_lib.peers t in
   let peers =
@@ -250,7 +250,7 @@ let get_status ~flag t =
   in
   let new_block_length_received =
     Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
-    @@ Coda_transition.External_transition.Initial_validated.consensus_state
+    @@ Mina_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Mina_lib.most_recent_valid_transition t)
   in

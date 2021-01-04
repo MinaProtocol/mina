@@ -1,7 +1,7 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Frontier_base
 
 (* TODO: bundle together with other writes by sharing batch requests between

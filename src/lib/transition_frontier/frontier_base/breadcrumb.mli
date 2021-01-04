@@ -8,7 +8,7 @@ open Core_kernel
 open Signature_lib
 open Mina_base
 open Coda_state
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type t [@@deriving sexp, eq, compare, to_yojson]

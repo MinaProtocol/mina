@@ -6,7 +6,7 @@ commit_id_short=$(git rev-parse --short=8 --verify HEAD)
 
 CWD=$PWD
 
-# we are nested 5 directories deep (_build/<context>/src/lib/coda_version)
+# we are nested 5 directories deep (_build/<context>/src/lib/mina_version)
 cd ../../../../..
   if [ -n "$CODA_COMMIT_SHA1" ]; then
     # pull from env var if set

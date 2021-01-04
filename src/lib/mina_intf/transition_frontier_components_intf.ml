@@ -3,7 +3,7 @@ open Async_kernel
 open Pipe_lib
 open Cache_lib
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 module type Transition_handler_validator_intf = sig

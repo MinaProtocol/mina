@@ -1,4 +1,4 @@
-let coda = Coda_plugins.get_mina_lib ()
+let coda = Mina_plugins.get_mina_lib ()
 
 let () =
   let config = Mina_lib.config coda in

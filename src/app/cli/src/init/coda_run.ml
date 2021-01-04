@@ -185,15 +185,15 @@ let summary exn_json =
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Coda_version.branch)
-    ; ("Coda_commit", `String Coda_version.commit_id) ]
+    ; ("Coda_branch", `String Mina_version.branch)
+    ; ("Coda_commit", `String Mina_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
       (Deferred.return (`String "Shutdown before Coda instance was created"))
     ~f:(fun t ->
-      Coda_commands.get_status ~flag:`Performance t
+      Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_json ~conf_dir ~top_logger coda_ref =
@@ -286,34 +286,34 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
-            ( Coda_commands.setup_and_submit_user_commands coda ts
+            ( Mina_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
-            ( Coda_commands.get_balance coda aid
+            ( Mina_commands.get_balance coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
-          return (Coda_commands.get_trust_status coda ip_address) )
+          return (Mina_commands.get_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
-          return (Coda_commands.get_trust_status_all coda) )
+          return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
-          return (Coda_commands.reset_trust_status coda ip_address) )
+          return (Mina_commands.reset_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
-            ( Coda_commands.verify_payment coda aid tx proof
+            ( Mina_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
-            ( Coda_commands.get_keys_with_details coda
+            ( Mina_commands.get_keys_with_details coda
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
           return
-            ( Coda_commands.get_public_keys coda
+            ( Mina_commands.get_public_keys coda
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
-            ( Coda_commands.get_nonce coda aid
+            ( Mina_commands.get_nonce coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
@@ -321,9 +321,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          Coda_commands.get_status ~flag coda )
+          Mina_commands.get_status ~flag coda )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          Coda_commands.clear_hist_status ~flag coda )
+          Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Mina_lib.get_ledger coda lh )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
@@ -450,7 +450,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let status flag =
-                  let%bind status = Coda_commands.get_status ~flag coda in
+                  let%bind status = Mina_commands.get_status ~flag coda in
                   Server.respond_string
                     ( status |> Daemon_rpcs.Types.Status.to_yojson
                     |> Yojson.Safe.pretty_to_string )

@@ -1729,7 +1729,7 @@ let archive_precomputed_blocks =
            | None ->
                (* Send the requests over GraphQL. *)
                let block =
-                 Coda_transition.External_transition.Precomputed_block
+                 Mina_transition.External_transition.Precomputed_block
                  .to_yojson block
                  |> Yojson.Safe.to_basic
                in
@@ -1756,7 +1756,7 @@ let archive_precomputed_blocks =
                  |> Deferred.return
                in
                let%bind precomputed_block =
-                 Coda_transition.External_transition.Precomputed_block
+                 Mina_transition.External_transition.Precomputed_block
                  .of_yojson precomputed_block_json
                  |> Result.map_error ~f:(fun err ->
                         Error.tag_arg (Error.of_string err)

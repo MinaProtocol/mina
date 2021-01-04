@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 open Coda_state
-open Coda_transition
+open Mina_transition
 open Network_peer
 open Network_pool
 open Pipe_lib

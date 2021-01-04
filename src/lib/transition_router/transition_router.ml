@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Coda_transition
+open Mina_transition
 open O1trace
 open Network_peer
 

@@ -1,7 +1,7 @@
 open Async
 open Core
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Network_pool
 open Pipe_lib
 open Network_peer
