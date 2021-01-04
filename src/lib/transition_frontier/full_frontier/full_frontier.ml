@@ -550,7 +550,7 @@ let update_metrics_with_diff (type mutant) t
       let blockchain_length =
         Int.to_float
           ( Consensus.Data.Consensus_state.blockchain_length consensus_state
-          |> Coda_numbers.Length.to_int )
+          |> Mina_numbers.Length.to_int )
       in
       let global_slot =
         Consensus.Data.Consensus_state.consensus_time consensus_state

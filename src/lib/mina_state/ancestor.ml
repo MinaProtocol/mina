@@ -51,7 +51,7 @@ module Prover : sig
        t
     -> prev_hash:State_hash.t
     -> hash:State_hash.t
-    -> length:Coda_numbers.Length.t
+    -> length:Mina_numbers.Length.t
     -> body_hash:State_body_hash.t
     -> unit
 
@@ -59,7 +59,7 @@ module Prover : sig
        t
     -> Input.t
     -> Output.t
-    -> ancestor_length:Coda_numbers.Length.t
+    -> ancestor_length:Mina_numbers.Length.t
     -> Proof.t
     -> unit Or_error.t
 
@@ -81,7 +81,7 @@ end = struct
       | [] ->
           (acc, List.rev hs)
       | body :: bs ->
-          let length = Coda_numbers.Length.succ length in
+          let length = Mina_numbers.Length.succ length in
           let full_state_hash =
             Protocol_state.hash_abstract ~hash_body:Fn.id
               {previous_state_hash= acc; body}
@@ -107,7 +107,7 @@ end = struct
 end
 
 let%test_unit "completeness" =
-  let open Coda_numbers in
+  let open Mina_numbers in
   let open Quickcheck in
   let open Generator in
   let ancestor = State_hash.gen in

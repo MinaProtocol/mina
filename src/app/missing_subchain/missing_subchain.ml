@@ -23,8 +23,8 @@ module Extensional_block = struct
     ; next_epoch_ledger_hash: Frozen_ledger_hash.t
     ; ledger_hash: Ledger_hash.t
     ; height: Unsigned.UInt32.t
-    ; global_slot: Coda_numbers.Global_slot.t
-    ; global_slot_since_genesis: Coda_numbers.Global_slot.t
+    ; global_slot: Mina_numbers.Global_slot.t
+    ; global_slot_since_genesis: Mina_numbers.Global_slot.t
     ; timestamp: Block_time.t }
 end
 
@@ -213,7 +213,7 @@ let main ~archive_uri ~state_hash () =
               ; ("ledger_hash", Ledger_hash.to_yojson block.ledger_hash)
               ; ("height", Unsigned_extended.UInt32.to_yojson block.height)
               ; ( "global_slot"
-                , Coda_numbers.Global_slot.to_yojson block.global_slot )
+                , Mina_numbers.Global_slot.to_yojson block.global_slot )
               ; ("timestamp", Block_time.to_yojson block.timestamp) ] ) ;
       ()
 

@@ -2,7 +2,7 @@ open Core
 open Signature_lib
 open Mina_base
 open Snark_params
-module Global_slot = Coda_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot
 open Currency
 open Pickles_types
 module Impl = Pickles.Impls.Step
@@ -5762,7 +5762,7 @@ let%test_module "transaction_snark" =
 let%test_module "account timing check" =
   ( module struct
     open Core_kernel
-    open Coda_numbers
+    open Mina_numbers
     open Currency
     open Transaction_validator.For_tests
 
@@ -5893,11 +5893,11 @@ let%test_module "account timing check" =
              ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
-      let txn_global_slot = Coda_numbers.Global_slot.of_int 1_900 in
+      let txn_global_slot = Mina_numbers.Global_slot.of_int 1_900 in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~account
           ~txn_amount:(Currency.Amount.of_int 100_000_000_000)
-          ~txn_global_slot:(Coda_numbers.Global_slot.of_int 1_900)
+          ~txn_global_slot:(Mina_numbers.Global_slot.of_int 1_900)
       in
       (* we're 900 slots past the cliff, which is 90 vesting periods
           subtract 90 * 100 = 9,000 from init min balance of 10,000 to get 1000
@@ -5957,7 +5957,7 @@ let%test_module "account timing check" =
              ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 101_000_000_000 in
-      let txn_global_slot = Coda_numbers.Global_slot.of_int 1_010 in
+      let txn_global_slot = Mina_numbers.Global_slot.of_int 1_010 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Error err ->

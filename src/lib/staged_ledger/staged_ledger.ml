@@ -1929,7 +1929,7 @@ let%test_module "test" =
       (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
 
     let dummy_state_view
-        ?(global_slot_since_genesis = Coda_numbers.Global_slot.zero) () =
+        ?(global_slot_since_genesis = Mina_numbers.Global_slot.zero) () =
       let state_body =
         let consensus_constants =
           let genesis_constants = Genesis_constants.for_unit_tests in
@@ -3065,9 +3065,9 @@ let%test_module "test" =
       let acc =
         Account.create_timed account_id balance
           ~initial_minimum_balance:balance
-          ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
+          ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
           ~cliff_amount:Amount.zero
-          ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
+          ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
           ~vesting_increment:(Amount.of_int 50_000_000_000)
         |> Or_error.ok_exn
       in
@@ -3114,7 +3114,7 @@ let%test_module "test" =
               ~current_state_view:
                 (dummy_state_view
                    ~global_slot_since_genesis:
-                     (Coda_numbers.Global_slot.of_int block_count)
+                     (Mina_numbers.Global_slot.of_int block_count)
                    ())
               ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
               Sequence.empty
