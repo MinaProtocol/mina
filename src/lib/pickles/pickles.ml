@@ -456,6 +456,17 @@ module Make (Inputs : Inputs) = struct
     (* TODO: Check identifying hash. *)
     return ()
 
+  let check_constraint_system_hash ~got ~expected =
+    if String.equal got expected then Or_error.return ()
+    else
+      Or_error.tag_arg
+        (Or_error.errorf
+           "Snark key header constraint system hashes do not match")
+        "constraint system hash" (got, expected) (fun (got, expected) ->
+          Sexp.List
+            [List [Atom "got"; Atom got]; List [Atom "expected"; Atom expected]]
+      )
+
   let max_local_max_branchings (type n)
       (module Max_branching : Nat.Intf with type n = n) branches choices =
     let module Local_max_branchings = struct
@@ -779,23 +790,9 @@ module Make (Inputs : Inputs) = struct
                       (* TODO: Remove this when identifying hashes are
                          implemented.
                       *)
-                      if
-                        String.equal
-                          (Lazy.force constraint_system_hash)
-                          header.constraint_system_hash
-                      then return ()
-                      else
-                        Or_error.tag_arg
-                          (Or_error.errorf
-                             "Snark key header constraint system hashes do \
-                              not match")
-                          "constraint system hash"
-                          ( Lazy.force constraint_system_hash
-                          , header.constraint_system_hash )
-                          (fun (got, expected) ->
-                            Sexp.List
-                              [ List [Atom "got"; Atom got]
-                              ; List [Atom "expected"; Atom expected] ] )
+                      check_constraint_system_hash
+                        ~got:header.constraint_system_hash
+                        ~expected:(Lazy.force constraint_system_hash)
                     in
                     header
 
@@ -813,23 +810,9 @@ module Make (Inputs : Inputs) = struct
                       (* TODO: Remove this when identifying hashes are
                          implemented.
                       *)
-                      if
-                        String.equal
-                          (Lazy.force constraint_system_hash)
-                          header.constraint_system_hash
-                      then return ()
-                      else
-                        Or_error.tag_arg
-                          (Or_error.errorf
-                             "Snark key header constraint system hashes do \
-                              not match")
-                          "constraint system hash"
-                          ( Lazy.force constraint_system_hash
-                          , header.constraint_system_hash )
-                          (fun (got, expected) ->
-                            Sexp.List
-                              [ List [Atom "got"; Atom got]
-                              ; List [Atom "expected"; Atom expected] ] )
+                      check_constraint_system_hash
+                        ~got:header.constraint_system_hash
+                        ~expected:(Lazy.force constraint_system_hash)
                     in
                     ( header
                     , { Backend.Tick.Keypair.index= key
@@ -893,23 +876,9 @@ module Make (Inputs : Inputs) = struct
                       (* TODO: Remove this when identifying hashes are
                          implemented.
                       *)
-                      if
-                        String.equal
-                          (Lazy.force constraint_system_hash)
-                          header.constraint_system_hash
-                      then return ()
-                      else
-                        Or_error.tag_arg
-                          (Or_error.errorf
-                             "Snark key header constraint system hashes do \
-                              not match")
-                          "constraint system hash"
-                          ( Lazy.force constraint_system_hash
-                          , header.constraint_system_hash )
-                          (fun (got, expected) ->
-                            Sexp.List
-                              [ List [Atom "got"; Atom got]
-                              ; List [Atom "expected"; Atom expected] ] )
+                      check_constraint_system_hash
+                        ~got:header.constraint_system_hash
+                        ~expected:(Lazy.force constraint_system_hash)
                     in
                     header
 
@@ -929,23 +898,9 @@ module Make (Inputs : Inputs) = struct
                       (* TODO: Remove this when identifying hashes are
                          implemented.
                       *)
-                      if
-                        String.equal
-                          (Lazy.force constraint_system_hash)
-                          header.constraint_system_hash
-                      then return ()
-                      else
-                        Or_error.tag_arg
-                          (Or_error.errorf
-                             "Snark key header constraint system hashes do \
-                              not match")
-                          "constraint system hash"
-                          ( Lazy.force constraint_system_hash
-                          , header.constraint_system_hash )
-                          (fun (got, expected) ->
-                            Sexp.List
-                              [ List [Atom "got"; Atom got]
-                              ; List [Atom "expected"; Atom expected] ] )
+                      check_constraint_system_hash
+                        ~got:header.constraint_system_hash
+                        ~expected:(Lazy.force constraint_system_hash)
                     in
                     (header, key)
 
