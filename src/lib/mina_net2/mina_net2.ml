@@ -145,7 +145,7 @@ module Go_log = struct
 
   let record_of_yojson (json : Yojson.Safe.t) =
     let open Result.Let_syntax in
-    let prefix = "Coda_net2.Go_log.record_of_yojson: " in
+    let prefix = "Mina_net2.Go_log.record_of_yojson: " in
     match json with
     | `Assoc fields ->
         let set_field field_name prev_value parse json =
@@ -884,9 +884,9 @@ module Helper = struct
               match decoded with
               | Ok data ->
                   (* TAKE CARE: doing anything with the return
-                      value here except ignore is UNSOUND because
-                      write_pipe has a cast type. We don't remember
-                      what the original 'return was. *)
+                  value here except ignore is UNSOUND because
+                  write_pipe has a cast type. We don't remember
+                  what the original 'return was. *)
                   if Strict_pipe.Writer.is_closed sub.write_pipe then
                     [%log' error t.logger]
                       "subscription writer for $topic unexpectedly closed. \

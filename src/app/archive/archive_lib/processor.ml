@@ -5,7 +5,7 @@ open Async
 open Core
 open Caqti_async
 open Mina_base
-open Coda_state
+open Mina_state
 open Mina_transition
 open Pipe_lib
 open Signature_lib

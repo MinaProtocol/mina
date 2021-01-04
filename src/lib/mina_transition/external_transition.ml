@@ -1,14 +1,14 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Coda_state
+open Mina_state
 
 module Validate_content = struct
-  type t = Coda_net2.Validation_callback.t
+  type t = Mina_net2.Validation_callback.t
 
   let bin_read_t buf ~pos_ref =
     bin_read_unit buf ~pos_ref ;
-    Coda_net2.Validation_callback.create_without_expiration ()
+    Mina_net2.Validation_callback.create_without_expiration ()
 
   let bin_write_t buf ~pos _ = bin_write_unit buf ~pos ()
 
@@ -16,7 +16,7 @@ module Validate_content = struct
 
   let bin_size_t _ = bin_size_unit ()
 
-  let t_of_sexp _ = Coda_net2.Validation_callback.create_without_expiration ()
+  let t_of_sexp _ = Mina_net2.Validation_callback.create_without_expiration ()
 
   let sexp_of_t _ = sexp_of_unit ()
 
@@ -318,10 +318,10 @@ let payments t =
         None )
 
 let broadcast t =
-  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Accept
+  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
 
 let don't_broadcast t =
-  Coda_net2.Validation_callback.fire_exn (validation_callback t) `Reject
+  Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
 
@@ -949,8 +949,8 @@ module Validated = struct
 
       module Erased = struct
         (* if this type receives a new version, that changes the serialization of
-             the type `t', so that type must also get a new version
-        *)
+                 the type `t', so that type must also get a new version
+          *)
         [%%versioned
         module Stable = struct
           module V1 = struct
@@ -1099,7 +1099,7 @@ let genesis ~precomputed_values =
            create ~protocol_state ~protocol_state_proof
              ~staged_ledger_diff:empty_diff
              ~validation_callback:
-               (Coda_net2.Validation_callback.create_without_expiration ())
+               (Mina_net2.Validation_callback.create_without_expiration ())
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              () ))
@@ -1235,7 +1235,7 @@ module Staged_ledger_validation = struct
         ~constraint_constants:precomputed_values.constraint_constants ~logger
         ~verifier parent_staged_ledger staged_ledger_diff
         ~current_state_view:
-          Coda_state.Protocol_state.(Body.view @@ body parent_protocol_state)
+          Mina_state.Protocol_state.(Body.view @@ body parent_protocol_state)
         ~state_and_body_hash:
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)

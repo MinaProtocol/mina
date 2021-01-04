@@ -2,7 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
-open Coda_state
+open Mina_state
 open Mina_transition
 open Signature_lib
 open O1trace
@@ -118,7 +118,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   in
   let previous_state_view =
     Protocol_state.body previous_protocol_state
-    |> Coda_state.Protocol_state.Body.view
+    |> Mina_state.Protocol_state.Body.view
   in
   let supercharge_coinbase =
     let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
@@ -232,13 +232,13 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             in
             let blockchain_state =
               (* We use the time of the beginning of the slot because if things
-                 are slower than expected, we may have entered the next slot and
-                 putting the **current** timestamp rather than the expected one
-                 will screw things up.
+               are slower than expected, we may have entered the next slot and
+               putting the **current** timestamp rather than the expected one
+               will screw things up.
 
-                 [generate_transition] will log an error if the [current_time]
-                 has a different slot from the [scheduled_time]
-              *)
+               [generate_transition] will log an error if the [current_time]
+               has a different slot from the [scheduled_time]
+            *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
                 ~snarked_next_available_token
@@ -361,8 +361,8 @@ let handle_block_production_errors ~logger ~previous_protocol_state
       exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
   | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
       (* Unexpected errors from staged_ledger are captured in
-                         `Fatal_error
-                      *)
+                     `Fatal_error
+    *)
       [%log error]
         ~metadata:
           [ ("error", Error_json.error_to_yojson e)
@@ -517,7 +517,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
                               ~validation_callback:
-                                (Coda_net2.Validation_callback
+                                (Mina_net2.Validation_callback
                                  .create_without_expiration ())
                               ~delta_transition_chain_proof () }
                       |> External_transition.skip_time_received_validation
@@ -585,14 +585,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       ; Deferred.choice
                           ( Time.Timeout.create time_controller
                               (* We allow up to 20 seconds for the transition
-                                 to make its way from the transition_writer to
-                                 the frontier.
-                                 This value is chosen to be reasonably
-                                 generous. In theory, this should not take
-                                 terribly long. But long cycles do happen in
-                                 our system, and with medium curves those long
-                                 cycles can be substantial.
-                              *)
+                                to make its way from the transition_writer to
+                                the frontier.
+                                This value is chosen to be reasonably
+                                generous. In theory, this should not take
+                                terribly long. But long cycles do happen in
+                                our system, and with medium curves those long
+                                cycles can be substantial.
+                             *)
                               (Time.Span.of_ms 20000L)
                               ~f:(Fn.const ())
                           |> Time.Timeout.to_deferred )
@@ -605,8 +605,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         return ()
                     | `Timed_out ->
                         (* FIXME #3167: this should be fatal, and more
-                           importantly, shouldn't happen.
-                        *)
+                        importantly, shouldn't happen.
+                     *)
                         [%log fatal] ~metadata
                           "Timed out waiting for generated transition \
                            $state_hash to enter transition frontier. \
@@ -628,7 +628,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               match Agent.get keypairs with
               | keypairs, `Different ->
                   (* Perform block production key swap since we have new
-                     keypairs *)
+                   keypairs *)
                   Consensus.Data.Local_state.block_production_keys_swap
                     ~constants:consensus_constants consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
@@ -656,10 +656,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 (* TODO: Re-enable this assertion when it doesn't fail dev demos
                  *       (see #5354)
                  * assert (
-                  Consensus.Hooks.required_local_state_sync
+                   Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
-                  = None ) ; *)
+                   = None ) ; *)
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
@@ -803,7 +803,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
                     ~validation_callback:
-                      (Coda_net2.Validation_callback.create_without_expiration
+                      (Mina_net2.Validation_callback.create_without_expiration
                          ())
                     ~delta_transition_chain_proof () }
             |> External_transition.skip_time_received_validation
@@ -871,8 +871,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               return ()
           | `Timed_out ->
               (* FIXME #3167: this should be fatal, and more importantly,
-                 shouldn't happen.
-              *)
+             shouldn't happen.
+          *)
               [%log fatal] ~metadata
                 "Timed out waiting for generated transition $state_hash to \
                  enter transition frontier. Continuing to produce new blocks \

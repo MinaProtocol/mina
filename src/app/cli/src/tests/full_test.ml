@@ -4,7 +4,7 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
 open Pipe_lib
 open O1trace

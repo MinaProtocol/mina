@@ -3,7 +3,7 @@ open Inline_test_quiet_logs
 open Core
 open Async
 open Mina_base
-open Coda_state
+open Mina_state
 open Pipe_lib.Strict_pipe
 open Mina_transition
 open Network_peer

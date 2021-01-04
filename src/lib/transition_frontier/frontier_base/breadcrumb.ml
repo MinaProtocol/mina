@@ -1,7 +1,7 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
+open Mina_state
 open Mina_transition
 open Network_peer
 
@@ -425,7 +425,7 @@ module For_tests = struct
           ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:
-            (Coda_net2.Validation_callback.create_without_expiration ())
+            (Mina_net2.Validation_callback.create_without_expiration ())
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)

@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-   async async_extra core mina_base mina_intf coda_state
+   async async_extra core mina_base mina_intf mina_state
    mina_transition consensus interruptible o1trace pipe_lib
    prover transaction_snark_scan_state transition_frontier
    network_pool unix_timestamp otp_lib transition_chain_prover)

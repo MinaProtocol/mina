@@ -403,7 +403,7 @@ module Types = struct
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
             ~args:Arg.[]
-            ~resolve:(fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+            ~resolve:(fun _ {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
@@ -415,7 +415,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun {ctx= coda; _}
-                   {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+                   {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string_system_time
                 (Mina_lib.time_controller coda)
                 timestamp )
@@ -423,13 +423,13 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
               Frozen_ledger_hash.to_string snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
               Mina_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
@@ -1460,20 +1460,20 @@ module Types = struct
               ~typ:(non_null (list (non_null peer)))
               ~doc:"Peers we will always allow connections from"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.trusted_peers)
+              ~resolve:(fun _ config -> config.Mina_net2.trusted_peers)
           ; field "bannedPeers"
               ~typ:(non_null (list (non_null peer)))
               ~doc:
                 "Peers we will never allow connections from (unless they are \
                  also trusted!)"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.banned_peers)
+              ~resolve:(fun _ config -> config.Mina_net2.banned_peers)
           ; field "isolate" ~typ:(non_null bool)
               ~doc:
                 "If true, no connections will be allowed unless they are from \
                  a trusted peer"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.isolate) ] )
+              ~resolve:(fun _ config -> config.Mina_net2.isolate) ] )
   end
 
   module Arguments = struct
@@ -1827,7 +1827,7 @@ module Types = struct
           let open Result.Let_syntax in
           let%bind trusted_peers = Result.all trusted_peers in
           let%map banned_peers = Result.all banned_peers in
-          Coda_net2.{isolate; trusted_peers; banned_peers} )
+          Mina_net2.{isolate; trusted_peers; banned_peers} )
         ~fields:
           Arg.
             [ arg "trustedPeers"
@@ -2687,7 +2687,7 @@ module Queries = struct
   let genesis_block =
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
-        let open Coda_state in
+        let open Mina_state in
         let { Precomputed_values.genesis_ledger
             ; constraint_constants
             ; consensus_constants
@@ -2762,7 +2762,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun {ctx= coda; _} () ->
-        List.map (Mina_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
+        List.map (Mina_lib.initial_peers coda) ~f:Mina_net2.Multiaddr.to_string
         )
 
   let get_peers =

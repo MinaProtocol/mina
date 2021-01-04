@@ -7,7 +7,7 @@ open Async_kernel
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Coda_state
+open Mina_state
 open Mina_transition
 open Network_peer
 
@@ -55,9 +55,9 @@ val transition_receipt_time : t -> Time.t option
 
 val hash : t -> int
 
-val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
+val blockchain_state : t -> Mina_state.Blockchain_state.Value.t
 
-val protocol_state : t -> Coda_state.Protocol_state.Value.t
+val protocol_state : t -> Mina_state.Protocol_state.Value.t
 
 val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
