@@ -990,7 +990,98 @@ module Make (Inputs : Inputs) = struct
     let module V = H4.To_vector (Vk) in
     lazy (V.f prev_varss_length (M.f steps_keys))
 
-  module Wrap_keys = struct
+  module type Wrap_keys = sig
+    val requests : (Max_branching.n, maxes_ns) Requests.Wrap.t
+
+    val main :
+         ( Impls.Wrap_impl.field Snarky_backendless.Cvar.t
+         , Impls.Wrap_impl.Field.t Pickles_types.Scalar_challenge.t
+         , Wrap_main.Other_field.Packed.t Pickles_types.Shifted_value.t
+         , Impls.Wrap_impl.Field.t (* Unused *)
+         , Impls.Wrap_impl.Field.t
+         , Impls.Wrap_impl.Field.t
+         , Impls.Wrap.Impl.field Snarky_backendless.Cvar.t
+         , ( Impls.Wrap_impl.Field.t Wrap_main.SC.t
+             Import.Types.Bulletproof_challenge.t
+           , Nat.z Backend.Tick.Rounds.plus_n )
+           Pickles_types.Vector.t
+         , Impls.Wrap_impl.field Snarky_backendless.Cvar.t )
+         Dlog_based.Statement.In_circuit.t
+      -> unit
+
+    val constraint_system : Impls.Wrap.R1CS_constraint_system.t Lazy.t
+
+    val constraint_system_digest : Md5.t Lazy.t
+
+    val constraint_system_hash : string Lazy.t
+
+    module Keys : sig
+      module Proving : sig
+        type t = private Tock.Proving_key.t
+
+        val header_template : Snark_keys_header.t Lazy.t
+
+        val cache_key : Cache.Wrap.Key.Proving.t Lazy.t
+
+        val check_header : string -> Snark_keys_header.t Or_error.t
+
+        val read_with_header : string -> (Snark_keys_header.t * t) Or_error.t
+
+        val write_with_header : string -> t -> unit Or_error.t
+
+        (** Set or get the [registered_key]. This is implicitly called by
+            [use_key_cache]; care should be taken to ensure that this is not
+            set when that will also be called.
+        *)
+        val registered_key : t Lazy.t Set_once.t
+
+        (** Lazy proxy to the [registered_key] value. *)
+        val registered_key_lazy : t Lazy.t
+
+        val of_raw_key : Tock.Proving_key.t -> t
+      end
+
+      module Verification : sig
+        type t = private Verification_key.t
+
+        val header_template : Snark_keys_header.t Lazy.t
+
+        val cache_key : Cache.Wrap.Key.Verification.t Lazy.t
+
+        val check_header : string -> Snark_keys_header.t Or_error.t
+
+        val read_with_header : string -> (Snark_keys_header.t * t) Or_error.t
+
+        val write_with_header : string -> t -> unit Or_error.t
+
+        (** Set or get the [registered_key]. This is implicitly called by
+            [use_key_cache]; care should be taken to ensure that this is not
+            set when that will also be called.
+        *)
+        val registered_key : t Lazy.t Set_once.t
+
+        (** Lazy proxy to the [registered_key] value. *)
+        val registered_key_lazy : t Lazy.t
+
+        val of_raw_key : Verification_key.t -> t
+      end
+
+      val generate : unit -> Proving.t * Verification.t
+
+      val read_or_generate_from_cache :
+           Key_cache.Spec.t list
+        -> (Proving.t * Dirty.t) Lazy.t * (Verification.t * Dirty.t) Lazy.t
+
+      (** Register the key cache as the source for the keys.
+          This may be called instead of setting [Proving.registered_key] and
+          [Verification.registered_key].
+          If either key has already been registered, this function will fail
+      *)
+      val use_key_cache : Key_cache.Spec.t list -> unit
+    end
+  end
+
+  module Wrap_keys : Wrap_keys = struct
     let requests, main =
       Timer.clock __LOC__ ;
       let prev_wrap_domains =
@@ -1044,6 +1135,8 @@ module Make (Inputs : Inputs) = struct
 
     module Keys = struct
       module Proving = struct
+        type t = Tock.Proving_key.t
+
         let kind =
           {Snark_keys_header.Kind.type_= "wrap-proving-key"; identifier= name}
 
@@ -1055,9 +1148,73 @@ module Make (Inputs : Inputs) = struct
           let%map.Lazy.Let_syntax cs = constraint_system
           and header = header_template in
           (Type_equal.Id.uid self.id, header, cs)
+
+        let check_header path =
+          let open Or_error.Let_syntax in
+          let%bind header, () =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset:_ _ -> ())
+              path
+          in
+          let%bind () = check_snark_keys_header kind header in
+          let%map () =
+            (* TODO: Remove this when identifying hashes are
+               implemented.
+            *)
+            check_constraint_system_hash ~got:header.constraint_system_hash
+              ~expected:(Lazy.force constraint_system_hash)
+          in
+          header
+
+        let read_with_header path =
+          let open Or_error.Let_syntax in
+          let%bind header, key =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset ->
+                Marlin_plonk_bindings.Pasta_fq_index.read ~offset
+                  (Backend.Tock.Keypair.load_urs ()) )
+              path
+          in
+          let%bind () = check_snark_keys_header kind header in
+          let%map () =
+            (* TODO: Remove this when identifying hashes are
+               implemented.
+            *)
+            check_constraint_system_hash ~got:header.constraint_system_hash
+              ~expected:(Lazy.force constraint_system_hash)
+          in
+          ( header
+          , {Backend.Tock.Keypair.index= key; cs= Lazy.force constraint_system}
+          )
+
+        let write_with_header path t =
+          Or_error.try_with (fun () ->
+              Snark_keys_header.write_with_header
+                ~expected_max_size_log2:33 (* 8 GB should be enough *)
+                ~append_data:
+                  (Marlin_plonk_bindings.Pasta_fq_index.write ~append:true
+                     t.Backend.Tock.Keypair.index)
+                (Lazy.force header_template)
+                path )
+
+        let registered_key = Set_once.create ()
+
+        let registered_key_lazy =
+          lazy
+            ( match Set_once.get registered_key with
+            | Some key ->
+                Lazy.force key
+            | None ->
+                failwithf
+                  "Wrap proving key for system %s was not registered before use"
+                  name () )
+
+        let of_raw_key = Fn.id
       end
 
       module Verification = struct
+        type t = Verification_key.t
+
         let kind =
           { Snark_keys_header.Kind.type_= "wrap-verification-key"
           ; identifier= name }
@@ -1070,7 +1227,127 @@ module Make (Inputs : Inputs) = struct
           let%map.Lazy.Let_syntax cs_hash = constraint_system_digest
           and header = header_template in
           (Type_equal.Id.uid self.id, header, cs_hash)
+
+        let check_header path =
+          let open Or_error.Let_syntax in
+          let%bind header, () =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset:_ _ -> ())
+              path
+          in
+          let%bind () = check_snark_keys_header kind header in
+          let%map () =
+            (* TODO: Remove this when identifying hashes are
+               implemented.
+            *)
+            check_constraint_system_hash ~got:header.constraint_system_hash
+              ~expected:(Lazy.force constraint_system_hash)
+          in
+          header
+
+        let read_with_header path =
+          let open Or_error.Let_syntax in
+          let%bind header, key =
+            Snark_keys_header.read_with_header
+              ~read_data:(fun ~offset path ->
+                In_channel.read_all path
+                |> Bigstring.of_string ~pos:offset
+                |> Verification_key.Stable.Latest.bin_read_t ~pos_ref:(ref 0)
+                )
+              path
+          in
+          let%bind () = check_snark_keys_header kind header in
+          let%map () =
+            (* TODO: Remove this when identifying hashes are
+               implemented.
+            *)
+            check_constraint_system_hash ~got:header.constraint_system_hash
+              ~expected:(Lazy.force constraint_system_hash)
+          in
+          (header, key)
+
+        let write_with_header path x =
+          Or_error.try_with (fun () ->
+              Snark_keys_header.write_with_header
+                ~expected_max_size_log2:33 (* 8 GB should be enough *)
+                ~append_data:(fun path ->
+                  Out_channel.with_file ~append:true path ~f:(fun file ->
+                      Out_channel.output_string file
+                        (Binable.to_string
+                           (module Verification_key.Stable.Latest)
+                           x) ) )
+                (Lazy.force header_template)
+                path )
+
+        let registered_key = Set_once.create ()
+
+        let registered_key_lazy =
+          lazy
+            ( match Set_once.get registered_key with
+            | Some key ->
+                Lazy.force key
+            | None ->
+                failwithf
+                  "Wrap verification key for system %s was not registered \
+                   before use"
+                  name () )
+
+        let of_raw_key = Fn.id
       end
+
+      let generate () =
+        Common.time "wrapkeygen" (fun () ->
+            let module Vk = Verification_key in
+            let open Impls.Wrap in
+            let (T (typ, conv)) = input () in
+            let main x () : unit = main (conv x) in
+            let kp = generate_keypair ~exposing:[typ] main in
+            let pk = Keypair.pk kp in
+            let vk = Keypair.vk kp in
+            let vk : Vk.t =
+              { index= vk
+              ; commitments=
+                  Pickles_types.Plonk_verification_key_evals.map vk.evals
+                    ~f:(fun x ->
+                      Array.map x.unshifted ~f:(function
+                        | Infinity ->
+                            failwith "Unexpected zero curve point"
+                        | Finite x ->
+                            x ) )
+              ; step_domains= Vector.to_array step_domains
+              ; data=
+                  (let open Marlin_plonk_bindings.Pasta_fq_index in
+                  {constraints= domain_d1_size pk.index}) }
+            in
+            (pk, vk) )
+
+      let read_or_generate_from_cache :
+             Key_cache.Spec.t list
+          -> (Proving.t * Dirty.t) Lazy.t * (Verification.t * Dirty.t) Lazy.t =
+        Memo.of_comparable
+          (module Key_cache.Spec.List)
+          (fun cache ->
+            Common.time "wrap read or generate" (fun () ->
+                let open Impls.Wrap in
+                let (T (typ, conv)) = input () in
+                let main x () : unit = main (conv x) in
+                let kp_cache, vk_cache =
+                  Cache.Wrap.read_or_generate
+                    (Vector.to_array step_domains)
+                    cache Proving.cache_key Verification.cache_key typ main
+                in
+                let pk_cache =
+                  let%map.Lazy.Let_syntax kp, dirty = kp_cache in
+                  (Keypair.pk kp, dirty)
+                in
+                (pk_cache, vk_cache) ) )
+
+      let use_key_cache cache =
+        let pk_cache, vk_cache = read_or_generate_from_cache cache in
+        Set_once.set_exn Proving.registered_key [%here]
+          (Lazy.map ~f:fst pk_cache) ;
+        Set_once.set_exn Verification.registered_key [%here]
+          (Lazy.map ~f:fst vk_cache)
     end
   end
 
