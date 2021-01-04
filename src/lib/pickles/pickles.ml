@@ -415,6 +415,47 @@ module Make (Inputs : Inputs) = struct
         (* TODO: Proper identifying hash. *)
         constraint_system_hash }
 
+  let check_snark_keys_header kind (header : Snark_keys_header.t) =
+    let open Or_error.Let_syntax in
+    let%bind () =
+      if Int.equal header.header_version Snark_keys_header.header_version then
+        return ()
+      else Or_error.errorf "Snark key header version mismatch"
+    in
+    let%bind () =
+      if Snark_keys_header.Kind.equal header.kind kind then return ()
+      else
+        Or_error.tag_arg (Or_error.errorf "Snark key kind mismatch")
+          "kind" (header.kind, kind) (fun (got, expected) ->
+            Sexp.List
+              [ List [Atom "got"; Snark_keys_header.Kind.sexp_of_t got]
+              ; List
+                  [Atom "expected"; Snark_keys_header.Kind.sexp_of_t expected]
+              ] )
+    in
+    let%bind () =
+      if
+        Snark_keys_header.Constraint_constants.equal
+          header.constraint_constants constraint_constants
+      then return ()
+      else
+        Or_error.tag_arg
+          (Or_error.errorf "Snark key header constraint constants do not match")
+          "constraint constants"
+          (header.constraint_constants, constraint_constants)
+          (fun (got, expected) ->
+            Sexp.List
+              [ List
+                  [ Atom "got"
+                  ; Snark_keys_header.Constraint_constants.sexp_of_t got ]
+              ; List
+                  [ Atom "expected"
+                  ; Snark_keys_header.Constraint_constants.sexp_of_t expected
+                  ] ] )
+    in
+    (* TODO: Check identifying hash. *)
+    return ()
+
   let max_local_max_branchings (type n)
       (module Max_branching : Nat.Intf with type n = n) branches choices =
     let module Local_max_branchings = struct
@@ -598,9 +639,9 @@ module Make (Inputs : Inputs) = struct
 
         val check_header : string -> Snark_keys_header.t Or_error.t
 
-        val read_with_header : string -> Snark_keys_header.t * t
+        val read_with_header : string -> (Snark_keys_header.t * t) Or_error.t
 
-        val write_with_header : string -> t -> unit
+        val write_with_header : string -> t -> unit Or_error.t
 
         (** Set or get the [registered_key]. This is implicitly called by
             [use_key_cache]; care should be taken to ensure that this is not
@@ -623,9 +664,9 @@ module Make (Inputs : Inputs) = struct
 
         val check_header : string -> Snark_keys_header.t Or_error.t
 
-        val read_with_header : string -> Snark_keys_header.t * t
+        val read_with_header : string -> (Snark_keys_header.t * t) Or_error.t
 
-        val write_with_header : string -> t -> unit
+        val write_with_header : string -> t -> unit Or_error.t
 
         (** Set or get the [registered_key]. This is implicitly called by
             [use_key_cache]; care should be taken to ensure that this is not
@@ -710,12 +751,13 @@ module Make (Inputs : Inputs) = struct
                 module Proving = struct
                   type t = Tick.Proving_key.t
 
+                  let kind =
+                    { Snark_keys_header.Kind.type_= "step-proving-key"
+                    ; identifier= name ^ "-" ^ b.rule.identifier }
+
                   let header_template =
                     Lazy.map constraint_system_hash ~f:(fun cs_hash ->
-                        snark_keys_header
-                          { type_= "step-proving-key"
-                          ; identifier= name ^ "-" ^ b.rule.identifier }
-                          cs_hash )
+                        snark_keys_header kind cs_hash )
 
                   let cache_key =
                     let%map.Lazy.Let_syntax cs = constraint_system
@@ -725,11 +767,84 @@ module Make (Inputs : Inputs) = struct
                     , Index.to_int b.index
                     , cs )
 
-                  let check_header _ = failwith "TODO"
+                  let check_header path =
+                    let open Or_error.Let_syntax in
+                    let%bind header, () =
+                      Snark_keys_header.read_with_header
+                        ~read_data:(fun ~offset:_ _ -> ())
+                        path
+                    in
+                    let%bind () = check_snark_keys_header kind header in
+                    let%map () =
+                      (* TODO: Remove this when identifying hashes are
+                         implemented.
+                      *)
+                      if
+                        String.equal
+                          (Lazy.force constraint_system_hash)
+                          header.constraint_system_hash
+                      then return ()
+                      else
+                        Or_error.tag_arg
+                          (Or_error.errorf
+                             "Snark key header constraint system hashes do \
+                              not match")
+                          "constraint system hash"
+                          ( Lazy.force constraint_system_hash
+                          , header.constraint_system_hash )
+                          (fun (got, expected) ->
+                            Sexp.List
+                              [ List [Atom "got"; Atom got]
+                              ; List [Atom "expected"; Atom expected] ] )
+                    in
+                    header
 
-                  let read_with_header _ = failwith "TODO"
+                  let read_with_header path =
+                    let open Or_error.Let_syntax in
+                    let%bind header, key =
+                      Snark_keys_header.read_with_header
+                        ~read_data:(fun ~offset ->
+                          Marlin_plonk_bindings.Pasta_fp_index.read ~offset
+                            (Backend.Tick.Keypair.load_urs ()) )
+                        path
+                    in
+                    let%bind () = check_snark_keys_header kind header in
+                    let%map () =
+                      (* TODO: Remove this when identifying hashes are
+                         implemented.
+                      *)
+                      if
+                        String.equal
+                          (Lazy.force constraint_system_hash)
+                          header.constraint_system_hash
+                      then return ()
+                      else
+                        Or_error.tag_arg
+                          (Or_error.errorf
+                             "Snark key header constraint system hashes do \
+                              not match")
+                          "constraint system hash"
+                          ( Lazy.force constraint_system_hash
+                          , header.constraint_system_hash )
+                          (fun (got, expected) ->
+                            Sexp.List
+                              [ List [Atom "got"; Atom got]
+                              ; List [Atom "expected"; Atom expected] ] )
+                    in
+                    ( header
+                    , { Backend.Tick.Keypair.index= key
+                      ; cs= Lazy.force constraint_system } )
 
-                  let write_with_header _ = failwith "TODO"
+                  let write_with_header path t =
+                    Or_error.try_with (fun () ->
+                        Snark_keys_header.write_with_header
+                          ~expected_max_size_log2:
+                            33 (* 8 GB should be enough *)
+                          ~append_data:
+                            (Marlin_plonk_bindings.Pasta_fp_index.write
+                               ~append:true t.Backend.Tick.Keypair.index)
+                          (Lazy.force header_template)
+                          path )
 
                   let registered_key = Set_once.create ()
 
@@ -750,12 +865,13 @@ module Make (Inputs : Inputs) = struct
                 module Verification = struct
                   type t = Tick.Verification_key.t
 
+                  let kind =
+                    { Snark_keys_header.Kind.type_= "step-verification-key"
+                    ; identifier= name ^ "-" ^ b.rule.identifier }
+
                   let header_template =
                     Lazy.map constraint_system_hash ~f:(fun cs_hash ->
-                        snark_keys_header
-                          { type_= "step-verification-key"
-                          ; identifier= name ^ "-" ^ b.rule.identifier }
-                          cs_hash )
+                        snark_keys_header kind cs_hash )
 
                   let cache_key : Cache.Step.Key.Verification.t Lazy.t =
                     let%map.Lazy.Let_syntax cs_hash = constraint_system_digest
@@ -765,11 +881,84 @@ module Make (Inputs : Inputs) = struct
                     , Index.to_int b.index
                     , cs_hash )
 
-                  let check_header _ = failwith "TODO"
+                  let check_header path =
+                    let open Or_error.Let_syntax in
+                    let%bind header, () =
+                      Snark_keys_header.read_with_header
+                        ~read_data:(fun ~offset:_ _ -> ())
+                        path
+                    in
+                    let%bind () = check_snark_keys_header kind header in
+                    let%map () =
+                      (* TODO: Remove this when identifying hashes are
+                         implemented.
+                      *)
+                      if
+                        String.equal
+                          (Lazy.force constraint_system_hash)
+                          header.constraint_system_hash
+                      then return ()
+                      else
+                        Or_error.tag_arg
+                          (Or_error.errorf
+                             "Snark key header constraint system hashes do \
+                              not match")
+                          "constraint system hash"
+                          ( Lazy.force constraint_system_hash
+                          , header.constraint_system_hash )
+                          (fun (got, expected) ->
+                            Sexp.List
+                              [ List [Atom "got"; Atom got]
+                              ; List [Atom "expected"; Atom expected] ] )
+                    in
+                    header
 
-                  let read_with_header _ = failwith "TODO"
+                  let read_with_header path =
+                    let open Or_error.Let_syntax in
+                    let%bind header, key =
+                      Snark_keys_header.read_with_header
+                        ~read_data:(fun ~offset path ->
+                          Marlin_plonk_bindings.Pasta_fp_verifier_index.read
+                            ~offset
+                            (Backend.Tick.Keypair.load_urs ())
+                            path )
+                        path
+                    in
+                    let%bind () = check_snark_keys_header kind header in
+                    let%map () =
+                      (* TODO: Remove this when identifying hashes are
+                         implemented.
+                      *)
+                      if
+                        String.equal
+                          (Lazy.force constraint_system_hash)
+                          header.constraint_system_hash
+                      then return ()
+                      else
+                        Or_error.tag_arg
+                          (Or_error.errorf
+                             "Snark key header constraint system hashes do \
+                              not match")
+                          "constraint system hash"
+                          ( Lazy.force constraint_system_hash
+                          , header.constraint_system_hash )
+                          (fun (got, expected) ->
+                            Sexp.List
+                              [ List [Atom "got"; Atom got]
+                              ; List [Atom "expected"; Atom expected] ] )
+                    in
+                    (header, key)
 
-                  let write_with_header _ = failwith "TODO"
+                  let write_with_header path x =
+                    Or_error.try_with (fun () ->
+                        Snark_keys_header.write_with_header
+                          ~expected_max_size_log2:
+                            33 (* 8 GB should be enough *)
+                          ~append_data:
+                            (Marlin_plonk_bindings.Pasta_fp_verifier_index
+                             .write ~append:true x)
+                          (Lazy.force header_template)
+                          path )
 
                   let registered_key = Set_once.create ()
 
