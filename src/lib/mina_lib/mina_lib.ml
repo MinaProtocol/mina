@@ -2,7 +2,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
@@ -70,7 +70,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -628,8 +628,8 @@ let best_chain ?max_length t =
   match max_length with
   | Some max_length when max_length <= List.length best_tip_path ->
       (* The [best_tip_path] has already been truncated to the correct length,
-         we skip adding the root to stay below the maximum.
-      *)
+       we skip adding the root to stay below the maximum.
+    *)
       best_tip_path
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
@@ -853,7 +853,7 @@ let create ?wallets (config : Config.t) =
                       [%log' warn config.logger]
                         "$sender has sent many blocks. This is very unusual."
                         ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
-                      Coda_net2.Validation_callback.fire_if_not_already_fired
+                      Mina_net2.Validation_callback.fire_if_not_already_fired
                         cb `Reject ;
                       None
                   | `Within_capacity ->
@@ -933,7 +933,7 @@ let create ?wallets (config : Config.t) =
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
-                          Coda_state.Protocol_state.hash state
+                          Mina_state.Protocol_state.hash state
                         in
                         let k_breadcrumbs =
                           Transition_frontier.root frontier
@@ -971,7 +971,7 @@ let create ?wallets (config : Config.t) =
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
-                  let git_commit = Coda_version.commit_id_short in
+                  let git_commit = Mina_version.commit_id_short in
                   let uptime_minutes =
                     let now = Time.now () in
                     let minutes_float =
@@ -1192,7 +1192,7 @@ let create ?wallets (config : Config.t) =
                              breadcrumb
                          in
                          let validation_callback =
-                           Coda_net2.Validation_callback
+                           Mina_net2.Validation_callback
                            .create_without_expiration ()
                          in
                          External_transition.Validated.poke_validation_callback
@@ -1200,7 +1200,7 @@ let create ?wallets (config : Config.t) =
                          don't_wait_for
                            (* this will never throw since the callback was created without expiration *)
                            (let%map v =
-                              Coda_net2.Validation_callback.await_exn
+                              Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
                             if v = `Accept then

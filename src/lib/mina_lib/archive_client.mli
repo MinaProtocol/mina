@@ -3,7 +3,7 @@ open Pipe_lib
 
 val dispatch_precomputed_block :
      Host_and_port.t Cli_lib.Flag.Types.with_name
-  -> Coda_transition.External_transition.Precomputed_block.t
+  -> Mina_transition.External_transition.Precomputed_block.t
   -> unit Async.Deferred.Or_error.t
 
 val run :

@@ -25,7 +25,7 @@ module Get_status =
       }
     }
     daemonStatus {
-      peers
+      peers { peerId }
     }
     syncStatus
     initialPeers
@@ -52,7 +52,7 @@ module Get_version =
   query {
     version
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
   }
@@ -63,7 +63,7 @@ module Get_network =
 {|
   query {
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
   }
@@ -91,7 +91,11 @@ module Validate_choice = struct
     object
       method daemonStatus =
         object
-          method peers = peers
+          method peers =
+            Array.map peers ~f:(fun peer ->
+                object
+                  method peerId = peer
+                end )
         end
 
       method initialPeers = initialPeers
@@ -292,7 +296,8 @@ module Status = struct
               (Block_identifier.create (fst oldest_block) (snd oldest_block))
           )
       ; peers=
-          (res#daemonStatus)#peers |> Array.to_list |> List.map ~f:Peer.create
+          (let peer_objs = (res#daemonStatus)#peers |> Array.to_list in
+           List.map peer_objs ~f:(fun po -> po#peerId |> Peer.create))
       ; sync_status=
           Some
             { Sync_status.current_index=
@@ -337,7 +342,10 @@ module Status = struct
 
           method daemonStatus =
             object
-              method peers = [|"dev.o1test.net"|]
+              method peers =
+                [| object
+                     method peerId = "dev.o1test.net"
+                   end |]
             end
 
           method syncStatus = `SYNCED

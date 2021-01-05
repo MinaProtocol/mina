@@ -30,7 +30,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
+          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -84,7 +84,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                     in
                     Strict_pipe.Writer.write intf.broadcast_message_writer
                       ( msg
-                      , Coda_net2.Validation_callback.create_without_expiration
+                      , Mina_net2.Validation_callback.create_without_expiration
                           () ) ) ) )
 
     let call_rpc : type q r.
@@ -116,12 +116,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; rpc_handlers: rpc_handler list
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers: Peer.t list
-      ; connection_gating: Coda_net2.connection_gating ref
+      ; connection_gating: Mina_net2.connection_gating ref
       ; received_message_reader:
-          (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
+          (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
+          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -177,7 +177,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         ; peer_table
         ; initial_peers
         ; connection_gating=
-            ref Coda_net2.{banned_peers= []; trusted_peers= []; isolate= false}
+            ref Mina_net2.{banned_peers= []; trusted_peers= []; isolate= false}
         ; received_message_reader
         ; received_message_writer
         ; ban_notification_reader
@@ -197,7 +197,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       Hashtbl.data t.peer_table
       |> List.map
            ~f:
-             (Fn.compose Coda_net2.Multiaddr.of_string Peer.to_multiaddr_string)
+             (Fn.compose Mina_net2.Multiaddr.of_string Peer.to_multiaddr_string)
 
     let random_peers t n =
       let%map peers = peers t in

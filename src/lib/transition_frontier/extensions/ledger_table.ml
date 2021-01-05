@@ -54,14 +54,14 @@ module T = struct
       | E (Root_transitioned transition, _) -> (
         match transition.garbage with
         | Full nodes ->
-            let open Coda_state in
+            let open Mina_state in
             List.iter nodes ~f:(fun node ->
                 let With_hash.{data= external_transition; _}, _ =
                   node.transition
                 in
                 let blockchain_state =
                   Protocol_state.blockchain_state
-                  @@ Coda_transition.External_transition.protocol_state
+                  @@ Mina_transition.External_transition.protocol_state
                        external_transition
                 in
                 let staged_ledger =

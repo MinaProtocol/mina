@@ -289,12 +289,12 @@ module Types = struct
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
-               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~peers:(id ~typ:(non_null (list (non_null peer))))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
                ~block_production_keys:
-                 (id ~typ:Schema.(non_null @@ list (non_null string)))
+                 (id ~typ:(non_null @@ list (non_null Schema.string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
                ~global_slot_since_genesis_best_tip:int
@@ -403,7 +403,7 @@ module Types = struct
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
             ~args:Arg.[]
-            ~resolve:(fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+            ~resolve:(fun _ {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
@@ -415,7 +415,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun {ctx= coda; _}
-                   {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+                   {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string_system_time
                 (Mina_lib.time_controller coda)
                 timestamp )
@@ -423,13 +423,13 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
               Frozen_ledger_hash.to_string snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
               Mina_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
@@ -1460,20 +1460,20 @@ module Types = struct
               ~typ:(non_null (list (non_null peer)))
               ~doc:"Peers we will always allow connections from"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.trusted_peers)
+              ~resolve:(fun _ config -> config.Mina_net2.trusted_peers)
           ; field "bannedPeers"
               ~typ:(non_null (list (non_null peer)))
               ~doc:
                 "Peers we will never allow connections from (unless they are \
                  also trusted!)"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.banned_peers)
+              ~resolve:(fun _ config -> config.Mina_net2.banned_peers)
           ; field "isolate" ~typ:(non_null bool)
               ~doc:
                 "If true, no connections will be allowed unless they are from \
                  a trusted peer"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.isolate) ] )
+              ~resolve:(fun _ config -> config.Mina_net2.isolate) ] )
   end
 
   module Arguments = struct
@@ -1526,7 +1526,7 @@ module Types = struct
       scalar "PrecomputedBlock"
         ~doc:"Block encoded in precomputed block format" ~coerce:(fun json ->
           let json = to_yojson json in
-          Coda_transition.External_transition.Precomputed_block.of_yojson json
+          Mina_transition.External_transition.Precomputed_block.of_yojson json
       )
 
     module type Numeric_type = sig
@@ -1827,7 +1827,7 @@ module Types = struct
           let open Result.Let_syntax in
           let%bind trusted_peers = Result.all trusted_peers in
           let%map banned_peers = Result.all banned_peers in
-          Coda_net2.{isolate; trusted_peers; banned_peers} )
+          Mina_net2.{isolate; trusted_peers; banned_peers} )
         ~fields:
           Arg.
             [ arg "trustedPeers"
@@ -1872,7 +1872,7 @@ module Subscriptions = struct
               ~typ:Types.Input.public_key_arg ]
       ~resolve:(fun {ctx= coda; _} public_key ->
         Deferred.Result.return
-        @@ Coda_commands.Subscriptions.new_block coda public_key )
+        @@ Mina_commands.Subscriptions.new_block coda public_key )
 
   let chain_reorganization =
     subscription_field "chainReorganization"
@@ -1883,7 +1883,7 @@ module Subscriptions = struct
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
         Deferred.Result.return
-        @@ Coda_commands.Subscriptions.reorganization coda )
+        @@ Mina_commands.Subscriptions.reorganization coda )
 
   let commands = [new_sync_update; new_block; chain_reorganization]
 end
@@ -2030,11 +2030,11 @@ module Mutations = struct
           Deferred.return
           @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
         in
-        Some (Coda_commands.reset_trust_status coda ip_address) )
+        Some (Mina_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
     match
-      Coda_commands.setup_and_submit_user_command coda user_command_input
+      Mina_commands.setup_and_submit_user_command coda user_command_input
     with
     | `Active f -> (
         match%map f with
@@ -2058,7 +2058,7 @@ module Mutations = struct
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
-      Option.map ~f:Coda_numbers.Global_slot.of_uint32 valid_until
+      Option.map ~f:Mina_numbers.Global_slot.of_uint32 valid_until
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -2521,7 +2521,7 @@ module Queries = struct
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
+        Mina_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -2531,7 +2531,7 @@ module Queries = struct
       ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
         match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
         | Ok ip_addr ->
-            Some (Coda_commands.get_trust_status coda ip_addr)
+            Some (Mina_commands.get_trust_status coda ip_addr)
         | Error _ ->
             None )
 
@@ -2541,13 +2541,13 @@ module Queries = struct
       ~args:Arg.[]
       ~doc:"IP address and trust status for all peers"
       ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_trust_status_all coda )
+        Mina_commands.get_trust_status_all coda )
 
   let version =
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some Coda_version.commit_id)
+      ~resolve:(fun _ _ -> Some Mina_version.commit_id)
 
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Mina_lib.wallets coda in
@@ -2687,7 +2687,7 @@ module Queries = struct
   let genesis_block =
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
-        let open Coda_state in
+        let open Mina_state in
         let { Precomputed_values.genesis_ledger
             ; constraint_constants
             ; consensus_constants
@@ -2745,7 +2745,7 @@ module Queries = struct
               Transition_frontier.Breadcrumb.validated_transition breadcrumb
             in
             let transactions =
-              Coda_transition.External_transition.Validated.transactions
+              Mina_transition.External_transition.Validated.transactions
                 ~constraint_constants:
                   (Mina_lib.config coda).precomputed_values
                     .constraint_constants transition
@@ -2762,7 +2762,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun {ctx= coda; _} () ->
-        List.map (Mina_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
+        List.map (Mina_lib.initial_peers coda) ~f:Mina_net2.Multiaddr.to_string
         )
 
   let get_peers =
