@@ -29,15 +29,22 @@ let pgConnectionPrev = getEnvOrFail("PGCONN2");
 let main = () => {
   let currPool = Postgres.createPool(pgConnectionCurr);
   let prevPool = Postgres.createPool(pgConnectionPrev);
+  Js.log("First Query - In Progress");
   Postgres.makeQuery(prevPool, Postgres.getBlocks, result => {
     switch (result) {
     | Ok(prevBlocks) =>
+      Js.log("First Query - Finished");
+      Js.log("Second Query - In Progress");
       Postgres.makeQuery(currPool, Postgres.getBlocks, result => {
         switch (result) {
         | Ok(currBlocks) =>
+          Js.log("Second Query - Finished");
           let blocks = Belt.Array.concat(prevBlocks, currBlocks);
+          Js.log("Metrics - In Progress");
           let metrics =
             blocks |> Types.Block.parseBlocks |> Metrics.calculateMetrics;
+          Js.log("Metrics - Finished");
+
           UploadLeaderboardPoints.uploadChallengePoints(
             spreadsheetId,
             metrics,
@@ -71,7 +78,7 @@ let main = () => {
 
         | Error(error) => Js.log(error)
         }
-      })
+      });
 
     | Error(error) => Js.log(error)
     }
