@@ -13,7 +13,7 @@ open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
-module Length = Coda_numbers.Length
+module Length = Mina_numbers.Length
 
 let m = Snark_params.Tick.m
 
@@ -81,7 +81,7 @@ let compute_delegatee_table_genesis_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
       Mina_base.Ledger.iteri ledger ~f:(fun i acct -> f i acct) )
 
-module Segment_id = Coda_numbers.Nat.Make32 ()
+module Segment_id = Mina_numbers.Nat.Make32 ()
 
 module Typ = Snark_params.Tick.Typ
 
@@ -163,8 +163,8 @@ module Data = struct
   module Block_data = struct
     type t =
       { stake_proof: Stake_proof.t
-      ; global_slot: Coda_numbers.Global_slot.t
-      ; global_slot_since_genesis: Coda_numbers.Global_slot.t
+      ; global_slot: Mina_numbers.Global_slot.t
+      ; global_slot_since_genesis: Mina_numbers.Global_slot.t
       ; vrf_result: Random_oracle.Digest.t }
 
     let prover_state {stake_proof; _} = stake_proof
@@ -609,7 +609,7 @@ module Data = struct
     end
 
     module Message = struct
-      module Global_slot = Coda_numbers.Global_slot
+      module Global_slot = Mina_numbers.Global_slot
 
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
@@ -1181,7 +1181,7 @@ module Data = struct
                 ~typ:(non_null @@ Graphql_base_types.uint32 ())
                 ~args:Arg.[]
                 ~resolve:(fun _ {Poly.epoch_length; _} ->
-                  Coda_numbers.Length.to_uint32 epoch_length ) ] )
+                  Mina_numbers.Length.to_uint32 epoch_length ) ] )
 
       let to_input
           ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
@@ -1344,8 +1344,8 @@ module Data = struct
   end
 
   module Consensus_transition = struct
-    include Coda_numbers.Global_slot
-    module Value = Coda_numbers.Global_slot
+    include Mina_numbers.Global_slot
+    module Value = Mina_numbers.Global_slot
 
     type var = Checked.t
 
@@ -1633,7 +1633,7 @@ module Data = struct
             (Global_slot.t * Global_slot.t list) Quickcheck.Generator.t =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
-          let module GS = Coda_numbers.Global_slot in
+          let module GS = Mina_numbers.Global_slot in
           let%bind prev_global_slot = small_positive_int in
           let%bind slot_diffs =
             Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
@@ -1852,7 +1852,7 @@ module Data = struct
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
             , Global_slot.Stable.V1.t
-            , Coda_numbers.Global_slot.Stable.V1.t
+            , Mina_numbers.Global_slot.Stable.V1.t
             , Epoch_data.Staking_value_versioned.Value.Stable.V1.t
             , Epoch_data.Next_value_versioned.Value.Stable.V1.t
             , bool
@@ -1866,7 +1866,7 @@ module Data = struct
 
       module For_tests = struct
         let with_global_slot_since_genesis (state : t) slot_number =
-          let global_slot_since_genesis : Coda_numbers.Global_slot.t =
+          let global_slot_since_genesis : Mina_numbers.Global_slot.t =
             slot_number
           in
           {state with global_slot_since_genesis}
@@ -1880,7 +1880,7 @@ module Data = struct
       , Vrf.Output.Truncated.var
       , Amount.var
       , Global_slot.Checked.t
-      , Coda_numbers.Global_slot.Checked.t
+      , Mina_numbers.Global_slot.Checked.t
       , Epoch_data.var
       , Epoch_data.var
       , Boolean.var
@@ -1900,7 +1900,7 @@ module Data = struct
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.typ
-      ; Coda_numbers.Global_slot.typ
+      ; Mina_numbers.Global_slot.typ
       ; Epoch_data.Staking.typ
       ; Epoch_data.Next.typ
       ; Boolean.typ
@@ -1941,7 +1941,7 @@ module Data = struct
              ; Vrf.Output.Truncated.to_bits last_vrf_output
              ; Amount.to_bits total_currency
              ; Global_slot.to_bits curr_global_slot
-             ; Coda_numbers.Global_slot.to_bits global_slot_since_genesis
+             ; Mina_numbers.Global_slot.to_bits global_slot_since_genesis
              ; [has_ancestor_in_same_checkpoint_window; supercharge_coinbase]
             |]
         ; field_elements= [||] }
@@ -1981,7 +1981,7 @@ module Data = struct
         and min_window_density = length min_window_density
         and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
         and global_slot_since_genesis =
-          up Coda_numbers.Global_slot.Checked.to_bits global_slot_since_genesis
+          up Mina_numbers.Global_slot.Checked.to_bits global_slot_since_genesis
         and sub_window_densities =
           Checked.List.fold sub_window_densities ~init:[] ~f:(fun acc l ->
               let%map res = length l in
@@ -2105,7 +2105,7 @@ module Data = struct
       ; total_currency
       ; curr_global_slot= next_global_slot
       ; global_slot_since_genesis=
-          Coda_numbers.Global_slot.add
+          Mina_numbers.Global_slot.add
             previous_consensus_state.global_slot_since_genesis slot_diff
       ; staking_epoch_data
       ; next_epoch_data
@@ -2123,7 +2123,7 @@ module Data = struct
         ~next:(slot2 : Global_slot.Checked.t) =
       let open Snarky_integer in
       let open Run in
-      let module Slot = Coda_numbers.Global_slot in
+      let module Slot = Mina_numbers.Global_slot in
       let slot1 = Slot.Checked.to_integer (Global_slot.slot_number slot1) in
       let checkpoint_window_size_in_slots =
         Length.Checked.to_integer constants.checkpoint_window_size_in_slots
@@ -2151,7 +2151,7 @@ module Data = struct
       let blockchain_length, global_slot_since_genesis =
         match constraint_constants.fork with
         | None ->
-            (Length.zero, Coda_numbers.Global_slot.zero)
+            (Length.zero, Mina_numbers.Global_slot.zero)
         | Some {previous_length; previous_global_slot; _} ->
             (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
             For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
@@ -2234,11 +2234,11 @@ module Data = struct
     (* Check that both epoch and slot are zero.
     *)
     let is_genesis_state (t : Value.t) =
-      Coda_numbers.Global_slot.(
+      Mina_numbers.Global_slot.(
         equal zero (Global_slot.slot_number t.curr_global_slot))
 
     let is_genesis (global_slot : Global_slot.Checked.t) =
-      let open Coda_numbers.Global_slot in
+      let open Mina_numbers.Global_slot in
       Checked.equal (Checked.constant zero)
         (Global_slot.slot_number global_slot)
 
@@ -2289,7 +2289,7 @@ module Data = struct
         Global_slot.Checked.to_epoch_and_slot prev_global_slot
       in
       let%bind global_slot_since_genesis =
-        Coda_numbers.Global_slot.Checked.add
+        Mina_numbers.Global_slot.Checked.add
           previous_state.global_slot_since_genesis slot_diff
       in
       let%bind epoch_increased = Epoch.Checked.(prev_epoch < next_epoch) in
@@ -2434,7 +2434,7 @@ module Data = struct
       ; curr_epoch= Segment_id.to_int epoch
       ; curr_slot= Segment_id.to_int slot
       ; global_slot_since_genesis=
-          Coda_numbers.Global_slot.to_int t.global_slot_since_genesis
+          Mina_numbers.Global_slot.to_int t.global_slot_since_genesis
       ; total_currency= Amount.to_int t.total_currency }
 
     let curr_global_slot (t : Value.t) = t.curr_global_slot
@@ -2507,20 +2507,20 @@ module Data = struct
               ~deprecated:(Deprecated (Some "use blockHeight instead"))
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
-                Coda_numbers.Length.to_uint32 blockchain_length )
+                Mina_numbers.Length.to_uint32 blockchain_length )
           ; field "blockHeight" ~typ:(non_null uint32)
               ~doc:"Height of the blockchain at this block"
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
-                Coda_numbers.Length.to_uint32 blockchain_length )
+                Mina_numbers.Length.to_uint32 blockchain_length )
           ; field "epochCount" ~typ:(non_null uint32)
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.epoch_count; _} ->
-                Coda_numbers.Length.to_uint32 epoch_count )
+                Mina_numbers.Length.to_uint32 epoch_count )
           ; field "minWindowDensity" ~typ:(non_null uint32)
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.min_window_density; _} ->
-                Coda_numbers.Length.to_uint32 min_window_density )
+                Mina_numbers.Length.to_uint32 min_window_density )
           ; field "lastVrfOutput" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:
@@ -3216,7 +3216,7 @@ module Hooks = struct
                 let global_slot_since_genesis =
                   let slot_diff =
                     match
-                      Coda_numbers.Global_slot.sub
+                      Mina_numbers.Global_slot.sub
                         (Global_slot.slot_number global_slot)
                         (Consensus_state.curr_global_slot state)
                     with
@@ -3235,7 +3235,7 @@ module Hooks = struct
                     | Some diff ->
                         diff
                   in
-                  Coda_numbers.Global_slot.add
+                  Mina_numbers.Global_slot.add
                     (Consensus_state.global_slot_since_genesis state)
                     slot_diff
                 in
@@ -3458,7 +3458,7 @@ module Hooks = struct
         global_slot =
       if
         not
-          (Coda_numbers.Global_slot.equal
+          (Mina_numbers.Global_slot.equal
              (Global_slot.slot_number global_slot)
              block_data.global_slot)
       then
@@ -3548,6 +3548,8 @@ module Hooks = struct
                                       , Mina_base.State_hash.t )
                                       With_hash.t
            -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+           -> coinbase_receiver:Public_key.Compressed.t
+           -> supercharge_coinbase:bool
            -> Consensus_state.Value.t)
           Quickcheck.Generator.t =
         let open Consensus_state in
@@ -3558,11 +3560,11 @@ module Hooks = struct
         in
         let open Quickcheck.Let_syntax in
         let%bind slot_advancement = gen_slot_advancement in
-        let%bind supercharge_coinbase = Quickcheck.Generator.bool in
         let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
                (Protocol_state.Value.t, Mina_base.State_hash.t) With_hash.t)
-            ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t) ->
+            ~(snarked_ledger_hash : Mina_base.Frozen_ledger_hash.t)
+            ~coinbase_receiver ~supercharge_coinbase ->
           let prev =
             Protocol_state.consensus_state
               (With_hash.data previous_protocol_state)
@@ -3572,7 +3574,7 @@ module Hooks = struct
             Global_slot.(prev.curr_global_slot + slot_advancement)
           in
           let global_slot_since_genesis =
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               add prev.global_slot_since_genesis (of_int slot_advancement))
           in
           let curr_epoch, curr_slot =
@@ -3622,7 +3624,7 @@ module Hooks = struct
                    ~slot:curr_slot)
           ; block_stake_winner= genesis_winner_pk
           ; block_creator= genesis_winner_pk
-          ; coinbase_receiver= genesis_winner_pk
+          ; coinbase_receiver
           ; supercharge_coinbase }
     end
   end
@@ -3666,11 +3668,11 @@ let%test_module "Proof of stake tests" =
           ()
       | Some fork ->
           assert (
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               equal fork.previous_global_slot
                 previous_consensus_state.global_slot_since_genesis) ) ;
           assert (
-            Coda_numbers.Length.(
+            Mina_numbers.Length.(
               equal
                 (succ fork.previous_length)
                 previous_consensus_state.blockchain_length) ) ) ;
@@ -3741,12 +3743,12 @@ let%test_module "Proof of stake tests" =
                 global_slot - previous_consensus_state.curr_global_slot)
           in
           assert (
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               equal
                 (add fork.previous_global_slot slot_diff)
                 next_consensus_state.global_slot_since_genesis) ) ;
           assert (
-            Coda_numbers.Length.(
+            Mina_numbers.Length.(
               equal
                 (succ (succ fork.previous_length))
                 next_consensus_state.blockchain_length) ) ) ;
@@ -3845,8 +3847,8 @@ let%test_module "Proof of stake tests" =
                   (State_hash.of_yojson
                      (`String
                        "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"))
-            ; previous_length= Coda_numbers.Length.of_int 100
-            ; previous_global_slot= Coda_numbers.Global_slot.of_int 200 }
+            ; previous_length= Mina_numbers.Length.of_int 100
+            ; previous_global_slot= Mina_numbers.Global_slot.of_int 200 }
         in
         {constraint_constants with fork= fork_constants}
       in

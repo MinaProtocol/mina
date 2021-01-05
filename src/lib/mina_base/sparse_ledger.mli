@@ -32,7 +32,7 @@ val of_root :
 
 val apply_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.t
   -> t
@@ -58,7 +58,7 @@ val snapp_accounts :
   t -> Transaction.t -> Snapp_account.t option * Snapp_account.t option
 
 val has_locked_tokens_exn :
-     global_slot:Coda_numbers.Global_slot.t
+     global_slot:Mina_numbers.Global_slot.t
   -> account_id:Account_id.t
   -> t
   -> bool

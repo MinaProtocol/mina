@@ -22,7 +22,7 @@ module Get_coinbase_and_genesis =
       stateHash
     }
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
   }
@@ -287,22 +287,13 @@ WITH RECURSIVE chain AS (
 
   module User_commands = struct
     module Extras = struct
-      let fee_payer_account_creation_fee_paid (x, _, _, _) = x
+      let fee_payer (x, _, _) = `Pk x
 
-      let receiver_account_creation_fee_paid (_, y, _, _) = y
+      let source (_, y, _) = `Pk y
 
-      let created_token (_, _, z, _) = z
+      let receiver (_, _, z) = `Pk z
 
-      let fee_payer (_, _, _, (x, _, _)) = `Pk x
-
-      let source (_, _, _, (_, y, _)) = `Pk y
-
-      let receiver (_, _, _, (_, _, z)) = `Pk z
-
-      let typ =
-        Caqti_type.(
-          tup4 (option int64) (option int64) (option int64)
-            (tup3 string string string))
+      let typ = Caqti_type.(tup3 string string string)
     end
 
     let typ =
@@ -454,10 +445,8 @@ WITH RECURSIVE chain AS (
             match uc.failure_reason with
             | None -> (
               match
-                ( User_commands.Extras.fee_payer_account_creation_fee_paid
-                    extras
-                , User_commands.Extras.receiver_account_creation_fee_paid
-                    extras )
+                ( uc.fee_payer_account_creation_fee_paid
+                , uc.receiver_account_creation_fee_paid )
               with
               | None, None ->
                   M.return
@@ -489,11 +478,11 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= Unsigned.UInt64.of_int uc.fee_token
-          ; token= Unsigned.UInt64.of_int uc.token
+          ; fee_token= Unsigned.UInt64.of_int64 uc.fee_token
+          ; token= Unsigned.UInt64.of_int64 uc.token
           ; nonce= Unsigned.UInt32.of_int uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
-          ; fee= Unsigned.UInt64.of_int uc.fee
+          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
+          ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status } )
     in

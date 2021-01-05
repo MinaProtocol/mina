@@ -32,7 +32,6 @@ module Network_config = struct
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; coda_faucet_amount: string
-    ; deploy_archive: bool
     ; coda_faucet_fee: string
     ; seed_zone: string
     ; seed_region: string
@@ -85,7 +84,8 @@ module Network_config = struct
     let user_sanitized =
       Str.global_replace (Str.regexp "\\W|_") "" user_from_env
     in
-    let user = String.sub user_sanitized ~pos:0 ~len:5 in
+    let user_len = Int.min 5 (String.length user_sanitized) in
+    let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let time_now = Unix.gmtime (Unix.gettimeofday ()) in
     let timestr =
       string_of_int time_now.tm_mday
@@ -223,7 +223,6 @@ module Network_config = struct
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
-        ; deploy_archive= false
         ; coda_points_image= images.points
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_key_pass= "naughty blue worm"

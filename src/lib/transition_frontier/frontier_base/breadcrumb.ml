@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Network_peer
 
 module T = struct
@@ -143,7 +143,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                           make_actions Sent_invalid_signature_or_proof
                       | Pre_diff _
                       | Non_zero_fee_excess _
-                      | Insufficient_work _ ->
+                      | Insufficient_work _
+                      | Mismatched_statuses _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -298,12 +299,13 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let gen_slot_advancement = Int.gen_incl 1 10 in
-    let%map make_next_consensus_state =
+    let%bind make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
         ~constraint_constants:
           precomputed_values.Precomputed_values.constraint_constants
         ~constants:precomputed_values.consensus_constants
     in
+    let%map supercharge_coinbase = Quickcheck.Generator.bool in
     fun parent_breadcrumb ->
       let open Deferred.Let_syntax in
       let parent_staged_ledger = staged_ledger parent_breadcrumb in
@@ -345,12 +347,13 @@ module For_tests = struct
         , (Protocol_state.hash_with_body ~body_hash prev_state, body_hash) )
       in
       let coinbase_receiver = largest_account_public_key in
-      let supercharge_coinbase = true in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
           ~constraint_constants:precomputed_values.constraint_constants
           ~coinbase_receiver ~current_state_view ~supercharge_coinbase
           ~transactions_by_fee:transactions ~get_completed_work
+        |> Result.map_error ~f:Staged_ledger.Pre_diff_info.Error.to_error
+        |> Or_error.ok_exn
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -405,6 +408,7 @@ module For_tests = struct
           ~previous_protocol_state:
             With_hash.
               {data= previous_protocol_state; hash= previous_state_hash}
+          ~coinbase_receiver ~supercharge_coinbase
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
@@ -421,7 +425,7 @@ module For_tests = struct
           ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:
-            (Coda_net2.Validation_callback.create_without_expiration ())
+            (Mina_net2.Validation_callback.create_without_expiration ())
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)
@@ -436,7 +440,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None ~skip_staged_ledger_verification:true
+          ~sender:None ~skip_staged_ledger_verification:`All
           ~transition_receipt_time ()
       with
       | Ok new_breadcrumb ->

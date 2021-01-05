@@ -2,8 +2,8 @@ open Core
 open Async
 open Pipe_lib
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Signature_lib
 open O1trace
 open Otp_lib
@@ -118,7 +118,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
   in
   let previous_state_view =
     Protocol_state.body previous_protocol_state
-    |> Coda_state.Protocol_state.Body.view
+    |> Mina_state.Protocol_state.Body.view
   in
   let supercharge_coinbase =
     let epoch_ledger = Consensus.Data.Block_data.epoch_ledger block_data in
@@ -141,8 +141,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               ~current_state_view:previous_state_view
               ~transactions_by_fee:transactions ~get_completed_work
               ~log_block_creation ~supercharge_coinbase )
+        |> Result.map_error ~f:(fun err ->
+               Staged_ledger.Staged_ledger_error.Pre_diff err )
       in
       match%map
+        let%bind.Deferred.Result.Let_syntax diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
@@ -160,7 +163,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           @@ Ledger.unregister_mask_exn ~loc:__LOC__
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
-            ( diff
+            ( (match diff with Ok diff -> diff | Error _ -> assert false)
             , next_staged_ledger_hash
             , ledger_proof_opt
             , is_new_stack
@@ -168,14 +171,23 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
-          [%log error]
-            ~metadata:
-              [ ( "error"
-                , `String (Staged_ledger.Staged_ledger_error.to_string e) )
-              ; ( "diff"
-                , Staged_ledger_diff.With_valid_signatures_and_proofs.to_yojson
-                    diff ) ]
-            "Error applying the diff $diff: $error" ;
+          ( match diff with
+          | Ok diff ->
+              [%log error]
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e)
+                    )
+                  ; ( "diff"
+                    , Staged_ledger_diff.With_valid_signatures_and_proofs
+                      .to_yojson diff ) ]
+                "Error applying the diff $diff: $error"
+          | Error e ->
+              [%log error] "Error building the diff: $error"
+                ~metadata:
+                  [ ( "error"
+                    , `String (Staged_ledger.Staged_ledger_error.to_string e)
+                    ) ] ) ;
           None)
   in
   match res with
@@ -220,13 +232,13 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             in
             let blockchain_state =
               (* We use the time of the beginning of the slot because if things
-                 are slower than expected, we may have entered the next slot and
-                 putting the **current** timestamp rather than the expected one
-                 will screw things up.
+               are slower than expected, we may have entered the next slot and
+               putting the **current** timestamp rather than the expected one
+               will screw things up.
 
-                 [generate_transition] will log an error if the [current_time]
-                 has a different slot from the [scheduled_time]
-              *)
+               [generate_transition] will log an error if the [current_time]
+               has a different slot from the [scheduled_time]
+            *)
               Blockchain_state.create_value ~timestamp:scheduled_time
                 ~snarked_ledger_hash:next_ledger_hash ~genesis_ledger_hash
                 ~snarked_next_available_token
@@ -269,14 +281,17 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
               Some (protocol_state, internal_transition, witness) ) )
 
 module Precomputed_block = struct
-  type t =
+  type t = External_transition.Precomputed_block.t =
     { scheduled_time: Time.t
     ; protocol_state: Protocol_state.value
     ; protocol_state_proof: Proof.t
     ; staged_ledger_diff: Staged_ledger_diff.t
     ; delta_transition_chain_proof:
         Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
-  [@@deriving sexp, to_yojson]
+
+  let sexp_of_t = External_transition.Precomputed_block.sexp_of_t
+
+  let t_of_sexp = External_transition.Precomputed_block.t_of_sexp
 end
 
 let handle_block_production_errors ~logger ~previous_protocol_state
@@ -346,8 +361,8 @@ let handle_block_production_errors ~logger ~previous_protocol_state
       exn_breadcrumb (Error.tag ~tag:"Invalid staged ledger hash" e)
   | Error (`Invalid_staged_ledger_diff (e, staged_ledger_diff)) ->
       (* Unexpected errors from staged_ledger are captured in
-                         `Fatal_error
-                      *)
+                     `Fatal_error
+    *)
       [%log error]
         ~metadata:
           [ ("error", Error_json.error_to_yojson e)
@@ -490,7 +505,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let delta_transition_chain_proof =
                       Transition_chain_prover.prove
                         ~length:
-                          (Coda_numbers.Length.to_int consensus_constants.delta)
+                          (Mina_numbers.Length.to_int consensus_constants.delta)
                         ~frontier previous_state_hash
                       |> Option.value_exn
                     in
@@ -502,7 +517,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             External_transition.create ~protocol_state
                               ~protocol_state_proof ~staged_ledger_diff
                               ~validation_callback:
-                                (Coda_net2.Validation_callback
+                                (Mina_net2.Validation_callback
                                  .create_without_expiration ())
                               ~delta_transition_chain_proof () }
                       |> External_transition.skip_time_received_validation
@@ -532,8 +547,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values
                             ~verifier ~trust_system ~parent:crumb ~transition
-                            ~sender:None (* Consider skipping here *)
-                            ~skip_staged_ledger_verification:false
+                            ~sender:None (* Consider skipping `All here *)
+                            ~skip_staged_ledger_verification:`Proofs
                             ~transition_receipt_time () )
                       |> Deferred.Result.map_error ~f:(function
                            | `Invalid_staged_ledger_diff e ->
@@ -570,14 +585,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       ; Deferred.choice
                           ( Time.Timeout.create time_controller
                               (* We allow up to 20 seconds for the transition
-                                 to make its way from the transition_writer to
-                                 the frontier.
-                                 This value is chosen to be reasonably
-                                 generous. In theory, this should not take
-                                 terribly long. But long cycles do happen in
-                                 our system, and with medium curves those long
-                                 cycles can be substantial.
-                              *)
+                                to make its way from the transition_writer to
+                                the frontier.
+                                This value is chosen to be reasonably
+                                generous. In theory, this should not take
+                                terribly long. But long cycles do happen in
+                                our system, and with medium curves those long
+                                cycles can be substantial.
+                             *)
                               (Time.Span.of_ms 20000L)
                               ~f:(Fn.const ())
                           |> Time.Timeout.to_deferred )
@@ -590,8 +605,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         return ()
                     | `Timed_out ->
                         (* FIXME #3167: this should be fatal, and more
-                           importantly, shouldn't happen.
-                        *)
+                        importantly, shouldn't happen.
+                     *)
                         [%log fatal] ~metadata
                           "Timed out waiting for generated transition \
                            $state_hash to enter transition frontier. \
@@ -613,7 +628,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               match Agent.get keypairs with
               | keypairs, `Different ->
                   (* Perform block production key swap since we have new
-                     keypairs *)
+                   keypairs *)
                   Consensus.Data.Local_state.block_production_keys_swap
                     ~constants:consensus_constants consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
@@ -641,10 +656,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 (* TODO: Re-enable this assertion when it doesn't fail dev demos
                  *       (see #5354)
                  * assert (
-                  Consensus.Hooks.required_local_state_sync
+                   Consensus.Hooks.required_local_state_sync
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
-                  = None ) ; *)
+                   = None ) ; *)
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
@@ -788,7 +803,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                   External_transition.create ~protocol_state
                     ~protocol_state_proof ~staged_ledger_diff
                     ~validation_callback:
-                      (Coda_net2.Validation_callback.create_without_expiration
+                      (Mina_net2.Validation_callback.create_without_expiration
                          ())
                     ~delta_transition_chain_proof () }
             |> External_transition.skip_time_received_validation
@@ -814,7 +829,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
                   ~trust_system ~parent:crumb ~transition ~sender:None
-                  ~skip_staged_ledger_verification:false
+                  ~skip_staged_ledger_verification:`Proofs
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->
@@ -856,8 +871,8 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               return ()
           | `Timed_out ->
               (* FIXME #3167: this should be fatal, and more importantly,
-                 shouldn't happen.
-              *)
+             shouldn't happen.
+          *)
               [%log fatal] ~metadata
                 "Timed out waiting for generated transition $state_hash to \
                  enter transition frontier. Continuing to produce new blocks \

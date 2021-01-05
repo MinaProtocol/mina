@@ -12,10 +12,10 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
-open Coda_state
+open Mina_state
 open Cache_lib
 open O1trace
-open Coda_transition
+open Mina_transition
 open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
@@ -181,9 +181,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~transition_receipt_time
             ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:
-              mostly_validated_transition (* TODO: Can we skip here? *)
-            ~skip_staged_ledger_verification:false () )
+            ~transition:mostly_validated_transition
+            (* TODO: Can we skip here? *) () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->

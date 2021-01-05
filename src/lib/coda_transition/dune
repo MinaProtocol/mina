@@ -1,6 +1,0 @@
-(library
- (name coda_transition)
- (public_name coda_transition)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson))
- (libraries core_kernel staged_ledger transition_chain_verifier truth mina_base coda_net2 coda_state precomputed_values consensus protocol_version staged_ledger_diff verifier allocation_functor))

@@ -99,9 +99,22 @@ spec:
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ "coda-archive run -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port {{ .Values.archive.ports.server }}" ]
+        args: [ 
+          "coda-archive",
+          "run",
+          "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
+          {{- if .Values.coda.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          {{- end }}
+          "-server-port", "{{ .Values.archive.ports.server }}"
+        ]
         env:
         imagePullPolicy: Always
+        {{- if .Values.coda.runtimeConfig }}
+        volumeMounts:
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
         ports:
         - name: archive-port
           protocol: TCP

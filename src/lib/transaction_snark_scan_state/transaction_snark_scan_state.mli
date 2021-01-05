@@ -13,7 +13,7 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Transaction_applied.t
     ; state_hash: State_hash.t * State_body_hash.t
     ; state_view: Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement: Transaction_snark.Statement.t
@@ -122,8 +122,8 @@ val staged_transactions : t -> Transaction.t With_status.t list
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
      Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
@@ -159,13 +159,13 @@ val required_state_hashes : t -> State_hash.Set.t
 (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
 val check_required_protocol_states :
      t
-  -> protocol_states:Coda_state.Protocol_state.value list
-  -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
+  -> protocol_states:Mina_state.Protocol_state.value list
+  -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
 
 (** All the proof bundles for snark workers*)
 val all_work_pairs :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
   -> ( Transaction.t
      , Transaction_witness.t
      , Ledger_proof.t )

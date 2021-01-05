@@ -11,7 +11,7 @@ open Snark_params.Tick
 
 open Snark_params_nonconsensus
 module Currency = Currency_nonconsensus.Currency
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
@@ -71,8 +71,8 @@ module Common : sig
         ( Currency.Fee.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
-        , Coda_numbers.Account_nonce.Stable.V1.t
-        , Coda_numbers.Global_slot.Stable.V1.t
+        , Mina_numbers.Account_nonce.Stable.V1.t
+        , Mina_numbers.Global_slot.Stable.V1.t
         , Signed_command_memo.t )
         Poly.Stable.V1.t
       [@@deriving compare, eq, sexp, hash]
@@ -89,8 +89,8 @@ module Common : sig
     ( Currency.Fee.var
     , Public_key.Compressed.var
     , Token_id.var
-    , Coda_numbers.Account_nonce.Checked.t
-    , Coda_numbers.Global_slot.Checked.t
+    , Mina_numbers.Account_nonce.Checked.t
+    , Mina_numbers.Global_slot.Checked.t
     , Signed_command_memo.Checked.t )
     Poly.t
 
@@ -137,8 +137,8 @@ val create :
      fee:Currency.Fee.t
   -> fee_token:Token_id.t
   -> fee_payer_pk:Public_key.Compressed.t
-  -> nonce:Coda_numbers.Account_nonce.t
-  -> valid_until:Coda_numbers.Global_slot.t option
+  -> nonce:Mina_numbers.Account_nonce.t
+  -> valid_until:Mina_numbers.Global_slot.t option
   -> memo:Signed_command_memo.t
   -> body:Body.t
   -> t
@@ -155,9 +155,9 @@ val fee_payer : t -> Account_id.t
 
 val fee_excess : t -> Fee_excess.t
 
-val nonce : t -> Coda_numbers.Account_nonce.t
+val nonce : t -> Mina_numbers.Account_nonce.t
 
-val valid_until : t -> Coda_numbers.Global_slot.t
+val valid_until : t -> Mina_numbers.Global_slot.t
 
 val memo : t -> Signed_command_memo.t
 
