@@ -17,8 +17,8 @@
   "author": "o1labs",
   "license": "MIT",
   "homepage": "https://codaprotocol.com",
-  "repository": "https://github.com/CodaProtocol/coda-automation",
-  "bugs": "https://github.com/CodaProtocol/coda-automation/issues",
+  "repository": "https://github.com/MinaProtocol/mina",
+  "bugs": "https://github.com/MinaProtocol/mina/issues",
   "devDependencies": {
     "bs-platform": "^7.2",
     "bsb": "^0.0.1",

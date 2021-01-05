@@ -34,38 +34,38 @@ src/app/validation/priv/plts
 maintenance/*.dot
 maintenance/*.png
 
-coda-automation/*config.json
-coda-automation/!bsconfig.json
-coda-automation/*/venv/*
-coda-automation/ec2.json
-coda-automation/*credentials.json
-coda-automation/token.pickle
-coda-automation/.merlin
-coda-automation/lib
-coda-automation/keys/genesis/*
-coda-automation/keys/keypairs/*
-coda-automation/keys/keysets/*
-coda-automation/keys/api-keys/*
-coda-automation/keys/testnet-keys/*
-coda-automation/src/*.js
-coda-automation/node_modules/
+automation/*config.json
+automation/!bsconfig.json
+automation/*/venv/*
+automation/ec2.json
+automation/*credentials.json
+automation/token.pickle
+automation/.merlin
+automation/lib
+automation/keys/genesis/*
+automation/keys/keypairs/*
+automation/keys/keysets/*
+automation/keys/api-keys/*
+automation/keys/testnet-keys/*
+automation/src/*.js
+automation/node_modules/
 
-coda-automation/scripts/offline_fish_keys
-coda-automation/scripts/offline_whale_keys
-coda-automation/scripts/online_fish_keys
-coda-automation/scripts/online_whale_keys
-coda-automation/scripts/service_keys
-coda-automation/scripts/genesis_ledger.json
-coda-automation/scripts/annotated_ledger.json
+automation/scripts/offline_fish_keys
+automation/scripts/offline_whale_keys
+automation/scripts/online_fish_keys
+automation/scripts/online_whale_keys
+automation/scripts/service_keys
+automation/scripts/genesis_ledger.json
+automation/scripts/annotated_ledger.json
 
-coda-automation/Digraph.gv
-coda-automation/Digraph.gv.png
-coda-automation/**/__pycache__/**
+automation/Digraph.gv
+automation/Digraph.gv.png
+automation/**/__pycache__/**
 
-coda-automation/nightly-logs
+automation/nightly-logs
 
-coda-automation/daemon.json
+automation/daemon.json
 
-coda-automation/discord_webhook_url.txt
-coda-automation/*-accounts.csv
-coda-automation/block_tree.gv.png
+automation/discord_webhook_url.txt
+automation/*-accounts.csv
+automation/block_tree.gv.png
