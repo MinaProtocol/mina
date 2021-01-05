@@ -12,7 +12,7 @@ If you have any issues setting up your testnet or have any other questions about
 # Code Structure
 
 ```
-coda-automation
+automation
 ├── helm
 │   ├── block-producer
 │   └── snark-worker

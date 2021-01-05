@@ -14,14 +14,14 @@ ARG COMMIT_HASH=master
 ARG TESTNET_NAME=turbo-pickles
 ARG CONFIG_FILE="/root/daemon.json"
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/coda-automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
+RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
 
 RUN head ${CONFIG_FILE}
 
 RUN coda daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
   mv ~/.coda-config/genesis/genesis_* /var/lib/coda/
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/coda-automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt
+RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt
 
 #RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 

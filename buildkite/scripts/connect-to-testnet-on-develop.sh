@@ -30,7 +30,7 @@ TESTNET_NAME="turbo-pickles"
 
 # Generate genesis proof and then crash due to no peers
 coda daemon \
-  -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
+  -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
 || true
 
@@ -39,8 +39,8 @@ rm ~/.coda-config/.mina-lock ||:
 
 # Restart in the background
 coda daemon \
-  -peer-list-file coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
-  -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
+  -peer-list-file automation/terraform/testnets/$TESTNET_NAME/peers.txt \
+  -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
   & # -background
 
