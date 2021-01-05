@@ -28,8 +28,8 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = [
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/ArchiveNodeArtifact"),
-          S.strictlyStart (S.contains "scripts/archive")
-          S.exactly "buildkite/nightly.txt"
+          S.strictlyStart (S.contains "scripts/archive"),
+          S.exactly "buildkite/nightly.txt" "sh"
         ],
         path = "Release",
         name = "ArchiveNodeArtifact"

@@ -10,16 +10,19 @@ let dependsOn = [
     { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
 ]
 
-in Pipeline.build Pipeline.Config::{
-  spec =
-    JobSpec::{
-    dirtyWhen = [
-      S.exactly "buildkite/nightly.txt",
-    ],
-    path = "Test",
-    name = "Nightly Test"
-  },
-  steps = [
-    DeployNightly.step dependsOn
-  ]
+in
+
+Pipeline.build
+  Pipeline.Config::{
+    spec =
+      JobSpec::{
+      dirtyWhen = [
+        S.exactly "buildkite/nightly.txt" "sh"
+      ],
+      path = "Test",
+      name = "Nightly Test"
+    },
+    steps = [
+      DeployNightly.step dependsOn
+    ]
 }
