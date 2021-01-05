@@ -19,9 +19,9 @@ spec:
               imagePullPolicy: Always
               env:
                 - name: PGCONN1
-                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
+                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB1 }}
                 - name: PGCONN2
-                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
+                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB2 }}
               volumeMounts:
                 - name: {{ .Values.volume.name }}
                   mountPath: {{ .Values.volume.mountPath }}

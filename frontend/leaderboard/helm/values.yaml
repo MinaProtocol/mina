@@ -15,4 +15,5 @@ postgresql:
   postgresqlUsername: "postgres"
   postgresHost: "postgresql"
   postgresPort: "5432"
-  postgresDB: "archive"
+  postgresDB1: "archive"
+  postgresDB2: "archive_backup"
