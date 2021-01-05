@@ -20,6 +20,7 @@ spec:
               env:
                 - name: PGCONN1
 <<<<<<< HEAD
+<<<<<<< HEAD
                   value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB1 }}
                 - name: PGCONN2
                   value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB2 }}
@@ -28,6 +29,11 @@ spec:
                 - name: PGCONN2
                   value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
 >>>>>>> feat: Added second PGCONN env var to helm chart
+=======
+                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB1 }}
+                - name: PGCONN2
+                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB2 }}
+>>>>>>> feat: Added helm chart values for second DB
               volumeMounts:
                 - name: {{ .Values.volume.name }}
                   mountPath: {{ .Values.volume.mountPath }}
