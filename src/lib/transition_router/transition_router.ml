@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Coda_transition
+open Mina_transition
 open O1trace
 open Network_peer
 
@@ -176,7 +176,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             let best_tip_length =
               External_transition.Initial_validated.blockchain_length
                 candidate_best_tip
-              |> Coda_numbers.Length.to_int
+              |> Mina_numbers.Length.to_int
             in
             Mina_metrics.Transition_frontier.update_max_blocklength_observed
               best_tip_length ;

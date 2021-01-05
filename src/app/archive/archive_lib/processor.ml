@@ -5,8 +5,8 @@ open Async
 open Core
 open Caqti_async
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Pipe_lib
 open Signature_lib
 open Pickles_types
@@ -134,7 +134,7 @@ module Timing_info = struct
     in
     let balance_to_int64 x = amount_to_int64 (Currency.Balance.to_amount x) in
     let slot_to_int64 x =
-      Coda_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
+      Mina_numbers.Global_slot.to_uint32 x |> Unsigned.UInt32.to_int64
     in
     let%bind public_key_id =
       Public_key.add_if_doesn't_exist (module Conn) acc.public_key
@@ -328,12 +328,12 @@ module User_command = struct
               (Signed_command.receiver_pk t)
           in
           let valid_until =
-            let open Coda_numbers in
+            let open Mina_numbers in
             let slot = Signed_command.valid_until t in
             if Global_slot.equal slot Global_slot.max_value then None
             else
               Some
-                ( slot |> Coda_numbers.Global_slot.to_uint32
+                ( slot |> Mina_numbers.Global_slot.to_uint32
                 |> Unsigned.UInt32.to_int64 )
           in
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
@@ -469,8 +469,8 @@ module User_command = struct
                 ; fee_payer_pk= Account_id.public_key fee_payer
                 ; nonce=
                     Option.value (S.nonce c)
-                      ~default:Coda_numbers.Account_nonce.zero
-                ; valid_until= Coda_numbers.Global_slot.max_value
+                      ~default:Mina_numbers.Account_nonce.zero
+                ; valid_until= Mina_numbers.Global_slot.max_value
                 ; memo= Signed_command_memo.create_from_string_exn "snapp" }
             ; body=
                 Payment

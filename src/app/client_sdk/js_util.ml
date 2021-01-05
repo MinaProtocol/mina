@@ -4,8 +4,8 @@ open Js_of_ocaml
 open Snark_params_nonconsensus
 open Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
-module Global_slot = Coda_numbers_nonconsensus.Global_slot
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
+module Global_slot = Mina_numbers_nonconsensus.Global_slot
 module Memo = Signed_command_memo
 module Signature_lib = Signature_lib_nonconsensus
 
@@ -28,7 +28,7 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
   in
   let fee_token = Token_id.default in
   let nonce_js = payload_common_js##.nonce in
-  let nonce = Js.to_string nonce_js |> Coda_numbers.Account_nonce.of_string in
+  let nonce = Js.to_string nonce_js |> Mina_numbers.Account_nonce.of_string in
   let valid_until_js = payload_common_js##.validUntil in
   let valid_until = Js.to_string valid_until_js |> Global_slot.of_string in
   let memo_js = payload_common_js##.memo in

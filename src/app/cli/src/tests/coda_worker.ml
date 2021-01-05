@@ -1,7 +1,7 @@
 open Core
 open Async
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Signature_lib
 open Pipe_lib
 open Init
@@ -9,10 +9,10 @@ open Init
 module Input = struct
   type t =
     { addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t
-    ; libp2p_keypair: Coda_net2.Keypair.Stable.Latest.t
+    ; libp2p_keypair: Mina_net2.Keypair.Stable.Latest.t
     ; net_configs:
         ( Node_addrs_and_ports.Display.Stable.Latest.t
-        * Coda_net2.Keypair.Stable.Latest.t )
+        * Mina_net2.Keypair.Stable.Latest.t )
         list
         * Node_addrs_and_ports.Display.Stable.Latest.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.Latest.t option
@@ -66,7 +66,7 @@ module T = struct
     ; get_nonce:
         ( 'worker
         , Account_id.t
-        , Coda_numbers.Account_nonce.t option )
+        , Mina_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
     ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
     ; send_user_command:
@@ -121,7 +121,7 @@ module T = struct
     ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
     ; coda_get_nonce:
-        Account_id.t -> Coda_numbers.Account_nonce.t option Deferred.t
+        Account_id.t -> Mina_numbers.Account_nonce.t option Deferred.t
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Signed_command.t Or_error.t Deferred.t
@@ -234,7 +234,7 @@ module T = struct
       C.create_rpc ~f:get_nonce_impl ~name:"get_nonce"
         ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:
-          [%bin_type_class: Coda_numbers.Account_nonce.Stable.Latest.t option]
+          [%bin_type_class: Mina_numbers.Account_nonce.Stable.Latest.t option]
         ()
 
     let root_length =
@@ -409,7 +409,7 @@ module T = struct
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
-              ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
+              ; initial_peers= List.map ~f:Mina_net2.Multiaddr.of_string peers
               ; addrs_and_ports=
                   Node_addrs_and_ports.of_display addrs_and_ports
               ; metrics_port= None
@@ -499,12 +499,12 @@ module T = struct
           let coda_start () = Mina_lib.start coda in
           let coda_get_balance account_id =
             return
-              ( Coda_commands.get_balance coda account_id
+              ( Mina_commands.get_balance coda account_id
               |> Participating_state.active_exn )
           in
           let coda_get_nonce account_id =
             return
-              ( Coda_commands.get_nonce coda account_id
+              ( Mina_commands.get_nonce coda account_id
               |> Participating_state.active_exn )
           in
           let coda_root_length () =
@@ -532,13 +532,13 @@ module T = struct
             in
             let payment_input = build_user_command_input amount sk pk fee in
             Deferred.map
-              ( Coda_commands.setup_and_submit_user_command coda payment_input
+              ( Mina_commands.setup_and_submit_user_command coda payment_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
           let coda_process_user_command cmd_input =
             Deferred.map
-              ( Coda_commands.setup_and_submit_user_command coda cmd_input
+              ( Mina_commands.setup_and_submit_user_command coda cmd_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
@@ -550,7 +550,7 @@ module T = struct
           in
           let coda_new_block key =
             Deferred.return
-            @@ Coda_commands.Subscriptions.new_block coda (Some key)
+            @@ Mina_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader
@@ -643,7 +643,7 @@ module T = struct
           in
           let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
+            @@ Mina_commands.For_tests.Subscriptions.new_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
