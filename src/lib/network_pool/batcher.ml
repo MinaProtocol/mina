@@ -93,7 +93,7 @@ let rec determine_outcome : type p r partial.
             (List.map xs ~f:(fun (_e, new_hint) ->
                  `Partially_validated new_hint ))
         in
-        determine_outcome (List.map xs ~f:(fun (e, _hint) -> e)) res_xs v
+        determine_outcome (List.map xs ~f:fst) res_xs v
       in
       let length = List.length potentially_invalid in
       let left, right = List.split_n potentially_invalid (length / 2) in
@@ -163,7 +163,14 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
           determine_outcome out_for_verification res t
     in
     t.state <- Verifying {out_for_verification} ;
-    upon res (fun _r -> start_verifier t) )
+    upon res (fun r ->
+        ( match r with
+        | Ok () ->
+            ()
+        | Error e ->
+            List.iter out_for_verification ~f:(fun x ->
+                Ivar.fill_if_empty x.res (Error e) ) ) ;
+        start_verifier t ) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
     (r, unit) Result.t Deferred.Or_error.t =
