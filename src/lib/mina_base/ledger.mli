@@ -100,12 +100,12 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
-module Undo : sig
+module Transaction_applied : sig
   open Transaction_logic
 
-  module Signed_command_undo : sig
+  module Signed_command_applied : sig
     module Common : sig
-      type t = Undo.Signed_command_undo.Common.t =
+      type t = Transaction_applied.Signed_command_applied.Common.t =
         { user_command: Signed_command.t With_status.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t
         ; fee_payer_timing: Account.Timing.t
@@ -114,7 +114,7 @@ module Undo : sig
     end
 
     module Body : sig
-      type t = Undo.Signed_command_undo.Body.t =
+      type t = Transaction_applied.Signed_command_applied.Body.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of
             { previous_delegate: Public_key.Compressed.t option }
@@ -125,94 +125,98 @@ module Undo : sig
       [@@deriving sexp]
     end
 
-    type t = Undo.Signed_command_undo.t = {common: Common.t; body: Body.t}
+    type t = Transaction_applied.Signed_command_applied.t =
+      {common: Common.t; body: Body.t}
     [@@deriving sexp]
   end
 
-  module Snapp_command_undo : sig
-    type t = Undo.Snapp_command_undo.t =
+  module Snapp_command_applied : sig
+    type t = Transaction_applied.Snapp_command_applied.t =
       { accounts: (Account_id.t * Account.t option) list
       ; command: Snapp_command.t With_status.t }
     [@@deriving sexp]
   end
 
-  module Command_undo : sig
-    type t = Undo.Command_undo.t =
-      | Signed_command of Signed_command_undo.t
-      | Snapp_command of Snapp_command_undo.t
+  module Command_applied : sig
+    type t = Transaction_applied.Command_applied.t =
+      | Signed_command of Signed_command_applied.t
+      | Snapp_command of Snapp_command_applied.t
     [@@deriving sexp]
   end
 
-  module Fee_transfer_undo : sig
-    type t = Undo.Fee_transfer_undo.t =
+  module Fee_transfer_applied : sig
+    type t = Transaction_applied.Fee_transfer_applied.t =
       { fee_transfer: Fee_transfer.t
       ; previous_empty_accounts: Account_id.t list
-      ; receiver_timing: Account.Timing.t }
+      ; receiver_timing: Account.Timing.t
+      ; balances: Transaction_status.Fee_transfer_balance_data.t }
     [@@deriving sexp]
   end
 
-  module Coinbase_undo : sig
-    type t = Undo.Coinbase_undo.t =
+  module Coinbase_applied : sig
+    type t = Transaction_applied.Coinbase_applied.t =
       { coinbase: Coinbase.t
       ; previous_empty_accounts: Account_id.t list
-      ; receiver_timing: Account.Timing.t }
+      ; receiver_timing: Account.Timing.t
+      ; balances: Transaction_status.Coinbase_balance_data.t }
     [@@deriving sexp]
   end
 
   module Varying : sig
-    type t = Undo.Varying.t =
-      | Command of Command_undo.t
-      | Fee_transfer of Fee_transfer_undo.t
-      | Coinbase of Coinbase_undo.t
+    type t = Transaction_applied.Varying.t =
+      | Command of Command_applied.t
+      | Fee_transfer of Fee_transfer_applied.t
+      | Coinbase of Coinbase_applied.t
     [@@deriving sexp]
   end
 
-  type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
+  type t = Transaction_applied.t =
+    {previous_hash: Ledger_hash.t; varying: Varying.t}
   [@@deriving sexp]
 
   val transaction : t -> Transaction.t With_status.t
 
-  val user_command_status : t -> User_command_status.t
+  val user_command_status : t -> Transaction_status.t
 end
 
 val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 
 val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
-  -> Undo.Signed_command_undo.t Or_error.t
+  -> Transaction_applied.Signed_command_applied.t Or_error.t
 
 val apply_fee_transfer :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Fee_transfer.t
-  -> Undo.Fee_transfer_undo.t Or_error.t
+  -> Transaction_applied.Fee_transfer_applied.t Or_error.t
 
 val apply_coinbase :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Coinbase.t
-  -> Undo.Coinbase_undo.t Or_error.t
+  -> Transaction_applied.Coinbase_applied.t Or_error.t
 
 val apply_transaction :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> txn_state_view:Snapp_predicate.Protocol_state.View.t
   -> t
   -> Transaction.t
-  -> Undo.t Or_error.t
+  -> Transaction_applied.t Or_error.t
 
 val undo :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
-  -> Undo.t
+  -> Transaction_applied.t
   -> unit Or_error.t
 
 val has_locked_tokens :
-     global_slot:Coda_numbers.Global_slot.t
+     global_slot:Mina_numbers.Global_slot.t
   -> account_id:Account_id.t
   -> t
   -> bool Or_error.t
@@ -226,7 +230,7 @@ val merkle_root_after_snapp_command_exn :
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
   -> Ledger_hash.t * [`Next_available_token of Token_id.t]
@@ -241,7 +245,7 @@ val num_accounts : t -> int
 val gen_initial_ledger_state :
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
-  * Coda_numbers.Account_nonce.t
+  * Mina_numbers.Account_nonce.t
   * Account_timing.t )
   array
   Quickcheck.Generator.t
@@ -249,7 +253,7 @@ val gen_initial_ledger_state :
 type init_state =
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
-  * Coda_numbers.Account_nonce.t
+  * Mina_numbers.Account_nonce.t
   * Account_timing.t )
   array
 [@@deriving sexp_of]

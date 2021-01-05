@@ -339,9 +339,9 @@ struct
           (`Valid_until valid_until, `Current_global_slot current_global_slot)
         ->
           ( "expired"
-          , [ ("valid_until", Coda_numbers.Global_slot.to_yojson valid_until)
+          , [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
             ; ( "current_global_slot"
-              , Coda_numbers.Global_slot.to_yojson current_global_slot ) ] )
+              , Mina_numbers.Global_slot.to_yojson current_global_slot ) ] )
 
     let balance_of_account ~global_slot (account : Account.t) =
       match account.timing with
@@ -991,10 +991,10 @@ struct
                                 , `Current_global_slot current_global_slot ) ->
                                 ( Expired
                                 , [ ( "valid_until"
-                                    , Coda_numbers.Global_slot.to_yojson
+                                    , Mina_numbers.Global_slot.to_yojson
                                         valid_until )
                                   ; ( "current_global_slot"
-                                    , Coda_numbers.Global_slot.to_yojson
+                                    , Mina_numbers.Global_slot.to_yojson
                                         current_global_slot ) ] )
                           in
                           let yojson_fail_reason =
@@ -1247,7 +1247,7 @@ struct
       else
         [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
               User_command.(
-                Coda_numbers.Account_nonce.compare (nonce_exn tx1)
+                Mina_numbers.Account_nonce.compare (nonce_exn tx1)
                   (nonce_exn tx2)) ) ]
   end
 
@@ -1449,8 +1449,8 @@ let%test_module _ =
       { With_status.data= cmd
       ; status=
           Applied
-            ( User_command_status.Auxiliary_data.empty
-            , User_command_status.Balance_data.empty ) }
+            ( Transaction_status.Auxiliary_data.empty
+            , Transaction_status.Balance_data.empty ) }
 
     let independent_signed_cmds' =
       List.map independent_cmds' ~f:(function
@@ -1672,7 +1672,7 @@ let%test_module _ =
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Coda_numbers.Global_slot.(succ (succ (succ curr_slot)))
+            Mina_numbers.Global_slot.(succ (succ (succ curr_slot)))
           in
           let valid_command =
             mk_payment ~valid_until:curr_slot_plus_three 1 1_000_000_000 1 9
@@ -1713,10 +1713,10 @@ let%test_module _ =
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Coda_numbers.Global_slot.(succ (succ (succ curr_slot)))
+            Mina_numbers.Global_slot.(succ (succ (succ curr_slot)))
           in
           let curr_slot_plus_seven =
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               succ (succ (succ (succ curr_slot_plus_three))))
           in
           let few_now, _few_later =

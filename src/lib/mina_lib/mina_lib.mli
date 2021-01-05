@@ -1,10 +1,11 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Pipe_lib
 open Signature_lib
+module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
@@ -38,6 +39,9 @@ val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
 val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
+
+val next_epoch_ledger :
+  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
@@ -99,7 +103,7 @@ val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Coda_net2.Multiaddr.t list
+val initial_peers : t -> Mina_net2.Multiaddr.t list
 
 val client_port : t -> int
 
@@ -146,8 +150,7 @@ val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
-val get_ledger :
-  t -> Staged_ledger_hash.t option -> Account.t list Deferred.Or_error.t
+val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 

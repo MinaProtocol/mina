@@ -1,5 +1,5 @@
 open Mina_base
-open Coda_state
+open Mina_state
 open Core_kernel
 open Pickles_types
 

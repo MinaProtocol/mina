@@ -1,0 +1,21 @@
+
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build',
+         '--build-arg',
+         'BAKE_VERSION=${_BAKE_VERSION}',
+         '--build-arg',
+         'COMMIT_HASH=${_COMMIT_HASH}',
+         '--build-arg',
+         'TESTNET_NAME=${_TESTNET_NAME}',
+         '--build-arg',
+         'CONFIG_FILE=${_CONFIG_FILE}',
+         '-t',
+         '${_GCR_BAKED_TAG}',
+         '.']
+options:
+  machineType: 'N1_HIGHCPU_8'
+images: [
+  '${_GCR_BAKED_TAG}',
+]
+

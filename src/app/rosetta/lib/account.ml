@@ -15,7 +15,7 @@ module Get_balance =
       }
       initialPeers
       daemonStatus {
-        peers
+        peers { peerId }
       }
       account(publicKey: $public_key, token: $token_id) {
         balance {

@@ -1,6 +1,0 @@
-(library
- (public_name coda_plugins)
- (name coda_plugins)
- (libraries core_kernel dynlink mina_lib)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version)))

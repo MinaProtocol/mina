@@ -22,7 +22,7 @@ module Exported : sig
 
     val total_currency : Value.t -> Currency.Amount.t
 
-    val min_window_density : Value.t -> Coda_numbers.Length.t
+    val min_window_density : Value.t -> Mina_numbers.Length.t
 
     val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
