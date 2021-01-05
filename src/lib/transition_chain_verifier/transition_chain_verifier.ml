@@ -1,6 +1,6 @@
 open Core
 open Mina_base
-open Coda_state
+open Mina_state
 
 module Merkle_list_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = State_body_hash.t

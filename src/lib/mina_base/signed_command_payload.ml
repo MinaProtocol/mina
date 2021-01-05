@@ -10,20 +10,20 @@ consensus_mechanism]
 
 open Snark_params.Tick
 open Signature_lib
-module Coda_numbers = Coda_numbers
+module Mina_numbers = Mina_numbers
 
 [%%else]
 
 open Signature_lib_nonconsensus
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Currency = Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
 module Memo = Signed_command_memo
-module Account_nonce = Coda_numbers.Account_nonce
-module Global_slot = Coda_numbers.Global_slot
+module Account_nonce = Mina_numbers.Account_nonce
+module Global_slot = Mina_numbers.Global_slot
 
 module Common = struct
   module Poly = struct

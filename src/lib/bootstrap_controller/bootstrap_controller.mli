@@ -1,5 +1,5 @@
 open Async_kernel
-open Coda_transition
+open Mina_transition
 open Pipe_lib
 open Network_peer
 
