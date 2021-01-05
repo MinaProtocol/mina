@@ -18,7 +18,9 @@ spec:
               image: {{ .Values.leaderboard.image }}
               imagePullPolicy: Always
               env:
-                - name: PGCONN
+                - name: PGCONN1
+                  value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
+                - name: PGCONN2
                   value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
               volumeMounts:
                 - name: {{ .Values.volume.name }}
