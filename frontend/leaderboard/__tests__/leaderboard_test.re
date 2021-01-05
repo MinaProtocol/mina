@@ -1,10 +1,9 @@
 open Jest;
 open Expect;
 module StringMap = Map.Make(String);
-
 let blocks = [|
   {
-    Types.Block.id: 1,
+    Types.Block.stateHash: "stateHash1",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -15,7 +14,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 2,
+    Types.Block.stateHash: "stateHash2",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -26,7 +25,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 3,
+    Types.Block.stateHash: "stateHash3",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -37,7 +36,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 4,
+    Types.Block.stateHash: "stateHash4",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -48,7 +47,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 5,
+    Types.Block.stateHash: "stateHash5",
     blockchainState: {
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
@@ -59,7 +58,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 6,
+    Types.Block.stateHash: "stateHash6",
     blockchainState: {
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
@@ -70,7 +69,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 7,
+    Types.Block.stateHash: "stateHash7",
     blockchainState: {
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
@@ -81,7 +80,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 8,
+    Types.Block.stateHash: "stateHash8",
     blockchainState: {
       creatorAccount: "publickey3",
       coinbaseReceiver: None,
@@ -92,7 +91,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 9,
+    Types.Block.stateHash: "stateHash9",
     blockchainState: {
       creatorAccount: "publickey3",
       coinbaseReceiver: None,
@@ -103,7 +102,7 @@ let blocks = [|
     internalCommands: [||],
   },
   {
-    id: 10,
+    Types.Block.stateHash: "stateHash10",
     blockchainState: {
       creatorAccount: "publickey4",
       coinbaseReceiver: None,

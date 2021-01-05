@@ -23,42 +23,55 @@ Node.Process.putEnvVar(
 
 let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
-let pgConnection = getEnvOrFail("PGCONN");
+let pgConnectionCurr = getEnvOrFail("PGCONN1");
+let pgConnectionPrev = getEnvOrFail("PGCONN2");
 
 let main = () => {
-  let pool = Postgres.createPool(pgConnection);
-  Postgres.makeQuery(pool, Postgres.getLateBlocks, result => {
+  let currPool = Postgres.createPool(pgConnectionCurr);
+  let prevPool = Postgres.createPool(pgConnectionPrev);
+  Postgres.makeQuery(prevPool, Postgres.getBlocks, result => {
     switch (result) {
-    | Ok(blocks) =>
-      let metrics =
-        blocks |> Types.Block.parseBlocks |> Metrics.calculateMetrics;
+    | Ok(prevBlocks) =>
+      Postgres.makeQuery(currPool, Postgres.getBlocks, result => {
+        switch (result) {
+        | Ok(currBlocks) =>
+          let blocks = Belt.Array.concat(prevBlocks, currBlocks);
+          let metrics =
+            blocks |> Types.Block.parseBlocks |> Metrics.calculateMetrics;
+          UploadLeaderboardPoints.uploadChallengePoints(
+            spreadsheetId,
+            metrics,
+            () => {
+              UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
 
-      UploadLeaderboardPoints.uploadChallengePoints(
-        spreadsheetId,
-        metrics,
-        () => {
-          UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+              Postgres.makeQuery(currPool, Postgres.getBlockHeight, result => {
+                switch (result) {
+                | Ok(blockHeightQuery) =>
+                  Belt.Option.(
+                    Js.Json.(
+                      blockHeightQuery[0]
+                      ->decodeObject
+                      ->flatMap(__x => Js.Dict.get(__x, "max"))
+                      ->flatMap(decodeString)
+                      ->mapWithDefault((), height => {
+                          UploadLeaderboardData.uploadData(
+                            spreadsheetId,
+                            height,
+                          )
+                        })
+                    )
+                  );
+                  Postgres.endPool(currPool);
+                  Postgres.endPool(prevPool);
+                | Error(error) => Js.log(error)
+                }
+              });
+            },
+          );
 
-          Postgres.makeQuery(pool, Postgres.getBlockHeight, result => {
-            switch (result) {
-            | Ok(blockHeightQuery) =>
-              Belt.Option.(
-                Js.Json.(
-                  blockHeightQuery[0]
-                  ->decodeObject
-                  ->flatMap(__x => Js.Dict.get(__x, "max"))
-                  ->flatMap(decodeString)
-                  ->mapWithDefault((), height => {
-                      UploadLeaderboardData.uploadData(spreadsheetId, height)
-                    })
-                )
-              );
-              Postgres.endPool(pool);
-            | Error(error) => Js.log(error)
-            }
-          });
-        },
-      );
+        | Error(error) => Js.log(error)
+        }
+      })
 
     | Error(error) => Js.log(error)
     }
