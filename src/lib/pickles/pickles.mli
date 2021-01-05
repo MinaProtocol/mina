@@ -435,6 +435,19 @@ end) : sig
     with type t = (Max_branching.n, Max_branching.n) Proof.t
      and type statement = A_value.t
 
+  (** Register this proof system, associating it with the tag [self].
+      This must be called exactly once, after the
+      [Wrap_keys.Keys.Verification.registered_key] has been satisfied, but
+      before evaluating any proof system that refers to the tag.
+  *)
+  val register : unit -> unit
+
+  (** Load keys from the specified cache, or generate them if they are not
+      found.
+      This sets the [registered_key] values in [Wrap_keys] and each module in
+      [steps] before calling [register]. If any of these have already been
+      called, the corresponding exception will be raised.
+  *)
   val use_cache : Key_cache.Spec.t list -> Cache_handle.t
 end
 

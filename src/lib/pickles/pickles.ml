@@ -1307,8 +1307,8 @@ module Make (Inputs : Inputs) = struct
                 in
                 let (module Requests) = b.requests in
                 let _, prev_vars_length = b.branching in
-                let pairing_vk = Lazy.force step_vk in
                 let wrap ?handler prevs next_state =
+                  let pairing_vk = Lazy.force step_vk in
                   let wrap_vk = Lazy.force wrap_vk in
                   let wrap_pk = Wrap_keys.Keys.Proving.registered_key_lazy in
                   let prevs =
@@ -1381,9 +1381,7 @@ module Make (Inputs : Inputs) = struct
     ; wrap_domains
     ; step_domains }
 
-  let () =
-    Timer.clock __LOC__ ;
-    Types_map.add_exn self data
+  let register () = Types_map.add_exn self data
 
   module P = Proof
 
@@ -1490,6 +1488,7 @@ module Make (Inputs : Inputs) = struct
       go steps
     in
     Timer.clock __LOC__ ;
+    register () ;
     (provers, wrap_vk, disk_key, !cache_handle)
 
   let use_cache cache =
