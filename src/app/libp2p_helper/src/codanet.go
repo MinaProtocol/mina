@@ -7,6 +7,7 @@ import (
 	"log"
 	"path"
 	"time"
+        "os"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -311,6 +312,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			}
 
 			as = append(as, externalAddr)
+                        
+                        _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+                        if exists { return as }
+                        
 			bs := make([]ma.Multiaddr, 0, len(as))
 			isPrivate := func(addr ma.Multiaddr) bool {
 				// get the ip out
