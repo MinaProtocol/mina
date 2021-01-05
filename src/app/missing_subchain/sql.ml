@@ -85,5 +85,3 @@ module Blocks_and_internal_commands = struct
   let run (module Conn : Caqti_async.CONNECTION) ~block_id =
     Conn.collect_list query block_id
 end
-
-module Internal_commands = struct end
