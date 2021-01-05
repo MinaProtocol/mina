@@ -92,7 +92,7 @@ spec:
             value: {{ $.Values.userAgent.txBatchSize | quote }}
           {{ end -}}
           {{- if ne $.Values.userAgent.sendEveryMins "" -}}
-          - name: AGENT_SEND_EVERY_MINUTES
+          - name: AGENT_SEND_EVERY_MINS
             value: "1"
           {{ end -}}
           - name: CODA_PUBLIC_KEY
@@ -183,6 +183,9 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-block-producer-key", "/root/wallet-keys/key",
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           "-generate-genesis-proof", "true",
@@ -198,7 +201,13 @@ spec:
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ $config.externalPort | quote }}
+          value: {{ $.Values.coda.ports.p2p | quote }}
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET 
+          value: "mina_network_block_data"
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         - name: CODA_CLIENT_TRUSTLIST
@@ -215,7 +224,8 @@ spec:
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ $config.externalPort }}
+          containerPort: {{ $.Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.external }}
 {{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
@@ -223,6 +233,10 @@ spec:
           mountPath: /root/wallet-keys
         - name: config-dir
           mountPath: /root/.coda-config
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
         {{- if $.Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
@@ -267,6 +281,15 @@ spec:
         configMap:
           name: block-producer-daemon-config
       {{- end }}
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -282,7 +305,7 @@ spec:
     app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ $config.externalPort }}
+    port: {{ $.Values.coda.ports.p2p }}
     targetPort: external-port
 ---
 {{ end }}
