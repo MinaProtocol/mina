@@ -1158,7 +1158,7 @@ module Staged_ledger_validation = struct
     Fn.compose statement_target statement
 
   let validate_staged_ledger_diff :
-         ?skip_staged_ledger_verification:bool
+         ?skip_staged_ledger_verification:[`All | `Proofs]
       -> ( 'time_received
          , 'genesis_state
          , 'proof

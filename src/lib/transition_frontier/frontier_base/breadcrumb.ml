@@ -440,7 +440,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None ~skip_staged_ledger_verification:true
+          ~sender:None ~skip_staged_ledger_verification:`All
           ~transition_receipt_time ()
       with
       | Ok new_breadcrumb ->

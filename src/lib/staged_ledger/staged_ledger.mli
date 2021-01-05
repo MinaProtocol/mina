@@ -114,7 +114,7 @@ val copy : t -> t
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
-     ?skip_verification:bool
+     ?skip_verification:[`Proofs | `All]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> Staged_ledger_diff.t
