@@ -281,12 +281,21 @@ let main ~archive_uri ~output_file ~state_hash () =
       in
       [%log info] "Found a subchain of length %d"
         (List.length extensional_blocks) ;
+      (* the user commands in a block with a given state hash *)
+      let user_cmds_tbl : Extensional.User_command.t list State_hash.Table.t =
+        State_hash.Table.create ()
+      in
+      (* the internal commands in a block with a given state hash *)
+      let internal_cmds_tbl :
+          Extensional.Internal_command.t list State_hash.Table.t =
+        State_hash.Table.create ()
+      in
       [%log info] "Querying for user commands in blocks" ;
       let%bind () =
         Deferred.List.iter extensional_blocks ~f:(fun block ->
             let%map user_cmds = fill_in_user_command pool block.state_hash in
             match
-              State_hash.Table.add Block.user_cmds_tbl ~key:block.state_hash
+              State_hash.Table.add user_cmds_tbl ~key:block.state_hash
                 ~data:user_cmds
             with
             | `Ok ->
@@ -304,8 +313,8 @@ let main ~archive_uri ~output_file ~state_hash () =
               fill_in_internal_command pool block.state_hash
             in
             match
-              State_hash.Table.add Block.internal_cmds_tbl
-                ~key:block.state_hash ~data:internal_cmds
+              State_hash.Table.add internal_cmds_tbl ~key:block.state_hash
+                ~data:internal_cmds
             with
             | `Ok ->
                 ()
@@ -316,7 +325,8 @@ let main ~archive_uri ~output_file ~state_hash () =
                 Core.exit 1 )
       in
       let blocks =
-        List.map extensional_blocks ~f:Block.block_of_extensional_block
+        List.map extensional_blocks
+          ~f:(Block.block_of_extensional_block user_cmds_tbl internal_cmds_tbl)
       in
       [%log info] "Writing blocks to $output_file"
         ~metadata:[("output_file", `String output_file)] ;
