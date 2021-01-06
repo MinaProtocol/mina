@@ -307,39 +307,32 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
-			if externalAddr == nil {
-				return as
+			if externalAddr != nil {
+				as = append(as, externalAddr) 
 			}
 
-			as = append(as, externalAddr) 
             _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
             if exists { return as }
-            
-			bs := make([]ma.Multiaddr, 0, len(as))
-			isPrivate := func(addr ma.Multiaddr) bool {
-				// get the ip out
-				// filter against the private ips
-				fs := ma.NewFilters()
-				parseCIDR := func(cidr string) gonet.IPNet {
-					_, ipnet, err := gonet.ParseCIDR(cidr)
-					if err != nil {
-						panic(err)
-					}
-					return *ipnet
+
+			parseCIDR := func(cidr string) gonet.IPNet {
+				_, ipnet, err := gonet.ParseCIDR(cidr)
+				if err != nil {
+					panic(err)
 				}
-
-				fs.AddFilter(parseCIDR("10.0.0.0/8"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("172.16.0.0/12"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("192.168.0.0/16"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("100.64.0.0/10"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("198.18.0.0/15"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("169.254.0.0/16"), ma.ActionDeny)
-
-				return fs.AddrBlocked(addr)
+				return *ipnet
 			}
 
+            fs := ma.NewFilters()
+			fs.AddFilter(parseCIDR("10.0.0.0/8"), ma.ActionDeny)
+			fs.AddFilter(parseCIDR("172.16.0.0/12"), ma.ActionDeny)
+			fs.AddFilter(parseCIDR("192.168.0.0/16"), ma.ActionDeny)
+			fs.AddFilter(parseCIDR("100.64.0.0/10"), ma.ActionDeny)
+			fs.AddFilter(parseCIDR("198.18.0.0/15"), ma.ActionDeny)
+			fs.AddFilter(parseCIDR("169.254.0.0/16"), ma.ActionDeny)
+
+			bs := []ma.Multiaddr{}
 			for _, a := range as {
-				if isPrivate(a) {
+				if fs.AddrBlocked(a) {
 					continue
 				}
 				bs = append(bs, a)
