@@ -1,6 +1,6 @@
 apiVersion: v2
 name: leaderboard
-description: A Helm chart for Coda Protocol's Testnet leaderboard service
+description: A Helm chart for Mina Protocol's Testnet leaderboard service
 type: application
 version: 0.1.10
 appVersion: 1.16.0
@@ -16,6 +16,6 @@ keywords:
 - points
 - mina
 - testnet
-home: https://codaprotocol.com/
+home: https://minaprotocol.com/
 sources:
 - https://github.com/CodaProtocol/coda/tree/develop/frontend/leaderboard
