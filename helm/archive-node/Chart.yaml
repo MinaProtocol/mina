@@ -2,8 +2,12 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.4.5
+version: 0.4.6
 appVersion: 1.16.0
+annotations:
+  artifacthub.io/changes: |
+    - enable Artifacthub repository hosting *changes* annotations
+    - add CHANGELOG.md for chart version => changelog tracking
 dependencies:
   - name: postgresql
     version: "*"
