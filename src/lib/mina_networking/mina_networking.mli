@@ -209,13 +209,15 @@ val get_best_tip :
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> State_hash.t
   -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
 
 val get_transition_chain :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
   -> External_transition.t list Deferred.Or_error.t
@@ -254,6 +256,7 @@ val broadcast_transaction_pool_diff :
 
 val glue_sync_ledger :
      t
+  -> preferred:Peer.t list
   -> (Ledger_hash.t * Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
      * Sync_ledger.Query.t

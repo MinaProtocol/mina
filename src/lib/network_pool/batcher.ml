@@ -140,77 +140,83 @@ let order_proofs t =
       Whenever the verifier returns, if the queue is nonempty, flush it into the verifier.
   *)
 
-let rec start_verifier : type proof partial r.
-    (proof, partial, r) t -> (proof, r) Outcome.t Or_error.t Ivar.t -> unit =
- fun t finished ->
-  if Queue.is_empty t.queue then (
+let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
+ fun t ->
+  if Q.is_empty t.queue then
     (* we looped in the else after verifier finished but no pending work. *)
-    t.state <- Waiting ;
-    Ivar.fill finished (Ok Outcome.empty) )
-  else
+    t.state <- Waiting
+  else (
+    [%log' debug t.logger] "Verifying proofs in batch of size $num_proofs"
+      ~metadata:[("num_proofs", `Int (Q.length t.queue))] ;
     let out_for_verification =
       let proofs =
-        (* TODO: Make this a proper config detail once we have data on what a
-           good default would be.
-        *)
-        match Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE" with
+        match t.max_weight_per_call with
         | None ->
-            let proofs = Queue.to_list t.queue in
-            Queue.clear t.queue ; proofs
-        | Some max_proofs ->
-            (* NB: Order is irrelevant because we sort immediately after *)
-            let rec take n acc =
-              if n > 0 then
-                match Queue.dequeue t.queue with
-                | Some proof ->
-                    take (n - 1) (proof :: acc)
-                | None ->
-                    acc
-              else acc
+            let proofs = Q.to_list t.queue in
+            Q.clear t.queue ; proofs
+        | Some max_weight ->
+            let rec take capacity acc =
+              match Q.first t.queue with
+              | None ->
+                  acc
+              | Some ({weight; _} as proof) ->
+                  if weight <= capacity then (
+                    Q.remove_first t.queue |> ignore ;
+                    take (capacity - weight) (proof :: acc) )
+                  else acc
             in
-            take (int_of_string max_proofs) []
+            List.rev (take max_weight [])
       in
       order_proofs t proofs
     in
-    let next_finished = Ivar.create () in
-    t.state <- Verifying {next_finished; out_for_verification} ;
+    [%log' debug t.logger] "Calling verifier with $num_proofs on $ids"
+      ~metadata:
+        [ ("num_proofs", `Int (List.length out_for_verification))
+        ; ( "ids"
+          , `List
+              (List.map
+                 ~f:(fun {id; _} -> `Int (Id.to_int_exn id))
+                 out_for_verification) ) ] ;
     let res =
-      call_verifier t
-        (List.map out_for_verification ~f:(fun (_id, p) -> `Proof p))
+      match%bind
+        call_verifier t
+          (List.map out_for_verification ~f:(fun {data= p; _} -> `Init p))
+      with
+      | Error e ->
+          Deferred.return (Error e)
+      | Ok res ->
+          determine_outcome out_for_verification res t
     in
-    upon res (fun verification_res ->
-        let outcome =
-          match verification_res with
-          | Error e ->
-              Deferred.return (Error e)
-          | Ok res ->
-              determine_outcome out_for_verification res t
-        in
-        upon outcome (fun y -> Ivar.fill finished y) ) ;
-    start_verifier t next_finished
-
-let verify' (type p r partial n) (t : (p, partial, r) t)
-    (proofs : (p, n) Vector.t) :
-    (Id.t, n) Vector.t * (p, r) Outcome.t Deferred.Or_error.t =
-  let proofs_with_ids = Vector.map proofs ~f:(fun p -> (Id.create (), p)) in
-  Queue.enqueue_all t.queue (Vector.to_list proofs_with_ids) ;
-  ( Vector.map proofs_with_ids ~f:fst
-  , match t.state with
-    | Verifying {next_finished; _} ->
-        Ivar.read next_finished
-    | Waiting ->
-        let finished = Ivar.create () in
-        start_verifier t finished ; Ivar.read finished )
+    t.state <- Verifying {out_for_verification} ;
+    upon res (fun r ->
+        ( match r with
+        | Ok () ->
+            ()
+        | Error e ->
+            List.iter out_for_verification ~f:(fun x ->
+                Ivar.fill_if_empty x.res (Error e) ) ) ;
+        start_verifier t ) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
     (r, unit) Result.t Deferred.Or_error.t =
-  let [id], d = verify' t [proof] in
-  Deferred.Or_error.map d ~f:(fun outcome ->
-      match Map.find_exn outcome id with
-      | `Valid x ->
-          Ok x
-      | `Invalid _ ->
-          Error () )
+  let elt =
+    {id= Id.create (); data= proof; weight= t.weight proof; res= Ivar.create ()}
+  in
+  ( match (t.how_to_add, t.compare_init) with
+  | `Enqueue_back, _ | `Insert, None ->
+      Q.insert_last t.queue elt
+  | `Insert, Some compare -> (
+      (* Find the first element that [proof] is less than *)
+      let compare = compare_elt ~compare in
+      match Q.find_elt t.queue ~f:(fun e -> compare elt e < 0) with
+      | None ->
+          (* [proof] is greater than all elts in the queue, and so goes in the back. *)
+          Q.insert_last t.queue elt
+      | Some succ ->
+          Q.insert_before t.queue succ elt ) )
+  |> ignore ;
+  (match t.state with Verifying _ -> () | Waiting -> start_verifier t) ;
+  Ivar.read elt.res
 
 type ('a, 'b, 'c) batcher = ('a, 'b, 'c) t [@@deriving sexp]
 

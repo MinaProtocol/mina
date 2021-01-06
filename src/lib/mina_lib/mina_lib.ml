@@ -768,6 +768,7 @@ let start_with_precomputed_blocks t blocks =
   start t
 
 let create ?wallets (config : Config.t) =
+  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -1150,6 +1151,7 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                  ~catchup_mode
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->

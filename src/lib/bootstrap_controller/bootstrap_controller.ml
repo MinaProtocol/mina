@@ -149,11 +149,12 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
         | Error e ->
             return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
-let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-    ~genesis_constants =
+let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
+    ~sync_ledger_reader ~genesis_constants =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
-  Mina_networking.glue_sync_ledger t.network query_reader response_writer ;
+  Mina_networking.glue_sync_ledger ~preferred t.network query_reader
+    response_writer ;
   Reader.iter sync_ledger_reader ~f:(fun incoming_transition ->
       let (transition, _) : External_transition.Initial_validated.t =
         Envelope.Incoming.data incoming_transition
@@ -198,8 +199,9 @@ let external_transition_compare consensus_constants =
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
-    ~transition_reader ~persistent_root ~persistent_frontier
-    ~initial_root_transition ~precomputed_values =
+    ~transition_reader ~best_seen_transition ~persistent_root
+    ~persistent_frontier ~initial_root_transition ~precomputed_values
+    ~catchup_mode =
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
@@ -243,8 +245,17 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
              ~trust_system
          in
          don't_wait_for
-           (sync_ledger t ~root_sync_ledger ~transition_graph
-              ~sync_ledger_reader ~genesis_constants) ;
+           (sync_ledger t
+              ~preferred:
+                ( Option.to_list best_seen_transition
+                |> List.filter_map ~f:(fun x ->
+                       match Envelope.Incoming.sender x with
+                       | Local ->
+                           None
+                       | Remote r ->
+                           Some r ) )
+              ~root_sync_ledger ~transition_graph ~sync_ledger_reader
+              ~genesis_constants) ;
          (* We ignore the resulting ledger returned here since it will always
          * be the same as the ledger we started with because we are syncing
          * a db ledger. *)
@@ -484,7 +495,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ~precomputed_values ()
+                ~persistent_frontier ~precomputed_values ~catchup_mode ()
               >>| function
               | Ok frontier ->
                   frontier
@@ -657,7 +668,7 @@ let%test_module "Bootstrap_controller tests" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
-                  ~sync_ledger_reader
+                  ~preferred:[] ~sync_ledger_reader
                   ~genesis_constants:Genesis_constants.compiled
               in
               let%bind () =
@@ -721,9 +732,10 @@ let%test_module "Bootstrap_controller tests" =
       [%log info] "bootstrap begin" ;
       Block_time.Timeout.await_exn time_controller ~timeout_duration
         (run ~logger ~trust_system ~verifier ~network:my_net.network
+           ~best_seen_transition:None
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~initial_root_transition ~precomputed_values)
+           ~catchup_mode:`Normal ~initial_root_transition ~precomputed_values)
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :

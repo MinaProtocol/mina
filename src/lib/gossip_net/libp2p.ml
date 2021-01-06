@@ -671,6 +671,27 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       | Error e ->
           return (Failed_to_connect e)
 
+    let query_peer' (type q r) ?how ?timeout t (peer_id : Peer.Id.t)
+        (rpc : (q, r) rpc) (qs : q list) =
+      let%bind net2 = !(t.net2) in
+      match%bind
+        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
+      with
+      | Ok stream ->
+          let peer = Mina_net2.Stream.remote_peer stream in
+          let transport = prepare_stream_transport stream in
+          let (module Impl) = implementation_of_rpc rpc in
+          try_call_rpc_with_dispatch ?timeout ~rpc_name:Impl.name t peer
+            transport
+            (fun conn qs ->
+              Deferred.Or_error.List.map ?how qs ~f:(fun q ->
+                  Impl.dispatch_multi conn q ) )
+            qs
+          >>| fun data ->
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
+      | Error e ->
+          return (Failed_to_connect e)
+
     let query_random_peers t n rpc query =
       let%map peers = random_peers t n in
       [%log' trace t.config.logger]

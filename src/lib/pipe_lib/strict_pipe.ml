@@ -68,6 +68,8 @@ module Reader0 = struct
 
   let read t = enforce_single_reader t (Pipe.read t.reader)
 
+  let read' t = enforce_single_reader t (Pipe.read' t.reader)
+
   let fold reader ~init ~f =
     enforce_single_reader reader
       (let rec go b =
