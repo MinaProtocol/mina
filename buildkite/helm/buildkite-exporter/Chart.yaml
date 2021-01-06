@@ -16,4 +16,4 @@ keywords:
 - mina
 home: https://o1labs.org/
 sources:
-- https://github.com/CodaProtocol
+- https://github.com/MinaProtocol/mina/tree/develop/buildkite/helm/buildkite-exporter
