@@ -26,16 +26,21 @@ module Payload = struct
     let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo : t =
       {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
-    let to_user_command_common (t : t) ~inferred_nonce :
+    let to_user_command_common (t : t) ~minimum_nonce ~inferred_nonce :
         (Signed_command_payload.Common.t, string) Result.t =
       let open Result.Let_syntax in
-      let%map () =
+      let%map nonce =
         match t.nonce with
         | None ->
             (*User did not provide a nonce, use inferred*)
-            Ok ()
+            Ok inferred_nonce
         | Some nonce ->
-            if Account_nonce.equal inferred_nonce nonce then Ok ()
+            (* NB: A lower, explicitly given nonce can be used to cancel
+               transactions or to re-issue them with a higher fee.
+            *)
+            if
+              Account_nonce.(minimum_nonce <= nonce && nonce <= inferred_nonce)
+            then Ok nonce
             else
               Error
                 (sprintf
@@ -46,7 +51,7 @@ module Payload = struct
       { Signed_command_payload.Common.Poly.fee= t.fee
       ; fee_token= t.fee_token
       ; fee_payer_pk= t.fee_payer_pk
-      ; nonce= inferred_nonce
+      ; nonce
       ; valid_until= t.valid_until
       ; memo= t.memo }
 
@@ -73,10 +78,12 @@ module Payload = struct
         Common.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
     ; body }
 
-  let to_user_command_payload (t : t) ~inferred_nonce :
+  let to_user_command_payload (t : t) ~minimum_nonce ~inferred_nonce :
       (Signed_command_payload.t, string) Result.t =
     let open Result.Let_syntax in
-    let%map common = Common.to_user_command_common t.common ~inferred_nonce in
+    let%map common =
+      Common.to_user_command_common t.common ~minimum_nonce ~inferred_nonce
+    in
     {Signed_command_payload.Poly.common; body= t.body}
 
   let fee_payer ({common; _} : t) = Common.fee_payer common
@@ -144,15 +151,19 @@ let inferred_nonce ~get_current_nonce ~(fee_payer : Account_id.t) ~nonce_map =
   let open Result.Let_syntax in
   let update_map = Map.set nonce_map ~key:fee_payer in
   match Map.find nonce_map fee_payer with
-  | Some nonce ->
+  | Some (min_nonce, nonce) ->
       (* Multiple user commands from the same fee-payer. *)
       let next_nonce = Account_nonce.succ nonce in
-      let updated_map = update_map ~data:next_nonce in
-      Ok (next_nonce, updated_map)
+      let updated_map = update_map ~data:(min_nonce, next_nonce) in
+      Ok (min_nonce, next_nonce, updated_map)
   | None ->
-      let%map txn_pool_or_account_nonce = get_current_nonce fee_payer in
-      let updated_map = update_map ~data:txn_pool_or_account_nonce in
-      (txn_pool_or_account_nonce, updated_map)
+      let%map `Min min_nonce, txn_pool_or_account_nonce =
+        get_current_nonce fee_payer
+      in
+      let updated_map =
+        update_map ~data:(min_nonce, txn_pool_or_account_nonce)
+      in
+      (min_nonce, txn_pool_or_account_nonce, updated_map)
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     (client_input : t) =
@@ -165,11 +176,12 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
   @@
   let open Deferred.Result.Let_syntax in
   let fee_payer = fee_payer client_input in
-  let%bind inferred_nonce, updated_nonce_map =
+  let%bind minimum_nonce, inferred_nonce, updated_nonce_map =
     inferred_nonce ~get_current_nonce ~fee_payer ~nonce_map |> Deferred.return
   in
   let%bind user_command_payload =
-    Payload.to_user_command_payload client_input.payload ~inferred_nonce
+    Payload.to_user_command_payload client_input.payload ~minimum_nonce
+      ~inferred_nonce
     |> Deferred.return
   in
   let%map signed_user_command =
