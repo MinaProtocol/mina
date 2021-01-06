@@ -19,7 +19,7 @@ Pipeline.build
       dirtyWhen = [
         S.exactly "buildkite/nightly" "txt"
       ],
-      path = "Test",
+      path = "Release",
       name = "Nightly Test"
     },
     steps = [
