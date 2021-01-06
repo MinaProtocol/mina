@@ -21,7 +21,13 @@ type epoch_ledger_hash = {hash: Frozen_ledger_hash.t} [@@deriving yojson]
 type epoch_data = {ledger: epoch_ledger_hash; seed: Epoch_seed.t}
 [@@deriving yojson]
 
-type blockchain_state = {timestamp: Block_time.t} [@@deriving yojson]
+type non_snark = {ledger_hash: Ledger_hash.t} [@@deriving yojson]
+
+type staged_ledger_hash = {non_snark: non_snark} [@@deriving yojson]
+
+type blockchain_state =
+  {staged_ledger_hash: staged_ledger_hash; timestamp: Block_time.t}
+[@@deriving yojson]
 
 type consensus_state =
   { curr_global_slot: curr_global_slot
@@ -77,12 +83,11 @@ type diff_commands =
 type staged_ledger_diff = {diff: diff_commands} [@@deriving yojson]
 
 (* essentially External_transition.t with some fields missing
-   and state_hash and ledger_hash added
+   and state_hash added
 *)
 
 type t =
   { state_hash: State_hash.t
-  ; ledger_hash: Ledger_hash.t
   ; protocol_state: protocol_state
   ; staged_ledger_diff: staged_ledger_diff }
 [@@deriving yojson]
@@ -103,7 +108,8 @@ let fee_transfer_tbl :
   Fee_transfer_via_coinbase.Table.create ()
 
 let blockchain_state_of_extensional_block (block : Extensional.Block.t) =
-  {timestamp= block.timestamp}
+  { staged_ledger_hash= {non_snark= {ledger_hash= block.ledger_hash}}
+  ; timestamp= block.timestamp }
 
 let mk_global_slot slot_number = {slot_number}
 
@@ -242,10 +248,9 @@ let staged_ledger_diff_of_extensional_block user_cmds_tbl internal_cmds_tbl
 let block_of_extensional_block user_cmds_tbl internal_cmds_tbl
     (block : Extensional.Block.t) : t =
   let state_hash = block.state_hash in
-  let ledger_hash = block.ledger_hash in
   let protocol_state = protocol_state_of_extensional_block block in
   let staged_ledger_diff =
     staged_ledger_diff_of_extensional_block user_cmds_tbl internal_cmds_tbl
       block
   in
-  {state_hash; ledger_hash; protocol_state; staged_ledger_diff}
+  {state_hash; protocol_state; staged_ledger_diff}
