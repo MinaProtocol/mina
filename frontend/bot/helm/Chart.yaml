@@ -18,4 +18,4 @@ keywords:
 - testnet
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina/tree/develop/frontend/leaderboard/helm
+- https://github.com/MinaProtocol/mina/tree/develop/frontend/bot/helm
