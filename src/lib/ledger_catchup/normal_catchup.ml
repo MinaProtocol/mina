@@ -46,18 +46,6 @@ open Network_peer
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
-module Catchup_jobs = struct
-  open Broadcast_pipe
-
-  let reader, writer = create 0
-
-  let update f = Writer.write writer (f (Reader.peek reader))
-
-  let incr () = update (( + ) 1)
-
-  let decr () = update (( - ) 1)
-end
-
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
@@ -187,11 +175,10 @@ let rec fold_until ~(init : 'accum)
 
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
-    ~target_hash ~job =
+    ~target_hash ~job ~hash_tree =
   [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
-  let hash_tree = Transition_frontier.catchup_hash_tree frontier in
   let open Deferred.Or_error.Let_syntax in
   Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
       let%bind transition_chain_proof =
@@ -533,6 +520,15 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
        , Strict_pipe.crash Strict_pipe.buffered
        , unit )
        Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
+  let hash_tree =
+    match Transition_frontier.catchup_tree frontier with
+    | Hash t ->
+        t
+    | Full _ ->
+        failwith
+          "If normal catchup is running, the frontier should have a hash \
+           tree, got a full one."
+  in
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
@@ -540,8 +536,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
            Transition_frontier.Catchup_hash_tree.Catchup_job_id.create ()
          in
          let notify_hash_tree_of_failure () =
-           Transition_frontier.(
-             Catchup_hash_tree.catchup_failed (catchup_hash_tree frontier) job)
+           Transition_frontier.(Catchup_hash_tree.catchup_failed hash_tree job)
          in
          don't_wait_for
            (let start_time = Core.Time.now () in
@@ -569,8 +564,8 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 (* try peers from subtrees first *)
                 let open Deferred.Let_syntax in
                 match%bind
-                  download_state_hashes ~logger ~trust_system ~network
-                    ~frontier ~peers:subtree_peers ~target_hash ~job
+                  download_state_hashes ~hash_tree ~logger ~trust_system
+                    ~network ~frontier ~peers:subtree_peers ~target_hash ~job
                 with
                 | Ok (peer, hashes) ->
                     return (Ok (peer, hashes))
@@ -583,8 +578,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                       Mina_networking.peers network >>| List.permute
                     in
                     match%bind
-                      download_state_hashes ~logger ~trust_system ~network
-                        ~frontier ~peers:random_peers ~target_hash ~job
+                      download_state_hashes ~hash_tree ~logger ~trust_system
+                        ~network ~frontier ~peers:random_peers ~target_hash
+                        ~job
                     with
                     | Ok (peer, hashes) ->
                         return (Ok (peer, hashes))
