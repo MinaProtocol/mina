@@ -21,13 +21,6 @@ module Worker = struct
   type t =
     { db: Database.t
     ; logger: Logger.t
-          (* Invariant:
-
-   If there are root transitions in this queue which can be performed, we perform
-   them immediately. This invariant is potentially violated whenever we touch the
-   database (i.e., whenever we process any other kind of diff) so we eagerly perform
-   work in this queue immediately after applying any other kind of diff. *)
-    ; root_transitions: Diff.Root_transition.Lite.t Queue.t
     ; persistent_root_instance: Persistent_root.Instance.t }
 
   type nonrec create_args = create_args
@@ -36,41 +29,7 @@ module Worker = struct
 
   (* worker assumes database has already been checked and initialized *)
   let create ({db; logger; persistent_root_instance} : create_args) : t =
-    {db; logger; root_transitions= Queue.create (); persistent_root_instance}
-
-  let eagerly_perform_root_transitions t =
-    let start = Time.now () in
-    let rec go count =
-      match Queue.peek t.root_transitions with
-      | None ->
-          count
-      | Some {new_root; garbage; _} -> (
-          let garbage = match garbage with Lite garbage -> garbage in
-          match Database.move_root t.db ~new_root ~garbage with
-          | Ok _old_root ->
-              ignore (Queue.dequeue_exn t.root_transitions) ;
-              go (count + 1)
-          | Error _ ->
-              count )
-    in
-    let count = go 0 in
-    [%log' trace t.logger] "Eagerly performed $n root transitions in $time"
-      ~metadata:
-        [ ("n", `Int count)
-        ; ("time", `String Time.(Span.to_string_hum (diff (now ()) start))) ]
-
-  let make_immediate_progress t diffs =
-    let root_transitions, other_diffs =
-      List.partition_map diffs ~f:(fun (Diff.Lite.E.E d) ->
-          match d with
-          | Root_transitioned rt ->
-              `Fst rt
-          | _ ->
-              `Snd (Diff.Lite.E.E d) )
-    in
-    Queue.enqueue_all t.root_transitions root_transitions ;
-    eagerly_perform_root_transitions t ;
-    `Unprocessed other_diffs
+    {db; logger; persistent_root_instance}
 
   (* nothing to close *)
   let close _ = Deferred.unit
@@ -148,7 +107,7 @@ module Worker = struct
   let handle_diff t (Diff.Lite.E.E diff) =
     let open Result.Let_syntax in
     let%map _mutant = apply_diff t diff in
-    eagerly_perform_root_transitions t
+    ()
 
   (* result equivalent of Deferred.Or_error.List.fold *)
   let rec deferred_result_list_fold ls ~init ~f =
@@ -161,18 +120,16 @@ module Worker = struct
         deferred_result_list_fold t ~init ~f
 
   let perform t input =
-    let (`Unprocessed other_diffs) = make_immediate_progress t input in
     match%map
-      [%log' trace t.logger]
-        "Applying %d other diffs to the persistent frontier"
-        (List.length other_diffs) ;
+      [%log' trace t.logger] "Applying %d diffs to the persistent frontier"
+        (List.length input) ;
       (* Iterating over the diff application in this way
          * effectively allows the scheduler to scheduler
          * other tasks in between diff applications.
          * If implemented otherwise, all diffs would be
          * applied during the same scheduler cycle.
          *)
-      deferred_result_list_fold other_diffs ~init:() ~f:(fun () diff ->
+      deferred_result_list_fold input ~init:() ~f:(fun () diff ->
           Deferred.return (handle_diff t diff) )
     with
     | Ok () ->
