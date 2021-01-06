@@ -422,11 +422,10 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         Persistent_root.Locations.potential_snarked_ledger
           t.persistent_root_instance.factory.directory
       in
-      let ledger =
-        Ledger.Db.create_checkpoint t.persistent_root_instance.snarked_ledger
-          ~directory_name:location ()
+      let () =
+        Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
+          ~directory_name:location
       in
-      let () = Ledger.Db.close ledger in
       Persistent_root.Instance.enqueue_snarked_ledger ~location
         t.persistent_root_instance ;
       let s = t.root_ledger in

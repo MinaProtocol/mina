@@ -496,7 +496,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               | Error `Persistent_frontier_malformed ->
                   fail "persistent frontier was malformed"
               | Error `Snarked_ledger_mismatch ->
-                  failwith
+                  fail
                     "this should not happen, because we just reset the \
                      snarked_ledger"
             in

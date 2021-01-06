@@ -76,10 +76,18 @@ let%test_module "Full_frontier tests" =
             Staged_ledger.create_exn ~constraint_constants ~ledger:root_ledger
         ; protocol_states= [] }
       in
+      let persistent_root =
+        Persistent_root.create ~logger ~directory:Filename.temp_dir_name
+          ~ledger_depth
+      in
+      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
+      let persistent_root_instance =
+        Persistent_root.create_instance_exn persistent_root
+      in
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
         ~consensus_local_state ~max_length ~precomputed_values
-        ~persistent_root_instance:(failwith "...")
+        ~persistent_root_instance
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->

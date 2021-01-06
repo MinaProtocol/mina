@@ -1,4 +1,3 @@
-open Async_kernel
 open Core
 open Mina_base
 open Frontier_base
@@ -124,7 +123,7 @@ module Instance = struct
       2. if none of those works, we load the old snarked_ledger and check if the old snarked_ledger matchees with the persistent_frontier
       3. if not, we just reset all the persisted data and start from genesis 
   *)
-  let load_from_disk factory ~merkle_root =
+  let load_from_disk factory ~snarked_ledger_hash =
     let potential_snarked_ledger_filenames_location =
       Locations.potential_snarked_ledgers factory.directory
     in
@@ -144,7 +143,13 @@ module Instance = struct
             Ledger.Db.create ~depth:factory.ledger_depth
               ~directory_name:location ()
           in
-          if State_hash.equal (Ledger.Db.merkle_root ledger) merkle_root then (
+          let potential_snarked_ledger_hash =
+            Frozen_ledger_hash.of_ledger_hash @@ Ledger.Db.merkle_root ledger
+          in
+          if
+            Frozen_ledger_hash.equal potential_snarked_ledger_hash
+              snarked_ledger_hash
+          then (
             let snarked_ledger =
               Ledger.Db.create ~depth:factory.ledger_depth
                 ~directory_name:
@@ -175,7 +180,13 @@ module Instance = struct
             ~directory_name:(Locations.snarked_ledger factory.directory)
             ()
         in
-        if State_hash.equal (Ledger.Db.merkle_root snarked_ledger) merkle_root
+        let potential_snarked_ledger_hash =
+          Frozen_ledger_hash.of_ledger_hash
+          @@ Ledger.Db.merkle_root snarked_ledger
+        in
+        if
+          Frozen_ledger_hash.equal potential_snarked_ledger_hash
+            snarked_ledger_hash
         then
           Ok
             { snarked_ledger
@@ -229,10 +240,10 @@ type t = Factory_type.t
 let create ~logger ~directory ~ledger_depth =
   {directory; logger; instance= None; ledger_depth}
 
-let load_from_disk_exn t ~merkle_root =
+let load_from_disk_exn t ~snarked_ledger_hash =
   let open Result.Let_syntax in
   assert (t.instance = None) ;
-  let%map instance = Instance.load_from_disk t ~merkle_root in
+  let%map instance = Instance.load_from_disk t ~snarked_ledger_hash in
   t.instance <- Some instance ;
   instance
 
@@ -248,9 +259,8 @@ let with_instance_exn t ~f =
   Instance.destroy instance ; x
 
 let reset_to_genesis_exn t ~precomputed_values =
-  let open Deferred.Let_syntax in
   assert (t.instance = None) ;
-  let%map () = File_system.remove_dir t.directory in
+  File_system.rmrf t.directory ;
   with_instance_exn t ~f:(fun instance ->
       ignore
         (Ledger_transfer.transfer_accounts

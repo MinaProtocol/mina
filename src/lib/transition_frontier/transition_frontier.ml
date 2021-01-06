@@ -156,8 +156,10 @@ let rec load_with_max_length :
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state
-      ~merkle_root =
-    match Persistent_root.load_from_disk_exn persistent_root ~merkle_root with
+      ~snarked_ledger_hash =
+    match
+      Persistent_root.load_from_disk_exn persistent_root ~snarked_ledger_hash
+    with
     | Error _ as err ->
         let%map () =
           Persistent_frontier.Instance.destroy persistent_frontier_instance
@@ -194,9 +196,7 @@ let rec load_with_max_length :
         ~root_data:(genesis_root_data ~precomputed_values)
         ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     in
-    let%bind () =
-      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
-    in
+    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
@@ -263,10 +263,10 @@ let rec load_with_max_length :
               | err ->
                   err ) )
       else return (Error `Persistent_frontier_malformed)
-  | Ok merkle_root -> (
+  | Ok snarked_ledger_hash -> (
       match%bind
         continue persistent_frontier_instance
-          ~ignore_consensus_local_state:true ~merkle_root
+          ~ignore_consensus_local_state:true ~snarked_ledger_hash
       with
       | Error (`Failure err) when retry_with_fresh_db ->
           [%log error]
