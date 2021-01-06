@@ -1,6 +1,6 @@
 apiVersion: v2
 name: o1-bot
-description: A Helm chart for Coda Protocol's O(1) role-based testnet service bots
+description: A Helm chart for Mina Protocol's O(1) role-based testnet service bots
 type: application
 version: 0.0.3
 appVersion: 0.0.1
@@ -16,6 +16,6 @@ keywords:
 - community
 - mina
 - testnet
-home: https://codaprotocol.com/
+home: https://minaprotocol.com/
 sources:
-- https://github.com/CodaProtocol
+- https://github.com/MinaProtocol/mina/tree/develop/frontend/bot
