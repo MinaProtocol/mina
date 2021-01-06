@@ -722,31 +722,7 @@ let cancel_transaction_graphql =
          let receiver_pk = Signed_command.receiver_pk user_command in
          let cancel_sender_pk = Signed_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
-         let%bind nonce_response =
-           let open Graphql_lib.Encoders in
-           Graphql_client.query_exn
-             (Graphql_queries.Get_inferred_nonce.make
-                ~public_key:(public_key cancel_sender_pk)
-                ())
-             graphql_endpoint
-         in
-         let maybe_inferred_nonce =
-           let open Option.Let_syntax in
-           let%bind account = nonce_response#account in
-           let%map nonce = account#inferredNonce in
-           int_of_string nonce
-         in
-         let cancelled_nonce =
-           Mina_numbers.Account_nonce.to_int
-             (Signed_command.nonce user_command)
-         in
-         let inferred_nonce =
-           Option.value maybe_inferred_nonce ~default:cancelled_nonce
-         in
          let cancel_fee =
-           let diff =
-             Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
-           in
            let fee =
              Currency.Fee.to_uint64 (Signed_command.fee user_command)
            in
@@ -755,7 +731,7 @@ let cancel_transaction_graphql =
            in
            let open Unsigned.UInt64.Infix in
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
-           Currency.Fee.of_uint64 (fee + (replace_fee * diff))
+           Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
