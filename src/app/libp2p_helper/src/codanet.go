@@ -37,6 +37,25 @@ import (
 	mplex "github.com/libp2p/go-mplex"
 )
 
+var (
+	privateIPs = []string{
+		"10.0.0.0/8", 
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"100.64.0.0/10",
+		"198.18.0.0/15",
+		"169.254.0.0/16",
+	}
+)
+
+func parseCIDR(cidr string) gonet.IPNet {
+	_, ipnet, err := gonet.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return *ipnet
+}
+
 type CodaConnectionManager struct {
 	p2pManager   *p2pconnmgr.BasicConnMgr
 	OnConnect    func(network.Network, network.Conn)
@@ -151,6 +170,10 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 
 	if allowed == nil {
 		allowed = new(peer.Set)
+	}
+
+	for _, addr := range privateIPs {
+		addrFilters.AddFilter(parseCIDR(addr), ma.ActionDeny)
 	}
 
 	return &CodaGatingState{
@@ -314,21 +337,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
             _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
             if exists { return as }
 
-			parseCIDR := func(cidr string) gonet.IPNet {
-				_, ipnet, err := gonet.ParseCIDR(cidr)
-				if err != nil {
-					panic(err)
-				}
-				return *ipnet
-			}
-
             fs := ma.NewFilters()
-			fs.AddFilter(parseCIDR("10.0.0.0/8"), ma.ActionDeny)
-			fs.AddFilter(parseCIDR("172.16.0.0/12"), ma.ActionDeny)
-			fs.AddFilter(parseCIDR("192.168.0.0/16"), ma.ActionDeny)
-			fs.AddFilter(parseCIDR("100.64.0.0/10"), ma.ActionDeny)
-			fs.AddFilter(parseCIDR("198.18.0.0/15"), ma.ActionDeny)
-			fs.AddFilter(parseCIDR("169.254.0.0/16"), ma.ActionDeny)
+            for _, addr := range privateIPs {
+				fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
+            }
 
 			bs := []ma.Multiaddr{}
 			for _, a := range as {
