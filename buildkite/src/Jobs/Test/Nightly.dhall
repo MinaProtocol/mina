@@ -17,7 +17,7 @@ Pipeline.build
     spec =
       JobSpec::{
       dirtyWhen = [
-        S.exactly "buildkite/nightly" "txt"
+        S.exactly "buildkite/nightly.txt" "sh"
       ],
       path = "Test",
       name = "Nightly Test"

@@ -33,7 +33,7 @@ Pipeline.build
           S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
           S.exactly "dockerfiles/scripts/healthcheck-utilities" "sh",
           S.strictlyStart (S.contains "scripts"),
-          S.exactly "buildkite/nightly" "txt"
+          S.exactly "buildkite/nightly.txt" "sh"
         ],
         path = "Release",
         name = "MinaArtifact"
