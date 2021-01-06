@@ -192,7 +192,9 @@ module Instance = struct
             { snarked_ledger
             ; factory
             ; potential_snarked_ledgers= Queue.create () }
-        else Error `Snarked_ledger_mismatch
+        else (
+          Ledger.Db.close snarked_ledger ;
+          Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
         Ok {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
 
