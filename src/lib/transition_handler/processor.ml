@@ -26,6 +26,7 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
     ( (precomputed_values.genesis_constants.protocol.delta + 1)
       * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
+  |> Block_time.Span.min (Block_time.Span.of_ms (Int64.of_int 5000))
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
     =
@@ -181,9 +182,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~transition_receipt_time
             ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:
-              mostly_validated_transition (* TODO: Can we skip here? *)
-            ~skip_staged_ledger_verification:false () )
+            ~transition:mostly_validated_transition
+            (* TODO: Can we skip here? *) () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->

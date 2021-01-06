@@ -50,6 +50,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let query_peer ?timeout (Any ((module M), t)) = M.query_peer ?timeout t
 
+  let query_peer' ?how ?timeout (Any ((module M), t)) =
+    M.query_peer' ?how ?timeout t
+
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
   let ip_for_peer (Any ((module M), t)) = M.ip_for_peer t

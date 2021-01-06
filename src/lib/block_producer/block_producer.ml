@@ -546,10 +546,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       time ~logger ~time_controller
                         "Build breadcrumb on produced block" (fun () ->
                           Breadcrumb.build ~logger ~precomputed_values
-                            ~verifier ~trust_system ~parent:crumb ~transition
-                            ~sender:None (* Consider skipping here *)
-                            ~skip_staged_ledger_verification:false
-                            ~transition_receipt_time () )
+                            ~verifier ~trust_system ~parent:crumb
+                            ~transition
+                              (* Consider fully skipping verification here *)
+                            ~skip_staged_ledger_verification:`Proofs
+                            ~sender:None ~transition_receipt_time () )
                       |> Deferred.Result.map_error ~f:(function
                            | `Invalid_staged_ledger_diff e ->
                                `Invalid_staged_ledger_diff
@@ -829,7 +830,6 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
               "Build breadcrumb on produced block (precomputed)" (fun () ->
                 Breadcrumb.build ~logger ~precomputed_values ~verifier
                   ~trust_system ~parent:crumb ~transition ~sender:None
-                  ~skip_staged_ledger_verification:false
                   ~transition_receipt_time ()
                 |> Deferred.Result.map_error ~f:(function
                      | `Invalid_staged_ledger_diff e ->

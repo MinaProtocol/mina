@@ -163,7 +163,14 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
           determine_outcome out_for_verification res t
     in
     t.state <- Verifying {out_for_verification} ;
-    upon res (fun _r -> start_verifier t) )
+    upon res (fun r ->
+        ( match r with
+        | Ok () ->
+            ()
+        | Error e ->
+            List.iter out_for_verification ~f:(fun x ->
+                Ivar.fill_if_empty x.res (Error e) ) ) ;
+        start_verifier t ) )
 
 let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
     (r, unit) Result.t Deferred.Or_error.t =
