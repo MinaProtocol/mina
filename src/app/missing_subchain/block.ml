@@ -87,15 +87,6 @@ type t =
   ; staged_ledger_diff: staged_ledger_diff }
 [@@deriving yojson]
 
-(* the user commands in a block with a given state hash *)
-let user_cmds_tbl : Extensional.User_command.t list State_hash.Table.t =
-  State_hash.Table.create ()
-
-(* the internal commands in a block with a given state hash *)
-let internal_cmds_tbl : Extensional.Internal_command.t list State_hash.Table.t
-    =
-  State_hash.Table.create ()
-
 module Fee_transfer_via_coinbase = struct
   (* table of fee transfer via coinbase at given global slot, seq no, secondary seq no *)
   module T = struct
@@ -173,10 +164,7 @@ let payload_of_user_cmd user_cmd =
 
 let status_of_user_cmd (user_cmd : Extensional.User_command.t) =
   let open Transaction_status in
-  (* balance data here is always empty, it's a dummy value
-     that data doesn't appear in archive db
-     this way, we can use the existing type Transaction_status.t
-  *)
+  (* TODO: use actual balance data instead of dummy value *)
   match user_cmd.status with
   | None ->
       None
@@ -203,7 +191,8 @@ let signed_cmd_with_status_of_user_cmd (user_cmd : Extensional.User_command.t)
   { With_opt_status.data= Signed_command {payload= payload_of_user_cmd user_cmd}
   ; status= status_of_user_cmd user_cmd }
 
-let user_commands_of_extensional_block (block : Extensional.Block.t) =
+let user_commands_of_extensional_block user_cmds_tbl
+    (block : Extensional.Block.t) =
   let user_cmds = State_hash.Table.find_exn user_cmds_tbl block.state_hash in
   List.map user_cmds ~f:signed_cmd_with_status_of_user_cmd
 
@@ -231,23 +220,32 @@ let internal_cmd_balance_data_of_internal_cmd
   | cmd ->
       failwithf "Unknown internal command: %s" cmd ()
 
-let internal_commands_of_extensional_block (block : Extensional.Block.t) =
+let internal_commands_of_extensional_block internal_cmds_tbl
+    (block : Extensional.Block.t) =
   let internal_cmds =
     State_hash.Table.find_exn internal_cmds_tbl block.state_hash
   in
   List.map internal_cmds ~f:internal_cmd_balance_data_of_internal_cmd
 
-let diff_commands_of_extensional_block block =
-  { commands= user_commands_of_extensional_block block
+let diff_commands_of_extensional_block user_cmds_tbl internal_cmds_tbl block =
+  { commands= user_commands_of_extensional_block user_cmds_tbl block
   ; internal_command_balances=
-      List.filter_opt (internal_commands_of_extensional_block block) }
+      List.filter_opt
+        (internal_commands_of_extensional_block internal_cmds_tbl block) }
 
-let staged_ledger_diff_of_extensional_block block =
-  {diff= diff_commands_of_extensional_block block}
+let staged_ledger_diff_of_extensional_block user_cmds_tbl internal_cmds_tbl
+    block =
+  { diff=
+      diff_commands_of_extensional_block user_cmds_tbl internal_cmds_tbl block
+  }
 
-let block_of_extensional_block (block : Extensional.Block.t) : t =
+let block_of_extensional_block user_cmds_tbl internal_cmds_tbl
+    (block : Extensional.Block.t) : t =
   let state_hash = block.state_hash in
   let ledger_hash = block.ledger_hash in
   let protocol_state = protocol_state_of_extensional_block block in
-  let staged_ledger_diff = staged_ledger_diff_of_extensional_block block in
+  let staged_ledger_diff =
+    staged_ledger_diff_of_extensional_block user_cmds_tbl internal_cmds_tbl
+      block
+  in
   {state_hash; ledger_hash; protocol_state; staged_ledger_diff}
