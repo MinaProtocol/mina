@@ -334,13 +334,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				as = append(as, externalAddr) 
 			}
 
-            _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-            if exists { return as }
+			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+			if exists { return as }
 
-            fs := ma.NewFilters()
-            for _, addr := range privateIPs {
+			fs := ma.NewFilters()
+			for _, addr := range privateIPs {
 				fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
-            }
+			}
 
 			bs := []ma.Multiaddr{}
 			for _, a := range as {
