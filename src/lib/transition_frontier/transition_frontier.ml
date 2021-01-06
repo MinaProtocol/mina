@@ -196,6 +196,9 @@ let rec load_with_max_length :
         ~root_data:(genesis_root_data ~precomputed_values)
         ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     in
+    let persistent_frontier_instance =
+      Persistent_frontier.create_instance_exn persistent_frontier
+    in
     Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
