@@ -5,9 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	gonet "net"
 	"path"
 	"time"
-        "os"
+    "os"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -31,7 +32,6 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
-	gonet "net"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
@@ -311,11 +311,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				return as
 			}
 
-			as = append(as, externalAddr)
-                        
-                        _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-                        if exists { return as }
-                        
+			as = append(as, externalAddr) 
+            _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+            if exists { return as }
+            
 			bs := make([]ma.Multiaddr, 0, len(as))
 			isPrivate := func(addr ma.Multiaddr) bool {
 				// get the ip out
