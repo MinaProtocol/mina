@@ -880,9 +880,7 @@ let rec add_from_gossip_exn :
           | _ ->
               failwith "recursive add_exn failed"
         in
-        let drop_head, drop_tail =
-          Option.value_exn (Sequence.next dropped)
-        in
+        let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
         let increment =
           Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
         in
