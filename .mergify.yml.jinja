@@ -9,7 +9,7 @@ pull_request_rules:
       actions:
           merge:
               method: merge
-              strict: smart
+              strict: false
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop with the ready-to-merge-into-develop label
       conditions:
@@ -22,5 +22,31 @@ pull_request_rules:
       actions:
           merge:
               method: merge
-              strict: smart
+              strict: false
+          delete_head_branch: {}
+    - name: automatically merge approved PRs into develop-until-4.1-hardfork with the ready-to-merge-into-develop label
+      conditions:
+          {%- for status in required_status | sort %}
+          - "status-success={{status}}"
+          {%- endfor %}
+          - "#approved-reviews-by>=1"
+          - label=ready-to-merge-into-develop
+          - base=develop-until-4.1-hardfork
+      actions:
+          merge:
+              method: merge
+              strict: false
+          delete_head_branch: {}
+    - name: automatically merge approved PRs into develop-until-adversarial with the ready-to-merge-into-develop label
+      conditions:
+          {%- for status in required_status | sort %}
+          - "status-success={{status}}"
+          {%- endfor %}
+          - "#approved-reviews-by>=1"
+          - label=ready-to-merge-into-develop
+          - base=develop-until-adversarial
+      actions:
+          merge:
+              method: merge
+              strict: false
           delete_head_branch: {}

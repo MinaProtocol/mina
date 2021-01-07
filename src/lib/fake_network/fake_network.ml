@@ -1,10 +1,10 @@
 open Async
 open Core
-open Coda_base
+open Mina_base
 open Gadt_lib
 open Signature_lib
 open Network_peer
-module Gossip_net = Coda_networking.Gossip_net
+module Gossip_net = Mina_networking.Gossip_net
 
 (* There must be at least 2 peers to create a network *)
 type 'n num_peers = 'n Peano.gt_1
@@ -15,7 +15,7 @@ type peer_state =
   ; consensus_local_state: Consensus.Data.Local_state.t }
 
 type peer_network =
-  {peer: Network_peer.Peer.t; state: peer_state; network: Coda_networking.t}
+  {peer: Network_peer.Peer.t; state: peer_state; network: Mina_networking.t}
 
 type nonrec 'n t =
   { fake_gossip_network: Gossip_net.Fake.network
@@ -52,7 +52,7 @@ let setup (type n) ?(logger = Logger.null ())
     Gossip_net.Fake.create_network (Vect.to_list peers)
   in
   let config peer consensus_local_state =
-    let open Coda_networking.Config in
+    let open Mina_networking.Config in
     { logger
     ; trust_system
     ; time_controller
@@ -75,8 +75,8 @@ let setup (type n) ?(logger = Logger.null ())
         let frontier = state.frontier in
         let network =
           Thread_safe.block_on_async_exn (fun () ->
-              (* TODO: merge implementations with coda_lib *)
-              Coda_networking.create
+              (* TODO: merge implementations with mina_lib *)
+              Mina_networking.create
                 (config peer state.consensus_local_state)
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   (fun query_env ->
@@ -106,6 +106,7 @@ let setup (type n) ?(logger = Logger.null ())
                     , expected_merkle_root
                     , pending_coinbases
                     , protocol_states )) )
+                ~get_some_initial_peers:(fun _ -> Deferred.return [])
                 ~answer_sync_ledger_query:(fun query_env ->
                   let ledger_hash, _ = Envelope.Incoming.data query_env in
                   Sync_handler.answer_query ~frontier ledger_hash
@@ -119,7 +120,7 @@ let setup (type n) ?(logger = Logger.null ())
                             ~error:
                               (Error.createf
                                  !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
-                                 Coda_networking.refused_answer_query_string
+                                 Mina_networking.refused_answer_query_string
                                  ledger_hash)) )
                 ~get_ancestry:(fun query_env ->
                   Deferred.return
@@ -154,12 +155,21 @@ module Generator = struct
     -> peer_state Generator.t
 
   let fresh_peer ~precomputed_values ~max_frontier_length =
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~genesis_ledger
+        ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+        ~epoch_ledger_location
+        ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+        ~genesis_state_hash:
+          (With_hash.hash precomputed_values.protocol_state_with_hash)
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~precomputed_values
@@ -169,12 +179,21 @@ module Generator = struct
 
   let peer_with_branch ~frontier_branch_size ~precomputed_values
       ~max_frontier_length =
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~genesis_ledger
+        ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+        ~epoch_ledger_location
+        ~ledger_depth:precomputed_values.constraint_constants.ledger_depth
+        ~genesis_state_hash:
+          (With_hash.hash precomputed_values.protocol_state_with_hash)
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch ~precomputed_values

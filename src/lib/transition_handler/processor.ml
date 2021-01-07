@@ -6,14 +6,16 @@
  *  and breadcrumb rose trees (via the catchup pipe).
  *)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 open Cache_lib
 open O1trace
-open Coda_transition
+open Mina_transition
 open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
@@ -21,7 +23,7 @@ module Transition_frontier_validation =
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
   Block_time.Span.of_ms
-    ( precomputed_values.genesis_constants.protocol.delta
+    ( (precomputed_values.genesis_constants.protocol.delta + 1)
       * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
 
@@ -72,7 +74,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
              transition_time)
       in
-      Coda_metrics.Block_latency.Inclusion_time.update
+      Mina_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
@@ -84,6 +86,10 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     ~transition:cached_initially_validated_transition ~precomputed_values =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
+  in
+  let transition_receipt_time =
+    Some
+      (Envelope.Incoming.received_at enveloped_initially_validated_transition)
   in
   let sender =
     Envelope.Incoming.sender enveloped_initially_validated_transition
@@ -173,15 +179,16 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
       cached_transform_deferred_result cached_initially_validated_transition
         ~transform_cached:(fun _ ->
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
-            ~verifier ~trust_system ~sender:(Some sender)
-            ~parent:parent_breadcrumb ~transition:mostly_validated_transition
-          )
+            ~verifier ~trust_system ~transition_receipt_time
+            ~sender:(Some sender) ~parent:parent_breadcrumb
+            ~transition:mostly_validated_transition
+            (* TODO: Can we skip here? *) () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
               [%log error]
                 ~metadata:
-                  (metadata @ [("error", `String (Error.to_string_hum error))])
+                  (metadata @ [("error", Error_json.error_to_yojson error)])
                 "Error while building breadcrumb in the transition handler \
                  processor: $error" ;
               let (_
@@ -202,7 +209,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | Ok breadcrumb ->
               Deferred.return (Ok breadcrumb) )
     in
-    Coda_metrics.(
+    Mina_metrics.(
       Counter.inc_one
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
@@ -258,13 +265,13 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
   ignore
     (Reader.Merge.iter
        (* It is fine to skip the cache layer on blocks produced by this node
-        * because it is extradornarily unlikely we would write an internal bug
+        * because it is extraordinarily unlikely we would write an internal bug
         * triggering this case, and the external case (where we received an
         * identical external transition from the network) can happen iff there
         * is another node with the exact same private key and view of the
         * transaction pool. *)
        [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.inc_one
                  Transition_frontier_controller.transitions_being_processed) ;
              `Local_breadcrumb (Cached.pure breadcrumb) )
@@ -302,8 +309,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                              () ) ) ;
                      [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
-                        transition frontier: %s"
-                       (Error.to_string_hum err) )
+                        transition frontier: $error"
+                       ~metadata:[("error", Error_json.error_to_yojson err)] )
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
@@ -332,8 +339,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        ()
                    | Error err ->
                        [%log error]
-                         ~metadata:
-                           [("error", `String (Error.to_string_hum err))]
+                         ~metadata:[("error", Error_json.error_to_yojson err)]
                          "Error, failed to attach produced breadcrumb to \
                           transition frontier: $error" ;
                        let (_ : Transition_frontier.Breadcrumb.t) =
@@ -341,7 +347,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        in
                        ()
                  in
-                 Coda_metrics.(
+                 Mina_metrics.(
                    Gauge.dec_one
                      Transition_frontier_controller.transitions_being_processed)
              | `Partially_valid_transition transition ->

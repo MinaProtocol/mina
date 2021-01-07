@@ -2,8 +2,9 @@ open Core
 open Async
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 open Integration_test_lib
+open Unix
 
 module Network_config = struct
   type block_producer_config =
@@ -13,13 +14,16 @@ module Network_config = struct
     ; private_key_secret: string
     ; enable_gossip_flooding: bool
     ; run_with_user_agent: bool
-    ; run_with_bots: bool }
+    ; run_with_bots: bool
+    ; enable_peer_exchange: bool
+    ; isolated: bool }
   [@@deriving to_yojson]
 
   type terraform_config =
     { cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
+    ; k8s_context: string
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -66,6 +70,8 @@ module Network_config = struct
       ~(test_config : Test_config.t) ~(images : Container_images.t) =
     let { Test_config.k
         ; delta
+        ; slots_per_epoch
+        ; slots_per_sub_window
         ; proof_level
         ; txpool_max_size
         ; block_producers
@@ -74,14 +80,30 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
-    let testnet_name = "integration-test-" ^ test_name in
+    let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
+    let user_sanitized =
+      Str.global_replace (Str.regexp "\\W|_") "" user_from_env
+    in
+    let user_len = Int.min 5 (String.length user_sanitized) in
+    let user = String.sub user_sanitized ~pos:0 ~len:user_len in
+    let time_now = Unix.gmtime (Unix.gettimeofday ()) in
+    let timestr =
+      string_of_int time_now.tm_mday
+      ^ string_of_int time_now.tm_hour
+      ^ string_of_int time_now.tm_min
+    in
+    (* append the first 5 chars of the local system username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
+    (* username-testname-DaymonthHrMin *)
+    (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
-    let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
-    let cluster_name = "coda-infra-east" in
-    let cluster_region = "us-east1" in
-    let seed_zone = "us-east1-b" in
-    let seed_region = "us-east1" in
+    let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
+    let cluster_name = "mina-integration-west1" in
+    let k8s_context = cluster_id in
+    let cluster_region = "us-west1" in
+    let seed_zone = "us-west1-a" in
+    let seed_region = "us-west1" in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -89,16 +111,30 @@ module Network_config = struct
       if List.length block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
-      let f index ({Test_config.Block_producer.balance}, (pk, sk)) =
+      let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
         let runtime_account =
-          { Runtime_config.Accounts.pk=
-              Some (Public_key.Compressed.to_string pk)
+          let timing =
+            match timing with
+            | Account.Timing.Untimed ->
+                None
+            | Timed t ->
+                Some
+                  { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
+                      t.initial_minimum_balance
+                  ; cliff_time= t.cliff_time
+                  ; cliff_amount= t.cliff_amount
+                  ; vesting_period= t.vesting_period
+                  ; vesting_increment= t.vesting_increment }
+          in
+          let default = Runtime_config.Accounts.Single.default in
+          { default with
+            pk= Some (Public_key.Compressed.to_string pk)
           ; sk= None
           ; balance=
               Balance.of_formatted_string balance
               (* delegation currently unsupported *)
           ; delegate= None
-          ; timing= None }
+          ; timing }
         in
         let secret_name = "test-keypair-" ^ Int.to_string index in
         let keypair =
@@ -115,14 +151,19 @@ module Network_config = struct
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
       { Runtime_config.Proof_keys.level= Some proof_level
-      ; c= None
+      ; sub_windows_per_window= None
       ; ledger_depth= None
       ; work_delay= None
       ; block_window_duration_ms= None
       ; transaction_capacity= None
       ; coinbase_amount= None
+      ; supercharged_coinbase_factor= None
       ; account_creation_fee= None
-      ; supercharged_coinbase_factor= None }
+      ; fork= None }
+    in
+    let constraint_constants =
+      Genesis_ledger_helper.make_constraint_constants
+        ~default:Genesis_constants.Constraint_constants.compiled proof_config
     in
     let runtime_config =
       { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
@@ -130,6 +171,10 @@ module Network_config = struct
           Some
             { k= Some k
             ; delta= Some delta
+            ; slots_per_epoch= Some slots_per_epoch
+            ; sub_windows_per_window=
+                Some constraint_constants.supercharged_coinbase_factor
+            ; slots_per_sub_window= Some slots_per_sub_window
             ; genesis_state_timestamp=
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ())) }
       ; proof= Some proof_config (* TODO: prebake ledger and only set hash *)
@@ -138,12 +183,10 @@ module Network_config = struct
             { base= Accounts runtime_accounts
             ; add_genesis_winner= None
             ; num_accounts= None
+            ; balances= []
             ; hash= None
-            ; name= None } }
-    in
-    let constraint_constants =
-      Genesis_ledger_helper.make_constraint_constants
-        ~default:Genesis_constants.Constraint_constants.compiled proof_config
+            ; name= None }
+      ; epoch_data= None }
     in
     let genesis_constants =
       Or_error.ok_exn
@@ -159,7 +202,9 @@ module Network_config = struct
       ; private_key_secret= secret_name
       ; enable_gossip_flooding= false
       ; run_with_user_agent= false
-      ; run_with_bots= false }
+      ; run_with_bots= false
+      ; enable_peer_exchange= false
+      ; isolated= false }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
@@ -174,6 +219,7 @@ module Network_config = struct
         ; testnet_name
         ; seed_zone
         ; seed_region
+        ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
@@ -255,7 +301,8 @@ module Network_manager = struct
     ; genesis_constants: Genesis_constants.t
     ; block_producer_pod_names: Kubernetes_network.Node.t list
     ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
-    ; mutable deployed: bool }
+    ; mutable deployed: bool
+    ; keypairs: Keypair.t list }
 
   let run_cmd t prog args = Cmd_util.run_cmd t.testnet_dir prog args
 
@@ -315,17 +362,21 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id =
-      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
-      ; pod_id }
+    let cons_node pod_id port =
+      { Kubernetes_network.Node.cluster= network_config.cluster_id
+      ; Kubernetes_network.Node.namespace=
+          network_config.terraform.testnet_name
+      ; Kubernetes_network.Node.pod_id
+      ; Kubernetes_network.Node.node_graphql_port= port }
     in
+    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
+    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1" 3085] in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
-          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
+          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
+      )
     in
-    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
     let t =
       { logger
       ; cluster= network_config.cluster_id
@@ -337,7 +388,8 @@ module Network_manager = struct
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
       ; block_producer_pod_names
       ; snark_coordinator_pod_names
-      ; deployed= false }
+      ; deployed= false
+      ; keypairs= List.unzip network_config.keypairs |> snd }
     in
     [%log info] "Initializing terraform" ;
     let%bind () = run_cmd_exn t "terraform" ["init"] in
@@ -368,18 +420,19 @@ module Network_manager = struct
     ; block_producers= t.block_producer_pod_names
     ; snark_coordinators= t.snark_coordinator_pod_names
     ; archive_nodes= []
-    ; testnet_log_filter= t.testnet_log_filter }
+    ; testnet_log_filter= t.testnet_log_filter
+    ; keypairs= t.keypairs }
 
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    (* let%map () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in *)
+    let%bind () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
     t.deployed <- false ;
     Deferred.unit
 
   let cleanup t =
     let%bind () = if t.deployed then destroy t else return () in
     [%log' info t.logger] "Cleaning up network configuration" ;
-    (* File_system.remove_dir t.testnet_dir *)
+    let%bind () = File_system.remove_dir t.testnet_dir in
     Deferred.unit
 end

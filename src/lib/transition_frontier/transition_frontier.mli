@@ -6,15 +6,15 @@
  *)
 
 open Async_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 module Breadcrumb = Breadcrumb
 module Diff = Diff
-module Hash = Frontier_hash
 module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 module Root_data = Root_data
+module Catchup_hash_tree = Catchup_hash_tree
 
 include Frontier_intf.S
 
@@ -23,6 +23,10 @@ type Structured_log_events.t += Added_breadcrumb_user_commands
 
 type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
   [@@deriving register_event]
+
+val max_catchup_chunk_length : int
+
+val catchup_hash_tree : t -> Catchup_hash_tree.t
 
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
@@ -44,7 +48,7 @@ val load :
        | `Persistent_frontier_malformed ] )
      Deferred.Result.t
 
-val close : t -> unit Deferred.t
+val close : loc:string -> t -> unit Deferred.t
 
 val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
@@ -102,8 +106,8 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Coda_base.State_hash.t
-                              * Coda_state.Protocol_state.value )
+                            * ( Mina_base.State_hash.t
+                              * Mina_state.Protocol_state.value )
                               list )
                             Quickcheck.Generator.t
     -> max_length:int
@@ -120,8 +124,8 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
-                            * ( Coda_base.State_hash.t
-                              * Coda_state.Protocol_state.value )
+                            * ( Mina_base.State_hash.t
+                              * Mina_state.Protocol_state.value )
                               list )
                             Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)

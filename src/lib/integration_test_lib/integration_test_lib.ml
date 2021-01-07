@@ -9,12 +9,14 @@ end
 
 module Test_config = struct
   module Block_producer = struct
-    type t = {balance: string}
+    type t = {balance: string; timing: Mina_base.Account_timing.t}
   end
 
   type t =
     { k: int
     ; delta: int
+    ; slots_per_epoch: int
+    ; slots_per_sub_window: int
     ; proof_level: Runtime_config.Proof_keys.Level.t
     ; txpool_max_size: int
     ; block_producers: Block_producer.t list
@@ -24,14 +26,16 @@ module Test_config = struct
 
   let default =
     { k= 20
-    ; delta= 3
+    ; slots_per_epoch= 3 * 8 * 20
+    ; slots_per_sub_window= 2
+    ; delta= 0
     ; proof_level= Full
     ; txpool_max_size= 3000
     ; num_snark_workers= 2
     ; block_producers= []
     ; snark_worker_fee= "0.025"
     ; snark_worker_public_key=
-        (let pk, _ = (Lazy.force Coda_base.Sample_keypairs.keypairs).(0) in
+        (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
          Signature_lib.Public_key.Compressed.to_string pk) }
 end
 
@@ -51,20 +55,38 @@ module type Engine_intf = sig
   end
 
   module Node : sig
-    type t
+    type t =
+      { cluster: string
+      ; namespace: string
+      ; pod_id: string
+      ; node_graphql_port: int }
 
     val start : fresh_state:bool -> t -> unit Malleable_error.t
 
     val stop : t -> unit Malleable_error.t
 
+    (* does not return if it succeeds, use don't_wait_for *)
+    val set_port_forwarding_exn :
+      logger:Logger.t -> t -> int -> unit Deferred.t
+
     val send_payment :
-         logger:Logger.t
+         ?retry_on_graphql_error:bool
+      -> logger:Logger.t
       -> t
       -> sender:Signature_lib.Public_key.Compressed.t
       -> receiver:Signature_lib.Public_key.Compressed.t
       -> amount:Currency.Amount.t
       -> fee:Currency.Fee.t
       -> unit Malleable_error.t
+
+    val get_balance :
+         logger:Logger.t
+      -> t
+      -> account_id:Mina_base.Account_id.t
+      -> Currency.Balance.t Malleable_error.t
+
+    val get_peer_id :
+      logger:Logger.t -> t -> (string * string list) Malleable_error.t
   end
 
   module Network : sig
@@ -75,7 +97,8 @@ module type Engine_intf = sig
       ; block_producers: Node.t list
       ; snark_coordinators: Node.t list
       ; archive_nodes: Node.t list
-      ; testnet_log_filter: string }
+      ; testnet_log_filter: string
+      ; keypairs: Signature_lib.Keypair.t list }
   end
 
   module Network_config : sig
@@ -109,7 +132,7 @@ module type Engine_intf = sig
     val create :
          logger:Logger.t
       -> network:Network.t
-      -> on_fatal_error:(unit -> unit)
+      -> on_fatal_error:(Logger.Message.t -> unit)
       -> t Malleable_error.t
 
     val destroy : t -> Test_error.Set.t Malleable_error.t
@@ -122,12 +145,16 @@ module type Engine_intf = sig
     val wait_for :
          ?blocks:int
       -> ?epoch_reached:int
+      -> ?snarked_ledgers_generated:int
       -> ?timeout:[ `Slots of int
                   | `Epochs of int
                   | `Snarked_ledgers_generated of int
                   | `Milliseconds of int64 ]
       -> t
-      -> unit Malleable_error.t
+      -> ( [> `Blocks_produced of int]
+         * [> `Slots_passed of int]
+         * [> `Snarked_ledgers_generated of int] )
+         Malleable_error.t
 
     val wait_for_sync :
       Node.t list -> timeout:Time.Span.t -> t -> unit Malleable_error.t
@@ -155,6 +182,8 @@ module type Test_intf = sig
   type log_engine
 
   val config : Test_config.t
+
+  val expected_error_event_reprs : Structured_log_events.repr list
 
   val run : network -> log_engine -> unit Malleable_error.t
 end

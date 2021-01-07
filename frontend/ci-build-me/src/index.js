@@ -9,7 +9,7 @@ const circleApiKey = process.env.CIRCLECI_API_ACCESS_TOKEN;
 
 const runCircleBuild = async (github) => {
   const postData = JSON.stringify({
-    branch: github.pull_request.head.ref,
+    branch: `pull/${github.pull_request.number}/head`,
     parameters: {
       "run-ci": true,
     },
@@ -40,6 +40,7 @@ const runBuild = async (github) => {
     },
     pull_request_base_branch: github.pull_request.base.ref,
     pull_request_id: github.pull_request.number,
+    pull_request_repository: github.pull_request.head.repo.clone_url,
   });
 
   const options = {
@@ -55,6 +56,25 @@ const runBuild = async (github) => {
   };
   const request = await httpsRequest(options, postData);
   return request;
+};
+
+const hasExistingBuilds = async (github) => {
+  const options = {
+    hostname: "api.buildkite.com",
+    port: 443,
+    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds?branch=${encodeURIComponent(
+      github.pull_request.head.ref
+    )}&commit=${encodeURIComponent(
+      github.pull_request.head.sha
+    )}&state=running&state=finished`,
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+  };
+  const request = await httpsRequest(options);
+  return request.length > 0;
 };
 
 const getRequest = async (url) => {
@@ -79,9 +99,25 @@ const handler = async (event, req) => {
       req.body.pull_request.head.user.login ==
         req.body.pull_request.base.user.login
     ) {
-      const buildkite = await runBuild(req.body);
-      const circle = await runCircleBuild(req.body);
-      return [buildkite, circle];
+      let buildAlreadyExists;
+      try {
+        const res = await hasExistingBuilds(req.body);
+        buildAlreadyExists = res;
+      } catch (e) {
+        // if this fails for some reason, assume we don't have an existing build
+        console.error(`Failed to find existing builds:`);
+        console.error(e);
+        buildAlreadyExists = false;
+      }
+
+      if (!buildAlreadyExists) {
+        const buildkite = await runBuild(req.body);
+        const circle = await runCircleBuild(req.body);
+        return [buildkite, circle];
+      } else {
+        console.info("Build for this commit on this branch was already found");
+        return ["build already found for this commit", "build already found for this commit"];
+      }
     }
   } else if (event == "issue_comment") {
     if (
@@ -107,6 +143,9 @@ const handler = async (event, req) => {
           pull_request: prData.data,
         });
         return [buildkite, circle];
+      } else {
+        // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
+        return ["comment author is not (publically) a member of the core team", "comment author is not (publically) a member of the core team"];
       }
     }
   }
@@ -144,7 +183,7 @@ exports.githubWebhookHandler = async (req, res) => {
       console.info(`Triggered buildkite build at ${buildkite.web_url}`);
     } else {
       console.error(`Failed to trigger buildkite build for some reason:`);
-      console.error(data);
+      console.error(buildkite);
     }
 
     if (circle && circle.number) {

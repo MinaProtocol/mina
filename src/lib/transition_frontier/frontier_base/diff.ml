@@ -1,10 +1,10 @@
 open Core_kernel
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 
-type full
+type full = Full
 
-type lite
+type lite = Lite
 
 module Node = struct
   type _ t =

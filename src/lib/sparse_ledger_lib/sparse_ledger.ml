@@ -74,6 +74,8 @@ module type S = sig
 
   val merkle_root : t -> hash
 
+  val depth : t -> int
+
   val next_available_token : t -> token_id
 end
 
@@ -125,6 +127,8 @@ end = struct
         h
 
   type index = int [@@deriving sexp, to_yojson]
+
+  let depth {T.depth; _} = depth
 
   let merkle_root {T.tree; _} = hash tree
 

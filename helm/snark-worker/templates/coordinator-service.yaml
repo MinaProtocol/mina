@@ -1,15 +1,23 @@
-{{- if $.Values.coordinator.active }}
+{{- if .Values.coordinator.active }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{tpl $.Values.coordinator.fullname .}}
+  name: {{ tpl .Values.coordinator.fullname . }}
   labels:
-    app: {{tpl $.Values.coordinator.fullname .}}
+    app: {{ tpl .Values.coordinator.fullname . }}
 spec:
-  clusterIP: None
-  ports:
-    - port: {{ $.Values.coordinator.rpcPort }}
-      name: rpc
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
   selector:
-    app: {{tpl $.Values.coordinator.fullname .}}
+    app: {{ tpl .Values.coordinator.fullname . }}
+  ports:
+  - name: tcp-p2p
+    port: {{ .Values.coda.ports.p2p }}
+    targetPort: external-port
+  - name: tcp-client
+    port: {{ .Values.coda.ports.client }}
+    targetPort: client-port
 {{ end }}

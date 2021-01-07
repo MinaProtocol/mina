@@ -67,11 +67,15 @@ module Metadata = struct
 
   let of_yojson = Stable.Latest.of_yojson
 
+  let of_alist_exn = String.Map.of_alist_exn
+
   let mem = String.Map.mem
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
         String.Map.set acc ~key ~data )
+
+  let merge (a : t) (b : t) = extend a (String.Map.to_alist b)
 end
 
 let global_metadata = ref []
@@ -89,23 +93,6 @@ module Message = struct
     ; metadata: Metadata.t
     ; event_id: Structured_log_events.id option [@default None] }
   [@@deriving yojson]
-
-  let escape_chars = ['"'; '\\']
-
-  let to_yojson =
-    let escape =
-      Staged.unstage
-      @@ String.Escaping.escape ~escapeworthy:escape_chars ~escape_char:'\\'
-    in
-    fun t -> to_yojson {t with message= escape t.message}
-
-  let of_yojson =
-    let unescape =
-      Staged.unstage @@ String.Escaping.unescape ~escape_char:'\\'
-    in
-    fun json ->
-      Result.map (of_yojson json) ~f:(fun t ->
-          {t with message= unescape t.message} )
 
   let check_invariants (t : t) =
     match Logproc_lib.Interpolator.parse t.message with
@@ -215,10 +202,12 @@ module Transport = struct
         { directory: string
         ; log_filename: string
         ; max_size: int
+        ; num_rotate: int
+        ; mutable curr_index: int
         ; mutable primary_log: File_descr.t
         ; mutable primary_log_size: int }
 
-      let create ~directory ~max_size ~log_filename =
+      let create ~directory ~max_size ~log_filename ~num_rotate =
         if not (Result.is_ok (access directory [`Exists])) then
           mkdir_p ~perm:0o755 directory ;
         if not (Result.is_ok (access directory [`Exists; `Read; `Write])) then
@@ -234,11 +223,21 @@ module Transport = struct
           else (0, [O_RDWR; O_CREAT])
         in
         let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
-        {directory; log_filename; max_size; primary_log; primary_log_size}
+        { directory
+        ; log_filename
+        ; max_size
+        ; primary_log
+        ; primary_log_size
+        ; num_rotate
+        ; curr_index= 0 }
 
       let rotate t =
         let primary_log_loc = Filename.concat t.directory t.log_filename in
-        let secondary_log_filename = t.log_filename ^ ".0" in
+        let secondary_log_filename =
+          t.log_filename ^ "." ^ string_of_int t.curr_index
+        in
+        if t.curr_index < t.num_rotate then t.curr_index <- t.curr_index + 1
+        else t.curr_index <- 0 ;
         let secondary_log_loc =
           Filename.concat t.directory secondary_log_filename
         in
@@ -257,10 +256,11 @@ module Transport = struct
         t.primary_log_size <- t.primary_log_size + len
     end
 
-    let dumb_logrotate ~directory ~log_filename ~max_size =
+    let dumb_logrotate ~directory ~log_filename ~max_size ~num_rotate =
       T
         ( (module Dumb_logrotate)
-        , Dumb_logrotate.create ~directory ~log_filename ~max_size )
+        , Dumb_logrotate.create ~directory ~log_filename ~max_size ~num_rotate
+        )
   end
 end
 
@@ -324,12 +324,24 @@ let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message ~event_id
     =
+  let global_metadata' =
+    let m = !global_metadata in
+    let key_cmp (k1, _) (k2, _) = String.compare k1 k2 in
+    match List.find_all_dups m ~compare:key_cmp with
+    | [] ->
+        m
+    | dups ->
+        ("$duplicated_keys", `List (List.map ~f:(fun (s, _) -> `String s) dups))
+        :: List.dedup_and_sort m ~compare:key_cmp
+  in
   { Message.timestamp= Time.now ()
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata=
-      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata
+      Metadata.extend
+        (Metadata.merge (Metadata.of_alist_exn global_metadata') t.metadata)
+        metadata
   ; event_id }
 
 let raw ({id; _} as t) msg =
@@ -410,6 +422,8 @@ module Structured = struct
   let fatal = log ~level:Fatal
 
   let faulty_peer_without_punishment = log ~level:Faulty_peer
+
+  let best_tip_diff = log ~level:Spam ~module_:"" ~location:""
 end
 
 module Str = Structured

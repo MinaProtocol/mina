@@ -12,11 +12,11 @@ run_unit_tests_with_coverage() {
   # don't test nonconsensus code
   if [ -z $@ ] ; then
       echo "Creating coverage files for all libraries"
-      BISECT_ENABLE=YES dune runtest --force src/lib --profile=${DUNE_PROFILE} -j${NPROC}
+      dune runtest --instrument-with bisect_ppx --force src/lib --profile=${DUNE_PROFILE} -j${NPROC}
   else
       for libdir in $@; do
 	  echo "Creating coverage files for library \"$libdir\""
-	  BISECT_ENABLE=YES dune runtest --force src/lib/$libdir --profile=${DUNE_PROFILE} -j${NPROC}
+	  dune runtest --instrument-with bisect_ppx --force src/lib/$libdir --profile=${DUNE_PROFILE} -j${NPROC}
       done
   fi
 }

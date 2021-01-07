@@ -4,12 +4,13 @@ open Backend
 module Me = Tock
 module Other = Tick
 module Impl = Impls.Wrap
+open Pickles_types
 open Import
 
 let high_entropy_bits = 128
 
 let sponge_params_constant =
-  Sponge.Params.(map tweedle_p ~f:Impl.Field.Constant.of_string)
+  Sponge.Params.(map pasta_q ~f:Impl.Field.Constant.of_string)
 
 let field_random_oracle ?(length = Me.Field.size_in_bits - 1) s =
   Me.Field.of_bits (bits_random_oracle ~length s)
@@ -36,48 +37,63 @@ end
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
-module Sponge = struct
-  module S = Sponge.Make_sponge (Sponge.Poseidon (Sponge_inputs.Make (Impl)))
-
-  include Sponge.Bit_sponge.Make (struct
-              type t = Impl.Boolean.var
-            end)
-            (struct
-              include Impl.Field
-
-              let high_entropy_bits = high_entropy_bits
-
-              let to_bits t =
-                Bitstring_lib.Bitstring.Lsb_first.to_list
-                  (Impl.Field.unpack_full t)
-            end)
-            (Impl.Field)
-            (S)
+module Unsafe = struct
+  let unpack_unboolean ?(length = Field.size_in_bits) x =
+    let res =
+      exists
+        (Typ.list Boolean.typ_unchecked ~length)
+        ~compute:
+          As_prover.(
+            fun () -> List.take (Field.Constant.unpack (read_var x)) length)
+    in
+    Field.Assert.equal x (Field.project res) ;
+    res
 end
+
+module Sponge = struct
+  module Permutation =
+    Sponge_inputs.Make
+      (Impl)
+      (struct
+        include Tock_field_sponge.Inputs
+
+        let params = Tock_field_sponge.params
+      end)
+
+  module S = Sponge.Make_sponge (Permutation)
+  include S
+
+  let squeeze_field = squeeze
+
+  let squeeze =
+    Util.squeeze_with_packed (module Impl) ~squeeze ~high_entropy_bits
+end
+
+let%test_unit "sponge" =
+  let module T = Make_sponge.Test (Impl) (Tock_field_sponge.Field) (Sponge.S)
+  in
+  T.test Tock_field_sponge.params
 
 module Input_domain = struct
   let lagrange_commitments domain : Me.Inner_curve.Affine.t array =
     let domain_size = Domain.size domain in
-    let u = Unsigned.Size_t.of_int in
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
-            Snarky_bn382.Tweedle.Dum.Field_urs.lagrange_commitment
-              (Tick.Keypair.load_urs ()) (u domain_size) (u i)
-            |> Snarky_bn382.Tweedle.Dum.Field_poly_comm.unshifted
-            |> Fn.flip Me.Inner_curve.Affine.Backend.Vector.get 0
-            |> Me.Inner_curve.Affine.of_backend ) )
+            (Marlin_plonk_bindings.Pasta_fp_urs.lagrange_commitment
+               (Tick.Keypair.load_urs ()) domain_size i)
+              .unshifted.(0)
+            |> Or_infinity.finite_exn ) )
 
   let domain = Domain.Pow_2_roots_of_unity 7
 end
 
 module Inner_curve = struct
-  module C = Tweedle.Dum
+  module C = Pasta.Vesta
 
   module Inputs = struct
     module Impl = Impl
 
     module Params = struct
-      open Impl.Field.Constant
       include C.Params
 
       let one = C.to_affine_exn C.one
@@ -151,7 +167,9 @@ module Inner_curve = struct
 
   let ( + ) = T.add_exn
 
-  let scale t bs = T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs)
+  let scale t bs =
+    with_label __LOC__ (fun () ->
+        T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) )
 
   let to_field_elements (x, y) = [x; y]
 
@@ -173,26 +191,6 @@ module Inner_curve = struct
     assert_equal t (scale res bs) ;
     res
 
-  (* g -> 5 * g *)
-  let scale_by_quadratic_nonresidue t =
-    let t2 = T.double t in
-    let t4 = T.double t2 in
-    t + t4
-
-  let quadratic_nonresidue_inv = Other.Field.(inv (of_int 5))
-
-  let scale_by_quadratic_nonresidue_inv t =
-    let res =
-      exists typ
-        ~compute:
-          As_prover.(
-            fun () ->
-              C.to_affine_exn
-                (C.scale (C.of_affine (read typ t)) quadratic_nonresidue_inv))
-    in
-    ignore (scale_by_quadratic_nonresidue res) ;
-    res
-
   let negate = T.negate
 
   let one = T.one
@@ -203,7 +201,6 @@ end
 module Generators = struct
   let h =
     lazy
-      ( Snarky_bn382.Tweedle.Dum.Field_urs.h
-          (Zexe_backend.Tweedle.Dum_based.Keypair.load_urs ())
-      |> Zexe_backend.Tweedle.Dum.Affine.of_backend )
+      ( Marlin_plonk_bindings.Pasta_fp_urs.h (Backend.Tick.Keypair.load_urs ())
+      |> Or_infinity.finite_exn )
 end

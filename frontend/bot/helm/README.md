@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps O(1) Lab's Coda protocol bot for providing various services to deployed testnets.
+This chart bootstraps a Coda protocol bot for providing various services to deployed testnets.
 
 ## Add Coda Helm chart repository:
 
  ```console
- helm repo add coda <insert-repository-url>
+ helm repo add coda https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 

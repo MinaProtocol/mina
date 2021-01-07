@@ -148,10 +148,32 @@ let rec start_verifier : type proof partial r.
     t.state <- Waiting ;
     Ivar.fill finished (Ok Outcome.empty) )
   else
-    let out_for_verification = order_proofs t (Queue.to_list t.queue) in
+    let out_for_verification =
+      let proofs =
+        (* TODO: Make this a proper config detail once we have data on what a
+           good default would be.
+        *)
+        match Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE" with
+        | None ->
+            let proofs = Queue.to_list t.queue in
+            Queue.clear t.queue ; proofs
+        | Some max_proofs ->
+            (* NB: Order is irrelevant because we sort immediately after *)
+            let rec take n acc =
+              if n > 0 then
+                match Queue.dequeue t.queue with
+                | Some proof ->
+                    take (n - 1) (proof :: acc)
+                | None ->
+                    acc
+              else acc
+            in
+            take (int_of_string max_proofs) []
+      in
+      order_proofs t proofs
+    in
     let next_finished = Ivar.create () in
     t.state <- Verifying {next_finished; out_for_verification} ;
-    Queue.clear t.queue ;
     let res =
       call_verifier t
         (List.map out_for_verification ~f:(fun (_id, p) -> `Proof p))
@@ -197,7 +219,7 @@ let compare_envelope (e1 : _ Envelope.Incoming.t) (e2 : _ Envelope.Incoming.t)
   Envelope.Sender.compare e1.sender e2.sender
 
 module Transaction_pool = struct
-  open Coda_base
+  open Mina_base
 
   type diff = User_command.Verifiable.t list Envelope.Incoming.t
   [@@deriving sexp]
@@ -319,7 +341,7 @@ end
 
 module Snark_pool = struct
   type proof_envelope =
-    (Ledger_proof.t One_or_two.t * Coda_base.Sok_message.t) Envelope.Incoming.t
+    (Ledger_proof.t One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t
   [@@deriving sexp]
 
   (* We don't use partial verification here. *)
@@ -352,7 +374,7 @@ module Snark_pool = struct
   module Work_key = struct
     module T = struct
       type t =
-        (Transaction_snark.Statement.t One_or_two.t * Coda_base.Sok_message.t)
+        (Transaction_snark.Statement.t One_or_two.t * Mina_base.Sok_message.t)
         Envelope.Incoming.t
       [@@deriving sexp, compare]
     end
@@ -375,7 +397,7 @@ module Snark_pool = struct
 
   let%test_module "With valid and invalid proofs" =
     ( module struct
-      open Coda_base
+      open Mina_base
 
       let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
@@ -388,7 +410,7 @@ module Snark_pool = struct
             One_or_two.gen Transaction_snark.Statement.gen
           in
           let%map {fee; prover} = Fee_with_prover.gen in
-          let message = Coda_base.Sok_message.create ~fee ~prover in
+          let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:Ledger_proof.For_tests.mk_dummy_proof
           , message )
         in
@@ -406,9 +428,9 @@ module Snark_pool = struct
               ~f:(Signature_lib.Public_key.Compressed.( <> ) prover)
           in
           let sok_digest =
-            Coda_base.Sok_message.(digest (create ~fee ~prover:invalid_prover))
+            Mina_base.Sok_message.(digest (create ~fee ~prover:invalid_prover))
           in
-          let message = Coda_base.Sok_message.create ~fee ~prover in
+          let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:(fun statement ->
                 Ledger_proof.create ~statement ~sok_digest
                   ~proof:Proof.transaction_dummy )

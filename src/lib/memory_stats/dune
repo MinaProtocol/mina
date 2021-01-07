@@ -3,11 +3,12 @@
  (public_name memory_stats)
  (library_flags -linkall)
  (libraries
-    async_kernel
-    core
-    jemalloc
-    logger
-    )
+   async_kernel
+   core
+   jemalloc
+   logger
+ )
  (preprocess
-  (pps ppx_snarky ppx_coda ppx_version ppx_let bisect_ppx -- --conditional))
+  (pps ppx_snarky ppx_coda ppx_version ppx_let))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Memory statistics for OCaml and jemalloc"))

@@ -1,10 +1,9 @@
 open Core
 
 module Sender = struct
-  type t = Local | Remote of (Unix.Inet_addr.Blocking_sexp.t * Peer.Id.t)
-  [@@deriving sexp, compare]
+  type t = Local | Remote of Peer.t [@@deriving sexp, compare]
 
-  let of_peer (p : Peer.t) = Remote (p.host, p.peer_id)
+  let of_peer (p : Peer.t) = Remote p
 
   let equal sender1 sender2 = Int.equal (compare sender1 sender2) 0
 
@@ -12,24 +11,17 @@ module Sender = struct
     match t with
     | Local ->
         `String "Local"
-    | Remote (inet_addr, peer_id) ->
-        `Assoc
-          [ ( "Remote"
-            , `Assoc
-                [ ("host", `String (Unix.Inet_addr.to_string inet_addr))
-                ; ("peer_id", `String (Peer.Id.to_string peer_id)) ] ) ]
+    | Remote p ->
+        `Assoc [("Remote", Peer.to_yojson p)]
 
   let of_yojson (json : Yojson.Safe.t) : (t, string) Result.t =
     match json with
     | `String "Local" ->
         Ok Local
-    | `Assoc
-        [ ( "Remote"
-          , `Assoc [("host", `String addr); ("peer_id", `String peer_id)] ) ]
-      ->
-        Ok
-          (Remote
-             (Unix.Inet_addr.of_string addr, Peer.Id.unsafe_of_string peer_id))
+    | `Assoc [("Remote", peer_json)] ->
+        let open Result.Let_syntax in
+        let%map peer = Peer.of_yojson peer_json in
+        Remote peer
     | _ ->
         Error "Expected JSON representing envelope sender"
 
@@ -55,8 +47,9 @@ module Sender = struct
     in
     let remote =
       let inet = Unix.Inet_addr.of_string ip in
-      let%map peerid = String.gen_nonempty in
-      (inet, peerid)
+      let%bind peer_id = String.gen_nonempty in
+      let%map libp2p_port = Int.gen_uniform_incl 1025 49151 in
+      Peer.create inet ~peer_id ~libp2p_port
     in
     match%map Option.quickcheck_generator remote with
     | None ->
@@ -66,22 +59,41 @@ module Sender = struct
 end
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Sender.t}
+  let time_to_yojson tm = `String (Time.to_string tm)
+
+  let time_of_yojson = function
+    | `String s ->
+        Ok (Time.of_string s)
+    | _ ->
+        Error "time_of_yojson: Expected string"
+
+  type 'a t =
+    { data: 'a
+    ; sender: Sender.t
+    ; received_at: Time.t
+          [@to_yojson time_to_yojson] [@of_yojson time_of_yojson] }
   [@@deriving eq, sexp, yojson, compare]
 
   let sender t = t.sender
 
   let data t = t.data
 
-  let wrap ~data ~sender = {data; sender}
+  let received_at t = t.received_at
 
-  let wrap_peer ~data ~sender = {data; sender= Sender.of_peer sender}
+  let wrap ~data ~sender =
+    let received_at = Time.now () in
+    {data; sender; received_at}
+
+  let wrap_peer ~data ~sender =
+    let received_at = Time.now () in
+    {data; sender= Sender.of_peer sender; received_at}
 
   let map ~f t = {t with data= f t.data}
 
   let local data =
+    let received_at = Time.now () in
     let sender = Sender.Local in
-    {data; sender}
+    {data; sender; received_at}
 
   let remote_sender_exn t =
     match t.sender with
@@ -94,5 +106,6 @@ module Incoming = struct
     let open Quickcheck.Generator.Let_syntax in
     let%bind data = gen_a in
     let%map sender = Sender.gen in
-    {data; sender}
+    let received_at = Time.now () in
+    {data; sender; received_at}
 end

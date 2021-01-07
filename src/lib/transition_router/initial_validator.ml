@@ -1,10 +1,10 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 open Signature_lib
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type validation_error =
@@ -49,7 +49,7 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
         [("reason", `String "invalid delta transition chain proof")]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
-        ; ("error", `String (Error.to_string_hum err)) ]
+        ; ("error", Error_json.error_to_yojson err) ]
     | `Mismatched_protocol_version ->
         [("reason", `String "protocol version mismatch")]
     | `Invalid_protocol_version ->
@@ -61,12 +61,12 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
-      let error_metadata = [("error", `String (Error.to_string_hum err))] in
-      [%log fatal]
+      let error_metadata = [("error", Error_json.error_to_yojson err)] in
+      [%log error]
         ~metadata:
           (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
-      exit 21
+      Deferred.unit
   | `Invalid_proof ->
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->
@@ -179,52 +179,71 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         if Ivar.is_full initialization_finish_signal then (
+         if Ivar.is_full initialization_finish_signal then
            let ( `Transition transition_env
                , `Time_received time_received
-               , `Valid_cb is_valid_cb ) =
+               , `Valid_cb valid_cb ) =
              network_transition
            in
-           let transition_with_hash =
-             Envelope.Incoming.data transition_env
-             |> With_hash.of_data
-                  ~hash_data:
-                    (Fn.compose Protocol_state.hash
-                       External_transition.protocol_state)
-           in
-           Duplicate_block_detector.check ~precomputed_values duplicate_checker
-             logger transition_with_hash ;
-           let sender = Envelope.Incoming.sender transition_env in
-           let defer f = Fn.compose Deferred.return f in
-           match%bind
-             let open Deferred.Result.Monad_infix in
-             External_transition.(
-               Validation.wrap transition_with_hash
-               |> defer
-                    (validate_time_received ~precomputed_values ~time_received)
-               >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
-               >>= validate_proof ~verifier
-               >>= defer validate_delta_transition_chain
-               >>= defer validate_protocol_versions)
-           with
-           | Ok verified_transition ->
-               External_transition.poke_validation_callback
-                 (Envelope.Incoming.data transition_env)
-                 is_valid_cb ;
-               Envelope.Incoming.wrap ~data:verified_transition ~sender
-               |> Writer.write valid_transition_writer ;
-               let blockchain_length =
-                 External_transition.Initial_validated.consensus_state
-                   verified_transition
-                 |> Consensus.Data.Consensus_state.blockchain_length
-                 |> Coda_numbers.Length.to_int
+           if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
+             let transition_with_hash =
+               Envelope.Incoming.data transition_env
+               |> With_hash.of_data
+                    ~hash_data:
+                      (Fn.compose Protocol_state.hash
+                         External_transition.protocol_state)
+             in
+             Duplicate_block_detector.check ~precomputed_values
+               duplicate_checker logger transition_with_hash ;
+             let sender = Envelope.Incoming.sender transition_env in
+             let computation =
+               let open Interruptible.Let_syntax in
+               let defer f x =
+                 Interruptible.uninterruptible @@ Deferred.return (f x)
                in
-               Coda_metrics.Transition_frontier.update_max_blocklength_observed
-                 blockchain_length ;
-               return ()
-           | Error error ->
-               is_valid_cb false ;
-               handle_validation_error ~logger ~trust_system ~sender
-                 ~state_hash:(With_hash.hash transition_with_hash)
-                 ~delta:genesis_constants.protocol.delta error )
+               let%bind () =
+                 Interruptible.lift Deferred.unit
+                   (Mina_net2.Validation_callback.await_timeout valid_cb)
+               in
+               match%bind
+                 let open Interruptible.Result.Let_syntax in
+                 External_transition.(
+                   Validation.wrap transition_with_hash
+                   |> defer
+                        (validate_time_received ~precomputed_values
+                           ~time_received)
+                   >>= defer
+                         (validate_genesis_protocol_state ~genesis_state_hash)
+                   >>= (fun x ->
+                         Interruptible.uninterruptible
+                           (validate_proofs ~verifier [x])
+                         >>| List.hd_exn )
+                   >>= defer validate_delta_transition_chain
+                   >>= defer validate_protocol_versions)
+               with
+               | Ok verified_transition ->
+                   External_transition.poke_validation_callback
+                     (Envelope.Incoming.data transition_env)
+                     valid_cb ;
+                   Envelope.Incoming.wrap ~data:verified_transition ~sender
+                   |> Writer.write valid_transition_writer ;
+                   let blockchain_length =
+                     External_transition.Initial_validated.consensus_state
+                       verified_transition
+                     |> Consensus.Data.Consensus_state.blockchain_length
+                     |> Mina_numbers.Length.to_int
+                   in
+                   Mina_metrics.Transition_frontier
+                   .update_max_blocklength_observed blockchain_length ;
+                   return ()
+               | Error error ->
+                   Mina_net2.Validation_callback.fire_if_not_already_fired
+                     valid_cb `Reject ;
+                   Interruptible.uninterruptible
+                   @@ handle_validation_error ~logger ~trust_system ~sender
+                        ~state_hash:(With_hash.hash transition_with_hash)
+                        ~delta:genesis_constants.protocol.delta error
+             in
+             Interruptible.force computation >>| ignore )
+           else Deferred.unit
          else Deferred.unit ))

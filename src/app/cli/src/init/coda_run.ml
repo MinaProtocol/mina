@@ -1,7 +1,6 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
 open O1trace
 module Graphql_cohttp_async =
   Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -9,11 +8,11 @@ module Graphql_cohttp_async =
 
 let snark_job_list_json t =
   let open Participating_state.Let_syntax in
-  let%map sl = Coda_lib.best_staged_ledger t in
+  let%map sl = Mina_lib.best_staged_ledger t in
   Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
 let snark_pool_list t =
-  Coda_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
+  Mina_lib.snark_pool t |> Network_pool.Snark_pool.resource_pool
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
 
@@ -158,14 +157,14 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   (* ledger visualization *)
   [%log debug] "%s"
     (Visualization_message.success "registered masks" mask_file) ;
-  Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
+  Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
       [%log trace]
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
     (*Transition frontier visualization*)
-    match Coda_lib.visualize_frontier ~filename:frontier_file t with
+    match Mina_lib.visualize_frontier ~filename:frontier_file t with
     | `Active () ->
         [%log debug] "%s"
           (Visualization_message.success "transition frontier" frontier_file)
@@ -176,7 +175,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
 let remove_prev_crash_reports ~conf_dir =
   Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
 
-let summary exn_str =
+let summary exn_json =
   let uname = Core.Unix.uname () in
   let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
   `Assoc
@@ -184,20 +183,20 @@ let summary exn_str =
     ; ("Release", `String (Core.Unix.Utsname.release uname))
     ; ("Machine", `String (Core.Unix.Utsname.machine uname))
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
-    ; ("Exception", `String exn_str)
+    ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Coda_version.branch)
-    ; ("Coda_commit", `String Coda_version.commit_id) ]
+    ; ("Coda_branch", `String Mina_version.branch)
+    ; ("Coda_commit", `String Mina_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
       (Deferred.return (`String "Shutdown before Coda instance was created"))
     ~f:(fun t ->
-      Coda_commands.get_status ~flag:`Performance t
+      Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
-let make_report exn_str ~conf_dir ~top_logger coda_ref =
+let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: enter" ;
   let _ = remove_prev_crash_reports ~conf_dir in
@@ -233,8 +232,8 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
         ()
   in
   (*System info/crash summary*)
-  let summary = summary exn_str in
-  Yojson.to_file (temp_config ^/ "crash_summary.json") summary ;
+  let summary = summary exn_json in
+  Yojson.Safe.to_file (temp_config ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
   let _ =
@@ -281,70 +280,68 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
     Logger.extend
-      (Coda_lib.top_level_logger coda)
+      (Mina_lib.top_level_logger coda)
       [("coda_run", `String "Setting up server logs")]
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
-            ( Coda_commands.setup_and_submit_user_commands coda ts
+            ( Mina_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
-            ( Coda_commands.get_balance coda aid
+            ( Mina_commands.get_balance coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
-          return (Coda_commands.get_trust_status coda ip_address) )
+          return (Mina_commands.get_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
-          return (Coda_commands.get_trust_status_all coda) )
+          return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
-          return (Coda_commands.reset_trust_status coda ip_address) )
+          return (Mina_commands.reset_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
-            ( Coda_commands.verify_payment coda aid tx proof
+            ( Mina_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
-    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, aid) ->
-          let open Deferred.Or_error.Let_syntax in
-          let%bind acc_opt =
-            Coda_commands.get_account coda aid
-            |> Participating_state.active_error |> Deferred.return
-          in
-          let%bind account =
-            Result.of_option acc_opt
-              ~error:
-                (Error.of_string
-                   (sprintf
-                      !"Could not find account of public key %{sexp: \
-                        Account_id.t}"
-                      aid))
-            |> Deferred.return
-          in
-          Coda_commands.prove_receipt coda ~proving_receipt
-            ~resulting_receipt:account.Account.Poly.receipt_chain_hash )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
-            ( Coda_commands.get_keys_with_details coda
+            ( Mina_commands.get_keys_with_details coda
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
           return
-            ( Coda_commands.get_public_keys coda
+            ( Mina_commands.get_public_keys coda
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
-            ( Coda_commands.get_nonce coda aid
+            ( Mina_commands.get_nonce coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
-            ( Coda_lib.get_inferred_nonce_from_transaction_pool_and_ledger coda
+            ( Mina_lib.get_inferred_nonce_from_transaction_pool_and_ledger coda
                 aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          Coda_commands.get_status ~flag coda )
+          Mina_commands.get_status ~flag coda )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          Coda_commands.clear_hist_status ~flag coda )
+          Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
-          Coda_lib.get_ledger coda lh )
+          Mina_lib.get_ledger coda lh )
+    ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
+          ( match which with
+          | Next ->
+              Ok (Mina_lib.next_epoch_ledger coda)
+          | Current ->
+              Option.value_map
+                (Mina_lib.staking_ledger coda)
+                ~default:
+                  (Or_error.error_string "current staking ledger not available")
+                ~f:Or_error.return )
+          |> Or_error.map ~f:(function
+               | Genesis_epoch_ledger l ->
+                   Mina_base.Ledger.to_list l
+               | Ledger_db db ->
+                   Mina_base.Ledger.Db.to_list db )
+          |> Deferred.return )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )
@@ -354,14 +351,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Snark_pool_list.rpc (fun () () ->
           return (snark_pool_list coda) )
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
-          let open Coda_lib.Config in
-          Coda_tracing.start (Coda_lib.config coda).conf_dir )
+          let open Mina_lib.Config in
+          Coda_tracing.start (Mina_lib.config coda).conf_dir )
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Coda_tracing.stop () ; Deferred.unit )
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
-          return (Coda_lib.visualize_frontier ~filename coda) )
+          return (Mina_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
-        (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
+        (fun () filename -> return (Mina_base.Ledger.Debug.visualize ~filename)
       )
     ; implement Daemon_rpcs.Set_staking.rpc (fun () keypairs ->
           let keypair_and_compressed_key =
@@ -369,7 +366,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
                 (keypair, Public_key.compress public_key) )
           in
-          Coda_lib.replace_block_production_keypairs coda
+          Mina_lib.replace_block_production_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
           Deferred.unit )
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
@@ -391,8 +388,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
-          Telemetry.get_telemetry_data_from_peers (Coda_lib.net coda) peers )
-    ]
+          Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda) peers )
+    ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
+          return
+            (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
+      ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs_versioned.Get_work.Latest.rpc (fun () () ->
@@ -400,19 +400,19 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             (let open Option.Let_syntax in
             let%bind key =
               Option.merge
-                (Coda_lib.snark_worker_key coda)
-                (Coda_lib.snark_coordinator_key coda)
+                (Mina_lib.snark_worker_key coda)
+                (Mina_lib.snark_coordinator_key coda)
                 ~f:Fn.const
             in
-            let%map r = Coda_lib.request_work coda in
+            let%map r = Mina_lib.request_work coda in
             [%log trace]
               ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
               "responding to a Get_work request with some new work" ;
-            Coda_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
+            Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, key)) )
     ; implement Snark_worker.Rpcs_versioned.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
-          Coda_metrics.(
+          Mina_metrics.(
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           [%log trace] "received completed work from a snark worker"
             ~metadata:
@@ -425,14 +425,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Deferred.return @@ Coda_lib.add_work coda work ) ]
+          Deferred.return @@ Mina_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
           let graphql_callback =
             Graphql_cohttp_async.make_callback
               (fun _req -> coda)
-              Coda_graphql.schema
+              Mina_graphql.schema
           in
           Cohttp_async.(
             Server.create_expert
@@ -450,7 +450,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let status flag =
-                  let%bind status = Coda_commands.get_status ~flag coda in
+                  let%bind status = Mina_commands.get_status ~flag coda in
                   Server.respond_string
                     ( status |> Daemon_rpcs.Types.Status.to_yojson
                     |> Yojson.Safe.pretty_to_string )
@@ -476,7 +476,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                    rest_server_port ) ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
-      (On_port (Coda_lib.client_port coda))
+      (On_port (Mina_lib.client_port coda))
   in
   don't_wait_for
     (Deferred.ignore
@@ -508,15 +508,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Rpc.Connection.server_with_close
                     ~handshake_timeout:
                       (Time.Span.of_sec
-                         Coda_compile_config.rpc_handshake_timeout_sec)
+                         Mina_compile_config.rpc_handshake_timeout_sec)
                     ~heartbeat_config:
                       (Rpc.Connection.Heartbeat_config.create
                          ~timeout:
                            (Time_ns.Span.of_sec
-                              Coda_compile_config.rpc_heartbeat_timeout_sec)
+                              Mina_compile_config.rpc_heartbeat_timeout_sec)
                          ~send_every:
                            (Time_ns.Span.of_sec
-                              Coda_compile_config.rpc_heartbeat_send_every_sec))
+                              Mina_compile_config.rpc_heartbeat_send_every_sec))
                     reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn
@@ -526,9 +526,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          [%log error]
-                            "Exception while handling RPC server request from \
-                             $address: $error"
+                          [%log warn]
+                            "Handshake error while handling RPC server \
+                             request from $address"
                             ~metadata:
                               [ ("error", `String (Exn.to_string_mach exn))
                               ; ("context", `String "rpc_server")
@@ -559,7 +559,7 @@ let coda_crash_message ~log_issue ~action ~error =
   %s
 %!|err} error followup
 
-let no_report exn_str status =
+let no_report exn_json status =
   sprintf
     "include the last 20 lines from .coda-config/coda.log and then paste the \
      following:\n\
@@ -568,13 +568,18 @@ let no_report exn_str status =
      Status:\n\
      %s\n"
     (Yojson.Safe.to_string status)
-    (Yojson.Safe.to_string (summary exn_str))
+    (Yojson.Safe.to_string (summary exn_json))
 
-let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
-  let exn_str = Exn.to_string e in
+let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
+    =
+  (* attempt to free up some memory before handling crash *)
+  (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
+  Hashtbl.keys child_pids
+  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid))) ;
+  let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
-    ~metadata:[("exn", `String exn_str)] ;
+    ~metadata:[("exn", exn_json)] ;
   let%bind status = coda_status !coda_ref in
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "handle_crash: acquired coda status" ;
@@ -584,7 +589,7 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
         ~timeout_duration:(Block_time.Span.of_ms 30_000L)
         time_controller
         ( try
-            make_report exn_str ~conf_dir coda_ref ~top_logger
+            make_report exn_json ~conf_dir coda_ref ~top_logger
             >>| fun k -> Ok k
           with exn -> return (Error (Error.of_exn exn)) )
     with
@@ -594,26 +599,27 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
         sprintf "attach the crash report %s" report_file
     | `Ok (Ok None) ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
-        no_report exn_str status
+        no_report exn_json status
     | `Ok (Error e) ->
         [%log' fatal top_logger] "Exception when generating crash report: $exn"
-          ~metadata:[("exn", `String (Error.to_string_hum e))] ;
-        no_report exn_str status
+          ~metadata:[("exn", Error_json.error_to_yojson e)] ;
+        no_report exn_json status
     | `Timeout ->
         [%log' fatal top_logger] "Timed out while generated crash report" ;
-        no_report exn_str status
+        no_report exn_json status
   in
   let message =
     coda_crash_message ~error:"crashed" ~action:action_string ~log_issue:true
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
+let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
+    coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
            match Monitor.extract_exn exn with
-           | Coda_networking.No_initial_peers ->
+           | Mina_networking.No_initial_peers ->
                let message =
                  coda_crash_message
                    ~error:"failed to connect to any initial peers"
@@ -634,8 +640,23 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
-           | _ ->
-               handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
+           | Mina_user_error.Mina_user_error {message; where} ->
+               Core.print_string "\nFATAL ERROR" ;
+               let error =
+                 match where with
+                 | None ->
+                     "encountered a configuration error"
+                 | Some where ->
+                     sprintf "encountered a configuration error %s" where
+               in
+               let message =
+                 coda_crash_message ~error ~action:("\n" ^ message)
+                   ~log_issue:false
+               in
+               Core.print_string message ; Deferred.unit
+           | exn ->
+               handle_crash exn ~time_controller ~conf_dir ~child_pids
+                 ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
   Async_unix.Signal.(

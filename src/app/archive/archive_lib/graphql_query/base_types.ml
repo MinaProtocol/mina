@@ -1,7 +1,7 @@
 (**  Low-level dependency make graphql_query.ml compile less often, which takes a long time **)
 open Core
 
-open Coda_base
+open Mina_base
 
 module Make_numeric (Input : sig
   type t
@@ -54,7 +54,7 @@ end
 module Fee = Make_numeric (Currency.Fee)
 module Amount = Make_numeric (Currency.Amount)
 module Nonce = Make_numeric (Account.Nonce)
-module Length = Make_numeric (Coda_numbers.Length)
+module Length = Make_numeric (Mina_numbers.Length)
 
 module Block_time = Make_numeric (struct
   type t = Block_time.t

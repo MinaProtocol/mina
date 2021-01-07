@@ -1,4 +1,4 @@
-Thank you for contributing to Coda! Please see `CONTRIBUTING.md` if you haven't
+Thank you for contributing to Mina! Please see `CONTRIBUTING.md` if you haven't
 yet. In that doc, there are more details around how to start our CI.
 
 Explain your changes here.
