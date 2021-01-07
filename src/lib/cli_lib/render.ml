@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 module type Printable_intf = sig
   type t [@@deriving to_yojson]

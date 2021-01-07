@@ -1,7 +1,7 @@
 open Async
 open Core
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 
@@ -245,14 +245,14 @@ module Json_parsing = struct
         failwithf "Could not parse JSON using %s.of_yojson" modl ()
 
   let valid_commands_with_statuses :
-      Coda_base.User_command.Valid.t Coda_base.With_status.t list parser =
+      Mina_base.User_command.Valid.t Mina_base.With_status.t list parser =
     function
     | `List cmds ->
         let cmd_or_errors =
           List.map cmds
             ~f:
-              (Coda_base.With_status.of_yojson
-                 Coda_base.User_command.Valid.of_yojson)
+              (Mina_base.With_status.of_yojson
+                 Mina_base.User_command.Valid.of_yojson)
         in
         List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
             match (accum, cmd_or_err) with
@@ -517,7 +517,7 @@ module Block_produced_query = struct
 end
 
 module Breadcrumb_added_query = struct
-  open Coda_base
+  open Mina_base
 
   module Result = struct
     type t = {user_commands: User_command.Valid.t With_status.t list}
@@ -1032,7 +1032,7 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
           go (n - 1)
       | Ok {Malleable_error.Accumulator.computation_result= res; soft_errors= _}
         ->
-          let open Coda_base in
+          let open Mina_base in
           let open Signature_lib in
           (* res is a list of Breadcrumb_added_query.Result.t
              each of those contains a list of user commands
@@ -1054,7 +1054,7 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
             let actual_status = cmd_with_status.With_status.status in
             let applied =
               match actual_status with
-              | User_command_status.Applied _ ->
+              | Transaction_status.Applied _ ->
                   true
               | _ ->
                   false
@@ -1077,11 +1077,11 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
                     , `String (Public_key.Compressed.to_string receiver) )
                   ; ("amount", `String (Currency.Amount.to_string amount))
                   ; ( "actual_user_command_status"
-                    , User_command_status.to_yojson actual_status ) ] ;
+                    , Transaction_status.to_yojson actual_status ) ] ;
               Error.raise
                 (Error.of_string
                    (sprintf "Unexpected status in matching payment: %s"
-                      ( User_command_status.to_yojson actual_status
+                      ( Transaction_status.to_yojson actual_status
                       |> Yojson.Safe.to_string ))) )
           else (
             [%log info]

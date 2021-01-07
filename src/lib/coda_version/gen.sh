@@ -23,12 +23,6 @@ cd ../../../../..
     marlin_commit_id_short=$(git rev-parse --short=8 --verify HEAD)
     marlin_commit_date=$(git show HEAD -s --format="%cI")
   cd ../../..
-  cd src/lib/zexe
-    zexe_commit_id=$(git rev-parse --verify HEAD)
-    if [ -n "$(git diff --stat)" ]; then zexe_commit_id="[DIRTY]$id"; fi
-    zexe_commit_id_short=$(git rev-parse --short=8 --verify HEAD)
-    zexe_commit_date=$(git show HEAD -s --format="%cI")
-  cd ../../..
 cd $CWD
 
 echo "let commit_id = \"$id\"" > "$1"
@@ -39,7 +33,3 @@ echo "let commit_date = \"$commit_date\"" >> "$1"
 echo "let marlin_commit_id = \"$marlin_commit_id\"" >> "$1"
 echo "let marlin_commit_id_short = \"$marlin_commit_id_short\"" >> "$1"
 echo "let marlin_commit_date = \"$marlin_commit_date\"" >> "$1"
-
-echo "let zexe_commit_id = \"$zexe_commit_id\"" >> "$1"
-echo "let zexe_commit_id_short = \"$zexe_commit_id_short\"" >> "$1"
-echo "let zexe_commit_date = \"$zexe_commit_date\"" >> "$1"

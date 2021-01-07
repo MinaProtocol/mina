@@ -1,7 +1,10 @@
 open Core_kernel
 
 module Fork_config = struct
-  type t = {previous_state_hash: string; previous_length: int}
+  type t =
+    { previous_state_hash: string
+    ; previous_length: int
+    ; previous_global_slot: int }
   [@@deriving yojson, dhall_type, bin_io_unversioned]
 end
 
@@ -52,6 +55,7 @@ module Json_layout = struct
         type t =
           { initial_minimum_balance: Currency.Balance.t
           ; cliff_time: Coda_numbers.Global_slot.t
+          ; cliff_amount: Currency.Amount.t
           ; vesting_period: Coda_numbers.Global_slot.t
           ; vesting_increment: Currency.Amount.t }
         [@@deriving yojson, dhall_type, sexp]
@@ -59,6 +63,7 @@ module Json_layout = struct
         let fields =
           [| "initial_minimum_balance"
            ; "cliff_time"
+           ; "cliff_amount"
            ; "vesting_period"
            ; "vesting_increment" |]
 
@@ -394,6 +399,7 @@ module Accounts = struct
       type t = Json_layout.Accounts.Single.Timed.t =
         { initial_minimum_balance: Currency.Balance.Stable.Latest.t
         ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
+        ; cliff_amount: Currency.Amount.Stable.Latest.t
         ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
         ; vesting_increment: Currency.Amount.Stable.Latest.t }
       [@@deriving bin_io_unversioned, sexp]

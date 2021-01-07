@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-open Coda_base
+open Mina_base
 open Coda_transition
 open Frontier_base
 open Network_peer
@@ -9,12 +9,12 @@ module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 
   module Best_tip_prover :
-    Coda_intf.Best_tip_prover_intf
+    Mina_intf.Best_tip_prover_intf
     with type transition_frontier := Transition_frontier.t
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Sync_handler_intf
+  Mina_intf.Sync_handler_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
@@ -174,12 +174,14 @@ module Make (Inputs : Inputs_intf) :
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.prove")])
           ~existing:
-            (External_transition.consensus_state best_tip_with_witness.data)
+            (With_hash.map ~f:External_transition.consensus_state
+               best_tip_with_witness.data)
           ~candidate:seen_consensus_state
         = `Keep
       in
       let%map () = Option.some_if is_tip_better () in
-      best_tip_with_witness
+      { best_tip_with_witness with
+        data= With_hash.data best_tip_with_witness.data }
 
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
         ~precomputed_values observed_state peer_root =
@@ -194,7 +196,8 @@ module Make (Inputs : Inputs_intf) :
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.verify")])
           ~existing:
-            (External_transition.consensus_state best_tip_transition.data)
+            (With_hash.map ~f:External_transition.consensus_state
+               best_tip_transition)
           ~candidate
         = `Keep
       in

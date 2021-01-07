@@ -280,7 +280,7 @@ end
 type signed_command_common =
   { sender: Signature_lib.Public_key.Compressed.t
   ; fee: Currency.Fee.t
-  ; nonce: Coda_base.Account.Nonce.t option
+  ; nonce: Mina_base.Account.Nonce.t option
   ; memo: string option }
 
 let signed_command_common : signed_command_common Command.Param.t =
@@ -299,7 +299,7 @@ let signed_command_common : signed_command_common Command.Param.t =
            (Currency.Fee.to_formatted_string
               Coda_compile_config.default_transaction_fee)
            (Currency.Fee.to_formatted_string
-              Coda_base.Signed_command.minimum_fee))
+              Mina_base.Signed_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -346,7 +346,7 @@ module Signed_command = struct
            (Currency.Fee.to_formatted_string
               Coda_compile_config.default_transaction_fee)
            (Currency.Fee.to_formatted_string
-              Coda_base.Signed_command.minimum_fee))
+              Mina_base.Signed_command.minimum_fee))
       (optional txn_fee)
 
   let valid_until =
@@ -375,6 +375,6 @@ module Signed_command = struct
       ~doc:
         (sprintf
            "STRING Memo accompanying the transaction (up to %d characters)"
-           Coda_base.Signed_command_memo.max_input_length)
+           Mina_base.Signed_command_memo.max_input_length)
       (optional string)
 end

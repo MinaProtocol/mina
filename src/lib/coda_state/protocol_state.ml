@@ -2,7 +2,7 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Coda_base
+open Mina_base
 
 [%%ifdef
 consensus_mechanism]
@@ -136,6 +136,7 @@ module Body = struct
     ; last_vrf_output= ()
     ; total_currency= C.total_currency_var cs
     ; curr_global_slot= C.curr_global_slot_var cs
+    ; global_slot_since_genesis= C.global_slot_since_genesis_var cs
     ; staking_epoch_data= C.staking_epoch_data_var cs
     ; next_epoch_data= C.next_epoch_data_var cs }
 
@@ -158,6 +159,7 @@ module Body = struct
     ; last_vrf_output= ()
     ; total_currency= C.total_currency cs
     ; curr_global_slot= C.curr_global_slot cs
+    ; global_slot_since_genesis= C.global_slot_since_genesis cs
     ; staking_epoch_data= C.staking_epoch_data cs
     ; next_epoch_data= C.next_epoch_data cs }
 end
@@ -273,7 +275,7 @@ let genesis_state_hash ?(state_hash = None) state =
 call_logger]
 
 let hash s =
-  Coda_debug.Call_logger.record_call "Protocol_state.hash" ;
+  Mina_debug.Call_logger.record_call "Protocol_state.hash" ;
   hash s
 
 [%%endif]
@@ -286,9 +288,9 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
       { Body.Poly.blockchain_state=
           Blockchain_state.negative_one ~constraint_constants
             ~genesis_ledger_hash:
-              (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+              (Mina_base.Ledger.merkle_root (Lazy.force genesis_ledger))
             ~snarked_next_available_token:
-              (Coda_base.Ledger.next_available_token
+              (Mina_base.Ledger.next_available_token
                  (Lazy.force genesis_ledger))
       ; genesis_state_hash= State_hash.of_hash Outside_hash_image.t
       ; consensus_state=

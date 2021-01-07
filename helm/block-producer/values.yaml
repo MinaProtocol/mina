@@ -9,10 +9,10 @@ coda:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
     - /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
   ports:
-    p2p: "8301"
+    client: "8301"
     graphql: "3085"
     metrics: "10001"
-    external: "10909"
+    p2p: "10909"
 
 userAgent:
   image: ""

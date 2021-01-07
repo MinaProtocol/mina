@@ -1,12 +1,22 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 
 module Catchup_job_id = Unique_id.Int ()
 
 module Node = struct
   module State = struct
-    type t = Have_breadcrumb | Part_of_catchups of Catchup_job_id.Hash_set.t
+    module Ids = struct
+      type t = Catchup_job_id.Hash_set.t
+
+      let to_yojson (t : t) =
+        `List
+          (List.map (Hash_set.to_list t) ~f:(fun x ->
+               `String (Catchup_job_id.to_string x) ))
+    end
+
+    type t = Have_breadcrumb | Part_of_catchups of Ids.t
+    [@@deriving to_yojson]
   end
 
   type t =
@@ -15,14 +25,45 @@ module Node = struct
           (* If a node has a breadcrumb, then all of its ancestors have
    breadcrumbs as well. *)
     }
+  [@@deriving to_yojson]
+end
+
+module L = struct
+  type t = Logger.t
+
+  let to_yojson _ = `String "logger"
+end
+
+module State_hash_table = struct
+  type 'a t = 'a State_hash.Table.t
+
+  let to_yojson f t : Yojson.Safe.t =
+    `Assoc
+      (List.map (State_hash.Table.to_alist t) ~f:(fun (h, x) ->
+           (State_hash.to_base58_check h, f x) ))
+end
+
+module State_hash_hash_set = struct
+  type t = State_hash.Hash_set.t
+
+  let to_yojson (t : t) : Yojson.Safe.t =
+    `List (List.map (Hash_set.to_list t) ~f:State_hash.to_yojson)
+end
+
+module State_hash_set = struct
+  type t = State_hash.Set.t
+
+  let to_yojson (t : t) : Yojson.Safe.t =
+    `List (List.map (Set.to_list t) ~f:State_hash.to_yojson)
 end
 
 type t =
-  { nodes: Node.t State_hash.Table.t
-  ; tips: State_hash.Hash_set.t
-  ; children: State_hash.Set.t State_hash.Table.t
+  { nodes: Node.t State_hash_table.t
+  ; tips: State_hash_hash_set.t
+  ; children: State_hash_set.t State_hash_table.t
   ; mutable root: State_hash.t
-  ; logger: Logger.t }
+  ; logger: L.t }
+[@@deriving to_yojson]
 
 let max_catchup_chain_length t =
   let rec missing_length acc (node : Node.t) =
@@ -56,18 +97,23 @@ let create ~root =
   ; logger= Logger.create () }
 
 let check_for_parent t h ~parent:p ~check_has_breadcrumb =
-  let log s =
-    [%log' warn t.logger]
-      ~metadata:
-        [("parent", State_hash.to_yojson p); ("hash", State_hash.to_yojson h)]
-      "hash tree invariant broken: %s" s
-  in
   match Hashtbl.find t.nodes p with
   | None ->
-      log "$parent not found in hash-tree for $hash"
+      [%log' debug t.logger]
+        ~metadata:
+          [ ("parent", State_hash.to_yojson p)
+          ; ("hash", State_hash.to_yojson h)
+          ; ("tree", to_yojson t) ]
+        "hash tree invariant broken: $parent not found in $tree for $hash"
   | Some x ->
       if check_has_breadcrumb && x.state <> Have_breadcrumb then
-        log "expected $parent to have breadcrumb (child is $hash)"
+        [%log' debug t.logger]
+          ~metadata:
+            [ ("parent", State_hash.to_yojson p)
+            ; ("hash", State_hash.to_yojson h)
+            ; ("tree", to_yojson t) ]
+          "hash tree invariant broken: expected $parent to have breadcrumb \
+           (child is $hash) in $tree"
       else ()
 
 let add_child t h ~parent =
@@ -162,9 +208,10 @@ let apply_diffs t (ds : Diff.Full.E.t list) =
         let h = Root_data.Limited.hash new_root in
         Hashtbl.change t.nodes h ~f:(function
           | None ->
-              [%log' warn t.logger]
-                ~metadata:[("hash", State_hash.to_yojson h)]
-                "hash tree invariant broken: new root $hash not present. \
+              [%log' debug t.logger]
+                ~metadata:
+                  [("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
+                "hash $tree invariant broken: new root $hash not present. \
                  Diffs may have been applied out of order" ;
               None
           | Some x ->

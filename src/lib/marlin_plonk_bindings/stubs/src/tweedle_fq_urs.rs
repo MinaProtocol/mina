@@ -1,11 +1,13 @@
-use crate::tweedle_dum::{CamlTweedleDumAffine, CamlTweedleDumPolyComm};
 use algebra::{
-    tweedle::{dum::Affine as GAffine, fp::Fp, fq::Fq},
+    tweedle::{dum::Affine as GAffine, fq::Fq},
     One, Zero,
 };
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
 
-use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
+use commitment_dlog::{
+    commitment::{b_poly_coefficients, PolyComm},
+    srs::SRS,
+};
 
 use std::{
     fs::{File, OpenOptions},
@@ -13,31 +15,13 @@ use std::{
     rc::Rc,
 };
 
-pub struct CamlTweedleFqUrs(pub Rc<SRS<GAffine>>);
+use crate::caml_pointer::{self, CamlPointer};
 
-/* Note: The SRS is stored in the rust heap, OCaml only holds the refcounted reference to it.  */
-
-extern "C" fn caml_tweedle_fq_urs_finalize(v: ocaml::Value) {
-    let v: ocaml::Pointer<CamlTweedleFqUrs> = ocaml::FromValue::from_value(v);
-    unsafe { v.drop_in_place() };
-}
-
-ocaml::custom!(CamlTweedleFqUrs {
-    finalize: caml_tweedle_fq_urs_finalize,
-});
-
-unsafe impl ocaml::FromValue for CamlTweedleFqUrs {
-    fn from_value(value: ocaml::Value) -> CamlTweedleFqUrs {
-        let ptr: ocaml::Pointer<CamlTweedleFqUrs> = ocaml::FromValue::from_value(value);
-        // Create a new clone of the reference-counted pointer, to ensure that the boxed SRS will
-        // live at least as long as both the OCaml value *and* this current copy of the value.
-        CamlTweedleFqUrs(Rc::clone(&ptr.as_ref().0))
-    }
-}
+pub type CamlTweedleFqUrs = CamlPointer<Rc<SRS<GAffine>>>;
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_urs_create(depth: ocaml::Int) -> CamlTweedleFqUrs {
-    CamlTweedleFqUrs(Rc::new(SRS::create(depth as usize)))
+    caml_pointer::create(Rc::new(SRS::create(depth as usize)))
 }
 
 #[ocaml::func]
@@ -52,7 +36,7 @@ pub fn caml_tweedle_fq_urs_write(
             .unwrap()),
         Ok(file) => {
             let file = BufWriter::new(file);
-            let urs: &SRS<GAffine> = &urs.0;
+            let urs: &SRS<GAffine> = &*urs;
             let _ = (*urs).write(file);
             Ok(())
         }
@@ -78,7 +62,7 @@ pub fn caml_tweedle_fq_urs_read(
             };
             match SRS::<GAffine>::read(file) {
                 Err(_) => Ok(None),
-                Ok(urs) => Ok(Some(CamlTweedleFqUrs(Rc::new(urs)))),
+                Ok(urs) => Ok(Some(caml_pointer::create(Rc::new(urs)))),
             }
         }
     }
@@ -89,7 +73,7 @@ pub fn caml_tweedle_fq_urs_lagrange_commitment(
     urs: CamlTweedleFqUrs,
     domain_size: ocaml::Int,
     i: ocaml::Int,
-) -> Result<CamlTweedleDumPolyComm<Fp>, ocaml::Error> {
+) -> Result<PolyComm<GAffine>, ocaml::Error> {
     match EvaluationDomain::<Fq>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fq_urs_lagrange_commitment")
@@ -101,7 +85,7 @@ pub fn caml_tweedle_fq_urs_lagrange_commitment(
                 .map(|j| if i == j { Fq::one() } else { Fq::zero() })
                 .collect();
             let p = Evaluations::<Fq>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok(urs.0.commit_non_hiding(&p, None).into())
+            Ok((*urs).commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -111,7 +95,7 @@ pub fn caml_tweedle_fq_urs_commit_evaluations(
     urs: CamlTweedleFqUrs,
     domain_size: ocaml::Int,
     evals: Vec<Fq>,
-) -> Result<CamlTweedleDumPolyComm<Fp>, ocaml::Error> {
+) -> Result<PolyComm<GAffine>, ocaml::Error> {
     match EvaluationDomain::<Fq>::new(domain_size as usize) {
         None => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fq_urs_commit_evaluations")
@@ -121,7 +105,7 @@ pub fn caml_tweedle_fq_urs_commit_evaluations(
         Some(x_domain) => {
             let evals = evals.into_iter().map(From::from).collect();
             let p = Evaluations::<Fq>::from_vec_and_domain(evals, x_domain).interpolate();
-            Ok(urs.0.commit_non_hiding(&p, None).into())
+            Ok((*urs).commit_non_hiding(&p, None).into())
         }
     }
 }
@@ -130,27 +114,27 @@ pub fn caml_tweedle_fq_urs_commit_evaluations(
 pub fn caml_tweedle_fq_urs_b_poly_commitment(
     urs: CamlTweedleFqUrs,
     chals: Vec<Fq>,
-) -> Result<CamlTweedleDumPolyComm<Fp>, ocaml::Error> {
+) -> Result<PolyComm<GAffine>, ocaml::Error> {
     let chals: Vec<Fq> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
     let p = DensePolynomial::<Fq>::from_coefficients_vec(coeffs);
-    Ok(urs.0.commit_non_hiding(&p, None).into())
+    Ok((*urs).commit_non_hiding(&p, None).into())
 }
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_urs_batch_accumulator_check(
     urs: CamlTweedleFqUrs,
-    comms: Vec<CamlTweedleDumAffine<Fp>>,
+    comms: Vec<GAffine>,
     chals: Vec<Fq>,
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
-        &urs.0,
+        &*urs,
         &comms.into_iter().map(From::from).collect(),
         &chals.into_iter().map(From::from).collect(),
     )
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fq_urs_h(urs: CamlTweedleFqUrs) -> CamlTweedleDumAffine<Fp> {
-    urs.0.h.into()
+pub fn caml_tweedle_fq_urs_h(urs: CamlTweedleFqUrs) -> GAffine {
+    (*urs).h.into()
 }

@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Currency
 
 let option lab =
@@ -37,15 +37,16 @@ module Transaction_with_witness = struct
          witness and the transaction
       *)
       type t =
-        { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
+        { transaction_with_info:
+            Transaction_logic.Transaction_applied.Stable.V1.t
         ; state_hash: State_hash.Stable.V1.t * State_body_hash.Stable.V1.t
               (* TODO: It's inefficient to store this here. Optimize it someday. *)
-        ; state_view: Coda_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
+        ; state_view: Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
         ; init_stack:
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness: Coda_base.Sparse_ledger.Stable.V1.t sexp_opaque }
+        ; ledger_witness: Mina_base.Sparse_ledger.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -183,7 +184,7 @@ let create_expected_statement ~constraint_constants
     Sparse_ledger.next_available_token ledger_witness
   in
   let {With_status.data= transaction; status= _} =
-    Ledger.Undo.transaction transaction_with_info
+    Ledger.Transaction_applied.transaction transaction_with_info
   in
   let%bind after =
     Or_error.try_with (fun () ->
@@ -530,9 +531,9 @@ struct
 end
 
 module Staged_undos = struct
-  type undo = Ledger.Undo.t
+  type applied_txn = Ledger.Transaction_applied.t
 
-  type t = undo list
+  type t = applied_txn list
 
   let apply ~constraint_constants t ledger =
     List.fold_left t ~init:(Ok ()) ~f:(fun acc t ->
@@ -591,7 +592,8 @@ let extract_txns txns_with_witnesses =
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
       let txn =
-        Ledger.Undo.transaction txn_with_witness.transaction_with_info
+        Ledger.Transaction_applied.transaction
+          txn_with_witness.transaction_with_info
       in
       let state_hash = fst txn_with_witness.state_hash in
       (txn, state_hash) )
@@ -620,14 +622,16 @@ let target_merkle_root t =
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info |> Ledger.Undo.transaction )
+      t.transaction_with_info |> Ledger.Transaction_applied.transaction )
   @@ Parallel_scan.pending_data t
 
 let staged_transactions_with_protocol_states t
     ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      let txn = t.transaction_with_info |> Ledger.Undo.transaction in
+      let txn =
+        t.transaction_with_info |> Ledger.Transaction_applied.transaction
+      in
       let%map protocol_state = get_state (fst t.state_hash) in
       (txn, protocol_state) )
   @@ Parallel_scan.pending_data t
@@ -728,7 +732,7 @@ let all_work_pairs t
         , ledger_witness
         , init_stack ) ->
         let {With_status.data= transaction; status} =
-          Ledger.Undo.transaction transaction_with_info
+          Ledger.Transaction_applied.transaction transaction_with_info
         in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
@@ -832,7 +836,7 @@ let check_required_protocol_states t ~protocol_states =
   (*Don't check further if the lengths dont match*)
   let%bind () = check_length protocol_states in
   let received_state_map =
-    List.fold protocol_states ~init:Coda_base.State_hash.Map.empty
+    List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
         State_hash.Map.set m ~key:(Coda_state.Protocol_state.hash ps) ~data:ps
     )

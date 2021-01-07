@@ -159,9 +159,7 @@ pub fn caml_tweedle_fp_two_adic_root_of_unity() -> Fp {
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_fp_domain_generator(
-    log2_size: ocaml::Int,
-) -> Result<Fp, ocaml::Error> {
+pub fn caml_tweedle_fp_domain_generator(log2_size: ocaml::Int) -> Result<Fp, ocaml::Error> {
     match Domain::new(1 << log2_size) {
         Some(x) => Ok(x.group_gen),
         None => Err(
@@ -190,4 +188,9 @@ pub fn caml_tweedle_fp_of_bytes(x: &[u8]) -> Result<Fp, ocaml::Error> {
     };
     let x = unsafe { *(x.as_ptr() as *const Fp) };
     Ok(x)
+}
+
+#[ocaml::func]
+pub fn caml_tweedle_fp_deep_copy(x: Fp) -> Fp {
+    x
 }

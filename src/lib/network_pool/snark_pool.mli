@@ -61,13 +61,34 @@ end
 module type Transition_frontier_intf = sig
   type t
 
+  type staged_ledger
+
+  module Breadcrumb : sig
+    type t
+
+    val staged_ledger : t -> staged_ledger
+  end
+
+  type best_tip_diff
+
+  val best_tip : t -> Breadcrumb.t
+
+  val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
+
   val snark_pool_refcount_pipe :
        t
     -> (int * int Transaction_snark_work.Statement.Table.t)
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Transition_frontier : Transition_frontier_intf) :
+module Make
+    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+        type t
+
+        val ledger : t -> Base_ledger.t
+    end)
+    (Transition_frontier : Transition_frontier_intf
+                           with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t
 
 include S with type transition_frontier := Transition_frontier.t
@@ -81,6 +102,7 @@ module Diff_versioned : sig
             Transaction_snark_work.Statement.Stable.V1.t
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
+        | Empty
       [@@deriving compare, sexp]
     end
   end]

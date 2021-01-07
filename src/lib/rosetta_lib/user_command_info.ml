@@ -6,7 +6,7 @@ open Core_kernel
 [%%ifndef
 consensus_mechanism]
 
-module Coda_base = Coda_base_nonconsensus
+module Mina_base = Mina_base_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Signature_lib = Signature_lib_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
@@ -16,12 +16,12 @@ module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 module Fee_currency = Currency.Fee
 module Amount_currency = Currency.Amount
 open Rosetta_models
-module Signed_command = Coda_base.Signed_command
-module Token_id = Coda_base.Token_id
+module Signed_command = Mina_base.Signed_command
+module Token_id = Mina_base.Token_id
 module Public_key = Signature_lib.Public_key
-module Signed_command_memo = Coda_base.Signed_command_memo
-module Payment_payload = Coda_base.Payment_payload
-module Stake_delegation = Coda_base.Stake_delegation
+module Signed_command_memo = Mina_base.Signed_command_memo
+module Payment_payload = Mina_base.Payment_payload
+module Stake_delegation = Mina_base.Stake_delegation
 
 let pk_to_public_key ~context (`Pk pk) =
   Public_key.Compressed.of_base58_check pk
@@ -179,13 +179,13 @@ module Partial = struct
           Result.return @@ Signed_command.Payload.Body.Stake_delegation payload
       | `Create_token ->
           let payload =
-            { Coda_base.New_token_payload.token_owner_pk= receiver_pk
+            { Mina_base.New_token_payload.token_owner_pk= receiver_pk
             ; disable_new_accounts= false }
           in
           Result.return @@ Signed_command.Payload.Body.Create_new_token payload
       | `Create_token_account ->
           let payload =
-            { Coda_base.New_account_payload.token_id= Token_id.of_uint64 t.token
+            { Mina_base.New_account_payload.token_id= Token_id.of_uint64 t.token
             ; token_owner_pk= source_pk
             ; receiver_pk
             ; account_disabled= false }
@@ -201,7 +201,7 @@ module Partial = struct
                      [Errors.Partial_reason.Amount_not_some]))
           in
           let payload =
-            { Coda_base.Minting_payload.token_id= Token_id.of_uint64 t.token
+            { Mina_base.Minting_payload.token_id= Token_id.of_uint64 t.token
             ; token_owner_pk= source_pk
             ; receiver_pk
             ; amount= Amount_currency.of_uint64 amount }

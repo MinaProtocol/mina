@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Coda_state
 open Signature_lib
 
@@ -31,6 +31,12 @@ module type External_transition_common_intf = sig
   val consensus_time_produced_at : t -> Consensus.Data.Consensus_time.t
 
   val block_producer : t -> Public_key.Compressed.t
+
+  val block_winner : t -> Public_key.Compressed.t
+
+  val coinbase_receiver : t -> Public_key.Compressed.t
+
+  val supercharge_coinbase : t -> bool
 
   val transactions :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -75,6 +81,20 @@ module type S = sig
   include External_transition_base_intf
 
   type external_transition = t
+
+  module Precomputed_block : sig
+    type t =
+      { scheduled_time: Block_time.Time.t
+      ; protocol_state: Protocol_state.value
+      ; protocol_state_proof: Proof.t
+      ; staged_ledger_diff: Staged_ledger_diff.t
+      ; delta_transition_chain_proof:
+          Frozen_ledger_hash.t * Frozen_ledger_hash.t list }
+    [@@deriving sexp, yojson]
+
+    val of_external_transition :
+      scheduled_time:Block_time.Time.t -> external_transition -> t
+  end
 
   module Validation : sig
     type ( 'time_received

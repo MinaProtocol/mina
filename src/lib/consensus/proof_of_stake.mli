@@ -22,9 +22,11 @@ module Consensus_state : sig
              , 'vrf_output
              , 'amount
              , 'global_slot
+             , 'global_slot_since_genesis
              , 'staking_epoch_data
              , 'next_epoch_data
-             , 'bool )
+             , 'bool
+             , 'pk )
              t =
           { blockchain_length: 'length
           ; epoch_count: 'length
@@ -33,9 +35,14 @@ module Consensus_state : sig
           ; last_vrf_output: 'vrf_output
           ; total_currency: 'amount
           ; curr_global_slot: 'global_slot
+          ; global_slot_since_genesis: 'global_slot_since_genesis
           ; staking_epoch_data: 'staking_epoch_data
           ; next_epoch_data: 'next_epoch_data
-          ; has_ancestor_in_same_checkpoint_window: 'bool }
+          ; has_ancestor_in_same_checkpoint_window: 'bool
+          ; block_stake_winner: 'pk
+          ; block_creator: 'pk
+          ; coinbase_receiver: 'pk
+          ; supercharge_coinbase: 'bool }
         [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
       end
     end]
@@ -50,19 +57,21 @@ module Consensus_state : sig
           , Vrf_output.Truncated.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Global_slot.Stable.V1.t
-          , ( Coda_base.Epoch_ledger.Value.Stable.V1.t
-            , Coda_base.Epoch_seed.Stable.V1.t
-            , Coda_base.State_hash.Stable.V1.t
-            , Coda_base.State_hash.Stable.V1.t
+          , Coda_numbers.Global_slot.Stable.V1.t
+          , ( Mina_base.Epoch_ledger.Value.Stable.V1.t
+            , Mina_base.Epoch_seed.Stable.V1.t
+            , Mina_base.State_hash.Stable.V1.t
+            , Mina_base.State_hash.Stable.V1.t
             , Coda_numbers.Length.Stable.V1.t )
-            Coda_base.Epoch_data.Poly.Stable.V1.t
-          , ( Coda_base.Epoch_ledger.Value.Stable.V1.t
-            , Coda_base.Epoch_seed.Stable.V1.t
-            , Coda_base.State_hash.Stable.V1.t
-            , Coda_base.State_hash.Stable.V1.t
+            Mina_base.Epoch_data.Poly.Stable.V1.t
+          , ( Mina_base.Epoch_ledger.Value.Stable.V1.t
+            , Mina_base.Epoch_seed.Stable.V1.t
+            , Mina_base.State_hash.Stable.V1.t
+            , Mina_base.State_hash.Stable.V1.t
             , Coda_numbers.Length.Stable.V1.t )
-            Coda_base.Epoch_data.Poly.Stable.V1.t
-          , bool )
+            Mina_base.Epoch_data.Poly.Stable.V1.t
+          , bool
+          , Signature_lib.Public_key.Compressed.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving sexp, eq, compare, hash, yojson]
       end
@@ -99,9 +108,9 @@ module Exported : sig
 
     val min_window_density : Value.t -> Coda_numbers.Length.t
 
-    val staking_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+    val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
-    val next_epoch_data : Value.t -> Coda_base.Epoch_data.Value.t
+    val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
     (* unsafe modules for creating dummy states when doing vrf evaluations *)
     (* TODO: refactor code so that [Hooks.next_proposal] does not require a full [Consensus_state] *)
