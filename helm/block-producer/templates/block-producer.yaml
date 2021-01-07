@@ -212,6 +212,8 @@ spec:
           value: {{ $.Values.coda.privkeyPass | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
         ports:
         - name: client-port
           protocol: TCP 
