@@ -141,7 +141,8 @@ end)
     in
     let rl =
       Rate_limiter.create
-        ~capacity:(Resource_pool.Diff.max_per_second, `Per Time.Span.second)
+        ~capacity:
+          (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
     in
     if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
