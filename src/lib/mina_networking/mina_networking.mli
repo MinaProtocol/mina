@@ -274,6 +274,8 @@ val query_peer :
   -> 'q
   -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
 
+val restart_helper : t -> unit
+
 val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
 
