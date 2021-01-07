@@ -303,7 +303,7 @@ end = struct
     Ivar.fill_if_empty j.res x ;
     try !check_invariant_r t
     with e ->
-      [%log' info t.logger]
+      [%log' debug t.logger]
         ~metadata:[("exn", `String (Exn.to_string e))]
         "job_finished $exn"
 
