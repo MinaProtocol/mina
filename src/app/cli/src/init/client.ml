@@ -1746,8 +1746,13 @@ let archive_precomputed_blocks =
                             (fun () ->
                               Sexp.List
                                 [ List
-                                    [Atom "uri"; Atom (Uri.to_string uri.value)]
-                                ; List [Atom "uri_flag"; Atom uri.name]
+                                    [ Atom "uri"
+                                    ; Atom
+                                        (Uri.to_string graphql_endpoint.value)
+                                    ]
+                                ; List
+                                    [ Atom "uri_flag"
+                                    ; Atom graphql_endpoint.name ]
                                 ; List [Atom "error_message"; Atom e] ] )
                       | `Graphql_error e ->
                           Error.createf "GraphQL error: %s" e )
