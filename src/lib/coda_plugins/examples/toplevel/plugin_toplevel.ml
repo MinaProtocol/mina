@@ -8,19 +8,19 @@ let read_input =
   let rec go buffer len i =
     if i >= len then return (i, false)
     else
-     let%bind c = Reader.read_char stdin in
-     match c with
-     | `Eof -> return (i, true)
-     | `Ok c ->
-     Bytes.set buffer i c;
-     if c = '\n' then return (i + 1, false)
-     else go buffer len (i + 1)
+      let%bind c = Reader.read_char stdin in
+      match c with
+      | `Eof ->
+          return (i, true)
+      | `Ok c ->
+          Bytes.set buffer i c ;
+          if c = '\n' then return (i + 1, false) else go buffer len (i + 1)
   in
   fun prompt buffer len ->
     Writer.write stdout prompt ;
     Thread_safe.block_on_async_exn (fun () ->
-      let%bind () = Writer.flushed stdout in
-      go buffer len 0 )
+        let%bind () = Writer.flushed stdout in
+        go buffer len 0 )
 
 let () =
   let config = Coda_lib.config coda in
@@ -37,7 +37,7 @@ let () =
        will probably not be relevant here, and may refer to directives or
        modules that aren't available.
     *)
-    Array.set Sys.argv i "-noinit"
+    Sys.argv.(i) <- "-noinit"
   done ;
   Ocamlnat_lib.Opttoploop.read_interactive_input := read_input ;
   don't_wait_for @@ In_thread.run Ocamlnat_lib.Opttopmain.main
