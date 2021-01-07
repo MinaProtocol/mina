@@ -7,7 +7,7 @@ type view =
 
 module Log_event : sig
   type t =
-    { protocol_state: Coda_state.Protocol_state.Value.t
+    { protocol_state: Mina_state.Protocol_state.Value.t
     ; state_hash: State_hash.t
     ; just_emitted_a_proof: bool }
   [@@deriving yojson, sexp, compare]

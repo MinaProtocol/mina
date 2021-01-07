@@ -2,9 +2,9 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
-open Coda_state
+open Mina_state
 open Signature_lib
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type validation_error =
@@ -185,7 +185,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                , `Valid_cb valid_cb ) =
              network_transition
            in
-           if not (Coda_net2.Validation_callback.is_expired valid_cb) then (
+           if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
              let transition_with_hash =
                Envelope.Incoming.data transition_env
                |> With_hash.of_data
@@ -203,7 +203,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                in
                let%bind () =
                  Interruptible.lift Deferred.unit
-                   (Coda_net2.Validation_callback.await_timeout valid_cb)
+                   (Mina_net2.Validation_callback.await_timeout valid_cb)
                in
                match%bind
                  let open Interruptible.Result.Let_syntax in
@@ -231,13 +231,13 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                      External_transition.Initial_validated.consensus_state
                        verified_transition
                      |> Consensus.Data.Consensus_state.blockchain_length
-                     |> Coda_numbers.Length.to_int
+                     |> Mina_numbers.Length.to_int
                    in
                    Mina_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;
                    return ()
                | Error error ->
-                   Coda_net2.Validation_callback.fire_if_not_already_fired
+                   Mina_net2.Validation_callback.fire_if_not_already_fired
                      valid_cb `Reject ;
                    Interruptible.uninterruptible
                    @@ handle_validation_error ~logger ~trust_system ~sender

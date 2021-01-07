@@ -19,9 +19,9 @@ module Make (Engine : Engine_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= Balance.of_int min_balance
-        ; cliff_time= Coda_numbers.Global_slot.of_int cliff_time
+        ; cliff_time= Mina_numbers.Global_slot.of_int cliff_time
         ; cliff_amount= Amount.of_int cliff_amount
-        ; vesting_period= Coda_numbers.Global_slot.of_int vesting_period
+        ; vesting_period= Mina_numbers.Global_slot.of_int vesting_period
         ; vesting_increment= Amount.of_int vesting_increment }
     in
     let timing1 =
@@ -59,7 +59,7 @@ module Make (Engine : Engine_intf) = struct
     [%log info] "Waiting for block producer 2 (of 2) to initialize" ;
     let%bind () = Log_engine.wait_for_init block_producer2 log_engine in
     [%log info] "Block producer 2 (of 2) initialized" ;
-    let graphql_port = 3085 in
+    let graphql_port = block_producer2.node_graphql_port in
     Async_kernel.Deferred.don't_wait_for
       (Node.set_port_forwarding_exn ~logger block_producer2 graphql_port) ;
     let sender = pk_of_keypair network.keypairs 1 in

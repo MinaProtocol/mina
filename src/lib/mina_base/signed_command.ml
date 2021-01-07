@@ -7,13 +7,13 @@ open Import
 [%%ifndef
 consensus_mechanism]
 
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Currency = Currency_nonconsensus.Currency
 module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
 
 [%%endif]
 
-open Coda_numbers
+open Mina_numbers
 module Fee = Currency.Fee
 module Payload = Signed_command_payload
 
@@ -71,7 +71,7 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Coda_compile_config.minimum_user_command_fee
+let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee t < minimum_fee)
 
@@ -161,7 +161,7 @@ module Gen = struct
       ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~fee_range
       create_body =
     let open Quickcheck.Generator.Let_syntax in
-    let min_fee = Fee.to_int Coda_compile_config.minimum_user_command_fee in
+    let min_fee = Fee.to_int Mina_compile_config.minimum_user_command_fee in
     let max_fee = min_fee + fee_range in
     let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t) =
       key_gen
@@ -237,7 +237,7 @@ module Gen = struct
       -> ?sign_type:[`Fake | `Real]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t
+         * Mina_numbers.Account_nonce.t
          * Account_timing.t )
          array
       -> t list Quickcheck.Generator.t =

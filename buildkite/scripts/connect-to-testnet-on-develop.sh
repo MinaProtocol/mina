@@ -28,23 +28,9 @@ apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 TESTNET_NAME="turbo-pickles"
 
 
-if [ ! -d coda-automation ]; then
-  # Somebody ran this without the mina repo checked out...
-  echo "WARNING: Connecting to testnet without a checked-out coda-automation repo. Attempting to pull data from github's master branch (fallback branch is 3a4e5ce2d)."
-  mkdir -p coda-automation/terraform/testnets/$TESTNET_NAME
-  # Fetch the files we need from coda-automation's master instead
-  # Fall through to a known-good file
-  curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/terraform/testnets/$TESTNET_NAME/genesis_ledger.json --output coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
-  || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/genesis_ledger.json  --output coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json
-  curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/master/terraform/testnets/$TESTNET_NAME/peers.txt --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
-  || curl https://raw.githubusercontent.com/MinaProtocol/coda-automation/3a4e5ce2dc1ff01dde37495d43979aa1aeb20bb5/terraform/testnets/$TESTNET_NAME/peers.txt  --output coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt
-else
-  cd coda-automation && git pull origin master && cd -
-fi
-
 # Generate genesis proof and then crash due to no peers
 coda daemon \
-  -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
+  -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
 || true
 
@@ -53,8 +39,8 @@ rm ~/.coda-config/.mina-lock ||:
 
 # Restart in the background
 coda daemon \
-  -peer-list-file coda-automation/terraform/testnets/$TESTNET_NAME/peers.txt \
-  -config-file ./coda-automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
+  -peer-list-file automation/terraform/testnets/$TESTNET_NAME/peers.txt \
+  -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
   & # -background
 

@@ -65,7 +65,7 @@ if [ ! -d "$ledgerfolder" ]; then
   
   mkdir $ledgerfolder
 
-  S=./coda-automation/scripts
+  S=./automation/scripts
 
   rm -rf $ledgerfolder/offline_whale_keys
   rm -rf $ledgerfolder/offline_fish_keys
