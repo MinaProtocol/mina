@@ -1749,7 +1749,7 @@ let archive_precomputed_blocks =
                                     [Atom "uri"; Atom (Uri.to_string uri.value)]
                                 ; List [Atom "uri_flag"; Atom uri.name]
                                 ; List [Atom "error_message"; Atom e] ] )
-                      | Error (`Graphql_error e) ->
+                      | `Graphql_error e ->
                           Error.createf "GraphQL error: %s" e )
                in
                ()
