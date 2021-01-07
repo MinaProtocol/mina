@@ -166,7 +166,7 @@ end = struct
       Hash_set.clear preferred ;
       Strict_pipe.Writer.close w
 
-    let read t =
+    let rec read t =
       match%bind Strict_pipe.Reader.read' t.r with
       | `Eof ->
           return `Eof
@@ -182,10 +182,13 @@ end = struct
                   if not (Peer.equal p p') then Strict_pipe.Writer.write t.w x
               ) ;
               return (`Ok res)
-          | None ->
-              let res = Queue.dequeue_exn q in
-              Queue.iter q ~f:(Strict_pipe.Writer.write t.w) ;
-              return (`Ok res) )
+          | None -> (
+            match Queue.dequeue q with
+            | None ->
+                read t
+            | Some res ->
+                Queue.iter q ~f:(Strict_pipe.Writer.write t.w) ;
+                return (`Ok res) ) )
 
     type update =
       | New_job of {new_job: Job.t; all_peers: Peer.Set.t}
@@ -318,6 +321,9 @@ end = struct
             ())
 
   let cancel t h =
+    [%log' debug t.logger]
+      ~metadata:[("key", Key.to_yojson h)]
+      "cancel the download $key" ;
     let job =
       List.find_map ~f:Lazy.force
         [ lazy (Q.lookup t.pending h)
@@ -497,7 +503,26 @@ end = struct
 
   let all_stalled t = Q.is_empty t.pending
 
+  let to_yojson t : Yojson.Safe.t =
+    check_invariant t ;
+    let list xs =
+      `Assoc [("length", `Int (List.length xs)); ("elts", `List xs)]
+    in
+    let f q = list (List.map ~f:Job.to_yojson (Q.to_list q)) in
+    `Assoc
+      [ ("total_jobs", `Int (total_jobs t))
+      ; ("pending", f t.pending)
+      ; ("stalled", f t.stalled)
+      ; ( "downloading"
+        , list
+            (List.map (Hashtbl.to_alist t.downloading) ~f:(fun (h, (p, _)) ->
+                 `Assoc
+                   [ ("hash", Key.to_yojson h)
+                   ; ("peer", `String (Peer.to_multiaddr_string p)) ] )) ) ]
+
   let rec step t =
+    [%log' debug t.logger] "Downloader: Mownload step"
+      ~metadata:[("downloader", to_yojson t)] ;
     if is_empty t then (
       match%bind Strict_pipe.Reader.read t.flush_r with
       | `Eof ->
@@ -537,19 +562,20 @@ end = struct
             ~metadata:[("peer", Peer.to_yojson peer)] ;
           let to_download =
             let rec go n acc skipped =
-              if n >= t.max_batch_size then acc
+              if n >= t.max_batch_size then (acc, skipped)
               else
                 match Q.dequeue t.pending with
                 | None ->
-                    (* We can just enqueue directly into pending without going thru
-                    enqueue_exn since we know these skipped jobs are not stalled*)
-                    List.iter (List.rev skipped) ~f:(Q.enqueue_exn t.pending) ;
-                    List.rev acc
+                    (acc, skipped)
                 | Some x ->
                     if Map.mem x.attempts peer then go n acc (x :: skipped)
                     else go (n + 1) (x :: acc) skipped
             in
-            go 0 [] []
+            let acc, skipped = go 0 [] [] in
+            (* We can just enqueue directly into pending without going thru
+            enqueue_exn since we know these skipped jobs are not stalled*)
+            List.iter (List.rev skipped) ~f:(Q.enqueue_exn t.pending) ;
+            List.rev acc
           in
           [%log' debug t.logger] "Downloader: to download $n"
             ~metadata:[("n", `Int (List.length to_download))] ;
@@ -559,23 +585,6 @@ end = struct
           | _ :: _ ->
               don't_wait_for (download t peer to_download) ;
               step t ) )
-
-  let to_yojson t : Yojson.Safe.t =
-    check_invariant t ;
-    let list xs =
-      `Assoc [("length", `Int (List.length xs)); ("elts", `List xs)]
-    in
-    let f q = list (List.map ~f:Job.to_yojson (Q.to_list q)) in
-    `Assoc
-      [ ("total_jobs", `Int (total_jobs t))
-      ; ("pending", f t.pending)
-      ; ("stalled", f t.stalled)
-      ; ( "downloading"
-        , list
-            (List.map (Hashtbl.to_alist t.downloading) ~f:(fun (h, (p, _)) ->
-                 `Assoc
-                   [ ("hash", Key.to_yojson h)
-                   ; ("peer", `String (Peer.to_multiaddr_string p)) ] )) ) ]
 
   let create ~max_batch_size ~stop ~trust_system ~get ~peers ~preferred =
     let%map all_peers = peers () in
