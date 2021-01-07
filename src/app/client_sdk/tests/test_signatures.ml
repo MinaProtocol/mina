@@ -15,25 +15,25 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
-module Coda_base = Coda_base_nonconsensus
+module Mina_base = Mina_base_nonconsensus
 module Signature_lib = Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 
 [%%endif]
 
-open Coda_base
+open Mina_base
 open Signature_lib
 
 let signer_pk =
   Public_key.Compressed.of_base58_check_exn
-    "B62qkef7po74VEvJYcLYsdZ83FuKidgNZ8Xiaitzo8gKJXaxLwxgG7T"
+    "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
 
 (* signer *)
 let keypair =
   let private_key =
     Private_key.of_base58_check_exn
-      "EKFdTXQKPsEi2JUSE3JkmKtKFu8uDcgc5MmR5zj6nz5FUWPVuK6c"
+      "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw"
   in
   let public_key = Public_key.decompress_exn signer_pk in
   Keypair.{public_key; private_key}
@@ -41,18 +41,18 @@ let keypair =
 (* payment receiver *)
 let receiver =
   Public_key.Compressed.of_base58_check_exn
-    "B62qnekV6LVbEttV7j3cxJmjSbxDWuXa5h3KeVEXHPGKTzthQaBufrY"
+    "B62qrcFstkpqXww1EkSGrqMCwCNho86kuqBd4FrAAUsPxNKdiPzAUsy"
 
 (* delegatee *)
 let new_delegate =
   Public_key.Compressed.of_base58_check_exn
-    "B62qoW9n8n54FqHV8dPp7eCtpAZS1Jw9zsK7AHHiYmUzi6Wvms8reqt"
+    "B62qkfHpLpELqpMK6ZvUTJ5wRqKDRF3UHyJ4Kv3FU79Sgs4qpBnx5RR"
 
 let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_int fee in
   let fee_token = Token_id.default in
   let nonce = Account.Nonce.of_int nonce in
-  let valid_until = Coda_numbers.Global_slot.of_int valid_until in
+  let valid_until = Mina_numbers.Global_slot.of_int valid_until in
   let memo = Signed_command_memo.create_from_string_exn memo in
   Signed_command_payload.Common.Poly.
     {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}

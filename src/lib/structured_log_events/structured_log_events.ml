@@ -61,3 +61,25 @@ let register_constructor = Registry.register_constructor
 let dump_registered_events () =
   List.map !Registry.reprs ~f:(fun {event_name; id; arguments; _} ->
       (event_name, id, Set.to_list arguments) )
+
+let check_interpolations_exn ~msg_loc msg label_names =
+  (* don't use Logproc_lib, which depends on C++ code
+     using Interpolator_lib allows use in js_of_ocaml
+     the `parse` code is the same
+  *)
+  match Interpolator_lib.Interpolator.parse msg with
+  | Error err ->
+      failwithf
+        "%s\nEncountered an error while parsing the structured log message: %s"
+        msg_loc err ()
+  | Ok items ->
+      List.iter items ~f:(function
+        | `Interpolate interp
+          when not (List.mem ~equal:String.equal label_names interp) ->
+            failwithf
+              "%s\n\
+               The structured log message contains interpolation point \
+               \"$%s\" which is not a field in the record"
+              msg_loc interp ()
+        | _ ->
+            () )

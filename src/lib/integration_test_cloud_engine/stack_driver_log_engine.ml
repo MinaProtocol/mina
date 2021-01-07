@@ -1,7 +1,7 @@
 open Async
 open Core
 open Pipe_lib
-open Coda_base
+open Mina_base
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 
@@ -245,14 +245,14 @@ module Json_parsing = struct
         failwithf "Could not parse JSON using %s.of_yojson" modl ()
 
   let valid_commands_with_statuses :
-      Coda_base.User_command.Valid.t Coda_base.With_status.t list parser =
+      Mina_base.User_command.Valid.t Mina_base.With_status.t list parser =
     function
     | `List cmds ->
         let cmd_or_errors =
           List.map cmds
             ~f:
-              (Coda_base.With_status.of_yojson
-                 Coda_base.User_command.Valid.of_yojson)
+              (Mina_base.With_status.of_yojson
+                 Mina_base.User_command.Valid.of_yojson)
         in
         List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
             match (accum, cmd_or_err) with
@@ -517,7 +517,7 @@ module Block_produced_query = struct
 end
 
 module Breadcrumb_added_query = struct
-  open Coda_base
+  open Mina_base
 
   module Result = struct
     type t = {user_commands: User_command.Valid.t With_status.t list}
@@ -598,7 +598,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
       let%bind logs = Subscription.pull subscription in
       Malleable_error.List.map logs ~f:parse_subscription)
   in
-  [%log info] "Pulling %s subscription" subscription_name ;
+  [%log debug] "Pulling subscription $subscription_name"
+    ~metadata:[("subscription_name", `String subscription_name)] ;
   let%bind () =
     uninterruptible
       ( match results with
@@ -625,7 +626,7 @@ let start_background_query (type r)
     Subscription.create ~logger ~name:Query.name
       ~filter:(Query.filter testnet_log_filter)
   in
-  [%log info] "Subscription created for $query"
+  [%log info] "Subscription created for background query $query"
     ~metadata:[("query", `String Query.name)] ;
   let subscription_task =
     let open Interruptible.Let_syntax in
@@ -693,7 +694,6 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       ~handle_result:(fun result ->
         let open Initialization_query.Result in
         let open Malleable_error.Let_syntax in
-        [%log info] "Handling initialization log for node \"%s\"" result.pod_id ;
         let%bind ivar =
           (* TEMP hack, this probably should be of_option_hard *)
           Malleable_error.of_option_soft
@@ -728,14 +728,6 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
             let best_tip_map' =
               String.Map.set best_tip_map ~key:result.pod_id ~data:new_best_tip
             in
-            [%log debug]
-              ~metadata:
-                [ ( "best_tip_map"
-                  , `Assoc
-                      ( String.Map.to_alist best_tip_map'
-                      |> List.map ~f:(fun (k, v) -> (k, State_hash.to_yojson v))
-                      ) ) ]
-              "Updated best tip map: $best_tip_map" ;
             let%map () =
               Deferred.bind ~f:Malleable_error.return
                 (Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map')
@@ -743,12 +735,16 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
             () ) )
   in
   let cancel_background_tasks () =
+    let open Deferred.Let_syntax in
     if not (Ivar.is_full cancel_background_tasks_ivar) then
       Ivar.fill cancel_background_tasks_ivar () ;
-    Deferred.all_unit
-      [ errors_task_finished
-      ; initialization_task_finished
-      ; transition_frontier_diff_application_finished ]
+    let%map () =
+      Deferred.all_unit
+        [ errors_task_finished
+        ; initialization_task_finished
+        ; transition_frontier_diff_application_finished ]
+    in
+    [%log debug] "cancel_background_tasks finished"
   in
   { testnet_log_filter= network.testnet_log_filter
   ; logger
@@ -784,7 +780,9 @@ let destroy t : Test_error.Set.t Malleable_error.t =
     Deferred.bind (cancel_background_tasks ()) ~f:Malleable_error.return
   in
   Broadcast_pipe.Writer.close best_tip_map_writer ;
+  let logger = Logger.create () in
   let%map _ = delete_subscriptions subscriptions in
+  [%log debug] "subscriptions deleted" ;
   let lift error_array =
     DynArray.to_list error_array
     |> List.map ~f:(fun {Error_query.Result.pod_id; message} ->
@@ -1021,7 +1019,7 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
           go (n - 1)
       | Ok {Malleable_error.Accumulator.computation_result= res; soft_errors= _}
         ->
-          let open Coda_base in
+          let open Mina_base in
           let open Signature_lib in
           (* res is a list of Breadcrumb_added_query.Result.t
              each of those contains a list of user commands
@@ -1043,7 +1041,7 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
             let actual_status = cmd_with_status.With_status.status in
             let applied =
               match actual_status with
-              | User_command_status.Applied _ ->
+              | Transaction_status.Applied _ ->
                   true
               | _ ->
                   false
@@ -1066,11 +1064,11 @@ let wait_for_payment ?(num_tries = 30) t ~logger ~sender ~receiver ~amount () :
                     , `String (Public_key.Compressed.to_string receiver) )
                   ; ("amount", `String (Currency.Amount.to_string amount))
                   ; ( "actual_user_command_status"
-                    , User_command_status.to_yojson actual_status ) ] ;
+                    , Transaction_status.to_yojson actual_status ) ] ;
               Error.raise
                 (Error.of_string
                    (sprintf "Unexpected status in matching payment: %s"
-                      ( User_command_status.to_yojson actual_status
+                      ( Transaction_status.to_yojson actual_status
                       |> Yojson.Safe.to_string ))) )
           else (
             [%log info]

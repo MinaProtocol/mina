@@ -27,8 +27,8 @@ if [ -n "$charts" ]; then
 
   if [ -n "${HELM_LINT+x}" ]; then
     for dir in $dirs; do
-      if [[ "$dir" =~ .*"coda-automation".* ]]; then
-        # do not lint charts contained within the coda-automation submodule
+      if [[ "$dir" =~ .*"automation".* ]]; then
+        # do not lint charts contained within the automation submodule
         continue
       fi
 
@@ -39,7 +39,7 @@ if [ -n "$charts" ]; then
       # Only attempt to execute DRY-RUNs against application charts
       chartType=$(cat $dir/Chart.yaml | grep 'type:' | awk '{ print $2}')
       if [[ "$chartType" =~ "application" ]]; then
-        helm install test $dir --dry-run --namespace test
+        helm install test-archive-node $dir --dry-run --namespace test
       else
         echo "found library chart - skipping dry-run"
       fi
@@ -54,8 +54,8 @@ if [ -n "$charts" ]; then
     gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
 
     for dir in $dirs; do
-      if [[ "$dir" =~ .*"coda-automation".* ]]; then
-        # do not release charts contained within the coda-automation submodule
+      if [[ "$dir" =~ .*"automation".* ]]; then
+        # do not release charts contained within the automation submodule
         continue
       fi
 

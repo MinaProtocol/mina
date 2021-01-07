@@ -66,13 +66,13 @@ end
 type signed_command_common =
   { sender: Signature_lib.Public_key.Compressed.t
   ; fee: Currency.Fee.t
-  ; nonce: Coda_base.Account.Nonce.t option
+  ; nonce: Mina_base.Account.Nonce.t option
   ; memo: string option }
 
 val signed_command_common : signed_command_common Command.Param.t
 
 module Signed_command : sig
-  val hd_index : Coda_numbers.Hd_index.t Command.Spec.param
+  val hd_index : Mina_numbers.Hd_index.t Command.Spec.param
 
   val receiver_pk : Signature_lib.Public_key.Compressed.t Command.Spec.param
 
@@ -80,9 +80,9 @@ module Signed_command : sig
 
   val fee : Currency.Fee.t option Command.Spec.param
 
-  val valid_until : Coda_numbers.Global_slot.t option Command.Spec.param
+  val valid_until : Mina_numbers.Global_slot.t option Command.Spec.param
 
-  val nonce : Coda_numbers.Account_nonce.t option Command.Spec.param
+  val nonce : Mina_numbers.Account_nonce.t option Command.Spec.param
 
   val memo : string option Command.Spec.param
 end

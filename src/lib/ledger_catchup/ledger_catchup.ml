@@ -4,8 +4,8 @@ open Core
 open Async
 open Cache_lib
 open Pipe_lib
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
@@ -187,14 +187,15 @@ let rec fold_until ~(init : 'accum)
 
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
-    ~target_hash =
+    ~target_hash ~job =
   [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
+  let hash_tree = Transition_frontier.catchup_hash_tree frontier in
+  let open Deferred.Or_error.Let_syntax in
   Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-      let open Deferred.Or_error.Let_syntax in
       let%bind transition_chain_proof =
-        Coda_networking.get_transition_chain_proof network peer target_hash
+        Mina_networking.get_transition_chain_proof network peer target_hash
       in
       (* a list of state_hashes from new to old *)
       let%bind hashes =
@@ -222,9 +223,12 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
            (Non_empty_list.to_list hashes)
            ~init:[]
            ~f:(fun acc hash ->
-             if Transition_frontier.find frontier hash |> Option.is_some then
-               Continue_or_stop.Stop (Ok (peer, acc))
-             else Continue_or_stop.Continue (hash :: acc) )
+             match Transition_frontier.find frontier hash with
+             | Some final ->
+                 Continue_or_stop.Stop
+                   (Ok (peer, Frontier_base.Breadcrumb.state_hash final, acc))
+             | None ->
+                 Continue_or_stop.Continue (hash :: acc) )
            ~finish:(fun acc ->
              let module T = struct
                type t = State_hash.t list [@@deriving to_yojson]
@@ -243,6 +247,13 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
              Or_error.errorf
                !"Peer %{sexp:Network_peer.Peer.t} moves too fast"
                peer ) )
+  >>| fun (peer, final, hashes) ->
+  let (_ : State_hash.t) =
+    List.fold hashes ~init:final ~f:(fun parent h ->
+        Transition_frontier.Catchup_hash_tree.add hash_tree h ~parent ~job ;
+        h )
+  in
+  (peer, hashes)
 
 let verify_against_hashes transitions hashes =
   List.length transitions = List.length hashes
@@ -300,7 +311,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
   Deferred.Or_error.List.concat_map
     (partition Transition_frontier.max_catchup_chunk_length
        hashes_of_missing_transitions) ~how:`Parallel ~f:(fun hashes ->
-      let%bind.Async peers = Coda_networking.peers network in
+      let%bind.Async peers = Mina_networking.peers network in
       let peers =
         Peers_pool.create ~busy ~preferred:[preferred_peer]
           (List.permute peers)
@@ -327,7 +338,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                      $target_hash" ;
                   let%bind transitions =
                     match%map.Async
-                      Coda_networking.get_transition_chain network peer hashes
+                      Mina_networking.get_transition_chain network peer hashes
                     with
                     | Ok x ->
                         Ok x
@@ -340,7 +351,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                           "$error from downloading $n blocks from $peer" ;
                         Error e
                   in
-                  Coda_metrics.(
+                  Mina_metrics.(
                     Gauge.set
                       Transition_frontier_controller
                       .transitions_downloaded_from_catchup
@@ -400,7 +411,9 @@ let verify_transitions_and_build_breadcrumbs ~logger
       | Ok tvs ->
           return
             (Ok
-               (List.map2_exn transitions tvs ~f:(fun e data -> {e with data})))
+               (List.map2_exn transitions tvs ~f:(fun e data ->
+                    (* this does not update the envelope timestamps *)
+                    {e with data} )))
       | Error (`Verifier_error error) ->
           [%log warn]
             ~metadata:[("error", Error_json.error_to_yojson error)]
@@ -523,6 +536,13 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback catchup_job_reader
        ~f:(fun (target_hash, subtrees) ->
+         let job =
+           Transition_frontier.Catchup_hash_tree.Catchup_job_id.create ()
+         in
+         let notify_hash_tree_of_failure () =
+           Transition_frontier.(
+             Catchup_hash_tree.catchup_failed (catchup_hash_tree frontier) job)
+         in
          don't_wait_for
            (let start_time = Core.Time.now () in
             [%log info] "Catch up to $target_hash"
@@ -550,7 +570,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                 let open Deferred.Let_syntax in
                 match%bind
                   download_state_hashes ~logger ~trust_system ~network
-                    ~frontier ~peers:subtree_peers ~target_hash
+                    ~frontier ~peers:subtree_peers ~target_hash ~job
                 with
                 | Ok (peer, hashes) ->
                     return (Ok (peer, hashes))
@@ -560,11 +580,11 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                        subtrees; trying again with random peers"
                       ~metadata:[("error", Error_json.error_to_yojson err)] ;
                     let%bind random_peers =
-                      Coda_networking.peers network >>| List.permute
+                      Mina_networking.peers network >>| List.permute
                     in
                     match%bind
                       download_state_hashes ~logger ~trust_system ~network
-                        ~frontier ~peers:random_peers ~target_hash
+                        ~frontier ~peers:random_peers ~target_hash ~job
                     with
                     | Ok (peer, hashes) ->
                         return (Ok (peer, hashes))
@@ -617,9 +637,10 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   [%log trace]
                     "catchup breadcrumbs pipe was closed; attempt to write to \
                      closed pipe" ;
+                  notify_hash_tree_of_failure () ;
                   garbage_collect_subtrees ~logger
                     ~subtrees:trees_of_breadcrumbs ;
-                  Coda_metrics.(
+                  Mina_metrics.(
                     Gauge.set Transition_frontier_controller.catchup_time_ms
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr () )
@@ -628,7 +649,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   Strict_pipe.Writer.write catchup_breadcrumbs_writer
                     (trees_of_breadcrumbs, `Ledger_catchup ivar) ;
                   let%bind () = Ivar.read ivar in
-                  Coda_metrics.(
+                  Mina_metrics.(
                     Gauge.set Transition_frontier_controller.catchup_time_ms
                       Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                   Catchup_jobs.decr ()
@@ -638,8 +659,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \
                    catchup data received. See error for details: $error" ;
+                notify_hash_tree_of_failure () ;
                 garbage_collect_subtrees ~logger ~subtrees ;
-                Coda_metrics.(
+                Mina_metrics.(
                   Gauge.set Transition_frontier_controller.catchup_time_ms
                     Core.Time.(Span.to_ms @@ diff (now ()) start_time)) ;
                 Catchup_jobs.decr ()) ))

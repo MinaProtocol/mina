@@ -21,7 +21,9 @@ block-producer readiness settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && hasPeersGreaterThan 3 && ownsFunds"
+      "/bin/bash",
+      "-c",
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds"
     ]
 {{- end }}
 
@@ -29,8 +31,10 @@ readinessProbe:
 ALL block-producer healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.blockProducer.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.blockProducer.livenessCheck" . }}
 {{- include "healthcheck.blockProducer.readinessCheck" . }}
+{{- end }}
 {{- end }}
 
 ### User Agent Healthchecks ###
@@ -59,7 +63,9 @@ user-agent readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && hasSentUserCommandsGreaterThan 1"
+      "/bin/bash",
+      "-c",
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasSentUserCommandsGreaterThan 0"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
@@ -68,8 +74,10 @@ readinessProbe:
 ALL user-agent healthchecks - TODO: readd startupProbes once clusters k8s have been updated to 1.16
 */}}
 {{- define "healthcheck.userAgent.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.userAgent.livenessCheck" . }}
 {{- include "healthcheck.userAgent.readinessCheck" . }}
+{{- end }}
 {{- end }}
 
 ### Bot Healthchecks ###
@@ -98,7 +106,9 @@ Mina testnet bot readiness check settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 1 && ownsFunds"
+      "/bin/bash",
+      "-c",
+      "source /healthcheck/utilities.sh && isDaemonSynced && peerCountGreaterThan 0 && ownsFunds"
     ]
 {{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
@@ -107,6 +117,8 @@ readinessProbe:
 ALL bots healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.bots.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.bots.livenessCheck" . }}
 {{- include "healthcheck.bots.readinessCheck" . }}
+{{- end }}
 {{- end }}

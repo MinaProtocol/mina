@@ -250,7 +250,7 @@ jobs:
             {{ checkout_no_lfs }}
             - run:
                   name: Update branch protection rule from test configuration
-                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status ${CIRCLE_BRANCH}
 
     run-leaderboard:
         docker:
@@ -722,12 +722,14 @@ workflows:
             - update-branch-protection:
                 filters:
                   branches:
-                    only: develop
+                    only:
+                    - develop
+                    - master
+                    - develop-until-4.1-hardfork
+                    - develop-until-adversarial
             - tracetool
-            - build-wallet
             - test-archive
             - build-archive
-            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

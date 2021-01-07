@@ -15,7 +15,7 @@ module Get_balance =
       }
       initialPeers
       daemonStatus {
-        peers
+        peers { peerId }
       }
       account(publicKey: $public_key, token: $token_id) {
         balance {
@@ -64,7 +64,7 @@ module Balance = struct
             @@ object
                  method genesisBlock =
                    object
-                     method stateHash = "STATE_HASH_GENISIS"
+                     method stateHash = "STATE_HASH_GENESIS"
                    end
 
                  method bestChain =
@@ -142,7 +142,6 @@ module Balance = struct
             | Some token_id ->
                 Amount_of.token token_id )
               (account#balance)#total ]
-      ; coins= []
       ; metadata=
           Option.map
             ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
@@ -172,7 +171,6 @@ module Balance = struct
                      ; currency=
                          {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
                      ; metadata= None } ]
-               ; coins= []
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )
 end

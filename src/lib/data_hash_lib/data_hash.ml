@@ -137,7 +137,7 @@ module T0 = struct
     curve_size = 255]
 
     let%test "Binable from stringable V1" =
-      let known_good_digest = "8fffa8b873e2f0600ad8327fa5423859" in
+      let known_good_digest = "fa43c8180f9f3cef1cf5767592e964c1" in
       Ppx_version_runtime.Serialization.check_serialization
         (module Stable.V1)
         field known_good_digest
