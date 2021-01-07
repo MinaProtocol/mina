@@ -242,6 +242,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   include Instance
 
+  let restart_helper (_ : t) = ()
+
   let create_network = Network.create
 
   let create_instance network local_ip impls =
