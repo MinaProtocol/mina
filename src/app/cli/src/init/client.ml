@@ -1756,13 +1756,18 @@ let archive_precomputed_blocks =
                  |> Deferred.return
                in
                let%bind precomputed_block =
-                 Mina_transition.External_transition.Precomputed_block
-                 .of_yojson precomputed_block_json
-                 |> Result.map_error ~f:(fun err ->
-                        Error.tag_arg (Error.of_string err)
-                          "Could not parse JSON as a precomputed block from \
-                           file"
-                          path String.sexp_of_t )
+                 Or_error.try_with (fun () ->
+                     Mina_transition.External_transition.Precomputed_block
+                     .of_yojson precomputed_block_json )
+                 |> Result.map_error ~f:(fun err_err ->
+                        match err_err with
+                        | Ok err ->
+                            Error.tag_arg (Error.of_string err)
+                              "Could not parse JSON as a precomputed block \
+                               from file"
+                              path String.sexp_of_t
+                        | Error e ->
+                            e )
                  |> Deferred.return
                in
                send_block precomputed_block
