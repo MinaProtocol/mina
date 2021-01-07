@@ -33,20 +33,15 @@ fi
 
 pushd /home/opam/opam-repository && git pull && popd
 
-# Don't prompt for newly-added ssh keys
-mkdir -p ~/.ssh
-echo "Host *" >> ~/.ssh/config
-echo "    StrictHostKeyChecking accept-new" >> ~/.ssh/config
-
 if [ "$SWITCH_FOUND" = true ]; then
   # Add the o1-labs opam repository
-  opam repository add --yes --all --set-default o1-labs git@github.com:o1-labs/opam-repository.git
+  opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
   opam switch set $SWITCH
 else
   # Build opam from scratch
   opam init
   # Add the o1-labs opam repository
-  opam repository add --yes --all --set-default o1-labs git@github.com:o1-labs/opam-repository.git
+  opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
   opam update
   opam switch create $SWITCH || true
   opam switch $SWITCH
