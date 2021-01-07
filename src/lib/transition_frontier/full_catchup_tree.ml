@@ -3,9 +3,9 @@ open Async
 open Cache_lib
 open Pipe_lib
 open Mina_base
-open Mina_transition
+open Coda_transition
 open Network_peer
-open Mina_numbers
+open Coda_numbers
 
 module Attempt_history = struct
   module Attempt = struct
@@ -38,7 +38,7 @@ module Downloader_job = struct
     let h, l = t.key in
     `Assoc
       [ ("hash", State_hash.to_yojson h)
-      ; ("length", Mina_numbers.Length.to_yojson l)
+      ; ("length", Coda_numbers.Length.to_yojson l)
       ; ("attempts", Attempt_history.to_yojson t.attempts) ]
 
   let result (t : t) = Ivar.read t.res
@@ -108,7 +108,7 @@ module Node = struct
     { mutable state: State.t
     ; mutable attempts: Attempt_history.t
     ; state_hash: State_hash.t
-    ; blockchain_length: Mina_numbers.Length.t
+    ; blockchain_length: Coda_numbers.Length.t
     ; parent: State_hash.t
     ; result: (Breadcrumb.t, Attempt_history.t) Result.t Ivar.t }
 end
