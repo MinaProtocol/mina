@@ -5,7 +5,7 @@ type: library
 version: 0.0.7
 appVersion: 0.0.1
 dependencies:
-icon:
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
 keywords:
 - mina
 - testnet
