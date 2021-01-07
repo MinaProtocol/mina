@@ -120,13 +120,13 @@ let getCreateTokenAndSend = blocks => {
   for the work that has been included.
  */
 let calculateSnarkFeeSum = (map, block: Types.Block.t) => {
+  let coinbaseReceiver =
+    Belt.Option.getWithDefault(block.blockchainState.coinbaseReceiver, "");
+
   block.internalCommands
   |> Array.fold_left(
        (map, command: Types.Block.InternalCommand.t) => {
-         switch (
-           command.type_,
-           command.receiverAccount != block.blockchainState.creatorAccount,
-         ) {
+         switch (command.type_, command.receiverAccount !== coinbaseReceiver) {
          | (FeeTransfer, true) =>
            map
            |> StringMap.update(
@@ -151,13 +151,13 @@ let getSnarkFeesCollected = blocks => {
 };
 
 let calculateHighestSnarkFeeCollected = (map, block: Types.Block.t) => {
+  let coinbaseReceiver =
+    Belt.Option.getWithDefault(block.blockchainState.coinbaseReceiver, "");
+
   block.internalCommands
   |> Array.fold_left(
        (map, command: Types.Block.InternalCommand.t) => {
-         switch (
-           command.type_,
-           command.receiverAccount != block.blockchainState.creatorAccount,
-         ) {
+         switch (command.type_, command.receiverAccount !== coinbaseReceiver) {
          | (FeeTransfer, true) =>
            map
            |> StringMap.update(
@@ -238,6 +238,9 @@ let calculateAllUsers = metrics => {
 let echoBotPublicKeys = [
   "B62qndJi5mnRoBZ8SAYDM1oR2SgAk5WpZC8hGpJUZ4e64kDHGbFMeLJ",
 ];
+
+let excludePublicKeys = [];
+
 let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
   let transactionSent = getTransactionSentByUser(blocks);
@@ -257,6 +260,7 @@ let calculateMetrics = blocks => {
     throwAwayValues(coinbaseReceiverChallenge),
     throwAwayValues(createAndSendToken),
   ])
+  |> StringMap.filter((key, _) => {!List.mem(key, excludePublicKeys)})
   |> StringMap.mapi((key, _) =>
        {
          Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),

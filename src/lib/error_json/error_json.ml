@@ -102,7 +102,9 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
 let rec info_internal_repr_to_yojson_aux (info : Info.Internal_repr.t)
     (acc : unit info_repr) : info_data info_repr =
   match info with
-  | Could_not_construct sexp | Sexp sexp ->
+  | Could_not_construct sexp ->
+      {acc with base= Sexp (List [Atom "Could_not_construct"; sexp])}
+  | Sexp sexp ->
       {acc with base= Sexp sexp}
   | String str ->
       {acc with base= String str}

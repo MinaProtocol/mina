@@ -80,8 +80,8 @@ module type Resource_pool_diff_intf = sig
     -> verified Envelope.Incoming.t Deferred.Or_error.t
 
   (** Warning: Using this directly could corrupt the resource pool if it
-  conincides with applying locally generated diffs or diffs from the network
-  or diffs from transition frontier extensions.*)
+      conincides with applying locally generated diffs or diffs from the network
+      or diffs from transition frontier extensions.*)
   val unsafe_apply :
        pool
     -> verified Envelope.Incoming.t
@@ -140,7 +140,7 @@ module type Network_pool_base_intf = sig
   module Broadcast_callback : sig
     type t =
       | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
-      | External of Coda_net2.Validation_callback.t
+      | External of Mina_net2.Validation_callback.t
   end
 
   val create :
@@ -149,7 +149,7 @@ module type Network_pool_base_intf = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * Coda_net2.Validation_callback.t )
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -165,7 +165,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
-                      * Coda_net2.Validation_callback.t )
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)

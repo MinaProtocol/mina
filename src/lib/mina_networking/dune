@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (libraries core o1trace async mina_intf
             async_extra gossip_net mina_base unix_timestamp perf_histograms proof_carrying_data
-            consensus network_pool coda_transition transition_frontier staged_ledger
+            consensus network_pool mina_transition transition_frontier staged_ledger
             sync_status)
  (inline_tests)
  (preprocess

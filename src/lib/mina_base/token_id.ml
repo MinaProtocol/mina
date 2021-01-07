@@ -10,7 +10,7 @@ open Import
 
 [%%endif]
 
-module T = Coda_numbers.Nat.Make64 ()
+module T = Mina_numbers.Nat.Make64 ()
 
 let default = T.of_uint64 Unsigned.UInt64.one
 

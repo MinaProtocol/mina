@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Frontier_base
 open Network_peer
 
