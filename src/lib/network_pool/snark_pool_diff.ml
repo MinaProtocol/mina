@@ -63,7 +63,7 @@ module Make
 
   let verified_size _ = 1
 
-  let max_per_second = 4
+  let max_per_15_seconds = 20
 
   let summary = function
     | Add_solved_work (work, {proof= _; fee}) ->

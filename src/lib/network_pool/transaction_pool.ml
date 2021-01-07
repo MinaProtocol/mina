@@ -791,7 +791,7 @@ struct
 
       let score x = Int.max 1 (List.length x)
 
-      let max_per_second = 2
+      let max_per_15_seconds = 10
 
       let verified_size = List.length
 
