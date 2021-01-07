@@ -1190,6 +1190,8 @@ include struct
 
   let query_peer ?timeout {gossip_net; _} = query_peer ?timeout gossip_net
 
+  let restart_helper {gossip_net; _} = restart_helper gossip_net
+
   (* these cannot be directly lifted due to the value restriction *)
   let on_first_connect t = lift on_first_connect t
 
