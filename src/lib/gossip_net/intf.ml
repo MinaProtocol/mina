@@ -14,6 +14,8 @@ module type Gossip_net_intf = sig
 
   module Rpc_intf : Rpc_interface_intf
 
+  val restart_helper : t -> unit
+
   val peers : t -> Peer.t list Deferred.t
 
   val initial_peers : t -> Mina_net2.Multiaddr.t list

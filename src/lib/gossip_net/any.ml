@@ -71,4 +71,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let set_connection_gating (Any ((module M), t)) config =
     M.set_connection_gating t config
+
+  let restart_helper (Any ((module M), t)) = M.restart_helper t
 end
