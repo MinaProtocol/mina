@@ -220,13 +220,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let ban_notification_reader {ban_notification_reader; _} =
       ban_notification_reader
 
-    let query_peer ?timeout:_ t peer rpc query =
+    let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
         ~responder_id:peer rpc query
 
-    let query_peer' ?how ?timeout t peer rpc qs =
+    let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
       let%map rs =
-        Deferred.List.map ?how qs ~f:(query_peer ?timeout t peer rpc)
+        Deferred.List.map ?how qs
+          ~f:(query_peer ?timeout ?heartbeat_timeout t peer rpc)
       in
       with_return (fun {return} ->
           let data =

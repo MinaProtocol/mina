@@ -32,6 +32,7 @@ module type Gossip_net_intf = sig
 
   val query_peer' :
        ?how:Monad_sequence.how
+    -> ?heartbeat_timeout:Time_ns.Span.t
     -> ?timeout:Time.Span.t
     -> t
     -> Peer.Id.t
@@ -40,7 +41,8 @@ module type Gossip_net_intf = sig
     -> 'r list rpc_response Deferred.t
 
   val query_peer :
-       ?timeout:Time.Span.t
+       ?heartbeat_timeout:Time_ns.Span.t
+    -> ?timeout:Time.Span.t
     -> t
     -> Peer.Id.t
     -> ('q, 'r) Rpc_intf.rpc
