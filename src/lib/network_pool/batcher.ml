@@ -1,68 +1,36 @@
 open Core_kernel
 open Async_kernel
 open Network_peer
-open Pickles_types
 
 module Id = Unique_id.Int ()
 
-module Outcome = struct
-  (* The final result of a batch verification. For each proof, a determination of
-     whether or not it is valid.
-
-     We allow valid proofs to carry data of type 'result, rather than just being
-     propositional. This is to support, e.g., User_command.t's getting
-     verified into a result of type User_command.Valid.t.
-  *)
-  type ('proof, 'result) t = [`Valid of 'result | `Invalid of 'proof] Id.Map.t
-  [@@deriving sexp]
-
-  let invalid invalid =
-    Id.Map.of_alist_exn (List.map invalid ~f:(fun (id, x) -> (id, `Invalid x)))
-
-  let to_invalid (t : _ t) =
-    Map.fold t ~init:[] ~f:(fun ~key:_ ~data acc ->
-        match data with `Valid _ -> acc | `Invalid x -> x :: acc )
-
-  let of_alist_exn : _ -> _ t = Id.Map.of_alist_exn
-
-  let empty : _ t = Id.Map.empty
-
-  (* Merge the outcomes for two batches. Used to recombine results of
-     recursive splitting *)
-  let append (type p r) (t1 : (p, r) t) (t2 : (p, r) t) : (p, r) t =
-    Id.Map.merge t1 t2 ~f:(fun ~key:_ d ->
-        match d with
-        | `Left x | `Right x ->
-            Some x
-        | `Both (x, y) -> (
-          (* This should never happen. Still, we handle it
-          in case the truly unthinkable occurs *)
-          match (x, y) with
-          | `Valid _, `Valid _ ->
-              Some x
-          | `Invalid _, `Invalid _ ->
-              Some x
-          | `Valid _, `Invalid _ | `Invalid _, `Valid _ ->
-              assert false ) )
-end
+type ('init, 'result) elt =
+  { id: Id.t
+  ; data: 'init
+  ; weight: int
+  ; res: ('result, unit) Result.t Or_error.t Ivar.t sexp_opaque }
+[@@deriving sexp]
 
 type ('proof, 'result) state =
   | Waiting
-  | Verifying of
-      { out_for_verification: (Id.t * 'proof) list
-      ; next_finished:
-          ('proof, 'result) Outcome.t Or_error.t Ivar.t sexp_opaque }
+  | Verifying of {out_for_verification: ('proof, 'result) elt list}
 [@@deriving sexp]
 
-type ('proof, 'partially_validated, 'result) t =
-  { mutable state: ('proof, 'result) state
-  ; queue: (Id.t * 'proof) Queue.t
-  ; compare_proof: ('proof -> 'proof -> int) option
+module Q = Doubly_linked
+
+type ('init, 'partially_validated, 'result) t =
+  { mutable state: ('init, 'result) state
+  ; how_to_add: [`Insert | `Enqueue_back]
+  ; queue: ('init, 'result) elt Q.t
+  ; compare_init: ('init -> 'init -> int) option
+  ; logger: Logger.t sexp_opaque
+  ; weight: 'init -> int
+  ; max_weight_per_call: int option
   ; verifier:
       (* The batched verifier may make partial progress on its input so that we can
          save time when it is re-verified in a smaller batch in the case that a batch
          fails to verify. *)
-      (   [`Proof of 'proof | `Partially_validated of 'partially_validated] list
+      (   [`Init of 'init | `Partially_validated of 'partially_validated] list
        -> [ `Valid of 'result
           | `Invalid
           | `Potentially_invalid of 'partially_validated ]
@@ -71,69 +39,76 @@ type ('proof, 'partially_validated, 'result) t =
       sexp_opaque }
 [@@deriving sexp]
 
-let create ?compare_proof verifier =
-  {state= Waiting; queue= Queue.create (); compare_proof; verifier}
+let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init
+    ?(weight = fun _ -> 1) ?max_weight_per_call verifier =
+  { state= Waiting
+  ; queue= Q.create ()
+  ; how_to_add
+  ; compare_init
+  ; verifier
+  ; weight
+  ; max_weight_per_call
+  ; logger= Option.value logger ~default:(Logger.create ()) }
 
 let call_verifier t (ps : 'proof list) = t.verifier ps
 
 (*Worst case (if all the proofs are invalid): log n * (2^(log n) + 1)
   In the average case this should show better performance.
-  We need to implement the trusted/untrusted batches from the snark pool batching RFC #4882 to avoid possible DoS/DDoS here*)
+  We could implement the trusted/untrusted batches from the snark pool batching RFC #4882 
+  to further mitigate possible DoS/DDoS here*)
 let rec determine_outcome : type p r partial.
-       (Id.t * p) list
+       (p, r) elt list
     -> [`Valid of r | `Invalid | `Potentially_invalid of partial] list
     -> (p, partial, r) t
-    -> (p, r) Outcome.t Deferred.Or_error.t =
+    -> unit Deferred.Or_error.t =
  fun ps res v ->
   (* First separate out all the known results. That information will definitely be included
     in the outcome. *)
-  let known, potentially_invalid =
-    List.partition_map (List.zip_exn ps res) ~f:(fun ((id, p), r) ->
+  let potentially_invalid =
+    List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
         match r with
         | `Valid r ->
-            `Fst (id, `Valid r)
+            Ivar.fill elt.res (Ok (Ok r)) ;
+            None
         | `Invalid ->
-            `Fst (id, `Invalid p)
+            Ivar.fill elt.res (Ok (Error ())) ;
+            None
         | `Potentially_invalid new_hint ->
-            `Snd (id, p, new_hint) )
+            Some (elt, new_hint) )
   in
   let open Deferred.Or_error.Let_syntax in
   match potentially_invalid with
   | [] ->
       (* All results are known *)
-      return (Outcome.of_alist_exn known)
-  | [(id, p, _)] ->
+      return ()
+  | [({res; _}, _)] ->
+      Ivar.fill res (Ok (Error ())) ;
       (* If there is a potentially invalid proof in this batch of size 1, then
          that proof is itself invalid. *)
-      return Outcome.(append (invalid [(id, p)]) (of_alist_exn known))
+      return ()
   | _ ->
       let outcome xs =
         let%bind res_xs =
           call_verifier v
-            (List.map xs ~f:(fun (_id, _p, new_hint) ->
+            (List.map xs ~f:(fun (_e, new_hint) ->
                  `Partially_validated new_hint ))
         in
-        determine_outcome
-          (List.map xs ~f:(fun (id, p, _hint) -> (id, p)))
-          res_xs v
+        determine_outcome (List.map xs ~f:(fun (e, _hint) -> e)) res_xs v
       in
       let length = List.length potentially_invalid in
       let left, right = List.split_n potentially_invalid (length / 2) in
-      let%bind outcome_l = outcome left in
-      let%map outcome_r = outcome right in
-      List.fold known
-        ~f:(fun acc (id, x) -> Map.add_exn acc ~key:id ~data:x)
-        ~init:(Outcome.append outcome_l outcome_r)
+      let%bind () = outcome left in
+      outcome right
+
+let compare_elt ~compare t1 t2 =
+  match compare t1.data t2.data with 0 -> Id.compare t1.id t2.id | x -> x
 
 let order_proofs t =
-  match t.compare_proof with
+  match t.compare_init with
   | None ->
       Fn.id
   | Some compare ->
-      let compare (id1, p1) (id2, p2) =
-        match compare p1 p2 with 0 -> Id.compare id1 id2 | x -> x
-      in
-      List.sort ~compare
+      List.sort ~compare:(compare_elt ~compare)
 
 (* When new proofs come in put them in the queue.
       If state = Waiting, verify those proofs immediately.
@@ -249,12 +224,12 @@ module Transaction_pool = struct
 
   type t = (diff, partial, User_command.Valid.t list) batcher [@@deriving sexp]
 
-  type input = [`Proof of diff | `Partially_validated of partial]
+  type input = [`Init of diff | `Partially_validated of partial]
 
   let init_result (ds : input list) =
     (* We store a result for every diff in the input. *)
     Array.of_list_map ds ~f:(function
-      | `Proof d ->
+      | `Init d ->
           (* Initially, the status of all the transactions in a never-before-seen
             diff are unknown. *)
           `In_progress (Array.of_list_map d.data ~f:(fun _ -> `Unknown))
@@ -276,7 +251,7 @@ module Transaction_pool = struct
          (Array.map a ~f:(function `Valid c -> Some c | _ -> None)))
 
   let create verifier : t =
-    create ~compare_proof:compare_envelope (fun (ds : input list) ->
+    create ~compare_init:compare_envelope (fun (ds : input list) ->
         let open Deferred.Or_error.Let_syntax in
         let result = init_result ds in
         (* Extract all the transactions that have not yet been fully validated and hold on to their
@@ -284,7 +259,7 @@ module Transaction_pool = struct
         let unknowns =
           List.concat_mapi ds ~f:(fun i x ->
               match x with
-              | `Proof diff ->
+              | `Init diff ->
                   List.mapi diff.data ~f:(fun j c -> ((i, j), c))
               | `Partially_validated partial ->
                   List.filter_mapi partial ~f:(fun j c ->
@@ -360,10 +335,18 @@ module Snark_pool = struct
     match%map verify t p with Ok () -> true | Error () -> false
 
   let create verifier : t =
-    create ~compare_proof:compare_envelope (fun ps0 ->
+    create
+    (* TODO: Make this a proper config detail once we have data on what a
+           good default would be.
+        *)
+      ~max_weight_per_call:
+        (Option.value_map ~default:1000 ~f:Int.of_string
+           (Sys.getenv_opt "MAX_VERIFIER_BATCH_SIZE"))
+      ~compare_init:compare_envelope
+      (fun ps0 ->
         let ps =
           List.concat_map ps0 ~f:(function
-              | `Partially_validated env | `Proof env ->
+              | `Partially_validated env | `Init env ->
               let ps, message = env.data in
               One_or_two.map ps ~f:(fun p -> (p, message))
               |> One_or_two.to_list )
@@ -373,8 +356,7 @@ module Snark_pool = struct
         | true ->
             List.map ps0 ~f:(fun _ -> `Valid ())
         | false ->
-            List.map ps0 ~f:(function
-                | `Partially_validated env | `Proof env ->
+            List.map ps0 ~f:(function `Partially_validated env | `Init env ->
                 `Potentially_invalid env ) )
 
   module Work_key = struct
@@ -395,9 +377,10 @@ module Snark_pool = struct
 
   let verify' (t : t) ps =
     let open Deferred.Or_error.Let_syntax in
-    let (T ps) = Vector.of_list ps in
-    let%map outcome = verify' t ps |> snd in
-    let invalid = Outcome.to_invalid outcome in
+    let%map invalid =
+      Deferred.Or_error.List.filter_map ps ~f:(fun p ->
+          match%map verify t p with true -> None | false -> Some p )
+    in
     `Invalid
       (Work_key.Set.of_list (List.map invalid ~f:Work_key.of_proof_envelope))
 
@@ -497,3 +480,4 @@ module Snark_pool = struct
                 run_test proof_lists ) )
     end )
 end
+
