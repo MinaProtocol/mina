@@ -553,7 +553,7 @@ let create_node ~downloader t ~parent x =
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
     with e ->
-      [%log' info t.logger]
+      [%log' debug t.logger]
         ~metadata:[("exn", `String (Exn.to_string e))]
         "create_node $exn" ) ;
   write_graph t ; node
@@ -613,7 +613,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
     set_state t node s ;
     try check_invariant ~downloader t
     with e ->
-      [%log' info t.logger]
+      [%log' debug t.logger]
         ~metadata:[("exn", `String (Exn.to_string e))]
         "set_state $exn"
   in
@@ -649,7 +649,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         return ()
     | To_download download_job ->
         let%bind b, attempts = step (Downloader.Job.result download_job) in
-        [%log' fatal t.logger]
+        [%log' debug t.logger]
           ~metadata:
             [ ("state_hash", State_hash.to_yojson state_hash)
             ; ( "donwload_number"
@@ -802,7 +802,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                  [("target_hash", State_hash.to_yojson target_parent_hash)]
                "Failed to download state hashes for $target_hash"
          | Ok (root, state_hashes) ->
-             [%log' fatal t.logger]
+             [%log' debug t.logger]
                ~metadata:
                  [ ("downloader", Downloader.to_yojson downloader)
                  ; ( "node_states"
@@ -1429,7 +1429,7 @@ end = struct
     try 
       !check_invariant_r t
     with e -> (
-      [%log' info t.logger]
+      [%log' debug t.logger]
         ~metadata:[ "exn", `String (Exn.to_string e) ]
         "job_finished $exn" 
       )
