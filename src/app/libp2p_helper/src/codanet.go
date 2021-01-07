@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path"
 	"time"
-        "os"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -105,6 +105,11 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
 	cm.OnDisconnect(net, c)
 	cm.p2pManager.Notifee().Disconnected(net, c)
+}
+
+// proxy remaining p2pconnmgr.BasicConnMgr methods for access
+func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
+	return cm.p2pManager.GetInfo()
 }
 
 // Helper contains all the daemon state
@@ -312,10 +317,12 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			}
 
 			as = append(as, externalAddr)
-                        
-                        _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-                        if exists { return as }
-                        
+
+			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+			if exists {
+				return as
+			}
+
 			bs := make([]ma.Multiaddr, 0, len(as))
 			isPrivate := func(addr ma.Multiaddr) bool {
 				// get the ip out
