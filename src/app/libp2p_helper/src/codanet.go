@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 	gonet "net"
+	"os"
 	"path"
 	"time"
-    "os"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -39,7 +39,7 @@ import (
 
 var (
 	privateIPs = []string{
-		"10.0.0.0/8", 
+		"10.0.0.0/8",
 		"172.16.0.0/12",
 		"192.168.0.0/16",
 		"100.64.0.0/10",
@@ -161,15 +161,15 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 	logger := logging.Logger("codanet.CodaGatingState")
 
 	if addrFilters == nil {
-		addrFilters = new(ma.Filters)
+		addrFilters = ma.NewFilters()
 	}
 
 	if denied == nil {
-		denied = new(peer.Set)
+		denied = peer.NewSet()
 	}
 
 	if allowed == nil {
-		allowed = new(peer.Set)
+		allowed = peer.NewSet()
 	}
 
 	for _, addr := range privateIPs {
@@ -331,11 +331,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
 			if externalAddr != nil {
-				as = append(as, externalAddr) 
+				as = append(as, externalAddr)
 			}
 
 			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-			if exists { return as }
+			if exists {
+				return as
+			}
 
 			fs := ma.NewFilters()
 			for _, addr := range privateIPs {
