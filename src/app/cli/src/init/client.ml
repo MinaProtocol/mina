@@ -1733,7 +1733,7 @@ let archive_precomputed_blocks =
                  .to_yojson block
                  |> Yojson.Safe.to_basic
                in
-               let%map.Async.Or_error.Let_syntax _res =
+               let%map.Deferred.Or_error.Let_syntax _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
                  *)
