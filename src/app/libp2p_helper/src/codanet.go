@@ -208,6 +208,13 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
+	_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+	
+	// if we want to allow connecting to private IPs, and this addr is a private IP, allow
+	if exists && gs.AddrFilters.AddrBlocked(addr) {
+		return true
+	}
+
 	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(addr))
 
 	if !allow {
@@ -332,11 +339,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
 			if externalAddr != nil {
 				as = append(as, externalAddr)
-			}
-
-			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-			if exists {
-				return as
 			}
 
 			fs := ma.NewFilters()
