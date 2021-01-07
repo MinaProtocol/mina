@@ -219,7 +219,7 @@ let compare_envelope (e1 : _ Envelope.Incoming.t) (e2 : _ Envelope.Incoming.t)
   Envelope.Sender.compare e1.sender e2.sender
 
 module Transaction_pool = struct
-  open Coda_base
+  open Mina_base
 
   type diff = User_command.Verifiable.t list Envelope.Incoming.t
   [@@deriving sexp]
@@ -341,7 +341,7 @@ end
 
 module Snark_pool = struct
   type proof_envelope =
-    (Ledger_proof.t One_or_two.t * Coda_base.Sok_message.t) Envelope.Incoming.t
+    (Ledger_proof.t One_or_two.t * Mina_base.Sok_message.t) Envelope.Incoming.t
   [@@deriving sexp]
 
   (* We don't use partial verification here. *)
@@ -374,7 +374,7 @@ module Snark_pool = struct
   module Work_key = struct
     module T = struct
       type t =
-        (Transaction_snark.Statement.t One_or_two.t * Coda_base.Sok_message.t)
+        (Transaction_snark.Statement.t One_or_two.t * Mina_base.Sok_message.t)
         Envelope.Incoming.t
       [@@deriving sexp, compare]
     end
@@ -397,7 +397,7 @@ module Snark_pool = struct
 
   let%test_module "With valid and invalid proofs" =
     ( module struct
-      open Coda_base
+      open Mina_base
 
       let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
@@ -410,7 +410,7 @@ module Snark_pool = struct
             One_or_two.gen Transaction_snark.Statement.gen
           in
           let%map {fee; prover} = Fee_with_prover.gen in
-          let message = Coda_base.Sok_message.create ~fee ~prover in
+          let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:Ledger_proof.For_tests.mk_dummy_proof
           , message )
         in
@@ -428,9 +428,9 @@ module Snark_pool = struct
               ~f:(Signature_lib.Public_key.Compressed.( <> ) prover)
           in
           let sok_digest =
-            Coda_base.Sok_message.(digest (create ~fee ~prover:invalid_prover))
+            Mina_base.Sok_message.(digest (create ~fee ~prover:invalid_prover))
           in
-          let message = Coda_base.Sok_message.create ~fee ~prover in
+          let message = Mina_base.Sok_message.create ~fee ~prover in
           ( One_or_two.map statements ~f:(fun statement ->
                 Ledger_proof.create ~statement ~sok_digest
                   ~proof:Proof.transaction_dummy )

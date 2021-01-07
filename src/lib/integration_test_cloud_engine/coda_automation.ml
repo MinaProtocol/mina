@@ -2,8 +2,9 @@ open Core
 open Async
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 open Integration_test_lib
+open Unix
 
 module Network_config = struct
   type block_producer_config =
@@ -22,6 +23,7 @@ module Network_config = struct
     { cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
+    ; k8s_context: string
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -30,7 +32,6 @@ module Network_config = struct
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; coda_faucet_amount: string
-    ; deploy_archive: bool
     ; coda_faucet_fee: string
     ; seed_zone: string
     ; seed_region: string
@@ -79,14 +80,30 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
-    let testnet_name = "integration-test-" ^ test_name in
+    let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
+    let user_sanitized =
+      Str.global_replace (Str.regexp "\\W|_") "" user_from_env
+    in
+    let user_len = Int.min 5 (String.length user_sanitized) in
+    let user = String.sub user_sanitized ~pos:0 ~len:user_len in
+    let time_now = Unix.gmtime (Unix.gettimeofday ()) in
+    let timestr =
+      string_of_int time_now.tm_mday
+      ^ string_of_int time_now.tm_hour
+      ^ string_of_int time_now.tm_min
+    in
+    (* append the first 5 chars of the local system username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
+    (* username-testname-DaymonthHrMin *)
+    (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
     (* HARD CODED NETWORK VALUES *)
     let project_id = "o1labs-192920" in
-    let cluster_id = "gke_o1labs-192920_us-east1_coda-infra-east" in
-    let cluster_name = "coda-infra-east" in
-    let cluster_region = "us-east1" in
-    let seed_zone = "us-east1-b" in
-    let seed_region = "us-east1" in
+    let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
+    let cluster_name = "mina-integration-west1" in
+    let k8s_context = cluster_id in
+    let cluster_region = "us-west1" in
+    let seed_zone = "us-west1-a" in
+    let seed_region = "us-west1" in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -105,6 +122,7 @@ module Network_config = struct
                   { Runtime_config.Accounts.Single.Timed.initial_minimum_balance=
                       t.initial_minimum_balance
                   ; cliff_time= t.cliff_time
+                  ; cliff_amount= t.cliff_amount
                   ; vesting_period= t.vesting_period
                   ; vesting_increment= t.vesting_increment }
           in
@@ -201,10 +219,10 @@ module Network_config = struct
         ; testnet_name
         ; seed_zone
         ; seed_region
+        ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
-        ; deploy_archive= false
         ; coda_points_image= images.points
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_key_pass= "naughty blue worm"
@@ -344,17 +362,21 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id =
-      { Kubernetes_network.Node.namespace= network_config.terraform.testnet_name
-      ; pod_id }
+    let cons_node pod_id port =
+      { Kubernetes_network.Node.cluster= network_config.cluster_id
+      ; Kubernetes_network.Node.namespace=
+          network_config.terraform.testnet_name
+      ; Kubernetes_network.Node.pod_id
+      ; Kubernetes_network.Node.node_graphql_port= port }
     in
+    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
+    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1" 3085] in
     let block_producer_pod_names =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
-          cons_node @@ Printf.sprintf "test-block-producer-%d" (i + 1) )
+          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
+      )
     in
-    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1"] in
     let t =
       { logger
       ; cluster= network_config.cluster_id

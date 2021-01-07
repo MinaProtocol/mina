@@ -35,7 +35,6 @@ Pipeline.build
           , label = "Helm chart lint steps"
           , key = "lint-helm-chart"
           , target = Size.Small
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]

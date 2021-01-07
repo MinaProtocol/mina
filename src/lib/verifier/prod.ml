@@ -2,8 +2,8 @@
 
 open Core_kernel
 open Async
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 open Blockchain_snark
 
 type ledger_proof = Ledger_proof.Prod.t
@@ -14,12 +14,12 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_commands :
-         Coda_base.User_command.Verifiable.t list
-      -> [ `Valid of Coda_base.User_command.Valid.t
+         Mina_base.User_command.Verifiable.t list
+      -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Coda_base.Snapp_statement.t
+           * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list ]
          list
@@ -125,7 +125,7 @@ module Worker = struct
             | `Invalid
             | `Valid_assuming of
               ( Pickles.Side_loaded.Verification_key.t
-              * Coda_base.Snapp_statement.t
+              * Mina_base.Snapp_statement.t
               * Pickles.Side_loaded.Proof.t )
               list ]
             list )
@@ -189,7 +189,7 @@ module Worker = struct
                   | `Invalid
                   | `Valid_assuming of
                     ( Pickles.Side_loaded.Verification_key.Stable.Latest.t
-                    * Coda_base.Snapp_statement.Stable.Latest.t
+                    * Mina_base.Snapp_statement.Stable.Latest.t
                     * Pickles.Side_loaded.Proof.Stable.Latest.t )
                     list ]
                   list]
@@ -223,6 +223,8 @@ type t = {worker: worker Deferred.t ref; logger: Logger.Stable.Latest.t}
 let plus_or_minus initial ~delta =
   initial +. (Random.float (2. *. delta) -. delta)
 
+let min_expected_lifetime = Time.Span.of_min 1.
+
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let on_failure err =
@@ -230,7 +232,13 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
       ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
+  let prev_start = ref (Time.of_span_since_epoch Time.Span.zero) in
   let create_worker () =
+    let now = Time.now () in
+    let prev_died_early =
+      Time.Span.( < ) (Time.diff now !prev_start) min_expected_lifetime
+    in
+    prev_start := now ;
     let%map connection, process =
       Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
         ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
@@ -243,8 +251,9 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         ; ( "process_kind"
           , `String Child_processes.Termination.(show_process_kind Verifier) )
         ] ;
-    Child_processes.Termination.register_process pids process
-      Child_processes.Termination.Verifier ;
+    if prev_died_early then
+      Child_processes.Termination.register_process pids process
+        Child_processes.Termination.Verifier ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stdout process |> Reader.pipe)
@@ -265,21 +274,32 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   let worker_ref = ref (Deferred.return worker) in
   let rec on_worker {connection= _; process} =
     let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
-    upon (after restart_after) (fun () ->
+    let finished =
+      Deferred.any
+        [ (after restart_after >>| fun () -> `Time_to_restart)
+        ; (Process.wait process >>| fun _ -> `Unexpected_termination) ]
+    in
+    upon finished (fun e ->
         let pid = Process.pid process in
-        Child_processes.Termination.mark_termination_as_expected pids pid ;
-        ( match Signal.send Signal.kill (`Pid pid) with
-        | `No_such_process ->
-            [%log info] "verifier failed to get sigkill (no such process)"
-              ~metadata:
-                [("verifier_pid", `Int (Process.pid process |> Pid.to_int))]
-        | `Ok ->
-            [%log info] "verifier successfully got sigkill"
-              ~metadata:
-                [("verifier_pid", `Int (Process.pid process |> Pid.to_int))] ) ;
+        let () =
+          match e with
+          | `Unexpected_termination ->
+              [%log error] "verifier terminated unexpectedly"
+                ~metadata:[("verifier_pid", `Int (Pid.to_int pid))]
+          | `Time_to_restart -> (
+              Child_processes.Termination.mark_termination_as_expected pids pid ;
+              match Signal.send Signal.kill (`Pid pid) with
+              | `No_such_process ->
+                  [%log info]
+                    "verifier failed to get sigkill (no such process)"
+                    ~metadata:[("verifier_pid", `Int (Pid.to_int pid))]
+              | `Ok ->
+                  [%log info] "verifier successfully got sigkill"
+                    ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] )
+        in
         let new_worker =
           let%bind res = Process.wait process in
-          [%log info] "prover successfully stopped"
+          [%log info] "verifier successfully stopped"
             ~metadata:
               [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
               ; ("exit_status", `String (Unix.Exit_or_signal.to_string_hum res))

@@ -1,7 +1,10 @@
 open Core_kernel
 
 module Fork_config = struct
-  type t = {previous_state_hash: string; previous_length: int}
+  type t =
+    { previous_state_hash: string
+    ; previous_length: int
+    ; previous_global_slot: int }
   [@@deriving yojson, dhall_type, bin_io_unversioned]
 end
 
@@ -51,14 +54,16 @@ module Json_layout = struct
       module Timed = struct
         type t =
           { initial_minimum_balance: Currency.Balance.t
-          ; cliff_time: Coda_numbers.Global_slot.t
-          ; vesting_period: Coda_numbers.Global_slot.t
+          ; cliff_time: Mina_numbers.Global_slot.t
+          ; cliff_amount: Currency.Amount.t
+          ; vesting_period: Mina_numbers.Global_slot.t
           ; vesting_increment: Currency.Amount.t }
         [@@deriving yojson, dhall_type, sexp]
 
         let fields =
           [| "initial_minimum_balance"
            ; "cliff_time"
+           ; "cliff_amount"
            ; "vesting_period"
            ; "vesting_increment" |]
 
@@ -175,8 +180,8 @@ module Json_layout = struct
         ; token: (Unsigned_extended.UInt64.t option[@default None])
         ; token_permissions: (Token_permissions.t option[@default None])
         ; nonce:
-            (Coda_numbers.Account_nonce.t[@default
-                                           Coda_numbers.Account_nonce.zero])
+            (Mina_numbers.Account_nonce.t[@default
+                                           Mina_numbers.Account_nonce.zero])
         ; receipt_chain_hash: (string option[@default None])
         ; voting_for: (string option[@default None])
         ; snapp: (Snapp_account.t option[@default None])
@@ -207,7 +212,7 @@ module Json_layout = struct
         ; timing= None
         ; token= None
         ; token_permissions= None
-        ; nonce= Coda_numbers.Account_nonce.zero
+        ; nonce= Mina_numbers.Account_nonce.zero
         ; receipt_chain_hash= None
         ; voting_for= None
         ; snapp= None
@@ -393,8 +398,9 @@ module Accounts = struct
     module Timed = struct
       type t = Json_layout.Accounts.Single.Timed.t =
         { initial_minimum_balance: Currency.Balance.Stable.Latest.t
-        ; cliff_time: Coda_numbers.Global_slot.Stable.Latest.t
-        ; vesting_period: Coda_numbers.Global_slot.Stable.Latest.t
+        ; cliff_time: Mina_numbers.Global_slot.Stable.Latest.t
+        ; cliff_amount: Currency.Amount.Stable.Latest.t
+        ; vesting_period: Mina_numbers.Global_slot.Stable.Latest.t
         ; vesting_increment: Currency.Amount.Stable.Latest.t }
       [@@deriving bin_io_unversioned, sexp]
     end
@@ -411,7 +417,7 @@ module Accounts = struct
       ; timing: Timed.t option
       ; token: Unsigned_extended.UInt64.Stable.Latest.t option
       ; token_permissions: Token_permissions.t option
-      ; nonce: Coda_numbers.Account_nonce.Stable.Latest.t
+      ; nonce: Mina_numbers.Account_nonce.Stable.Latest.t
       ; receipt_chain_hash: string option
       ; voting_for: string option
       ; snapp: Snapp_account.t option
@@ -441,7 +447,7 @@ module Accounts = struct
     ; timing: Single.Timed.t option
     ; token: Unsigned_extended.UInt64.t option
     ; token_permissions: Single.Token_permissions.t option
-    ; nonce: Coda_numbers.Account_nonce.t
+    ; nonce: Mina_numbers.Account_nonce.t
     ; receipt_chain_hash: string option
     ; voting_for: string option
     ; snapp: Single.Snapp_account.t option

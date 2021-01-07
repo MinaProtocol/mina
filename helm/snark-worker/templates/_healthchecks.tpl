@@ -21,7 +21,9 @@ snark-coordinator readiness settings
 readinessProbe:
   exec:
     command: [
-      "source /healthcheck/utilities.sh && isDaemonSynced && ownsFunds && hasSnarkWorker"
+      "/bin/bash",
+      "-c",
+      "source /healthcheck/utilities.sh && isDaemonSynced && hasSnarkWorker"
     ]
 {{- end }}
 
@@ -29,6 +31,8 @@ readinessProbe:
 ALL snark-coordinator healthchecks - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.snarkCoordinator.allChecks" }}
+{{- if .healthcheck.enabled }}
 {{- include "healthcheck.snarkCoordinator.livenessCheck" . }}
 {{- include "healthcheck.snarkCoordinator.readinessCheck" . }}
+{{- end }}
 {{- end }}

@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 
 type Structured_log_events.t +=
   | Merge_snark_generated of
@@ -70,7 +70,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         let open Deferred.Or_error.Let_syntax in
         let%map proof, time =
           perform_single s
-            ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
+            ~message:(Mina_base.Sok_message.create ~fee ~prover:public_key)
             w
         in
         ( proof
@@ -92,15 +92,15 @@ module Make (Inputs : Intf.Inputs_intf) :
     let%map res =
       Rpc.Connection.with_client
         ~handshake_timeout:
-          (Time.Span.of_sec Coda_compile_config.rpc_handshake_timeout_sec)
+          (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
         ~heartbeat_config:
           (Rpc.Connection.Heartbeat_config.create
              ~timeout:
                (Time_ns.Span.of_sec
-                  Coda_compile_config.rpc_heartbeat_timeout_sec)
+                  Mina_compile_config.rpc_heartbeat_timeout_sec)
              ~send_every:
                (Time_ns.Span.of_sec
-                  Coda_compile_config.rpc_heartbeat_send_every_sec))
+                  Mina_compile_config.rpc_heartbeat_send_every_sec))
         (Tcp.Where_to_connect.of_host_and_port address)
         (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
@@ -123,12 +123,12 @@ module Make (Inputs : Intf.Inputs_intf) :
     One_or_two.iter metrics ~f:(fun (time, tag) ->
         match tag with
         | `Merge ->
-            Coda_metrics.(
+            Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_merge_time_sec (Time.Span.to_sec time)) ;
             [%str_log info] (Merge_snark_generated {time})
         | `Transition ->
-            Coda_metrics.(
+            Mina_metrics.(
               Cryptography.Snark_work_histogram.observe
                 Cryptography.snark_work_base_time_sec (Time.Span.to_sec time)) ;
             [%str_log info] (Base_snark_generated {time}) )

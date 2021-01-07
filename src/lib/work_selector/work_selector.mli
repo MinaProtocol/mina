@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 module State :
   Intf.State_intf with type transition_frontier := Transition_frontier.t

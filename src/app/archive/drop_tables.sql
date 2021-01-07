@@ -28,4 +28,8 @@ drop table snarked_ledger_hashes;
 
 drop index idx_public_keys_value;
 
+drop index idx_public_key_id;
+
+drop table timing_info;
+
 drop table public_keys;

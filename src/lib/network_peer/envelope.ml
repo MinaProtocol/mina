@@ -59,22 +59,41 @@ module Sender = struct
 end
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Sender.t}
+  let time_to_yojson tm = `String (Time.to_string tm)
+
+  let time_of_yojson = function
+    | `String s ->
+        Ok (Time.of_string s)
+    | _ ->
+        Error "time_of_yojson: Expected string"
+
+  type 'a t =
+    { data: 'a
+    ; sender: Sender.t
+    ; received_at: Time.t
+          [@to_yojson time_to_yojson] [@of_yojson time_of_yojson] }
   [@@deriving eq, sexp, yojson, compare]
 
   let sender t = t.sender
 
   let data t = t.data
 
-  let wrap ~data ~sender = {data; sender}
+  let received_at t = t.received_at
 
-  let wrap_peer ~data ~sender = {data; sender= Sender.of_peer sender}
+  let wrap ~data ~sender =
+    let received_at = Time.now () in
+    {data; sender; received_at}
+
+  let wrap_peer ~data ~sender =
+    let received_at = Time.now () in
+    {data; sender= Sender.of_peer sender; received_at}
 
   let map ~f t = {t with data= f t.data}
 
   let local data =
+    let received_at = Time.now () in
     let sender = Sender.Local in
-    {data; sender}
+    {data; sender; received_at}
 
   let remote_sender_exn t =
     match t.sender with
@@ -87,5 +106,6 @@ module Incoming = struct
     let open Quickcheck.Generator.Let_syntax in
     let%bind data = gen_a in
     let%map sender = Sender.gen in
-    {data; sender}
+    let received_at = Time.now () in
+    {data; sender; received_at}
 end

@@ -26,11 +26,11 @@ module Make (Engine : Engine_intf) = struct
     (* wait for initialization *)
     let%bind () = Log_engine.wait_for_init node log_engine in
     [%log info] "send_payment_test: done waiting for initialization" ;
-    let graphql_port = 3085 in
+    let graphql_port = block_producer.node_graphql_port in
     Async_kernel.Deferred.don't_wait_for
       (Node.set_port_forwarding_exn ~logger block_producer graphql_port) ;
     (* same keypairs used by Coda_automation to populate the ledger *)
-    let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs in
+    let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs in
     (* send the payment *)
     let sender, _sk1 = keypairs.(0) in
     let receiver, _sk2 = keypairs.(1) in
@@ -40,5 +40,9 @@ module Make (Engine : Engine_intf) = struct
       Node.send_payment ~logger node ~sender ~receiver ~amount ~fee
     in
     (* confirm payment *)
-    Log_engine.wait_for_payment log_engine ~logger ~sender ~receiver ~amount ()
+    let%map () =
+      Log_engine.wait_for_payment log_engine ~logger ~sender ~receiver ~amount
+        ()
+    in
+    [%log info] "send_payment_test: succesfully completed"
 end

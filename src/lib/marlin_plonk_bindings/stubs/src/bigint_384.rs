@@ -10,59 +10,29 @@ const BIGINT384_NUM_LIMBS: i32 =
     (BIGINT384_NUM_BITS + BIGINT384_LIMB_BITS - 1) / BIGINT384_LIMB_BITS;
 const BIGINT384_NUM_BYTES: usize = (BIGINT384_NUM_LIMBS as usize) * 8;
 
-#[derive(Copy, Clone)]
-pub struct CamlBigint384(pub BigInteger384);
-
-pub type CamlBigint384Ptr = ocaml::Pointer<CamlBigint384>;
-
-extern "C" fn caml_bigint_384_compare_raw(x: ocaml::Value, y: ocaml::Value) -> libc::c_int {
-    let x: CamlBigint384Ptr = ocaml::FromValue::from_value(x);
-    let y: CamlBigint384Ptr = ocaml::FromValue::from_value(y);
-
-    match x.as_ref().0.cmp(&y.as_ref().0) {
-        Less => -1,
-        Equal => 0,
-        Greater => 1,
-    }
+pub fn to_biguint(x: &BigInteger384) -> BigUint {
+    let x_ = x.0.as_ptr() as *const u8;
+    let x_ = unsafe { std::slice::from_raw_parts(x_, BIGINT384_NUM_BYTES) };
+    num_bigint::BigUint::from_bytes_le(x_)
 }
 
-impl From<&CamlBigint384> for BigUint {
-    fn from(x: &CamlBigint384) -> BigUint {
-        let x_ = (x.0).0.as_ptr() as *const u8;
-        let x_ = unsafe { std::slice::from_raw_parts(x_, BIGINT384_NUM_BYTES) };
-        num_bigint::BigUint::from_bytes_le(x_)
-    }
+pub fn of_biguint(x: &BigUint) -> BigInteger384 {
+    let mut bytes = x.to_bytes_le();
+    bytes.resize(BIGINT384_NUM_BYTES, 0);
+    let limbs = bytes.as_ptr();
+    let limbs = limbs as *const [u64; BIGINT384_NUM_LIMBS as usize];
+    let limbs = unsafe { &(*limbs) };
+    BigInteger384(*limbs)
 }
-
-impl From<&BigUint> for CamlBigint384 {
-    fn from(x: &BigUint) -> CamlBigint384 {
-        let mut bytes = x.to_bytes_le();
-        bytes.resize(BIGINT384_NUM_BYTES, 0);
-        let limbs = bytes.as_ptr();
-        let limbs = limbs as *const [u64; BIGINT384_NUM_LIMBS as usize];
-        let limbs = unsafe { &(*limbs) };
-        CamlBigint384(BigInteger384(*limbs))
-    }
-}
-
-impl std::fmt::Display for CamlBigint384 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        BigUint::from(self).fmt(f)
-    }
-}
-
-ocaml::custom!(CamlBigint384 {
-    compare: caml_bigint_384_compare_raw,
-});
 
 #[ocaml::func]
 pub fn caml_bigint_384_of_numeral(
     s: &[u8],
     _len: u32,
     base: u32,
-) -> Result<CamlBigint384, ocaml::Error> {
+) -> Result<BigInteger384, ocaml::Error> {
     match BigUint::parse_bytes(s, base) {
-        Some(data) => Ok((&data).into()),
+        Some(data) => Ok(of_biguint(&data)),
         None => Err(ocaml::Error::invalid_argument("caml_bigint_384_of_numeral")
             .err()
             .unwrap()),
@@ -70,9 +40,9 @@ pub fn caml_bigint_384_of_numeral(
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_of_decimal_string(s: &[u8]) -> Result<CamlBigint384, ocaml::Error> {
+pub fn caml_bigint_384_of_decimal_string(s: &[u8]) -> Result<BigInteger384, ocaml::Error> {
     match BigUint::parse_bytes(s, 10) {
-        Some(data) => Ok((&data).into()),
+        Some(data) => Ok(of_biguint(&data)),
         None => Err(
             ocaml::Error::invalid_argument("caml_bigint_384_of_decimal_string")
                 .err()
@@ -92,14 +62,20 @@ pub fn caml_bigint_384_bytes_per_limb() -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_div(x: CamlBigint384Ptr, y: CamlBigint384Ptr) -> CamlBigint384 {
-    let res: BigUint = BigUint::from(x.as_ref()) / BigUint::from(y.as_ref());
-    (&res).into()
+pub fn caml_bigint_384_div(
+    x: ocaml::Pointer<BigInteger384>,
+    y: ocaml::Pointer<BigInteger384>,
+) -> BigInteger384 {
+    let res: BigUint = to_biguint(x.as_ref()) / to_biguint(y.as_ref());
+    of_biguint(&res)
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_compare(x: CamlBigint384Ptr, y: CamlBigint384Ptr) -> ocaml::Int {
-    match x.as_ref().0.cmp(&y.as_ref().0) {
+pub fn caml_bigint_384_compare(
+    x: ocaml::Pointer<BigInteger384>,
+    y: ocaml::Pointer<BigInteger384>,
+) -> ocaml::Int {
+    match x.as_ref().cmp(y.as_ref()) {
         Less => -1,
         Equal => 0,
         Greater => 1,
@@ -107,19 +83,22 @@ pub fn caml_bigint_384_compare(x: CamlBigint384Ptr, y: CamlBigint384Ptr) -> ocam
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_print(x: CamlBigint384Ptr) {
-    println!("{}", BigUint::from(x.as_ref()));
+pub fn caml_bigint_384_print(x: ocaml::Pointer<BigInteger384>) {
+    println!("{}", to_biguint(x.as_ref()));
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_to_string(x: CamlBigint384Ptr) -> String {
-    BigUint::from(x.as_ref()).to_string()
+pub fn caml_bigint_384_to_string(x: ocaml::Pointer<BigInteger384>) -> String {
+    to_biguint(x.as_ref()).to_string()
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_test_bit(x: CamlBigint384Ptr, i: ocaml::Int) -> Result<bool, ocaml::Error> {
+pub fn caml_bigint_384_test_bit(
+    x: ocaml::Pointer<BigInteger384>,
+    i: ocaml::Int,
+) -> Result<bool, ocaml::Error> {
     match i.try_into() {
-        Ok(i) => Ok(x.as_ref().0.get_bit(i)),
+        Ok(i) => Ok(x.as_ref().get_bit(i)),
         Err(_) => Err(ocaml::Error::invalid_argument("caml_bigint_384_test_bit")
             .err()
             .unwrap()),
@@ -127,21 +106,27 @@ pub fn caml_bigint_384_test_bit(x: CamlBigint384Ptr, i: ocaml::Int) -> Result<bo
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_to_bytes(x: CamlBigint384Ptr) -> ocaml::Value {
-    let len = std::mem::size_of::<CamlBigint384>();
+pub fn caml_bigint_384_to_bytes(x: ocaml::Pointer<BigInteger384>) -> ocaml::Value {
+    let len = std::mem::size_of::<BigInteger384>();
     let str = unsafe { ocaml::sys::caml_alloc_string(len) };
+    let x_ptr: *const BigInteger384 = x.as_ref();
     unsafe {
-        core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+        core::ptr::copy_nonoverlapping(x_ptr as *const u8, ocaml::sys::string_val(str), len);
     }
     ocaml::Value(str)
 }
 
 #[ocaml::func]
-pub fn caml_bigint_384_of_bytes(x: &[u8]) -> Result<CamlBigint384, ocaml::Error> {
-    let len = std::mem::size_of::<CamlBigint384>();
+pub fn caml_bigint_384_of_bytes(x: &[u8]) -> Result<BigInteger384, ocaml::Error> {
+    let len = std::mem::size_of::<BigInteger384>();
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_384_of_bytes")?;
     };
-    let x = unsafe { *(x.as_ptr() as *const CamlBigint384) };
+    let x = unsafe { *(x.as_ptr() as *const BigInteger384) };
     Ok(x)
+}
+
+#[ocaml::func]
+pub fn caml_bigint_384_deep_copy(x: BigInteger384) -> BigInteger384 {
+    x
 }

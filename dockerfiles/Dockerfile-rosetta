@@ -252,7 +252,7 @@ RUN git pull \
    && go clean --cache --modcache --testcache -r
 
 # HACK: build without special cpu features to allow more people to run coda
-RUN sed -i 's/+bmi2,+adx/-bmi2,-adx/g' src/lib/zexe/snarky-bn382/dune src/lib/marlin_plonk_bindings/stubs/dune
+RUN ./scripts/zexe-standardize.sh
 
 # Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
