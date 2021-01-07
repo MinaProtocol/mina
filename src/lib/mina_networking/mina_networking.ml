@@ -1188,10 +1188,11 @@ include struct
 
   let random_peers_except = lift random_peers_except
 
-  let query_peer ?timeout {gossip_net; _} = query_peer ?timeout gossip_net
+  let query_peer ?heartbeat_timeout ?timeout {gossip_net; _} =
+    query_peer ?heartbeat_timeout ?timeout gossip_net
 
-  let query_peer' ?how ?timeout {gossip_net; _} =
-    query_peer' ?how ?timeout gossip_net
+  let query_peer' ?how ?heartbeat_timeout ?timeout {gossip_net; _} =
+    query_peer' ?how ?heartbeat_timeout ?timeout gossip_net
 
   (* these cannot be directly lifted due to the value restriction *)
   let on_first_connect t = lift on_first_connect t
@@ -1271,9 +1272,11 @@ let find_map' xs ~f =
 
 let online_status t = t.online_status
 
-let make_rpc_request ?timeout ~rpc ~label t peer input =
+let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
   let open Deferred.Let_syntax in
-  match%map query_peer ?timeout t peer.Peer.peer_id rpc input with
+  match%map
+    query_peer ?heartbeat_timeout ?timeout t peer.Peer.peer_id rpc input
+  with
   | Connected {data= Ok (Some response); _} ->
       Ok response
   | Connected {data= Ok None; _} ->
@@ -1289,8 +1292,8 @@ let get_transition_chain_proof ?timeout t =
   make_rpc_request ?timeout ~rpc:Rpcs.Get_transition_chain_proof
     ~label:"transition chain proof" t
 
-let get_transition_chain ?timeout t =
-  make_rpc_request ?timeout ~rpc:Rpcs.Get_transition_chain
+let get_transition_chain ?heartbeat_timeout ?timeout t =
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
     ~label:"chain of transitions" t
 
 let get_best_tip ?timeout t peer =

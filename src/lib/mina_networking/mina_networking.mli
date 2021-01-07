@@ -216,7 +216,8 @@ val get_transition_chain_proof :
   -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
 
 val get_transition_chain :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
@@ -265,7 +266,8 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
