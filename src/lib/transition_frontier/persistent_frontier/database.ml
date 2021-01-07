@@ -250,11 +250,11 @@ let check t ~genesis_state_hash =
           get t.db ~key:Protocol_states_for_root_scan_state
             ~error:(`Corrupt (`Not_found `Protocol_states_for_root_scan_state))
         in
-        let%map _ =
+        let%map best_tip_transition =
           get t.db ~key:(Transition best_tip)
             ~error:(`Corrupt (`Not_found `Best_tip_transition))
         in
-        (root_hash, root_transition)
+        (root_hash, root_transition, best_tip_transition)
       in
       let rec check_arcs pred_hash =
         let%bind successors =
@@ -270,7 +270,9 @@ let check t ~genesis_state_hash =
             check_arcs succ_hash )
       in
       let%bind () = check_version () in
-      let%bind root_hash, root_transition = check_base () in
+      let%bind root_hash, root_transition, best_tip_transition =
+        check_base ()
+      in
       let%bind () =
         let persisted_genesis_state_hash =
           External_transition.protocol_state root_transition
@@ -281,7 +283,7 @@ let check t ~genesis_state_hash =
         else Error (`Genesis_state_mismatch persisted_genesis_state_hash)
       in
       let snarked_ledger_hash =
-        External_transition.blockchain_state root_transition
+        External_transition.blockchain_state best_tip_transition
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let%map () = check_arcs root_hash in
