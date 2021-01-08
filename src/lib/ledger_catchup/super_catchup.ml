@@ -509,6 +509,13 @@ let check_invariant ~downloader t =
     (Hashtbl.count t.nodes ~f:(fun node ->
          Node.State.enum node.state = To_download ))
 
+let download s d ~key ~attempts =
+  let logger = Logger.create () in
+  [%log debug]
+    ~metadata:[("key", Downloader.Key.to_yojson key); ("caller", `String s)]
+    "Mownload download $key" ;
+  Downloader.download d ~key ~attempts
+
 let create_node ~downloader t ~parent x =
   let attempts = Attempt_history.empty in
   let state, h, blockchain_length, result =
@@ -520,7 +527,7 @@ let create_node ~downloader t ~parent x =
         , Ivar.create_full (Ok root) )
     | `Hash (h, l) ->
         ( Node.State.To_download
-            (Downloader.download downloader ~key:(h, l) ~attempts)
+            (download "create_node" downloader ~key:(h, l) ~attempts)
         , h
         , l
         , Ivar.create () )
@@ -583,7 +590,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
           let sec_per_block = 15. in
           Time.Span.of_sec (Float.of_int (List.length hs) *. sec_per_block)
         in
-        Mina_networking.get_transition_chain ~timeout network peer
+        Mina_networking.get_transition_chain
+          ~heartbeat_timeout:(Time_ns.Span.of_sec 20.) ~timeout network peer
           (List.map hs ~f:fst) )
       ~peers:(fun () -> Mina_networking.peers network)
   in
@@ -613,10 +621,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              node.attempts
          | Remote peer ->
              Map.set node.attempts ~key:peer ~data:{failure_reason} ) ;
-      failwith "someone was bad :(" |> ignore ;
       set_state t node
         (To_download
-           (Downloader.download downloader
+           (download "failed" downloader
               ~key:(state_hash, node.blockchain_length)
               ~attempts:node.attempts)) ;
       run_node node
@@ -823,6 +830,14 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              [%log debug]
                ~metadata:[("n", `Int (List.length state_hashes))]
                "Adding $n nodes" ;
+             List.iter forest
+               ~f:
+                 (Rose_tree.iter ~f:(fun c ->
+                      let node =
+                        create_node ~downloader t ~parent:target_parent_hash
+                          (`Initial_validated c)
+                      in
+                      run_node node |> ignore )) ;
              List.fold state_hashes
                ~init:(root.state_hash, root.blockchain_length)
                ~f:(fun (parent, l) h ->
@@ -833,30 +848,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                    in
                    don't_wait_for (run_node node >>| ignore) ) ;
                  (h, l) )
-             |> ignore ;
-             List.iter forest
-               ~f:
-                 (Rose_tree.iter ~f:(fun c ->
-                      let node =
-                        create_node ~downloader t ~parent:target_parent_hash
-                          (`Initial_validated c)
-                      in
-                      run_node node |> ignore )) ;
-             [%log' fatal t.logger]
-               ~metadata:
-                 [ ( "donwload_number"
-                   , `Int
-                       (Hashtbl.count t.nodes ~f:(fun node ->
-                            Node.State.enum node.state = To_download )) )
-                 ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-                 ; ( "node_states"
-                   , let s = Node.State.Enum.Table.create () in
-                     Hashtbl.iter t.nodes ~f:(fun node ->
-                         Hashtbl.incr s (Node.State.enum node.state) ) ;
-                     `List
-                       (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                            `List [Node.State.Enum.to_yojson k; `Int v] )) ) ]
-               "heres good") )
+             |> ignore) )
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
