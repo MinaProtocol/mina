@@ -368,7 +368,8 @@ end = struct
 
     let update t u : unit =
       update t u ;
-      Strict_pipe.Writer.write t.w ()
+      if not (Strict_pipe.Writer.is_closed t.w) then
+        Strict_pipe.Writer.write t.w ()
   end
 
   type t =
@@ -437,7 +438,9 @@ end = struct
     t.next_flush
     <- Some
          (Clock.Event.run_after max_wait
-            (fun () -> Strict_pipe.Writer.write t.flush_w ())
+            (fun () ->
+              if not (Strict_pipe.Writer.is_closed t.flush_w) then
+                Strict_pipe.Writer.write t.flush_w () )
             ())
 
   let cancel t h =
@@ -480,8 +483,10 @@ end = struct
     let new_peers = Set.diff peers' t.all_peers in
     Useful_peers.update t.useful_peers
       (Refreshed_peers {all_peers= peers'; active_jobs= active_job_keys t}) ;
-    if not (Set.is_empty new_peers) then
-      Strict_pipe.Writer.write t.got_new_peers_w () ;
+    if
+      (not (Set.is_empty new_peers))
+      && not (Strict_pipe.Writer.is_closed t.got_new_peers_w)
+    then Strict_pipe.Writer.write t.got_new_peers_w () ;
     t.all_peers <- Peer.Set.of_list peers ;
     let rec go n =
       (* We need the initial length explicitly because we may re-enqueue things
@@ -730,7 +735,8 @@ end = struct
                 | None ->
                     (acc, skipped)
                 | Some x ->
-                    if Map.mem x.attempts peer then go n acc (x :: skipped)
+                    if not (Hash_set.mem useful_for x.key) then
+                      go n acc (x :: skipped)
                     else go (n + 1) (x :: acc) skipped
             in
             let acc, skipped = go 0 [] [] in
