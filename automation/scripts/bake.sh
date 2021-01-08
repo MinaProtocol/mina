@@ -3,7 +3,7 @@
 # Set defaults before parsing args
 TESTNET=testworld
 DOCKER_TAG=0.1.1-41db206
-AUTOMATION_PATHSPEC=$(git log -1 --pretty=format:%H)
+GIT_PATHSPEC=$(git log -1 --pretty=format:%H)
 CONFIG_FILE=/root/daemon.json
 CLOUD=false
 
@@ -17,8 +17,8 @@ while [ $# -gt 0 ]; do
     --docker-tag=*)
       DOCKER_TAG="${1#*=}"
       ;;
-    --automation-commit=*)
-      AUTOMATION_PATHSPEC="${1#*=}"
+    --commit=*)
+      GIT_PATHSPEC="${1#*=}"
       ;;
     --config-file=*)
       CONFIG_FILE="${1#*=}"
@@ -32,10 +32,10 @@ done
 
 echo Testnet is ${TESTNET}
 echo Initial Docker Image is codaprotocol/coda-daemon:${DOCKER_TAG}
-echo Coda Automation Pathspec is ${AUTOMATION_PATHSPEC}
+echo Mina Git Repo Pathspec is ${GIT_PATHSPEC}
 echo Config File Path is ${CONFIG_FILE}
 
-first7=$(echo ${AUTOMATION_PATHSPEC} | cut -c1-7)
+first7=$(echo ${GIT_PATHSPEC} | cut -c1-7)
 
 hub_baked_tag="codaprotocol/coda-daemon-baked:${DOCKER_TAG}-${TESTNET}-${first7}"
 gcr_baked_tag="gcr.io/o1labs-192920/coda-daemon-baked:${DOCKER_TAG}-${TESTNET}-${first7}"
@@ -54,7 +54,7 @@ then
   echo Building $gcr_baked_tag in the cloud
 
   gcloud builds submit --config=cloudbuild.yaml \
-  --substitutions=_BAKE_VERSION="$DOCKER_TAG",_COMMIT_HASH="$AUTOMATION_PATHSPEC",_TESTNET_NAME="$TESTNET",_CONFIG_FILE="$CONFIG_FILE",_GCR_BAKED_TAG="$gcr_baked_tag" .
+  --substitutions=_BAKE_VERSION="$DOCKER_TAG",_COMMIT_HASH="$GIT_PATHSPEC",_TESTNET_NAME="$TESTNET",_CONFIG_FILE="$CONFIG_FILE",_GCR_BAKED_TAG="$gcr_baked_tag" .
 
   exit 0
 fi
@@ -68,7 +68,7 @@ done
 cat Dockerfile | docker build --no-cache \
   -t "${hub_baked_tag}" \
   --build-arg "BAKE_VERSION=${DOCKER_TAG}" \
-  --build-arg "COMMIT_HASH=${AUTOMATION_PATHSPEC}" \
+  --build-arg "COMMIT_HASH=${GIT_PATHSPEC}" \
   --build-arg "TESTNET_NAME=${TESTNET}" \
   --build-arg "CONFIG_FILE=${CONFIG_FILE}" -
 
