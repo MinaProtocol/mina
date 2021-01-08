@@ -165,7 +165,7 @@ module Status = struct
     val get : 'a t -> 'a
   end) =
   struct
-    let map_entry ~f (name : string) field = Some (name, f @@ FieldT.get field)
+    let map_entry (name : string) ~f field = Some (name, f @@ FieldT.get field)
 
     let string_entry (name : string) (field : string FieldT.t) =
       map_entry ~f:Fn.id name field
@@ -182,11 +182,11 @@ module Status = struct
 
     let int_option_entry = option_entry ~f:Int.to_string
 
-    let list_entry name ~to_string =
-      map_entry name ~f:(fun keys ->
-          let len = List.length keys in
+    let list_string_entry name ~to_string =
+      map_entry name ~f:(fun list ->
+          let len = List.length list in
           let list_str =
-            if len > 0 then " " ^ List.to_string ~f:to_string keys else ""
+            if len > 0 then " " ^ List.to_string ~f:to_string list else ""
           in
           Printf.sprintf "%d%s" len list_str )
 
@@ -212,7 +212,19 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    let peers = list_entry "Peers" ~to_string:Fn.id
+    let peers field =
+      let render display_peer =
+        let open Network_peer.Peer in
+        of_display display_peer |> to_multiaddr_string
+      in
+      map_entry
+        (sprintf "Peers (%d)" (List.length @@ FieldT.get field))
+        ~f:(fun peers ->
+          List.mapi peers ~f:(fun i peer ->
+              let rendered = "\t" ^ render peer in
+              if i = 0 then "\n" ^ rendered else rendered )
+          |> String.concat ~sep:"\n" )
+        field
 
     let user_commands_sent = int_entry "User_commands sent"
 
@@ -224,7 +236,7 @@ module Status = struct
     let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
     let block_production_keys =
-      list_entry "Block producers running" ~to_string:Fn.id
+      list_string_entry "Block producers running" ~to_string:Fn.id
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -348,7 +360,7 @@ module Status = struct
     ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
-    ; peers: string list
+    ; peers: Network_peer.Peer.Display.Stable.Latest.t list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int

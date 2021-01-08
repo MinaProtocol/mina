@@ -1,10 +1,10 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib
-open Coda_transition
+open Mina_transition
 open O1trace
 open Network_peer
-open Coda_numbers
+open Mina_numbers
 
 type Structured_log_events.t += Starting_transition_frontier_controller
   [@@deriving
