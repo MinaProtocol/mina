@@ -618,7 +618,6 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              node.attempts
          | Remote peer ->
              Map.set node.attempts ~key:peer ~data:{failure_reason} ) ;
-      failwith "someone was bad :(" |> ignore ;
       set_state t node
         (To_download
            (Downloader.download downloader
