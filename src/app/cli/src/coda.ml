@@ -306,7 +306,7 @@ let setup_daemon logger =
       ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
   and log_precomputed_blocks =
     flag "log-precomputed-blocks"
-      (optional_with_default true bool)
+      (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
   and upload_blocks_to_gcloud =
     flag "upload-blocks-to-gcloud"
