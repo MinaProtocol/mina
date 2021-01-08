@@ -3,7 +3,7 @@
 # Set defaults before parsing args
 TESTNET=testworld
 DOCKER_TAG=0.1.1-41db206
-AUTOMATION_PATHSPEC=$(git log master -1 --pretty=format:%H)
+AUTOMATION_PATHSPEC=$(git log -1 --pretty=format:%H)
 CONFIG_FILE=/root/daemon.json
 CLOUD=false
 
