@@ -398,7 +398,13 @@ end = struct
                 |> ignore )
       | New_job new_job ->
           Hashtbl.iteri t.knowledge ~f:(fun ~key:p ~data:to_try ->
-              let useful_for_job = not (Map.mem new_job.attempts p) in
+              let useful_for_job =
+                match Map.find new_job.attempts p with
+                | None ->
+                    true
+                | Some a ->
+                    Attempt.worth_retrying a
+              in
               if useful_for_job then (
                 Hash_set.add to_try new_job.key ;
                 match Available_and_useful.find t.available_and_useful p with
@@ -509,7 +515,13 @@ end = struct
         kill_job t j ;
         Useful_peers.update t.useful_peers (Job_cancelled h)
 
-  let is_stalled t e = Set.for_all t.all_peers ~f:(Map.mem e.J.attempts)
+  let is_stalled t e =
+    Set.for_all t.all_peers ~f:(fun p ->
+        match Map.find e.J.attempts p with
+        | None ->
+            false
+        | Some a ->
+            not (Attempt.worth_retrying a) )
 
   let enqueue t e =
     if is_stalled t e then Q.enqueue t.stalled e else Q.enqueue t.pending e
