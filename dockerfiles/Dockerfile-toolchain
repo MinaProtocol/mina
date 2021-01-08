@@ -78,7 +78,6 @@ RUN /tmp/rust_install.sh -y
 RUN export PATH="$PATH:$HOME/.cargo/bin"
 RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
 
-
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
 RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
