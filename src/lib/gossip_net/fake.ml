@@ -220,9 +220,31 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let ban_notification_reader {ban_notification_reader; _} =
       ban_notification_reader
 
-    let query_peer ?timeout:_ t peer rpc query =
+    let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
         ~responder_id:peer rpc query
+
+    let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
+      let%map rs =
+        Deferred.List.map ?how qs
+          ~f:(query_peer ?timeout ?heartbeat_timeout t peer rpc)
+      in
+      with_return (fun {return} ->
+          let data =
+            List.map rs ~f:(function
+              | Connected x ->
+                  x.data
+              | Failed_to_connect e ->
+                  return (Mina_base.Rpc_intf.Failed_to_connect e) )
+            |> Or_error.all
+          in
+          let sender =
+            Option.value_exn
+              (Hashtbl.find t.peer_table peer)
+              ~error:
+                (Error.createf "failed to find peer %s in peer_table" peer)
+          in
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender) )
 
     let query_random_peers _ = failwith "TODO stub"
 
@@ -241,6 +263,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   type network = Network.t
 
   include Instance
+
+  let restart_helper (_ : t) = ()
 
   let create_network = Network.create
 
