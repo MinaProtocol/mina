@@ -202,6 +202,25 @@ locals {
         apt-get update -y && apt-get install helm -y --allow-unauthenticated
         cp --update --verbose $(which helm) "$${CI_SHARED_BIN}/helm"
       EOF
+
+      "03-gcloud-cluster-setup" = <<-EOF
+        #!/bin/bash
+
+        set -eou pipefail
+
+        declare -A k8s_cluster_mappings=(
+          ["coda-infra-east"]="us-east1"
+          ["coda-infra-east4"]="us-east4"
+          ["coda-infra-central1"]="us-central1"
+          ["mina-integration-west1"]="us-west1"
+        )
+        for cluster in "${!k8s_cluster_mappings[@]}"; do
+            gcloud container clusters get-credentials "${cluster}" --region "${k8s_cluster_mappings[$cluster]}"
+        done
+
+        # Set Kubernetes current context to specified ctx
+        kubectl config use-context ${var.k8s_context}
+      EOF
     }
   }
 }
