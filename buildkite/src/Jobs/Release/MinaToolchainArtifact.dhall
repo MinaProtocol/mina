@@ -45,7 +45,8 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.exactly "dockerfiles/Dockerfile-toolchain" ""
+          S.strictlyStart (S.contains "dockerfiles/Dockerfile-toolchain"),
+          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaToolchainArtifact")
         ],
         path = "Release",
         name = "MinaToolchainArtifact"
