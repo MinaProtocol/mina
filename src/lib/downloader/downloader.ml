@@ -24,6 +24,8 @@ end) (Attempt : sig
   type t [@@deriving to_yojson]
 
   val download : t
+
+  val worth_retrying : t -> bool
 end) (Result : sig
   type t
 
@@ -94,6 +96,10 @@ end = struct
       Option.map (Doubly_linked.remove_first t.queue) ~f:(fun {key; value} ->
           Hashtbl.remove t.table key ; value )
 
+    let clear t =
+      Hashtbl.clear t.table ;
+      Doubly_linked.clear t.queue
+
     let enqueue t (e : _ J.t) =
       if Hashtbl.mem t.table e.key then `Key_already_present
       else
@@ -111,6 +117,8 @@ end = struct
         in
         Hashtbl.set t.table ~key:e.key ~data:elt ;
         `Ok
+
+    let enqueue_exn t e = assert (enqueue t e = `Ok)
 
     let iter t ~f = Doubly_linked.iter t.queue ~f:(fun {value; _} -> f value)
 
@@ -161,11 +169,19 @@ end = struct
               Hashtbl.iteri tbl ~f:(fun ~key ~data -> return (Some (key, data))) ;
               None )
         in
-        match get t.preferred with
+        let rec go tbl =
+          match get tbl with
+          | None ->
+              None
+          | Some ((key, data) as r) ->
+              if Hash_set.is_empty data then ( Hashtbl.remove tbl key ; go tbl )
+              else Some r
+        in
+        match go t.preferred with
         | Some r ->
             Some r
         | None ->
-            get t.non_preferred
+            go t.non_preferred
 
       let find t p =
         match Hashtbl.find t.preferred p with
@@ -215,6 +231,35 @@ end = struct
           Strict_pipe.Writer.t
           sexp_opaque }
     [@@deriving sexp]
+
+    let reset_knowledge t ~all_peers ~preferred ~active_jobs =
+      (* Clear knowledge *)
+      Hashtbl.clear t.knowledge ;
+      (* Reset preferred *)
+      Hash_set.clear t.all_preferred ;
+      List.iter preferred ~f:(Hash_set.add t.all_preferred) ;
+      (* Clear availability state *)
+      Available_and_useful.clear t.available_and_useful ;
+      (* Reset availability state *)
+      Set.iter all_peers ~f:(fun p ->
+          let to_try =
+            let to_try = Key.Hash_set.create () in
+            List.iter active_jobs ~f:(fun (j : Job.t) ->
+                match Map.find j.attempts p with
+                | None ->
+                    Hash_set.add to_try j.key
+                | Some a ->
+                    if Attempt.worth_retrying a then Hash_set.add to_try j.key
+                    else () ) ;
+            to_try
+          in
+          Peer.Table.add t.knowledge ~key:p ~data:to_try |> ignore ;
+          if not (Hash_set.mem t.downloading_peers p) then
+            Available_and_useful.add t.available_and_useful p
+              (Hash_set.diff to_try t.downloading_keys)
+              ~preferred:(Hash_set.mem t.all_preferred p)
+            |> ignore ) ;
+      Strict_pipe.Writer.write t.w ()
 
     let to_yojson {knowledge; all_preferred; available_and_useful; _} =
       `Assoc
@@ -353,7 +398,13 @@ end = struct
                 |> ignore )
       | New_job new_job ->
           Hashtbl.iteri t.knowledge ~f:(fun ~key:p ~data:to_try ->
-              let useful_for_job = not (Map.mem new_job.attempts p) in
+              let useful_for_job =
+                match Map.find new_job.attempts p with
+                | None ->
+                    true
+                | Some a ->
+                    Attempt.worth_retrying a
+              in
               if useful_for_job then (
                 Hash_set.add to_try new_job.key ;
                 match Available_and_useful.find t.available_and_useful p with
@@ -389,6 +440,7 @@ end = struct
     ; get: Peer.t -> Key.t list -> Result.t list Deferred.Or_error.t
     ; peers: unit -> Peer.t list Deferred.t
     ; max_batch_size: int
+    ; preferred: Peer.t list
           (* A peer is useful if there is a job in the pending queue which has not
    been attempted with that peer. *)
     ; got_new_peers_w:
@@ -463,7 +515,13 @@ end = struct
         kill_job t j ;
         Useful_peers.update t.useful_peers (Job_cancelled h)
 
-  let is_stalled t e = Set.for_all t.all_peers ~f:(Map.mem e.J.attempts)
+  let is_stalled t e =
+    Set.for_all t.all_peers ~f:(fun p ->
+        match Map.find e.J.attempts p with
+        | None ->
+            false
+        | Some a ->
+            not (Attempt.worth_retrying a) )
 
   let enqueue t e =
     if is_stalled t e then Q.enqueue t.stalled e else Q.enqueue t.pending e
@@ -476,6 +534,10 @@ end = struct
     Q.iter t.stalled ~f:(fun j -> Hash_set.add res j.key) ;
     Hashtbl.iter_keys t.downloading ~f:(Hash_set.add res) ;
     res
+
+  let active_jobs t =
+    Q.to_list t.pending @ Q.to_list t.stalled
+    @ List.map (Hashtbl.data t.downloading) ~f:snd
 
   let refresh_peers t =
     let%map peers = t.peers () in
@@ -516,6 +578,7 @@ end = struct
         ; got_new_peers_r= _
         ; pending
         ; stalled
+        ; preferred= _
         ; downloading
         ; max_batch_size= _
         ; logger= _
@@ -536,8 +599,6 @@ end = struct
     Hashtbl.clear downloading ;
     clear_queue pending ;
     clear_queue stalled
-
-  let reader r = (Strict_pipe.Reader.to_linear_pipe r).pipe
 
   let download t peer xs =
     let keys = List.map xs ~f:(fun x -> x.J.key) in
@@ -653,6 +714,8 @@ end = struct
                    [ ("hash", Key.to_yojson h)
                    ; ("peer", `String (Peer.to_multiaddr_string p)) ] )) ) ]
 
+  let post_stall_retry_delay = Time.Span.of_min 1.
+
   let rec step t =
     [%log' debug t.logger] "Downloader: Mownload step"
       ~metadata:[("downloader", to_yojson t)] ;
@@ -665,19 +728,17 @@ end = struct
           [%log' debug t.logger] "Downloader: flush" ;
           step t )
     else if all_stalled t then (
-      [%log' debug t.logger] "Downloader: all stalled" ;
-      match%bind
-        choose
-          [ Pipe.read_choice_single_consumer_exn (reader t.flush_r) [%here]
-          ; Pipe.read_choice_single_consumer_exn (reader t.got_new_peers_r)
-              [%here] ]
-      with
-      | `Ok () ->
-          [%log' debug t.logger] "Downloader: keep going" ;
-          step t
-      | `Eof ->
-          [%log' debug t.logger] "Downloader: other eof" ;
-          Deferred.unit )
+      [%log' debug t.logger]
+        "Downloader: all stalled. Resetting knowledge, waiting %s and then \
+         retrying."
+        (Time.Span.to_string_hum post_stall_retry_delay) ;
+      Useful_peers.reset_knowledge t.useful_peers ~all_peers:t.all_peers
+        ~preferred:t.preferred ~active_jobs:(active_jobs t) ;
+      Q.iter t.stalled ~f:(Q.enqueue_exn t.pending) ;
+      Q.clear t.stalled ;
+      let%bind () = after post_stall_retry_delay in
+      [%log' debug t.logger] "Downloader: continuing after reset" ;
+      step t )
     else (
       [%log' debug t.logger] "Downloader: else"
         ~metadata:
@@ -771,6 +832,7 @@ end = struct
       ; got_new_peers_r
       ; got_new_peers_w
       ; useful_peers= Useful_peers.create ~all_peers ~preferred
+      ; preferred
       ; get
       ; peers
       ; max_batch_size
