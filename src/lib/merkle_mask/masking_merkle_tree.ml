@@ -118,7 +118,6 @@ module Make (Inputs : Inputs_intf.S) = struct
           ()
 
     let detached_signal t =
-      assert_is_attached t ;
       Async.Ivar.read t.detached_parent_signal
 
     let get_parent ({parent= opt; _} as t) =
