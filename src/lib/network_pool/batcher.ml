@@ -480,4 +480,3 @@ module Snark_pool = struct
                 run_test proof_lists ) )
     end )
 end
-
