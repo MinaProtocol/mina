@@ -1193,10 +1193,10 @@ workflows:
             - lint-opt
             - compare-test-signatures
             - client-sdk-unit-tests
-            - update-branch-protection:
-                filters:
-                  branches:
-                    only: develop
+            #- update-branch-protection:
+                #filters:
+                  #branches:
+                    #only: develop
             - tracetool
             - test-archive
             - build-archive
