@@ -26,6 +26,7 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
     ( (precomputed_values.genesis_constants.protocol.delta + 1)
       * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
+  |> Block_time.Span.min (Block_time.Span.of_ms (Int64.of_int 5000))
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
     =

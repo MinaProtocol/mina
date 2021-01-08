@@ -1193,14 +1193,14 @@ workflows:
             - lint-opt
             - compare-test-signatures
             - client-sdk-unit-tests
-            - update-branch-protection:
-                filters:
-                  branches:
-                    only:
-                    - develop
-                    - master
-                    - develop-until-4.1-hardfork
-                    - develop-until-adversarial
+            #- update-branch-protection:
+                #filters:
+                  #branches:
+                    #only:
+                    #- develop
+                    #- master
+                    #- develop-until-4.1-hardfork
+                    #- develop-until-adversarial
             - tracetool
             - test-archive
             - build-archive
