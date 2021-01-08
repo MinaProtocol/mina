@@ -3,7 +3,7 @@ open Async
 open Cli_lib
 
 module Graphql_block = struct
-  open Coda_base
+  open Mina_base
   open Coda_state
 
   let validation_callback =
@@ -68,6 +68,9 @@ module Graphql_block = struct
     let token_id x =
       Token_id.of_uint64 (Unsigned.UInt64.of_string (to_string x))
     in
+    let pubkey x =
+      Signature_lib.Public_key.Compressed.of_base58_check_exn (to_string x)
+    in
     let state_hash x = State_hash.of_base58_check_exn (to_string x) in
     let ledger_hash x = Ledger_hash.of_base58_check_exn (to_string x) in
     let curr_state_hash = state_hash (json -. "stateHash") in
@@ -80,6 +83,106 @@ module Graphql_block = struct
       ; ledger=
           { Epoch_ledger.Poly.hash= ledger_hash (x -. "ledger" -. "hash")
           ; total_currency= amount (x -. "ledger" -. "totalCurrency") } }
+    in
+    let creator = pubkey (json -. "creator") in
+    let ( (staged_ledger_diff : Staged_ledger_diff.t)
+        , transactions
+        , coinbase_receiver ) =
+      let txns = json -. "transactions" in
+      let coinbase_amount = amount (txns -. "coinbase") in
+      let diff : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t =
+        { Staged_ledger_diff.Pre_diff_two.completed_works= []
+        ; commands= []
+        ; coinbase= Staged_ledger_diff.At_most_two.Zero
+        ; internal_command_balances= [] }
+      in
+      let has_coinbase =
+        not (Currency.Amount.equal Currency.Amount.zero coinbase_amount)
+      in
+      let coinbase_receiver =
+        if has_coinbase then
+          pubkey (txns -. "coinbaseReceiverAccount" -. "publicKey")
+        else dummy_coinbase_receiver
+      in
+      let transactions =
+        let fts =
+          List.map
+            (to_list (txns -. "feeTransfer"))
+            ~f:(fun ft ->
+              Fee_transfer.Single.create ~fee_token:Token_id.default
+                ~receiver_pk:(pubkey (ft -. "recipient"))
+                ~fee:(fee (ft -. "fee")) )
+          |> One_or_two.group_list
+          |> List.map ~f:(fun x ->
+                 { Mina_base.With_status.data=
+                     Transaction.Fee_transfer
+                       (Or_error.ok_exn (Fee_transfer.of_singles x))
+                 ; status=
+                     Applied
+                       ( Transaction_status.Auxiliary_data.empty
+                       , Transaction_status.Balance_data.empty ) } )
+        in
+        let commands : Transaction.t With_status.t list =
+          List.map
+            (to_list (txns -. "userCommands"))
+            ~f:(fun x ->
+              ( let source = pubkey (x -. "source" -. "publicKey") in
+                let receiver = pubkey (x -. "receiver" -. "publicKey") in
+                let body =
+                  match to_string (x -. "kind") with
+                  | "PAYMENT" ->
+                      Signed_command_payload.Body.Payment
+                        { Payment_payload.Poly.source_pk= source
+                        ; receiver_pk= receiver
+                        ; amount= amount (x -. "amount")
+                        ; token_id= token_id (x -. "token") }
+                  | "STAKE_DELEGATION" ->
+                      Signed_command_payload.Body.Stake_delegation
+                        (Set_delegate
+                           { delegator= pubkey (x -. "delegator" -. "publicKey")
+                           ; new_delegate= receiver })
+                  | s ->
+                      failwithf "unknown kind: %s" s ()
+                in
+                { Mina_base.With_status.status=
+                    Applied
+                      ( Transaction_status.Auxiliary_data.empty
+                      , Transaction_status.Balance_data.empty )
+                ; data=
+                    Transaction.Command
+                      (User_command.Signed_command
+                         { Signed_command.Poly.payload=
+                             Signed_command_payload.create
+                               ~fee:(fee (x -. "fee"))
+                               ~fee_token:(token_id (x -. "feeToken"))
+                               ~fee_payer_pk:source
+                               ~nonce:
+                                 (Account.Nonce.of_int (to_int (x -. "nonce")))
+                               ~valid_until:None
+                               ~memo:
+                                 (Signed_command_memo.of_string
+                                    (to_string (x -. "memo")))
+                               ~body
+                         ; signer=
+                             Signature_lib.Public_key.decompress_exn source
+                         ; signature= Signature.dummy }) }
+                : Transaction.t With_status.t ) )
+        in
+        commands
+        @ ( if has_coinbase then
+            [ { Mina_base.With_status.status=
+                  Applied
+                    ( Transaction_status.Auxiliary_data.empty
+                    , Transaction_status.Balance_data.empty )
+              ; data=
+                  Transaction.Coinbase
+                    ( Coinbase.create ~amount:coinbase_amount
+                        ~receiver:coinbase_receiver ~fee_transfer:None
+                    |> Or_error.ok_exn ) } ]
+          else [] )
+        @ fts
+      in
+      ({Staged_ledger_diff.diff= (diff, None)}, transactions, coinbase_receiver)
     in
     let protocol_state : Protocol_state.Value.t =
       let p = json -. "protocolState" in
@@ -129,111 +232,17 @@ module Graphql_block = struct
                         Genesis_constants.Constraint_constants.compiled)
                  ( Consensus.Epoch.of_string (to_string (cs -. "epoch"))
                  , Consensus.Slot.of_string (to_string (cs -. "slot")) )
+           ; global_slot_since_genesis=
+               Coda_numbers.Global_slot.of_string
+                 (to_string (cs -. "slotSinceGenesis"))
            ; staking_epoch_data
            ; next_epoch_data
-           ; has_ancestor_in_same_checkpoint_window= false })
-    in
-    let (staged_ledger_diff : Staged_ledger_diff.t), transactions =
-      let pubkey x =
-        Signature_lib.Public_key.Compressed.of_base58_check_exn (to_string x)
-      in
-      let txns = json -. "transactions" in
-      let coinbase_amount = amount (txns -. "coinbase") in
-      let diff : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t =
-        { Staged_ledger_diff.Pre_diff_two.completed_works= []
-        ; commands= []
-        ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-      in
-      let has_coinbase =
-        not (Currency.Amount.equal Currency.Amount.zero coinbase_amount)
-      in
-      let coinbase_receiver =
-        if has_coinbase then
-          pubkey (txns -. "coinbaseReceiverAccount" -. "publicKey")
-        else dummy_coinbase_receiver
-      in
-      let transactions =
-        let fts =
-          List.map
-            (to_list (txns -. "feeTransfer"))
-            ~f:(fun ft ->
-              Fee_transfer.Single.create ~fee_token:Token_id.default
-                ~receiver_pk:(pubkey (ft -. "recipient"))
-                ~fee:(fee (ft -. "fee")) )
-          |> One_or_two.group_list
-          |> List.map ~f:(fun x ->
-                 { Coda_base.With_status.data=
-                     Transaction.Fee_transfer
-                       (Or_error.ok_exn (Fee_transfer.of_singles x))
-                 ; status= Applied User_command_status.Auxiliary_data.empty }
-             )
-        in
-        let commands : Transaction.t With_status.t list =
-          List.map
-            (to_list (txns -. "userCommands"))
-            ~f:(fun x ->
-              ( let source = pubkey (x -. "source" -. "publicKey") in
-                let receiver = pubkey (x -. "receiver" -. "publicKey") in
-                let body =
-                  match to_string (x -. "kind") with
-                  | "PAYMENT" ->
-                      Signed_command_payload.Body.Payment
-                        { Payment_payload.Poly.source_pk= source
-                        ; receiver_pk= receiver
-                        ; amount= amount (x -. "amount")
-                        ; token_id= token_id (x -. "token") }
-                  | "STAKE_DELEGATION" ->
-                      Signed_command_payload.Body.Stake_delegation
-                        (Set_delegate
-                           { delegator= pubkey (x -. "delegator" -. "publicKey")
-                           ; new_delegate= receiver })
-                  | s ->
-                      failwithf "unknown kind: %s" s ()
-                in
-                { Coda_base.With_status.status=
-                    Applied User_command_status.Auxiliary_data.empty
-                ; data=
-                    Transaction.Command
-                      (User_command.Signed_command
-                         { Signed_command.Poly.payload=
-                             Signed_command_payload.create
-                               ~fee:(fee (x -. "fee"))
-                               ~fee_token:(token_id (x -. "feeToken"))
-                               ~fee_payer_pk:source
-                               ~nonce:
-                                 (Account.Nonce.of_int (to_int (x -. "nonce")))
-                               ~valid_until:None
-                               ~memo:
-                                 (Signed_command_memo.of_string
-                                    (to_string (x -. "memo")))
-                               ~body
-                         ; signer=
-                             Signature_lib.Public_key.decompress_exn source
-                         ; signature= Signature.dummy }) }
-                : Transaction.t With_status.t ) )
-        in
-        commands
-        @ ( if has_coinbase then
-            [ { Coda_base.With_status.status=
-                  Applied User_command_status.Auxiliary_data.empty
-              ; data=
-                  Transaction.Coinbase
-                    ( Coinbase.create ~amount:coinbase_amount
-                        ~receiver:coinbase_receiver ~fee_transfer:None
-                    |> Or_error.ok_exn ) } ]
-          else [] )
-        @ fts
-      in
-      ( { Staged_ledger_diff.creator= pubkey (json -. "creator")
-        ; diff= (diff, None)
-        ; coinbase_receiver
-        ; supercharge_coinbase=
-            ( if
-              Currency.Amount.equal coinbase_amount
-                Genesis_constants.Constraint_constants.compiled.coinbase_amount
-            then false
-            else true ) }
-      , transactions )
+           ; has_ancestor_in_same_checkpoint_window= false
+           ; block_stake_winner=
+               coinbase_receiver (*not present in block data*)
+           ; block_creator= creator
+           ; coinbase_receiver
+           ; supercharge_coinbase= false (*not in the json/schema*) })
     in
     ( Coda_transition.External_transition.create ~protocol_state
         ~staged_ledger_diff ~protocol_state_proof ~delta_transition_chain_proof
@@ -276,7 +285,7 @@ module Best_tip_diff_log = struct
         (List.map
            ~f:(fun {protocol_state; state_hash; just_emitted_a_proof= _} ->
              (state_hash, protocol_state) ))
-    |> Coda_base.State_hash.Map.of_alist_reduce ~f:Fn.const
+    |> Mina_base.State_hash.Map.of_alist_reduce ~f:Fn.const
 end
 
 let deferred_result_map xs ~f =
@@ -290,10 +299,10 @@ let deferred_result_map xs ~f =
   in
   go [] xs
 
-open Coda_base
+open Mina_base
 
 let recover_main () =
-  let best_tip_logs =
+  (*let best_tip_logs =
     [ "frontend/archive-node-blocks/recover/best_tip_logs__2020-11-23T09-18.json"
     ; "frontend/archive-node-blocks/recover/missing-best-tip-logs-2020-11-19T02-16.json"
     ; "frontend/archive-node-blocks/recover/downloaded-logs-20201212-210358.json"
@@ -307,11 +316,12 @@ let recover_main () =
     Deferred.List.concat_map ~f:Best_tip_diff_log.of_file best_tip_logs
     >>| List.map ~f:Best_tip_diff_log.extract_protocol_states
     >>| List.reduce_exn ~f:(fun x y ->
-            Map.merge x y ~f:(fun ~key t ->
+            Map.merge x y ~f:(fun ~key:_ t ->
                 match t with `Both (x, _) | `Left x | `Right x -> Some x ) )
-  in
+  in*)
+  let states = State_hash.Map.empty in
   let%bind bs =
-    let path = "blocks/blocks.json" in
+    let path = "/home/o1labs/Downloads/blocks2.json" in
     let%map s = Reader.file_contents path in
     List.filter_map
       ~f:(fun x -> try Some (Graphql_block.read_one states x) with _ -> None)
@@ -326,7 +336,7 @@ let recover_main () =
     in
     let children =
       State_hash.Table.of_alist_multi
-        (List.map bs ~f:(fun (b, ts) ->
+        (List.map bs ~f:(fun (b, _ts) ->
              (Coda_transition.External_transition.parent_hash b.data, b.hash)
          ))
     in
@@ -355,13 +365,13 @@ let recover_main () =
   let%bind res =
     let open Deferred.Result.Let_syntax in
     let postgres =
-      Uri.of_string "postgres://postgres:codarules@0.0.0.0:5432/archivedb"
+      Uri.of_string "postgres://o1labs:o1labs@127.0.0.1:5432/testworld_archive"
     in
     let%bind ((module Conn) as conn) = Caqti_async.connect postgres in
     Core.printf "yo: %d\n%!" (List.length bs) ;
     let%bind () = Conn.start () in
     match%bind.Async
-      let%bind xs =
+      let%bind _xs =
         let i = ref 0 in
         deferred_result_map bs ~f:(fun (b, ts) ->
             Core.printf "yo: %d\n%!" !i ;
@@ -379,7 +389,7 @@ let recover_main () =
         let%bind.Async _ = Conn.rollback () in
         Deferred.Result.fail err
   in
-  Result.map_error res (fun e -> Caqti_error.Exn e) |> Result.ok_exn ;
+  Result.map_error res ~f:(fun e -> Caqti_error.Exn e) |> Result.ok_exn ;
   Core.print_endline "cool" ;
   Deferred.return ()
 
