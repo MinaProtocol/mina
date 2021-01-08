@@ -210,7 +210,7 @@ module T = struct
   let scan_state {scan_state; _} = scan_state
 
   let all_work_pairs t
-      ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+      ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       =
     Scan_state.all_work_pairs t.scan_state ~get_state
 
@@ -330,7 +330,7 @@ module T = struct
           let%bind.Or_error.Let_syntax txn_with_info =
             Ledger.apply_transaction ~constraint_constants
               ~txn_state_view:
-                (Coda_state.Protocol_state.Body.view protocol_state.body)
+                (Mina_state.Protocol_state.Body.view protocol_state.body)
               snarked_ledger tx.data
           in
           let computed_status =
@@ -1963,7 +1963,7 @@ let%test_module "test" =
       (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
 
     let dummy_state_view
-        ?(global_slot_since_genesis = Coda_numbers.Global_slot.zero) () =
+        ?(global_slot_since_genesis = Mina_numbers.Global_slot.zero) () =
       let state_body =
         let consensus_constants =
           let genesis_constants = Genesis_constants.for_unit_tests in
@@ -1972,14 +1972,14 @@ let%test_module "test" =
         in
         let compile_time_genesis =
           (*not using Precomputed_values.for_unit_test because of dependency cycle*)
-          Coda_state.Genesis_protocol_state.t
+          Mina_state.Genesis_protocol_state.t
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
         in
-        compile_time_genesis.data |> Coda_state.Protocol_state.body
+        compile_time_genesis.data |> Mina_state.Protocol_state.body
       in
-      { (Coda_state.Protocol_state.Body.view state_body) with
+      { (Mina_state.Protocol_state.Body.view state_body) with
         global_slot_since_genesis }
 
     let create_and_apply ?(coinbase_receiver = coinbase_receiver)
@@ -3099,9 +3099,9 @@ let%test_module "test" =
       let acc =
         Account.create_timed account_id balance
           ~initial_minimum_balance:balance
-          ~cliff_time:(Coda_numbers.Global_slot.of_int 4)
+          ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
           ~cliff_amount:Amount.zero
-          ~vesting_period:(Coda_numbers.Global_slot.of_int 2)
+          ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
           ~vesting_increment:(Amount.of_int 50_000_000_000)
         |> Or_error.ok_exn
       in
@@ -3148,7 +3148,7 @@ let%test_module "test" =
               ~current_state_view:
                 (dummy_state_view
                    ~global_slot_since_genesis:
-                     (Coda_numbers.Global_slot.of_int block_count)
+                     (Mina_numbers.Global_slot.of_int block_count)
                    ())
               ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
               Sequence.empty

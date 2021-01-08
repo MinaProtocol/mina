@@ -21,15 +21,15 @@ end)
       | Local of
           (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
            -> unit)
-      | External of Coda_net2.Validation_callback.t
+      | External of Mina_net2.Validation_callback.t
 
     let is_expired = function
       | Local _ ->
           false
       | External cb ->
-          Coda_net2.Validation_callback.is_expired cb
+          Mina_net2.Validation_callback.is_expired cb
 
-    open Coda_net2.Validation_callback
+    open Mina_net2.Validation_callback
 
     let error err =
       Fn.compose Deferred.return (function

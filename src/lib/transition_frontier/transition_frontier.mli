@@ -113,7 +113,7 @@ module For_tests : sig
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
                             * ( Mina_base.State_hash.t
-                              * Coda_state.Protocol_state.value )
+                              * Mina_state.Protocol_state.value )
                               list )
                             Quickcheck.Generator.t
     -> max_length:int
@@ -131,7 +131,7 @@ module For_tests : sig
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:( Breadcrumb.t
                             * ( Mina_base.State_hash.t
-                              * Coda_state.Protocol_state.value )
+                              * Mina_state.Protocol_state.value )
                               list )
                             Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
