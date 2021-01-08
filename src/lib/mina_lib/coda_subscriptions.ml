@@ -199,7 +199,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      [Yojson.Safe.to_string (Lazy.force precomputed_block)] )
            ) ;
            Option.iter log ~f:(fun `Log ->
-               [%log trace] "Saw block $precomputed_block"
+               [%log info] "Saw block $precomputed_block"
                  ~metadata:[("precomputed_block", Lazy.force precomputed_block)]
            )) ;
           match
