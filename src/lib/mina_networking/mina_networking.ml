@@ -1414,7 +1414,7 @@ module Sl_downloader = struct
   include Downloader.Make
             (Key)
             (struct
-              type t = unit
+              type t = unit [@@deriving to_yojson]
 
               let download : t = ()
             end)
@@ -1534,6 +1534,7 @@ let glue_sync_ledger :
       ~get:(fun peer qs ->
         let%map rs =
           query_peer' ~how:`Parallel
+            ~heartbeat_timeout:(Time_ns.Span.of_sec 20.)
             ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
             t peer.peer_id Rpcs.Answer_sync_ledger_query qs
         in
