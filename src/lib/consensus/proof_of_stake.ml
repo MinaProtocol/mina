@@ -1846,6 +1846,8 @@ module Data = struct
     module Value = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t =
             ( Length.Stable.V1.t
@@ -1863,6 +1865,21 @@ module Data = struct
           let to_latest = Fn.id
         end
       end]
+
+      type t =
+        ( Length.t
+        , Vrf.Output.Truncated.t
+        , Amount.t
+        , Global_slot.t
+        , Mina_numbers.Global_slot.t
+        , Mina_base.Epoch_data.Value.t
+        , Mina_base.Epoch_data.Value.t
+        , bool
+        , Public_key.Compressed.t )
+        Poly.t
+      [@@deriving sexp, eq, compare, hash, yojson]
+
+      type _unused = () constraint t = Stable.Latest.t
 
       module For_tests = struct
         let with_global_slot_since_genesis (state : t) slot_number =
@@ -2493,6 +2510,29 @@ module Data = struct
           else t.epoch_count
         in
         {t with epoch_count= new_epoch_count; curr_global_slot= new_global_slot}
+
+      let create_value `I_have_an_excellent_reason_to_call_this
+          ~blockchain_length ~epoch_count ~min_window_density
+          ~sub_window_densities ~last_vrf_output ~total_currency
+          ~curr_global_slot ~global_slot_since_genesis ~staking_epoch_data
+          ~next_epoch_data ~has_ancestor_in_same_checkpoint_window
+          ~block_stake_winner ~block_creator ~coinbase_receiver
+          ~supercharge_coinbase : Value.t =
+        { Poly.blockchain_length
+        ; epoch_count
+        ; min_window_density
+        ; sub_window_densities
+        ; last_vrf_output
+        ; curr_global_slot
+        ; global_slot_since_genesis
+        ; total_currency
+        ; staking_epoch_data
+        ; next_epoch_data
+        ; has_ancestor_in_same_checkpoint_window
+        ; block_stake_winner
+        ; block_creator
+        ; coinbase_receiver
+        ; supercharge_coinbase }
     end
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
