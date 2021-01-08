@@ -246,7 +246,7 @@ let fill_in_internal_command pool block_state_hash =
               cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
-let main ~archive_uri ~output_file ~state_hash () =
+let main ~archive_uri ~state_hash () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
   (* sanity-check input state hash *)
@@ -324,16 +324,23 @@ let main ~archive_uri ~output_file ~state_hash () =
                     [("state_hash", State_hash.to_yojson block.state_hash)] ;
                 Core.exit 1 )
       in
-      let blocks =
-        List.map extensional_blocks
-          ~f:(Block.block_of_extensional_block user_cmds_tbl internal_cmds_tbl)
+      [%log info] "Writing blocks" ;
+      let%map () =
+        Deferred.List.iter extensional_blocks ~f:(fun block ->
+            let precomputed_block =
+              Block.precomputed_block_of_extensional_block user_cmds_tbl
+                internal_cmds_tbl block
+            in
+            [%log info] "Writing block with $state_hash"
+              ~metadata:[("state_hash", State_hash.to_yojson block.state_hash)] ;
+            let output_file =
+              State_hash.to_string block.state_hash ^ ".json"
+            in
+            let%map writer = Async_unix.Writer.open_file output_file in
+            Async.fprintf writer "%s\n%!"
+              ( Block.to_yojson precomputed_block
+              |> Yojson.Safe.pretty_to_string ) )
       in
-      [%log info] "Writing blocks to $output_file"
-        ~metadata:[("output_file", `String output_file)] ;
-      let%map writer = Async_unix.Writer.open_file output_file in
-      List.iter blocks ~f:(fun block ->
-          Async.fprintf writer "%s\n%!"
-            (Block.to_yojson block |> Yojson.Safe.to_string) ) ;
       ()
 
 let () =
@@ -350,10 +357,6 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER:$USER@localhost:5432/archiver)"
              Param.(required string)
-         and output_file =
-           Param.flag "--output-file"
-             ~doc:"Output file for the blocks, in JSON format"
-             Param.(required string)
          and state_hash =
            Param.flag "--state-hash"
              ~doc:
@@ -361,4 +364,4 @@ let () =
                 block"
              Param.(required string)
          in
-         main ~archive_uri ~output_file ~state_hash)))
+         main ~archive_uri ~state_hash)))

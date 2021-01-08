@@ -11,6 +11,8 @@
    archive_lib
    block_time
    mina_numbers
+   mina_state
+   mina_transition
    logger
    mina_base)
  (preprocessor_deps ../../config.mlh)

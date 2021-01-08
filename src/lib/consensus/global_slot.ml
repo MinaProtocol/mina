@@ -50,6 +50,10 @@ let create ~(constants : Constants.t) ~(epoch : Epoch.t) ~(slot : Slot.t) : t =
   { slot_number= UInt32.Infix.(slot + (constants.slots_per_epoch * epoch))
   ; slots_per_epoch= constants.slots_per_epoch }
 
+let create_with_slot_number ~(constants : Constants.t) ~(slot_number : Slot.t)
+    : t =
+  {slot_number; slots_per_epoch= constants.slots_per_epoch}
+
 let of_epoch_and_slot ~(constants : Constants.t) (epoch, slot) =
   create ~epoch ~slot ~constants
 

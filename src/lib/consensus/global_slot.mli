@@ -39,6 +39,8 @@ val succ : t -> t
 
 val create : constants:Constants.t -> epoch:Epoch.t -> slot:Slot.t -> t
 
+val create_with_slot_number : constants:Constants.t -> slot_number:Slot.t -> t
+
 val of_epoch_and_slot : constants:Constants.t -> Epoch.t * Slot.t -> t
 
 val zero : constants:Constants.t -> t
