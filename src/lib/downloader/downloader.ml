@@ -798,4 +798,3 @@ end = struct
         Useful_peers.update t.useful_peers (New_job e) ;
         e
 end
-
