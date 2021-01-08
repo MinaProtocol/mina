@@ -194,10 +194,10 @@ end = struct
             not (Hash_set.is_empty to_try) )
 
       let add t ~preferred p v =
-        if Hash_set.is_empty v then ()
+        if Hash_set.is_empty v then `Ok
         else
           let s = if preferred then t.preferred else t.non_preferred in
-          Hashtbl.add_exn s ~key:p ~data:v
+          Hashtbl.add s ~key:p ~data:v
     end
 
     type t =
@@ -238,9 +238,11 @@ end = struct
       let available_and_useful = Available_and_useful.create () in
       let preferred = Peer.Hash_set.of_list preferred in
       List.iter all_peers ~f:(fun p ->
-          Peer.Table.add_exn knowledge ~key:p ~data:(Key.Hash_set.create ()) ;
+          Peer.Table.add knowledge ~key:p ~data:(Key.Hash_set.create ())
+          |> ignore ;
           Available_and_useful.add available_and_useful p
-            (Key.Hash_set.create ()) ~preferred:(Hash_set.mem preferred p) ) ;
+            (Key.Hash_set.create ()) ~preferred:(Hash_set.mem preferred p)
+          |> ignore ) ;
       let r, w =
         Strict_pipe.create ~name:"useful_peers-available"
           (Buffered (`Capacity 0, `Overflow Drop_head))
@@ -320,7 +322,8 @@ end = struct
               List.iter unsuccs ~f:(Hash_set.remove to_try) ;
               let s = Hash_set.diff to_try t.downloading_keys in
               Available_and_useful.add t.available_and_useful peer0 s
-                ~preferred:(Hash_set.mem t.all_preferred peer0) ) ;
+                ~preferred:(Hash_set.mem t.all_preferred peer0)
+              |> ignore ) ;
           (* Update the things in "available_and_useful" with the jobs that are now available. *)
           (* Move things over from "t.knowledge" into available_and_useful if they are now available and useful *)
           Hashtbl.iteri t.knowledge ~f:(fun ~key:peer ~data:to_try ->
@@ -334,18 +337,20 @@ end = struct
                 | None ->
                     let s = Hash_set.diff to_try t.downloading_keys in
                     Available_and_useful.add t.available_and_useful peer s
-                      ~preferred:(Hash_set.mem t.all_preferred peer) )
+                      ~preferred:(Hash_set.mem t.all_preferred peer)
+                    |> ignore )
       | Refreshed_peers {all_peers; active_jobs} ->
           Available_and_useful.filter_keys_inplace t.available_and_useful
             ~f:(Set.mem all_peers) ;
           Hashtbl.filter_keys_inplace t.knowledge ~f:(Set.mem all_peers) ;
           Set.iter all_peers ~f:(fun p ->
-              if not (Hashtbl.mem t.knowledge p) then (
-                Hashtbl.add_exn t.knowledge ~key:p
-                  ~data:(Hash_set.copy active_jobs) ;
-                Available_and_useful.add t.available_and_useful p
-                  (Hash_set.diff active_jobs t.downloading_keys)
-                  ~preferred:(Hash_set.mem t.all_preferred p) ) )
+              if not (Hashtbl.mem t.knowledge p) then
+                ( Hashtbl.add_exn t.knowledge ~key:p
+                    ~data:(Hash_set.copy active_jobs) ;
+                  Available_and_useful.add t.available_and_useful p
+                    (Hash_set.diff active_jobs t.downloading_keys)
+                    ~preferred:(Hash_set.mem t.all_preferred p) )
+                |> ignore )
       | New_job new_job ->
           Hashtbl.iteri t.knowledge ~f:(fun ~key:p ~data:to_try ->
               let useful_for_job = not (Map.mem new_job.attempts p) in
@@ -358,7 +363,8 @@ end = struct
                     if not (Hash_set.mem t.downloading_peers p) then
                       let s = Hash_set.diff to_try t.downloading_keys in
                       Available_and_useful.add t.available_and_useful p s
-                        ~preferred:(Hash_set.mem t.all_preferred p) ) )
+                        ~preferred:(Hash_set.mem t.all_preferred p)
+                      |> ignore ) )
 
     let update t u : unit =
       update t u ;
@@ -552,7 +558,7 @@ end = struct
       flush_soon t
     in
     List.iter xs ~f:(fun x ->
-        Hashtbl.add_exn t.downloading ~key:x.key ~data:(peer, x) ) ;
+        Hashtbl.set t.downloading ~key:x.key ~data:(peer, x) ) ;
     Useful_peers.update t.useful_peers (Download_starting (peer, keys)) ;
     let download_deferred = t.get peer keys in
     upon download_deferred (fun res ->
