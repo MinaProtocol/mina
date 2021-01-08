@@ -62,7 +62,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; subscription:
-          Message.msg Mina_net2.Pubsub.Subscription.t Deferred.t ref }
+          Message.msg Mina_net2.Pubsub.Subscription.t Deferred.t ref
+      ; restart_helper: unit -> unit }
 
     let create_rpc_implementations
         (Rpc_handler {rpc; f= handler; cost; budget}) =
@@ -416,6 +417,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       in
       let net2_ref = ref (Deferred.never ()) in
       let subscription_ref = ref (Deferred.never ()) in
+      let restarts_r, restarts_w =
+        Strict_pipe.create ~name:"libp2p-restarts"
+          (Strict_pipe.Buffered (`Capacity 0, `Overflow Strict_pipe.Drop_head))
+      in
       let%bind () =
         let rec on_libp2p_create res =
           net2_ref :=
@@ -464,6 +469,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             high_connectivity_ivar ~on_unexpected_termination
         in
         on_libp2p_create res ;
+        don't_wait_for
+          (Strict_pipe.Reader.iter restarts_r ~f:(fun () ->
+               let%bind n = !net2_ref in
+               let%bind () = Mina_net2.shutdown n in
+               let%bind () = on_unexpected_termination () in
+               !net2_ref >>| ignore )) ;
         let%map _ = res in
         ()
       in
@@ -513,7 +524,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; high_connectivity_ivar
       ; subscription= subscription_ref
       ; message_reader
-      ; ban_reader }
+      ; ban_reader
+      ; restart_helper= (fun () -> Strict_pipe.Writer.write restarts_w ()) }
 
     let peers t = !(t.net2) >>= Mina_net2.peers
 
@@ -538,7 +550,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         n
 
     let try_call_rpc_with_dispatch : type r q.
-           ?timeout:Time.Span.t
+           ?heartbeat_timeout:Time_ns.Span.t
+        -> ?timeout:Time.Span.t
         -> rpc_name:string
         -> t
         -> Peer.t
@@ -546,7 +559,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> (r, q) dispatch
         -> r
         -> q Deferred.Or_error.t =
-     fun ?timeout ~rpc_name t peer transport dispatch query ->
+     fun ?heartbeat_timeout ?timeout ~rpc_name t peer transport dispatch query ->
       let call () =
         Monitor.try_with (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
@@ -554,7 +567,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               ~heartbeat_config:
                 (Async_rpc_kernel.Rpc.Connection.Heartbeat_config.create
                    ~send_every:(Time_ns.Span.of_sec 10.)
-                   ~timeout:(Time_ns.Span.of_sec 120.))
+                   ~timeout:
+                     (Option.value ~default:(Time_ns.Span.of_sec 120.)
+                        heartbeat_timeout))
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
@@ -645,19 +660,21 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       call ()
 
     let try_call_rpc : type q r.
-           ?timeout:Time.Span.t
+           ?heartbeat_timeout:Time_ns.Span.t
+        -> ?timeout:Time.Span.t
         -> t
         -> Peer.t
         -> _
         -> (q, r) rpc
         -> q
         -> r Deferred.Or_error.t =
-     fun ?timeout t peer transport rpc query ->
+     fun ?heartbeat_timeout ?timeout t peer transport rpc query ->
       let (module Impl) = implementation_of_rpc rpc in
-      try_call_rpc_with_dispatch ?timeout ~rpc_name:Impl.name t peer transport
-        Impl.dispatch_multi query
+      try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
+        ~rpc_name:Impl.name t peer transport Impl.dispatch_multi query
 
-    let query_peer ?timeout t (peer_id : Peer.Id.t) rpc rpc_input =
+    let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
+        rpc_input =
       let%bind net2 = !(t.net2) in
       match%bind
         Mina_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
@@ -665,7 +682,29 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       | Ok stream ->
           let peer = Mina_net2.Stream.remote_peer stream in
           let transport = prepare_stream_transport stream in
-          try_call_rpc ?timeout t peer transport rpc rpc_input
+          try_call_rpc ?heartbeat_timeout ?timeout t peer transport rpc
+            rpc_input
+          >>| fun data ->
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
+      | Error e ->
+          return (Failed_to_connect e)
+
+    let query_peer' (type q r) ?how ?heartbeat_timeout ?timeout t
+        (peer_id : Peer.Id.t) (rpc : (q, r) rpc) (qs : q list) =
+      let%bind net2 = !(t.net2) in
+      match%bind
+        Mina_net2.open_stream net2 ~protocol:rpc_transport_proto peer_id
+      with
+      | Ok stream ->
+          let peer = Mina_net2.Stream.remote_peer stream in
+          let transport = prepare_stream_transport stream in
+          let (module Impl) = implementation_of_rpc rpc in
+          try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
+            ~rpc_name:Impl.name t peer transport
+            (fun conn qs ->
+              Deferred.Or_error.List.map ?how qs ~f:(fun q ->
+                  Impl.dispatch_multi conn q ) )
+            qs
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->
@@ -704,6 +743,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let set_connection_gating t config =
       let%bind net2 = !(t.net2) in
       Mina_net2.set_connection_gating_config net2 config
+
+    let restart_helper t = t.restart_helper ()
   end
 
   include T
