@@ -18,6 +18,8 @@ RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/auto
 
 RUN head ${CONFIG_FILE}
 
+RUN echo "{}" > /root/.coda-config/daemon.json
+
 RUN coda daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
   mv ~/.coda-config/genesis/genesis_* /var/lib/coda/
 
