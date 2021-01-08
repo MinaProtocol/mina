@@ -1,6 +1,6 @@
 open Mina_base
 open Core
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 (* Cache represents a graph. The key is a State_hash, which is the node in

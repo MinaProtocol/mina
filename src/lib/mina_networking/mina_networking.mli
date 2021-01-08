@@ -1,7 +1,7 @@
 open Async
 open Core
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Network_pool
 open Pipe_lib
 open Network_peer
@@ -32,7 +32,7 @@ module Rpcs : sig
       ( Staged_ledger.Scan_state.t
       * Ledger_hash.t
       * Pending_coinbase.t
-      * Coda_state.Protocol_state.value list )
+      * Mina_state.Protocol_state.value list )
       option
   end
 
@@ -170,7 +170,7 @@ val states :
      t
   -> ( External_transition.t Envelope.Incoming.t
      * Block_time.t
-     * Coda_net2.Validation_callback.t )
+     * Mina_net2.Validation_callback.t )
      Strict_pipe.Reader.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
@@ -230,7 +230,7 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
   -> ( Staged_ledger.Scan_state.t
      * Ledger_hash.t
      * Pending_coinbase.t
-     * Coda_state.Protocol_state.value list )
+     * Mina_state.Protocol_state.value list )
      Deferred.Or_error.t
 
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
@@ -238,13 +238,13 @@ val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 val snark_pool_diffs :
      t
   -> ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * Coda_net2.Validation_callback.t )
+     * Mina_net2.Validation_callback.t )
      Strict_pipe.Reader.t
 
 val transaction_pool_diffs :
      t
   -> ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     * Coda_net2.Validation_callback.t )
+     * Mina_net2.Validation_callback.t )
      Strict_pipe.Reader.t
 
 val broadcast_state :
@@ -279,12 +279,12 @@ val restart_helper : t -> unit
 val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
 
-val initial_peers : t -> Coda_net2.Multiaddr.t list
+val initial_peers : t -> Mina_net2.Multiaddr.t list
 
-val connection_gating_config : t -> Coda_net2.connection_gating Deferred.t
+val connection_gating_config : t -> Mina_net2.connection_gating Deferred.t
 
 val set_connection_gating_config :
-  t -> Coda_net2.connection_gating -> Coda_net2.connection_gating Deferred.t
+  t -> Mina_net2.connection_gating -> Mina_net2.connection_gating Deferred.t
 
 val ban_notification_reader :
   t -> Gossip_net.ban_notification Linear_pipe.Reader.t

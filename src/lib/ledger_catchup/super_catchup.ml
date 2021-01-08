@@ -2,9 +2,9 @@ open Core
 open Async
 open Cache_lib
 open Pipe_lib
-open Coda_numbers
+open Mina_numbers
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
