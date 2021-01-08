@@ -93,7 +93,7 @@ let rec determine_outcome : type p r partial.
             (List.map xs ~f:(fun (_e, new_hint) ->
                  `Partially_validated new_hint ))
         in
-        determine_outcome (List.map xs ~f:(fun (e, _hint) -> e)) res_xs v
+        determine_outcome (List.map xs ~f:fst) res_xs v
       in
       let length = List.length potentially_invalid in
       let left, right = List.split_n potentially_invalid (length / 2) in

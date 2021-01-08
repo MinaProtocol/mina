@@ -1,7 +1,6 @@
 open Core
 open Async
 open Cache_lib
-open Pipe_lib
 open Mina_base
 open Coda_transition
 open Network_peer
@@ -123,7 +122,7 @@ type t =
 (* mutable root: Node.t ; *)
 (*     ; mutable target: State_hash.t Envelope.Incoming.t (* So that we know who to punish if the process fails *) *)
 
-let tear_down {nodes; states} =
+let tear_down {nodes; states; _} =
   Hashtbl.iter nodes ~f:(fun x ->
       match x.state with
       | Root _ | Failed | Finished _ ->
@@ -186,7 +185,7 @@ let max_catchup_chain_length (t : t) =
         Hashtbl.set lengths ~key:node.state_hash ~data:n ;
         n
   in
-  Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key ~data acc ->
+  Hashtbl.fold t.nodes ~init:0 ~f:(fun ~key:_ ~data acc ->
       Int.max acc (longest_starting_at data) )
 
 let create_node_full t b : unit =
@@ -259,7 +258,7 @@ let prune t ~root_hash =
               reachable_from_root parent )
   in
   let to_remove =
-    Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key ~data acc ->
+    Hashtbl.fold t.nodes ~init:[] ~f:(fun ~key:_ ~data acc ->
         if reachable_from_root data then acc else data :: acc )
   in
   List.iter to_remove ~f:(remove_node' t)
