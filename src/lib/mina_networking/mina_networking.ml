@@ -1417,6 +1417,8 @@ module Sl_downloader = struct
               type t = unit [@@deriving to_yojson]
 
               let download : t = ()
+
+              let worth_retrying () = true
             end)
             (struct
               type t =

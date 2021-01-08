@@ -493,6 +493,9 @@ module Downloader = struct
               include Attempt_history.Attempt
 
               let download : t = {failure_reason= `Download}
+
+              let worth_retrying (t : t) =
+                match t.failure_reason with `Download -> true | _ -> false
             end)
             (struct
               type t = External_transition.t
