@@ -114,11 +114,11 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
             new_block
-            |> Coda_transition.External_transition.Validated.state_hash
+            |> Mina_transition.External_transition.Validated.state_hash
           in
           (let path, log = !precomputed_block_writer in
            let precomputed_block =
-             let open Coda_transition in
+             let open Mina_transition in
              lazy
                (let scheduled_time = Block_time.now time_controller in
                 let precomputed_block =

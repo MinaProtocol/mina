@@ -1,5 +1,5 @@
 open Mina_base
-open Coda_transition
+open Mina_transition
 
 type elt =
   ( External_transition.Initial_validated.t
