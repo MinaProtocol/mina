@@ -209,13 +209,16 @@ val get_best_tip :
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
-     t
+     ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> State_hash.t
   -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
 
 val get_transition_chain :
-     t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
   -> External_transition.t list Deferred.Or_error.t
@@ -254,6 +257,7 @@ val broadcast_transaction_pool_diff :
 
 val glue_sync_ledger :
      t
+  -> preferred:Peer.t list
   -> (Ledger_hash.t * Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
      * Sync_ledger.Query.t
@@ -262,12 +266,15 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
   -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+
+val restart_helper : t -> unit
 
 val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
