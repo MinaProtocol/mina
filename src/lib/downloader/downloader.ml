@@ -684,7 +684,7 @@ end = struct
 
   let is_empty t = Q.is_empty t.pending && Q.is_empty t.stalled
 
-  let all_stalled t = Q.is_empty t.pending
+  let all_stalled t = Q.is_empty t.pending && Hashtbl.is_empty t.downloading
 
   let to_yojson t : Yojson.Safe.t =
     check_invariant t ;
