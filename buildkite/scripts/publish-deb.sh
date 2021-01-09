@@ -28,6 +28,8 @@ fi
 case $BUILDKITE_BRANCH in
     master)
         CODENAME=release ;;
+    hotfix/super-catchup-restart-libp2p-upload-blocks)
+        CODENAME=release ;;
     *)
         CODENAME=unstable ;;
 esac
