@@ -35,6 +35,8 @@ module Block = {
 
     type t = {
       id: int,
+      hash: string,
+      nonce: string,
       type_: userCommandType,
       status: option(userCommandStatus),
       fromAccount: string,
@@ -52,6 +54,8 @@ module Block = {
         | id =>
           {
             id,
+            hash: json |> field("usercommandhash", string),
+            nonce: json |> field("usercommandnonce", string),
             type_:
               json
               |> field("usercommandtype", string)
@@ -90,6 +94,7 @@ module Block = {
 
     type t = {
       id: int,
+      hash: string,
       type_: internalCommandType,
       receiverAccount: string,
       fee: string,
@@ -103,6 +108,7 @@ module Block = {
         | id =>
           {
             id,
+            hash: json |> field("internalcommandhash", string),
             type_:
               json
               |> field("internalcommandtype", string)
@@ -117,6 +123,10 @@ module Block = {
         };
     };
   };
+
+  type command =
+    | UserCommand(UserCommand.t)
+    | InternalCommand(InternalCommand.t);
 
   module BlockChainState = {
     type t = {
@@ -168,6 +178,24 @@ module Block = {
     };
   };
 
+  let addCommandIfValid = (command, block) => {
+    switch (command) {
+    | UserCommand(newCommand) =>
+      block.userCommands
+      ->Belt.Array.keep(command => {newCommand.hash === command.hash})
+      ->Belt.Array.length
+      === 0
+        ? Js.Array.push(newCommand, block.userCommands) |> ignore : ()
+
+    | InternalCommand(newCommand) =>
+      block.internalCommands
+      ->Belt.Array.keep(command => {newCommand.hash === command.hash})
+      ->Belt.Array.length
+      === 0
+        ? Js.Array.push(newCommand, block.internalCommands) |> ignore : ()
+    };
+  };
+
   /*
    Because UserCommands and InternalCommands have a one to many
    relationship with a block, there will be duplicate blocks ids
@@ -199,40 +227,16 @@ module Block = {
                update(blockMap, newBlock.stateHash, block => {
                  switch (block) {
                  | Some(currentBlock) =>
-                   // TODO: Refactor these checks into seperate function
-                   // Check if a duplicate userCommand exists
-                   switch (userCommand) {
-                   | Some(newCommand) =>
-                     currentBlock.userCommands
-                     ->Belt.Array.keep(command => {
-                         newCommand.id === command.id
-                       })
-                     ->Belt.Array.length
-                     === 0
-                       ? Js.Array.push(newCommand, currentBlock.userCommands)
-                         |> ignore
-                       : ()
-                   | None => ()
-                   };
+                   Belt.Option.forEach(userCommand, newCommand => {
+                     addCommandIfValid(UserCommand(newCommand), currentBlock)
+                   });
 
-                   // Check if a duplicate internalCommand exists
-                   switch (internalCommand) {
-                   | Some(newCommand) =>
-                     currentBlock.internalCommands
-                     ->Belt.Array.keep(command => {
-                         newCommand.id === command.id
-                       })
-                     ->Belt.Array.length
-                     === 0
-                       ? Js.Array.push(
-                           newCommand,
-                           currentBlock.internalCommands,
-                         )
-                         |> ignore
-                       : ()
-
-                   | None => ()
-                   };
+                   Belt.Option.forEach(internalCommand, newCommand => {
+                     addCommandIfValid(
+                       InternalCommand(newCommand),
+                       currentBlock,
+                     )
+                   });
 
                    let block =
                      addCoinbaseReceiverIfSome(
@@ -244,32 +248,16 @@ module Block = {
                  }
                });
              } else {
-               switch (userCommand) {
-               | Some(newCommand) =>
-                 newBlock.userCommands
-                 ->Belt.Array.keep(command => {newCommand.id === command.id})
-                 ->Belt.Array.length
-                 === 0
-                   ? Js.Array.push(newCommand, newBlock.userCommands)
-                     |> ignore
-                   : ()
-               | None => ()
-               };
+               Belt.Option.forEach(userCommand, newCommand => {
+                 addCommandIfValid(UserCommand(newCommand), newBlock)
+               });
 
-               switch (internalCommand) {
-               | Some(newCommand) =>
-                 newBlock.internalCommands
-                 ->Belt.Array.keep(command => {newCommand.id === command.id})
-                 ->Belt.Array.length
-                 === 0
-                   ? Js.Array.push(newCommand, newBlock.internalCommands)
-                     |> ignore
-                   : ()
-
-               | None => ()
-               };
+               Belt.Option.forEach(internalCommand, newCommand => {
+                 addCommandIfValid(InternalCommand(newCommand), newBlock)
+               });
                let block =
                  addCoinbaseReceiverIfSome(newBlock, coinbaseReceiver);
+
                set(blockMap, block.stateHash, block);
              };
            },

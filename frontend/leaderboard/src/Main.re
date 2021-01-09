@@ -40,6 +40,9 @@ let main = () => {
         | Ok(currBlocks) =>
           Js.log("Second Query - Finished");
           let blocks = Belt.Array.concat(prevBlocks, currBlocks);
+          Js.log("Length of all blocks: ");
+          Js.log(Array.length(blocks));
+
           Js.log("Metrics - In Progress");
           let metrics =
             blocks |> Types.Block.parseBlocks |> Metrics.calculateMetrics;

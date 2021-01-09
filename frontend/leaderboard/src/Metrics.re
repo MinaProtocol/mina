@@ -73,11 +73,15 @@ let calculateTransactionSent = (map, block: Types.Block.t) => {
   block.userCommands
   |> Array.fold_left(
        (transactionMap, userCommand: Types.Block.UserCommand.t) => {
-         switch (userCommand.type_, userCommand.status) {
-         | (Payment, Some(Applied)) =>
-           incrementMapValue(userCommand.fromAccount, transactionMap)
-         | _ => transactionMap
-         }
+         transactionMap
+         |> StringMap.update(userCommand.fromAccount, value => {
+              switch (value) {
+              | Some(valueCount) =>
+                let nonce = int_of_string(userCommand.nonce);
+                nonce > valueCount ? Some(nonce) : Some(valueCount);
+              | None => Some(0)
+              }
+            })
        },
        map,
      );
