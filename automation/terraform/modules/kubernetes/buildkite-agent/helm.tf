@@ -217,9 +217,6 @@ locals {
         for cluster in "${!k8s_cluster_mappings[@]}"; do
             gcloud container clusters get-credentials "${cluster}" --region "${k8s_cluster_mappings[$cluster]}"
         done
-
-        # Set Kubernetes current context to specified ctx
-        kubectl config use-context ${var.k8s_context}
       EOF
     }
   }
