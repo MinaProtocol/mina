@@ -319,6 +319,35 @@ module Status = struct
         |> digest_entries ~title:""
       in
       map_entry "Addresses and ports" ~f:render
+
+    let catchup_status =
+      let render xs =
+        List.map xs ~f:(fun (s, n) ->
+            let s =
+              match
+                (s : Transition_frontier.Full_catchup_tree.Node.State.Enum.t)
+              with
+              | Failed ->
+                  "Failed"
+              | To_download ->
+                  "To download"
+              | To_initial_validate ->
+                  "To initial validate"
+              | To_build_breadcrumb ->
+                  "To build breadcrumb"
+              | Root ->
+                  "Root"
+              | Finished ->
+                  "Finished"
+              | To_verify ->
+                  "To verify"
+              | Wait_for_parent ->
+                  "Waiting for parent to finish"
+            in
+            ("\t" ^ s, Int.to_string n) )
+        |> digest_entries ~title:""
+      in
+      option_entry "Catchup status" ~f:render
   end
 
   type t =
@@ -336,6 +365,9 @@ module Status = struct
     ; snark_worker: string option
     ; snark_work_fee: int
     ; sync_status: Sync_status.Stable.Latest.t
+    ; catchup_status:
+        (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list
+        option
     ; block_production_keys: string list
     ; histograms: Histograms.t option
     ; consensus_time_best_tip:
@@ -365,7 +397,7 @@ module Status = struct
       ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports
+      ~snark_work_fee ~addrs_and_ports ~catchup_status
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =
