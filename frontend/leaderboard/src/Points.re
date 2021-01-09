@@ -40,6 +40,8 @@ let applyTopNPoints =
   Array.sort(f, metricsArray);
   Belt.Array.reverseInPlace(metricsArray);
 
+  metricsArray |> Array.iter(Js.log);
+
   let counter = ref(0);
   let topNArrayWithPoints =
     metricsArray
