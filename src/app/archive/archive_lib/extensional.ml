@@ -1,6 +1,5 @@
 (* extensional.ml -- extensional representations of archive db data *)
 
-open Core_kernel
 open Mina_base
 open Signature_lib
 
@@ -9,32 +8,13 @@ open Signature_lib
    their native OCaml types to assure the validity of the data
 *)
 
-module Block = struct
-  type t =
-    { state_hash: State_hash.t
-    ; parent_hash: State_hash.t
-    ; creator: Public_key.Compressed.t
-    ; block_winner: Public_key.Compressed.t
-    ; snarked_ledger_hash: Frozen_ledger_hash.t
-    ; staking_epoch_seed: Epoch_seed.t
-    ; staking_epoch_ledger_hash: Frozen_ledger_hash.t
-    ; next_epoch_seed: Epoch_seed.t
-    ; next_epoch_ledger_hash: Frozen_ledger_hash.t
-    ; ledger_hash: Ledger_hash.t
-    ; height: Unsigned.UInt32.t
-    ; global_slot: Mina_numbers.Global_slot.t
-    ; global_slot_since_genesis: Mina_numbers.Global_slot.t
-    ; timestamp: Block_time.t }
-end
-
 module User_command = struct
   (* for `typ` and `status`, a string is enough
      in any case, there aren't existing string conversions for the
      original OCaml types
   *)
   type t =
-    { block_state_hash: State_hash.t
-    ; sequence_no: int
+    { sequence_no: int
     ; typ: string
     ; fee_payer: Public_key.Compressed.t
     ; source: Public_key.Compressed.t
@@ -52,7 +32,7 @@ module User_command = struct
     ; fee_payer_account_creation_fee_paid: Currency.Amount.t option
     ; receiver_account_creation_fee_paid: Currency.Amount.t option
     ; created_token: Token_id.t option }
-  [@@deriving compare]
+  [@@deriving yojson]
 end
 
 module Internal_command = struct
@@ -68,5 +48,26 @@ module Internal_command = struct
     ; fee: Currency.Amount.t
     ; token: Token_id.t
     ; hash: Transaction_hash.t }
-  [@@deriving compare]
+  [@@deriving yojson]
+end
+
+module Block = struct
+  type t =
+    { state_hash: State_hash.t
+    ; parent_hash: State_hash.t
+    ; creator: Public_key.Compressed.t
+    ; block_winner: Public_key.Compressed.t
+    ; snarked_ledger_hash: Frozen_ledger_hash.t
+    ; staking_epoch_seed: Epoch_seed.t
+    ; staking_epoch_ledger_hash: Frozen_ledger_hash.t
+    ; next_epoch_seed: Epoch_seed.t
+    ; next_epoch_ledger_hash: Frozen_ledger_hash.t
+    ; ledger_hash: Ledger_hash.t
+    ; height: Unsigned_extended.UInt32.t
+    ; global_slot: Mina_numbers.Global_slot.t
+    ; global_slot_since_genesis: Mina_numbers.Global_slot.t
+    ; timestamp: Block_time.t
+    ; user_cmds: User_command.t list
+    ; internal_cmds: Internal_command.t list }
+  [@@deriving yojson]
 end
