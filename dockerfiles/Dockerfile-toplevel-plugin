@@ -1,14 +1,9 @@
 FROM codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
-ARG DUNE_PROFILE=testnet_postake_medium_curves
-ENV DUNE_PROFILE=$DUNE_PROFILE
-
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
 
 # Dependencies
-RUN sudo apt-get -y update && \
-  DEBIAN_FRONTEND=noninteractive sudo apt-get -y upgrade && \
-  DEBIAN_FRONTEND=noninteractive sudo apt-get -y install \
+RUN DEBIAN_FRONTEND=noninteractive sudo apt-get -y install \
     curl \
     jq \
     strace \
@@ -25,23 +20,30 @@ RUN sudo apt-get -y update && \
     rlwrap \
     tmux
 
-RUN mkdir /home/opam/mina
-
-WORKDIR /home/opam/mina
-
 # Update opam repo
 RUN opam repository remove --all default && opam repo add --all --set-default default https://github.com/ocaml/opam-repository.git && opam update
-
-RUN opam user-setup
 
 # Install opam
 RUN opam switch create 4.07.1
 
-COPY scripts/ scripts/
-COPY src/ src/
+# Pin ocamlnat
+RUN opam pin add ocamlnat https://github.com/mrmr1993/ocamlnat.git
+
+ARG BRANCH_OR_COMMIT=compatible
+
+# Install opam switch
+RUN wget https://raw.githubusercontent.com/MinaProtocol/mina/$BRANCH_OR_COMMIT/src/opam.export
+RUN opam switch import opam.export
+RUN yes | opam user-setup
+
+# Clone mina repo
+RUN git clone https://github.com/MinaProtocol/mina.git mina
+
+WORKDIR /home/opam/mina
+
+RUN git checkout $BRANCH_OR_COMMIT
 
 # Install packages, pin forked packages
-RUN opam switch import src/opam.export
 RUN opam pin add src/external/ocaml-sodium
 RUN opam pin add src/external/rpc_parallel
 RUN opam pin add src/external/ocaml-extlib
@@ -49,79 +51,62 @@ RUN opam pin add src/external/async_kernel
 RUN opam pin add src/external/coda_base58
 RUN opam pin add src/external/graphql_ppx
 
-# Pin ocamlnat
-RUN opam pin add ocamlnat https://github.com/mrmr1993/ocamlnat.git
-
 # Copy files required for build
 COPY Makefile graphql_schema.json dune-project ./
 
 RUN sudo chown -R opam .
+
+ARG DUNE_PROFILE=testnet_postake_medium_curves
+ENV DUNE_PROFILE=$DUNE_PROFILE
+ARG DOWNLOAD_SNARK_KEYS=false
 
 ENV PATH=/home/opam/.cargo/bin:${PATH}
 
 RUN eval $(opam config env) && dune clean
 RUN eval $(opam config env) && GO=/usr/lib/go/bin/go make libp2p_helper
 
-# Hotpatch mina_version
-RUN echo '\n\
-(library\n\
- (name mina_version)\n\
- (instrumentation (backend bisect_ppx))\n\
- (preprocess (pps ppx_version))\n\
- (public_name mina_version))' > src/lib/mina_version/dune
-
-RUN echo '\
-let commit_id = "1ccac09c6253973ccba48fe2beffa5d0334eefb2"\n\
-let commit_id_short = "1ccac09c"\n\
-let branch = "feature/toplevel-docker-image"\n\
-let commit_date = "2021-01-07T14:35:46+00:00"\n\
-let marlin_commit_id = "838cfcab9e7387a23221498ae166af28241f458e"\n\
-let marlin_commit_id_short = "838cfcab"\n\
-let marlin_commit_date = "2020-12-22T00:57:16+00:00"' > src/lib/mina_version/mina_version.ml
-
-RUN echo '\
-(library\n\
-  (inline_tests)\n\
-  (name zexe_backend_common)\n\
-  (public_name zexe_backend.common)\n\
-  (flags -warn-error -27)\n\
-  (instrumentation (backend bisect_ppx))\n\
-  (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))\n\
-  (libraries\n\
-    hex\n\
-    digestif\n\
-    pickles_types\n\
-    marlin_plonk_bindings\n\
-    key_cache\n\
-    sgn_type\n\
-    snarky.backendless\n\
-    sponge\n\
-    snarkette\n\
-    core\n\
-    integers\n\
-    allocation_functor ))' > src/lib/zexe_backend/zexe_backend_common/dune
-
-RUN echo 'let marlin_repo_sha = "1ccac09c"' > src/lib/zexe_backend/zexe_backend_common/version.ml
+# Enable plugins, set download_snark_keys in the config file
+RUN cat src/config/$DUNE_PROFILE.mlh \
+    | sed -e 's/plugins false/plugins true/' \
+          -e 's/download_snark_keys true/download_snark_keys $DOWNLOAD_SNARK_KEYS/'
+    > modified_config_file.mlh \
+    && mv modified_config_file.mlh src/config/$DUNE_PROFILE.mlh
 
 # Build coda.exe and the toplevel plugin
-RUN eval $(opam config env) && dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$DUNE_PROFILE
-RUN eval $(opam config env) && dune build --profile=$DUNE_PROFILE src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs
+RUN eval $(opam config env) && dune build --profile=$DUNE_PROFILE src/app/logproc/logproc.exe src/app/cli/src/coda.exe src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs
 
-WORKDIR /home/opam
-
-RUN wget -O peers.txt https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt
-RUN wget -O daemon.json https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/genesis_ledger.json
-
+# Make init script.
+# Note: log-level=fatal is less than ideal, but does allow us to operate the
+# toplevel without being interrupted by log messages.
 RUN echo '#!/bin/bash -x\n\
   tmux new-session rlwrap mina/_build/default/src/app/cli/src/coda.exe daemon\n\
-    -config-file daemon.json\n\
-    -peer-list-file peers.txt\n\
+    -log-level fatal\n\
+    -config-file automation/terraform/testnets/$MINA_TESTNET/genesis_ledger.json\n\
+    -peer-list-file automation/terraform/testnets/$MINA_TESTNET/peers.txt\n\
     -load-plugin\n\
-      mina/_build/default/src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs'\
+      _build/default/src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs'\
 > init_coda.sh
+
+# Make list commands to run to initialize the toplevel by
+# * using the coda.exe .merlin file to infer the paths to its interface files,
+# * manually specifying the path to the toplevel plugin interface files,
+# * adding a command to load the plugin's mina object directly in the toplevel.
+# This file will need to be copied directly
+RUN \
+  (cat src/app/cli/src/.merlin
+     | sed \
+       -e 's/^B \/\(.*\)/#directory "\/\1";;/' \
+       -e 's/B \(.*\)/#directory "src\/app\/cli\/src\/\1"/' \
+     | grep "#directory" \
+   && echo '#directory "_build/default/src/lib/mina_plugins/examples/toplevel/.plugin_toplevel.eobjs/byte";;' \
+   && echo '#directory "_build/default/src/lib/mina_plugins/examples/toplevel/.plugin_toplevel.eobjs/native";;' \
+   && echo 'let mina = Dune__exe__Plugin_toplevel.mina;;') \
+   > toplevel_init_commands
 
 RUN chmod +x init_coda.sh
 
 ENV CODA_TIME_OFFSET 0
+
+ENV MINA_TESTNET testworld
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_coda.sh"]
