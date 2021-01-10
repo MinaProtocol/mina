@@ -75,7 +75,7 @@ RUN eval $(opam config env) && GO=/usr/lib/go/bin/go make libp2p_helper
 # Enable plugins, set download_snark_keys in the config file
 RUN cat src/config/$DUNE_PROFILE.mlh \
     | sed -e 's/plugins false/plugins true/' \
-          -e 's/download_snark_keys true/download_snark_keys $DOWNLOAD_SNARK_KEYS/' \
+          -e 's/download_snark_keys true/download_snark_keys ${DOWNLOAD_SNARK_KEYS}/' \
     > modified_config_file.mlh \
     && mv modified_config_file.mlh src/config/$DUNE_PROFILE.mlh
 
