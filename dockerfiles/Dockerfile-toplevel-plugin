@@ -94,7 +94,7 @@ RUN echo '#!/bin/bash -x\n\
 # * adding a command to load the plugin's mina object directly in the toplevel.
 # This file will need to be copied directly
 RUN \
-  (cat src/app/cli/src/.merlin
+  (cat src/app/cli/src/.merlin \
      | sed \
        -e 's/^B \/\(.*\)/#directory "\/\1";;/' \
        -e 's/B \(.*\)/#directory "src\/app\/cli\/src\/\1"/' \
