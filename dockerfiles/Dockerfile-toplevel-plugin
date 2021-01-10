@@ -92,7 +92,7 @@ RUN echo '#!/bin/bash -x\n\
     -peer-list-file automation/terraform/testnets/$MINA_TESTNET/peers.txt\n\
     -load-plugin\n\
       _build/default/src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs'\
-> init_coda.sh
+> init_mina.sh
 
 # Make list commands to run to initialize the toplevel by
 # * using the coda.exe .merlin file to infer the paths to its interface files,
@@ -110,10 +110,10 @@ RUN \
    && echo 'let mina = Dune__exe__Plugin_toplevel.mina;;') \
    > toplevel_init_commands
 
-RUN chmod +x init_coda.sh
+RUN chmod +x init_mina.sh
 
 ENV CODA_TIME_OFFSET 0
 
 ENV MINA_TESTNET testworld
 
-ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_coda.sh"]
+ENTRYPOINT ["/usr/bin/dumb-init", "/home/opam/mina/init_mina.sh"]
