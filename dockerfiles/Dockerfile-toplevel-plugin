@@ -86,11 +86,11 @@ RUN eval $(opam config env) && dune build --profile=$DUNE_PROFILE src/app/logpro
 # Note: log-level=fatal is less than ideal, but does allow us to operate the
 # toplevel without being interrupted by log messages.
 RUN echo '#!/bin/bash -x\n\
-  tmux new-session rlwrap mina/_build/default/src/app/cli/src/coda.exe daemon\n\
-    -log-level fatal\n\
-    -config-file automation/terraform/testnets/$MINA_TESTNET/genesis_ledger.json\n\
-    -peer-list-file automation/terraform/testnets/$MINA_TESTNET/peers.txt\n\
-    -load-plugin\n\
+  tmux new-session rlwrap mina/_build/default/src/app/cli/src/coda.exe daemon\
+    -log-level fatal\
+    -config-file automation/terraform/testnets/$MINA_TESTNET/genesis_ledger.json\
+    -peer-list-file automation/terraform/testnets/$MINA_TESTNET/peers.txt\
+    -load-plugin\
       _build/default/src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs'\
 > init_mina.sh
 
