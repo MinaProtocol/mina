@@ -1,4 +1,8 @@
 FROM codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+ARG BRANCH_OR_COMMIT=compatible
+ARG DUNE_PROFILE=testnet_postake_medium_curves
+ARG DOWNLOAD_SNARK_KEYS=false
+
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
 
@@ -29,7 +33,6 @@ RUN opam switch create 4.07.1
 # Pin ocamlnat
 RUN opam pin add ocamlnat https://github.com/mrmr1993/ocamlnat.git
 
-ARG BRANCH_OR_COMMIT=compatible
 
 # Install opam switch
 RUN wget https://raw.githubusercontent.com/MinaProtocol/mina/$BRANCH_OR_COMMIT/src/opam.export
@@ -56,9 +59,7 @@ COPY Makefile graphql_schema.json dune-project ./
 
 RUN sudo chown -R opam .
 
-ARG DUNE_PROFILE=testnet_postake_medium_curves
 ENV DUNE_PROFILE=$DUNE_PROFILE
-ARG DOWNLOAD_SNARK_KEYS=false
 
 ENV PATH=/home/opam/.cargo/bin:${PATH}
 
