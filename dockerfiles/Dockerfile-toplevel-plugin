@@ -86,7 +86,7 @@ RUN eval $(opam config env) && dune build --profile=$DUNE_PROFILE src/app/logpro
 # Note: log-level=fatal is less than ideal, but does allow us to operate the
 # toplevel without being interrupted by log messages.
 RUN echo '#!/bin/bash -x\n\
-  tmux new-session rlwrap mina/_build/default/src/app/cli/src/coda.exe daemon\
+  tmux new-session rlwrap _build/default/src/app/cli/src/coda.exe daemon\
     -log-level fatal\
     -config-file automation/terraform/testnets/$MINA_TESTNET/genesis_ledger.json\
     -peer-list-file automation/terraform/testnets/$MINA_TESTNET/peers.txt\
@@ -113,6 +113,7 @@ RUN \
 RUN chmod +x init_mina.sh
 
 # Set locale for tmux
+RUN sudo apt-get install locales-all
 RUN sudo localectl set-locale LANG=en_US.UTF-8
 
 ENV CODA_TIME_OFFSET 0
