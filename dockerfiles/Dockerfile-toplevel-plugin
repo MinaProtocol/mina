@@ -82,6 +82,15 @@ RUN cat src/config/$DUNE_PROFILE.mlh \
 # Build coda.exe and the toplevel plugin
 RUN eval $(opam config env) && dune build --profile=$DUNE_PROFILE src/app/logproc/logproc.exe src/app/cli/src/coda.exe src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs
 
+ARG MINA_TESTNET=testworld
+ENV MINA_TESTNET=$MINA_TESTNET
+
+# Generate genesis proof
+RUN _build/default/src/app/cli/src/coda.exe daemon\
+      -log-level info\
+      -config-file automation/terraform/testnets/$MINA_TESTNET/genesis_ledger.json\
+      -generate-genesis-proof true || true
+
 # Make init script.
 # Note: log-level=fatal is less than ideal, but does allow us to operate the
 # toplevel without being interrupted by log messages.
@@ -117,7 +126,5 @@ RUN sudo apt-get install locales-all
 RUN sudo localectl set-locale LANG=en_US.UTF-8
 
 ENV CODA_TIME_OFFSET 0
-
-ENV MINA_TESTNET testworld
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/home/opam/mina/init_mina.sh"]
