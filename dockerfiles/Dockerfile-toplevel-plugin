@@ -41,6 +41,8 @@ RUN wget https://raw.githubusercontent.com/MinaProtocol/mina/$BRANCH_OR_COMMIT/s
 RUN opam switch import opam.export
 RUN yes | opam user-setup
 
+WORKDIR /home/opam
+
 # Clone mina repo
 RUN git clone https://github.com/MinaProtocol/mina.git mina
 
