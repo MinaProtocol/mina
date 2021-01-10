@@ -4,7 +4,7 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 ARG DOWNLOAD_SNARK_KEYS=false
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN echo "Building image with version $coda_deb_version"
+RUN echo "Building image with toplevel"
 
 # Dependencies
 RUN DEBIAN_FRONTEND=noninteractive sudo apt-get -y install \
