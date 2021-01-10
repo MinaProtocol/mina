@@ -58,9 +58,6 @@ RUN opam pin add src/external/async_kernel
 RUN opam pin add src/external/coda_base58
 RUN opam pin add src/external/graphql_ppx
 
-# Copy files required for build
-COPY Makefile graphql_schema.json dune-project ./
-
 RUN sudo chown -R opam .
 
 ENV DUNE_PROFILE=$DUNE_PROFILE
