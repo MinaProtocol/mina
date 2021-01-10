@@ -44,11 +44,11 @@ RUN yes | opam user-setup
 WORKDIR /home/opam
 
 # Clone mina repo
-RUN git clone https://github.com/MinaProtocol/mina.git mina
+RUN git clone --depth 1 --shallow-submodules --branch $BRANCH_OR_COMMIT https://github.com/MinaProtocol/mina.git mina
 
 WORKDIR /home/opam/mina
 
-RUN git checkout $BRANCH_OR_COMMIT
+RUN git submodule update --init --recursive
 
 # Install packages, pin forked packages
 RUN opam pin add src/external/ocaml-sodium
