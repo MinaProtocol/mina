@@ -112,6 +112,9 @@ RUN \
 
 RUN chmod +x init_mina.sh
 
+# Set locale for tmux
+RUN sudo localectl set-locale LANG=en_US.UTF-8
+
 ENV CODA_TIME_OFFSET 0
 
 ENV MINA_TESTNET testworld
