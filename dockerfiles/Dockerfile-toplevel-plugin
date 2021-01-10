@@ -43,10 +43,10 @@ RUN yes | opam user-setup
 
 WORKDIR /home/opam
 
-ARG BRANCH_OR_COMMIT=compatible
+ARG BRANCH=compatible
 
 # Clone mina repo
-RUN git clone --depth 1 --shallow-submodules --branch $BRANCH_OR_COMMIT https://github.com/MinaProtocol/mina.git mina
+RUN git clone --depth 1 --shallow-submodules --branch $BRANCH https://github.com/MinaProtocol/mina.git mina
 
 WORKDIR /home/opam/mina
 
