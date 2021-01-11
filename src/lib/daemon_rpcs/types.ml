@@ -213,7 +213,7 @@ module Status = struct
     let conf_dir = string_entry "Configuration directory"
 
     let peers field =
-      Some ("Peers", sprintf "%d" @@ List.length (FieldT.get field))
+      Some ("Peers", string_of_int @@ List.length (FieldT.get field))
 
     let user_commands_sent = int_entry "User_commands sent"
 
