@@ -56,7 +56,7 @@ Pipeline.build
             commands  = commands,
             label = "Build and release Mina toolchain Docker image",
             key = "mina-toolchain-image",
-            target = Size.Large,
+            target = Size.XLarge,
             docker_login = Some DockerLogin::{=},
             depends_on = [ dependsOn ]
         }
