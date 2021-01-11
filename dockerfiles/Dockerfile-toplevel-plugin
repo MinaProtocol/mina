@@ -21,7 +21,20 @@ RUN DEBIAN_FRONTEND=noninteractive sudo apt-get update && \
     dnsutils \
     tzdata \
     rlwrap \
-    tmux
+    tmux \
+    locales \
+    locales-all
+
+# Set locale for tmux
+RUN sudo apt-get install -y locales locales-all
+RUN sudo sed \
+      -e '/en_US.UTF-8/s/^# //g' \
+      -e '/en_GB.UTF-8/s/^# //g' \
+      -i /etc/locale.gen && \
+    sudo locale-gen
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 
 # Update opam repo
 RUN opam repository remove --all default && opam repo add --all --set-default default https://github.com/ocaml/opam-repository.git && opam update
@@ -120,10 +133,6 @@ RUN \
    > toplevel_init_commands
 
 RUN chmod +x init_mina.sh
-
-# Set locale for tmux
-RUN sudo apt-get install locales-all
-RUN sudo localectl set-locale LANG=en_US.UTF-8
 
 ENV CODA_TIME_OFFSET 0
 
