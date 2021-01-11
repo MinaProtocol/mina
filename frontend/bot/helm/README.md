@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Coda protocol bot for providing various services to deployed testnets.
+This chart bootstraps a Mina protocol bot for providing various services to deployed testnets.
 
-## Add Coda Helm chart repository:
+## Add Mina Helm chart repository:
 
  ```console
- helm repo add coda https://coda-charts.storage.googleapis.com
+ helm repo add mina https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -20,7 +20,7 @@ Parameter | Description
 `bot.name` | name of bot to deploy
 `bot.image` | container image representing bot function/role
 `bot.role` | role/function of bot to deploy
-`bot.testnet` | coda protocol testnet to deploy to
+`bot.testnet` | Mina protocol testnet to deploy to
 
 ### Optional Settings
 
