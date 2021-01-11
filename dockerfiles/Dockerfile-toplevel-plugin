@@ -108,19 +108,23 @@ RUN _build/default/src/app/cli/src/coda.exe daemon\
 # Note: log-level=fatal is less than ideal, but does allow us to operate the
 # toplevel without being interrupted by log messages.
 RUN echo '#!/bin/bash -x\n\
-  tmux new-session rlwrap _build/default/src/app/cli/src/coda.exe daemon\
+  tmux new-session -d rlwrap _build/default/src/app/cli/src/coda.exe daemon\
     -log-level fatal\
     -config-file automation/terraform/testnets/$MINA_TESTNET/genesis_ledger.json\
     -peer-list-file automation/terraform/testnets/$MINA_TESTNET/peers.txt\
     -load-plugin\
-      _build/default/src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs'\
+      _build/default/src/lib/mina_plugins/examples/toplevel/plugin_toplevel.cmxs\n\
+  mkfifo tmux_output_pipe\n\
+  tmux pipe-pane -o "cat >> tmux_output_pipe"\n\
+  tail -f tmux_output_pipe'\
 > init_mina.sh
 
 # Make list commands to run to initialize the toplevel by
 # * using the coda.exe .merlin file to infer the paths to its interface files,
 # * manually specifying the path to the toplevel plugin interface files,
 # * adding a command to load the plugin's mina object directly in the toplevel.
-# This file will need to be copied directly
+# This file can be loaded into the toplevel using the
+# `#load "toplevel_init_commands";;` directive.
 RUN \
   (cat src/app/cli/src/.merlin \
      | sed \
