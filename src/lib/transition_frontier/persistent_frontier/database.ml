@@ -285,6 +285,12 @@ let check t ~genesis_state_hash =
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let%map () = check_arcs root_hash in
+      [%log' trace t.logger]
+        ~metadata:
+          [ ( "snarked_ledger_hash"
+            , Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash
+              |> Ledger_hash.to_yojson ) ]
+        "Snarked_ledger_hash in persistent database is $snarked_ledger_hash" ;
       snarked_ledger_hash )
   |> Result.map_error ~f:(fun err -> `Corrupt (`Raised err))
   |> Result.join

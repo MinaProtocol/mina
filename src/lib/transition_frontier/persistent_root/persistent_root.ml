@@ -113,7 +113,7 @@ module Instance = struct
     File_system.rmrf (Locations.snarked_ledger factory.directory) ;
     let snarked_ledger =
       Ledger.Db.create ~depth:factory.ledger_depth
-        ~directory_name:(Locations.tmp_snarked_ledger factory.directory)
+        ~directory_name:(Locations.snarked_ledger factory.directory)
         ()
     in
     {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
@@ -193,6 +193,16 @@ module Instance = struct
             ; factory
             ; potential_snarked_ledgers= Queue.create () }
         else (
+          [%log' trace factory.logger]
+            ~metadata:
+              [ ( "snarked_ledger_hash"
+                , Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash
+                  |> Ledger_hash.to_yojson )
+              ; ( "potential_snarked_ledger_hash"
+                , Frozen_ledger_hash.to_ledger_hash
+                    potential_snarked_ledger_hash
+                  |> Ledger_hash.to_yojson ) ]
+            "Initializing persistent frontier database with $root_data" ;
           Ledger.Db.close snarked_ledger ;
           Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
