@@ -19,4 +19,4 @@ keywords:
 - testnet
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina
+- https://github.com/MinaProtocol/mina/tree/develop/helm/seed-node
