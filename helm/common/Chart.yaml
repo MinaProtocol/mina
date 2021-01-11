@@ -17,4 +17,4 @@ keywords:
 - utilities
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina/helm
+- https://github.com/MinaProtocol/mina/tree/develop/helm/common
