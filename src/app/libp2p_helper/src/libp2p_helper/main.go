@@ -899,9 +899,11 @@ type beginAdvertisingMsg struct {
 
 type mdnsListener struct {
 	FoundPeer chan peer.AddrInfo
+	app       *app
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
+	l.app.P2p.GatingState.AllowedPeers.Add(info.ID)
 	l.FoundPeer <- info
 }
 
@@ -911,7 +913,10 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 		return err
 	}
 	app.P2p.Mdns = &mdns
-	l := &mdnsListener{FoundPeer: foundPeerCh}
+	l := &mdnsListener{
+		FoundPeer: foundPeerCh,
+		app:       app,
+	}
 	mdns.RegisterNotifee(l)
 
 	return nil
@@ -1269,6 +1274,21 @@ func init() {
 	http.Handle("/metrics", promhttp.Handler())
 }
 
+func newApp() *app {
+	return &app{
+		P2p:            nil,
+		Ctx:            context.Background(),
+		Subs:           make(map[int]subscription),
+		Topics:         make(map[string]*pubsub.Topic),
+		ValidatorMutex: &sync.Mutex{},
+		Validators:     make(map[int]*validationStatus),
+		Streams:        make(map[int]net.Stream),
+		OutChan:        make(chan interface{}, 4096),
+		Out:            bufio.NewWriter(os.Stdout),
+		AddedPeers:     []peer.AddrInfo{},
+	}
+}
+
 func main() {
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
@@ -1337,20 +1357,8 @@ func main() {
 	// 4 * (2^24/3) / 2^20 = 21.33
 	bufsize := (1024 * 1024) * 1024
 	lines.Buffer(make([]byte, bufsize), bufsize)
-	out := bufio.NewWriter(os.Stdout)
 
-	app := &app{
-		P2p:            nil,
-		Ctx:            context.Background(),
-		Subs:           make(map[int]subscription),
-		Topics:         make(map[string]*pubsub.Topic),
-		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]*validationStatus),
-		Streams:        make(map[int]net.Stream),
-		OutChan:        make(chan interface{}, 4096),
-		Out:            out,
-		AddedPeers:     []peer.AddrInfo{},
-	}
+	app := newApp()
 
 	go func() {
 		for {
