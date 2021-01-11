@@ -34,8 +34,8 @@ module Scan_state : sig
 
   val staged_transactions_with_protocol_states :
        t
-    -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-    -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+    -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+    -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
        Or_error.t
 
   val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
@@ -46,8 +46,8 @@ module Scan_state : sig
   (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
   val check_required_protocol_states :
        t
-    -> protocol_states:Coda_state.Protocol_state.value list
-    -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
+    -> protocol_states:Mina_state.Protocol_state.value list
+    -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
 end
 
 module Pre_diff_info : Pre_diff_info.S
@@ -114,7 +114,7 @@ val copy : t -> t
 val hash : t -> Staged_ledger_hash.t
 
 val apply :
-     ?skip_verification:bool
+     ?skip_verification:[`Proofs | `All]
   -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
   -> Staged_ledger_diff.t
@@ -173,7 +173,7 @@ val create_diff :
 val can_apply_supercharged_coinbase_exn :
      winner:Public_key.Compressed.t
   -> epoch_ledger:Mina_base.Sparse_ledger.t
-  -> global_slot:Coda_numbers.Global_slot.t
+  -> global_slot:Mina_numbers.Global_slot.t
   -> bool
 
 val statement_exn :
@@ -189,12 +189,12 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> snarked_ledger:Ledger.t
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
   -> t Or_error.t Deferred.t
 
 val all_work_pairs :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
   -> ( Transaction.t
      , Transaction_witness.t
      , Ledger_proof.t )

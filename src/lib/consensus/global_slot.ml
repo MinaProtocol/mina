@@ -1,8 +1,8 @@
 open Unsigned
 open Core
 open Snark_params.Tick
-module T = Coda_numbers.Global_slot
-module Length = Coda_numbers.Length
+module T = Mina_numbers.Global_slot
+module Length = Mina_numbers.Length
 
 module Poly = struct
   [%%versioned

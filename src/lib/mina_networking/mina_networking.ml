@@ -1,8 +1,8 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Network_peer
 open Network_pool
 open Pipe_lib
@@ -125,7 +125,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.t
           * Ledger_hash.t
           * Pending_coinbase.t
-          * Coda_state.Protocol_state.value list )
+          * Mina_state.Protocol_state.value list )
           option
       end
 
@@ -150,7 +150,7 @@ module Rpcs = struct
           ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t
-          * Coda_state.Protocol_state.Value.Stable.V1.t list )
+          * Mina_state.Protocol_state.Value.Stable.V1.t list )
           option
         [@@deriving bin_io, version {rpc}]
 
@@ -728,15 +728,15 @@ type t =
   ; states:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; snark_pool_diffs:
       ( Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
@@ -1109,7 +1109,7 @@ let create (config : Config.t)
         I.e., what do we do when too many messages are coming in, or going out.
         For example, some things you really want to not drop (like your outgoing
         block announcment).
-     *)
+  *)
   let received_gossips, online_notifier =
     Strict_pipe.Reader.Fork.two
       (Gossip_net.Any.received_message_reader gossip_net)
@@ -1188,7 +1188,13 @@ include struct
 
   let random_peers_except = lift random_peers_except
 
-  let query_peer ?timeout {gossip_net; _} = query_peer ?timeout gossip_net
+  let query_peer ?heartbeat_timeout ?timeout {gossip_net; _} =
+    query_peer ?heartbeat_timeout ?timeout gossip_net
+
+  let query_peer' ?how ?heartbeat_timeout ?timeout {gossip_net; _} =
+    query_peer' ?how ?heartbeat_timeout ?timeout gossip_net
+
+  let restart_helper {gossip_net; _} = restart_helper gossip_net
 
   (* these cannot be directly lifted due to the value restriction *)
   let on_first_connect t = lift on_first_connect t
@@ -1268,9 +1274,11 @@ let find_map' xs ~f =
 
 let online_status t = t.online_status
 
-let make_rpc_request ?timeout ~rpc ~label t peer input =
+let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
   let open Deferred.Let_syntax in
-  match%map query_peer ?timeout t peer.Peer.peer_id rpc input with
+  match%map
+    query_peer ?heartbeat_timeout ?timeout t peer.Peer.peer_id rpc input
+  with
   | Connected {data= Ok (Some response); _} ->
       Ok response
   | Connected {data= Ok None; _} ->
@@ -1282,13 +1290,13 @@ let make_rpc_request ?timeout ~rpc ~label t peer input =
   | Failed_to_connect e ->
       Error (Error.tag e ~tag:"failed-to-connect")
 
-let get_transition_chain_proof t =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof
+let get_transition_chain_proof ?timeout t =
+  make_rpc_request ?timeout ~rpc:Rpcs.Get_transition_chain_proof
     ~label:"transition chain proof" t
 
-let get_transition_chain t =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
-    t
+let get_transition_chain ?heartbeat_timeout ?timeout t =
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
+    ~label:"chain of transitions" t
 
 let get_best_tip ?timeout t peer =
   make_rpc_request ?timeout ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
@@ -1391,6 +1399,35 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
 let get_ancestry t inet_addr input =
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
 
+module Sl_downloader = struct
+  module Key = struct
+    module T = struct
+      type t = Ledger_hash.t * Sync_ledger.Query.t
+      [@@deriving hash, compare, sexp, to_yojson]
+    end
+
+    include T
+    include Comparable.Make (T)
+    include Hashable.Make (T)
+  end
+
+  include Downloader.Make
+            (Key)
+            (struct
+              type t = unit
+
+              let download : t = ()
+            end)
+            (struct
+              type t =
+                (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
+                * Mina_base.Sync_ledger.Answer.t
+              [@@deriving to_yojson]
+
+              let key = fst
+            end)
+end
+
 let glue_sync_ledger :
        t
     -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
@@ -1427,8 +1464,8 @@ let glue_sync_ledger :
                   %{sexp: Ledger_hash.t}"
                 peer (fst query) ;
               (* TODO : here is a place where an envelope could contain
-                    a Peer.t, and not just an IP address, if desired
-                 *)
+                a Peer.t, and not just an IP address, if desired
+            *)
               Some (Envelope.Incoming.wrap ~data:answer ~sender)
           | Connected {data= Ok (Error e); _} ->
               [%log' info t.logger]
@@ -1469,3 +1506,64 @@ let glue_sync_ledger :
   Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
     ~f:(answer_query 0 (Peer.Hash_set.of_list []))
   |> don't_wait_for
+
+let _ = glue_sync_ledger
+
+let glue_sync_ledger :
+       t
+    -> preferred:Peer.t list
+    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
+       Pipe_lib.Linear_pipe.Reader.t
+    -> ( Mina_base.Ledger_hash.t
+       * Mina_base.Sync_ledger.Query.t
+       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+       Pipe_lib.Linear_pipe.Writer.t
+    -> unit =
+ fun t ~preferred query_reader response_writer ->
+  (* We attempt to query 3 random peers, retry_max times. We keep track of the
+          peers that couldn't answer a particular query and won't try them
+          again. *)
+  (*
+  let retry_max = 6 in
+  let retry_interval = Core.Time.Span.of_ms 200. in
+    *)
+  let downloader =
+    Sl_downloader.create ~preferred ~max_batch_size:100
+      ~stop:(Pipe_lib.Linear_pipe.closed query_reader)
+      ~trust_system:t.trust_system
+      ~get:(fun peer qs ->
+        let%map rs =
+          query_peer' ~how:`Parallel
+            ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
+            t peer.peer_id Rpcs.Answer_sync_ledger_query qs
+        in
+        match rs with
+        | Failed_to_connect e ->
+            Error e
+        | Connected res -> (
+          match res.data with
+          | Error e ->
+              Error e
+          | Ok rs -> (
+            match List.zip qs rs with
+            | Unequal_lengths ->
+                Or_error.error_string "mismatched lengths"
+            | Ok ps ->
+                Ok
+                  (List.filter_map ps ~f:(fun (q, r) ->
+                       match r with Ok r -> Some (q, r) | Error _ -> None )) )
+          ) )
+      ~peers:(fun () -> peers t)
+  in
+  don't_wait_for
+    (let%bind downloader = downloader in
+     Linear_pipe.iter_unordered ~max_concurrency:400 query_reader ~f:(fun q ->
+         match%bind
+           Sl_downloader.Job.result
+             (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
+         with
+         | Error _ ->
+             Deferred.unit
+         | Ok (a, _) ->
+             Linear_pipe.write_if_open response_writer
+               (fst q, snd q, {a with data= snd a.data}) ))

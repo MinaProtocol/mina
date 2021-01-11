@@ -26,14 +26,6 @@ pg_ctlcluster 11 main start
 # wait for it to settle
 sleep 3
 
-# archive
-/mina-bin/archive/archive.exe run \
-  -postgres-uri $PG_CONN \
-  -server-port 3086 &
-
-# wait for it to settle
-sleep 3
-
 export CODA_PRIVKEY_PASS=""
 export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
@@ -45,6 +37,15 @@ export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
 PK=${MINA_PK:=ZsMSUuKL9zLAF7sMn951oakTFRCCDw9rDfJgqJ55VMtPXaPa5vPwntQRFJzsHyeh8R8}
 
 echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
+
+# archive
+/mina-bin/archive/archive.exe run \
+  -postgres-uri $PG_CONN \
+  -config-file ${MINA_CONFIG_FILE} \
+  -server-port 3086 &
+
+# wait for it to settle
+sleep 3
 
 # Daemon w/ mounted config file, initial file is phase 3 config.json
 /mina-bin/cli/src/coda.exe daemon \

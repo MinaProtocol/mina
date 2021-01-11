@@ -1,7 +1,7 @@
 (* See the .mli for a description of the purpose of this module. *)
 open Core
 open Mina_base
-open Coda_numbers
+open Mina_numbers
 open Signature_lib
 
 (* Fee increase required to replace a transaction. This represents the cost to
@@ -70,8 +70,8 @@ module Command_error = struct
     | Overflow
     | Bad_token
     | Expired of
-        [`Valid_until of Coda_numbers.Global_slot.t]
-        * [`Current_global_slot of Coda_numbers.Global_slot.t]
+        [`Valid_until of Mina_numbers.Global_slot.t]
+        * [`Current_global_slot of Mina_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
   [@@deriving sexp_of, to_yojson]
@@ -333,7 +333,7 @@ let current_global_slot t =
   in
   match t.constraint_constants.fork with
   | Some {previous_global_slot; _} ->
-      Coda_numbers.Global_slot.(add previous_global_slot current_slot)
+      Mina_numbers.Global_slot.(add previous_global_slot current_slot)
   | None ->
       current_slot
 
@@ -1140,8 +1140,8 @@ let%test_module _ =
                       , `Current_global_slot current_global_slot )) ->
                     failwithf
                       !"Expired user command. Current global slot is \
-                        %{sexp:Coda_numbers.Global_slot.t} but user command \
-                        is only valid until %{sexp:Coda_numbers.Global_slot.t}"
+                        %{sexp:Mina_numbers.Global_slot.t} but user command \
+                        is only valid until %{sexp:Mina_numbers.Global_slot.t}"
                       current_global_slot valid_until () )
           in
           go cmds )
