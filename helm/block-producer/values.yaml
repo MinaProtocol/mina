@@ -23,7 +23,7 @@ userAgent:
   txBatchSize: ""
   sendEveryMins: ""
   ports:
-    metrics: 10000
+    metrics: 8000
 
 bots:
   image: ""

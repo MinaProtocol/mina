@@ -183,21 +183,21 @@ val create_new_account_exn : t -> Account_id.t -> Account.t -> unit
 
 val apply_user_command :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
   -> Transaction_applied.Signed_command_applied.t Or_error.t
 
 val apply_fee_transfer :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Fee_transfer.t
   -> Transaction_applied.Fee_transfer_applied.t Or_error.t
 
 val apply_coinbase :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Coinbase.t
   -> Transaction_applied.Coinbase_applied.t Or_error.t
@@ -216,7 +216,7 @@ val undo :
   -> unit Or_error.t
 
 val has_locked_tokens :
-     global_slot:Coda_numbers.Global_slot.t
+     global_slot:Mina_numbers.Global_slot.t
   -> account_id:Account_id.t
   -> t
   -> bool Or_error.t
@@ -230,7 +230,7 @@ val merkle_root_after_snapp_command_exn :
 
 val merkle_root_after_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
-  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> txn_global_slot:Mina_numbers.Global_slot.t
   -> t
   -> Signed_command.With_valid_signature.t
   -> Ledger_hash.t * [`Next_available_token of Token_id.t]
@@ -245,7 +245,7 @@ val num_accounts : t -> int
 val gen_initial_ledger_state :
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
-  * Coda_numbers.Account_nonce.t
+  * Mina_numbers.Account_nonce.t
   * Account_timing.t )
   array
   Quickcheck.Generator.t
@@ -253,7 +253,7 @@ val gen_initial_ledger_state :
 type init_state =
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
-  * Coda_numbers.Account_nonce.t
+  * Mina_numbers.Account_nonce.t
   * Account_timing.t )
   array
 [@@deriving sexp_of]

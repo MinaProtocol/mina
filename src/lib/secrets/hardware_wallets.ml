@@ -86,7 +86,7 @@ let compute_public_key ~hd_index =
     ( "python3"
     , [ "-m" ^ hardware_wallet_script
       ; "--request=publickey"
-      ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
+      ; "--nonce=" ^ Mina_numbers.Hd_index.to_string hd_index ] )
   in
   Process.run ~prog ~args ()
   |> Deferred.Result.map_error ~f:report_process_error
@@ -112,7 +112,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
         ; "--request=sign"
         ; "--msgx=" ^ messages.(0)
         ; "--msgm=" ^ messages.(1)
-        ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
+        ; "--nonce=" ^ Mina_numbers.Hd_index.to_string hd_index ] )
     in
     let%bind signature_str =
       Process.run ~prog ~args ()
@@ -142,5 +142,5 @@ let sign ~hd_index ~public_key ~user_command_payload :
 
 let write_exn ~hd_index ~index_path : unit Deferred.t =
   let%bind index_file = Writer.open_file index_path in
-  Writer.write_line index_file (Coda_numbers.Hd_index.to_string hd_index) ;
+  Writer.write_line index_file (Mina_numbers.Hd_index.to_string hd_index) ;
   Writer.close index_file

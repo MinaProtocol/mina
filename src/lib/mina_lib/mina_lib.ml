@@ -2,13 +2,14 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
 open O1trace
 open Otp_lib
 open Network_peer
+module Archive_client = Archive_client
 module Config = Config
 module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
@@ -69,7 +70,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -333,10 +334,17 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode
+(* This is a hack put in place to deal with nodes getting stuck
+   in Offline states, that is, not receiving blocks for an extended period.
+
+   To address this, we restart the libp2p helper when we become offline. *)
+let next_helper_restart = ref None
+
+let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
+  let restart_delay = Time.Span.of_min 5. in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -346,6 +354,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
         else
           match online_status with
           | `Offline ->
+              ( match !next_helper_restart with
+              | None ->
+                  next_helper_restart :=
+                    Some
+                      (Async.Clock.Event.run_after restart_delay
+                         (fun () ->
+                           Mina_networking.restart_helper net ;
+                           next_helper_restart := None )
+                         ())
+              | Some _ ->
+                  () ) ;
               if `Empty = first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
@@ -354,19 +373,22 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
                 `Listening )
               else `Offline
           | `Online -> (
-            match active_status with
-            | None ->
-                let logger = Logger.create () in
-                [%str_log info] Bootstrapping ;
-                `Bootstrap
-            | Some (_, catchup_jobs) ->
-                let logger = Logger.create () in
-                if catchup_jobs > 0 then (
-                  [%str_log info] Ledger_catchup ;
-                  `Catchup )
-                else (
-                  [%str_log info] Synced ;
-                  `Synced ) ) )
+              Option.iter !next_helper_restart ~f:(fun e ->
+                  Async.Clock.Event.abort_if_possible e () ) ;
+              next_helper_restart := None ;
+              match active_status with
+              | None ->
+                  let logger = Logger.create () in
+                  [%str_log info] Bootstrapping ;
+                  `Bootstrap
+              | Some (_, catchup_jobs) ->
+                  let logger = Logger.create () in
+                  if catchup_jobs > 0 then (
+                    [%str_log info] Ledger_catchup ;
+                    `Catchup )
+                  else (
+                    [%str_log info] Synced ;
+                    `Synced ) ) )
   in
   let observer = observe incremental_status in
   (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
@@ -427,14 +449,14 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 
 let best_ledger = compose_of_option best_ledger_opt
 
-let get_ledger t staged_ledger_hash_opt =
+let get_ledger t state_hash_opt =
   let open Deferred.Or_error.Let_syntax in
-  let%bind staged_ledger_hash =
-    Option.value_map staged_ledger_hash_opt ~f:Deferred.Or_error.return
+  let%bind state_hash =
+    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
       ~default:
-        ( match best_staged_ledger t with
-        | `Active staged_ledger ->
-            Deferred.Or_error.return (Staged_ledger.hash staged_ledger)
+        ( match best_tip t with
+        | `Active bc ->
+            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
             Deferred.Or_error.error_string
               "get_ledger: can't get staged ledger hash while bootstrapping" )
@@ -446,9 +468,9 @@ let get_ledger t staged_ledger_hash_opt =
     List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
         let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
         if
-          Staged_ledger_hash.equal
-            (Staged_ledger.hash staged_ledger)
-            staged_ledger_hash
+          State_hash.equal
+            (Transition_frontier.Breadcrumb.state_hash b)
+            state_hash
         then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
         else None )
   with
@@ -456,7 +478,7 @@ let get_ledger t staged_ledger_hash_opt =
       Deferred.Or_error.return x
   | None ->
       Deferred.Or_error.error_string
-        "get_ledger: staged ledger hash not found in transition frontier"
+        "get_ledger: state hash not found in transition frontier"
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (account_id : Account_id.t) =
@@ -627,8 +649,8 @@ let best_chain ?max_length t =
   match max_length with
   | Some max_length when max_length <= List.length best_tip_path ->
       (* The [best_tip_path] has already been truncated to the correct length,
-         we skip adding the root to stay below the maximum.
-      *)
+       we skip adding the root to stay below the maximum.
+    *)
       best_tip_path
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
@@ -709,6 +731,9 @@ let staking_ledger t =
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
 
+let next_epoch_ledger t =
+  Consensus.Data.Local_state.next_epoch_ledger t.config.consensus_local_state
+
 let find_delegators table pk =
   Option.value_map
     (Public_key.Compressed.Table.find table pk)
@@ -768,6 +793,7 @@ let start_with_precomputed_blocks t blocks =
   start t
 
 let create ?wallets (config : Config.t) =
+  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -849,7 +875,7 @@ let create ?wallets (config : Config.t) =
                       [%log' warn config.logger]
                         "$sender has sent many blocks. This is very unusual."
                         ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
-                      Coda_net2.Validation_callback.fire_if_not_already_fired
+                      Mina_net2.Validation_callback.fire_if_not_already_fired
                         cb `Reject ;
                       None
                   | `Within_capacity ->
@@ -929,7 +955,7 @@ let create ?wallets (config : Config.t) =
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
-                          Coda_state.Protocol_state.hash state
+                          Mina_state.Protocol_state.hash state
                         in
                         let k_breadcrumbs =
                           Transition_frontier.root frontier
@@ -967,7 +993,7 @@ let create ?wallets (config : Config.t) =
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
-                  let git_commit = Coda_version.commit_id_short in
+                  let git_commit = Mina_version.commit_id_short in
                   let uptime_minutes =
                     let now = Time.now () in
                     let minutes_float =
@@ -1150,6 +1176,7 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                  ~catchup_mode
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
@@ -1188,7 +1215,7 @@ let create ?wallets (config : Config.t) =
                              breadcrumb
                          in
                          let validation_callback =
-                           Coda_net2.Validation_callback
+                           Mina_net2.Validation_callback
                            .create_without_expiration ()
                          in
                          External_transition.Validated.poke_validation_callback
@@ -1196,7 +1223,7 @@ let create ?wallets (config : Config.t) =
                          don't_wait_for
                            (* this will never throw since the callback was created without expiration *)
                            (let%map v =
-                              Coda_net2.Validation_callback.await_exn
+                              Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
                             if v = `Accept then
@@ -1387,7 +1414,7 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger
+            create_sync_status_observer ~logger:config.logger ~net
               ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:

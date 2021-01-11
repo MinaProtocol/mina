@@ -34,7 +34,7 @@ module Payload = struct
       type t =
         ( Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
-        , Coda_numbers.Account_nonce.Stable.V1.t
+        , Mina_numbers.Account_nonce.Stable.V1.t
         , Currency.Fee.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, eq, yojson, hash, compare]
@@ -47,7 +47,7 @@ module Payload = struct
     type t =
       ( Public_key.Compressed.var
       , Token_id.Checked.t
-      , Coda_numbers.Account_nonce.Checked.t
+      , Mina_numbers.Account_nonce.Checked.t
       , Currency.Fee.Checked.t )
       Poly.t
 
@@ -57,7 +57,7 @@ module Payload = struct
       List.reduce_exn ~f:append
         [ Public_key.Compressed.Checked.to_input pk
         ; !(Token_id.Checked.to_input token_id)
-        ; !(Coda_numbers.Account_nonce.Checked.to_input nonce)
+        ; !(Mina_numbers.Account_nonce.Checked.to_input nonce)
         ; Currency.Fee.var_to_input fee ]
   end
 
@@ -68,7 +68,7 @@ module Payload = struct
     Typ.of_hlistable
       [ Public_key.Compressed.typ
       ; Token_id.typ
-      ; Coda_numbers.Account_nonce.typ
+      ; Mina_numbers.Account_nonce.typ
       ; Currency.Fee.typ ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -76,7 +76,7 @@ module Payload = struct
   let dummy : t =
     { pk= Public_key.Compressed.empty
     ; token_id= Token_id.invalid
-    ; nonce= Coda_numbers.Account_nonce.zero
+    ; nonce= Mina_numbers.Account_nonce.zero
     ; fee= Currency.Fee.zero }
 
   let to_input ({pk; token_id; nonce; fee} : t) =
@@ -84,7 +84,7 @@ module Payload = struct
     List.reduce_exn ~f:append
       [ Public_key.Compressed.to_input pk
       ; Token_id.to_input token_id
-      ; Coda_numbers.Account_nonce.to_input nonce
+      ; Mina_numbers.Account_nonce.to_input nonce
       ; Currency.Fee.to_input fee ]
 end
 

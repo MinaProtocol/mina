@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "develop" ]; then
+if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
   exit 0
 fi
 
