@@ -39,6 +39,6 @@ if [[ "$BUILDKITE_BRANCH" == "hotfix/super-catchup-restart-libp2p-upload-blocks"
     export VERSION="${GITTAG}-${GITHASH}"
     export GENERATE_KEYPAIR_VERSION=${VERSION}
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
-fi
+else
 
 set -x
