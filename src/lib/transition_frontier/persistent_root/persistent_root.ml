@@ -109,8 +109,7 @@ module Instance = struct
         destroy_potential_snarked_ledgers potential_snarked_ledgers
       else ()
     in
-    File_system.rmrf (Locations.potential_snarked_ledger factory.directory) ;
-    File_system.rmrf (Locations.snarked_ledger factory.directory) ;
+    File_system.rmrf (Locations.potential_snarked_ledgers factory.directory) ;
     let snarked_ledger =
       Ledger.Db.create ~depth:factory.ledger_depth
         ~directory_name:(Locations.snarked_ledger factory.directory)
@@ -150,6 +149,11 @@ module Instance = struct
             Frozen_ledger_hash.equal potential_snarked_ledger_hash
               snarked_ledger_hash
           then (
+            (* Here I first create an empty database and then transfer the data from
+               checkpoint to the empty database. Then remove the old snarked_ledger and
+               rename the newly created database to the actual snarked_ledger. This is
+               because checkpoints are kind of symblic link, I need first copy the content
+               to the new database and then I can remove the orignal one. *)
             let snarked_ledger =
               Ledger.Db.create ~depth:factory.ledger_depth
                 ~directory_name:
