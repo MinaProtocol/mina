@@ -20,4 +20,4 @@ keywords:
 - testnet
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina/tree/develop/src/lib/snark_worker
+- https://github.com/MinaProtocol/mina/tree/develop/helm/snark-worker
