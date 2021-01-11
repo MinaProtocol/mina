@@ -4,89 +4,36 @@ open Core_kernel
 open Async
 open Mina_base
 open Signature_lib
+open Archive_lib
 
-(* the `blocks` table in the archive db uses foreign keys to refer to other
-   tables; the type here fills in the data from those other tables, using
-   their native OCaml types to assure the validity of the data
-*)
+let query_db pool ~f ~item =
+  match%bind Caqti_async.Pool.use f pool with
+  | Ok v ->
+      return v
+  | Error msg ->
+      failwithf "Error getting %s from db, error: %s" item
+        (Caqti_error.show msg) ()
 
-module Extensional_block = struct
-  type t =
-    { state_hash: State_hash.t
-    ; parent_hash: State_hash.t
-    ; creator: Public_key.Compressed.t
-    ; block_winner: Public_key.Compressed.t
-    ; snarked_ledger_hash: Frozen_ledger_hash.t
-    ; staking_epoch_seed: Epoch_seed.t
-    ; staking_epoch_ledger_hash: Frozen_ledger_hash.t
-    ; next_epoch_seed: Epoch_seed.t
-    ; next_epoch_ledger_hash: Frozen_ledger_hash.t
-    ; ledger_hash: Ledger_hash.t
-    ; height: Unsigned.UInt32.t
-    ; global_slot: Mina_numbers.Global_slot.t
-    ; global_slot_since_genesis: Mina_numbers.Global_slot.t
-    ; timestamp: Block_time.t }
-end
-
-module type Base58_decodable = sig
-  type t
-
-  val of_base58_check : string -> t Or_error.t
-end
-
-let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
-    Extensional_block.t Deferred.t =
-  let query_db ~f ~item =
-    match%bind Caqti_async.Pool.use f pool with
-    | Ok v ->
-        return v
-    | Error msg ->
-        [%log error] "Error getting %s from db" item
-          ~metadata:[("error", `String (Caqti_error.show msg))] ;
-        exit 1
-  in
-  let mk_of_base58_check (type t) (module M : Base58_decodable with type t = t)
-      desc item : t =
-    match M.of_base58_check item with
-    | Ok v ->
-        v
-    | Error err ->
-        [%log error] "Error decoding Base58Check %s" desc
-          ~metadata:
-            [ ("base58_check", `String item)
-            ; ("error", Error_json.error_to_yojson err) ] ;
-        Core.exit 1
-  in
-  let state_hash_of_base58_check =
-    mk_of_base58_check (module State_hash) "state hash"
-  in
-  let frozen_ledger_hash_of_base58_check =
-    mk_of_base58_check (module Frozen_ledger_hash) "frozen ledger hash"
-  in
-  let public_key_of_base58_check =
-    mk_of_base58_check (module Public_key.Compressed) "public key compressed"
-  in
-  let epoch_seed_of_base58_check =
-    mk_of_base58_check (module Epoch_seed) "epoch seed"
-  in
-  let ledger_hash_of_base58_check =
-    mk_of_base58_check (module Ledger_hash) "ledger hash"
-  in
-  let state_hash = state_hash_of_base58_check block.state_hash in
-  let parent_hash = state_hash_of_base58_check block.parent_hash in
+let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
+    Extensional.Block.t Deferred.t =
+  let query_db ~item ~f = query_db pool ~item ~f in
+  let state_hash = State_hash.of_base58_check_exn block.state_hash in
+  let parent_hash = State_hash.of_base58_check_exn block.parent_hash in
   let open Deferred.Let_syntax in
   let%bind creator_str =
     query_db
       ~f:(fun db -> Sql.Public_key.run db block.creator_id)
       ~item:"creator public key"
   in
-  let creator = public_key_of_base58_check creator_str in
+  let creator = Public_key.Compressed.of_base58_check_exn creator_str in
   let%bind block_winner_str =
     query_db
       ~f:(fun db -> Sql.Public_key.run db block.creator_id)
       ~item:"block winner public key"
   in
-  let block_winner = public_key_of_base58_check block_winner_str in
+  let block_winner =
+    Public_key.Compressed.of_base58_check_exn block_winner_str
+  in
   let%bind snarked_ledger_hash_str =
     query_db
       ~f:(fun db ->
@@ -94,14 +41,16 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
       ~item:"snarked ledger hash"
   in
   let snarked_ledger_hash =
-    frozen_ledger_hash_of_base58_check snarked_ledger_hash_str
+    Frozen_ledger_hash.of_base58_check_exn snarked_ledger_hash_str
   in
   let%bind staking_epoch_seed_str, staking_epoch_ledger_hash_id =
     query_db
       ~f:(fun db -> Sql.Epoch_data.run db block.staking_epoch_data_id)
       ~item:"staking epoch data"
   in
-  let staking_epoch_seed = epoch_seed_of_base58_check staking_epoch_seed_str in
+  let staking_epoch_seed =
+    Epoch_seed.of_base58_check_exn staking_epoch_seed_str
+  in
   let%bind staking_epoch_ledger_hash_str =
     query_db
       ~f:(fun db ->
@@ -109,31 +58,32 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
       ~item:"staking epoch ledger hash"
   in
   let staking_epoch_ledger_hash =
-    frozen_ledger_hash_of_base58_check staking_epoch_ledger_hash_str
+    Frozen_ledger_hash.of_base58_check_exn staking_epoch_ledger_hash_str
   in
   let%bind next_epoch_seed_str, next_epoch_ledger_hash_id =
     query_db
       ~f:(fun db -> Sql.Epoch_data.run db block.staking_epoch_data_id)
       ~item:"staking epoch data"
   in
-  let next_epoch_seed = epoch_seed_of_base58_check next_epoch_seed_str in
+  let next_epoch_seed = Epoch_seed.of_base58_check_exn next_epoch_seed_str in
   let%bind next_epoch_ledger_hash_str =
     query_db
       ~f:(fun db -> Sql.Snarked_ledger_hashes.run db next_epoch_ledger_hash_id)
       ~item:"next epoch ledger hash"
   in
   let next_epoch_ledger_hash =
-    frozen_ledger_hash_of_base58_check next_epoch_ledger_hash_str
+    Frozen_ledger_hash.of_base58_check_exn next_epoch_ledger_hash_str
   in
-  let ledger_hash = ledger_hash_of_base58_check block.ledger_hash in
+  let ledger_hash = Ledger_hash.of_base58_check_exn block.ledger_hash in
   let height = Unsigned.UInt32.of_int64 block.height in
   let global_slot = Unsigned.UInt32.of_int64 block.global_slot in
   let global_slot_since_genesis =
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
   let timestamp = Block_time.of_int64 block.timestamp in
+  (* commands to be filled in later *)
   return
-    { Extensional_block.state_hash
+    { Extensional.Block.state_hash
     ; parent_hash
     ; creator
     ; block_winner
@@ -146,7 +96,157 @@ let fill_in_block ~logger pool (block : Archive_lib.Processor.Block.t) :
     ; height
     ; global_slot
     ; global_slot_since_genesis
-    ; timestamp }
+    ; timestamp
+    ; user_cmds= []
+    ; internal_cmds= [] }
+
+let fill_in_user_command pool block_state_hash =
+  let query_db ~item ~f = query_db pool ~item ~f in
+  let pk_of_id id ~item =
+    let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
+    Public_key.Compressed.of_base58_check_exn pk_str
+  in
+  let open Deferred.Let_syntax in
+  let%bind block_id =
+    query_db ~item:"blocks" ~f:(fun db ->
+        Processor.Block.find db ~state_hash:block_state_hash )
+  in
+  let%bind user_command_ids_and_sequence_nos =
+    query_db ~item:"user command id, sequence no" ~f:(fun db ->
+        Sql.Blocks_and_user_commands.run db ~block_id )
+  in
+  (* create extensional user command for each id, seq no *)
+  Deferred.List.map user_command_ids_and_sequence_nos
+    ~f:(fun (user_cmd_id, sequence_no) ->
+      let%bind user_cmd =
+        query_db ~item:"blocks user commands" ~f:(fun db ->
+            Processor.User_command.Signed_command.load db ~id:user_cmd_id )
+      in
+      let typ = user_cmd.typ in
+      let%bind fee_payer = pk_of_id ~item:"fee payer" user_cmd.fee_payer_id in
+      let%bind source = pk_of_id ~item:"source" user_cmd.source_id in
+      let%bind receiver = pk_of_id ~item:"receiver" user_cmd.receiver_id in
+      let fee_token =
+        user_cmd.fee_token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
+      in
+      let token =
+        user_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
+      in
+      let nonce = user_cmd.nonce |> Account.Nonce.of_int in
+      let amount =
+        Option.map user_cmd.amount ~f:(fun amt ->
+            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
+      in
+      let fee =
+        user_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
+      in
+      let valid_until =
+        Option.map user_cmd.valid_until ~f:(fun valid ->
+            Unsigned.UInt32.of_int64 valid
+            |> Mina_numbers.Global_slot.of_uint32 )
+      in
+      let memo = user_cmd.memo |> Signed_command_memo.of_string in
+      let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let status = user_cmd.status in
+      let failure_reason =
+        Option.map user_cmd.failure_reason ~f:(fun s ->
+            match Transaction_status.Failure.of_string s with
+            | Ok fail ->
+                fail
+            | Error err ->
+                failwithf "Not a transaction status failure: %s, error: %s" s
+                  err () )
+      in
+      let fee_payer_account_creation_fee_paid =
+        Option.map user_cmd.fee_payer_account_creation_fee_paid ~f:(fun amt ->
+            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
+      in
+      let receiver_account_creation_fee_paid =
+        Option.map user_cmd.receiver_account_creation_fee_paid ~f:(fun amt ->
+            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
+      in
+      let created_token =
+        Option.map user_cmd.created_token ~f:(fun tok ->
+            Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64 )
+      in
+      return
+        { Extensional.User_command.sequence_no
+        ; typ
+        ; fee_payer
+        ; source
+        ; receiver
+        ; fee_token
+        ; token
+        ; nonce
+        ; amount
+        ; fee
+        ; valid_until
+        ; memo
+        ; hash
+        ; status
+        ; failure_reason
+        ; fee_payer_account_creation_fee_paid
+        ; receiver_account_creation_fee_paid
+        ; created_token } )
+
+let fill_in_internal_command pool block_state_hash =
+  let query_db ~item ~f = query_db pool ~item ~f in
+  let pk_of_id id ~item =
+    let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
+    Public_key.Compressed.of_base58_check_exn pk_str
+  in
+  let open Deferred.Let_syntax in
+  let%bind block_id =
+    query_db ~item:"blocks" ~f:(fun db ->
+        Processor.Block.find db ~state_hash:block_state_hash )
+  in
+  let%bind internal_cmd_info =
+    query_db
+      ~item:
+        "internal command id, global_slot, sequence no, secondary sequence no"
+      ~f:(fun db -> Sql.Blocks_and_internal_commands.run db ~block_id)
+  in
+  Deferred.List.map internal_cmd_info
+    ~f:(fun (internal_cmd_id, global_slot, sequence_no, secondary_sequence_no)
+       ->
+      let%bind internal_cmd =
+        query_db ~item:"blocks internal commands" ~f:(fun db ->
+            Processor.Internal_command.load db ~id:internal_cmd_id )
+      in
+      let typ = internal_cmd.typ in
+      let%bind receiver = pk_of_id ~item:"receiver" internal_cmd.receiver_id in
+      let fee =
+        internal_cmd.fee |> Unsigned.UInt64.of_int64
+        |> Currency.Amount.of_uint64
+      in
+      let token =
+        internal_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
+      in
+      let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
+      let cmd =
+        { Extensional.Internal_command.global_slot
+        ; sequence_no
+        ; secondary_sequence_no
+        ; typ
+        ; receiver
+        ; fee
+        ; token
+        ; hash }
+      in
+      ( if String.equal cmd.typ "fee_transfer_via_coinbase" then
+        match
+          Block.Fee_transfer_via_coinbase.Table.add Block.fee_transfer_tbl
+            ~key:(cmd.global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
+            ~data:cmd
+        with
+        | `Ok ->
+            ()
+        | `Duplicate ->
+            failwithf
+              "Duplicate fee transfer via coinbase at global slot = %Ld, \
+               sequence no = %d, secondary sequence no = %d"
+              cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
+      return cmd )
 
 let main ~archive_uri ~state_hash () =
   let logger = Logger.create () in
@@ -169,52 +269,48 @@ let main ~archive_uri ~state_hash () =
       [%log info] "Successfully created Caqti pool for Postgresql" ;
       [%log info] "Querying for subchain to block with given state hash" ;
       let%bind blocks =
-        match%bind
-          Caqti_async.Pool.use (fun db -> Sql.Subchain.run db state_hash) pool
-        with
-        | Ok blocks ->
-            return blocks
-        | Error msg ->
-            [%log error] "Error getting blocks in subchain"
-              ~metadata:[("error", `String (Caqti_error.show msg))] ;
-            exit 1
+        query_db pool
+          ~f:(fun db -> Sql.Subchain.run db state_hash)
+          ~item:"blocks"
       in
       if List.is_empty blocks then (
         [%log error]
           "No subchain available from genesis block to block with given state \
            hash" ;
         Core.exit 1 ) ;
-      let%map extensional_blocks =
-        Deferred.List.map blocks ~f:(fill_in_block ~logger pool)
-      in
-      let sorted_extensional_blocks =
-        List.dedup_and_sort extensional_blocks
-          ~compare:(fun (b1 : Extensional_block.t) b2 ->
-            Unsigned.UInt32.compare b1.global_slot b2.global_slot )
+      let%bind extensional_blocks =
+        Deferred.List.map blocks ~f:(fill_in_block pool)
       in
       [%log info] "Found a subchain of length %d"
-        (List.length sorted_extensional_blocks) ;
-      List.iter sorted_extensional_blocks ~f:(fun block ->
-          [%log info] "Block contents"
-            ~metadata:
-              [ ("state_hash", State_hash.to_yojson block.state_hash)
-              ; ("parent_hash", State_hash.to_yojson block.parent_hash)
-              ; ("creator", Public_key.Compressed.to_yojson block.creator)
-              ; ( "snarked_ledger_hash"
-                , Frozen_ledger_hash.to_yojson block.snarked_ledger_hash )
-              ; ( "staking_epoch_seed"
-                , Epoch_seed.to_yojson block.staking_epoch_seed )
-              ; ( "staking_epoch_ledger_hash"
-                , Frozen_ledger_hash.to_yojson block.staking_epoch_ledger_hash
-                )
-              ; ("next_epoch_data", Epoch_seed.to_yojson block.next_epoch_seed)
-              ; ( "next_epoch_ledger_hash"
-                , Frozen_ledger_hash.to_yojson block.next_epoch_ledger_hash )
-              ; ("ledger_hash", Ledger_hash.to_yojson block.ledger_hash)
-              ; ("height", Unsigned_extended.UInt32.to_yojson block.height)
-              ; ( "global_slot"
-                , Mina_numbers.Global_slot.to_yojson block.global_slot )
-              ; ("timestamp", Block_time.to_yojson block.timestamp) ] ) ;
+        (List.length extensional_blocks) ;
+      [%log info] "Querying for user commands in blocks" ;
+      let%bind blocks_with_user_cmds =
+        Deferred.List.map extensional_blocks ~f:(fun block ->
+            let%map user_cmds = fill_in_user_command pool block.state_hash in
+            {block with user_cmds} )
+      in
+      [%log info] "Querying for internal commands in blocks" ;
+      let%bind blocks_with_all_cmds =
+        Deferred.List.map blocks_with_user_cmds ~f:(fun block ->
+            let%map internal_cmds =
+              fill_in_internal_command pool block.state_hash
+            in
+            {block with internal_cmds} )
+      in
+      [%log info] "Writing blocks" ;
+      let%map () =
+        Deferred.List.iter blocks_with_all_cmds ~f:(fun block ->
+            [%log info] "Writing block with $state_hash"
+              ~metadata:[("state_hash", State_hash.to_yojson block.state_hash)] ;
+            let output_file =
+              State_hash.to_string block.state_hash ^ ".json"
+            in
+            Async_unix.Writer.with_file output_file ~f:(fun writer ->
+                return
+                  (Async.fprintf writer "%s\n%!"
+                     ( Extensional.Block.to_yojson block
+                     |> Yojson.Safe.pretty_to_string )) ) )
+      in
       ()
 
 let () =
