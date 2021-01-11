@@ -302,6 +302,18 @@ module User_command = struct
            "SELECT id FROM user_commands WHERE hash = ?")
         (Transaction_hash.to_base58_check transaction_hash)
 
+    let load (module Conn : CONNECTION) ~(id : int) =
+      Conn.find
+        (Caqti_request.find Caqti_type.int typ
+           {| SELECT type,fee_payer_id,source_id,receiver_id,fee_token,token,
+               nonce,amount,fee,valid_until,memo,hash,status,failure_reason,
+               fee_payer_account_creation_fee_paid,receiver_account_creation_fee_paid,
+               created_token
+              FROM user_commands
+              WHERE id = ?
+           |})
+        id
+
     let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
         (t : Signed_command.t) =
       let open Deferred.Result.Let_syntax in
@@ -499,14 +511,15 @@ module User_command = struct
 end
 
 module Internal_command = struct
-  type t = {typ: string; receiver_id: int; fee: int; token: int64; hash: string}
+  type t =
+    {typ: string; receiver_id: int; fee: int64; token: int64; hash: string}
 
   let typ =
     let encode t = Ok ((t.typ, t.receiver_id, t.fee, t.token), t.hash) in
     let decode ((typ, receiver_id, fee, token), hash) =
       Ok {typ; receiver_id; fee; token; hash}
     in
-    let rep = Caqti_type.(tup2 (tup4 string int int int64) string) in
+    let rep = Caqti_type.(tup2 (tup4 string int int64 int64) string) in
     Caqti_type.custom ~encode ~decode rep
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
@@ -517,6 +530,15 @@ module Internal_command = struct
          Caqti_type.int
          "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2")
       (Transaction_hash.to_base58_check transaction_hash, typ)
+
+  let load (module Conn : CONNECTION) ~(id : int) =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         {| SELECT type,receiver_id,fee,token,hash
+            FROM internal_commands
+            WHERE id = ?
+         |})
+      id
 end
 
 module Fee_transfer = struct

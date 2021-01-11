@@ -14,6 +14,8 @@ module type Gossip_net_intf = sig
 
   module Rpc_intf : Rpc_interface_intf
 
+  val restart_helper : t -> unit
+
   val peers : t -> Peer.t list Deferred.t
 
   val initial_peers : t -> Mina_net2.Multiaddr.t list
@@ -30,8 +32,19 @@ module type Gossip_net_intf = sig
   val random_peers_except :
     t -> int -> except:Peer.Hash_set.t -> Peer.t list Deferred.t
 
+  val query_peer' :
+       ?how:Monad_sequence.how
+    -> ?heartbeat_timeout:Time_ns.Span.t
+    -> ?timeout:Time.Span.t
+    -> t
+    -> Peer.Id.t
+    -> ('q, 'r) Rpc_intf.rpc
+    -> 'q list
+    -> 'r list rpc_response Deferred.t
+
   val query_peer :
-       ?timeout:Time.Span.t
+       ?heartbeat_timeout:Time_ns.Span.t
+    -> ?timeout:Time.Span.t
     -> t
     -> Peer.Id.t
     -> ('q, 'r) Rpc_intf.rpc

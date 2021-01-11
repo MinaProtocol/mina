@@ -131,6 +131,11 @@ missing_blocks_auditor :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
+missing_subchain :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_subchain/missing_subchain.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker

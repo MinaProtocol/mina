@@ -38,6 +38,8 @@ module Reader : sig
   (** Read a single value from the pipe or fail if the pipe is closed *)
   val read : 't t -> [`Eof | `Ok of 't] Deferred.t
 
+  val read' : 't t -> [`Eof | `Ok of 't Base.Queue.t] Deferred.t
+
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
   val of_linear_pipe : ?name:string -> 't Linear_pipe.Reader.t -> 't t
