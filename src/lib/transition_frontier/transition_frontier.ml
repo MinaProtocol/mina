@@ -175,7 +175,7 @@ let rec load_with_max_length :
           load_from_persistence_and_start ~logger ~verifier
             ~consensus_local_state ~max_length ~persistent_root
             ~persistent_root_instance ~persistent_frontier
-            ~persistent_frontier_instance ~precomputed_values
+            ~persistent_frontier_instance ~precomputed_values ~catchup_mode
             ignore_consensus_local_state
         with
         | Ok _ as result ->
@@ -212,7 +212,7 @@ let rec load_with_max_length :
       load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         ~max_length ~persistent_root ~persistent_root_instance
         ~persistent_frontier ~persistent_frontier_instance ~precomputed_values
-        false
+        ~catchup_mode false
     with
     | Ok _ as result ->
         return result
