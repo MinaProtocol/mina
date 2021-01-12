@@ -126,6 +126,11 @@ func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Con
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
+// proxy remaining p2pconnmgr.BasicConnMgr methods for access
+func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
+	return cm.p2pManager.GetInfo()
+}
+
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
@@ -341,6 +346,11 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				as = append(as, externalAddr)
 			}
 
+			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+			if exists {
+				return as
+			}
+      
 			fs := ma.NewFilters()
 			for _, addr := range privateIPs {
 				fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
