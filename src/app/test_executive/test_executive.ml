@@ -177,6 +177,7 @@ let main inputs =
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
   let f_dispatch_cleanup =
+    (*fun _ _ -> Deferred.return ()*)
     dispatch_cleanup ~logger
       ~network_cleanup_func:Engine.Network_manager.cleanup
       ~log_engine_cleanup_func:Engine.Log_engine.destroy ~net_manager_ref
@@ -205,7 +206,26 @@ let main inputs =
           Deferred.bind ~f:Malleable_error.return
             (Engine.Network_manager.deploy net_manager)
         in
+        let node_to_string (n : Engine.Node.t) : String.t =
+          Format.sprintf
+            "{cluster: %s; namespace: %s; pod_id: %s; node_graphql_port: %d}"
+            n.cluster n.namespace n.pod_id n.node_graphql_port
+        in
+        let node_list_to_string (nl : Engine.Node.t list) : String.t =
+          Format.sprintf "[ %s ]"
+            (String.concat ~sep:",  " (List.map nl ~f:node_to_string))
+        in
+        let snark_coordinators_list =
+          node_list_to_string network.snark_coordinators
+        in
+        let block_producers_list =
+          node_list_to_string network.block_producers
+        in
+        let archive_nodes_list = node_list_to_string network.archive_nodes in
         [%log info] "Network deployed" ;
+        [%log info] "snark_coordinators_list: %s" snark_coordinators_list ;
+        [%log info] "block_producers_list: %s" block_producers_list ;
+        [%log info] "archive_nodes_list: %s" archive_nodes_list ;
         let%bind log_engine =
           Engine.Log_engine.create ~logger ~network
             ~on_fatal_error:(fun message ->

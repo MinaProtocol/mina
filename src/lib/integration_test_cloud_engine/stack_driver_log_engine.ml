@@ -598,8 +598,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
       let%bind logs = Subscription.pull subscription in
       Malleable_error.List.map logs ~f:parse_subscription)
   in
-  [%log debug] "Pulling subscription $subscription_name"
-    ~metadata:[("subscription_name", `String subscription_name)] ;
+  (* [%log debug] "Pulling subscription $subscription_name"
+    ~metadata:[("subscription_name", `String subscription_name)] ; *)
   let%bind () =
     uninterruptible
       ( match results with
@@ -1096,7 +1096,8 @@ let wait_for_init (node : Kubernetes_network.Node.t) t =
   let%bind init =
     Malleable_error.of_option_hard
       (String.Map.find t.initialization_table node.pod_id)
-      "failed to find node in initialization table"
+      (Format.sprintf "failed to find node %s in initialization table"
+         node.pod_id)
   in
   if Ivar.is_full init then return ()
   else

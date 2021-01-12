@@ -68,16 +68,17 @@ module Network_config = struct
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
       ~(test_config : Test_config.t) ~(images : Container_images.t) =
-    let { Test_config.k
+    let { (* Test_config.k
         ; delta
         ; slots_per_epoch
-        ; slots_per_sub_window
-        ; proof_level
+        ; slots_per_sub_window *)
+            Test_config.proof_level
         ; txpool_max_size
         ; block_producers
         ; num_snark_workers
         ; snark_worker_fee
-        ; snark_worker_public_key } =
+        ; snark_worker_public_key
+        ; _ } =
       test_config
     in
     let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
@@ -169,12 +170,13 @@ module Network_config = struct
       { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
       ; genesis=
           Some
-            { k= Some k
-            ; delta= Some delta
-            ; slots_per_epoch= Some slots_per_epoch
+            { k= None
+            ; delta= None
+            ; slots_per_epoch= None
             ; sub_windows_per_window=
-                Some constraint_constants.supercharged_coinbase_factor
-            ; slots_per_sub_window= Some slots_per_sub_window
+                None
+                (* Some constraint_constants.supercharged_coinbase_factor *)
+            ; slots_per_sub_window= None
             ; genesis_state_timestamp=
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ())) }
       ; proof= Some proof_config (* TODO: prebake ledger and only set hash *)
