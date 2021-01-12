@@ -5,7 +5,8 @@ ARG WATCHMAN_DEB_URL="http://ftp.us.debian.org/debian/pool/main/w/watchman/watch
 
 RUN apt update && apt install -y \
     gnupg2 lsb-core apt-transport-https git curl jq wget \
-    graphviz dumb-init build-essential python-dev automake autoconf libtool pkg-config
+    graphviz dumb-init build-essential python-dev automake autoconf libtool \
+    libssl-dev pkg-config
 
 # Install GCloud SDK
 RUN wget ${GCLOUDSDK_DOWNLOAD_URL} && tar -zxf $(basename ${GCLOUDSDK_DOWNLOAD_URL}) -C /usr/local/
