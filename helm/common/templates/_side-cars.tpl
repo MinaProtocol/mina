@@ -25,7 +25,7 @@ Side-Car - Watchman: environment variable definition
 */}}
 {{- define "sideCar.watchman.envVars" }}
 - name: WATCHMAN_MOUNT_PATH
-  value: {{ .wathcman.volumeMountPath }}
+  value: {{ .watchman.volumeMountPath }}
 {{- range $key, $val := .watchman.envVars }}
 - name: {{ $key }}
   value: {{ $val | quote }}

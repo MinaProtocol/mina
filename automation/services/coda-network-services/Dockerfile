@@ -7,6 +7,8 @@ RUN apt update && apt install -y \
     graphviz dumb-init build-essential python-dev automake autoconf libtool \
     libssl-dev pkg-config
 
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+
 # Install GCloud SDK
 RUN wget ${GCLOUDSDK_DOWNLOAD_URL} && tar -zxf $(basename ${GCLOUDSDK_DOWNLOAD_URL}) -C /usr/local/
 RUN ln --symbolic --force /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud
@@ -22,11 +24,8 @@ RUN apt update && apt install -y kubectl
 RUN cd /tmp && git clone https://github.com/facebook/watchman.git -b v4.9.0 --depth 1
 
 WORKDIR /tmp/watchman
-
 RUN ./autogen.sh && ./configure --enable-statedir=/tmp
 RUN make && make install && mv watchman /usr/local/bin/watchman
-
-ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 
 COPY . /code
 COPY ./scripts /scripts
