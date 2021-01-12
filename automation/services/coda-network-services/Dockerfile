@@ -4,7 +4,7 @@ ARG GCLOUDSDK_DOWNLOAD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/dow
 
 RUN apt update && apt install -y \
     gnupg2 lsb-core apt-transport-https git curl jq wget \
-    graphviz dumb-init build-essential python-dev automake autoconf libtool
+    graphviz dumb-init build-essential python-dev automake autoconf libtool pkg-config
 
 # Install GCloud SDK
 RUN wget ${GCLOUDSDK_DOWNLOAD_URL} && tar -zxf $(basename ${GCLOUDSDK_DOWNLOAD_URL}) -C /usr/local/
@@ -18,11 +18,11 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 RUN apt update && apt install -y kubectl
 
 # Install Watchman utility
-RUN cd /tmp && git clone https://github.com/facebook/watchman.git
+RUN cd /tmp && git clone https://github.com/facebook/watchman.git -b v4.9.0 --depth 1
 
 WORKDIR /tmp/watchman
 
-RUN git checkout v4.7.0 && ./autogen.sh && ./configure --enable-statedir=/tmp
+RUN ./autogen.sh && ./configure --enable-statedir=/tmp
 RUN make && make install && mv watchman /usr/local/bin/watchman
 
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
