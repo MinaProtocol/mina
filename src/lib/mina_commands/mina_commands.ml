@@ -184,11 +184,9 @@ let get_status ~flag t =
   in
   let commit_id = Mina_version.commit_id in
   let conf_dir = config.conf_dir in
-  let%map peers = Mina_lib.peers t in
-  let peers =
-    List.map peers ~f:(fun peer ->
-        Network_peer.Peer.to_discovery_host_and_port peer
-        |> Host_and_port.to_string )
+  let%map peers =
+    let%map undisplay_peers = Mina_lib.peers t in
+    List.map ~f:Network_peer.Peer.to_display undisplay_peers
   in
   let user_commands_sent = !txn_count in
   let snark_worker =
@@ -339,8 +337,20 @@ let get_status ~flag t =
   let addrs_and_ports =
     Node_addrs_and_ports.to_display config.gossip_net_params.addrs_and_ports
   in
+  let catchup_status =
+    let open Option.Let_syntax in
+    let%bind frontier =
+      Mina_lib.transition_frontier t |> Pipe_lib.Broadcast_pipe.Reader.peek
+    in
+    match Transition_frontier.catchup_tree frontier with
+    | Full full ->
+        Some (Hashtbl.to_alist full.states)
+    | _ ->
+        None
+  in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
+  ; catchup_status
   ; blockchain_length
   ; highest_block_length_received= !max_block_height
   ; uptime_secs

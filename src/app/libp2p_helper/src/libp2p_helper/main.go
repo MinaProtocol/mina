@@ -899,9 +899,11 @@ type beginAdvertisingMsg struct {
 
 type mdnsListener struct {
 	FoundPeer chan peer.AddrInfo
+	app       *app
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
+	l.app.P2p.GatingState.AllowedPeers.Add(info.ID)
 	l.FoundPeer <- info
 }
 
@@ -911,7 +913,10 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 		return err
 	}
 	app.P2p.Mdns = &mdns
-	l := &mdnsListener{FoundPeer: foundPeerCh}
+	l := &mdnsListener{
+		FoundPeer: foundPeerCh,
+		app:       app,
+	}
 	mdns.RegisterNotifee(l)
 
 	return nil
@@ -999,6 +1004,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+
 		id := c.RemotePeer()
 
 		app.writeMsg(peerConnectionUpcall{
@@ -1013,6 +1020,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+
 		id := c.RemotePeer()
 
 		app.writeMsg(peerConnectionUpcall{
@@ -1028,6 +1037,11 @@ const (
 	latencyMeasurementTime = time.Second * 5
 	metricsRefreshTime     = time.Minute
 )
+
+func (app *app) updateConnectionMetrics() {
+	info := app.P2p.ConnectionManager.GetInfo()
+	connectionCountMetric.Set(float64(info.ConnCount))
+}
 
 func (a *app) checkBandwidth(id peer.ID) {
 	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -1263,10 +1277,30 @@ type successResult struct {
 	Duration string          `json:"duration"`
 }
 
+var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "connection_count",
+	Help: "Number of active connections, according to the CodaConnectionManager.",
+})
+
 func init() {
 	// === Register metrics collectors here ===
-	// currently, we only register the default go collector (which promhttp does automatically for us)
+	prometheus.MustRegister(connectionCountMetric)
 	http.Handle("/metrics", promhttp.Handler())
+}
+
+func newApp() *app {
+	return &app{
+		P2p:            nil,
+		Ctx:            context.Background(),
+		Subs:           make(map[int]subscription),
+		Topics:         make(map[string]*pubsub.Topic),
+		ValidatorMutex: &sync.Mutex{},
+		Validators:     make(map[int]*validationStatus),
+		Streams:        make(map[int]net.Stream),
+		OutChan:        make(chan interface{}, 4096),
+		Out:            bufio.NewWriter(os.Stdout),
+		AddedPeers:     []peer.AddrInfo{},
+	}
 }
 
 func main() {
@@ -1337,20 +1371,8 @@ func main() {
 	// 4 * (2^24/3) / 2^20 = 21.33
 	bufsize := (1024 * 1024) * 1024
 	lines.Buffer(make([]byte, bufsize), bufsize)
-	out := bufio.NewWriter(os.Stdout)
 
-	app := &app{
-		P2p:            nil,
-		Ctx:            context.Background(),
-		Subs:           make(map[int]subscription),
-		Topics:         make(map[string]*pubsub.Topic),
-		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]*validationStatus),
-		Streams:        make(map[int]net.Stream),
-		OutChan:        make(chan interface{}, 4096),
-		Out:            out,
-		AddedPeers:     []peer.AddrInfo{},
-	}
+	app := newApp()
 
 	go func() {
 		for {

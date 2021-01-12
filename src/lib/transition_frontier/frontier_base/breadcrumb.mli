@@ -28,7 +28,7 @@ val create :
   -> t
 
 val build :
-     ?skip_staged_ledger_verification:bool
+     ?skip_staged_ledger_verification:[`All | `Proofs]
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t

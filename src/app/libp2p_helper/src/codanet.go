@@ -5,9 +5,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	gonet "net"
+	"os"
 	"path"
 	"time"
-        "os"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -31,11 +32,29 @@ import (
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/crypto/blake2b"
-	gonet "net"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
 )
+
+var (
+	privateIPs = []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"100.64.0.0/10",
+		"198.18.0.0/15",
+		"169.254.0.0/16",
+	}
+)
+
+func parseCIDR(cidr string) gonet.IPNet {
+	_, ipnet, err := gonet.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return *ipnet
+}
 
 type CodaConnectionManager struct {
 	p2pManager   *p2pconnmgr.BasicConnMgr
@@ -107,6 +126,11 @@ func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Con
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
+// proxy remaining p2pconnmgr.BasicConnMgr methods for access
+func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
+	return cm.p2pManager.GetInfo()
+}
+
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
@@ -142,15 +166,19 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 	logger := logging.Logger("codanet.CodaGatingState")
 
 	if addrFilters == nil {
-		addrFilters = new(ma.Filters)
+		addrFilters = ma.NewFilters()
 	}
 
 	if denied == nil {
-		denied = new(peer.Set)
+		denied = peer.NewSet()
 	}
 
 	if allowed == nil {
-		allowed = new(peer.Set)
+		allowed = peer.NewSet()
+	}
+
+	for _, addr := range privateIPs {
+		addrFilters.AddFilter(parseCIDR(addr), ma.ActionDeny)
 	}
 
 	return &CodaGatingState{
@@ -185,6 +213,13 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
+	_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+	
+	// if we want to allow connecting to private IPs, and this addr is a private IP, allow
+	if exists && gs.AddrFilters.AddrBlocked(addr) {
+		return true
+	}
+
 	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(addr))
 
 	if !allow {
@@ -307,40 +342,23 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
-			if externalAddr == nil {
+			if externalAddr != nil {
+				as = append(as, externalAddr)
+			}
+
+			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+			if exists {
 				return as
 			}
-
-			as = append(as, externalAddr)
-                        
-                        _, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-                        if exists { return as }
-                        
-			bs := make([]ma.Multiaddr, 0, len(as))
-			isPrivate := func(addr ma.Multiaddr) bool {
-				// get the ip out
-				// filter against the private ips
-				fs := ma.NewFilters()
-				parseCIDR := func(cidr string) gonet.IPNet {
-					_, ipnet, err := gonet.ParseCIDR(cidr)
-					if err != nil {
-						panic(err)
-					}
-					return *ipnet
-				}
-
-				fs.AddFilter(parseCIDR("10.0.0.0/8"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("172.16.0.0/12"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("192.168.0.0/16"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("100.64.0.0/10"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("198.18.0.0/15"), ma.ActionDeny)
-				fs.AddFilter(parseCIDR("169.254.0.0/16"), ma.ActionDeny)
-
-				return fs.AddrBlocked(addr)
+      
+			fs := ma.NewFilters()
+			for _, addr := range privateIPs {
+				fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
 			}
 
+			bs := []ma.Multiaddr{}
 			for _, a := range as {
-				if isPrivate(a) {
+				if fs.AddrBlocked(a) {
 					continue
 				}
 				bs = append(bs, a)

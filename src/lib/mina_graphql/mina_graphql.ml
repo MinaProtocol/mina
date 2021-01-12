@@ -96,6 +96,33 @@ module Reflection = struct
         (fun t -> Block_time.to_time t |> Time.to_string)
         ~typ:(non_null string) a x
 
+    let nn_catchup_status a x =
+      reflect
+        (fun o ->
+          Option.map o
+            ~f:
+              (List.map ~f:(function
+                | ( Transition_frontier.Full_catchup_tree.Node.State.Enum
+                    .Finished
+                  , _ ) ->
+                    "finished"
+                | Failed, _ ->
+                    "failed"
+                | To_download, _ ->
+                    "to_download"
+                | To_initial_validate, _ ->
+                    "to_initial_validate"
+                | To_verify, _ ->
+                    "to_verify"
+                | Wait_for_parent, _ ->
+                    "wait_for_parent"
+                | To_build_breadcrumb, _ ->
+                    "to_build_breadcrumb"
+                | Root, _ ->
+                    "root" )) )
+        ~typ:(list (non_null string))
+        a x
+
     let string a x = id ~typ:string a x
 
     module F = struct
@@ -284,17 +311,17 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~chain_id:nn_string
+               ~catchup_status:nn_catchup_status ~chain_id:nn_string
                ~next_block_production:(id ~typ:block_producer_timing)
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
-               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~peers:(id ~typ:(non_null (list (non_null peer))))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
                ~block_production_keys:
-                 (id ~typ:Schema.(non_null @@ list (non_null string)))
+                 (id ~typ:(non_null @@ list (non_null Schema.string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
                ~global_slot_since_genesis_best_tip:int

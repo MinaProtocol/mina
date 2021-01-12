@@ -26,7 +26,7 @@ let tests : test list =
     , (module Payments_timed_accounts.Make : Test_functor_intf) )
   ; ( "bp-timed-accts"
     , (module Block_production_test_timed_accounts.Make : Test_functor_intf) )
-  ; ("peers", (module Mina_peers_test.Make : Test_functor_intf)) ]
+  ; ("peers", (module Peers_test.Make : Test_functor_intf)) ]
 
 let report_test_errors error_set
     (missing_event_reprs : Structured_log_events.repr list) =
