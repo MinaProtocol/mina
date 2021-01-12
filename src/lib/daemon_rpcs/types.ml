@@ -213,18 +213,7 @@ module Status = struct
     let conf_dir = string_entry "Configuration directory"
 
     let peers field =
-      let render display_peer =
-        let open Network_peer.Peer in
-        of_display display_peer |> to_multiaddr_string
-      in
-      map_entry
-        (sprintf "Peers (%d)" (List.length @@ FieldT.get field))
-        ~f:(fun peers ->
-          List.mapi peers ~f:(fun i peer ->
-              let rendered = "\t" ^ render peer in
-              if i = 0 then "\n" ^ rendered else rendered )
-          |> String.concat ~sep:"\n" )
-        field
+      Some ("Peers", string_of_int @@ List.length (FieldT.get field))
 
     let user_commands_sent = int_entry "User_commands sent"
 
