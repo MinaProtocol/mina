@@ -312,7 +312,7 @@ let close ~loc
   let%map () =
     Persistent_frontier.Instance.destroy persistent_frontier_instance
   in
-  Persistent_root.Instance.destroy persistent_root_instance
+  Persistent_root.Instance.close persistent_root_instance
 
 let persistent_root {persistent_root; _} = persistent_root
 

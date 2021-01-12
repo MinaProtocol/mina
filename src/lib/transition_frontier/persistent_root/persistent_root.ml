@@ -93,9 +93,9 @@ module Instance = struct
   let destroy_potential_snarked_ledgers potential_snarked_ledgers =
     List.iter potential_snarked_ledgers ~f:File_system.rmrf
 
-  let create_from_scratch factory =
+  let destroy t =
     let potential_snarked_ledger_filenames_location =
-      Locations.potential_snarked_ledgers factory.directory
+      Locations.potential_snarked_ledgers t.factory.directory
     in
     let () =
       if Sys.file_exists potential_snarked_ledger_filenames_location = `Yes
@@ -109,7 +109,11 @@ module Instance = struct
         destroy_potential_snarked_ledgers potential_snarked_ledgers
       else ()
     in
-    File_system.rmrf (Locations.potential_snarked_ledgers factory.directory) ;
+    File_system.rmrf (Locations.potential_snarked_ledgers t.factory.directory) ;
+    Ledger.Db.close t.snarked_ledger ;
+    t.factory.instance <- None
+
+  let create factory =
     let snarked_ledger =
       Ledger.Db.create ~depth:factory.ledger_depth
         ~directory_name:(Locations.snarked_ledger factory.directory)
@@ -197,22 +201,12 @@ module Instance = struct
             ; factory
             ; potential_snarked_ledgers= Queue.create () }
         else (
-          [%log' trace factory.logger]
-            ~metadata:
-              [ ( "snarked_ledger_hash"
-                , Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash
-                  |> Ledger_hash.to_yojson )
-              ; ( "potential_snarked_ledger_hash"
-                , Frozen_ledger_hash.to_ledger_hash
-                    potential_snarked_ledger_hash
-                  |> Ledger_hash.to_yojson ) ]
-            "Initializing persistent frontier database with $root_data" ;
           Ledger.Db.close snarked_ledger ;
           Error `Snarked_ledger_mismatch )
     | Some snarked_ledger ->
         Ok {snarked_ledger; factory; potential_snarked_ledgers= Queue.create ()}
 
-  let destroy t =
+  let close t =
     Ledger.Db.close t.snarked_ledger ;
     t.factory.instance <- None
 
@@ -265,14 +259,14 @@ let load_from_disk_exn t ~snarked_ledger_hash =
 
 let create_instance_exn t =
   assert (t.instance = None) ;
-  let instance = Instance.create_from_scratch t in
+  let instance = Instance.create t in
   t.instance <- Some instance ;
   instance
 
 let with_instance_exn t ~f =
   let instance = create_instance_exn t in
   let x = f instance in
-  Instance.destroy instance ; x
+  Instance.close instance ; x
 
 let reset_to_genesis_exn t ~precomputed_values =
   assert (t.instance = None) ;

@@ -356,7 +356,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               , Some staged_ledger_construction_time
               , result ) )
     in
-    Transition_frontier.Persistent_root.Instance.destroy
+    Transition_frontier.Persistent_root.Instance.close
       temp_persistent_root_instance ;
     match staged_ledger_aux_result with
     | Error e ->

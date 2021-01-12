@@ -350,12 +350,7 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
     ~metadata:
       [ ( "state_hash"
         , State_hash.to_yojson
-            (External_transition.Validated.state_hash root_transition) )
-      ; ( "root_snarked_ledger_hash"
-        , Ledger_hash.to_yojson
-            ( External_transition.Validated.blockchain_state root_transition
-            |> Blockchain_state.snarked_ledger_hash
-            |> Frozen_ledger_hash.to_ledger_hash ) ) ]
+            (External_transition.Validated.state_hash root_transition) ) ]
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->
