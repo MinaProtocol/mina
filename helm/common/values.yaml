@@ -12,7 +12,7 @@ nodeSelector:
 
 watchman:
   enable: false
-  image: icalialabs/watchman:latest
-  volumeName: watchman-dir
-  volumeMountPath: /tmp
-  command: ls
+  # image: icalialabs/watchman:latest
+  # volumeName: watchman-dir
+  # volumeMountPath: /tmp
+  # command: ls
