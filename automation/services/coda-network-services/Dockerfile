@@ -4,7 +4,8 @@ ARG GCLOUDSDK_DOWNLOAD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/dow
 ARG WATCHMAN_DEB_URL="http://ftp.us.debian.org/debian/pool/main/w/watchman/watchman_4.9.0-5+b1_amd64.deb"
 
 RUN apt update && apt install -y \
-    gnupg2 lsb-core apt-transport-https git curl jq wget graphviz dumb-init
+    gnupg2 lsb-core apt-transport-https git curl jq wget \
+    graphviz dumb-init build-essential python-dev automake autoconf libtool
 
 # Install GCloud SDK
 RUN wget ${GCLOUDSDK_DOWNLOAD_URL} && tar -zxf $(basename ${GCLOUDSDK_DOWNLOAD_URL}) -C /usr/local/
@@ -18,12 +19,16 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 RUN apt update && apt install -y kubectl
 
 # Install Watchman utility
-RUN wget ${WATCHMAN_DEB_URL} && apt install $(basename ${WATCHMAN_DEB_URL})
+RUN cd /tmp && git clone https://github.com/facebook/watchman.git
+
+WORKDIR /tmp/watchman
+
+RUN git checkout v4.7.0 && ./autogen.sh && ./configure --enable-statedir=/tmp
+RUN sudo make && sudo make install && sudo mv watchman /usr/local/bin/watchman
 
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 
 COPY . /code
-
 COPY ./scripts /scripts
 
 # TODO: find better mechanism for sharing files across repo DIRs
@@ -31,8 +36,7 @@ ADD https://raw.githubusercontent.com/MinaProtocol/mina/develop/automation/scrip
 
 COPY ./entrypoints /entrypoint.d
 
-RUN chmod -R 777 /code/
-RUN chmod -R 777 /scripts/
+RUN chmod -R 777 /code/ /scripts/
 
 COPY ./requirements.txt requirements.txt
 RUN pip install -r requirements.txt
