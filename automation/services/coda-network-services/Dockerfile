@@ -23,7 +23,7 @@ RUN cd /tmp && git clone https://github.com/facebook/watchman.git
 WORKDIR /tmp/watchman
 
 RUN git checkout v4.7.0 && ./autogen.sh && ./configure --enable-statedir=/tmp
-RUN sudo make && sudo make install && sudo mv watchman /usr/local/bin/watchman
+RUN make && make install && mv watchman /usr/local/bin/watchman
 
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 
