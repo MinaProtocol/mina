@@ -438,8 +438,13 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
         let s = "proof failed to verify" in
         [%log warn] "%s" s ;
         let%map () =
-          (* TODO: Isolate and punish all the evil sender *)
-          Deferred.unit
+          match transition.sender with
+          | Local ->
+              Deferred.unit
+          | Remote peer ->
+              Trust_system.(
+                record trust_system logger peer
+                  Actions.(Sent_invalid_proof, None))
         in
         Error (`Error (Error.of_string s))
     | Error e ->
@@ -488,11 +493,12 @@ module Downloader = struct
               include Attempt_history.Attempt
 
               let download : t = {failure_reason= `Download}
+
+              let worth_retrying (t : t) =
+                match t.failure_reason with `Download -> true | _ -> false
             end)
             (struct
               type t = External_transition.t
-
-              let to_yojson _ = `List []
 
               let key (t : t) =
                 External_transition.(state_hash t, blockchain_length t)
@@ -501,18 +507,17 @@ end
 
 let check_invariant ~downloader t =
   Downloader.check_invariant downloader ;
-  (*
-  let nonzero = List.filter ~f:(fun (_, n) -> n <> 0) |>  in
-  [%test_eq: (Node.State.Enum.t * int) list]
-    (Hashtbl.to_alist t.states |> nonzero)
-    (let s = Node.State.Enum.Table.create () in
-     Hashtbl.iter t.nodes ~f:(fun node ->
-         Hashtbl.incr s (Node.State.enum node.state) );
-     nonzero (Hashtbl.to_alist s)); *)
   [%test_eq: int]
     (Downloader.total_jobs downloader)
     (Hashtbl.count t.nodes ~f:(fun node ->
          Node.State.enum node.state = To_download ))
+
+let download s d ~key ~attempts =
+  let logger = Logger.create () in
+  [%log debug]
+    ~metadata:[("key", Downloader.Key.to_yojson key); ("caller", `String s)]
+    "Mownload download $key" ;
+  Downloader.download d ~key ~attempts
 
 let create_node ~downloader t ~parent x =
   let attempts = Attempt_history.empty in
@@ -525,7 +530,7 @@ let create_node ~downloader t ~parent x =
         , Ivar.create_full (Ok root) )
     | `Hash (h, l) ->
         ( Node.State.To_download
-            (Downloader.download downloader ~key:(h, l) ~attempts)
+            (download "create_node" downloader ~key:(h, l) ~attempts)
         , h
         , l
         , Ivar.create () )
@@ -588,7 +593,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
           let sec_per_block = 15. in
           Time.Span.of_sec (Float.of_int (List.length hs) *. sec_per_block)
         in
-        Mina_networking.get_transition_chain ~timeout network peer
+        Mina_networking.get_transition_chain
+          ~heartbeat_timeout:(Time_ns.Span.of_sec 20.) ~timeout network peer
           (List.map hs ~f:fst) )
       ~peers:(fun () -> Mina_networking.peers network)
   in
@@ -620,7 +626,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              Map.set node.attempts ~key:peer ~data:{failure_reason} ) ;
       set_state t node
         (To_download
-           (Downloader.download downloader
+           (download "failed" downloader
               ~key:(state_hash, node.blockchain_length)
               ~attempts:node.attempts)) ;
       run_node node
@@ -697,7 +703,14 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             (* No need to redownload in this case. We just wait a little and try again. *)
             retry ()
         | Ok (Error ()) ->
-            (* TODO: Punish *)
+            ( match iv.sender with
+            | Local ->
+                ()
+            | Remote peer ->
+                Trust_system.(
+                  record trust_system logger peer
+                    Actions.(Sent_invalid_proof, None))
+                |> don't_wait_for ) ;
             let _ = Cached.invalidate_with_failure tv in
             failed ~sender:iv.sender `Verify
         | Ok (Ok av) ->
@@ -820,6 +833,14 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              [%log debug]
                ~metadata:[("n", `Int (List.length state_hashes))]
                "Adding $n nodes" ;
+             List.iter forest
+               ~f:
+                 (Rose_tree.iter ~f:(fun c ->
+                      let node =
+                        create_node ~downloader t ~parent:target_parent_hash
+                          (`Initial_validated c)
+                      in
+                      run_node node |> ignore )) ;
              List.fold state_hashes
                ~init:(root.state_hash, root.blockchain_length)
                ~f:(fun (parent, l) h ->
@@ -830,30 +851,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                    in
                    don't_wait_for (run_node node >>| ignore) ) ;
                  (h, l) )
-             |> ignore ;
-             List.iter forest
-               ~f:
-                 (Rose_tree.iter ~f:(fun c ->
-                      let node =
-                        create_node ~downloader t ~parent:target_parent_hash
-                          (`Initial_validated c)
-                      in
-                      run_node node |> ignore )) ;
-             [%log' fatal t.logger]
-               ~metadata:
-                 [ ( "donwload_number"
-                   , `Int
-                       (Hashtbl.count t.nodes ~f:(fun node ->
-                            Node.State.enum node.state = To_download )) )
-                 ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-                 ; ( "node_states"
-                   , let s = Node.State.Enum.Table.create () in
-                     Hashtbl.iter t.nodes ~f:(fun node ->
-                         Hashtbl.incr s (Node.State.enum node.state) ) ;
-                     `List
-                       (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                            `List [Node.State.Enum.to_yojson k; `Int v] )) ) ]
-               "heres good") )
+             |> ignore) )
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer
@@ -863,563 +861,334 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_breadcrumbs_writer
   |> don't_wait_for
 
-(*
-module Downloader : sig
-  type t
+let%test_module "Ledger_catchup tests" =
+  ( module struct
+    let () =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true
 
-  module Job = Downloader_job
+    let max_frontier_length = 10
 
-  val cancel : t -> State_hash.t -> unit
+    let logger = Logger.null ()
 
-  val create :
-       stop:unit Deferred.t
-    -> trust_system:Trust_system.t
-    -> network:Mina_networking.t
-    -> t Deferred.t
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-  val download :
-       t
-    -> state_hash:State_hash.t
-    -> blockchain_length:Length.t
-    -> attempts:Attempt_history.t
-    -> Job.t
+    let proof_level = precomputed_values.proof_level
 
-  val total_jobs : t -> int
+    let trust_system = Trust_system.null ()
 
-  val check_invariant : t -> unit
+    let time_controller = Block_time.Controller.basic ~logger
 
-  val set_check_invariant : (t -> unit) -> unit
-end = struct
-  let max_wait = Time.Span.of_ms 100.
+    let downcast_transition transition =
+      let transition =
+        transition
+        |> External_transition.Validation
+           .reset_frontier_dependencies_validation
+        |> External_transition.Validation.reset_staged_ledger_diff_validation
+      in
+      Envelope.Incoming.wrap ~data:transition ~sender:Envelope.Sender.Local
 
-  module Job = Downloader_job
-  open Job
+    let downcast_breadcrumb breadcrumb =
+      downcast_transition
+        (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
 
-  module Q = struct
-    module Key = State_hash
-
-    module Key_value = struct
-      type 'a t = {key: Key.t; mutable value: 'a} [@@deriving fields]
-    end
-
-    (* Hash_queue would be perfect, but it doesn't expose enough for
-         us to make sure the underlying queue is sorted by blockchain_length. *)
-    type 'a t =
-      { queue: 'a Key_value.t Doubly_linked.t
-      ; table: 'a Key_value.t Doubly_linked.Elt.t Key.Table.t }
-
-    let dequeue t =
-      Option.map (Doubly_linked.remove_first t.queue) ~f:(fun {key; value} ->
-          Hashtbl.remove t.table key ; value )
-
-    let enqueue t (e : Job.t) =
-      if Hashtbl.mem t.table e.hash then `Key_already_present
-      else
-        let kv = {Key_value.key= e.hash; value= e} in
-        let elt =
-          match
-            Doubly_linked.find_elt t.queue ~f:(fun {value; _} ->
-                Length.( < ) e.blockchain_length value.Job.blockchain_length )
-          with
-          | None ->
-              (* e is >= everything. Put it at the back. *)
-              Doubly_linked.insert_last t.queue kv
-          | Some pred ->
-              Doubly_linked.insert_before t.queue pred kv
-        in
-        Hashtbl.set t.table ~key:e.hash ~data:elt ;
-        `Ok
-
-    let enqueue_exn t e =
-      match enqueue t e with
-      | `Key_already_present ->
-          failwith "key already present"
-      | `Ok ->
-          ()
-
-    let iter t ~f = Doubly_linked.iter t.queue ~f:(fun {value; _} -> f value)
-
-    let lookup t k =
-      Option.map (Hashtbl.find t.table k) ~f:(fun x ->
-          (Doubly_linked.Elt.value x).value )
-
-    let remove t k =
-      match Hashtbl.find_and_remove t.table k with
-      | None ->
-          ()
-      | Some elt ->
-          Doubly_linked.remove t.queue elt
-
-    let length t = Doubly_linked.length t.queue
-
-    let is_empty t = Doubly_linked.is_empty t.queue
-
-    let to_list t = List.map (Doubly_linked.to_list t.queue) ~f:Key_value.value
-
-    let create () =
-      {table= State_hash.Table.create (); queue= Doubly_linked.create ()}
-  end
-
-  module Useful_peers = struct
-    type t =
-      { all: State_hash.Hash_set.t Peer.Table.t
-      ; r: (Peer.t * State_hash.Hash_set.t) Strict_pipe.Reader.t sexp_opaque
-      ; w:
-          ( Peer.t * State_hash.Hash_set.t
-          , Strict_pipe.drop_head Strict_pipe.buffered
+    type catchup_test =
+      { cache: Transition_handler.Unprocessed_transition_cache.t
+      ; job_writer:
+          ( State_hash.t
+            * ( External_transition.Initial_validated.t Envelope.Incoming.t
+              , State_hash.t )
+              Cached.t
+              Rose_tree.t
+              list
+          , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
-          sexp_opaque }
-    [@@deriving sexp]
+      ; breadcrumbs_reader:
+          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+            Rose_tree.t
+            list
+          * [`Catchup_scheduler | `Ledger_catchup of unit Ivar.t] )
+          Strict_pipe.Reader.t }
 
-    let create ~all_peers =
-      let all = Peer.Table.create () in
-      List.iter all_peers ~f:(fun p ->
-          Hashtbl.set all ~key:p ~data:(State_hash.Hash_set.create ()) ) ;
-      let r, w =
-        Strict_pipe.create ~name:"useful_peers"
-          (Buffered (`Capacity 4096, `Overflow Drop_head))
+    let run_catchup ~network ~frontier =
+      let catchup_job_reader, catchup_job_writer =
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
-      Hashtbl.iteri all ~f:(fun ~key ~data ->
-          Strict_pipe.Writer.write w (key, data) ) ;
-      {all; r; w}
+      let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
+      in
+      let unprocessed_transition_cache =
+        Transition_handler.Unprocessed_transition_cache.create ~logger
+      in
+      let pids = Child_processes.Termination.create_pid_table () in
+      let%map verifier =
+        Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
+      in
+      run ~logger ~precomputed_values ~verifier ~trust_system ~network
+        ~frontier ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~unprocessed_transition_cache ;
+      { cache= unprocessed_transition_cache
+      ; job_writer= catchup_job_writer
+      ; breadcrumbs_reader= catchup_breadcrumbs_reader }
 
-    let tear_down {all; r= _; w} =
-      Hashtbl.iter all ~f:Hash_set.clear ;
-      Hashtbl.clear all ;
-      Strict_pipe.Writer.close w
+    let run_catchup_with_target ~network ~frontier ~target_breadcrumb =
+      let%map test = run_catchup ~network ~frontier in
+      let parent_hash =
+        Transition_frontier.Breadcrumb.parent_hash target_breadcrumb
+      in
+      let target_transition =
+        Transition_handler.Unprocessed_transition_cache.register_exn test.cache
+          (downcast_breadcrumb target_breadcrumb)
+      in
+      Strict_pipe.Writer.write test.job_writer
+        (parent_hash, [Rose_tree.T (target_transition, [])]) ;
+      (`Test test, `Cached_transition target_transition)
 
-    let rec read t =
-      match%bind Strict_pipe.Reader.read t.r with
-      | `Eof ->
-          return `Eof
-      | `Ok (_, s) as res ->
-          if Hash_set.is_empty s then read t else return res
+    let test_successful_catchup ~my_net ~target_best_tip_path =
+      let open Fake_network in
+      let target_breadcrumb = List.last_exn target_best_tip_path in
+      let%bind `Test {breadcrumbs_reader; _}, _ =
+        run_catchup_with_target ~network:my_net.network
+          ~frontier:my_net.state.frontier ~target_breadcrumb
+      in
+      (* TODO: expose Strict_pipe.read *)
+      let%map cached_catchup_breadcrumbs =
+        Block_time.Timeout.await_exn time_controller
+          ~timeout_duration:(Block_time.Span.of_ms 30000L)
+          ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
+          | `Eof ->
+              failwith "unexpected EOF"
+          | `Ok (_, `Catchup_scheduler) ->
+              failwith "did not expect a catchup scheduler action"
+          | `Ok (breadcrumbs, `Ledger_catchup ivar) ->
+              Ivar.fill ivar () ; List.hd_exn breadcrumbs )
+      in
+      let catchup_breadcrumbs =
+        Rose_tree.map cached_catchup_breadcrumbs
+          ~f:Cache_lib.Cached.invalidate_with_success
+      in
+      [%test_result: int]
+        ~message:
+          "Transition_frontier should not have any more catchup jobs at the \
+           end of the test"
+        ~equal:( = ) ~expect:0
+        (Broadcast_pipe.Reader.peek Catchup_jobs.reader) ;
+      let catchup_breadcrumbs_are_best_tip_path =
+        Rose_tree.equal (Rose_tree.of_list_exn target_best_tip_path)
+          catchup_breadcrumbs ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
+            External_transition.Validated.equal
+              (Transition_frontier.Breadcrumb.validated_transition
+                 breadcrumb_tree1)
+              (Transition_frontier.Breadcrumb.validated_transition
+                 breadcrumb_tree2) )
+      in
+      if not catchup_breadcrumbs_are_best_tip_path then
+        failwith
+          "catchup breadcrumbs were not equal to the best tip path we expected"
 
-    type update =
-      | New_job of {new_job: Job.t; all_peers: Peer.Set.t}
-      | New_peers of
-          { new_peers: Peer.Set.t
-          ; lost_peers: Peer.Set.t
-          ; pending: Job.t Q.t }
-      | Download_finished of Peer.t * State_hash.t list
-      | Job_cancelled of State_hash.t
-
-    let replace t peer =
-      match Hashtbl.find t.all peer with
-      | None ->
-          ()
-      | Some s ->
-          Strict_pipe.Writer.write t.w (peer, s)
-
-    let update t u =
-      match u with
-      | Job_cancelled h ->
-          Hashtbl.filter_inplace t.all ~f:(fun s ->
-              Hash_set.remove s h ; Hash_set.is_empty s )
-      | Download_finished (peer, hs) -> (
-        match Hashtbl.find t.all peer with
-        | None ->
-            ()
-        | Some s ->
-            List.iter hs ~f:(Hash_set.remove s) ;
-            if Hash_set.is_empty s then Hashtbl.remove t.all peer
-            else Strict_pipe.Writer.write t.w (peer, s) )
-      | New_peers {new_peers; lost_peers; pending} ->
-          Set.iter lost_peers ~f:(fun p ->
-              match Hashtbl.find t.all p with
-              | None ->
-                  ()
-              | Some s ->
-                  Hash_set.clear s ; Hashtbl.remove t.all p ) ;
-          Set.iter new_peers ~f:(fun p ->
-              if not (Hashtbl.mem t.all p) then (
-                let to_try = State_hash.Hash_set.create () in
-                Q.iter pending ~f:(fun j ->
-                    if not (Map.mem j.attempts p) then
-                      Hash_set.add to_try j.hash ) ;
-                Hashtbl.add_exn t.all ~key:p ~data:to_try ;
-                Strict_pipe.Writer.write t.w (p, to_try) ) )
-      | New_job {new_job; all_peers} ->
-          Set.iter all_peers ~f:(fun p ->
-              let useful_for_job = not (Map.mem new_job.attempts p) in
-              if useful_for_job then
-                match Hashtbl.find t.all p with
-                | Some s ->
-                    Hash_set.add s new_job.hash
-                | None ->
-                    let s = State_hash.Hash_set.of_list [new_job.hash] in
-                    Hashtbl.add_exn t.all ~key:p ~data:s ;
-                    Strict_pipe.Writer.write t.w (p, s) )
-  end
-
-  type t =
-    { mutable next_flush: (unit, unit) Clock.Event.t option
-    ; mutable all_peers: Peer.Set.t
-    ; pending: Job.t Q.t
-    ; stalled: Job.t Q.t
-    ; downloading: (Peer.t * Job.t) State_hash.Table.t
-    ; useful_peers: Useful_peers.t
-    ; flush_r: unit Strict_pipe.Reader.t (* Single reader *)
-    ; flush_w:
-        ( unit
-        , Strict_pipe.drop_head Strict_pipe.buffered
-        , unit )
-        Strict_pipe.Writer.t
-          (* buffer of length 0 *)
-    ; network: Mina_networking.t
-          (* A peer is useful if there is a job in the pending queue which has not
-   been attempted with that peer. *)
-    ; got_new_peers_w:
-        ( unit
-        , Strict_pipe.drop_head Strict_pipe.buffered
-        , unit )
-        Strict_pipe.Writer.t
-          (* buffer of length 0 *)
-    ; got_new_peers_r: unit Strict_pipe.Reader.t
-    ; logger: Logger.t
-    ; trust_system: Trust_system.t
-    ; stop: unit Deferred.t }
-
-  let total_jobs (t : t) =
-    Q.length t.pending + Q.length t.stalled + Hashtbl.length t.downloading
-
-  (* Checks disjointness *)
-  let check_invariant (t : t) =
-    Set.length
-      (State_hash.Set.union_list
-         [ Q.to_list t.pending |> List.map ~f:(fun j -> j.hash) |> State_hash.Set.of_list
-         ; Q.to_list t.stalled |> List.map ~f:(fun j -> j.hash) |> State_hash.Set.of_list
-         ; State_hash.Set.of_hashtbl_keys t.downloading
-         ] )
-    |> [%test_eq: int] (total_jobs t)
-
-  let check_invariant_r = ref check_invariant
-
-  let set_check_invariant f = check_invariant_r := f
-
-  let job_finished t j x =
-    Hashtbl.remove t.downloading j.hash ;
-    Ivar.fill_if_empty j.res x ;
-    try 
-      !check_invariant_r t
-    with e -> (
-      [%log' debug t.logger]
-        ~metadata:[ "exn", `String (Exn.to_string e) ]
-        "job_finished $exn" 
-      )
-
-
-  let kill_job _t j =  Ivar.fill_if_empty j.res (Error `Finished)
-
-  let flush_soon t =
-    Option.iter t.next_flush ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
-    t.next_flush
-    <- Some
-         (Clock.Event.run_after max_wait
-            (fun () -> Strict_pipe.Writer.write t.flush_w ())
-            ())
-
-  let cancel t h =
-    let job =
-      List.find_map ~f:Lazy.force
-        [ lazy (Q.lookup t.pending h)
-        ; lazy (Q.lookup t.stalled h)
-        ; lazy (Option.map ~f:snd (Hashtbl.find t.downloading h)) ]
-    in
-    Q.remove t.pending h ;
-    Q.remove t.stalled h ;
-    Hashtbl.remove t.downloading h ;
-    match job with
-    | None ->
-        ()
-    | Some j ->
-        kill_job t j ;
-        Useful_peers.update t.useful_peers (Job_cancelled h)
-
-  let is_stalled t e = Set.for_all t.all_peers ~f:(Map.mem e.attempts)
-
-  (* TODO: rewrite as "enqueue_all" *)
-  let enqueue t e =
-    Hashtbl.remove t.downloading e.hash ;
-    if is_stalled t e then Q.enqueue t.stalled e
-    else
-      let r = Q.enqueue t.pending e in
-      ( match r with
-      | `Key_already_present ->
-          ()
-      | `Ok ->
-          Useful_peers.update t.useful_peers
-            (New_job {new_job= e; all_peers= t.all_peers}) ) ;
-      r
-
-  let enqueue_exn t e = assert (enqueue t e = `Ok)
-
-  let refresh_peers t =
-    let%map peers = Mina_networking.peers t.network in
-    let peers' = Peer.Set.of_list peers in
-    let new_peers = Set.diff peers' t.all_peers in
-    let lost_peers = Set.diff t.all_peers peers' in
-    Useful_peers.update t.useful_peers
-      (New_peers {new_peers; lost_peers; pending= t.pending}) ;
-    if not (Set.is_empty new_peers) then
-      Strict_pipe.Writer.write t.got_new_peers_w () ;
-    t.all_peers <- Peer.Set.of_list peers ;
-    let rec go n =
-      (* We need the initial length explicitly because we may re-enqueue things
-           while looping. *)
-      if n = 0 then ()
-      else
-        match Q.dequeue t.stalled with
-        | None ->
-            ()
-        | Some e ->
-            enqueue_exn t e ;
-            go (n - 1)
-    in
-    go (Q.length t.stalled)
-
-  let peer_refresh_interval = Time.Span.of_min 1.
-
-  let tear_down
-      ({ next_flush
-      ; all_peers= _
-      ; flush_w
-      ; network= _
-      ; got_new_peers_w
-      ; flush_r= _
-      ; useful_peers
-      ; got_new_peers_r= _
-      ; pending
-      ; stalled
-      ; downloading
-      ; logger= _
-      ; trust_system= _
-      ; stop= _ } as t) =
-    let rec clear_queue q =
-      match Q.dequeue q with
-      | None ->
-          ()
-      | Some j ->
-          kill_job t j ; clear_queue q
-    in
-    Option.iter next_flush ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
-    Strict_pipe.Writer.close flush_w ;
-    Useful_peers.tear_down useful_peers ;
-    Strict_pipe.Writer.close got_new_peers_w ;
-    Hashtbl.iter downloading ~f:(fun (_, j) -> kill_job t j) ;
-    Hashtbl.clear downloading ;
-    clear_queue pending ;
-    clear_queue stalled
-
-  let make_peer_available t p =
-    if Set.mem t.all_peers p then Useful_peers.replace t.useful_peers p
-
-  let reader r = (Strict_pipe.Reader.to_linear_pipe r).pipe
-
-  let download t peer xs =
-    let timeout =
-      let sec_per_block = 5. in
-      Time.Span.of_sec (Float.of_int (List.length xs) *. sec_per_block)
-    in
-    let hs = List.map xs ~f:(fun x -> x.hash) in
-    let fail ?punish (e : Error.t) =
-      let e = Error.to_string_hum e in
-      if Option.is_some punish then
-        (* TODO: Make this an insta ban *)
-        Trust_system.(
-          record t.trust_system t.logger peer
-            Actions.(Violated_protocol, Some (e, [])))
-        |> don't_wait_for ;
-      [%log' debug t.logger]
-        "Downloading from $peer failed ($error) on $hashes"
-        ~metadata:
-          [ ("peer", Peer.to_yojson peer)
-          ; ("error", `String e)
-          ; ("hashes", `List (List.map hs ~f:State_hash.to_yojson)) ] ;
-      (* TODO: Log error *)
-      List.iter xs ~f:(fun x ->
-          enqueue_exn t
-            { x with
-              attempts=
-                Map.set x.attempts ~key:peer ~data:{failure_reason= `Download}
-            } ) ;
-      flush_soon t
-    in
-    List.iter xs ~f:(fun x ->
-        Hashtbl.add_exn t.downloading ~key:x.hash ~data:(peer, x) ) ;
-    let%map res =
-      Deferred.choose
-        [ Deferred.choice
-            (Mina_networking.get_transition_chain ~timeout t.network peer hs)
-            (fun x -> `Not_stopped x)
-        ; Deferred.choice t.stop (fun () -> `Stopped)
-        ; Deferred.choice
-            (* This happens if all the jobs are cancelled. *)
-            (Deferred.List.map xs ~f:(fun x -> Ivar.read x.res))
-            (fun _ -> `Stopped) ]
-    in
-    List.iter xs ~f:(fun j -> Hashtbl.remove t.downloading j.hash) ;
-    match res with
-    | `Stopped ->
-        List.iter xs ~f:(kill_job t)
-    | `Not_stopped r -> (
-        Useful_peers.update t.useful_peers (Download_finished (peer, hs)) ;
-        match r with
-        | Error e ->
-            fail e
-        | Ok bs -> (
-          match
-            List.map2 bs xs ~f:(fun b x ->
-                if State_hash.equal (External_transition.state_hash b) x.hash
-                then (
-                  job_finished t x
-                    (Ok
-                       ( { Envelope.Incoming.data= b
-                         ; received_at= Time.now ()
-                         ; sender= Remote peer }
-                       , x.attempts )) ;
-                  Ok () )
-                else Or_error.error_string "State had wrong hash" )
-          with
-          | Unequal_lengths ->
-              fail ~punish:()
-                (Error.of_string "Got wrong number of external transitions")
-          | Ok rs -> (
-            match Or_error.all_unit rs with
-            | Error e ->
-                fail ~punish:() e
-            | Ok () ->
-                () ) ) )
-
-  let is_empty t = Q.is_empty t.pending && Q.is_empty t.stalled
-
-  let all_stalled t = Q.is_empty t.pending
-
-  let max_chunk_length = 5
-
-  let rec step t =
-    if is_empty t then (
-      match%bind Strict_pipe.Reader.read t.flush_r with
-      | `Eof ->
-          [%log' debug t.logger] "Downloader: flush eof" ;
-          Deferred.unit
-      | `Ok () ->
-          [%log' debug t.logger] "Downloader: flush" ;
-          step t )
-    else if all_stalled t then (
-      [%log' debug t.logger] "Downloader: all stalled" ;
-      (* TODO: Put a log here *)
-      match%bind
-        choose
-          [ Pipe.read_choice_single_consumer_exn (reader t.flush_r) [%here]
-          ; Pipe.read_choice_single_consumer_exn (reader t.got_new_peers_r)
-              [%here] ]
-      with
-      | `Ok () ->
-          [%log' debug t.logger] "Downloader: keep going" ;
-          step t
-      | `Eof ->
-          [%log' debug t.logger] "Downloader: other eof" ;
-          Deferred.unit )
-    else (
-      [%log' debug t.logger] "Downloader: else"
-        ~metadata:
-          [ ( "peer_available"
-            , `Bool
-                (Option.is_some
-                   ( Strict_pipe.Reader.to_linear_pipe t.useful_peers.r
-                   |> Linear_pipe.peek )) ) ] ;
-      match%bind Useful_peers.read t.useful_peers with
-      | `Eof ->
-          Deferred.unit
-      | `Ok (peer, _hs) -> (
-          [%log' debug t.logger] "Downloader: got $peer"
-            ~metadata:[("peer", Peer.to_yojson peer)] ;
-          let to_download =
-            let rec go n acc skipped =
-              if n >= max_chunk_length then acc
-              else
-                match Q.dequeue t.pending with
-                | None ->
-                    (* We can just enqueue directly into pending without going thru
-                    enqueue_exn since we know these skipped jobs are not stalled*)
-                    List.iter (List.rev skipped) ~f:(Q.enqueue_exn t.pending) ;
-                    List.rev acc
-                | Some x ->
-                    if Map.mem x.attempts peer then go n acc (x :: skipped)
-                    else go (n + 1) (x :: acc) skipped
-            in
-            go 0 [] []
+    let%test_unit "can catchup to a peer within [2/k,k]" =
+      Quickcheck.test ~trials:5
+        Fake_network.Generator.(
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind peer_branch_size =
+            Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          [%log' debug t.logger] "Downloader: to download $n"
-            ~metadata:[("n", `Int (List.length to_download))] ;
-          match to_download with
-          | [] ->
-              make_peer_available t peer ; step t
-          | _ :: _ ->
-              don't_wait_for (download t peer to_download) ;
-              step t ) )
+          gen ~precomputed_values ~max_frontier_length
+            [ fresh_peer
+            ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [my_net; peer_net] = network.peer_networks in
+          (* TODO: I don't think I'm testing this right... *)
+          let target_best_tip_path =
+            Transition_frontier.(
+              path_map ~f:Fn.id peer_net.state.frontier
+                (best_tip peer_net.state.frontier))
+          in
+          Thread_safe.block_on_async_exn (fun () ->
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
-  let to_json t : Yojson.Safe.t =
-    check_invariant t ; 
-    let list xs =
-      `Assoc [("length", `Int (List.length xs)); ("elts", `List xs)]
-    in
-    let f q = list (List.map ~f:Job.to_yojson (Q.to_list q)) in
-    `Assoc
-      [ ("total_jobs", `Int (total_jobs t))
-      ; ("pending", f t.pending)
-      ; ("stalled", f t.stalled)
-      ; ( "downloading"
-        , list
-            (List.map (Hashtbl.to_alist t.downloading) ~f:(fun (h, (p, _)) ->
-                 `Assoc
-                   [ ("hash", State_hash.to_yojson h)
-                   ; ("peer", `String (Peer.to_multiaddr_string p)) ] )) ) ]
+    let%test_unit "catchup succeeds even if the parent transition is already \
+                   in the frontier" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~max_frontier_length
+            [fresh_peer; peer_with_branch ~frontier_branch_size:1])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [my_net; peer_net] = network.peer_networks in
+          let target_best_tip_path =
+            [Transition_frontier.best_tip peer_net.state.frontier]
+          in
+          Thread_safe.block_on_async_exn (fun () ->
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
-  let create ~stop ~trust_system ~network =
-    let%map all_peers = Mina_networking.peers network in
-    let pipe ~name c =
-      Strict_pipe.create ~name (Buffered (`Capacity c, `Overflow Drop_head))
-    in
-    let flush_r, flush_w = pipe ~name:"flush" 0 in
-    let got_new_peers_r, got_new_peers_w = pipe ~name:"got_new_peers" 0 in
-    let t =
-      { all_peers= Peer.Set.of_list all_peers
-      ; pending= Q.create ()
-      ; stalled= Q.create ()
-      ; next_flush= None
-      ; flush_r
-      ; flush_w
-      ; got_new_peers_r
-      ; got_new_peers_w
-      ; useful_peers= Useful_peers.create ~all_peers
-      ; network
-      ; logger= Logger.create ()
-      ; trust_system
-      ; downloading= State_hash.Table.create ()
-      ; stop }
-    in
-    don't_wait_for (step t) ;
-    upon stop (fun () -> tear_down t) ;
-    every ~stop (Time.Span.of_sec 10.) (fun () ->
-        [%log' debug t.logger]
-          ~metadata:[("jobs", to_json t)]
-          "Downloader jobs" ) ;
-    Clock.every' ~stop peer_refresh_interval (fun () -> refresh_peers t) ;
-    t
+    let%test_unit "catchup fails if one of the parent transitions fail" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~precomputed_values ~max_frontier_length
+            [ fresh_peer
+            ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
+            ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [my_net; peer_net] = network.peer_networks in
+          let target_breadcrumb =
+            Transition_frontier.best_tip peer_net.state.frontier
+          in
+          let failing_transition =
+            let open Transition_frontier.Extensions in
+            let history =
+              get_extension
+                (Transition_frontier.extensions peer_net.state.frontier)
+                Root_history
+            in
+            let failing_root_data =
+              List.nth_exn (Root_history.to_list history) 1
+            in
+            downcast_transition
+              (Frontier_base.Root_data.Historical.transition failing_root_data)
+          in
+          Thread_safe.block_on_async_exn (fun () ->
+              let%bind `Test {cache; _}, `Cached_transition cached_transition =
+                run_catchup_with_target ~network:my_net.network
+                  ~frontier:my_net.state.frontier ~target_breadcrumb
+              in
+              let cached_failing_transition =
+                Transition_handler.Unprocessed_transition_cache.register_exn
+                  cache failing_transition
+              in
+              let%bind () = after (Core.Time.Span.of_sec 1.) in
+              ignore
+                (Cache_lib.Cached.invalidate_with_failure
+                   cached_failing_transition) ;
+              let%map result =
+                Block_time.Timeout.await_exn time_controller
+                  ~timeout_duration:(Block_time.Span.of_ms 10000L)
+                  (Ivar.read (Cache_lib.Cached.final_state cached_transition))
+              in
+              if result <> `Failed then
+                failwith "expected ledger catchup to fail, but it succeeded" )
+          )
 
-  (* After calling download, if no one else has called within time [max_wait], 
-       we flush our queue. *)
-  let download t ~state_hash:hash ~blockchain_length ~attempts : Job.t =
-    match (Q.lookup t.pending hash, Q.lookup t.stalled hash) with
-    | Some _, Some _ ->
-        assert false
-    | Some x, None | None, Some x ->
-        x
-    | None, None ->
-        flush_soon t ;
-        let e = {hash; blockchain_length; attempts; res= Ivar.create ()} in
-        enqueue_exn t e ; e
-end *)
+    (* TODO: fix and re-enable *)
+    let%test_unit "super catchup won't be blocked by transitions that are \
+                   still being processed" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~max_frontier_length ~precomputed_values
+            [ fresh_peer
+            ; peer_with_branch ~frontier_branch_size:(max_frontier_length - 1)
+            ])
+        ~f:(fun network ->
+          let open Fake_network in
+          let [my_net; peer_net] = network.peer_networks in
+          Core.Printf.printf "$my_net.state.frontier.root = %s\n"
+            ( State_hash.to_base58_check
+            @@ Transition_frontier.(
+                 Breadcrumb.state_hash @@ root my_net.state.frontier) ) ;
+          Core.Printf.printf "$peer_net.state.frontier.root = %s\n"
+            ( State_hash.to_base58_check
+            @@ Transition_frontier.(
+                 Breadcrumb.state_hash @@ root my_net.state.frontier) ) ;
+          let missing_breadcrumbs =
+            let best_tip_path =
+              Transition_frontier.best_tip_path peer_net.state.frontier
+            in
+            Core.Printf.printf "$best_tip_path=\n  %s\n"
+              ( String.concat ~sep:"\n  "
+              @@ List.map
+                   ~f:
+                     (Fn.compose State_hash.to_base58_check
+                        Transition_frontier.Breadcrumb.state_hash)
+                   best_tip_path ) ;
+            (* List.take best_tip_path (List.length best_tip_path - 1) *)
+            best_tip_path
+          in
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let%bind {cache; job_writer; breadcrumbs_reader} =
+                run_catchup ~network:my_net.network
+                  ~frontier:my_net.state.frontier
+              in
+              let jobs =
+                List.map (List.rev missing_breadcrumbs) ~f:(fun breadcrumb ->
+                    let parent_hash =
+                      Transition_frontier.Breadcrumb.parent_hash breadcrumb
+                    in
+                    let cached_transition =
+                      Transition_handler.Unprocessed_transition_cache
+                      .register_exn cache
+                        (downcast_breadcrumb breadcrumb)
+                    in
+                    Core.Printf.printf "$job = %s --> %s\n"
+                      ( State_hash.to_base58_check
+                      @@ External_transition.Initial_validated.state_hash
+                      @@ Envelope.Incoming.data
+                      @@ Cached.peek cached_transition )
+                      (State_hash.to_base58_check parent_hash) ;
+                    (parent_hash, [Rose_tree.T (cached_transition, [])]) )
+              in
+              let%bind () = after (Core.Time.Span.of_ms 500.) in
+              List.iter jobs ~f:(Strict_pipe.Writer.write job_writer) ;
+              match%map
+                Block_time.Timeout.await_exn time_controller
+                  ~timeout_duration:(Block_time.Span.of_ms 15000L)
+                  (Strict_pipe.Reader.fold_until breadcrumbs_reader
+                     ~init:missing_breadcrumbs
+                     ~f:(fun remaining_breadcrumbs
+                        (rose_trees, catchup_signal)
+                        ->
+                       let[@warning "-8"] [rose_tree] = rose_trees in
+                       let catchup_breadcrumb_tree =
+                         Rose_tree.map rose_tree
+                           ~f:Cached.invalidate_with_success
+                       in
+                       Core.Printf.printf "!!!%d\n"
+                         ( List.length
+                         @@ Rose_tree.flatten catchup_breadcrumb_tree ) ;
+                       let[@warning "-8"] [received_breadcrumb] =
+                         Rose_tree.flatten catchup_breadcrumb_tree
+                       in
+                       match remaining_breadcrumbs with
+                       | [] ->
+                           failwith "received more breadcrumbs than expected"
+                       | expected_breadcrumb :: remaining_breadcrumbs' ->
+                           Core.Printf.printf "COMPARING %s vs. %s..."
+                             ( State_hash.to_base58_check
+                             @@ Transition_frontier.Breadcrumb.state_hash
+                                  expected_breadcrumb )
+                             ( State_hash.to_base58_check
+                             @@ Transition_frontier.Breadcrumb.state_hash
+                                  received_breadcrumb ) ;
+                           [%test_eq: State_hash.t]
+                             (Transition_frontier.Breadcrumb.state_hash
+                                expected_breadcrumb)
+                             (Transition_frontier.Breadcrumb.state_hash
+                                received_breadcrumb)
+                             ~message:
+                               "received breadcrumb state hash did not match \
+                                expected breadcrumb state hash" ;
+                           [%test_eq: Transition_frontier.Breadcrumb.t]
+                             expected_breadcrumb received_breadcrumb
+                             ~message:
+                               "received breadcrumb matched expected state \
+                                hash, but was not equal to expected breadcrumb" ;
+                           ( match catchup_signal with
+                           | `Catchup_scheduler ->
+                               failwith
+                                 "Did not expect a catchup scheduler action"
+                           | `Ledger_catchup ivar ->
+                               Ivar.fill ivar () ) ;
+                           print_endline " ok" ;
+                           if remaining_breadcrumbs' = [] then
+                             return (`Stop ())
+                           else return (`Continue remaining_breadcrumbs') ))
+              with
+              | `Eof _ ->
+                  failwith "unexpected EOF"
+              | `Terminated () ->
+                  () ) )
+  end )
