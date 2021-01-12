@@ -322,12 +322,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                       [ ("new_root", State_hash.to_yojson new_state_hash)
                       ; ("state_hash", State_hash.to_yojson hash) ]
                     "Protocol state (for scan state transactions) for \
-                     $state_hash not found when boostrapping to the new root \
+                     $state_hash not found when bootstrapping to the new root \
                      $new_root" ;
                   Or_error.errorf
                     !"Protocol state (for scan state transactions) for \
-                      %{sexp:State_hash.t} not found when boostrapping to the \
-                      new root %{sexp:State_hash.t}"
+                      %{sexp:State_hash.t} not found when bootstrapping to \
+                      the new root %{sexp:State_hash.t}"
                     hash new_state_hash
               | Some protocol_state ->
                   Ok protocol_state
