@@ -1,7 +1,6 @@
 FROM python:3.7-slim-stretch
 
 ARG GCLOUDSDK_DOWNLOAD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-296.0.1-linux-x86_64.tar.gz"
-ARG WATCHMAN_DEB_URL="http://ftp.us.debian.org/debian/pool/main/w/watchman/watchman_4.9.0-5+b1_amd64.deb"
 
 RUN apt update && apt install -y \
     gnupg2 lsb-core apt-transport-https git curl jq wget \
