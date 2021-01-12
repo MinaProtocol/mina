@@ -334,10 +334,17 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode
+(* This is a hack put in place to deal with nodes getting stuck
+   in Offline states, that is, not receiving blocks for an extended period.
+
+   To address this, we restart the libp2p helper when we become offline. *)
+let next_helper_restart = ref None
+
+let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
+  let restart_delay = Time.Span.of_min 5. in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -347,6 +354,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
         else
           match online_status with
           | `Offline ->
+              ( match !next_helper_restart with
+              | None ->
+                  next_helper_restart :=
+                    Some
+                      (Async.Clock.Event.run_after restart_delay
+                         (fun () ->
+                           Mina_networking.restart_helper net ;
+                           next_helper_restart := None )
+                         ())
+              | Some _ ->
+                  () ) ;
               if `Empty = first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
@@ -355,19 +373,22 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
                 `Listening )
               else `Offline
           | `Online -> (
-            match active_status with
-            | None ->
-                let logger = Logger.create () in
-                [%str_log info] Bootstrapping ;
-                `Bootstrap
-            | Some (_, catchup_jobs) ->
-                let logger = Logger.create () in
-                if catchup_jobs > 0 then (
-                  [%str_log info] Ledger_catchup ;
-                  `Catchup )
-                else (
-                  [%str_log info] Synced ;
-                  `Synced ) ) )
+              Option.iter !next_helper_restart ~f:(fun e ->
+                  Async.Clock.Event.abort_if_possible e () ) ;
+              next_helper_restart := None ;
+              match active_status with
+              | None ->
+                  let logger = Logger.create () in
+                  [%str_log info] Bootstrapping ;
+                  `Bootstrap
+              | Some (_, catchup_jobs) ->
+                  let logger = Logger.create () in
+                  if catchup_jobs > 0 then (
+                    [%str_log info] Ledger_catchup ;
+                    `Catchup )
+                  else (
+                    [%str_log info] Synced ;
+                    `Synced ) ) )
   in
   let observer = observe incremental_status in
   (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
@@ -772,6 +793,7 @@ let start_with_precomputed_blocks t blocks =
   start t
 
 let create ?wallets (config : Config.t) =
+  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -1154,6 +1176,7 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                  ~catchup_mode
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
@@ -1391,7 +1414,7 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger
+            create_sync_status_observer ~logger:config.logger ~net
               ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
