@@ -7,7 +7,7 @@ Side-Car - Watchman: volume definition
 */}}
 {{- define "sideCar.watchman.volume" }}
 {{- if .watchman.enable }}
-- name: {{ .watchman.volume_name }}
+- name: {{ .watchman.volumeName }}
   emptyDir: {}
 {{- end }}
 {{- end }}
