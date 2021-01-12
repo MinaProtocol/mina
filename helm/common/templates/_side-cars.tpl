@@ -6,8 +6,10 @@
 Side-Car - Watchman: volume definition
 */}}
 {{- define "sideCar.watchman.volume" }}
+{{- if .watchman.enable }}
 - name: {{ .watchman.volume_name }}
   emptyDir: {}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -42,7 +44,7 @@ Side-Car - Watchman: container definition
   volumeMounts:
 {{- include "sideCar.watchman.volumeMount" . | indent 2 }}
   env:
-{{- include "sideCar.watch.envVars" . | indent 2 }}
+{{- include "sideCar.watchman.envVars" . | indent 2 }}
 {{- end }}
 {{- end }}
 
@@ -52,6 +54,7 @@ Side-Car - Watchman: container definition
 Side-Car - Watchman: container life-cycle definition for post-start/pre-stop operations related to collecting Core dumps
 */}}
 {{- define "sideCar.watchman.lifeCycleHook.coreDump" }}
+{{- if .watchman.enable }}
 lifecycle:
   postStart:
     exec:
@@ -59,4 +62,5 @@ lifecycle:
   preStop:
     exec:
       command: ["ls","-lah", "{{ .watchman.volumeMountPath }}"]
+{{- end }}
 {{- end }}
