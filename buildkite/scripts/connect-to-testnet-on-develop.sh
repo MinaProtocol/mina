@@ -5,8 +5,8 @@ set -eo pipefail
 echo "Disabled for now as we don't have a testnet online yet"
 exit 0
 
-if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "develop" ]; then
-  echo "Not pulling against develop, not running the connect test"
+if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
+  echo "Not pulling against compatible, not running the connect test"
   exit 0
 fi
 
@@ -25,7 +25,7 @@ echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt
 apt-get update
 apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 
-TESTNET_NAME="turbo-pickles"
+TESTNET_NAME="testworld"
 
 
 # Generate genesis proof and then crash due to no peers
