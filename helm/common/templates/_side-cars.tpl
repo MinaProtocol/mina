@@ -16,8 +16,10 @@ Side-Car - Watchman: volume definition
 Side-Car - Watchman: volume-mount definition
 */}}
 {{- define "sideCar.watchman.volumeMount" }}
+{{- if .watchman.enable }}
 - name: {{ .watchman.volumeName }}
   mountPath: {{ .watchman.volumeMountPath }}
+{{- end }}
 {{- end }}
 
 {{/*
