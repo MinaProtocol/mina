@@ -1004,6 +1004,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+
 		id := c.RemotePeer()
 
 		app.writeMsg(peerConnectionUpcall{
@@ -1018,6 +1020,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+
 		id := c.RemotePeer()
 
 		app.writeMsg(peerConnectionUpcall{
@@ -1033,6 +1037,11 @@ const (
 	latencyMeasurementTime = time.Second * 5
 	metricsRefreshTime     = time.Minute
 )
+
+func (app *app) updateConnectionMetrics() {
+	info := app.P2p.ConnectionManager.GetInfo()
+	connectionCountMetric.Set(float64(info.ConnCount))
+}
 
 func (a *app) checkBandwidth(id peer.ID) {
 	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -1268,9 +1277,14 @@ type successResult struct {
 	Duration string          `json:"duration"`
 }
 
+var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "connection_count",
+	Help: "Number of active connections, according to the CodaConnectionManager.",
+})
+
 func init() {
 	// === Register metrics collectors here ===
-	// currently, we only register the default go collector (which promhttp does automatically for us)
+	prometheus.MustRegister(connectionCountMetric)
 	http.Handle("/metrics", promhttp.Handler())
 }
 
