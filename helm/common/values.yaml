@@ -16,3 +16,5 @@ watchman:
   # volumeName: watchman-dir
   # volumeMountPath: /tmp
   # command: ls
+  # envVars:
+  #   GCS_UPLOAD_URL: gs://mina-crash-dumps

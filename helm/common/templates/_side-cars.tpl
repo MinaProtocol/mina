@@ -6,35 +6,27 @@
 Side-Car - Watchman: volume definition
 */}}
 {{- define "sideCar.watchman.volume" }}
-{{- if .watchman.enable }}
 - name: {{ .watchman.volume_name }}
   emptyDir: {}
 {{- end }}
-{{- end }}
-
 
 {{/*
 Side-Car - Watchman: volume-mount definition
 */}}
 {{- define "sideCar.watchman.volumeMount" }}
-{{- if .watchman.enable }}
 - name: {{ .watchman.volumeName }}
   mountPath: {{ .watchman.volumeMountPath }}
 {{- end }}
-{{- end }}
 
 {{/*
-Side-Car - Watchman: container life-cycle definition for post-start/pre-stop operations related to collecting Core dumps
+Side-Car - Watchman: environment variable definition
 */}}
-{{- define "sideCar.watchman.lifeCycleHook.coreDump" }}
-{{- if .watchman.enable }}
-lifecycle:
-  postStart:
-    exec:
-      command: ["echo", "'{{ .watchman.volumeMountPath }}/core.%h.%e.%t' > /proc/sys/kernel/core_pattern"]
-  preStop:
-    exec:
-      command: ["ls","-lah", "{{ .watchman.volumeMountPath }}"]
+{{- define "sideCar.watchman.envVars" }}
+- name: WATCHMAN_MOUNT_PATH
+  value: {{ .wathcman.volumeMountPath }}
+{{- range $key, $val := .watchman.envVars }}
+- name: {{ $key }}
+  value: {{ $val | quote }}
 {{- end }}
 {{- end }}
 
@@ -49,5 +41,22 @@ Side-Car - Watchman: container definition
   imagePullPolicy: Always
   volumeMounts:
 {{- include "sideCar.watchman.volumeMount" . | indent 2 }}
+  env:
+{{- include "sideCar.watch.envVars" . | indent 2 }}
 {{- end }}
+{{- end }}
+
+# *** Core Dump (Watch) Helpers ***
+
+{{/*
+Side-Car - Watchman: container life-cycle definition for post-start/pre-stop operations related to collecting Core dumps
+*/}}
+{{- define "sideCar.watchman.lifeCycleHook.coreDump" }}
+lifecycle:
+  postStart:
+    exec:
+      command: ["echo", "'{{ .watchman.volumeMountPath }}/core.%h.%e.%t' > /proc/sys/kernel/core_pattern"]
+  preStop:
+    exec:
+      command: ["ls","-lah", "{{ .watchman.volumeMountPath }}"]
 {{- end }}
