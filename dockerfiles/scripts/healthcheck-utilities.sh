@@ -8,15 +8,27 @@ function isDaemonSynced() {
     )
 
     case ${status} in
+      \"BOOTSTRAP\")
+        ;&
+      \"CATCHUP\")
+        ;&
+      \"CONNECTING\")
+        ;&
       \"SYNCED\")
         return 0
         ;;
       *)
-        now=$(date +%s)
-        timestamp=$(grep 'timestamp' /root/daemon.json | awk '{print $2}' | sed -e s/\"//g)
-        timestamp_second=$(date -d ${timestamp} +%s)
-        [[ $now -le $timestamp_seconds ]] && return 0 # special case to claim synced before the genesis timestamp
-        echo "Daemon is out of sync with status: ${status}" && return 1
+        DAEMON_CONFIG="/root/daemon.json"
+        if [ -f "$DAEMON_CONFIG" ]; then
+            now=$(date +%s)
+            timestamp=$(grep 'timestamp' ${DAEMON_CONFIG} | awk '{print $2}' | sed -e s/\"//g)
+            timestamp_second=$(date -d ${timestamp} +%s)
+
+            [[ $now -le $timestamp_seconds ]] && return 0 # special case to claim synced before the genesis timestamp
+        fi
+        echo "Daemon is out of sync with status: ${status}"
+
+        return 1
     esac
 }
 

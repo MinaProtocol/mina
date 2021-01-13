@@ -9,12 +9,12 @@ open Core_kernel
 [%%ifdef
 consensus_mechanism]
 
-open Coda_numbers
+open Mina_numbers
 open Snark_params.Tick
 
 [%%else]
 
-open Coda_numbers_nonconsensus.Coda_numbers
+open Mina_numbers_nonconsensus.Mina_numbers
 open Snark_params_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 
@@ -26,8 +26,8 @@ module type Gen_intf = sig
   module Gen : sig
     (** Generate a single transaction between
     * Generate random keys for sender and receiver
-    * for fee $\in [Coda_compile_config.minimum_user_command_fee,
-    * Coda_compile_config.minimum_user_command_fee+fee_range]$
+    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+    * Mina_compile_config.minimum_user_command_fee+fee_range]$
     * and an amount $\in [1,max_amount]$
     *)
     val payment :
@@ -44,8 +44,8 @@ module type Gen_intf = sig
 
     (** Generate a single transaction between
     * $a, b \in keys$
-    * for fee $\in [Coda_compile_config.minimum_user_command_fee,
-    * Coda_compile_config.minimum_user_command_fee+fee_range]$
+    * for fee $\in [Mina_compile_config.minimum_user_command_fee,
+    * Mina_compile_config.minimum_user_command_fee+fee_range]$
     * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
@@ -84,7 +84,7 @@ module type Gen_intf = sig
       -> ?sign_type:[`Fake | `Real]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t
+         * Mina_numbers.Account_nonce.t
          * Account_timing.t )
          array
       -> t list Quickcheck.Generator.t

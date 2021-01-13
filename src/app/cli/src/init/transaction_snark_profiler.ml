@@ -119,15 +119,15 @@ let rec pair_up = function
 let precomputed_values = Precomputed_values.compiled
 
 let state_body =
-  Coda_state.(
+  Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
         values.protocol_state_with_hash.data |> Protocol_state.body ))
 
 let curr_state_view =
-  Lazy.map state_body ~f:Coda_state.Protocol_state.Body.view
+  Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
 let state_body_hash =
-  Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
+  Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =

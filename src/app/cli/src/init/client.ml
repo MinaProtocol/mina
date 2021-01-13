@@ -436,7 +436,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
+      ; valid_until: Mina_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -454,7 +454,7 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until= Some (Coda_numbers.Global_slot.random ())
+          ; valid_until= Some (Mina_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -631,8 +631,8 @@ let create_new_account_graphql =
                Deferred.return token_owner
            | None when Token_id.(equal default) token ->
                (* NOTE: Doesn't matter who we say the owner is for the default
-                  token, arbitrarily choose the receiver.
-               *)
+                        token, arbitrarily choose the receiver.
+                  *)
                Deferred.return receiver
            | None -> (
                let%map token_owner =
@@ -737,7 +737,7 @@ let cancel_transaction_graphql =
            int_of_string nonce
          in
          let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int
+           Mina_numbers.Account_nonce.to_int
              (Signed_command.nonce user_command)
          in
          let inferred_nonce =
@@ -767,7 +767,7 @@ let cancel_transaction_graphql =
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
-                  (Coda_numbers.Account_nonce.to_uint32
+                  (Mina_numbers.Account_nonce.to_uint32
                      (Signed_command.nonce user_command)))
              ()
          in
@@ -1349,7 +1349,7 @@ let create_hd_account =
              (response#createHDAccount)#public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
-           (Coda_numbers.Hd_index.to_string hd_index)
+           (Mina_numbers.Hd_index.to_string hd_index)
            pk_string ))
 
 let unlock_account =
@@ -1422,18 +1422,18 @@ let generate_libp2p_keypair =
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
-            Coda_net2.create ~logger ~conf_dir:tmpd
+            Mina_net2.create ~logger ~conf_dir:tmpd
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
           with
           | Ok net ->
-              let%bind me = Coda_net2.Keypair.random net in
-              let%bind () = Coda_net2.shutdown net in
+              let%bind me = Mina_net2.Keypair.random net in
+              let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
                   me
               in
-              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
                 ~metadata:[("error", Error_json.error_to_yojson e)] ;
@@ -1527,8 +1527,8 @@ let add_peers_graphql =
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
                match
-                 Coda_net2.Multiaddr.of_string peer
-                 |> Coda_net2.Multiaddr.to_peer
+                 Mina_net2.Multiaddr.of_string peer
+                 |> Mina_net2.Multiaddr.to_peer
                  |> Option.map ~f:Network_peer.Peer.to_display
                with
                | Some peer ->
@@ -1705,6 +1705,91 @@ let object_lifetime_statistics =
              printf "Failed to get object lifetime statistics: %s\n%!"
                (Error.to_string_hum err) ))
 
+let archive_precomputed_blocks =
+  let archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
+  let files =
+    Command.Param.anon
+      Command.Anons.(sequence ("FILES" %: Command.Param.string))
+  in
+  Command.async
+    ~summary:
+      "Archive a precomputed block from a file.\n\n\
+       If an archive address is given, this process will communicate with the \
+       archive node directly; otherwise it will communicate through the \
+       daemon over the rest-server"
+    (Cli_lib.Background_daemon.graphql_init
+       (Command.Param.both archive_process_location files)
+       ~f:(fun graphql_endpoint (archive_process_location, files) ->
+         let send_block block =
+           match archive_process_location with
+           | Some archive_process_location ->
+               (* Connect directly to the archive node. *)
+               Mina_lib.Archive_client.dispatch_precomputed_block
+                 archive_process_location block
+           | None ->
+               (* Send the requests over GraphQL. *)
+               let block =
+                 Mina_transition.External_transition.Precomputed_block
+                 .to_yojson block
+                 |> Yojson.Safe.to_basic
+               in
+               let%map.Deferred.Or_error.Let_syntax _res =
+                 (* Don't catch this error: [query_exn] already handles
+                    printing etc.
+                 *)
+                 Graphql_client.query
+                   (Graphql_queries.Archive_precomputed_block.make ~block ())
+                   graphql_endpoint
+                 |> Deferred.Result.map_error ~f:(function
+                      | `Failed_request e ->
+                          Error.create "Unable to connect to Coda daemon" ()
+                            (fun () ->
+                              Sexp.List
+                                [ List
+                                    [ Atom "uri"
+                                    ; Atom
+                                        (Uri.to_string graphql_endpoint.value)
+                                    ]
+                                ; List
+                                    [ Atom "uri_flag"
+                                    ; Atom graphql_endpoint.name ]
+                                ; List [Atom "error_message"; Atom e] ] )
+                      | `Graphql_error e ->
+                          Error.createf "GraphQL error: %s" e )
+               in
+               ()
+         in
+         Deferred.List.iter files ~f:(fun path ->
+             match%map
+               let open Deferred.Or_error.Let_syntax in
+               let%bind precomputed_block_json =
+                 Or_error.try_with (fun () ->
+                     In_channel.with_file path ~f:(fun in_channel ->
+                         Yojson.Safe.from_channel in_channel ) )
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg err "Could not parse JSON from file" path
+                          String.sexp_of_t )
+                 |> Deferred.return
+               in
+               let%bind precomputed_block =
+                 Mina_transition.External_transition.Precomputed_block
+                 .of_yojson precomputed_block_json
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg (Error.of_string err)
+                          "Could not parse JSON as a precomputed block from \
+                           file"
+                          path String.sexp_of_t )
+                 |> Deferred.return
+               in
+               send_block precomputed_block
+             with
+             | Ok () ->
+                 Format.printf "Sent block to archive node from %s@." path
+             | Error err ->
+                 Format.eprintf
+                   "Failed to send block to archive node from %s. Error:@.%s@."
+                   path (Error.to_string_hum err) ) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1816,4 +1901,5 @@ let advanced =
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
-    ; ("object-lifetime-statistics", object_lifetime_statistics) ]
+    ; ("object-lifetime-statistics", object_lifetime_statistics)
+    ; ("archive-precomputed-blocks", archive_precomputed_blocks) ]

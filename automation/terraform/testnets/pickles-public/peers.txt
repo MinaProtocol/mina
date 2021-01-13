@@ -1,0 +1,4 @@
+/ip4/35.223.249.70/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr/
+/dns4/seed-one.pickles-public.o1test.net/tcp/10001/p2p/12D3KooWJ9mNdbUXUpUNeMnejRumKzmQF15YeWwAPAhTAWB6dhiv/
+/dns4/seed-two.pickles-public.o1test.net/tcp/10001/p2p/12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5/
+/ip4/35.222.177.215/tcp/10513/p2p/12D3KooWJT44QbRKh17gDL3gmj81e4EhaA9AZYTXTQnEVowd6orU/

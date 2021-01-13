@@ -268,7 +268,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
   let txn_global_slot =
     cmd.txn_global_slot |> Unsigned.UInt32.of_int64
-    |> Coda_numbers.Global_slot.of_uint32
+    |> Mina_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
     Error.tag_arg err "Could not apply internal command"
@@ -344,7 +344,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
   in
   let txn_global_slot =
     cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
-    |> Coda_numbers.Global_slot.of_uint32
+    |> Mina_numbers.Global_slot.of_uint32
   in
   let undo_or_error =
     Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
@@ -416,7 +416,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
   let memo = Signed_command_memo.of_string cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
-        Coda_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
+        Mina_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
   in
   let payload =
     Signed_command_payload.create
