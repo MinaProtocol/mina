@@ -1106,6 +1106,15 @@ let create ?wallets (config : Config.t) =
               ~get_transition_chain:
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
+              ~get_transition_knowledge:(fun _q ->
+                return
+                  ( match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                  | None ->
+                      []
+                  | Some frontier ->
+                      Sync_handler.best_tip_path ~frontier ) )
           in
           (* tie the first knot *)
           net_ref := Some net ;
