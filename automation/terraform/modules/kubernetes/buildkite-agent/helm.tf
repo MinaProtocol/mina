@@ -217,6 +217,9 @@ locals {
         for cluster in "${!k8s_cluster_mappings[@]}"; do
             gcloud container clusters get-credentials "${cluster}" --region "${k8s_cluster_mappings[$cluster]}"
         done
+
+        # set agent default Kubernetes context (Mina integration)
+        kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
       EOF
     }
   }
