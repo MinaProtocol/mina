@@ -91,28 +91,6 @@ let getTransactionSentByUser = blocks => {
   blocks |> calculateProperty(calculateTransactionSent);
 };
 
-let calculateCreateTokenAndSend = (map, block: Types.Block.t) => {
-  block.userCommands
-  |> Array.fold_left(
-       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
-         switch (userCommand.type_, userCommand.status) {
-         | (Payment, Some(Applied)) =>
-           /* If tokenID is 1, that means it's native coda */
-           if (userCommand.token |> int_of_string != 1) {
-             incrementMapValue(userCommand.fromAccount, transactionMap);
-           } else {
-             transactionMap;
-           }
-         | _ => transactionMap
-         }
-       },
-       map,
-     );
-};
-
-let getCreateTokenAndSend = blocks => {
-  blocks |> calculateProperty(calculateCreateTokenAndSend);
-};
 
 /*
   Due to snarkJobs not being apart of the archive API, we calculate
@@ -253,7 +231,6 @@ let calculateMetrics = blocks => {
   let transactionsReceivedByEcho =
     getTransactionsSentToAddress(blocks, echoBotPublicKeys);
   let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
-  let createAndSendToken = getCreateTokenAndSend(blocks);
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
@@ -262,7 +239,6 @@ let calculateMetrics = blocks => {
     throwAwayValues(highestSnarkFeeCollected),
     throwAwayValues(transactionsReceivedByEcho),
     throwAwayValues(coinbaseReceiverChallenge),
-    throwAwayValues(createAndSendToken),
   ])
   |> StringMap.filter((key, _) => {!List.mem(key, excludePublicKeys)})
   |> StringMap.mapi((key, _) =>
@@ -275,7 +251,6 @@ let calculateMetrics = blocks => {
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
          coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
-         createAndSendToken: StringMap.find_opt(key, createAndSendToken),
        }
      );
 };

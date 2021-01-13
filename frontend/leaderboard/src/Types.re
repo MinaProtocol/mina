@@ -41,10 +41,6 @@ module Block = {
       status: option(userCommandStatus),
       fromAccount: string,
       toAccount: string,
-      feePayerAccount: string,
-      fee: string,
-      amount: option(string),
-      token: string,
     };
 
     module Decode = {
@@ -66,11 +62,6 @@ module Block = {
               |> userCommandStatusOfString,
             fromAccount: json |> field("usercommandfromaccount", string),
             toAccount: json |> field("usercommandtoaccount", string),
-            feePayerAccount:
-              json |> field("usercommandfeepayeraccount", string),
-            fee: json |> field("usercommandfee", string),
-            amount: json |> optional(field("usercommandamount", string)),
-            token: json |> field("usercommandtoken", string),
           }
           ->Some
         | exception (DecodeError(_)) => None
@@ -98,7 +89,6 @@ module Block = {
       type_: internalCommandType,
       receiverAccount: string,
       fee: string,
-      token: string,
     };
 
     module Decode = {
@@ -116,7 +106,6 @@ module Block = {
             receiverAccount:
               json |> field("internalcommandrecipient", string),
             fee: json |> field("internalcommandfee", string),
-            token: json |> field("internalcommandtoken", string),
           }
           ->Some
         | exception (DecodeError(_)) => None
@@ -131,7 +120,6 @@ module Block = {
   module BlockChainState = {
     type t = {
       timestamp: string,
-      height: string,
       creatorAccount: string,
       coinbaseReceiver: option(string),
     };
@@ -143,7 +131,6 @@ module Block = {
           creatorAccount: json |> field("blockcreatoraccount", string),
           coinbaseReceiver: None,
           timestamp: json |> field("timestamp", string),
-          height: json |> field("height", string),
         };
       };
     };
@@ -286,6 +273,5 @@ module Metrics = {
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
     coinbaseReceiver: option(bool),
-    createAndSendToken: option(int),
   };
 };

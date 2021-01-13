@@ -8,7 +8,6 @@ let blocks = [|
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
       timestamp: "0",
-      height: "1",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -19,7 +18,6 @@ let blocks = [|
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
       timestamp: "1548878462542",
-      height: "2",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -30,7 +28,6 @@ let blocks = [|
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
       timestamp: "1548878464058",
-      height: "3",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -41,7 +38,6 @@ let blocks = [|
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
       timestamp: "1548878466000",
-      height: "4",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -52,7 +48,6 @@ let blocks = [|
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
       timestamp: "1548878468000",
-      height: "5",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -63,7 +58,6 @@ let blocks = [|
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
       timestamp: "1548878470000",
-      height: "6",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -74,7 +68,6 @@ let blocks = [|
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
       timestamp: "1548878472000",
-      height: "7",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -85,7 +78,6 @@ let blocks = [|
       creatorAccount: "publickey3",
       coinbaseReceiver: None,
       timestamp: "1548878474000",
-      height: "8",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -96,7 +88,6 @@ let blocks = [|
       creatorAccount: "publickey3",
       coinbaseReceiver: None,
       timestamp: "1548878476000",
-      height: "9",
     },
     userCommands: [||],
     internalCommands: [||],
@@ -107,13 +98,11 @@ let blocks = [|
       creatorAccount: "publickey4",
       coinbaseReceiver: None,
       timestamp: "1548878478000",
-      height: "10",
     },
     userCommands: [||],
     internalCommands: [||],
   },
 |];
-
 describe("Metrics", () => {
   describe("blocksCreatedMetric", () => {
     let blockMetrics = Metrics.getBlocksCreatedByUser(blocks);
@@ -140,7 +129,6 @@ describe("Metrics", () => {
     });
   })
 });
-
 describe("Points functions", () => {
   let blockMetrics = blocks |> Metrics.calculateMetrics;
   describe("addPointsToAtleastN", () => {
@@ -152,7 +140,6 @@ describe("Points functions", () => {
           1000,
           blockMetrics,
         );
-
       test("correct number of points given to publickey1", () => {
         expect(StringMap.find("publickey1", blockPoints)) |> toBe(1000)
       });

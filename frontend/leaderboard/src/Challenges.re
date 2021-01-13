@@ -102,19 +102,6 @@ let sendMinaChallenge = metricsMap => {
   );
 };
 
-let createAndSendTokenChallenge = metricsMap => {
-  [
-    // you will receive 1000 pts for minting and sending your own token to another account
-    Points.addPointsToUsersWithAtleastN(
-      (metricRecord: Types.Metrics.t) => metricRecord.createAndSendToken,
-      1,
-      1000,
-      metricsMap,
-    ),
-  ]
-  |> Points.sumPointsMaps;
-};
-
 let calculatePoints = (challengeName, metricsMap) => {
   switch (String.lowercase_ascii(challengeName)) {
   | "produce blocks on mina" => Some(blocksChallenge(metricsMap))
