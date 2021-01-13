@@ -81,6 +81,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     Unsigned.UInt32.of_int64 block.global_slot_since_genesis
   in
   let timestamp = Block_time.of_int64 block.timestamp in
+  (* commands to be filled in later *)
   return
     { Extensional.Block.state_hash
     ; parent_hash
@@ -95,7 +96,9 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; height
     ; global_slot
     ; global_slot_since_genesis
-    ; timestamp }
+    ; timestamp
+    ; user_cmds= []
+    ; internal_cmds= [] }
 
 let fill_in_user_command pool block_state_hash =
   let query_db ~item ~f = query_db pool ~item ~f in
@@ -168,7 +171,6 @@ let fill_in_user_command pool block_state_hash =
       in
       return
         { Extensional.User_command.sequence_no
-        ; block_state_hash
         ; typ
         ; fee_payer
         ; source
@@ -246,7 +248,7 @@ let fill_in_internal_command pool block_state_hash =
               cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
-let main ~archive_uri ~output_file ~state_hash () =
+let main ~archive_uri ~state_hash () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
   (* sanity-check input state hash *)
@@ -281,59 +283,34 @@ let main ~archive_uri ~output_file ~state_hash () =
       in
       [%log info] "Found a subchain of length %d"
         (List.length extensional_blocks) ;
-      (* the user commands in a block with a given state hash *)
-      let user_cmds_tbl : Extensional.User_command.t list State_hash.Table.t =
-        State_hash.Table.create ()
-      in
-      (* the internal commands in a block with a given state hash *)
-      let internal_cmds_tbl :
-          Extensional.Internal_command.t list State_hash.Table.t =
-        State_hash.Table.create ()
-      in
       [%log info] "Querying for user commands in blocks" ;
-      let%bind () =
-        Deferred.List.iter extensional_blocks ~f:(fun block ->
+      let%bind blocks_with_user_cmds =
+        Deferred.List.map extensional_blocks ~f:(fun block ->
             let%map user_cmds = fill_in_user_command pool block.state_hash in
-            match
-              State_hash.Table.add user_cmds_tbl ~key:block.state_hash
-                ~data:user_cmds
-            with
-            | `Ok ->
-                ()
-            | `Duplicate ->
-                [%log error] "Duplicate entry in user commands table"
-                  ~metadata:
-                    [("state_hash", State_hash.to_yojson block.state_hash)] ;
-                Core.exit 1 )
+            {block with user_cmds} )
       in
       [%log info] "Querying for internal commands in blocks" ;
-      let%bind () =
-        Deferred.List.iter extensional_blocks ~f:(fun block ->
+      let%bind blocks_with_all_cmds =
+        Deferred.List.map blocks_with_user_cmds ~f:(fun block ->
             let%map internal_cmds =
               fill_in_internal_command pool block.state_hash
             in
-            match
-              State_hash.Table.add internal_cmds_tbl ~key:block.state_hash
-                ~data:internal_cmds
-            with
-            | `Ok ->
-                ()
-            | `Duplicate ->
-                [%log error] "Duplicate entry in internal commands table"
-                  ~metadata:
-                    [("state_hash", State_hash.to_yojson block.state_hash)] ;
-                Core.exit 1 )
+            {block with internal_cmds} )
       in
-      let blocks =
-        List.map extensional_blocks
-          ~f:(Block.block_of_extensional_block user_cmds_tbl internal_cmds_tbl)
+      [%log info] "Writing blocks" ;
+      let%map () =
+        Deferred.List.iter blocks_with_all_cmds ~f:(fun block ->
+            [%log info] "Writing block with $state_hash"
+              ~metadata:[("state_hash", State_hash.to_yojson block.state_hash)] ;
+            let output_file =
+              State_hash.to_string block.state_hash ^ ".json"
+            in
+            Async_unix.Writer.with_file output_file ~f:(fun writer ->
+                return
+                  (Async.fprintf writer "%s\n%!"
+                     ( Extensional.Block.to_yojson block
+                     |> Yojson.Safe.pretty_to_string )) ) )
       in
-      [%log info] "Writing blocks to $output_file"
-        ~metadata:[("output_file", `String output_file)] ;
-      let%map writer = Async_unix.Writer.open_file output_file in
-      List.iter blocks ~f:(fun block ->
-          Async.fprintf writer "%s\n%!"
-            (Block.to_yojson block |> Yojson.Safe.to_string) ) ;
       ()
 
 let () =
@@ -350,10 +327,6 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER:$USER@localhost:5432/archiver)"
              Param.(required string)
-         and output_file =
-           Param.flag "--output-file"
-             ~doc:"Output file for the blocks, in JSON format"
-             Param.(required string)
          and state_hash =
            Param.flag "--state-hash"
              ~doc:
@@ -361,4 +334,4 @@ let () =
                 block"
              Param.(required string)
          in
-         main ~archive_uri ~output_file ~state_hash)))
+         main ~archive_uri ~state_hash)))

@@ -194,7 +194,7 @@ module Status = struct
 
     let blockchain_length = int_option_entry "Block height"
 
-    let highest_block_length_received = int_entry "Max observed block length"
+    let highest_block_length_received = int_entry "Max observed block height"
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
@@ -213,18 +213,7 @@ module Status = struct
     let conf_dir = string_entry "Configuration directory"
 
     let peers field =
-      let render display_peer =
-        let open Network_peer.Peer in
-        of_display display_peer |> to_multiaddr_string
-      in
-      map_entry
-        (sprintf "Peers (%d)" (List.length @@ FieldT.get field))
-        ~f:(fun peers ->
-          List.mapi peers ~f:(fun i peer ->
-              let rendered = "\t" ^ render peer in
-              if i = 0 then "\n" ^ rendered else rendered )
-          |> String.concat ~sep:"\n" )
-        field
+      Some ("Peers", string_of_int @@ List.length (FieldT.get field))
 
     let user_commands_sent = int_entry "User_commands sent"
 
@@ -319,6 +308,35 @@ module Status = struct
         |> digest_entries ~title:""
       in
       map_entry "Addresses and ports" ~f:render
+
+    let catchup_status =
+      let render xs =
+        List.map xs ~f:(fun (s, n) ->
+            let s =
+              match
+                (s : Transition_frontier.Full_catchup_tree.Node.State.Enum.t)
+              with
+              | Failed ->
+                  "Failed"
+              | To_download ->
+                  "To download"
+              | To_initial_validate ->
+                  "To initial validate"
+              | To_build_breadcrumb ->
+                  "To build breadcrumb"
+              | Root ->
+                  "Root"
+              | Finished ->
+                  "Finished"
+              | To_verify ->
+                  "To verify"
+              | Wait_for_parent ->
+                  "Waiting for parent to finish"
+            in
+            ("\t" ^ s, Int.to_string n) )
+        |> digest_entries ~title:""
+      in
+      option_entry "Catchup status" ~f:render
   end
 
   type t =
@@ -336,6 +354,9 @@ module Status = struct
     ; snark_worker: string option
     ; snark_work_fee: int
     ; sync_status: Sync_status.Stable.Latest.t
+    ; catchup_status:
+        (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list
+        option
     ; block_production_keys: string list
     ; histograms: Histograms.t option
     ; consensus_time_best_tip:
@@ -365,7 +386,7 @@ module Status = struct
       ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
       ~global_slot_since_genesis_best_tip ~consensus_time_now
       ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports
+      ~snark_work_fee ~addrs_and_ports ~catchup_status
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

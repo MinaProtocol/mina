@@ -210,6 +210,8 @@ let setup_daemon logger =
          generate-libp2p-keypair`) to use with libp2p discovery (default: \
          generate per-run temporary keypair)"
   and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
+  and super_catchup =
+    flag "super-catchup" ~doc:"Use the experimental super-catchup" no_arg
   and enable_flooding =
     flag "enable-flooding"
       ~doc:
@@ -304,7 +306,7 @@ let setup_daemon logger =
       ~doc:"PATH Path to write precomputed blocks to, for replay or archiving"
   and log_precomputed_blocks =
     flag "log-precomputed-blocks"
-      (optional_with_default true bool)
+      (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
   and upload_blocks_to_gcloud =
     flag "upload-blocks-to-gcloud"
@@ -980,8 +982,8 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       let%map coda =
         Mina_lib.create ~wallets
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
-             ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
-             ~net_config ~gossip_net_params
+             ~is_seed ~super_catchup ~disable_telemetry ~demo_mode
+             ~coinbase_receiver ~net_config ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
              ~proposed_protocol_version_opt
              ~work_selection_method:
