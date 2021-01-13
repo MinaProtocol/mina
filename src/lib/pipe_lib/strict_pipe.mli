@@ -127,6 +127,7 @@ end
 
 val create :
      ?name:string
+  -> ?warn_on_drop:bool
   -> ('t, 'type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 

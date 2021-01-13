@@ -333,6 +333,57 @@ module Rpcs = struct
     end
   end
 
+  module Get_transition_knowledge = struct
+    module Master = struct
+      let name = "Get_transition_knowledge"
+
+      module T = struct
+        type query = unit [@@deriving sexp, to_yojson]
+
+        type response = State_hash.t list
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response = State_hash.Stable.V1.t list
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+  end
+
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -624,6 +675,10 @@ module Rpcs = struct
           rpc
     | Get_transition_chain
         : (Get_transition_chain.query, Get_transition_chain.response) rpc
+    | Get_transition_knowledge
+        : ( Get_transition_knowledge.query
+          , Get_transition_knowledge.response )
+          rpc
     | Get_transition_chain_proof
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
@@ -653,6 +708,8 @@ module Rpcs = struct
         (module Answer_sync_ledger_query)
     | Get_transition_chain ->
         (module Get_transition_chain)
+    | Get_transition_knowledge ->
+        (module Get_transition_knowledge)
     | Get_transition_chain_proof ->
         (module Get_transition_chain_proof)
     | Get_ancestry ->
@@ -798,7 +855,10 @@ let create (config : Config.t)
        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
     ~(get_transition_chain :
           Rpcs.Get_transition_chain.query Envelope.Incoming.t
-       -> Rpcs.Get_transition_chain.response Deferred.t) =
+       -> Rpcs.Get_transition_chain.response Deferred.t)
+    ~(get_transition_knowledge :
+          Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_knowledge.response Deferred.t) =
   let logger = config.logger in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
@@ -1001,6 +1061,16 @@ let create (config : Config.t)
     in
     record_unknown_item result sender action_msg msg_args
   in
+  let get_transition_knowledge_rpc conn ~version:_ query =
+    [%log info] "Sending transition_knowledge to $peer" ~metadata:(md conn) ;
+    let action_msg = "Get_transition_knowledge query: $query" in
+    let msg_args =
+      [("query", Rpcs.Get_transition_knowledge.query_to_yojson query)]
+    in
+    run_for_rpc_result conn query ~f:get_transition_knowledge action_msg
+      msg_args
+    >>| fst
+  in
   let get_transition_chain_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain query: $query" in
@@ -1069,6 +1139,11 @@ let create (config : Config.t)
         { rpc= Get_ancestry
         ; f= get_ancestry_rpc
         ; budget= (5, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_transition_knowledge
+        ; f= get_transition_knowledge_rpc
+        ; budget= (1, `Per minute)
         ; cost= unit }
     ; Rpc_handler
         { rpc= Get_transition_chain
@@ -1290,9 +1365,9 @@ let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
   | Failed_to_connect e ->
       Error (Error.tag e ~tag:"failed-to-connect")
 
-let get_transition_chain_proof ?timeout t =
-  make_rpc_request ?timeout ~rpc:Rpcs.Get_transition_chain_proof
-    ~label:"transition chain proof" t
+let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
+  make_rpc_request ?heartbeat_timeout ?timeout
+    ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition chain proof" t
 
 let get_transition_chain ?heartbeat_timeout ?timeout t =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
@@ -1428,6 +1503,7 @@ module Sl_downloader = struct
 
               let key = fst
             end)
+            (Ledger_hash)
 end
 
 let glue_sync_ledger :
@@ -1530,13 +1606,117 @@ let glue_sync_ledger :
   let retry_interval = Core.Time.Span.of_ms 200. in
     *)
   let downloader =
+    let heartbeat_timeout = Time_ns.Span.of_sec 20. in
+    let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
+    (*
+    let peers =
+      let r, w =
+        Broadcast_pipe.create []
+      in 
+      upon global_stop (fun () -> Broadcast_pipe.Writer.close w) ;
+      Clock.every' ~stop:global_stop (Time.Span.of_min 1.) (fun () ->
+          peers t >>=
+          Broadcast_pipe.Writer.write w) ;
+      r
+    in
+    (* Makes it so this doesn't fire until we start getting queries. *)
+    let knowledge root_hash_r =
+      let knowledge_r, knowledge_w =
+        Strict_pipe.create ~name:"sync-ledger-knowledge"
+          Strict_pipe.Synchronous
+      in
+      upon global_stop (fun () -> Strict_pipe.Writer.close knowledge_w) ;
+      let request_r, request_w =
+        Strict_pipe.create ~name:"sync-ledger-knowledge-requests"
+          Strict_pipe.Synchronous
+      in
+      upon global_stop (fun () -> Strict_pipe.Writer.close request_w) ;
+      let refresh_knowledge stop peer =
+        Clock.every' (Time.Span.of_min 7.) ~stop (fun () ->
+            if not (Strict_pipe.Writer.is_closed request_w)
+            then Strict_pipe.Writer.write request_w peer
+            else Deferred.unit
+          )
+      in 
+      let ps : (unit Ivar.t) Peer.Table.t = Peer.Table.create () in
+      Broadcast_pipe.Reader.iter peers ~f:(fun peers ->
+          let peers = Peer.Hash_set.of_list peers in
+          Hashtbl.filteri_inplace ps ~f:(fun ~key:p ~data: finished ->
+              let keep = Hash_set.mem peers p in
+              (if not keep
+               then Ivar.fill_if_empty finished ());
+              keep ) ;
+          Hash_set.iter peers ~f:(fun p ->
+              if not (Hashtbl.mem ps p)
+              then 
+                ( let finished = Ivar.create () in
+                  refresh_knowledge(Ivar.read finished) p ;
+                Hashtbl.add_exn ps ~key:p
+                  ~data:finished) ) ;
+          Deferred.unit
+      ) |> don't_wait_for;
+      let knows_about_ledger =
+        let throttle = Throttle.create ~continue_on_error:true ~max_concurrent_jobs:8 in
+        fun h peer ->
+          Throttle.enqueue throttle (fun () ->
+            match%map
+              query_peer ~heartbeat_timeout
+                ~timeout:(Time.Span.of_sec 10.)
+                t peer.Peer.peer_id 
+                Rpcs.Answer_sync_ledger_query 
+                (h, Num_accounts)
+            with
+              | Connected { data=Ok _; _ } -> true
+            | Failed_to_connect _
+            | Connected { data=Error _; _ } -> false)
+      in 
+      Broadcast_pipe.Reader.iter root_hash_r ~f:(fun _ ->
+          Hashtbl.mapi_inplace ps ~f:(fun ~key:p ~data: finished ->
+            Ivar.fill_if_empty finished () ;
+            let finished = Ivar.create () in
+            refresh_knowledge (Ivar.read finished) p ;
+            finished );
+          Deferred.unit
+      ) |> don't_wait_for;
+      Strict_pipe.Reader.iter request_r ~f:(fun peer ->
+        let h = Broadcast_pipe.Reader.peek root_hash_r in
+          let%bind knows = 
+            knows_about_ledger h peer
+          in
+          Strict_pipe.Writer.write knowledge_w (
+          if knows
+          then (peer, `Call (fun (h', _) -> Ledger_hash.equal h' h))
+          else (peer, `Some [] ) ) ) |> don't_wait_for ;
+      knowledge_r
+    in
+*)
+    let knowledge h peer =
+      match%map
+        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
+          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+      with
+      | Connected {data= Ok _; _} ->
+          `Call (fun (h', _) -> Ledger_hash.equal h' h)
+      | Failed_to_connect _ | Connected {data= Error _; _} ->
+          `Some []
+    in
+    let%bind _ = Linear_pipe.values_available query_reader in
+    let root_hash_r, root_hash_w =
+      Broadcast_pipe.create
+        (Option.value_exn (Linear_pipe.peek query_reader) |> fst)
+    in
     Sl_downloader.create ~preferred ~max_batch_size:100
-      ~stop:(Pipe_lib.Linear_pipe.closed query_reader)
+      ~peers:(fun () -> peers t)
+      ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
       ~trust_system:t.trust_system
-      ~get:(fun peer qs ->
+      ~get:(fun (peer : Peer.t) qs ->
+        List.iter qs ~f:(fun (h, _) ->
+            if
+              not
+                (Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r))
+            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
         let%map rs =
-          query_peer' ~how:`Parallel
-            ~heartbeat_timeout:(Time_ns.Span.of_sec 20.)
+          query_peer' ~how:`Parallel ~heartbeat_timeout
             ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
             t peer.peer_id Rpcs.Answer_sync_ledger_query qs
         in
@@ -1556,7 +1736,6 @@ let glue_sync_ledger :
                   (List.filter_map ps ~f:(fun (q, r) ->
                        match r with Ok r -> Some (q, r) | Error _ -> None )) )
           ) )
-      ~peers:(fun () -> peers t)
   in
   don't_wait_for
     (let%bind downloader = downloader in
