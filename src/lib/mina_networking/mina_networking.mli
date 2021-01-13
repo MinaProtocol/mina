@@ -48,6 +48,12 @@ module Rpcs : sig
     type response = External_transition.t list option
   end
 
+  module Get_transition_knowledge : sig
+    type query = unit
+
+    type response = State_hash.t list
+  end
+
   module Get_transition_chain_proof : sig
     type query = State_hash.t
 
@@ -130,6 +136,10 @@ module Rpcs : sig
           rpc
     | Get_transition_chain
         : (Get_transition_chain.query, Get_transition_chain.response) rpc
+    | Get_transition_knowledge
+        : ( Get_transition_knowledge.query
+          , Get_transition_knowledge.response )
+          rpc
     | Get_transition_chain_proof
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
@@ -209,7 +219,8 @@ val get_best_tip :
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
   -> State_hash.t
@@ -320,4 +331,8 @@ val create :
   -> get_transition_chain:(   Rpcs.Get_transition_chain.query
                               Envelope.Incoming.t
                            -> Rpcs.Get_transition_chain.response Deferred.t)
+  -> get_transition_knowledge:(   Rpcs.Get_transition_knowledge.query
+                                  Envelope.Incoming.t
+                               -> Rpcs.Get_transition_knowledge.response
+                                  Deferred.t)
   -> t Deferred.t
