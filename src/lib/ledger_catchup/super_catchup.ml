@@ -289,9 +289,54 @@ let try_to_connect_hash_chain t hashes ~frontier =
         "Finishing download_state_hashes with $n $hashes. with $all_hashes" ;
       Or_error.errorf !"Peer moves too fast" )
 
+module Downloader = struct
+  module Key = struct
+    module T = struct
+      type t = State_hash.t * Length.t [@@deriving to_yojson, hash, sexp]
+
+      let compare (h1, n1) (h2, n2) =
+        match Length.compare n1 n2 with
+        | 0 ->
+            State_hash.compare h1 h2
+        | c ->
+            c
+    end
+
+    include T
+    include Hashable.Make (T)
+    include Comparable.Make (T)
+  end
+
+  include Downloader.Make
+            (Key)
+            (struct
+              include Attempt_history.Attempt
+
+              let download : t = {failure_reason= `Download}
+
+              let worth_retrying (t : t) =
+                match t.failure_reason with `Download -> true | _ -> false
+            end)
+            (struct
+              type t = External_transition.t
+
+              let key (t : t) =
+                External_transition.(state_hash t, blockchain_length t)
+            end)
+            (struct
+              type t = (State_hash.t * Length.t) option
+            end)
+end
+
+let with_lengths hs ~target_length =
+  List.filter_mapi (Non_empty_list.to_list hs) ~f:(fun i x ->
+      let open Option.Let_syntax in
+      let%map x_len = Length.sub target_length (Length.of_int i) in
+      (x, x_len) )
+
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes t ~logger ~trust_system ~network ~frontier
-    ~target_hash =
+    ~target_hash ~target_length ~downloader =
   [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
@@ -305,13 +350,17 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
         Mina_networking.get_transition_chain_proof
           ~timeout:(Time.Span.of_sec 10.) network peer target_hash
       in
+      let now = Time.now () in
       (* a list of state_hashes from new to old *)
       let%bind hashes =
         match
           Transition_chain_verifier.verify ~target_hash ~transition_chain_proof
         with
-        | Some hashes ->
-            Deferred.Or_error.return hashes
+        | Some hs ->
+            let ks = with_lengths hs ~target_length in
+            Downloader.update_knowledge downloader peer (`Some ks) ;
+            Downloader.mark_preferred downloader peer ~now ;
+            Deferred.Or_error.return hs
         | None ->
             let error_msg =
               sprintf
@@ -326,7 +375,13 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
                     , Some (error_msg, []) )) ;
             Deferred.Or_error.error_string error_msg
       in
-      Deferred.return @@ try_to_connect_hash_chain t hashes ~frontier )
+      Deferred.return
+        ( match try_to_connect_hash_chain t hashes ~frontier with
+        | Ok x ->
+            Downloader.mark_preferred downloader peer ~now ;
+            Ok x
+        | Error e ->
+            Error e ) )
 
 let get_state_hashes = ()
 
@@ -469,42 +524,6 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
 
 open Frontier_base
 
-module Downloader = struct
-  module Key = struct
-    module T = struct
-      type t = State_hash.t * Length.t [@@deriving to_yojson, hash, sexp]
-
-      let compare (h1, n1) (h2, n2) =
-        match Length.compare n1 n2 with
-        | 0 ->
-            State_hash.compare h1 h2
-        | c ->
-            c
-    end
-
-    include T
-    include Hashable.Make (T)
-    include Comparable.Make (T)
-  end
-
-  include Downloader.Make
-            (Key)
-            (struct
-              include Attempt_history.Attempt
-
-              let download : t = {failure_reason= `Download}
-
-              let worth_retrying (t : t) =
-                match t.failure_reason with `Download -> true | _ -> false
-            end)
-            (struct
-              type t = External_transition.t
-
-              let key (t : t) =
-                External_transition.(state_hash t, blockchain_length t)
-            end)
-end
-
 let check_invariant ~downloader t =
   Downloader.check_invariant downloader ;
   [%test_eq: int]
@@ -558,6 +577,24 @@ let create_node ~downloader t ~parent x =
 
 let set_state t node s = set_state t node s ; write_graph t
 
+let pick ~constants
+    (x : (Mina_state.Protocol_state.Value.t, State_hash.t) With_hash.t)
+    (y : _ With_hash.t) =
+  let f = With_hash.map ~f:Mina_state.Protocol_state.consensus_state in
+  match
+    Consensus.Hooks.select ~constants ~existing:(f x) ~candidate:(f y)
+      ~logger:(Logger.null ())
+  with
+  | `Keep ->
+      x
+  | `Take ->
+      y
+
+let forest_pick forest =
+  with_return (fun {return} ->
+      List.iter forest ~f:(Rose_tree.iter ~f:return) ;
+      assert false )
+
 (* TODO: In the future, this could take over scheduling bootstraps too. *)
 let run ~logger ~trust_system ~verifier ~network ~frontier
     ~(catchup_job_reader :
@@ -586,17 +623,78 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
   in
   let stop = Transition_frontier.closed frontier in
   upon stop (fun () -> tear_down t) ;
+  let combine =
+    Option.merge
+      ~f:
+        (pick
+           ~constants:precomputed_values.Precomputed_values.consensus_constants)
+  in
+  let pre_context
+      (trees :
+        ( External_transition.Initial_validated.t Envelope.Incoming.t
+        , _ )
+        Cached.t
+        Rose_tree.t
+        list) =
+    let f tree =
+      let best = ref None in
+      Rose_tree.iter tree
+        ~f:(fun (x :
+                  ( External_transition.Initial_validated.t Envelope.Incoming.t
+                  , _ )
+                  Cached.t)
+           ->
+          let x, _ = (Cached.peek x).data in
+          best :=
+            combine !best
+              (Some (With_hash.map ~f:External_transition.protocol_state x)) ) ;
+      !best
+    in
+    List.map trees ~f |> List.reduce ~f:combine |> Option.join
+  in
+  let best_tip_r, best_tip_w = Broadcast_pipe.create None in
   let%bind downloader =
+    let knowledge h peer =
+      let heartbeat_timeout = Time_ns.Span.of_sec 30. in
+      match h with
+      | None ->
+          return `All
+      | Some (h, len) -> (
+          match%map
+            Mina_networking.get_transition_chain_proof
+              ~timeout:(Time.Span.of_sec 30.) ~heartbeat_timeout network peer h
+          with
+          | Error _ ->
+              `Some []
+          | Ok p -> (
+            match
+              Transition_chain_verifier.verify ~target_hash:h
+                ~transition_chain_proof:p
+            with
+            | Some hs ->
+                let ks = with_lengths hs ~target_length:len in
+                `Some ks
+            | None ->
+                `Some [] ) )
+    in
     Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
       ~get:(fun peer hs ->
-        let timeout =
+        let sec =
           let sec_per_block = 15. in
-          Time.Span.of_sec (Float.of_int (List.length hs) *. sec_per_block)
+          Float.of_int (List.length hs) *. sec_per_block
         in
         Mina_networking.get_transition_chain
-          ~heartbeat_timeout:(Time_ns.Span.of_sec 20.) ~timeout network peer
-          (List.map hs ~f:fst) )
+          ~heartbeat_timeout:(Time_ns.Span.of_sec sec)
+          ~timeout:(Time.Span.of_sec sec) network peer (List.map hs ~f:fst) )
       ~peers:(fun () -> Mina_networking.peers network)
+      ~knowledge_context:
+        (Broadcast_pipe.map best_tip_r
+           ~f:
+             (Option.map ~f:(fun (x : _ With_hash.t) ->
+                  ( x.hash
+                  , Mina_state.Protocol_state.consensus_state x.data
+                    |> Consensus.Data.Consensus_state.blockchain_length ) )))
+      ~knowledge
   in
   check_invariant ~downloader t ;
   let () =
@@ -774,7 +872,23 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
   Strict_pipe.Reader.iter_without_pushback catchup_job_reader
     ~f:(fun (target_parent_hash, forest) ->
       don't_wait_for
+        (let prev_ctx = Broadcast_pipe.Reader.peek best_tip_r in
+         let ctx = combine prev_ctx (pre_context forest) in
+         let eq x y =
+           let f = Option.map ~f:With_hash.hash in
+           Option.equal State_hash.equal (f x) (f y)
+         in
+         if eq prev_ctx ctx then Deferred.unit
+         else Broadcast_pipe.Writer.write best_tip_w ctx) ;
+      don't_wait_for
         (let state_hashes =
+           let target_length =
+             let len =
+               forest_pick forest |> Cached.peek |> Envelope.Incoming.data
+               |> External_transition.Initial_validated.blockchain_length
+             in
+             Option.value_exn (Length.sub len (Length.of_int 1))
+           in
            match
              List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
                ~f:(fun c ->
@@ -782,6 +896,12 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                    External_transition.Initial_validated.state_hash
                      (Cached.peek c).data
                  in
+                 ( match (Cached.peek c).sender with
+                 | Local ->
+                     ()
+                 | Remote peer ->
+                     Downloader.add_knowledge downloader peer
+                       [(target_parent_hash, target_length)] ) ;
                  let open Option.Let_syntax in
                  let%bind {proof= path, root; data} = Best_tip_lru.get h in
                  let%bind p =
@@ -795,7 +915,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
            with
            | None ->
                download_state_hashes t ~logger ~trust_system ~network ~frontier
-                 ~target_hash:target_parent_hash
+                 ~downloader ~target_length ~target_hash:target_parent_hash
            | Some res ->
                [%log debug] "Succeeded in using cache." ;
                Deferred.return (Ok res)
