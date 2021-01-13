@@ -578,6 +578,8 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
   if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
+    (* If vesting period is zero then everything vests immediately at the cliff *)
+  else if Global_slot.(equal vesting_period zero) then Balance.zero
   else
     match Balance.(initial_minimum_balance - cliff_amount) with
     | None ->
