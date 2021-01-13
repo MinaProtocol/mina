@@ -23,7 +23,7 @@ module Query = struct
         | Num_accounts
             (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
-      [@@deriving sexp, yojson]
+      [@@deriving sexp, yojson, hash, compare]
     end
   end]
 end

@@ -322,3 +322,13 @@ mutation ($peers: [NetworkPeer!]!) {
   }
 }
 |}]
+
+module Archive_precomputed_block =
+[%graphql
+{|
+mutation ($block: PrecomputedBlock!) {
+  archivePrecomputedBlock(block: $block) {
+      applied
+  }
+}
+|}]

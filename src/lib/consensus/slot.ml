@@ -2,7 +2,7 @@ open Core_kernel
 open Snark_params
 open Unsigned
 
-module T = Coda_numbers.Nat.Make32 ()
+module T = Mina_numbers.Nat.Make32 ()
 
 include (T : module type of T with module Checked := T.Checked)
 
@@ -18,7 +18,7 @@ module Checked = struct
   let in_seed_update_range ~(constants : Constants.var) (slot : var) =
     let open Tick in
     let open Snarky_integer in
-    let module Length = Coda_numbers.Length in
+    let module Length = Mina_numbers.Length in
     let integer_mul i i' = make_checked (fun () -> Integer.mul ~m i i') in
     let to_integer = Length.Checked.to_integer in
     let%bind third_epoch =
@@ -45,7 +45,7 @@ let gen (constants : Constants.t) =
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let constants = Lazy.force Constants.for_unit_tests in
-  let module Length = Coda_numbers.Length in
+  let module Length = Mina_numbers.Length in
   let test x =
     Test_util.test_equal
       (Snarky_backendless.Typ.tuple2 Constants.typ typ)

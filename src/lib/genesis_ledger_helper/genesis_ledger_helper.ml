@@ -607,7 +607,7 @@ module Ledger = struct
             Genesis_constants.Proof_level.equal Full proof_level
       in
       if add_genesis_winner_account then
-        let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+        let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
         match accounts with
         | (_, account) :: _
           when Public_key.Compressed.equal (Account.public_key account) pk ->
@@ -898,7 +898,7 @@ module Genesis_proof = struct
         ~protocol_constants:genesis_constants.protocol
     in
     let protocol_state_with_hash =
-      Coda_state.Genesis_protocol_state.t
+      Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
     in
@@ -1154,9 +1154,9 @@ let make_constraint_constants
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length
+            ; previous_length= Mina_numbers.Length.of_int previous_length
             ; previous_global_slot=
-                Coda_numbers.Global_slot.of_int previous_global_slot } ) }
+                Mina_numbers.Global_slot.of_int previous_global_slot } ) }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -1320,7 +1320,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
-           { base= Named Coda_compile_config.genesis_ledger
+           { base= Named Mina_compile_config.genesis_ledger
            ; num_accounts= None
            ; balances= []
            ; hash= None

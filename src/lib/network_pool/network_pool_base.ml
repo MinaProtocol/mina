@@ -21,15 +21,15 @@ end)
       | Local of
           (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected) Or_error.t
            -> unit)
-      | External of Coda_net2.Validation_callback.t
+      | External of Mina_net2.Validation_callback.t
 
     let is_expired = function
       | Local _ ->
           false
       | External cb ->
-          Coda_net2.Validation_callback.is_expired cb
+          Mina_net2.Validation_callback.is_expired cb
 
-    open Coda_net2.Validation_callback
+    open Mina_net2.Validation_callback
 
     let error err =
       Fn.compose Deferred.return (function
@@ -53,7 +53,7 @@ end)
           fire_exn cb `Accept ;
           Deferred.unit
 
-    let replace broadcast_pipe accepted rejected = function
+    let _replace broadcast_pipe accepted rejected = function
       | Local f ->
           f (Ok (accepted, rejected)) ;
           Linear_pipe.write broadcast_pipe accepted
@@ -75,7 +75,6 @@ end)
 
   let apply_and_broadcast t
       (diff : Resource_pool.Diff.verified Envelope.Incoming.t) cb =
-    let open Envelope.Incoming in
     let rebroadcast (diff', rejected) =
       let open Broadcast_callback in
       if Resource_pool.Diff.is_empty diff' then (
@@ -86,17 +85,10 @@ end)
               , Resource_pool.Diff.verified_to_yojson
                 @@ Envelope.Incoming.data diff ) ] ;
         drop diff' rejected cb )
-      else if
-        Resource_pool.Diff.verified_size diff.data
-        = Resource_pool.Diff.size diff'
-      then (
+      else (
         [%log' trace t.logger] "Rebroadcasting diff %s"
           (Resource_pool.Diff.summary diff') ;
         forward t.write_broadcasts diff' rejected cb )
-      else (
-        [%log' trace t.logger] "Broadcasting %s"
-          (Resource_pool.Diff.summary diff') ;
-        replace t.write_broadcasts diff' rejected cb )
     in
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool diff with
     | Ok res ->
@@ -141,7 +133,8 @@ end)
     in
     let rl =
       Rate_limiter.create
-        ~capacity:(Resource_pool.Diff.max_per_second, `Per Time.Span.second)
+        ~capacity:
+          (Resource_pool.Diff.max_per_15_seconds, `Per (Time.Span.of_sec 15.0))
     in
     if log_rate_limiter then log_rate_limiter_occasionally t rl ;
     (*Note: This is done asynchronously to use batch verification*)
