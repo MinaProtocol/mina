@@ -4,7 +4,7 @@ compiler: [
   "base-threads.base"
   "base-unix.base"
   "ocaml.4.07.1"
-  "ocaml-base-compiler.4.07.1"
+  "ocaml-variants.4.07.1+logoom"
   "ocaml-config.1"
 ]
 roots: [
@@ -24,7 +24,7 @@ roots: [
   "js_of_ocaml-toplevel.3.6.0"
   "menhir.20181113"
   "merlin.3.2.2"
-  "ocaml-base-compiler.4.07.1"
+  "ocaml-variants.4.07.1+logoom"
   "ocamlformat.0.9"
   "ocamlgraph.1.8.8"
   "ocp-indent.1.7.0"
@@ -130,7 +130,7 @@ installed: [
   "mmap.1.1.0"
   "num.1.1"
   "ocaml.4.07.1"
-  "ocaml-base-compiler.4.07.1"
+  "ocaml-variants.4.07.1+logoom"
   "ocaml-compiler-libs.v0.11.0"
   "ocaml-config.1"
   "ocaml-migrate-parsetree.1.7.3"
