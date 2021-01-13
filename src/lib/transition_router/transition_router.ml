@@ -188,31 +188,33 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
     List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
         Option.merge acc (Option.return enveloped_candidate_best_tip)
           ~f:(fun enveloped_existing_best_tip enveloped_candidate_best_tip ->
-            let candidate_best_tip =
-              Envelope.Incoming.data enveloped_candidate_best_tip
-            in
-            let existing_best_tip =
-              Envelope.Incoming.data enveloped_existing_best_tip
-            in
             Mina_networking.fill_first_received_message_signal network ;
-            if
-              External_transition.Initial_validated.compare
-                candidate_best_tip.data existing_best_tip.data
-              > 0
-            then (
-              let best_tip_length =
-                External_transition.Initial_validated.blockchain_length
-                  candidate_best_tip.data
-                |> Length.to_int
-              in
-              Mina_metrics.Transition_frontier.update_max_blocklength_observed
-                best_tip_length ;
-              don't_wait_for
-              @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                   candidate_best_tip.data ;
-              enveloped_candidate_best_tip )
-            else enveloped_existing_best_tip ) )
+            let f x =
+              External_transition.Validation.forget_validation_with_hash x
+              |> With_hash.map ~f:External_transition.consensus_state
+            in
+            match
+              Consensus.Hooks.select
+                ~constants:precomputed_values.consensus_constants
+                ~existing:(f enveloped_existing_best_tip.data.data)
+                ~candidate:(f enveloped_candidate_best_tip.data.data)
+                ~logger
+            with
+            | `Keep ->
+                enveloped_existing_best_tip
+            | `Take ->
+                enveloped_candidate_best_tip ) )
   in
+  Option.iter res ~f:(fun best ->
+      let best_tip_length =
+        External_transition.Initial_validated.blockchain_length best.data.data
+        |> Length.to_int
+      in
+      Mina_metrics.Transition_frontier.update_max_blocklength_observed
+        best_tip_length ;
+      don't_wait_for
+      @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
+           best.data.data ) ;
   Option.map res
     ~f:
       (Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
