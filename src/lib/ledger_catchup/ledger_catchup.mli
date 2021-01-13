@@ -4,6 +4,7 @@ open Cache_lib
 open Mina_base
 open Mina_transition
 open Network_peer
+module Best_tip_lru = Best_tip_lru
 
 module Catchup_jobs : sig
   val reader : int Broadcast_pipe.Reader.t

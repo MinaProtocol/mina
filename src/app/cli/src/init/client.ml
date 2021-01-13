@@ -1733,15 +1733,31 @@ let archive_precomputed_blocks =
                  .to_yojson block
                  |> Yojson.Safe.to_basic
                in
-               let%map _res =
+               let%map.Deferred.Or_error.Let_syntax _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
                  *)
-                 Graphql_client.query_exn
+                 Graphql_client.query
                    (Graphql_queries.Archive_precomputed_block.make ~block ())
                    graphql_endpoint
+                 |> Deferred.Result.map_error ~f:(function
+                      | `Failed_request e ->
+                          Error.create "Unable to connect to Coda daemon" ()
+                            (fun () ->
+                              Sexp.List
+                                [ List
+                                    [ Atom "uri"
+                                    ; Atom
+                                        (Uri.to_string graphql_endpoint.value)
+                                    ]
+                                ; List
+                                    [ Atom "uri_flag"
+                                    ; Atom graphql_endpoint.name ]
+                                ; List [Atom "error_message"; Atom e] ] )
+                      | `Graphql_error e ->
+                          Error.createf "GraphQL error: %s" e )
                in
-               Ok ()
+               ()
          in
          Deferred.List.iter files ~f:(fun path ->
              match%map
