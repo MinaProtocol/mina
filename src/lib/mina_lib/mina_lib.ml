@@ -78,7 +78,10 @@ type pipes =
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
-        * (Account_id.t -> (Mina_base.Account.Nonce.t, string) Result.t)
+        * (   Account_id.t
+           -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
+              , string )
+              Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -484,15 +487,15 @@ let get_ledger t state_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
 
+let get_account t aid =
+  let open Participating_state.Let_syntax in
+  let%map ledger = best_ledger t in
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_account ledger aid in
+  Ledger.get ledger loc
+
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (account_id : Account_id.t) =
-  let get_account aid =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind loc = Ledger.location_of_account ledger aid in
-    Ledger.get ledger loc
-  in
   let transaction_pool = t.components.transaction_pool in
   let resource_pool =
     Network_pool.Transaction_pool.resource_pool transaction_pool
@@ -516,7 +519,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
       let open Participating_state.Option.Let_syntax in
-      let%map account = get_account account_id in
+      let%map account = get_account t account_id in
       account.Account.Poly.nonce
 
 let snark_job_state t = t.snark_job_state
@@ -712,7 +715,14 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
            `sender` is not in the ledger or sent a transaction in transaction \
            pool."
     | Some nonce ->
-        Ok nonce
+        let ledger_nonce =
+          Participating_state.active (get_account t aid)
+          |> Option.join
+          |> Option.map ~f:(fun {Account.Poly.nonce; _} ->
+                 Mina_numbers.Account_nonce.succ nonce )
+          |> Option.value ~default:nonce
+        in
+        Ok (`Min ledger_nonce, nonce)
   in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     ( uc_inputs
