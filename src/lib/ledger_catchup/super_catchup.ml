@@ -678,7 +678,11 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
     Downloader.create ~stop ~trust_system ~preferred:[] ~max_batch_size:5
       ~get:(fun peer hs ->
         let sec =
-          let sec_per_block = 15. in
+          let sec_per_block =
+            Option.value_map
+              (Sys.getenv "MINA_EXPECTED_PER_BLOCK_DOWNLOAD_TIME")
+              ~default:15. ~f:Float.of_string
+          in
           Float.of_int (List.length hs) *. sec_per_block
         in
         Mina_networking.get_transition_chain
