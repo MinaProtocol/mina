@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	net "github.com/libp2p/go-libp2p-core/network"
@@ -29,6 +31,16 @@ var (
 	testProtocol = protocol.ID("/mina/")
 )
 
+var port = 7000
+
+func TestMain(m *testing.M) {
+	_ = logging.SetLogLevel("codanet.Helper", "debug")
+	_ = logging.SetLogLevel("codanet.CodaGatingState", "debug")
+	_ = os.Setenv("CONNECT_PRIVATE_IPS", "true")
+
+	os.Exit(m.Run())
+}
+
 func newTestKey(t *testing.T) crypto.PrivKey {
 	r := crand.Reader
 	key, _, err := crypto.GenerateEd25519Key(r)
@@ -41,8 +53,11 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
+	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", port))
+	require.NoError(t, err)
+
 	helper, err := codanet.MakeHelper(context.Background(),
-		[]ma.Multiaddr{},
+		[]ma.Multiaddr{addr},
 		nil,
 		dir,
 		newTestKey(t),
@@ -52,6 +67,13 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		50,
 	)
 	require.NoError(t, err)
+	port++
+
+	helper.GatingState.AddrFilters = ma.NewFilters()
+
+	t.Cleanup(func() {
+		helper.Host.Close()
+	})
 
 	return &app{
 		P2p:            helper,
@@ -62,6 +84,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
 		AddedPeers:     make([]peer.AddrInfo, 0, 512),
+		NoUpcalls:      true,
 	}
 }
 
@@ -91,7 +114,6 @@ func multiaddrs(h host.Host) (multiaddrs []ma.Multiaddr) {
 func TestDHTDiscovery_TwoNodes(t *testing.T) {
 	appA := newTestApp(t, nil)
 	appA.NoMDNS = true
-	defer appA.P2p.Host.Close()
 
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
@@ -99,7 +121,6 @@ func TestDHTDiscovery_TwoNodes(t *testing.T) {
 	appB := newTestApp(t, appAInfos)
 	appB.AddedPeers = appAInfos
 	appB.NoMDNS = true
-	defer appB.P2p.Host.Close()
 
 	// begin appB and appC's DHT advertising
 	ret, err := new(beginAdvertisingMsg).run(appB)
@@ -113,41 +134,26 @@ func TestDHTDiscovery_TwoNodes(t *testing.T) {
 	time.Sleep(time.Second)
 }
 
-func TestDHTDiscovery(t *testing.T) {
+func TestDHTDiscovery_ThreeNodes(t *testing.T) {
 	appA := newTestApp(t, nil)
 	appA.NoMDNS = true
-	defer appA.P2p.Host.Close()
 
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
 	appB := newTestApp(t, appAInfos)
 	appB.NoMDNS = true
-	defer appB.P2p.Host.Close()
 
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
 	appC := newTestApp(t, appAInfos)
 	appC.NoMDNS = true
-	defer appC.P2p.Host.Close()
 
 	err = appC.P2p.Host.Connect(appC.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
 	time.Sleep(time.Second)
-
-	go func() {
-		<-appA.OutChan
-	}()
-
-	go func() {
-		<-appB.OutChan
-	}()
-
-	go func() {
-		<-appC.OutChan
-	}()
 
 	// begin appB and appC's DHT advertising
 	ret, err := new(beginAdvertisingMsg).run(appB)
@@ -186,11 +192,9 @@ func TestDHTDiscovery(t *testing.T) {
 func TestMDNSDiscovery(t *testing.T) {
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
-	defer appA.P2p.Host.Close()
 
 	appB := newTestApp(t, nil)
 	appB.NoDHT = true
-	defer appB.P2p.Host.Close()
 
 	// begin appA and appB's mDNS advertising
 	ret, err := new(beginAdvertisingMsg).run(appB)
@@ -232,11 +236,9 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
-	defer appA.P2p.Host.Close()
 
 	appB := newTestApp(t, nil)
 	appB.NoDHT = true
-	defer appB.P2p.Host.Close()
 
 	// connect the two nodes
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -295,11 +297,16 @@ func TestConfigurationMsg(t *testing.T) {
 	require.NoError(t, err)
 	keyEnc := codaEncode(keyBytes)
 
+	external := "/ip4/0.0.0.0/tcp/7000"
+
 	msg := &configureMsg{
-		Statedir:  dir,
-		Privk:     keyEnc,
-		NetworkID: string(testProtocol),
-		ListenOn:  []string{"/ip4/127.0.0.1/tcp/7000"},
+		Statedir:            dir,
+		Privk:               keyEnc,
+		NetworkID:           string(testProtocol),
+		ListenOn:            []string{"/ip4/127.0.0.1/tcp/7000"},
+		MetricsPort:         "9000",
+		External:            external,
+		ValidationQueueSize: 16,
 	}
 
 	ret, err := msg.run(testApp)
