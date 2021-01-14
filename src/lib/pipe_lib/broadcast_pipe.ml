@@ -122,6 +122,11 @@ module Writer = struct
         Int.Table.clear t.pipes )
 end
 
+let map t ~f =
+  let r, w = create (f (Reader.peek t)) in
+  don't_wait_for (Reader.iter t ~f:(fun x -> Writer.write w (f x))) ;
+  r
+
 (*
  * 1. Cached value is keeping peek working
  * 2. Multiple listeners receive the first mvar value
