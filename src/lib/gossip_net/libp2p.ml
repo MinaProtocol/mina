@@ -579,11 +579,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 | None ->
                     d
                 | Some timeout ->
-                    Deferred.any
-                      [ d
-                      ; ( after timeout
-                        >>| fun () -> Or_error.error_string "rpc timed out" )
-                      ] )
+                    Deferred.choose
+                      [ Deferred.choice d Fn.id
+                      ; choice (after timeout) (fun () ->
+                            Or_error.error_string "rpc timed out" ) ] )
               transport
               ~on_handshake_error:
                 (`Call
