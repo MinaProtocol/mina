@@ -38,6 +38,11 @@ import (
 )
 
 var (
+	logger = logging.Logger("codanet.Helper")
+	gsLogger = logging.Logger("codanet.CodaGatingState")
+)
+
+var (
 	privateIPs = []string{
 		"10.0.0.0/8",
 		"172.16.0.0/12",
@@ -55,6 +60,8 @@ func parseCIDR(cidr string) gonet.IPNet {
 	}
 	return *ipnet
 }
+
+type connectionChangeFunc = func(network.Network, network.Conn)
 
 type CodaConnectionManager struct {
 	p2pManager   *p2pconnmgr.BasicConnMgr
@@ -131,6 +138,12 @@ func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
 	return cm.p2pManager.GetInfo()
 }
 
+func (cm *CodaConnectionManager) SetOnConnect(f connectionChangeFunc) {
+	logger.Info("SetOnConnect")
+	cm.OnConnect = f
+	logger.Info("SetOnConnect set")
+}
+
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
@@ -163,8 +176,6 @@ type CodaGatingState struct {
 
 // NewCodaGatingState returns a new CodaGatingState
 func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer.Set) *CodaGatingState {
-	logger := logging.Logger("codanet.CodaGatingState")
-
 	if addrFilters == nil {
 		addrFilters = ma.NewFilters()
 	}
@@ -182,7 +193,7 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 	}
 
 	return &CodaGatingState{
-		logger:       logger,
+		logger:       gsLogger,
 		AddrFilters:  addrFilters,
 		DeniedPeers:  denied,
 		AllowedPeers: allowed,
@@ -236,6 +247,7 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 // Bluetooth), straight after it has accepted a connection from its socket.
 func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
 	remoteAddr := addrs.RemoteMultiaddr()
+
 	allow = !gs.AddrFilters.AddrBlocked(remoteAddr)
 
 	if !allow {
@@ -294,8 +306,6 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 
 // MakeHelper does all the initialization to run one host
 func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int) (*Helper, error) {
-	logger := logging.Logger("codanet.Helper")
-
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
