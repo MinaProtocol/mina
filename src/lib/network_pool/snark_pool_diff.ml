@@ -87,9 +87,7 @@ module Make
           ~f:Snark_work_lib.Work.Single.Spec.statement
       , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
 
-  let min_fee_delta = Currency.Fee.of_formatted_string "0.5"
-
-  let has_significantly_lower_fee pool work ~fee ~sender =
+  let has_lower_fee pool work ~fee ~sender =
     let reject_and_log_if_local reason =
       [%log' trace (Pool.get_logger pool)]
         "Rejecting snark work $work from $sender: $reason"
@@ -105,11 +103,7 @@ module Make
     | Some {fee= {fee= prev; _}; _} -> (
       match Currency.Fee.compare fee prev with
       | -1 ->
-          if Currency.Fee.(Option.value_exn (sub prev fee) >= min_fee_delta)
-          then Ok ()
-          else
-            reject_and_log_if_local
-              "fee better, but not by more than the min delta"
+          Ok ()
       | 0 ->
           reject_and_log_if_local "fee equal to cheapest work we have"
       | 1 ->
@@ -131,7 +125,7 @@ module Make
         (*reject higher priced gossiped proofs*)
         if is_local then verify ()
         else
-          match has_significantly_lower_fee pool work ~fee:fee.fee ~sender with
+          match has_lower_fee pool work ~fee:fee.fee ~sender with
           | Ok () ->
               verify ()
           | _ ->
@@ -159,9 +153,7 @@ module Make
           (let add_to_pool () =
              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
            in
-           match
-             has_significantly_lower_fee pool work ~fee:fee.fee ~sender
-           with
+           match has_lower_fee pool work ~fee:fee.fee ~sender with
            | Ok () ->
                add_to_pool ()
            | Error e ->
