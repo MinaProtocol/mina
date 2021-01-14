@@ -175,7 +175,8 @@ module Snark_worker = struct
         match signal_or_error with
         | Ok () ->
             [%log info] "Snark worker process died" ;
-            Ivar.fill kill_ivar () ;
+            if Ivar.is_full kill_ivar then [%log warn] "Ivar.fill bug is here!" ;
+            Ivar.fill_if_empty kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
             [%log fatal]
@@ -223,7 +224,9 @@ module Snark_worker = struct
             [ ( "snark_worker_pid"
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
-        Ivar.fill process_ivar snark_worker_process
+        if Ivar.is_full process_ivar then
+          [%log' warn t.config.logger] "Ivar.fill bug is here!" ;
+        Ivar.fill_if_empty process_ivar snark_worker_process
     | `Off _ ->
         [%log' info t.config.logger]
           !"Attempted to turn on snark worker, but snark worker key is set to \
@@ -711,7 +714,11 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
         Ok nonce
   in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
+    ( uc_inputs
+    , ( if Ivar.is_full result_ivar then
+          [%log' warn t.config.logger] "Ivar.fill bug is here!" ;
+        Ivar.fill_if_empty result_ivar )
+    , get_current_nonce )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 

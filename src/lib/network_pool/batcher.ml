@@ -68,10 +68,14 @@ let rec determine_outcome : type p r partial.
     List.filter_map (List.zip_exn ps res) ~f:(fun (elt, r) ->
         match r with
         | `Valid r ->
-            Ivar.fill elt.res (Ok (Ok r)) ;
+            if Ivar.is_full elt.res then
+              [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+            Ivar.fill_if_empty elt.res (Ok (Ok r)) ;
             None
         | `Invalid ->
-            Ivar.fill elt.res (Ok (Error ())) ;
+            if Ivar.is_full elt.res then
+              [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+            Ivar.fill_if_empty elt.res (Ok (Error ())) ;
             None
         | `Potentially_invalid new_hint ->
             Some (elt, new_hint) )
@@ -82,7 +86,9 @@ let rec determine_outcome : type p r partial.
       (* All results are known *)
       return ()
   | [({res; _}, _)] ->
-      Ivar.fill res (Ok (Error ())) ;
+      if Ivar.is_full res then
+        [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+      Ivar.fill_if_empty res (Ok (Error ())) ;
       (* If there is a potentially invalid proof in this batch of size 1, then
          that proof is itself invalid. *)
       return ()

@@ -31,7 +31,9 @@ end = struct
   let cancel t =
     match t.task with
     | Some (ivar, _) ->
-        Ivar.fill ivar () ;
+        if Ivar.is_full ivar then
+          [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+        Ivar.fill_if_empty ivar () ;
         t.task <- None
     | None ->
         ()
@@ -59,7 +61,10 @@ let time_of_ms = Fn.compose Time.of_span_since_epoch Time.Span.of_ms
 
 let lift_sync f =
   Interruptible.uninterruptible
-    (Deferred.create (fun ivar -> Ivar.fill ivar (f ())))
+    (Deferred.create (fun ivar ->
+         if Ivar.is_full ivar then
+           [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+         Ivar.fill_if_empty ivar (f ()) ))
 
 module Singleton_scheduler : sig
   type t
