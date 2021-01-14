@@ -216,9 +216,14 @@ locals {
           ["coda-infra-central1"]="us-central1"
           ["mina-integration-west1"]="us-west1"
         )
-        for cluster in "${!k8s_cluster_mappings[@]}"; do
-            gcloud container clusters get-credentials "${cluster}" --region "${k8s_cluster_mappings[$cluster]}"
+        for cluster in "$${!k8s_ctx_mappings[@]}"; do
+            gcloud container clusters get-credentials "$${cluster}" --region "$${k8s_ctx_mappings[$cluster]}"
         done
+
+        # Copy kube config to shared Docker path
+        export CI_SHARED_CONFIG="/var/buildkite/shared/config"
+        mkdir -p "$${CI_SHARED_CONFIG}"
+        cp /root/.kube/config "$${CI_SHARED_CONFIG}/.kube" && chmod ugo+rw "$${CI_SHARED_CONFIG}/.kube"
 
         # set agent default Kubernetes context for deployment
         kubectl config use-context ${var.testnet_k8s_ctx}
