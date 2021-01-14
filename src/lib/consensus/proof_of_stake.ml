@@ -2748,7 +2748,8 @@ module Hooks = struct
                       , Mina_base.Ledger_hash.to_yojson ledger_hash ) ]
                   "Failed to serve epoch ledger query with hash $ledger_hash \
                    from $peer: $error" ) ;
-            Ivar.fill ivar response )
+            if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
+            Ivar.fill_if_empty ivar response )
     end
 
     open Mina_base.Rpc_intf
