@@ -75,6 +75,8 @@ let ( < ) (t : t) (t' : t) = t.slot_number < t'.slot_number
 
 let ( - ) (t : t) (t' : t) = T.sub t.slot_number t'.slot_number
 
+let max t1 t2 = if t2 > t1 then t2 else t1
+
 let succ (t : t) = {t with slot_number= T.succ t.slot_number}
 
 let of_slot_number ~(constants : Constants.t) slot_number =
