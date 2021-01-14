@@ -718,8 +718,7 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
         let ledger_nonce =
           Participating_state.active (get_account t aid)
           |> Option.join
-          |> Option.map ~f:(fun {Account.Poly.nonce; _} ->
-                 Mina_numbers.Account_nonce.succ nonce )
+          |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
           |> Option.value ~default:nonce
         in
         Ok (`Min ledger_nonce, nonce)
