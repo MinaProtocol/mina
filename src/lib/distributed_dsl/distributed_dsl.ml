@@ -194,7 +194,7 @@ struct
     match Token.Table.find t.timer_stoppers tok with
     | Some ivar ->
         if Ivar.is_full ivar then
-          [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+          [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
         Ivar.fill_if_empty ivar `Cancelled
     | None ->
         ()

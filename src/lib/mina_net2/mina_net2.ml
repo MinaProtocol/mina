@@ -60,13 +60,13 @@ module Validation_callback = struct
   let fire_if_not_already_fired cb result =
     if not (is_expired cb) then (
       if Ivar.is_full cb.signal then
-        [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
       Ivar.fill_if_empty cb.signal result )
 
   let fire_exn cb result =
     if not (is_expired cb) then (
       if Ivar.is_full cb.signal then
-        [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
       Ivar.fill_if_empty cb.signal result )
 end
 
@@ -766,7 +766,7 @@ module Helper = struct
       | Some ivar ->
           (* This fill should be okay because we "found and removed" the request *)
           if Ivar.is_full ivar then
-            [%log' warn t.logger] "Ivar.fill bug is here!" ;
+            [%log' error t.logger] "Ivar.fill bug is here!" ;
           Ivar.fill_if_empty ivar fill_result ;
           Ok ()
       | None ->

@@ -459,7 +459,7 @@ end = struct
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
       if Ivar.is_full t.validity_listener then
-        [%log' warn t.logger] "Ivar.fill bug is here!" ;
+        [%log' error t.logger] "Ivar.fill bug is here!" ;
       Ivar.fill_if_empty t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
