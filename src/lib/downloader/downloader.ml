@@ -261,16 +261,18 @@ end = struct
     let reset_knowledge t ~all_peers =
       (* Reset preferred *)
       Preferred_heap.clear t.all_preferred ;
-      Hashtbl.filteri_inplace t.knowledge ~f:(fun ~key:p ~data:k ->
+      Hashtbl.filter_mapi_inplace t.knowledge ~f:(fun ~key:p ~data:k ->
           Hash_set.clear k.tried_and_failed ;
-          Set.mem all_peers p ) ;
+          if Set.mem all_peers p 
+          then Some { k with claimed=None }
+          else None ) ;
       Set.iter all_peers ~f:(fun p ->
           if not (Hashtbl.mem t.knowledge p) then
             Hashtbl.add_exn t.knowledge ~key:p ~data:(Knowledge.create ()) ) ;
       Strict_pipe.Writer.write t.w ()
 
-    let to_yojson {knowledge; all_preferred; _} =
-      let _list xs =
+    let to_yojson {knowledge; all_preferred; knowledge_requesting_peers; temporary_ignores; downloading_peers;r=_;w=_} =
+      let list xs =
         `Assoc [("length", `Int (List.length xs)); ("elts", `List xs)]
       in
       let f q = Knowledge.to_yojson q in
@@ -282,7 +284,17 @@ end = struct
         ; ( "preferred"
           , `List
               (List.map (Preferred_heap.to_list all_preferred) ~f:(fun p ->
-                   `String (Peer.to_multiaddr_string p) )) ) ]
+                   `String (Peer.to_multiaddr_string p) )) ) 
+        ; ("temporary_ignores", 
+           list (List.map ~f:Peer.to_yojson (Hashtbl.keys temporary_ignores)
+          ) )
+        ; ("downloading_peers", 
+           list (List.map ~f:Peer.to_yojson (Hash_set.to_list downloading_peers)
+          ) )
+        ; ("knowledge_requesting_peers", 
+           list (List.map ~f:Peer.to_yojson (Hash_set.to_list knowledge_requesting_peers)
+          ) )
+        ]
 
     let create ~preferred ~all_peers =
       let knowledge =
