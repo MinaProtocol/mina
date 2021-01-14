@@ -3102,7 +3102,7 @@ module Hooks = struct
         ~condition:candidate_vrf_is_bigger
     in
     let long_fork_chain_quality_is_better =
-      (* The min window density if we imagine extending to the amx slot of the two chains. *)
+      (* The min window density if we imagine extending to the max slot of the two chains. *)
       (* TODO: You could argue that instead this should be imagine extending to the current consensus time. *)
       let max_slot =
         Global_slot.max candidate.curr_global_slot existing.curr_global_slot
