@@ -113,11 +113,9 @@ module G = Graph.Graphviz.Dot (struct
   let edge_attributes _ = []
 end)
 
-let _write_graph (t : t) =
-  let path = "/home/izzy/repos/coda/super-catchup-develop/catchup.dot" in
-  Out_channel.with_file path ~f:(fun c -> G.output_graph c t)
-
-let write_graph (_ : t) = ()
+let write_graph (_ : t) =
+  let _ = G.output_graph in
+  ()
 
 let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
     ~unprocessed_transition_cache enveloped_transition =
