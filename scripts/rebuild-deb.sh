@@ -118,6 +118,10 @@ cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDD
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
 cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
 
+# Control the behavior of the system journal on a per unit basis using a .conf file
+mkdir -p "${BUILDDIR}/usr/lib/systemd/journald.conf.d/"
+cp ../scripts/mina.conf "${BUILDDIR}/usr/lib/systemd/journald.conf.d/"
+
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
