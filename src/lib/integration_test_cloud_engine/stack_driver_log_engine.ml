@@ -637,7 +637,7 @@ let start_background_query (type r)
   don't_wait_for
     (finally subscription_task ~f:(fun () ->
          if Ivar.is_full finished_ivar then
-           [%log warn] "Ivar.fill bug is here!" ;
+           [%log error] "Ivar.fill bug is here!" ;
          Ivar.fill_if_empty finished_ivar () )) ;
   (subscription, Ivar.read finished_ivar)
 

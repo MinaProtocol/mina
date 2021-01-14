@@ -15,7 +15,7 @@ module T = struct
       | Some ls ->
           List.iter ls ~f:(fun ivar ->
               if Ivar.is_full ivar then
-                [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+                [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
               Ivar.fill_if_empty ivar () ) ;
           None
       | None ->

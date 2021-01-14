@@ -69,12 +69,12 @@ let rec determine_outcome : type p r partial.
         match r with
         | `Valid r ->
             if Ivar.is_full elt.res then
-              [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill_if_empty elt.res (Ok (Ok r)) ;
             None
         | `Invalid ->
             if Ivar.is_full elt.res then
-              [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+              [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
             Ivar.fill_if_empty elt.res (Ok (Error ())) ;
             None
         | `Potentially_invalid new_hint ->
@@ -87,7 +87,7 @@ let rec determine_outcome : type p r partial.
       return ()
   | [({res; _}, _)] ->
       if Ivar.is_full res then
-        [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
       Ivar.fill_if_empty res (Ok (Error ())) ;
       (* If there is a potentially invalid proof in this batch of size 1, then
          that proof is itself invalid. *)
