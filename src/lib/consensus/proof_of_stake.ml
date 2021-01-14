@@ -2749,7 +2749,7 @@ module Hooks = struct
                   "Failed to serve epoch ledger query with hash $ledger_hash \
                    from $peer: $error" ) ;
             if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
-            Ivar.fill_if_empty ivar response )
+            Ivar.fill ivar response )
     end
 
     open Mina_base.Rpc_intf

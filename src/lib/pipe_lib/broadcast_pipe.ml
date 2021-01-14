@@ -32,7 +32,9 @@ let create a =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
                Deferred.ignore @@ Pipe.downstream_flushed p )
          in
-         Ivar.fill_if_empty !downstream_flushed_v () ;
+         if Ivar.is_full !downstream_flushed_v then
+           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+         Ivar.fill !downstream_flushed_v () ;
          Deferred.unit )) ;
   (t, t)
 
