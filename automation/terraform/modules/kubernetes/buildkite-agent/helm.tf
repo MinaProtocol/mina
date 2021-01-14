@@ -203,12 +203,14 @@ locals {
         cp --update --verbose $(which helm) "$${CI_SHARED_BIN}/helm"
       EOF
 
-      "03-gcloud-cluster-setup" = <<-EOF
+      "03-setup-k8s-ctx" = <<-EOF
         #!/bin/bash
 
         set -eou pipefail
 
-        declare -A k8s_cluster_mappings=(
+        # k8s_ctx = <gcloud_project>_<cluster-region>_<cluster-name>
+        # k8s context mappings: <cluster-name> => <cluster-region>
+        declare -A k8s_ctx_mappings=(
           ["coda-infra-east"]="us-east1"
           ["coda-infra-east4"]="us-east4"
           ["coda-infra-central1"]="us-central1"
@@ -218,8 +220,8 @@ locals {
             gcloud container clusters get-credentials "${cluster}" --region "${k8s_cluster_mappings[$cluster]}"
         done
 
-        # set agent default Kubernetes context (Mina integration)
-        kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
+        # set agent default Kubernetes context for deployment
+        kubectl config use-context ${var.testnet_k8s_ctx}
       EOF
     }
   }
