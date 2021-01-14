@@ -717,7 +717,14 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
   in
   let rec run_node (node : Node.t) =
     let state_hash = node.state_hash in
-    let failed ~sender failure_reason =
+    let failed ?error ~sender failure_reason =
+      [%log' debug t.logger] "failed with $error"
+        ~metadata:
+          [ ( "error"
+            , Option.value_map ~default:`Null error ~f:(fun e ->
+                  `String (Error.to_string_hum e) ) )
+          ; ("reason", Attempt_history.Attempt.reason_to_yojson failure_reason)
+          ] ;
       node.attempts
       <- ( match sender with
          | Envelope.Sender.Local ->
@@ -777,10 +784,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                 {b with data= {With_hash.data= b.data; hash= state_hash}}
             |> Deferred.map ~f:(fun x -> Ok x) )
         with
-        | Error (`Error _e) ->
+        | Error (`Error e) ->
             (* TODO: Log *)
             (* Validation failed. Record the failure and go back to download. *)
-            failed ~sender:b.sender `Initial_validate
+            failed ~error:e ~sender:b.sender `Initial_validate
         | Error `Couldn't_reach_verifier ->
             retry ()
         | Ok (`In_frontier hash) ->
@@ -800,9 +807,13 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             |> Deferred.map ~f:Result.return )
         with
         | Error _e ->
+            [%log' debug t.logger] "Couldn't reach verifier. Retrying"
+              ~metadata:[("state_hash", State_hash.to_yojson node.state_hash)] ;
             (* No need to redownload in this case. We just wait a little and try again. *)
             retry ()
         | Ok (Error ()) ->
+            [%log' warn t.logger] "verification failed! redownloading"
+              ~metadata:[("state_hash", State_hash.to_yojson node.state_hash)] ;
             ( match iv.sender with
             | Local ->
                 ()
@@ -849,9 +860,20 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                 ~sender:(Some av.sender) ~transition_receipt_time ()
             |> Deferred.map ~f:Result.return )
         with
-        | Error _e ->
+        | Error e ->
             let _ = Cached.invalidate_with_failure c in
-            failed ~sender:av.sender `Build_breadcrumb
+            let e =
+              match e with
+              | `Exn e ->
+                  Error.tag (Error.of_exn e) ~tag:"exn"
+              | `Fatal_error e ->
+                  Error.tag (Error.of_exn e) ~tag:"fatal"
+              | `Invalid_staged_ledger_diff e ->
+                  Error.tag e ~tag:"invalid staged ledger diff"
+              | `Invalid_staged_ledger_hash e ->
+                  Error.tag e ~tag:"invalid staged ledger hash"
+            in
+            failed ~error:e ~sender:av.sender `Build_breadcrumb
         | Ok breadcrumb ->
             let%bind () =
               Scheduler.yield () |> Deferred.map ~f:Result.return
