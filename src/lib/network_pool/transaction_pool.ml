@@ -1878,11 +1878,10 @@ let%test_module _ =
           assert_pool_txs @@ List.drop independent_cmds' 3 ;
           Deferred.unit )
 
-    let%test_unit "transaction replacement works and drops later transactions"
-        =
+    let%test_unit "transaction replacement works" =
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind assert_pool_txs, pool, _best_tip_diff_w, _frontier =
+      let%bind assert_pool_txs, pool, _best_tip_diff_w, frontier =
         setup_test ()
       in
       let set_sender idx (tx : Signed_command.t) =
@@ -1934,7 +1933,25 @@ let%test_module _ =
         ; (* sufficient *)
           mk_payment 2 20_000_000_000 1 4 721_000_000_000
         ; (* insufficient *)
-          mk_payment 3 10_000_000_000 1 4 927_000_000_000 ]
+          (let amount = 927_000_000_000 in
+           let fee =
+             let ledger = Mock_transition_frontier.best_tip frontier in
+             let sender_kp = test_keys.(3) in
+             let sender_pk = Public_key.compress sender_kp.public_key in
+             let sender_aid = Account_id.create sender_pk Token_id.default in
+             let location =
+               Mock_base_ledger.location_of_account ledger sender_aid
+               |> Option.value_exn
+             in
+             (* Spend all of the tokens in the account. Should fail because the
+                command with nonce=0 will already have spent some.
+             *)
+             let account =
+               Mock_base_ledger.get ledger location |> Option.value_exn
+             in
+             Currency.Balance.to_int account.balance - amount
+           in
+           mk_payment 3 fee 1 4 amount) ]
       in
       let%bind apply_res_2 =
         Test.Resource_pool.Diff.unsafe_apply pool

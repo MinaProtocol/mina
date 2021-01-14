@@ -779,7 +779,7 @@ let rec add_from_gossip_exn :
         ; consensus_constants
         ; time_controller }
       , Sequence.empty )
-  | Some (queued_cmds, reserved_currency) -> (
+  | Some (queued_cmds, reserved_currency) ->
       (* commands queued for this sender *)
       assert (not @@ F_sequence.is_empty queued_cmds) ;
       let last_queued_nonce =
@@ -860,20 +860,6 @@ let rec add_from_gossip_exn :
             ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
           (* C3 *)
         in
-        let increment =
-          Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
-        in
-        let%bind () =
-          let replace_fee =
-            Option.value_exn
-              (Currency.Fee.scale replace_fee (F_sequence.length drop_queue))
-          in
-          Result.ok_if_true
-            Currency.Fee.(increment >= replace_fee)
-            ~error:
-              (Insufficient_replace_fee (`Replace_fee replace_fee, increment))
-          (* C3 *)
-        in
         let dropped, t' =
           remove_with_dependents_exn t @@ F_sequence.head_exn drop_queue
         in
@@ -882,15 +868,73 @@ let rec add_from_gossip_exn :
           Transaction_hash.User_command_with_valid_signature.t Sequence.t]
           dropped
           (F_sequence.to_seq drop_queue) ;
-        match add_from_gossip_exn t' ~verify cmd0 current_nonce balance with
-        | Ok (v, t'', dropped') ->
-            (* We've already removed them, so this should always be empty. *)
-            assert (Sequence.is_empty dropped') ;
-            Result.Ok (v, t'', dropped)
-        | Error (Insufficient_funds _ as err) ->
-            Error err (* C2 *)
-        | _ ->
-            failwith "recursive add_exn failed" )
+        (* Add the new transaction *)
+        let%bind cmd, t'', _ =
+          match add_from_gossip_exn t' ~verify cmd0 current_nonce balance with
+          | Ok (v, t'', dropped') ->
+              (* We've already removed them, so this should always be empty. *)
+              assert (Sequence.is_empty dropped') ;
+              Result.Ok (v, t'', dropped)
+          | Error (Insufficient_funds _ as err) ->
+              Error err (* C2 *)
+          | _ ->
+              failwith "recursive add_exn failed"
+        in
+        let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
+        let increment =
+          Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
+        in
+        (* Re-add all of the transactions we dropped until there are none left,
+           or until the fees from dropped transactions exceed the fee increase
+           over the first transaction.
+        *)
+        let%bind t'', increment, dropped' =
+          let rec go t' increment dropped dropped' current_nonce =
+            match (Sequence.next dropped, dropped') with
+            | None, Some dropped' ->
+                Ok (t', increment, dropped')
+            | None, None ->
+                Ok (t', increment, Sequence.empty)
+            | Some (cmd, dropped), Some _ -> (
+                let cmd_unchecked =
+                  Transaction_hash.User_command_with_valid_signature.command
+                    cmd
+                in
+                let replace_fee = User_command.fee_exn cmd_unchecked in
+                match Currency.Fee.(increment - replace_fee) with
+                | Some increment ->
+                    go t' increment dropped dropped' current_nonce
+                | None ->
+                    Error
+                      (Insufficient_replace_fee
+                         (`Replace_fee replace_fee, increment)) )
+            | Some (cmd, dropped'), None -> (
+                let current_nonce = Account_nonce.succ current_nonce in
+                match
+                  add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce
+                    balance
+                with
+                | Ok (_v, t', dropped_) ->
+                    assert (Sequence.is_empty dropped_) ;
+                    go t' increment dropped' None current_nonce
+                | Error (Insufficient_funds _) ->
+                    (* Re-evaluate with the same [dropped] to calculate the new
+                       fee increment.
+                    *)
+                    go t' increment dropped (Some dropped') current_nonce
+                | _ ->
+                    failwith "recursive add_exn failed" )
+          in
+          go t'' increment drop_tail None current_nonce
+        in
+        let%map () =
+          Result.ok_if_true
+            Currency.Fee.(increment >= replace_fee)
+            ~error:
+              (Insufficient_replace_fee (`Replace_fee replace_fee, increment))
+          (* C3 *)
+        in
+        (cmd, t'', Sequence.(append (return drop_head) dropped'))
 
 let add_from_backtrack :
        t
