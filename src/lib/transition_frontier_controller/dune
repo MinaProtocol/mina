@@ -2,5 +2,5 @@
  (name transition_frontier_controller)
  (public_name transition_frontier_controller)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version))
+ (preprocess (pps ppx_version ppx_coda))
  (libraries core_kernel consensus mina_intf mina_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler test_genesis_ledger mina_networking ledger_catchup))

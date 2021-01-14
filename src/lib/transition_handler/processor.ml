@@ -315,7 +315,9 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
-                     Ivar.fill decrement_signal ()
+                     if Ivar.is_full decrement_signal then
+                       [%log error] "Ivar.fill bug is here!" ;
+                     Ivar.fill_if_empty decrement_signal ()
                  | `Catchup_scheduler ->
                      () )
              | `Local_breadcrumb breadcrumb ->
