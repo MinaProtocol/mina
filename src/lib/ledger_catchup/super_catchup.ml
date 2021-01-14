@@ -533,7 +533,7 @@ let download s d ~key ~attempts =
   let logger = Logger.create () in
   [%log debug]
     ~metadata:[("key", Downloader.Key.to_yojson key); ("caller", `String s)]
-    "Mownload download $key" ;
+    "Download download $key" ;
   Downloader.download d ~key ~attempts
 
 let create_node ~downloader t ~parent x =
