@@ -129,17 +129,25 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let mark_failed : type a b. (a, b) t -> unit = function
       | Base x ->
-          Ivar.fill x.final_state `Failed
+          if Ivar.is_full x.final_state then
+            [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+          Ivar.fill_if_empty x.final_state `Failed
       | Derivative x ->
-          Ivar.fill x.final_state `Failed
+          if Ivar.is_full x.final_state then
+            [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+          Ivar.fill_if_empty x.final_state `Failed
       | Pure _ ->
           failwith "cannot set consumed state of pure Cached.t"
 
     let mark_success : type a b. (a, b) t -> unit = function
       | Base x ->
-          Ivar.fill x.final_state (`Success x.data)
+          if Ivar.is_full x.final_state then
+            [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+          Ivar.fill_if_empty x.final_state (`Success x.data)
       | Derivative x ->
-          Ivar.fill x.final_state (`Success x.original)
+          if Ivar.is_full x.final_state then
+            [%log' warn (Logger.create ())] "Ivar.fill bug is here!" ;
+          Ivar.fill_if_empty x.final_state (`Success x.original)
       | Pure _ ->
           failwith "cannot set consumed state of pure Cached.t"
 
