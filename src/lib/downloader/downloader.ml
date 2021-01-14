@@ -478,7 +478,13 @@ end = struct
           if not out_of_band then
             Hash_set.remove t.knowledge_requesting_peers peer ;
           let tried_and_failed =
-            let s = Key.Hash_set.create () in
+            let s =
+              match Hashtbl.find t.knowledge peer with
+              | None ->
+                  Key.Hash_set.create ()
+              | Some {tried_and_failed; _} ->
+                  tried_and_failed
+            in
             List.iter active_jobs ~f:(fun j ->
                 match Map.find j.J.attempts peer with
                 | None ->
