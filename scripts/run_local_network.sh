@@ -62,7 +62,7 @@ fi
 
 if [ ! -d "$ledgerfolder" ]; then
   echo "making ledger"
-  
+
   mkdir $ledgerfolder
 
   S=./automation/scripts
@@ -146,7 +146,7 @@ mkdir -p $nodesfolder
 
 mkdir $nodesfolder/seed
 
-$CODA daemon -seed -client-port 3000 -rest-port 3001 -external-port 3002 -metrics-port 3003 -libp2p-metrics-port 3004 -config-directory $nodesfolder/seed -config-file $daemon -generate-genesis-proof true -discovery-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr -log-json -log-level Trace &> $nodesfolder/seed/log.txt &
+$CODA daemon -seed -client-port 3000 -rest-port 3001 -external-port 3002 -metrics-port 3003 -libp2p-metrics-port 3004 -config-directory $nodesfolder/seed -config-file $daemon -generate-genesis-proof true -discovery-keypair CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr -log-json -log-level Trace -archive-address 3086 &> $nodesfolder/seed/log.txt &
 seed_pid=$!
 
 echo 'waiting for seed to go up...'
