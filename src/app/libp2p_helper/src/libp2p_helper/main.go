@@ -62,8 +62,9 @@ type app struct {
 	UnsafeNoTrustIP bool
 
 	// development configuration options
-	NoMDNS bool
-	NoDHT  bool
+	NoMDNS    bool
+	NoDHT     bool
+	NoUpcalls bool
 }
 
 var seqs = make(chan int)
@@ -108,6 +109,10 @@ type envelope struct {
 }
 
 func (app *app) writeMsg(msg interface{}) {
+	if app.NoUpcalls {
+		return
+	}
+
 	app.OutChan <- msg
 }
 
@@ -928,13 +933,15 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	for _, info := range app.AddedPeers {
-		app.P2p.Logger.Error("Trying to connect to: ", info)
+		app.P2p.Logger.Debug("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())
 			continue
 		}
 	}
+
+	app.P2p.Logger.Debug("connected to seed peers")
 
 	foundPeerCh := make(chan peer.AddrInfo)
 
@@ -946,7 +953,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	go func() {
 		for info := range foundPeerCh {
 			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", info.ID)
+				app.P2p.Logger.Debugf("discovered peer: %s", info.ID)
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 
 				// now connect to the peer we discovered
@@ -983,7 +990,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			return nil, badp2p(err)
 		}
 
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 1000)
+		app.P2p.Logger.Debugf("beginning DHT advertising")
 
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
 		if err != nil {
