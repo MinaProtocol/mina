@@ -1681,7 +1681,7 @@ let object_lifetime_statistics =
              printf "Failed to get object lifetime statistics: %s\n%!"
                (Error.to_string_hum err) ))
 
-let archive_precomputed_blocks =
+let archive_blocks =
   let params =
     let open Command.Let_syntax in
     let%map_open files =
@@ -1701,12 +1701,25 @@ let archive_precomputed_blocks =
           "true/false Whether to log messages for files that were processed \
            successfully"
         (Command.Flag.optional_with_default true Command.Param.bool)
-    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
-    (files, success_file, failure_file, log_successes, archive_process_location)
+    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
+    and precomputed_flag =
+      Command.Param.flag "precomputed" no_arg
+        ~doc:"Blocks are in precomputed JSON format"
+    and extensional_flag =
+      Command.Param.flag "extensional" no_arg
+        ~doc:"Blocks are in extensional JSON format"
+    in
+    ( files
+    , success_file
+    , failure_file
+    , log_successes
+    , archive_process_location
+    , precomputed_flag
+    , extensional_flag )
   in
   Command.async
     ~summary:
-      "Archive a precomputed block from a file.\n\n\
+      "Archive a block from a file.\n\n\
        If an archive address is given, this process will communicate with the \
        archive node directly; otherwise it will communicate through the \
        daemon over the rest-server"
@@ -1716,28 +1729,27 @@ let archive_precomputed_blocks =
           , success_file
           , failure_file
           , log_successes
-          , archive_process_location )
+          , archive_process_location
+          , precomputed_flag
+          , extensional_flag )
           ->
-         let send_block block =
+         if Bool.equal precomputed_flag extensional_flag then
+           failwith
+             "Must provide exactly one of -precomputed and -extensional flags" ;
+         let make_send_block ~graphql_make ~archive_dispatch ~block_to_yojson
+             block =
            match archive_process_location with
            | Some archive_process_location ->
                (* Connect directly to the archive node. *)
-               Mina_lib.Archive_client.dispatch_precomputed_block
-                 archive_process_location block
+               archive_dispatch archive_process_location block
            | None ->
                (* Send the requests over GraphQL. *)
-               let block =
-                 Mina_transition.External_transition.Precomputed_block
-                 .to_yojson block
-                 |> Yojson.Safe.to_basic
-               in
+               let block = block_to_yojson block |> Yojson.Safe.to_basic in
                let%map.Deferred.Or_error.Let_syntax _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
                  *)
-                 Graphql_client.query
-                   (Graphql_queries.Archive_precomputed_block.make ~block ())
-                   graphql_endpoint
+                 Graphql_client.query (graphql_make ~block ()) graphql_endpoint
                  |> Deferred.Result.map_error ~f:(function
                       | `Failed_request e ->
                           Error.create "Unable to connect to Coda daemon" ()
@@ -1767,10 +1779,24 @@ let archive_precomputed_blocks =
          in
          let add_to_success_file = output_file_line success_file in
          let add_to_failure_file = output_file_line failure_file in
+         let send_precomputed_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_precomputed_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_precomputed_block
+             ~block_to_yojson:
+               Mina_transition.External_transition.Precomputed_block.to_yojson
+         in
+         let send_extensional_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_extensional_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_extensional_block
+             ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson
+         in
          Deferred.List.iter files ~f:(fun path ->
              match%map
-               let open Deferred.Or_error.Let_syntax in
-               let%bind precomputed_block_json =
+               let%bind.Deferred.Or_error.Let_syntax block_json =
                  Or_error.try_with (fun () ->
                      In_channel.with_file path ~f:(fun in_channel ->
                          Yojson.Safe.from_channel in_channel ) )
@@ -1779,17 +1805,34 @@ let archive_precomputed_blocks =
                           String.sexp_of_t )
                  |> Deferred.return
                in
-               let%bind precomputed_block =
-                 Mina_transition.External_transition.Precomputed_block
-                 .of_yojson precomputed_block_json
-                 |> Result.map_error ~f:(fun err ->
-                        Error.tag_arg (Error.of_string err)
-                          "Could not parse JSON as a precomputed block from \
-                           file"
-                          path String.sexp_of_t )
-                 |> Deferred.return
-               in
-               send_block precomputed_block
+               let open Deferred.Or_error.Let_syntax in
+               if precomputed_flag then
+                 let%bind precomputed_block =
+                   Mina_transition.External_transition.Precomputed_block
+                   .of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as a precomputed block from \
+                             file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_precomputed_block precomputed_block
+               else if extensional_flag then
+                 let%bind extensional_block =
+                   Archive_lib.Extensional.Block.of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as an extensional block \
+                             from file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_extensional_block extensional_block
+               else
+                 (* should be unreachable *)
+                 failwith
+                   "Expected exactly one of precomputed, extensional flags"
              with
              | Ok () ->
                  if log_successes then
@@ -1913,4 +1956,4 @@ let advanced =
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-precomputed-blocks", archive_precomputed_blocks) ]
+    ; ("archive-blocks", archive_blocks) ]
