@@ -290,7 +290,7 @@ let close ~loc
     ; extensions
     ; closed
     ; genesis_state_hash= _ } =
-  [%log trace] "Closing transition frontier" ;
+  [%log debug] "Closing transition frontier" ;
   Full_frontier.close ~loc full_frontier ;
   Extensions.close extensions ;
   let%map () =
