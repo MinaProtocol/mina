@@ -39,6 +39,13 @@ export declare type payment = {
   */
 export declare const genKeys: () => keypair;
 /**
+  * Derives the public key of the corresponding private key
+  *
+  * @param privateKey - The private key used to get the corresponding public key
+  * @returns A public key
+  */
+export declare const derivePublicKey: (privateKey: privateKey) => publicKey;
+/**
   * Signs an arbitrary message
   *
   * @param key - The keypair used to sign the message
