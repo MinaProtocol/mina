@@ -195,7 +195,7 @@ struct
     | Some ivar ->
         if Ivar.is_full ivar then
           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-        Ivar.fill ivar `Cancelled
+        Ivar.fill_if_empty ivar `Cancelled
     | None ->
         ()
 

@@ -2,10 +2,10 @@
 
 This chart bootstraps a Buildkite GraphQL API metrics exporter providing job and agent statistics to a Prometheus compatible endpoint.
 
-## Add Mina Helm chart repository:
+## Add Coda Helm chart repository:
 
  ```console
- helm repo add mina https://coda-charts.storage.googleapis.com
+ helm repo add coda https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 

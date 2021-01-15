@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Mina protocol Testnet archive node and associated Postgres database.
+This chart bootstraps a Coda protocol Testnet archive node and associated Postgres database.
 
-## Add Mina Helm chart repository:
+## Add Coda Helm chart repository:
 
  ```console
- helm repo add mina https://coda-charts.storage.googleapis.com
+ helm repo add coda https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -17,8 +17,8 @@ The following table lists the configurable parameters of the `archive-node` char
 
 Parameter | Description
 --- | ---
-`testnetName` | Mina protocol testnet name to deploy to
-`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon 
+`testnetName` | Coda protocol testnet name to deploy to
+`coda.seedPeers` | peers to bootstrap the the archive node's Coda daemon 
 `archive.nodeName` | name identifier of archive node pod
 
 ### Optional Settings

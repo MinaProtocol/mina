@@ -42,5 +42,3 @@ end
 
 (** Create a shared pipe and seed it with 'a *)
 val create : 'a -> 'a Reader.t * 'a Writer.t
-
-val map : 'a Reader.t -> f:('a -> 'b) -> 'b Reader.t

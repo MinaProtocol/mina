@@ -30,10 +30,6 @@ locals {
         }
       ]
     }
-    # Disable per-region instances due to grafanacloud aggregator setup
-    alertmanager = {
-      enabled = false
-    }
   }
 }
 

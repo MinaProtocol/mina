@@ -180,7 +180,7 @@ module Snark_worker = struct
             [%log info] "Snark worker process died" ;
             if Ivar.is_full kill_ivar then
               [%log error] "Ivar.fill bug is here!" ;
-            Ivar.fill kill_ivar () ;
+            Ivar.fill_if_empty kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
             [%log fatal]
@@ -230,7 +230,7 @@ module Snark_worker = struct
           "Started snark worker process with pid: $snark_worker_pid" ;
         if Ivar.is_full process_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
-        Ivar.fill process_ivar snark_worker_process
+        Ivar.fill_if_empty process_ivar snark_worker_process
     | `Off _ ->
         [%log' info t.config.logger]
           !"Attempted to turn on snark worker, but snark worker key is set to \
@@ -718,7 +718,8 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
         let ledger_nonce =
           Participating_state.active (get_account t aid)
           |> Option.join
-          |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
+          |> Option.map ~f:(fun {Account.Poly.nonce; _} ->
+                 Mina_numbers.Account_nonce.succ nonce )
           |> Option.value ~default:nonce
         in
         Ok (`Min ledger_nonce, nonce)
@@ -727,7 +728,7 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
     ( uc_inputs
     , ( if Ivar.is_full result_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
-        Ivar.fill result_ivar )
+        Ivar.fill_if_empty result_ivar )
     , get_current_nonce )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
@@ -1123,15 +1124,6 @@ let create ?wallets (config : Config.t) =
               ~get_transition_chain:
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
-              ~get_transition_knowledge:(fun _q ->
-                return
-                  ( match
-                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                    with
-                  | None ->
-                      []
-                  | Some frontier ->
-                      Sync_handler.best_tip_path ~frontier ) )
           in
           (* tie the first knot *)
           net_ref := Some net ;

@@ -32,9 +32,7 @@ let create a =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
                Deferred.ignore @@ Pipe.downstream_flushed p )
          in
-         if Ivar.is_full !downstream_flushed_v then
-           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-         Ivar.fill !downstream_flushed_v () ;
+         Ivar.fill_if_empty !downstream_flushed_v () ;
          Deferred.unit )) ;
   (t, t)
 
@@ -123,11 +121,6 @@ module Writer = struct
         Int.Table.iter t.pipes ~f:(fun w -> Pipe.close w) ;
         Int.Table.clear t.pipes )
 end
-
-let map t ~f =
-  let r, w = create (f (Reader.peek t)) in
-  don't_wait_for (Reader.iter t ~f:(fun x -> Writer.write w (f x))) ;
-  r
 
 (*
  * 1. Cached value is keeping peek working

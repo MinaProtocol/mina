@@ -2,12 +2,8 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.4.6
+version: 0.4.5
 appVersion: 1.16.0
-annotations:
-  artifacthub.io/changes: |
-    - enable Artifacthub repository hosting *changes* annotations
-    - add CHANGELOG.md for chart version => changelog tracking
 dependencies:
   - name: postgresql
     version: "*"
@@ -23,4 +19,4 @@ keywords:
 - testnet
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina/tree/develop/helm/archive-node
+- https://github.com/MinaProtocol/mina/tree/develop/src/app/archive

@@ -2,12 +2,8 @@ apiVersion: v2
 name: block-producer
 description: A Helm chart for Mina Protocol's block producing network nodes
 type: application
-version: 0.4.5
+version: 0.4.4
 appVersion: 1.16.0
-annotations:
-  artifacthub.io/changes: |
-    - enable Artifacthub repository hosting *changes* annotations
-    - add CHANGELOG.md for chart version => changelog tracking
 dependencies:
   - name: common-utilities
     version: 0.0.7
@@ -21,5 +17,5 @@ keywords:
 - testnet
 home: https://minaprotocol.com/
 sources:
-- https://github.com/MinaProtocol/mina/tree/develop/helm/block-producer
+- https://github.com/MinaProtocol/mina/tree/develop/src/lib/block_producer
 

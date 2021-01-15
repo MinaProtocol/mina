@@ -34,12 +34,11 @@ let is_transition_for_bootstrap ~logger
   | `Keep ->
       false
   | `Take ->
-      let slack = 5 in
       if
         Length.to_int
           ( Transition_frontier.best_tip frontier
           |> Transition_frontier.Breadcrumb.blockchain_length )
-        + 290 + slack
+        + 290
         < Length.to_int
             (Consensus.Data.Consensus_state.blockchain_length
                new_consensus_state.data)

@@ -71,6 +71,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       kill catchup_breadcrumbs_writer ;
       if Ivar.is_full clean_up_catchup_scheduler then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler () )
+      Ivar.fill_if_empty clean_up_catchup_scheduler () )
   |> don't_wait_for ;
   processed_transition_reader

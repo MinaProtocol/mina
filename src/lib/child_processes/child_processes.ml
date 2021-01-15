@@ -314,7 +314,7 @@ let start_custom :
        Reader.close @@ Process.stderr process) ;
     let%bind () = Sys.remove lock_path in
     if Ivar.is_full terminated_ivar then [%log error] "Ivar.fill bug is here!" ;
-    Ivar.fill terminated_ivar termination_status ;
+    Ivar.fill_if_empty terminated_ivar termination_status ;
     let log_bad_termination () =
       [%log fatal] "Process died unexpectedly: $exit_or_signal"
         ~metadata:
