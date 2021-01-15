@@ -58,10 +58,16 @@ module Validation_callback = struct
         result
 
   let fire_if_not_already_fired cb result =
-    if not (is_expired cb) then Ivar.fill cb.signal result
+    if not (is_expired cb) then (
+      if Ivar.is_full cb.signal then
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+      Ivar.fill cb.signal result )
 
   let fire_exn cb result =
-    if not (is_expired cb) then Ivar.fill cb.signal result
+    if not (is_expired cb) then (
+      if Ivar.is_full cb.signal then
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+      Ivar.fill cb.signal result )
 end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
@@ -759,7 +765,10 @@ module Helper = struct
       match Hashtbl.find_and_remove t.outstanding_requests seq with
       | Some ivar ->
           (* This fill should be okay because we "found and removed" the request *)
-          Ivar.fill ivar fill_result ; Ok ()
+          if Ivar.is_full ivar then
+            [%log' error t.logger] "Ivar.fill bug is here!" ;
+          Ivar.fill ivar fill_result ;
+          Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
             (Yojson.Safe.to_string v)

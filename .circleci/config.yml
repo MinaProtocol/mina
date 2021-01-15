@@ -99,7 +99,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -168,14 +168,14 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
 
             - save_cache:
                 name: Save cache - opam
-                key: opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                key: opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/home/opam/.opam"
                 no_output_timeout: 1h
@@ -225,7 +225,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -279,7 +279,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -319,7 +319,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -352,7 +352,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -586,7 +586,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -630,7 +630,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -843,7 +843,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -882,7 +882,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -921,7 +921,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -963,7 +963,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -1002,7 +1002,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -1041,7 +1041,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -1080,7 +1080,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -1124,7 +1124,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -1166,7 +1166,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-linux-v2-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'

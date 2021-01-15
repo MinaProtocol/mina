@@ -1,0 +1,8 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: coda
+          image: gcr.io/o1labs-192920/coda-daemon-baked:0.2.2-hotfix-super-catchup-restart-libp2p-upload-blocks-9614ad9-testworld-efd7221
+        - name: archive
+          image: gcr.io/o1labs-192920/coda-archive:0.2.2-develop-7cdab68

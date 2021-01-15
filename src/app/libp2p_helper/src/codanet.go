@@ -126,6 +126,11 @@ func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Con
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
+// proxy remaining p2pconnmgr.BasicConnMgr methods for access
+func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
+	return cm.p2pManager.GetInfo()
+}
+
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
@@ -209,7 +214,7 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
 	_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-	
+
 	// if we want to allow connecting to private IPs, and this addr is a private IP, allow
 	if exists && gs.AddrFilters.AddrBlocked(addr) {
 		return true

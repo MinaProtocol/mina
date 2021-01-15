@@ -1393,7 +1393,7 @@ module Data = struct
        - skipped more than a window, set every sub_windows to be 0 and mark next_sub_window_length to be 1
     *)
 
-    let update_min_window_density ~constants ~prev_global_slot
+    let update_min_window_density ~incr_window ~constants ~prev_global_slot
         ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density =
       let prev_global_sub_window =
         Global_sub_window.of_global_slot ~constants prev_global_slot
@@ -1446,8 +1446,8 @@ module Data = struct
               Sub_window.(of_int i = next_relative_sub_window)
             in
             if is_next_sub_window then
-              if same_sub_window then Length.(succ length)
-              else Length.(succ zero)
+              let f = if incr_window then Length.succ else Fn.id in
+              if same_sub_window then f length else f Length.zero
             else length )
       in
       (min_window_density, sub_window_densities)
@@ -1721,7 +1721,8 @@ module Data = struct
                     , (prev_min_window_density, prev_sub_window_densities) )
                ->
               let _, _, min_window_density1 =
-                update_several_times ~f:update_min_window_density
+                update_several_times
+                  ~f:(update_min_window_density ~incr_window:true)
                   ~prev_global_slot ~next_global_slots
                   ~prev_sub_window_densities ~prev_min_window_density
                   ~constants
@@ -1768,7 +1769,8 @@ module Data = struct
                 (fun ( (prev_global_slot, next_global_slots)
                      , (prev_min_window_density, prev_sub_window_densities)
                      , constants ) ->
-                  update_several_times ~f:update_min_window_density
+                  update_several_times
+                    ~f:(update_min_window_density ~incr_window:true)
                     ~prev_global_slot ~next_global_slots
                     ~prev_sub_window_densities ~prev_min_window_density
                     ~constants )
@@ -2090,6 +2092,7 @@ module Data = struct
       in
       let min_window_density, sub_window_densities =
         Min_window_density.update_min_window_density ~constants
+          ~incr_window:true
           ~prev_global_slot:previous_consensus_state.curr_global_slot
           ~next_global_slot
           ~prev_sub_window_densities:
@@ -2748,6 +2751,7 @@ module Hooks = struct
                       , Mina_base.Ledger_hash.to_yojson ledger_hash ) ]
                   "Failed to serve epoch ledger query with hash $ledger_hash \
                    from $peer: $error" ) ;
+            if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
             Ivar.fill ivar response )
     end
 
@@ -3098,9 +3102,26 @@ module Hooks = struct
         ~condition:candidate_vrf_is_bigger
     in
     let long_fork_chain_quality_is_better =
-      less_than_or_equal_when existing.min_window_density
-        candidate.min_window_density ~compare:Length.compare
-        ~condition:blockchain_length_is_longer
+      (* The min window density if we imagine extending to the max slot of the two chains. *)
+      (* TODO: You could argue that instead this should be imagine extending to the current consensus time. *)
+      let max_slot =
+        Global_slot.max candidate.curr_global_slot existing.curr_global_slot
+      in
+      let virtual_min_window_density (s : Consensus_state.Value.t) =
+        if Global_slot.equal s.curr_global_slot max_slot then
+          s.min_window_density
+        else
+          Min_window_density.update_min_window_density ~incr_window:false
+            ~constants ~prev_global_slot:s.curr_global_slot
+            ~next_global_slot:max_slot
+            ~prev_sub_window_densities:s.sub_window_densities
+            ~prev_min_window_density:s.min_window_density
+          |> fst
+      in
+      less_than_or_equal_when
+        (virtual_min_window_density existing)
+        (virtual_min_window_density candidate)
+        ~compare:Length.compare ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
       if is_short_range existing candidate ~constants then
@@ -3600,7 +3621,7 @@ module Hooks = struct
           in
           let min_window_density, sub_window_densities =
             Min_window_density.update_min_window_density ~constants
-              ~prev_global_slot:prev.curr_global_slot
+              ~incr_window:true ~prev_global_slot:prev.curr_global_slot
               ~next_global_slot:curr_global_slot
               ~prev_sub_window_densities:prev.sub_window_densities
               ~prev_min_window_density:prev.min_window_density
