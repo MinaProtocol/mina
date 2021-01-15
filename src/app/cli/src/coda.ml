@@ -398,7 +398,7 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn ~logger
               ~which:"libp2p keypair" s
             |> Deferred.map ~f:Option.some )
     in
@@ -772,7 +772,7 @@ let setup_daemon logger =
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
                 ~which:"block producer keypair" sk_file
             in
             Some kp
@@ -783,7 +783,7 @@ let setup_daemon logger =
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
                 ~which:"block producer keypair" sk_file
             in
             Some kp
