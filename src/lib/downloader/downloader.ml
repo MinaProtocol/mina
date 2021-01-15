@@ -524,9 +524,7 @@ end = struct
           Hashtbl.set t.knowledge ~key:peer
             ~data:{Knowledge.claimed= Some claimed; tried_and_failed}
       | Job_cancelled h ->
-          jobs_no_longer_needed t [h] ;
-          Hashtbl.iter t.knowledge ~f:(fun s ->
-              Hash_set.remove s.tried_and_failed h )
+          jobs_no_longer_needed t [h]
       | Download_starting peer ->
           Hash_set.add t.downloading_peers peer
       | Download_finished (peer0, `Successful succs, `Unsuccessful unsuccs)
@@ -771,7 +769,7 @@ end = struct
       | Error e ->
           fail e
       | Ok rs ->
-          [%log' debug t.logger] "result is $result"
+          [%log' debug t.logger] "Downloader got $result"
             ~metadata:
               [ ("result", f xs)
               ; ("peer", `String (Peer.to_multiaddr_string peer)) ] ;

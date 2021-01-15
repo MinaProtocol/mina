@@ -39,7 +39,7 @@ let is_transition_for_bootstrap ~logger
         Length.to_int
           ( Transition_frontier.best_tip frontier
           |> Transition_frontier.Breadcrumb.blockchain_length )
-        + 290 + slack
+        + Length.to_int constants.k + slack
         < Length.to_int
             (Consensus.Data.Consensus_state.blockchain_length
                new_consensus_state.data)
