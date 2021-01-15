@@ -61,13 +61,13 @@ module Validation_callback = struct
     if not (is_expired cb) then (
       if Ivar.is_full cb.signal then
         [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-      Ivar.fill_if_empty cb.signal result )
+      Ivar.fill cb.signal result )
 
   let fire_exn cb result =
     if not (is_expired cb) then (
       if Ivar.is_full cb.signal then
         [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-      Ivar.fill_if_empty cb.signal result )
+      Ivar.fill cb.signal result )
 end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
@@ -767,7 +767,7 @@ module Helper = struct
           (* This fill should be okay because we "found and removed" the request *)
           if Ivar.is_full ivar then
             [%log' error t.logger] "Ivar.fill bug is here!" ;
-          Ivar.fill_if_empty ivar fill_result ;
+          Ivar.fill ivar fill_result ;
           Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq

@@ -74,6 +74,8 @@ module Reader : sig
    * unit. See [fold reader ~init ~f] *)
   val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
 
+  val iter' : 'a t -> f:('a Base.Queue.t -> unit Deferred.t) -> unit Deferred.t
+
   (** See [fold_without_pushback reader ~init ~f] *)
   val iter_without_pushback :
        ?consumer:Pipe.Consumer.t
@@ -127,6 +129,7 @@ end
 
 val create :
      ?name:string
+  -> ?warn_on_drop:bool
   -> ('t, 'type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 
