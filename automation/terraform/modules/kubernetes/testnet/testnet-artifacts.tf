@@ -6,7 +6,7 @@ resource "null_resource" "block_producer_key_generation" {
 
 resource "null_resource" "prepare_keys_for_deployment" {
   provisioner "local-exec" {
-      command = "chmod -R a+rwX ../../../keys"
+      command = "sudo chmod -R a+rwX ../../../keys"
   }
   depends_on  = [kubernetes_namespace.testnet_namespace, null_resource.block_producer_key_generation]
 }
