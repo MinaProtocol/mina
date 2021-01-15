@@ -37,13 +37,18 @@ struct
     let%bind result =
       match Sys.getenv env with
       | Some password ->
+          (* this function is only called from client commands that can prompt for
+             a password, so printing a message, rather than a formatted log, is OK
+          *)
+          printf "Using %s private-key password from environment variable %s\n"
+            which env ;
           read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
       | None ->
           let read_file () =
             read_privkey
               ( lazy
                 (Password.read_hidden_line ~error_help_message:""
-                   "Secret key password: ") )
+                   "Private-key password: ") )
           in
           let rec read_until_correct () =
             match%bind read_file () with
@@ -63,11 +68,14 @@ struct
     | Error e ->
         Privkey_error.raise ~which e
 
-  let read_from_env_exn ~which path =
+  let read_from_env_exn ~logger ~which path =
     let read_privkey password = read ~privkey_path:path ~password in
     let%bind result =
       match Sys.getenv env with
       | Some password ->
+          [%log info]
+            "Using %s private-key password from environment variable %s" which
+            env ;
           read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
       | None ->
           Deferred.Result.fail (`Password_not_in_environment env)

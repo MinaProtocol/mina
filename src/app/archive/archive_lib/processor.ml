@@ -60,6 +60,12 @@ let rec vector : type t n.
         ~encode:(fun Vector.(x :: xs) -> Ok (x, xs))
         ~decode:(fun (x, xs) -> Ok (x :: xs))
 
+(* process a Caqti query on list of items
+   if we were instead to simply map the query over the list,
+    we'd get "in use" assertion failures for the connection
+   the bind makes sure the connection is available for
+    each query
+*)
 let rec deferred_result_list_fold ls ~init ~f =
   let open Deferred.Result.Let_syntax in
   match ls with
@@ -176,10 +182,12 @@ module Timing_info = struct
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO timing_info \
-              (public_key_id,token,initial_balance,initial_minimum_balance, \
-              cliff_time, cliff_amount, vesting_period, vesting_increment ) \
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+             {sql| INSERT INTO timing_info
+                    (public_key_id,token,initial_balance,initial_minimum_balance,
+                     cliff_time, cliff_amount, vesting_period, vesting_increment)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   RETURNING id
+             |sql})
           values
 end
 
@@ -219,18 +227,11 @@ module Epoch_data = struct
     let rep = Caqti_type.(tup2 string int) in
     Caqti_type.custom ~encode ~decode rep
 
-  let add_if_doesn't_exist ~is_genesis_block (module Conn : CONNECTION)
-      (t : Mina_base.Epoch_data.Value.t) =
+  (* for extensional blocks, we have just the seed and ledger hash *)
+  let add_from_seed_and_ledger_hash_id (module Conn : CONNECTION) ~seed
+      ~ledger_hash_id =
     let open Deferred.Result.Let_syntax in
-    let Mina_base.Epoch_ledger.Poly.{hash; _} =
-      Mina_base.Epoch_data.Poly.ledger t
-    in
-    let%bind ledger_hash_id =
-      if is_genesis_block then
-        Snarked_ledger_hash.add_if_doesn't_exist (module Conn) hash
-      else Snarked_ledger_hash.find (module Conn) hash
-    in
-    let seed = Mina_base.Epoch_data.Poly.seed t |> Epoch_seed.to_string in
+    let seed = Epoch_seed.to_string seed in
     match%bind
       Conn.find_opt
         (Caqti_request.find_opt typ Caqti_type.int
@@ -242,9 +243,24 @@ module Epoch_data = struct
     | None ->
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO epoch_data (seed, ledger_hash_id) VALUES (?, ?) \
-              RETURNING id")
+             {sql| INSERT INTO epoch_data (seed, ledger_hash_id) VALUES (?, ?)
+                   RETURNING id
+             |sql})
           {seed; ledger_hash_id}
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (t : Mina_base.Epoch_data.Value.t) =
+    let open Deferred.Result.Let_syntax in
+    let Mina_base.Epoch_ledger.Poly.{hash; _} =
+      Mina_base.Epoch_data.Poly.ledger t
+    in
+    let%bind ledger_hash_id =
+      Snarked_ledger_hash.add_if_doesn't_exist (module Conn) hash
+    in
+    add_from_seed_and_ledger_hash_id
+      (module Conn)
+      ~seed:(Mina_base.Epoch_data.Poly.seed t)
+      ~ledger_hash_id
 end
 
 module User_command = struct
@@ -305,13 +321,13 @@ module User_command = struct
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
         (Caqti_request.find Caqti_type.int typ
-           {| SELECT type,fee_payer_id,source_id,receiver_id,fee_token,token,
-               nonce,amount,fee,valid_until,memo,hash,status,failure_reason,
-               fee_payer_account_creation_fee_paid,receiver_account_creation_fee_paid,
-               created_token
-              FROM user_commands
-              WHERE id = ?
-           |})
+           {sql| SELECT type,fee_payer_id,source_id,receiver_id,fee_token,token,
+                  nonce,amount,fee,valid_until,memo,hash,status,failure_reason,
+                  fee_payer_account_creation_fee_paid,receiver_account_creation_fee_paid,
+                  created_token
+                 FROM user_commands
+                 WHERE id = ?
+           |sql})
         id
 
     let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
@@ -351,14 +367,14 @@ module User_command = struct
           (* TODO: Converting these uint64s to int64 can overflow; see #5419 *)
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {| INSERT INTO user_commands (type, fee_payer_id, source_id,
-                   receiver_id, fee_token, token, nonce, amount, fee,
-                   valid_until, memo, hash, status, failure_reason,
-                   fee_payer_account_creation_fee_paid,
-                   receiver_account_creation_fee_paid,
-                   created_token)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 RETURNING id |})
+               {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
+                      receiver_id, fee_token, token, nonce, amount, fee,
+                      valid_until, memo, hash, status, failure_reason,
+                      fee_payer_account_creation_fee_paid,
+                      receiver_account_creation_fee_paid,
+                      created_token)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id |sql})
             { typ=
                 ( match via with
                 | `Ident ->
@@ -448,13 +464,14 @@ module User_command = struct
                  (tup2 (option string) (option string))
                  (tup3 (option int64) (option int64) (option int64))
                  int)
-             "UPDATE user_commands \n\
-              SET status = ?, \n\
-             \    failure_reason = ?, \n\
-             \    fee_payer_account_creation_fee_paid = ?, \n\
-             \    receiver_account_creation_fee_paid = ?, \n\
-             \    created_token = ? \n\
-              WHERE id = ?")
+             {sql| UPDATE user_commands
+                   SET status = ?,
+                    failure_reason = ?,
+                    fee_payer_account_creation_fee_paid = ?,
+                    receiver_account_creation_fee_paid = ?,
+                    created_token = ?
+                   WHERE id = ?
+             |sql})
           ( (Some status_str, failure_reason)
           , ( fee_payer_account_creation_fee_paid
             , receiver_account_creation_fee_paid
@@ -508,6 +525,78 @@ module User_command = struct
 
   let find conn ~(transaction_hash : Transaction_hash.t) =
     Signed_command.find conn ~transaction_hash
+
+  (* meant to work with either a signed command, or a snapp *)
+  let add_extensional (module Conn : CONNECTION)
+      (user_cmd : Extensional.User_command.t) =
+    let amount_opt_to_int64_opt amt_opt =
+      Option.map amt_opt
+        ~f:(Fn.compose Unsigned.UInt64.to_int64 Currency.Amount.to_uint64)
+    in
+    let open Deferred.Result.Let_syntax in
+    let%bind fee_payer_id =
+      Public_key.add_if_doesn't_exist (module Conn) user_cmd.fee_payer
+    in
+    let%bind source_id =
+      Public_key.add_if_doesn't_exist (module Conn) user_cmd.source
+    in
+    let%bind receiver_id =
+      Public_key.add_if_doesn't_exist (module Conn) user_cmd.receiver
+    in
+    Conn.find
+      (Caqti_request.find Signed_command.typ Caqti_type.int
+         {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
+                      receiver_id, fee_token, token, nonce, amount, fee,
+                      valid_until, memo, hash, status, failure_reason,
+                      fee_payer_account_creation_fee_paid,
+                      receiver_account_creation_fee_paid,
+                      created_token)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+         |sql})
+      { typ= user_cmd.typ
+      ; fee_payer_id
+      ; source_id
+      ; receiver_id
+      ; fee_token=
+          user_cmd.fee_token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+      ; token= user_cmd.token |> Token_id.to_uint64 |> Unsigned.UInt64.to_int64
+      ; nonce= user_cmd.nonce |> Unsigned.UInt32.to_int
+      ; amount= user_cmd.amount |> amount_opt_to_int64_opt
+      ; fee=
+          user_cmd.fee
+          |> Fn.compose Unsigned.UInt64.to_int64 Currency.Fee.to_uint64
+      ; valid_until=
+          Option.map user_cmd.valid_until
+            ~f:
+              (Fn.compose Unsigned.UInt32.to_int64
+                 Mina_numbers.Global_slot.to_uint32)
+      ; memo= user_cmd.memo |> Signed_command_memo.to_string
+      ; hash= user_cmd.hash |> Transaction_hash.to_base58_check
+      ; status= user_cmd.status
+      ; failure_reason=
+          Option.map user_cmd.failure_reason
+            ~f:Transaction_status.Failure.to_string
+      ; fee_payer_account_creation_fee_paid=
+          user_cmd.fee_payer_account_creation_fee_paid
+          |> amount_opt_to_int64_opt
+      ; receiver_account_creation_fee_paid=
+          user_cmd.receiver_account_creation_fee_paid
+          |> amount_opt_to_int64_opt
+      ; created_token=
+          Option.map user_cmd.created_token
+            ~f:
+              (Fn.compose Unsigned.UInt64.to_int64 Mina_base.Token_id.to_uint64)
+      }
+
+  let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
+      (user_cmd : Extensional.User_command.t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind find (module Conn) ~transaction_hash:user_cmd.hash with
+    | None ->
+        add_extensional (module Conn) user_cmd
+    | Some user_cmd_id ->
+        return user_cmd_id
 end
 
 module Internal_command = struct
@@ -534,11 +623,42 @@ module Internal_command = struct
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         {| SELECT type,receiver_id,fee,token,hash
-            FROM internal_commands
-            WHERE id = ?
-         |})
+         {sql| SELECT type,receiver_id,fee,token,hash
+               FROM internal_commands
+               WHERE id = ?
+         |sql})
       id
+
+  let add_extensional_if_doesn't_exist (module Conn : CONNECTION)
+      (internal_cmd : Extensional.Internal_command.t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind
+      find
+        (module Conn)
+        ~transaction_hash:internal_cmd.hash ~typ:internal_cmd.typ
+    with
+    | Some internal_command_id ->
+        return internal_command_id
+    | None ->
+        let%bind receiver_id =
+          Public_key.add_if_doesn't_exist (module Conn) internal_cmd.receiver
+        in
+        Conn.find
+          (Caqti_request.find typ Caqti_type.int
+             {sql| INSERT INTO internal_commands
+                    (type, receiver_id, fee, token,hash)
+                   VALUES (?, ?, ?, ?, ?)
+                   RETURNING id
+             |sql})
+          { typ= internal_cmd.typ
+          ; receiver_id
+          ; fee=
+              internal_cmd.fee |> Currency.Fee.to_uint64
+              |> Unsigned.UInt64.to_int64
+          ; token=
+              internal_cmd.token |> Token_id.to_uint64
+              |> Unsigned.UInt64.to_int64
+          ; hash= internal_cmd.hash |> Transaction_hash.to_base58_check }
 end
 
 module Fee_transfer = struct
@@ -595,8 +715,11 @@ module Fee_transfer = struct
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO internal_commands (type, receiver_id, fee, token, \
-              hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
+             {sql| INSERT INTO internal_commands
+                    (type, receiver_id, fee, token, hash)
+                   VALUES (?, ?, ?, ?, ?)
+                   RETURNING id
+             |sql})
           { kind
           ; receiver_id
           ; fee= Fee_transfer.Single.fee t |> Currency.Fee.to_int
@@ -640,23 +763,56 @@ module Coinbase = struct
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO internal_commands (type, receiver_id, fee, token, \
-              hash) VALUES (?, ?, ?, ?, ?) RETURNING id")
+             {sql| INSERT INTO internal_commands
+                    (type, receiver_id, fee, token, hash)
+                   VALUES (?, ?, ?, ?, ?)
+                   RETURNING id
+             |sql})
           { receiver_id
           ; amount= Coinbase.amount t |> Currency.Amount.to_int
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
-module Block_and_Internal_command = struct
+module Block_and_internal_command = struct
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
     Conn.exec
       (Caqti_request.exec
          Caqti_type.(tup4 int int int int)
-         "INSERT INTO blocks_internal_commands (block_id, \
-          internal_command_id, sequence_no, secondary_sequence_no) VALUES (?, \
-          ?, ?, ?)")
+         {sql| INSERT INTO blocks_internal_commands
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+                VALUES (?, ?, ?, ?)
+         |sql})
       (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+
+  let find (module Conn : CONNECTION) ~block_id ~internal_command_id
+      ~sequence_no ~secondary_sequence_no =
+    Conn.find_opt
+      (Caqti_request.find_opt
+         Caqti_type.(tup4 int int int int)
+         Caqti_type.string
+         {sql| SELECT 'exists' FROM blocks_internal_commands
+               WHERE block_id = $1
+               AND internal_command_id = $2
+               AND sequence_no = $3
+               AND secondary_sequence_no = $4
+         |sql})
+      (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
+      ~internal_command_id ~sequence_no ~secondary_sequence_no =
+    let open Deferred.Result.Let_syntax in
+    match%bind
+      find
+        (module Conn)
+        ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+    with
+    | Some _ ->
+        return ()
+    | None ->
+        add
+          (module Conn)
+          ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
 
   let add_with_balance conn ~block_id ~internal_command_id ~sequence_no
       ~secondary_sequence_no ~balance =
@@ -670,9 +826,31 @@ module Block_and_signed_command = struct
     Conn.exec
       (Caqti_request.exec
          Caqti_type.(tup3 int int int)
-         "INSERT INTO blocks_user_commands (block_id, user_command_id, \
-          sequence_no) VALUES (?, ?, ?)")
+         {sql| INSERT INTO blocks_user_commands
+                 (block_id, user_command_id, sequence_no)
+               VALUES (?, ?, ?)
+         |sql})
       (block_id, user_command_id, sequence_no)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
+      ~user_command_id ~sequence_no =
+    let open Deferred.Result.Let_syntax in
+    match%bind
+      Conn.find_opt
+        (Caqti_request.find_opt
+           Caqti_type.(tup3 int int int)
+           Caqti_type.string
+           {sql| SELECT 'exists' FROM blocks_user_commands
+                 WHERE block_id = $1
+                 AND user_command_id = $2
+                 AND sequence_no = $3
+           |sql})
+        (block_id, user_command_id, sequence_no)
+    with
+    | Some _ ->
+        return ()
+    | None ->
+        add (module Conn) ~block_id ~user_command_id ~sequence_no
 end
 
 module Block = struct
@@ -729,10 +907,12 @@ module Block = struct
   let load (module Conn : CONNECTION) ~(id : int) =
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         "SELECT state_hash, parent_id, parent_hash, creator_id, \
-          block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, \
-          next_epoch_data_id, ledger_hash, height, global_slot, \
-          global_slot_since_genesis, timestamp FROM blocks WHERE id = ?")
+         {sql| SELECT state_hash, parent_id, parent_hash, creator_id,
+                      block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id,
+                      next_epoch_data_id, ledger_hash, height, global_slot,
+                      global_slot_since_genesis, timestamp FROM blocks
+               WHERE id = ?
+         |sql})
       id
 
   let add_parts_if_doesn't_exist (module Conn : CONNECTION)
@@ -764,29 +944,26 @@ module Block = struct
             ( Protocol_state.blockchain_state protocol_state
             |> Blockchain_state.snarked_ledger_hash )
         in
-        let is_genesis_block =
-          Consensus.Data.Consensus_state.is_genesis_state consensus_state
-        in
         let%bind staking_epoch_data_id =
-          Epoch_data.add_if_doesn't_exist ~is_genesis_block
+          Epoch_data.add_if_doesn't_exist
             (module Conn)
             (Consensus.Data.Consensus_state.staking_epoch_data consensus_state)
         in
         let%bind next_epoch_data_id =
-          Epoch_data.add_if_doesn't_exist ~is_genesis_block
+          Epoch_data.add_if_doesn't_exist
             (module Conn)
             (Consensus.Data.Consensus_state.next_epoch_data consensus_state)
         in
         let%bind block_id =
           Conn.find
             (Caqti_request.find typ Caqti_type.int
-               {| INSERT INTO blocks (state_hash, parent_id, parent_hash,
-                   creator_id, block_winner_id,
-                   snarked_ledger_hash_id, staking_epoch_data_id,
-                   next_epoch_data_id, ledger_hash, height, global_slot,
-                   global_slot_since_genesis, timestamp)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-               |})
+               {sql| INSERT INTO blocks (state_hash, parent_id, parent_hash,
+                      creator_id, block_winner_id,
+                      snarked_ledger_hash_id, staking_epoch_data_id,
+                      next_epoch_data_id, ledger_hash, height, global_slot,
+                      global_slot_since_genesis, timestamp)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+               |sql})
             { state_hash= hash |> State_hash.to_string
             ; parent_id
             ; parent_hash=
@@ -888,7 +1065,7 @@ module Block = struct
                     ~f:(fun ()
                        ((fee_transfer_id, secondary_sequence_no), balance)
                        ->
-                      Block_and_Internal_command.add_with_balance
+                      Block_and_internal_command.add_with_balance
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
                         ~sequence_no ~secondary_sequence_no ~balance
@@ -914,7 +1091,7 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Via_coinbase
                       in
-                      Block_and_Internal_command.add_with_balance
+                      Block_and_internal_command.add_with_balance
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
                         ~secondary_sequence_no:0
@@ -927,7 +1104,7 @@ module Block = struct
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
                 in
                 let%map () =
-                  Block_and_Internal_command.add_with_balance
+                  Block_and_internal_command.add_with_balance
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
                     ~secondary_sequence_no:0
@@ -951,13 +1128,139 @@ module Block = struct
       ~protocol_state:t.protocol_state ~staged_ledger_diff:t.staged_ledger_diff
       ~hash:(Protocol_state.hash t.protocol_state)
 
+  let add_from_extensional (module Conn : CONNECTION)
+      (block : Extensional.Block.t) =
+    let open Deferred.Result.Let_syntax in
+    let%bind block_id =
+      match%bind find_opt (module Conn) ~state_hash:block.state_hash with
+      | Some block_id ->
+          return block_id
+      | None ->
+          let%bind parent_id =
+            find_opt (module Conn) ~state_hash:block.parent_hash
+          in
+          let%bind creator_id =
+            Public_key.add_if_doesn't_exist (module Conn) block.creator
+          in
+          let%bind block_winner_id =
+            Public_key.add_if_doesn't_exist (module Conn) block.block_winner
+          in
+          let%bind snarked_ledger_hash_id =
+            Snarked_ledger_hash.add_if_doesn't_exist
+              (module Conn)
+              block.snarked_ledger_hash
+          in
+          let%bind staking_ledger_hash_id =
+            Snarked_ledger_hash.add_if_doesn't_exist
+              (module Conn)
+              block.staking_epoch_ledger_hash
+          in
+          let%bind staking_epoch_data_id =
+            Epoch_data.add_from_seed_and_ledger_hash_id
+              (module Conn)
+              ~seed:block.staking_epoch_seed
+              ~ledger_hash_id:staking_ledger_hash_id
+          in
+          let%bind next_ledger_hash_id =
+            Snarked_ledger_hash.add_if_doesn't_exist
+              (module Conn)
+              block.next_epoch_ledger_hash
+          in
+          let%bind next_epoch_data_id =
+            Epoch_data.add_from_seed_and_ledger_hash_id
+              (module Conn)
+              ~seed:block.next_epoch_seed ~ledger_hash_id:next_ledger_hash_id
+          in
+          Conn.find
+            (Caqti_request.find typ Caqti_type.int
+               {sql| INSERT INTO blocks
+                     (state_hash, parent_id, parent_hash,
+                      creator_id, block_winner_id,
+                      snarked_ledger_hash_id, staking_epoch_data_id,
+                      next_epoch_data_id, ledger_hash, height, global_slot,
+                      global_slot_since_genesis, timestamp)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+               |sql})
+            { state_hash= block.state_hash |> State_hash.to_string
+            ; parent_id
+            ; parent_hash= block.parent_hash |> State_hash.to_string
+            ; creator_id
+            ; block_winner_id
+            ; snarked_ledger_hash_id
+            ; staking_epoch_data_id
+            ; next_epoch_data_id
+            ; ledger_hash= block.ledger_hash |> Ledger_hash.to_string
+            ; height= block.height |> Unsigned.UInt32.to_int64
+            ; global_slot= block.global_slot |> Unsigned.UInt32.to_int64
+            ; global_slot_since_genesis=
+                block.global_slot_since_genesis |> Unsigned.UInt32.to_int64
+            ; timestamp= block.timestamp |> Block_time.to_int64 }
+    in
+    (* add user commands *)
+    let%bind user_cmd_ids_and_seq_nos =
+      let%map user_cmd_ids_rev =
+        deferred_result_list_fold block.user_cmds ~init:[]
+          ~f:(fun acc user_cmd ->
+            let%map cmd_id =
+              User_command.add_extensional_if_doesn't_exist
+                (module Conn)
+                user_cmd
+            in
+            cmd_id :: acc )
+      in
+      let sequence_nos =
+        List.map block.user_cmds ~f:(fun user_cmd -> user_cmd.sequence_no)
+      in
+      List.zip_exn (List.rev user_cmd_ids_rev) sequence_nos
+    in
+    (* add user commands to join table *)
+    let%bind () =
+      deferred_result_list_fold user_cmd_ids_and_seq_nos ~init:()
+        ~f:(fun () (user_command_id, sequence_no) ->
+          Block_and_signed_command.add_if_doesn't_exist
+            (module Conn)
+            ~block_id ~user_command_id ~sequence_no )
+    in
+    (* add internal commands *)
+    let%bind internal_cmd_ids_and_seq_nos =
+      let%map internal_cmd_ids_rev =
+        deferred_result_list_fold block.internal_cmds ~init:[]
+          ~f:(fun acc internal_cmd ->
+            let%map cmd_id =
+              Internal_command.add_extensional_if_doesn't_exist
+                (module Conn)
+                internal_cmd
+            in
+            cmd_id :: acc )
+      in
+      let sequence_nos =
+        List.map block.internal_cmds ~f:(fun internal_cmd ->
+            (internal_cmd.sequence_no, internal_cmd.secondary_sequence_no) )
+      in
+      List.zip_exn (List.rev internal_cmd_ids_rev) sequence_nos
+    in
+    (* add internal commands to join table *)
+    let%bind () =
+      deferred_result_list_fold internal_cmd_ids_and_seq_nos ~init:()
+        ~f:(fun ()
+           (internal_command_id, (sequence_no, secondary_sequence_no))
+           ->
+          Block_and_internal_command.add_if_doesn't_exist
+            (module Conn)
+            ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+      )
+    in
+    return block_id
+
   let set_parent_id_if_null (module Conn : CONNECTION) ~parent_hash
       ~(parent_id : int) =
     Conn.exec
       (Caqti_request.exec
          Caqti_type.(tup2 int string)
-         "UPDATE blocks SET parent_id = ? WHERE parent_hash = ? AND parent_id \
-          IS NULL")
+         {sql| UPDATE blocks SET parent_id = ?
+               WHERE parent_hash = ?
+               AND parent_id IS NULL
+         |sql})
       (parent_id, State_hash.to_base58_check parent_hash)
 
   let delete_if_older_than ?height ?num_blocks ?timestamp
@@ -1143,12 +1446,19 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
   let precomputed_block_reader, precomputed_block_writer =
     Strict_pipe.create ~name:"precomputed_archive_block" Synchronous
   in
+  let extensional_block_reader, extensional_block_writer =
+    Strict_pipe.create ~name:"extensional_archive_block" Synchronous
+  in
   let implementations =
     [ Async.Rpc.Rpc.implement Archive_rpc.t (fun () archive_diff ->
           Strict_pipe.Writer.write writer archive_diff )
     ; Async.Rpc.Rpc.implement Archive_rpc.precomputed_block
         (fun () precomputed_block ->
           Strict_pipe.Writer.write precomputed_block_writer precomputed_block
+      )
+    ; Async.Rpc.Rpc.implement Archive_rpc.extensional_block
+        (fun () extensional_block ->
+          Strict_pipe.Writer.write extensional_block_writer extensional_block
       ) ]
   in
   match%bind Caqti_async.connect postgres_address with
@@ -1178,6 +1488,23 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
                   [ ( "block"
                     , Protocol_state.hash precomputed_block.protocol_state
                       |> State_hash.to_yojson )
+                  ; ("error", `String (Caqti_error.show e)) ]
+          | Ok () ->
+              () )
+      |> don't_wait_for ;
+      Strict_pipe.Reader.iter extensional_block_reader
+        ~f:(fun extensional_block ->
+          match%map
+            add_block_aux ~add_block:Block.add_from_extensional
+              ~hash:(fun block -> block.state_hash)
+              ~delete_older_than conn extensional_block
+          with
+          | Error e ->
+              [%log warn]
+                "Extensional block $block could not be archived: $error"
+                ~metadata:
+                  [ ( "block"
+                    , extensional_block.state_hash |> State_hash.to_yojson )
                   ; ("error", `String (Caqti_error.show e)) ]
           | Ok () ->
               () )

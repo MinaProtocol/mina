@@ -332,3 +332,13 @@ mutation ($block: PrecomputedBlock!) {
   }
 }
 |}]
+
+module Archive_extensional_block =
+[%graphql
+{|
+mutation ($block: ExtensionalBlock!) {
+  archiveExtensionalBlock(block: $block) {
+      applied
+  }
+}
+|}]

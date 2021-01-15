@@ -78,7 +78,10 @@ type pipes =
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
-        * (Account_id.t -> (Mina_base.Account.Nonce.t, string) Result.t)
+        * (   Account_id.t
+           -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
+              , string )
+              Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -175,6 +178,8 @@ module Snark_worker = struct
         match signal_or_error with
         | Ok () ->
             [%log info] "Snark worker process died" ;
+            if Ivar.is_full kill_ivar then
+              [%log error] "Ivar.fill bug is here!" ;
             Ivar.fill kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
@@ -223,6 +228,8 @@ module Snark_worker = struct
             [ ( "snark_worker_pid"
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
+        if Ivar.is_full process_ivar then
+          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
     | `Off _ ->
         [%log' info t.config.logger]
@@ -480,15 +487,15 @@ let get_ledger t state_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
 
+let get_account t aid =
+  let open Participating_state.Let_syntax in
+  let%map ledger = best_ledger t in
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_account ledger aid in
+  Ledger.get ledger loc
+
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (account_id : Account_id.t) =
-  let get_account aid =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind loc = Ledger.location_of_account ledger aid in
-    Ledger.get ledger loc
-  in
   let transaction_pool = t.components.transaction_pool in
   let resource_pool =
     Network_pool.Transaction_pool.resource_pool transaction_pool
@@ -512,7 +519,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
       let open Participating_state.Option.Let_syntax in
-      let%map account = get_account account_id in
+      let%map account = get_account t account_id in
       account.Account.Poly.nonce
 
 let snark_job_state t = t.snark_job_state
@@ -708,10 +715,20 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
            `sender` is not in the ledger or sent a transaction in transaction \
            pool."
     | Some nonce ->
-        Ok nonce
+        let ledger_nonce =
+          Participating_state.active (get_account t aid)
+          |> Option.join
+          |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
+          |> Option.value ~default:nonce
+        in
+        Ok (`Min ledger_nonce, nonce)
   in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
+    ( uc_inputs
+    , ( if Ivar.is_full result_ivar then
+          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
+        Ivar.fill result_ivar )
+    , get_current_nonce )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1106,6 +1123,15 @@ let create ?wallets (config : Config.t) =
               ~get_transition_chain:
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
+              ~get_transition_knowledge:(fun _q ->
+                return
+                  ( match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                  | None ->
+                      []
+                  | Some frontier ->
+                      Sync_handler.best_tip_path ~frontier ) )
           in
           (* tie the first knot *)
           net_ref := Some net ;
