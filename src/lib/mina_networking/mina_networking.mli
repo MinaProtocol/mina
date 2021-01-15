@@ -210,7 +210,8 @@ val get_ancestry :
      Deferred.Or_error.t
 
 val get_best_tip :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
   -> ( External_transition.t
