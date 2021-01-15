@@ -1682,22 +1682,40 @@ let object_lifetime_statistics =
                (Error.to_string_hum err) ))
 
 let archive_blocks =
-  let open Command.Param in
-  let precomputed_flag =
-    flag "precomputed" no_arg ~doc:"Blocks are in precomputed JSON format"
-  in
-  let extensional_flag =
-    flag "extensional" no_arg ~doc:"Blocks are in extensional JSON format"
-  in
-  let archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
-  let files =
-    Command.Param.anon
-      Command.Anons.(sequence ("FILES" %: Command.Param.string))
-  in
-  let args =
-    Command.Param.both
-      (Command.Param.both archive_process_location files)
-      (Args.zip2 precomputed_flag extensional_flag)
+  let params =
+    let open Command.Let_syntax in
+    let%map_open files =
+      Command.Param.anon
+        Command.Anons.(sequence ("FILES" %: Command.Param.string))
+    and success_file =
+      Command.Param.flag "successful-files"
+        ~doc:"PATH Appends the list of files that were processed successfully"
+        (Command.Flag.optional Command.Param.string)
+    and failure_file =
+      Command.Param.flag "failed-files"
+        ~doc:"PATH Appends the list of files that failed to be processed"
+        (Command.Flag.optional Command.Param.string)
+    and log_successes =
+      Command.Param.flag "log-successful"
+        ~doc:
+          "true/false Whether to log messages for files that were processed \
+           successfully"
+        (Command.Flag.optional_with_default true Command.Param.bool)
+    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
+    and precomputed_flag =
+      Command.Param.flag "precomputed" no_arg
+        ~doc:"Blocks are in precomputed JSON format"
+    and extensional_flag =
+      Command.Param.flag "extensional" no_arg
+        ~doc:"Blocks are in extensional JSON format"
+    in
+    ( files
+    , success_file
+    , failure_file
+    , log_successes
+    , archive_process_location
+    , precomputed_flag
+    , extensional_flag )
   in
   Command.async
     ~summary:
@@ -1705,10 +1723,15 @@ let archive_blocks =
        If an archive address is given, this process will communicate with the \
        archive node directly; otherwise it will communicate through the \
        daemon over the rest-server"
-    (Cli_lib.Background_daemon.graphql_init args
+    (Cli_lib.Background_daemon.graphql_init params
        ~f:(fun graphql_endpoint
-          ( (archive_process_location, files)
-          , (precomputed_flag, extensional_flag) )
+          ( files
+          , success_file
+          , failure_file
+          , log_successes
+          , archive_process_location
+          , precomputed_flag
+          , extensional_flag )
           ->
          if Bool.equal precomputed_flag extensional_flag then
            failwith
@@ -1746,6 +1769,16 @@ let archive_blocks =
                in
                ()
          in
+         let output_file_line path =
+           match path with
+           | Some path ->
+               let file = Out_channel.create ~append:true path in
+               fun line -> Out_channel.output_lines file [line]
+           | None ->
+               fun _line -> ()
+         in
+         let add_to_success_file = output_file_line success_file in
+         let add_to_failure_file = output_file_line failure_file in
          let send_precomputed_block =
            make_send_block
              ~graphql_make:Graphql_queries.Archive_precomputed_block.make
@@ -1802,11 +1835,14 @@ let archive_blocks =
                    "Expected exactly one of precomputed, extensional flags"
              with
              | Ok () ->
-                 Format.printf "Sent block to archive node from %s@." path
+                 if log_successes then
+                   Format.printf "Sent block to archive node from %s@." path ;
+                 add_to_success_file path
              | Error err ->
                  Format.eprintf
                    "Failed to send block to archive node from %s. Error:@.%s@."
-                   path (Error.to_string_hum err) ) ))
+                   path (Error.to_string_hum err) ;
+                 add_to_failure_file path ) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
