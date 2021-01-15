@@ -13,7 +13,8 @@ data "local_file" "genesis_ledger" {
 }
 
 locals {
-  mina_helm_repo = "https://coda-charts.storage.googleapis.com"
+  use_local_charts = false
+  mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
@@ -184,8 +185,8 @@ resource "helm_release" "seed" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-seed"
-  repository  = local.mina_helm_repo
-  chart       = "seed-node"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
   version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
@@ -206,8 +207,8 @@ resource "helm_release" "block_producers" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-block-producers"
-  repository  = local.mina_helm_repo
-  chart       = "block-producer"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
   version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
@@ -224,8 +225,8 @@ resource "helm_release" "snark_workers" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-snark-worker"
-  repository  = local.mina_helm_repo
-  chart       = "snark-worker"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
   version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
@@ -244,8 +245,8 @@ resource "helm_release" "archive_node" {
   count       = var.archive_node_count
   
   name        = "archive-node-${count.index}"
-  repository  = local.mina_helm_repo
-  chart       = "archive-node"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
   version     = "0.4.6"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
