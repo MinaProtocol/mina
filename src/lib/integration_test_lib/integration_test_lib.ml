@@ -165,7 +165,7 @@ module type Engine_intf = sig
         num_tries is the maximum number of breadcrumbs to examine
     *)
     val wait_for_payment :
-         ?num_tries:int
+         ?timeout_duration:Time.Span.t
       -> t
       -> logger:Logger.t
       -> sender:Signature_lib.Public_key.Compressed.t
