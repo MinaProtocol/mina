@@ -186,7 +186,7 @@ module Timing_info = struct
                     (public_key_id,token,initial_balance,initial_minimum_balance,
                      cliff_time, cliff_amount, vesting_period, vesting_increment)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                   RETURNING id")
+                   RETURNING id
              |sql})
           values
 end
@@ -552,7 +552,8 @@ module User_command = struct
                       receiver_account_creation_fee_paid,
                       created_token)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    RETURNING id |sql})
+                    RETURNING id
+         |sql})
       { typ= user_cmd.typ
       ; fee_payer_id
       ; source_id

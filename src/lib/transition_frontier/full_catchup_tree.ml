@@ -8,10 +8,10 @@ open Mina_numbers
 
 module Attempt_history = struct
   module Attempt = struct
-    type t =
-      { failure_reason:
-          [`Download | `Initial_validate | `Verify | `Build_breadcrumb] }
+    type reason = [`Download | `Initial_validate | `Verify | `Build_breadcrumb]
     [@@deriving yojson]
+
+    type t = {failure_reason: reason} [@@deriving yojson]
   end
 
   type t = Attempt.t Peer.Map.t
