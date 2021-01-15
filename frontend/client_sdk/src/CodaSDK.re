@@ -60,6 +60,16 @@ type codaSDK;
 [@genType]
 let genKeys = () => genKeys(codaSDK, ());
 
+[@bs.send] external publicKeyOfPrivateKey: (codaSDK, privateKey) => publicKey= "publicKeyOfPrivateKey";
+/**
+  * Derives the public key of the corresponding private key
+  *
+  * @param privateKey - The private key used to get the corresponding public key
+  * @returns A public key
+ */
+[@genType]
+let derivePublicKey = (privateKey: privateKey) => publicKeyOfPrivateKey(codaSDK, privateKey);
+
 [@bs.send]
 external signString: (codaSDK, privateKey, string) => signature = "signString";
 /**
