@@ -457,7 +457,10 @@ end = struct
   let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
-    else Ivar.fill t.validity_listener `Ok
+    else (
+      if Ivar.is_full t.validity_listener then
+        [%log' error t.logger] "Ivar.fill bug is here!" ;
+      Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =

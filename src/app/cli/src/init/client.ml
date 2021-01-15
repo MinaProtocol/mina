@@ -722,31 +722,7 @@ let cancel_transaction_graphql =
          let receiver_pk = Signed_command.receiver_pk user_command in
          let cancel_sender_pk = Signed_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
-         let%bind nonce_response =
-           let open Graphql_lib.Encoders in
-           Graphql_client.query_exn
-             (Graphql_queries.Get_inferred_nonce.make
-                ~public_key:(public_key cancel_sender_pk)
-                ())
-             graphql_endpoint
-         in
-         let maybe_inferred_nonce =
-           let open Option.Let_syntax in
-           let%bind account = nonce_response#account in
-           let%map nonce = account#inferredNonce in
-           int_of_string nonce
-         in
-         let cancelled_nonce =
-           Mina_numbers.Account_nonce.to_int
-             (Signed_command.nonce user_command)
-         in
-         let inferred_nonce =
-           Option.value maybe_inferred_nonce ~default:cancelled_nonce
-         in
          let cancel_fee =
-           let diff =
-             Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
-           in
            let fee =
              Currency.Fee.to_uint64 (Signed_command.fee user_command)
            in
@@ -755,7 +731,7 @@ let cancel_transaction_graphql =
            in
            let open Unsigned.UInt64.Infix in
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
-           Currency.Fee.of_uint64 (fee + (replace_fee * diff))
+           Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
@@ -1705,41 +1681,75 @@ let object_lifetime_statistics =
              printf "Failed to get object lifetime statistics: %s\n%!"
                (Error.to_string_hum err) ))
 
-let archive_precomputed_blocks =
-  let archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
-  let files =
-    Command.Param.anon
-      Command.Anons.(sequence ("FILES" %: Command.Param.string))
+let archive_blocks =
+  let params =
+    let open Command.Let_syntax in
+    let%map_open files =
+      Command.Param.anon
+        Command.Anons.(sequence ("FILES" %: Command.Param.string))
+    and success_file =
+      Command.Param.flag "successful-files"
+        ~doc:"PATH Appends the list of files that were processed successfully"
+        (Command.Flag.optional Command.Param.string)
+    and failure_file =
+      Command.Param.flag "failed-files"
+        ~doc:"PATH Appends the list of files that failed to be processed"
+        (Command.Flag.optional Command.Param.string)
+    and log_successes =
+      Command.Param.flag "log-successful"
+        ~doc:
+          "true/false Whether to log messages for files that were processed \
+           successfully"
+        (Command.Flag.optional_with_default true Command.Param.bool)
+    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
+    and precomputed_flag =
+      Command.Param.flag "precomputed" no_arg
+        ~doc:"Blocks are in precomputed JSON format"
+    and extensional_flag =
+      Command.Param.flag "extensional" no_arg
+        ~doc:"Blocks are in extensional JSON format"
+    in
+    ( files
+    , success_file
+    , failure_file
+    , log_successes
+    , archive_process_location
+    , precomputed_flag
+    , extensional_flag )
   in
   Command.async
     ~summary:
-      "Archive a precomputed block from a file.\n\n\
+      "Archive a block from a file.\n\n\
        If an archive address is given, this process will communicate with the \
        archive node directly; otherwise it will communicate through the \
        daemon over the rest-server"
-    (Cli_lib.Background_daemon.graphql_init
-       (Command.Param.both archive_process_location files)
-       ~f:(fun graphql_endpoint (archive_process_location, files) ->
-         let send_block block =
+    (Cli_lib.Background_daemon.graphql_init params
+       ~f:(fun graphql_endpoint
+          ( files
+          , success_file
+          , failure_file
+          , log_successes
+          , archive_process_location
+          , precomputed_flag
+          , extensional_flag )
+          ->
+         if Bool.equal precomputed_flag extensional_flag then
+           failwith
+             "Must provide exactly one of -precomputed and -extensional flags" ;
+         let make_send_block ~graphql_make ~archive_dispatch ~block_to_yojson
+             block =
            match archive_process_location with
            | Some archive_process_location ->
                (* Connect directly to the archive node. *)
-               Mina_lib.Archive_client.dispatch_precomputed_block
-                 archive_process_location block
+               archive_dispatch archive_process_location block
            | None ->
                (* Send the requests over GraphQL. *)
-               let block =
-                 Mina_transition.External_transition.Precomputed_block
-                 .to_yojson block
-                 |> Yojson.Safe.to_basic
-               in
+               let block = block_to_yojson block |> Yojson.Safe.to_basic in
                let%map.Deferred.Or_error.Let_syntax _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
                  *)
-                 Graphql_client.query
-                   (Graphql_queries.Archive_precomputed_block.make ~block ())
-                   graphql_endpoint
+                 Graphql_client.query (graphql_make ~block ()) graphql_endpoint
                  |> Deferred.Result.map_error ~f:(function
                       | `Failed_request e ->
                           Error.create "Unable to connect to Coda daemon" ()
@@ -1759,10 +1769,34 @@ let archive_precomputed_blocks =
                in
                ()
          in
+         let output_file_line path =
+           match path with
+           | Some path ->
+               let file = Out_channel.create ~append:true path in
+               fun line -> Out_channel.output_lines file [line]
+           | None ->
+               fun _line -> ()
+         in
+         let add_to_success_file = output_file_line success_file in
+         let add_to_failure_file = output_file_line failure_file in
+         let send_precomputed_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_precomputed_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_precomputed_block
+             ~block_to_yojson:
+               Mina_transition.External_transition.Precomputed_block.to_yojson
+         in
+         let send_extensional_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_extensional_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_extensional_block
+             ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson
+         in
          Deferred.List.iter files ~f:(fun path ->
              match%map
-               let open Deferred.Or_error.Let_syntax in
-               let%bind precomputed_block_json =
+               let%bind.Deferred.Or_error.Let_syntax block_json =
                  Or_error.try_with (fun () ->
                      In_channel.with_file path ~f:(fun in_channel ->
                          Yojson.Safe.from_channel in_channel ) )
@@ -1771,24 +1805,44 @@ let archive_precomputed_blocks =
                           String.sexp_of_t )
                  |> Deferred.return
                in
-               let%bind precomputed_block =
-                 Mina_transition.External_transition.Precomputed_block
-                 .of_yojson precomputed_block_json
-                 |> Result.map_error ~f:(fun err ->
-                        Error.tag_arg (Error.of_string err)
-                          "Could not parse JSON as a precomputed block from \
-                           file"
-                          path String.sexp_of_t )
-                 |> Deferred.return
-               in
-               send_block precomputed_block
+               let open Deferred.Or_error.Let_syntax in
+               if precomputed_flag then
+                 let%bind precomputed_block =
+                   Mina_transition.External_transition.Precomputed_block
+                   .of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as a precomputed block from \
+                             file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_precomputed_block precomputed_block
+               else if extensional_flag then
+                 let%bind extensional_block =
+                   Archive_lib.Extensional.Block.of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as an extensional block \
+                             from file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_extensional_block extensional_block
+               else
+                 (* should be unreachable *)
+                 failwith
+                   "Expected exactly one of precomputed, extensional flags"
              with
              | Ok () ->
-                 Format.printf "Sent block to archive node from %s@." path
+                 if log_successes then
+                   Format.printf "Sent block to archive node from %s@." path ;
+                 add_to_success_file path
              | Error err ->
                  Format.eprintf
                    "Failed to send block to archive node from %s. Error:@.%s@."
-                   path (Error.to_string_hum err) ) ))
+                   path (Error.to_string_hum err) ;
+                 add_to_failure_file path ) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1902,4 +1956,4 @@ let advanced =
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-precomputed-blocks", archive_precomputed_blocks) ]
+    ; ("archive-blocks", archive_blocks) ]
