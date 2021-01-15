@@ -1,11 +1,7 @@
 data "google_client_config" "current" {}
 
-data "google_container_cluster" "cluster" {
-  name     = var.cluster_name
-  location = var.cluster_region
-}
-
 provider "kubernetes" {
+  alias = "testnet_deploy"
   config_context  = var.k8s_context
 }
 
