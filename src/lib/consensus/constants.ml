@@ -15,6 +15,7 @@ module Poly = struct
         ; slots_per_window: 'length
         ; sub_windows_per_window: 'length
         ; slots_per_epoch: 'length
+        ; grace_period_slots: 'length
         ; epoch_size: 'length
         ; checkpoint_window_slots_per_year: 'length
         ; checkpoint_window_size_in_slots: 'length
@@ -82,6 +83,8 @@ module type M_intf = sig
   val ( * ) : t -> t -> t
 
   val ( + ) : t -> t -> t
+
+  val min : t -> t -> t
 end
 
 module Constants_UInt32 :
@@ -122,6 +125,8 @@ module Constants_UInt32 :
   let ( * ) = UInt32.mul
 
   let ( + ) = UInt32.add
+
+  let min = UInt32.min
 end
 
 module Constants_checked :
@@ -169,6 +174,8 @@ module Constants_checked :
   let ( * ) = Integer.mul ~m
 
   let ( + ) = Integer.add ~m
+
+  let min = Integer.min ~m
 end
 
 let create' (type a b c)
@@ -205,6 +212,26 @@ let create' (type a b c)
     let duration = Slot.duration_ms * size
   end in
   let delta_duration = Slot.duration_ms * (delta + M.one) in
+  (* We forgo updating the min density for the first 10 days (or epoch, whichever comes first)
+      of the network's operation. The reasoning is as follows:
+
+      - There may be many empty slots in the beginning of the network, as everyone
+        gets their nodes up and running. 10 days gives all involved in the project
+        a chance to observe the actual fill rate and try to fix what's keeping it down.
+      - With actual network parameters, 1 epoch = 2 weeks < 10 days,
+        which means the long fork rule will not come into play during the grace period,
+        and then we still have 4 days (= 1920 slots) to compute min-density for the next epoch. *)
+  let grace_period_slots =
+    let n = 10. in
+    let n_days =
+      let n_days_ms =
+        Time_ns.Span.(to_ms (of_day n))
+        |> Float.round_up |> Float.to_int |> M.constant
+      in
+      M.( / ) n_days_ms block_window_duration_ms
+    in
+    M.min n_days slots_per_epoch
+  in
   let res : (a, b, c) Poly.t =
     { Poly.k= to_length k
     ; delta= to_length delta
@@ -213,6 +240,7 @@ let create' (type a b c)
     ; slots_per_window= to_length slots_per_window
     ; sub_windows_per_window= to_length sub_windows_per_window
     ; slots_per_epoch= to_length slots_per_epoch
+    ; grace_period_slots= to_length grace_period_slots
     ; slot_duration_ms= to_timespan Slot.duration_ms
     ; epoch_size= to_length Epoch.size
     ; epoch_duration= to_timespan Epoch.duration
@@ -280,6 +308,7 @@ let data_spec =
     ; Length.Checked.typ
     ; Length.Checked.typ
     ; Length.Checked.typ
+    ; Length.Checked.typ
     ; Block_time.Span.Unpacked.typ
     ; Block_time.Span.Unpacked.typ
     ; Block_time.Span.Unpacked.typ
@@ -303,6 +332,7 @@ let to_input (t : t) =
             ; t.slots_per_window
             ; t.sub_windows_per_window
             ; t.slots_per_epoch
+            ; t.grace_period_slots
             ; t.epoch_size
             ; t.checkpoint_window_slots_per_year
             ; t.checkpoint_window_size_in_slots |]
@@ -339,6 +369,7 @@ module Checked = struct
     and slots_per_window = u var.slots_per_window
     and sub_windows_per_window = u var.sub_windows_per_window
     and slots_per_epoch = u var.slots_per_epoch
+    and grace_period_slots = u var.grace_period_slots
     and epoch_size = u var.epoch_size
     and checkpoint_window_slots_per_year =
       u var.checkpoint_window_slots_per_year
@@ -360,6 +391,7 @@ module Checked = struct
           ; slots_per_window
           ; sub_windows_per_window
           ; slots_per_epoch
+          ; grace_period_slots
           ; epoch_size
           ; checkpoint_window_slots_per_year
           ; checkpoint_window_size_in_slots
