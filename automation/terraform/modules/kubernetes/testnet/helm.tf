@@ -1,5 +1,5 @@
 provider helm {
-  debug = true
+  alias = "testnet_deploy"
   kubernetes {
     config_context  = var.k8s_context
   }
@@ -162,6 +162,8 @@ locals {
 # Cluster-Local Seed Node
 
 resource "kubernetes_role_binding" "helm_release" {
+  # provider   = helm.testnet_deploy
+
   metadata {
     name      = "admin-role"
     namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
@@ -179,10 +181,12 @@ resource "kubernetes_role_binding" "helm_release" {
 }
 
 resource "helm_release" "seed" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-seed"
   repository  = local.mina_helm_repo
   chart       = "seed-node"
-  version     = "0.3.2"
+  version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -199,10 +203,12 @@ resource "helm_release" "seed" {
 # Block Producer
 
 resource "helm_release" "block_producers" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-block-producers"
   repository  = local.mina_helm_repo
   chart       = "block-producer"
-  version     = "0.4.3"
+  version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -215,10 +221,12 @@ resource "helm_release" "block_producers" {
 # Snark Worker
 
 resource "helm_release" "snark_workers" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-snark-worker"
   repository  = local.mina_helm_repo
   chart       = "snark-worker"
-  version     = "0.3.3"
+  version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
@@ -231,12 +239,14 @@ resource "helm_release" "snark_workers" {
 # Archive Node
 
 resource "helm_release" "archive_node" {
+  provider   = helm.testnet_deploy
+
   count       = var.archive_node_count
   
   name        = "archive-node-${count.index}"
   repository  = local.mina_helm_repo
   chart       = "archive-node"
-  version     = "0.3.3"
+  version     = "0.4.6"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
     yamlencode(local.archive_node_vars)
