@@ -132,9 +132,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
     Deferred.List.filter_map ~how:`Parallel peers ~f:(fun peer ->
         let open Deferred.Let_syntax in
         match%bind
-          Mina_networking.get_best_tip
-            ~heartbeat_timeout:(Time_ns.Span.of_min 1.)
-            ~timeout:(Time.Span.of_min 1.) network peer
+          Mina_networking.get_best_tip ~timeout:(Time.Span.of_min 1.) network
+            peer
         with
         | Error e ->
             [%log debug]
