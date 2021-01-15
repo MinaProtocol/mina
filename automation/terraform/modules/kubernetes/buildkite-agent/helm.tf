@@ -203,6 +203,16 @@ locals {
         cp --update --verbose $(which helm) "$${CI_SHARED_BIN}/helm"
       EOF
 
+      "02-install-terraform" = <<-EOF
+        #!/bin/bash
+
+        set -eou pipefail
+
+        apt install -y unzip
+        curl -sL https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip -o terraform.zip
+        unzip terraform.zip && mv terraform /usr/bin
+      EOF
+
       "03-setup-k8s-ctx" = <<-EOF
         #!/bin/bash
 
