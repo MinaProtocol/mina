@@ -1147,9 +1147,7 @@ module Multiaddr = struct
 
   let to_peer t =
     match String.split ~on:'/' t with
-    | [""; protocol; ip4_str; "tcp"; tcp_str; "p2p"; peer_id]
-      when List.mem ["ip4"; "ip6"; "dns4"; "dns6"] protocol ~equal:String.equal
-      -> (
+    | [""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id] -> (
       try
         let host = Unix.Inet_addr.of_string ip4_str in
         let libp2p_port = Int.of_string tcp_str in
@@ -1157,6 +1155,15 @@ module Multiaddr = struct
       with _ -> None )
     | _ ->
         None
+
+  let valid_as_peer t =
+    match String.split ~on:'/' t with
+    | [""; protocol; _; "tcp"; _; "p2p"; _]
+      when List.mem ["ip4"; "ip6"; "dns4"; "dns6"] protocol ~equal:String.equal
+      ->
+        true
+    | _ ->
+        false
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
