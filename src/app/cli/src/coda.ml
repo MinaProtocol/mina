@@ -898,6 +898,15 @@ let setup_daemon logger =
                    (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
                   file )
       in
+      List.iter libp2p_peers_raw ~f:(fun raw_peer ->
+          match Mina_net2.Multiaddr.(to_peer @@ of_string raw_peer) with
+          | Some _ ->
+              ()
+          | None ->
+              Mina_user_error.raisef ~where:"decoding peer as a multiaddress"
+                "The given peer \"%s\" is not a valid multiaddress (ex: \
+                 /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+                raw_peer ) ;
       let initial_peers =
         List.concat
           [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
