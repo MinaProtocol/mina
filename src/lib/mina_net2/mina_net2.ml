@@ -1147,7 +1147,9 @@ module Multiaddr = struct
 
   let to_peer t =
     match String.split ~on:'/' t with
-    | [""; "ip4"; ip4_str; "tcp"; tcp_str; "p2p"; peer_id] -> (
+    | [""; protocol; ip4_str; "tcp"; tcp_str; "p2p"; peer_id]
+      when List.mem ["ip4"; "ip6"; "dns4"; "dns6"] protocol ~equal:String.equal
+      -> (
       try
         let host = Unix.Inet_addr.of_string ip4_str in
         let libp2p_port = Int.of_string tcp_str in
