@@ -1556,6 +1556,12 @@ module Types = struct
           Mina_transition.External_transition.Precomputed_block.of_yojson json
       )
 
+    let extensional_block =
+      scalar "ExtensionalBlock"
+        ~doc:"Block encoded in extensional block format" ~coerce:(fun json ->
+          let json = to_yojson json in
+          Archive_lib.Extensional.Block.of_yojson json )
+
     module type Numeric_type = sig
       type t
 
@@ -2425,7 +2431,7 @@ module Mutations = struct
       ~args:
         Arg.
           [ arg "block" ~doc:"Block encoded in precomputed block format"
-              ~typ:(non_null @@ Types.Input.precomputed_block) ]
+              ~typ:(non_null Types.Input.precomputed_block) ]
       ~typ:
         (non_null
            (obj "Applied" ~fields:(fun _ ->
@@ -2444,6 +2450,35 @@ module Mutations = struct
         in
         let%map () =
           Mina_lib.Archive_client.dispatch_precomputed_block archive_location
+            block
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        () )
+
+  let archive_extensional_block =
+    io_field "archiveExtensionalBlock"
+      ~args:
+        Arg.
+          [ arg "block" ~doc:"Block encoded in extensional block format"
+              ~typ:(non_null Types.Input.extensional_block) ]
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true) ] )))
+      ~resolve:(fun {ctx= coda; _} () block ->
+        let open Deferred.Result.Let_syntax in
+        let%bind archive_location =
+          match (Mina_lib.config coda).archive_process_location with
+          | Some archive_location ->
+              return archive_location
+          | None ->
+              Deferred.Result.fail
+                "Could not find an archive process to connect to"
+        in
+        let%map () =
+          Mina_lib.Archive_client.dispatch_extensional_block archive_location
             block
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
@@ -2472,7 +2507,8 @@ module Mutations = struct
     ; set_snark_work_fee
     ; set_connection_gating_config
     ; add_peer
-    ; archive_precomputed_block ]
+    ; archive_precomputed_block
+    ; archive_extensional_block ]
 end
 
 module Queries = struct
