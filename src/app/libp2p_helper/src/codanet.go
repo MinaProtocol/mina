@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	gonet "net"
 	"path"
 	"time"
 
@@ -35,17 +36,36 @@ import (
 	mplex "github.com/libp2p/go-mplex"
 )
 
+var (
+	privateIPs = []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"100.64.0.0/10",
+		"198.18.0.0/15",
+		"169.254.0.0/16",
+	}
+)
+
+func parseCIDR(cidr string) gonet.IPNet {
+	_, ipnet, err := gonet.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return *ipnet
+}
+
 type CodaConnectionManager struct {
 	p2pManager   *p2pconnmgr.BasicConnMgr
 	OnConnect    func(network.Network, network.Conn)
 	OnDisconnect func(network.Network, network.Conn)
 }
 
-func newCodaConnectionManager() *CodaConnectionManager {
+func newCodaConnectionManager(maxConnections int) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:   p2pconnmgr.NewConnManager(25, 50, time.Duration(30*time.Second)),
+		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(30*time.Second)),
 		OnConnect:    noop,
 		OnDisconnect: noop,
 	}
@@ -105,6 +125,11 @@ func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Con
 	cm.p2pManager.Notifee().Disconnected(net, c)
 }
 
+// proxy remaining p2pconnmgr.BasicConnMgr methods for access
+func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
+	return cm.p2pManager.GetInfo()
+}
+
 // Helper contains all the daemon state
 type Helper struct {
 	Host              host.Host
@@ -129,6 +154,7 @@ type customValidator struct {
 // https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
 // the comments of the functions below are taken from those docs.
 type CodaGatingState struct {
+	logger       logging.EventLogger
 	AddrFilters  *ma.Filters
 	DeniedPeers  *peer.Set
 	AllowedPeers *peer.Set
@@ -136,23 +162,30 @@ type CodaGatingState struct {
 
 // NewCodaGatingState returns a new CodaGatingState
 func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer.Set) *CodaGatingState {
+	logger := logging.Logger("codanet.CodaGatingState")
+
 	if addrFilters == nil {
-		addrFilters = new(ma.Filters)
+		addrFilters = ma.NewFilters()
 	}
 
 	if denied == nil {
-		denied = new(peer.Set)
+		denied = peer.NewSet()
 	}
 
 	if allowed == nil {
-		allowed = new(peer.Set)
+		allowed = peer.NewSet()
 	}
 
 	return &CodaGatingState{
+		logger:       logger,
 		AddrFilters:  addrFilters,
 		DeniedPeers:  denied,
 		AllowedPeers: allowed,
 	}
+}
+
+func (gs *CodaGatingState) logGate() {
+	gs.logger.Debugf("gated a connection with config: %+v", gs)
 }
 
 // InterceptPeerDial tests whether we're permitted to Dial the specified peer.
@@ -225,7 +258,7 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
 
 	me, err := peer.IDFromPrivateKey(pk)
@@ -262,7 +295,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager()
+	connManager := newCodaConnectionManager(maxConnections)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,
