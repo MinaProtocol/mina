@@ -403,8 +403,13 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 
 	var topic *pubsub.Topic
 	var has bool
+
 	if topic, has = app.Topics[t.Topic]; !has {
-		return nil, badRPC(err)
+		topic, err = app.P2p.Pubsub.Join(t.Topic)
+		if err != nil {
+			return nil, badp2p(err)
+		}
+		app.Topics[t.Topic] = topic
 	}
 
 	if err := topic.Publish(app.Ctx, data); err != nil {
@@ -429,6 +434,12 @@ func codaEncode(data []byte) string {
 func codaDecode(data string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(data)
 }
+
+var (
+	acceptResult = "accept"
+	rejectResult = "reject"
+	ignoreResult = "ignore"
+)
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
@@ -512,18 +523,19 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationReject
 		case res := <-ch:
 			switch res {
-			case "reject":
+			case rejectResult:
 				app.P2p.Logger.Info("why u fail to validate :(")
 				return pubsub.ValidationReject
-			case "accept":
+			case acceptResult:
 				app.P2p.Logger.Info("validated!")
 				return pubsub.ValidationAccept
-			case "ignore":
+			case ignoreResult:
 				app.P2p.Logger.Info("ignoring valid message!")
 				return pubsub.ValidationIgnore
+			default:
+				app.P2p.Logger.Info("ignoring message that falled off the end!")
+				return pubsub.ValidationIgnore
 			}
-			app.P2p.Logger.Info("ignoring message that falled off the end!")
-			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
@@ -649,11 +661,6 @@ type streamReadCompleteUpcall struct {
 	StreamIdx int    `json:"stream_idx"`
 }
 
-type openStreamMsg struct {
-	Peer       string `json:"peer"`
-	ProtocolID string `json:"protocol"`
-}
-
 type incomingMsgUpcall struct {
 	Upcall    string `json:"upcall"`
 	StreamIdx int    `json:"stream_idx"`
@@ -696,6 +703,11 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			StreamIdx: idx,
 		})
 	}()
+}
+
+type openStreamMsg struct {
+	Peer       string `json:"peer"`
+	ProtocolID string `json:"protocol"`
 }
 
 type openStreamResult struct {
