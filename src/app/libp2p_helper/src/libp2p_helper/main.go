@@ -733,7 +733,6 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		// Note: It is _very_ important that we call handleStreamReads here -- this is how the "caller" side of the stream starts listening to the responses from the RPCs. Do not remove.
 		handleStreamReads(app, stream, streamIdx)
 	}()
-
 	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil
 }
 
@@ -900,9 +899,11 @@ type beginAdvertisingMsg struct {
 
 type mdnsListener struct {
 	FoundPeer chan peer.AddrInfo
+	app       *app
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
+	l.app.P2p.GatingState.AllowedPeers.Add(info.ID)
 	l.FoundPeer <- info
 }
 
@@ -912,22 +913,11 @@ func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
 		return err
 	}
 	app.P2p.Mdns = &mdns
-	l := &mdnsListener{FoundPeer: foundPeerCh}
-	mdns.RegisterNotifee(l)
-
-	validPeer := func(who peer.ID) bool {
-		return who.Validate() == nil && who != app.P2p.Me
+	l := &mdnsListener{
+		FoundPeer: foundPeerCh,
+		app:       app,
 	}
-
-	// report local discovery peers
-	go func() {
-		for info := range l.FoundPeer {
-			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", info.ID)
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
-			}
-		}
-	}()
+	mdns.RegisterNotifee(l)
 
 	return nil
 }
@@ -938,6 +928,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	for _, info := range app.AddedPeers {
+		app.P2p.Logger.Error("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())
@@ -946,6 +937,20 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	foundPeerCh := make(chan peer.AddrInfo)
+
+	validPeer := func(who peer.ID) bool {
+		return who.Validate() == nil && who != app.P2p.Me
+	}
+
+	// report discovery peers local
+	go func() {
+		for info := range foundPeerCh {
+			if validPeer(info.ID) {
+				app.P2p.Logger.Debugf("discovered peer", info.ID)
+				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+			}
+		}
+	}()
 
 	if !app.NoMDNS {
 		app.P2p.Logger.Debugf("beginning mDNS discovery")
