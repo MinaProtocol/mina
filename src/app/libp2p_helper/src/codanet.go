@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	logger = logging.Logger("codanet.Helper")
+	logger   = logging.Logger("codanet.Helper")
 	gsLogger = logging.Logger("codanet.CodaGatingState")
 )
 
