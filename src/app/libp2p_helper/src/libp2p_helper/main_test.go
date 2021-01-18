@@ -49,6 +49,8 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 	return key
 }
 
+func testStreamHandler(_ net.Stream) {}
+
 func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
@@ -70,6 +72,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 	port++
 
 	helper.GatingState.AddrFilters = ma.NewFilters()
+	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
 		helper.Host.Close()
@@ -315,35 +318,227 @@ func TestConfigurationMsg(t *testing.T) {
 }
 
 func TestListenMsg(t *testing.T) {
+	addrStr := "/ip4/127.0.0.2/tcp/8000"
 
+	addr, err := ma.NewMultiaddr(addrStr)
+	require.NoError(t, err)
+
+	testApp := newTestApp(t, nil)
+
+	msg := &listenMsg{
+		Iface: addrStr,
+	}
+
+	addrs, err := msg.run(testApp)
+	require.NoError(t, err)
+
+	found := false
+	for _, a := range addrs.([]ma.Multiaddr) {
+		if a.Equal(addr) {
+			found = true
+			break
+		}
+	}
+
+	require.True(t, found)
 }
 
 func TestPublishMsg(t *testing.T) {
+	var err error
+	testApp := newTestApp(t, nil)
+	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
+	require.NoError(t, err)
 
+	topic := "testtopic"
+	data := "testdata"
+
+	msg := &publishMsg{
+		Topic: topic,
+		Data:  data,
+	}
+
+	ret, err := msg.run(testApp)
+	require.NoError(t, err)
+	require.Equal(t, "publish success", ret)
+
+	_, has := testApp.Topics[topic]
+	require.True(t, has)
 }
 
 func TestSubscribeMsg(t *testing.T) {
+	var err error
+	testApp := newTestApp(t, nil)
+	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
+	require.NoError(t, err)
 
+	topic := "testtopic"
+	idx := 0
+
+	msg := &subscribeMsg{
+		Topic:        topic,
+		Subscription: idx,
+	}
+
+	ret, err := msg.run(testApp)
+	require.NoError(t, err)
+	require.Equal(t, "subscribe success", ret)
+
+	_, has := testApp.Topics[topic]
+	require.True(t, has)
+	_, has = testApp.Subs[idx]
+	require.True(t, has)
 }
 
 func TestUnsubscribeMsg(t *testing.T) {
+	var err error
+	testApp := newTestApp(t, nil)
+	testApp.P2p.Pubsub, err = pubsub.NewGossipSub(testApp.Ctx, testApp.P2p.Host)
+	require.NoError(t, err)
 
+	topic := "testtopic"
+	idx := 0
+
+	msg := &subscribeMsg{
+		Topic:        topic,
+		Subscription: idx,
+	}
+
+	ret, err := msg.run(testApp)
+	require.NoError(t, err)
+	require.Equal(t, "subscribe success", ret)
+
+	_, has := testApp.Topics[topic]
+	require.True(t, has)
+	_, has = testApp.Subs[idx]
+	require.True(t, has)
+
+	unsubMsg := &unsubscribeMsg{
+		Subscription: idx,
+	}
+	ret, err = unsubMsg.run(testApp)
+	require.NoError(t, err)
+	require.Equal(t, "unsubscribe success", ret)
+
+	_, has = testApp.Subs[idx]
+	require.False(t, has)
 }
 
 func TestValidationCompleteMsg(t *testing.T) {
+	testApp := newTestApp(t, nil)
 
+	var result string
+	idx := 0
+	status := &validationStatus{
+		Completion: make(chan string),
+	}
+
+	testApp.Validators[idx] = status
+
+	go func() {
+		result = <-status.Completion
+	}()
+
+	msg := &validationCompleteMsg{
+		Seqno: idx,
+		Valid: acceptResult,
+	}
+
+	ret, err := msg.run(testApp)
+	require.NoError(t, err)
+	require.Equal(t, "validationComplete success", ret)
+	require.Equal(t, acceptResult, result)
 }
 
 func TestGenerateKeypairMsg(t *testing.T) {
+	testApp := newTestApp(t, nil)
 
+	ret, err := (&generateKeypairMsg{}).run(testApp)
+	require.NoError(t, err)
+
+	kp, ok := ret.(generatedKeypair)
+	require.True(t, ok)
+	require.NotEqual(t, "", kp.Private)
+	require.NotEqual(t, "", kp.Public)
+	require.NotEqual(t, "", kp.PeerID)
 }
 
 func TestOpenStreamMsg(t *testing.T) {
+	appA := newTestApp(t, nil)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
 
+	appB := newTestApp(t, appAInfos)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	msg := &openStreamMsg{
+		Peer:       appB.P2p.Host.ID().String(),
+		ProtocolID: string(testProtocol),
+	}
+
+	go func() {
+		seqs <- 1
+	}()
+
+	ret, err := msg.run(appA)
+	require.NoError(t, err)
+
+	expectedPort := port - 1
+	expected := codaPeerInfo{
+		Libp2pPort: expectedPort,
+		Host:       "127.0.0.1",
+		PeerID:     appB.P2p.Host.ID().String(),
+	}
+
+	res, ok := ret.(openStreamResult)
+	require.True(t, ok)
+	require.Equal(t, res.StreamIdx, 1)
+	require.Equal(t, res.Peer, expected)
 }
 
 func TestCloseStreamMsg(t *testing.T) {
+	appA := newTestApp(t, nil)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
 
+	appB := newTestApp(t, appAInfos)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	msg := &openStreamMsg{
+		Peer:       appB.P2p.Host.ID().String(),
+		ProtocolID: string(testProtocol),
+	}
+
+	go func() {
+		seqs <- 1
+	}()
+
+	ret, err := msg.run(appA)
+	require.NoError(t, err)
+
+	expectedPort := port - 1
+	expected := codaPeerInfo{
+		Libp2pPort: expectedPort,
+		Host:       "127.0.0.1",
+		PeerID:     appB.P2p.Host.ID().String(),
+	}
+
+	res, ok := ret.(openStreamResult)
+	require.True(t, ok)
+	require.Equal(t, res.StreamIdx, 1)
+	require.Equal(t, res.Peer, expected)
+
+	closeMsg := &closeStreamMsg{
+		StreamIdx: 1,
+	}
+
+	ret, err = closeMsg.run(appA)
+	require.NoError(t, err)
+	require.Equal(t, "closeStream success", ret)
+
+	_, has := appA.Streams[1]
+	require.False(t, has)
 }
 
 func TestResetStreamMsg(t *testing.T) {
