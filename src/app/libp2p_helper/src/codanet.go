@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	gonet "net"
+	"os"
 	"path"
 	"time"
 
@@ -176,6 +177,13 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 		allowed = peer.NewSet()
 	}
 
+	_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+	if !exists {
+		for _, addr := range privateIPs {
+			addrFilters.AddFilter(parseCIDR(addr), ma.ActionDeny)
+		}
+	}
+
 	return &CodaGatingState{
 		logger:       logger,
 		AddrFilters:  addrFilters,
@@ -194,6 +202,11 @@ func (gs *CodaGatingState) logGate() {
 func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 	allow = !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
 
+	if !allow {
+		gs.logger.Infof("disallowing peer dial from: %v", p)
+		gs.logGate()
+	}
+
 	return
 }
 
@@ -203,7 +216,14 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(id)) && !gs.AddrFilters.AddrBlocked(addr)
+
+	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(addr))
+
+	if !allow {
+		gs.logger.Infof("disallowing peer dial from: %v", id)
+		gs.logGate()
+	}
+
 	return
 }
 
@@ -214,6 +234,12 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
 	remoteAddr := addrs.RemoteMultiaddr()
 	allow = !gs.AddrFilters.AddrBlocked(remoteAddr)
+
+	if !allow {
+		gs.logger.Infof("refusing to accept inbound connection from addr: %v", remoteAddr)
+		gs.logGate()
+	}
+
 	return
 }
 
@@ -228,7 +254,13 @@ func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, add
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = (!gs.DeniedPeers.Contains(id) || gs.AllowedPeers.Contains(id)) && !gs.AddrFilters.AddrBlocked(remoteAddr)
+	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(remoteAddr))
+
+	if !allow {
+		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v", remoteAddr)
+		gs.logGate()
+	}
+
 	return
 }
 
@@ -307,12 +339,28 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.ConnectionManager(connManager),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
-			if externalAddr == nil {
-				return as
+			if externalAddr != nil {
+				as = append(as, externalAddr)
 			}
 
-			as = append(as, externalAddr)
-			return as
+			fs := ma.NewFilters()
+
+			_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
+			if !exists {
+				for _, addr := range privateIPs {
+					fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
+				}
+			}
+
+			bs := []ma.Multiaddr{}
+			for _, a := range as {
+				if fs.AddrBlocked(a) {
+					continue
+				}
+				bs = append(bs, a)
+			}
+
+			return bs
 		}),
 		p2p.NATPortMap(),
 		p2p.Routing(
