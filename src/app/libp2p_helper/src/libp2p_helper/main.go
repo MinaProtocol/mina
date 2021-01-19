@@ -723,7 +723,9 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+
 	streamIdx := <-seqs
+
 	peer, err := peer.Decode(o.Peer)
 	if err != nil {
 		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
@@ -1006,7 +1008,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			return nil, badp2p(err)
 		}
 
-		time.Sleep(time.Millisecond * 1000)
+		time.Sleep(time.Millisecond * 100)
 		app.P2p.Logger.Debugf("beginning DHT advertising")
 
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
