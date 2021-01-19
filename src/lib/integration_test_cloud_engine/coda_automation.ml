@@ -16,7 +16,8 @@ module Network_config = struct
     ; run_with_user_agent: bool
     ; run_with_bots: bool
     ; enable_peer_exchange: bool
-    ; isolated: bool }
+    ; isolated: bool
+    ; libp2p_secret: string option }
   [@@deriving to_yojson]
 
   type terraform_config =
@@ -28,9 +29,6 @@ module Network_config = struct
     ; coda_agent_image: string
     ; coda_bots_image: string
     ; coda_points_image: string
-          (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
-    ; runtime_config: Yojson.Safe.t
-          [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; coda_faucet_amount: string
     ; coda_faucet_fee: string
     ; seed_zone: string
@@ -57,6 +55,10 @@ module Network_config = struct
     ; keypairs: (string * Keypair.t) list
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
+          (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
+          (* this field has all sortsa controversy lol *)
+    ; runtime_config: Yojson.Safe.t
+          [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -206,7 +208,8 @@ module Network_config = struct
       ; run_with_user_agent= false
       ; run_with_bots= false
       ; enable_peer_exchange= false
-      ; isolated= false }
+      ; isolated= false
+      ; libp2p_secret= None }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
@@ -215,6 +218,7 @@ module Network_config = struct
     ; keypairs= block_producer_keypairs
     ; constraint_constants
     ; genesis_constants
+    ; runtime_config= Runtime_config.to_yojson runtime_config
     ; terraform=
         { cluster_name
         ; cluster_region
@@ -226,7 +230,6 @@ module Network_config = struct
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
         ; coda_points_image= images.points
-        ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_key_pass= "naughty blue worm"
         ; block_producer_starting_host_port= base_port
         ; block_producer_configs=
@@ -353,6 +356,10 @@ module Network_manager = struct
       ~f:(fun ch ->
         Network_config.to_terraform network_config
         |> Terraform.to_string
+        |> Out_channel.output_string ch ) ;
+    Out_channel.with_file ~fail_if_exists:true
+      (testnet_dir ^/ "genesis_ledger.json") ~f:(fun ch ->
+        network_config.runtime_config |> Yojson.Safe.pretty_to_string
         |> Out_channel.output_string ch ) ;
     let%bind () =
       Deferred.List.iter network_config.keypairs

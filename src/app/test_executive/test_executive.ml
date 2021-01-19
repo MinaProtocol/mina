@@ -175,14 +175,14 @@ let main inputs =
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
-  let cleanup_deferred_ref = ref None in
-  let f_dispatch_cleanup =
-    (*fun _ _ -> Deferred.return ()*)
-    dispatch_cleanup ~logger
+  (* let cleanup_deferred_ref = ref None in *)
+  let f_dispatch_cleanup _ _ =
+    Deferred.return ()
+    (*dispatch_cleanup ~logger
       ~network_cleanup_func:Engine.Network_manager.cleanup
       ~log_engine_cleanup_func:Engine.Log_engine.destroy ~net_manager_ref
       ~log_engine_ref ~cleanup_deferred_ref
-      (module T : Test_intf)
+      (module T : Test_intf)*)
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
   Signal.handle Signal.terminating ~f:(fun signal ->
