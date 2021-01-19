@@ -244,7 +244,7 @@ resource "helm_release" "archive_node" {
 
   count       = var.archive_node_count
   
-  name        = "archive-node-${count.index}"
+  name        = "archive-node-${count.index + 1}"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
   version     = "0.4.6"
