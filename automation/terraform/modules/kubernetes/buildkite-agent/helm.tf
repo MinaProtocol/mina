@@ -56,6 +56,10 @@ locals {
       "name" = "CODA_HELM_REPO"
       "value" = var.coda_helm_repo
     },
+    {
+      "name" = "KUBE_CONFIG_PATH"
+      "value" = "~/.kube/config"
+    },
     # AWS EnvVars
     {
       "name" = "AWS_ACCESS_KEY_ID"
