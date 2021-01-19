@@ -22,7 +22,7 @@ module Get_coinbase_and_genesis =
       stateHash
     }
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
   }
@@ -411,7 +411,7 @@ WITH RECURSIVE chain AS (
           in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
-          ; fee= Unsigned.UInt64.of_int ic.fee
+          ; fee= Unsigned.UInt64.of_int64 ic.fee
           ; token= Unsigned.UInt64.of_int64 ic.token
           ; hash= ic.hash } )
     in

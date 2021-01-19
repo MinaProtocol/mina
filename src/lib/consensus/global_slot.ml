@@ -1,8 +1,8 @@
 open Unsigned
 open Core
 open Snark_params.Tick
-module T = Coda_numbers.Global_slot
-module Length = Coda_numbers.Length
+module T = Mina_numbers.Global_slot
+module Length = Mina_numbers.Length
 
 module Poly = struct
   [%%versioned
@@ -74,6 +74,8 @@ let ( + ) (x : t) n : t = {x with slot_number= T.add x.slot_number (T.of_int n)}
 let ( < ) (t : t) (t' : t) = t.slot_number < t'.slot_number
 
 let ( - ) (t : t) (t' : t) = T.sub t.slot_number t'.slot_number
+
+let max t1 t2 = if t2 > t1 then t2 else t1
 
 let succ (t : t) = {t with slot_number= T.succ t.slot_number}
 

@@ -21,6 +21,7 @@ type t =
   ; monitor: Monitor.t option
   ; is_seed: bool
   ; disable_telemetry: bool
+  ; super_catchup: bool
   ; initial_block_production_keypairs: Keypair.Set.t
   ; coinbase_receiver: Consensus.Coinbase_receiver.t
   ; work_selection_method: (module Work_selector.Selection_method_intf)

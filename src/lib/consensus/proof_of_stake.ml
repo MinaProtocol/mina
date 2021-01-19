@@ -11,7 +11,7 @@ open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
-module Length = Coda_numbers.Length
+module Length = Mina_numbers.Length
 
 let m = Snark_params.Tick.m
 
@@ -79,7 +79,7 @@ let compute_delegatee_table_genesis_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
       Mina_base.Ledger.iteri ledger ~f:(fun i acct -> f i acct) )
 
-module Segment_id = Coda_numbers.Nat.Make32 ()
+module Segment_id = Mina_numbers.Nat.Make32 ()
 
 module Typ = Snark_params.Tick.Typ
 
@@ -161,8 +161,8 @@ module Data = struct
   module Block_data = struct
     type t =
       { stake_proof: Stake_proof.t
-      ; global_slot: Coda_numbers.Global_slot.t
-      ; global_slot_since_genesis: Coda_numbers.Global_slot.t
+      ; global_slot: Mina_numbers.Global_slot.t
+      ; global_slot_since_genesis: Mina_numbers.Global_slot.t
       ; vrf_result: Random_oracle.Digest.t }
 
     let prover_state {stake_proof; _} = stake_proof
@@ -607,7 +607,7 @@ module Data = struct
     end
 
     module Message = struct
-      module Global_slot = Coda_numbers.Global_slot
+      module Global_slot = Mina_numbers.Global_slot
 
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
@@ -1179,7 +1179,7 @@ module Data = struct
                 ~typ:(non_null @@ Graphql_base_types.uint32 ())
                 ~args:Arg.[]
                 ~resolve:(fun _ {Poly.epoch_length; _} ->
-                  Coda_numbers.Length.to_uint32 epoch_length ) ] )
+                  Mina_numbers.Length.to_uint32 epoch_length ) ] )
 
       let to_input
           ({ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} :
@@ -1342,8 +1342,8 @@ module Data = struct
   end
 
   module Consensus_transition = struct
-    include Coda_numbers.Global_slot
-    module Value = Coda_numbers.Global_slot
+    include Mina_numbers.Global_slot
+    module Value = Mina_numbers.Global_slot
 
     type var = Checked.t
 
@@ -1391,7 +1391,7 @@ module Data = struct
        - skipped more than a window, set every sub_windows to be 0 and mark next_sub_window_length to be 1
     *)
 
-    let update_min_window_density ~constants ~prev_global_slot
+    let update_min_window_density ~incr_window ~constants ~prev_global_slot
         ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density =
       let prev_global_sub_window =
         Global_sub_window.of_global_slot ~constants prev_global_slot
@@ -1444,8 +1444,8 @@ module Data = struct
               Sub_window.(of_int i = next_relative_sub_window)
             in
             if is_next_sub_window then
-              if same_sub_window then Length.(succ length)
-              else Length.(succ zero)
+              let f = if incr_window then Length.succ else Fn.id in
+              if same_sub_window then f length else f Length.zero
             else length )
       in
       (min_window_density, sub_window_densities)
@@ -1631,7 +1631,7 @@ module Data = struct
             (Global_slot.t * Global_slot.t list) Quickcheck.Generator.t =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
-          let module GS = Coda_numbers.Global_slot in
+          let module GS = Mina_numbers.Global_slot in
           let%bind prev_global_slot = small_positive_int in
           let%bind slot_diffs =
             Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
@@ -1719,7 +1719,8 @@ module Data = struct
                     , (prev_min_window_density, prev_sub_window_densities) )
                ->
               let _, _, min_window_density1 =
-                update_several_times ~f:update_min_window_density
+                update_several_times
+                  ~f:(update_min_window_density ~incr_window:true)
                   ~prev_global_slot ~next_global_slots
                   ~prev_sub_window_densities ~prev_min_window_density
                   ~constants
@@ -1766,7 +1767,8 @@ module Data = struct
                 (fun ( (prev_global_slot, next_global_slots)
                      , (prev_min_window_density, prev_sub_window_densities)
                      , constants ) ->
-                  update_several_times ~f:update_min_window_density
+                  update_several_times
+                    ~f:(update_min_window_density ~incr_window:true)
                     ~prev_global_slot ~next_global_slots
                     ~prev_sub_window_densities ~prev_min_window_density
                     ~constants )
@@ -1850,7 +1852,7 @@ module Data = struct
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
             , Global_slot.Stable.V1.t
-            , Coda_numbers.Global_slot.Stable.V1.t
+            , Mina_numbers.Global_slot.Stable.V1.t
             , Epoch_data.Staking_value_versioned.Value.Stable.V1.t
             , Epoch_data.Next_value_versioned.Value.Stable.V1.t
             , bool
@@ -1864,7 +1866,7 @@ module Data = struct
 
       module For_tests = struct
         let with_global_slot_since_genesis (state : t) slot_number =
-          let global_slot_since_genesis : Coda_numbers.Global_slot.t =
+          let global_slot_since_genesis : Mina_numbers.Global_slot.t =
             slot_number
           in
           {state with global_slot_since_genesis}
@@ -1878,7 +1880,7 @@ module Data = struct
       , Vrf.Output.Truncated.var
       , Amount.var
       , Global_slot.Checked.t
-      , Coda_numbers.Global_slot.Checked.t
+      , Mina_numbers.Global_slot.Checked.t
       , Epoch_data.var
       , Epoch_data.var
       , Boolean.var
@@ -1898,7 +1900,7 @@ module Data = struct
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.typ
-      ; Coda_numbers.Global_slot.typ
+      ; Mina_numbers.Global_slot.typ
       ; Epoch_data.Staking.typ
       ; Epoch_data.Next.typ
       ; Boolean.typ
@@ -1939,7 +1941,7 @@ module Data = struct
              ; Vrf.Output.Truncated.to_bits last_vrf_output
              ; Amount.to_bits total_currency
              ; Global_slot.to_bits curr_global_slot
-             ; Coda_numbers.Global_slot.to_bits global_slot_since_genesis
+             ; Mina_numbers.Global_slot.to_bits global_slot_since_genesis
              ; [has_ancestor_in_same_checkpoint_window; supercharge_coinbase]
             |]
         ; field_elements= [||] }
@@ -1979,7 +1981,7 @@ module Data = struct
         and min_window_density = length min_window_density
         and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
         and global_slot_since_genesis =
-          up Coda_numbers.Global_slot.Checked.to_bits global_slot_since_genesis
+          up Mina_numbers.Global_slot.Checked.to_bits global_slot_since_genesis
         and sub_window_densities =
           Checked.List.fold sub_window_densities ~init:[] ~f:(fun acc l ->
               let%map res = length l in
@@ -2088,6 +2090,7 @@ module Data = struct
       in
       let min_window_density, sub_window_densities =
         Min_window_density.update_min_window_density ~constants
+          ~incr_window:true
           ~prev_global_slot:previous_consensus_state.curr_global_slot
           ~next_global_slot
           ~prev_sub_window_densities:
@@ -2103,7 +2106,7 @@ module Data = struct
       ; total_currency
       ; curr_global_slot= next_global_slot
       ; global_slot_since_genesis=
-          Coda_numbers.Global_slot.add
+          Mina_numbers.Global_slot.add
             previous_consensus_state.global_slot_since_genesis slot_diff
       ; staking_epoch_data
       ; next_epoch_data
@@ -2121,7 +2124,7 @@ module Data = struct
         ~next:(slot2 : Global_slot.Checked.t) =
       let open Snarky_integer in
       let open Run in
-      let module Slot = Coda_numbers.Global_slot in
+      let module Slot = Mina_numbers.Global_slot in
       let slot1 = Slot.Checked.to_integer (Global_slot.slot_number slot1) in
       let checkpoint_window_size_in_slots =
         Length.Checked.to_integer constants.checkpoint_window_size_in_slots
@@ -2149,7 +2152,7 @@ module Data = struct
       let blockchain_length, global_slot_since_genesis =
         match constraint_constants.fork with
         | None ->
-            (Length.zero, Coda_numbers.Global_slot.zero)
+            (Length.zero, Mina_numbers.Global_slot.zero)
         | Some {previous_length; previous_global_slot; _} ->
             (*Note: global_slot_since_genesis at fork point is the same as global_slot_since_genesis in the new genesis. This value is used to check transaction validity and existence of locked tokens.
             For reviewers, should this be incremented by 1 because it's technically a new block? we don't really know how many slots passed since the fork point*)
@@ -2232,11 +2235,11 @@ module Data = struct
     (* Check that both epoch and slot are zero.
     *)
     let is_genesis_state (t : Value.t) =
-      Coda_numbers.Global_slot.(
+      Mina_numbers.Global_slot.(
         equal zero (Global_slot.slot_number t.curr_global_slot))
 
     let is_genesis (global_slot : Global_slot.Checked.t) =
-      let open Coda_numbers.Global_slot in
+      let open Mina_numbers.Global_slot in
       Checked.equal (Checked.constant zero)
         (Global_slot.slot_number global_slot)
 
@@ -2287,7 +2290,7 @@ module Data = struct
         Global_slot.Checked.to_epoch_and_slot prev_global_slot
       in
       let%bind global_slot_since_genesis =
-        Coda_numbers.Global_slot.Checked.add
+        Mina_numbers.Global_slot.Checked.add
           previous_state.global_slot_since_genesis slot_diff
       in
       let%bind epoch_increased = Epoch.Checked.(prev_epoch < next_epoch) in
@@ -2432,7 +2435,7 @@ module Data = struct
       ; curr_epoch= Segment_id.to_int epoch
       ; curr_slot= Segment_id.to_int slot
       ; global_slot_since_genesis=
-          Coda_numbers.Global_slot.to_int t.global_slot_since_genesis
+          Mina_numbers.Global_slot.to_int t.global_slot_since_genesis
       ; total_currency= Amount.to_int t.total_currency }
 
     let curr_global_slot (t : Value.t) = t.curr_global_slot
@@ -2505,20 +2508,20 @@ module Data = struct
               ~deprecated:(Deprecated (Some "use blockHeight instead"))
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
-                Coda_numbers.Length.to_uint32 blockchain_length )
+                Mina_numbers.Length.to_uint32 blockchain_length )
           ; field "blockHeight" ~typ:(non_null uint32)
               ~doc:"Height of the blockchain at this block"
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
-                Coda_numbers.Length.to_uint32 blockchain_length )
+                Mina_numbers.Length.to_uint32 blockchain_length )
           ; field "epochCount" ~typ:(non_null uint32)
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.epoch_count; _} ->
-                Coda_numbers.Length.to_uint32 epoch_count )
+                Mina_numbers.Length.to_uint32 epoch_count )
           ; field "minWindowDensity" ~typ:(non_null uint32)
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.min_window_density; _} ->
-                Coda_numbers.Length.to_uint32 min_window_density )
+                Mina_numbers.Length.to_uint32 min_window_density )
           ; field "lastVrfOutput" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:
@@ -2746,6 +2749,7 @@ module Hooks = struct
                       , Mina_base.Ledger_hash.to_yojson ledger_hash ) ]
                   "Failed to serve epoch ledger query with hash $ledger_hash \
                    from $peer: $error" ) ;
+            if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
             Ivar.fill ivar response )
     end
 
@@ -3096,9 +3100,26 @@ module Hooks = struct
         ~condition:candidate_vrf_is_bigger
     in
     let long_fork_chain_quality_is_better =
-      less_than_or_equal_when existing.min_window_density
-        candidate.min_window_density ~compare:Length.compare
-        ~condition:blockchain_length_is_longer
+      (* The min window density if we imagine extending to the max slot of the two chains. *)
+      (* TODO: You could argue that instead this should be imagine extending to the current consensus time. *)
+      let max_slot =
+        Global_slot.max candidate.curr_global_slot existing.curr_global_slot
+      in
+      let virtual_min_window_density (s : Consensus_state.Value.t) =
+        if Global_slot.equal s.curr_global_slot max_slot then
+          s.min_window_density
+        else
+          Min_window_density.update_min_window_density ~incr_window:false
+            ~constants ~prev_global_slot:s.curr_global_slot
+            ~next_global_slot:max_slot
+            ~prev_sub_window_densities:s.sub_window_densities
+            ~prev_min_window_density:s.min_window_density
+          |> fst
+      in
+      less_than_or_equal_when
+        (virtual_min_window_density existing)
+        (virtual_min_window_density candidate)
+        ~compare:Length.compare ~condition:blockchain_length_is_longer
     in
     let precondition_msg, choice_msg, should_take =
       if is_short_range existing candidate ~constants then
@@ -3214,7 +3235,7 @@ module Hooks = struct
                 let global_slot_since_genesis =
                   let slot_diff =
                     match
-                      Coda_numbers.Global_slot.sub
+                      Mina_numbers.Global_slot.sub
                         (Global_slot.slot_number global_slot)
                         (Consensus_state.curr_global_slot state)
                     with
@@ -3233,7 +3254,7 @@ module Hooks = struct
                     | Some diff ->
                         diff
                   in
-                  Coda_numbers.Global_slot.add
+                  Mina_numbers.Global_slot.add
                     (Consensus_state.global_slot_since_genesis state)
                     slot_diff
                 in
@@ -3456,7 +3477,7 @@ module Hooks = struct
         global_slot =
       if
         not
-          (Coda_numbers.Global_slot.equal
+          (Mina_numbers.Global_slot.equal
              (Global_slot.slot_number global_slot)
              block_data.global_slot)
       then
@@ -3572,7 +3593,7 @@ module Hooks = struct
             Global_slot.(prev.curr_global_slot + slot_advancement)
           in
           let global_slot_since_genesis =
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               add prev.global_slot_since_genesis (of_int slot_advancement))
           in
           let curr_epoch, curr_slot =
@@ -3598,7 +3619,7 @@ module Hooks = struct
           in
           let min_window_density, sub_window_densities =
             Min_window_density.update_min_window_density ~constants
-              ~prev_global_slot:prev.curr_global_slot
+              ~incr_window:true ~prev_global_slot:prev.curr_global_slot
               ~next_global_slot:curr_global_slot
               ~prev_sub_window_densities:prev.sub_window_densities
               ~prev_min_window_density:prev.min_window_density
@@ -3666,11 +3687,11 @@ let%test_module "Proof of stake tests" =
           ()
       | Some fork ->
           assert (
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               equal fork.previous_global_slot
                 previous_consensus_state.global_slot_since_genesis) ) ;
           assert (
-            Coda_numbers.Length.(
+            Mina_numbers.Length.(
               equal
                 (succ fork.previous_length)
                 previous_consensus_state.blockchain_length) ) ) ;
@@ -3741,12 +3762,12 @@ let%test_module "Proof of stake tests" =
                 global_slot - previous_consensus_state.curr_global_slot)
           in
           assert (
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               equal
                 (add fork.previous_global_slot slot_diff)
                 next_consensus_state.global_slot_since_genesis) ) ;
           assert (
-            Coda_numbers.Length.(
+            Mina_numbers.Length.(
               equal
                 (succ (succ fork.previous_length))
                 next_consensus_state.blockchain_length) ) ) ;
@@ -3845,8 +3866,8 @@ let%test_module "Proof of stake tests" =
                   (State_hash.of_yojson
                      (`String
                        "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"))
-            ; previous_length= Coda_numbers.Length.of_int 100
-            ; previous_global_slot= Coda_numbers.Global_slot.of_int 200 }
+            ; previous_length= Mina_numbers.Length.of_int 100
+            ; previous_global_slot= Mina_numbers.Global_slot.of_int 200 }
         in
         {constraint_constants with fork= fork_constants}
       in

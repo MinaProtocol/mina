@@ -67,7 +67,9 @@ module Get_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -78,7 +80,9 @@ module Get_trust_status_all = struct
   type query = unit [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -90,7 +94,9 @@ module Reset_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =

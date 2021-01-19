@@ -61,6 +61,12 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk kubectl -y
 
+# Terraform tools
+RUN curl -sL https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip -o terraform.zip && \
+    unzip terraform.zip && \
+    sudo mv terraform /usr/bin && \
+    sudo ln -s /usr/bin/terraform /usr/local/bin/terraform
+
 # Helm tools
 RUN curl https://baltocdn.com/helm/signing.asc | apt-key add - && \
     echo "deb https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list && \

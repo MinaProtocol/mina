@@ -14,15 +14,15 @@ let dispatch rpc query (host_and_port : Host_and_port.t) =
           match%bind
             Rpc.Connection.create
               ~handshake_timeout:
-                (Time.Span.of_sec Coda_compile_config.rpc_handshake_timeout_sec)
+                (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
               ~heartbeat_config:
                 (Rpc.Connection.Heartbeat_config.create
                    ~timeout:
                      (Time_ns.Span.of_sec
-                        Coda_compile_config.rpc_heartbeat_timeout_sec)
+                        Mina_compile_config.rpc_heartbeat_timeout_sec)
                    ~send_every:
                      (Time_ns.Span.of_sec
-                        Coda_compile_config.rpc_heartbeat_send_every_sec))
+                        Mina_compile_config.rpc_heartbeat_send_every_sec))
               r w
               ~connection_state:(fun _ -> ())
           with

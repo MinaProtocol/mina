@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Pipe_lib
 open Signature_lib
 module Archive_client = Archive_client
@@ -103,7 +103,7 @@ val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Coda_net2.Multiaddr.t list
+val initial_peers : t -> Mina_net2.Multiaddr.t list
 
 val client_port : t -> int
 
