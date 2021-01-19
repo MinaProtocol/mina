@@ -39,6 +39,45 @@ module Test_config = struct
          Signature_lib.Public_key.Compressed.to_string pk) }
 end
 
+module Network_state = struct
+  (* TODO: Just replace the first 3 fields here with Protocol_state *)
+  type t =
+    { block_height: int
+    ; epoch: int
+    ; global_slot: int
+    ; snarked_ledgers_generated: int
+    ; blocks_generated: int }
+end
+
+type constants =
+  { constraints: Genesis_constants.Constraint_constants.t
+  ; genesis: Genesis_constants.t }
+
+module Network_time_span = struct
+  type t = Epochs of int | Slots of int | Literal of Time.Span.t
+
+  let to_span t ~(constants : constants) =
+    let open Int64 in
+    let slots n =
+      Time.Span.of_ms
+        (to_float (n * of_int constants.constraints.block_window_duration_ms))
+    in
+    match t with
+    | Epochs n ->
+        slots (of_int n * of_int constants.genesis.protocol.slots_per_epoch)
+    | Slots n ->
+        slots (of_int n)
+    | Literal span ->
+        span
+end
+
+module Condition = struct
+  type t =
+    { condition_subscription: Network_state.t -> bool
+    ; soft_timeout: Network_time_span.t
+    ; hard_timeout: Network_time_span.t }
+end
+
 (** The signature of integration test engines. An integration test engine
  *  provides the core functionality for deploying, monitoring, and
  *  interacting with networks.
@@ -143,14 +182,8 @@ module type Engine_intf = sig
       3. Has seen some number of slots/epochs crossed/snarked ledgers generated or x milliseconds has passed
     Note: Varying number of snarked ledgers generated because of reorgs is not captured here *)
     val wait_for :
-         ?blocks:int
-      -> ?epoch_reached:int
-      -> ?snarked_ledgers_generated:int
-      -> ?timeout:[ `Slots of int
-                  | `Epochs of int
-                  | `Snarked_ledgers_generated of int
-                  | `Milliseconds of int64 ]
-      -> t
+         t
+      -> Condition.t
       -> ( [> `Blocks_produced of int]
          * [> `Slots_passed of int]
          * [> `Snarked_ledgers_generated of int] )
