@@ -62,7 +62,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
   in
   let%bind next_epoch_seed_str, next_epoch_ledger_hash_id =
     query_db
-      ~f:(fun db -> Sql.Epoch_data.run db block.staking_epoch_data_id)
+      ~f:(fun db -> Sql.Epoch_data.run db block.next_epoch_data_id)
       ~item:"staking epoch data"
   in
   let next_epoch_seed = Epoch_seed.of_base58_check_exn next_epoch_seed_str in
@@ -216,16 +216,14 @@ let fill_in_internal_command pool block_state_hash =
       let typ = internal_cmd.typ in
       let%bind receiver = pk_of_id ~item:"receiver" internal_cmd.receiver_id in
       let fee =
-        internal_cmd.fee |> Unsigned.UInt64.of_int64
-        |> Currency.Amount.of_uint64
+        internal_cmd.fee |> Unsigned.UInt64.of_int64 |> Currency.Fee.of_uint64
       in
       let token =
         internal_cmd.token |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64
       in
       let hash = internal_cmd.hash |> Transaction_hash.of_base58_check_exn in
       let cmd =
-        { Extensional.Internal_command.global_slot
-        ; sequence_no
+        { Extensional.Internal_command.sequence_no
         ; secondary_sequence_no
         ; typ
         ; receiver
@@ -236,7 +234,7 @@ let fill_in_internal_command pool block_state_hash =
       ( if String.equal cmd.typ "fee_transfer_via_coinbase" then
         match
           Block.Fee_transfer_via_coinbase.Table.add Block.fee_transfer_tbl
-            ~key:(cmd.global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
+            ~key:(global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
             ~data:cmd
         with
         | `Ok ->
@@ -245,7 +243,7 @@ let fill_in_internal_command pool block_state_hash =
             failwithf
               "Duplicate fee transfer via coinbase at global slot = %Ld, \
                sequence no = %d, secondary sequence no = %d"
-              cmd.global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
+              global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
 let main ~archive_uri ~state_hash () =
