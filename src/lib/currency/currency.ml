@@ -347,7 +347,7 @@ end = struct
   consensus_mechanism]
 
   module Checked = struct
-    module N = Coda_numbers.Nat.Make_checked (Unsigned) (B)
+    module N = Mina_numbers.Nat.Make_checked (Unsigned) (B)
 
     type t = var
 

@@ -57,3 +57,31 @@ module Epoch_data = struct
 
   let run (module Conn : Caqti_async.CONNECTION) id = Conn.find query id
 end
+
+module Blocks_and_user_commands = struct
+  let query =
+    Caqti_request.collect Caqti_type.int
+      Caqti_type.(tup2 int int)
+      {| SELECT user_command_id, sequence_no
+       FROM blocks_user_commands
+       WHERE block_id = ?
+    |}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end
+
+module Blocks_and_internal_commands = struct
+  let query =
+    Caqti_request.collect Caqti_type.int
+      Caqti_type.(tup4 int int64 int int)
+      {| SELECT internal_command_id, global_slot, sequence_no, secondary_sequence_no
+       FROM (blocks_internal_commands
+             INNER JOIN blocks
+             ON blocks.id = blocks_internal_commands.block_id)
+       WHERE block_id = ?
+    |}
+
+  let run (module Conn : Caqti_async.CONNECTION) ~block_id =
+    Conn.collect_list query block_id
+end

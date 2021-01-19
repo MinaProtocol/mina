@@ -53,7 +53,7 @@ let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let global_slot =
-  Command.Arg_type.map Command.Param.int ~f:Coda_numbers.Global_slot.of_int
+  Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
 
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_formatted_string
@@ -67,7 +67,7 @@ let txn_nonce =
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
 let hd_index =
-  Command.Arg_type.map Command.Param.string ~f:Coda_numbers.Hd_index.of_string
+  Command.Arg_type.map Command.Param.string ~f:Mina_numbers.Hd_index.of_string
 
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string

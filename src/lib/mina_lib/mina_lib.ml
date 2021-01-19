@@ -2,7 +2,7 @@ open Core_kernel
 open Async
 open Unsigned
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
@@ -70,7 +70,7 @@ type pipes =
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
-      * Coda_net2.Validation_callback.t )
+      * Mina_net2.Validation_callback.t )
       Pipe.Writer.t
   ; user_command_input_writer:
       ( User_command_input.t list
@@ -78,7 +78,10 @@ type pipes =
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
-        * (Account_id.t -> (Mina_base.Account.Nonce.t, string) Result.t)
+        * (   Account_id.t
+           -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
+              , string )
+              Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -175,6 +178,8 @@ module Snark_worker = struct
         match signal_or_error with
         | Ok () ->
             [%log info] "Snark worker process died" ;
+            if Ivar.is_full kill_ivar then
+              [%log error] "Ivar.fill bug is here!" ;
             Ivar.fill kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
@@ -223,6 +228,8 @@ module Snark_worker = struct
             [ ( "snark_worker_pid"
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
+        if Ivar.is_full process_ivar then
+          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
     | `Off _ ->
         [%log' info t.config.logger]
@@ -334,10 +341,17 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode
+(* This is a hack put in place to deal with nodes getting stuck
+   in Offline states, that is, not receiving blocks for an extended period.
+
+   To address this, we restart the libp2p helper when we become offline. *)
+let next_helper_restart = ref None
+
+let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
+  let restart_delay = Time.Span.of_min 5. in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -347,6 +361,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
         else
           match online_status with
           | `Offline ->
+              ( match !next_helper_restart with
+              | None ->
+                  next_helper_restart :=
+                    Some
+                      (Async.Clock.Event.run_after restart_delay
+                         (fun () ->
+                           Mina_networking.restart_helper net ;
+                           next_helper_restart := None )
+                         ())
+              | Some _ ->
+                  () ) ;
               if `Empty = first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
@@ -355,19 +380,22 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
                 `Listening )
               else `Offline
           | `Online -> (
-            match active_status with
-            | None ->
-                let logger = Logger.create () in
-                [%str_log info] Bootstrapping ;
-                `Bootstrap
-            | Some (_, catchup_jobs) ->
-                let logger = Logger.create () in
-                if catchup_jobs > 0 then (
-                  [%str_log info] Ledger_catchup ;
-                  `Catchup )
-                else (
-                  [%str_log info] Synced ;
-                  `Synced ) ) )
+              Option.iter !next_helper_restart ~f:(fun e ->
+                  Async.Clock.Event.abort_if_possible e () ) ;
+              next_helper_restart := None ;
+              match active_status with
+              | None ->
+                  let logger = Logger.create () in
+                  [%str_log info] Bootstrapping ;
+                  `Bootstrap
+              | Some (_, catchup_jobs) ->
+                  let logger = Logger.create () in
+                  if catchup_jobs > 0 then (
+                    [%str_log info] Ledger_catchup ;
+                    `Catchup )
+                  else (
+                    [%str_log info] Synced ;
+                    `Synced ) ) )
   in
   let observer = observe incremental_status in
   (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
@@ -459,15 +487,15 @@ let get_ledger t state_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
 
+let get_account t aid =
+  let open Participating_state.Let_syntax in
+  let%map ledger = best_ledger t in
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_account ledger aid in
+  Ledger.get ledger loc
+
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (account_id : Account_id.t) =
-  let get_account aid =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind loc = Ledger.location_of_account ledger aid in
-    Ledger.get ledger loc
-  in
   let transaction_pool = t.components.transaction_pool in
   let resource_pool =
     Network_pool.Transaction_pool.resource_pool transaction_pool
@@ -491,7 +519,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
       let open Participating_state.Option.Let_syntax in
-      let%map account = get_account account_id in
+      let%map account = get_account t account_id in
       account.Account.Poly.nonce
 
 let snark_job_state t = t.snark_job_state
@@ -628,8 +656,8 @@ let best_chain ?max_length t =
   match max_length with
   | Some max_length when max_length <= List.length best_tip_path ->
       (* The [best_tip_path] has already been truncated to the correct length,
-         we skip adding the root to stay below the maximum.
-      *)
+       we skip adding the root to stay below the maximum.
+    *)
       best_tip_path
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
@@ -687,10 +715,20 @@ let add_transactions t (uc_inputs : User_command_input.t list) =
            `sender` is not in the ledger or sent a transaction in transaction \
            pool."
     | Some nonce ->
-        Ok nonce
+        let ledger_nonce =
+          Participating_state.active (get_account t aid)
+          |> Option.join
+          |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
+          |> Option.value ~default:nonce
+        in
+        Ok (`Min ledger_nonce, nonce)
   in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
+    ( uc_inputs
+    , ( if Ivar.is_full result_ivar then
+          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
+        Ivar.fill result_ivar )
+    , get_current_nonce )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -772,6 +810,7 @@ let start_with_precomputed_blocks t blocks =
   start t
 
 let create ?wallets (config : Config.t) =
+  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -853,7 +892,7 @@ let create ?wallets (config : Config.t) =
                       [%log' warn config.logger]
                         "$sender has sent many blocks. This is very unusual."
                         ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
-                      Coda_net2.Validation_callback.fire_if_not_already_fired
+                      Mina_net2.Validation_callback.fire_if_not_already_fired
                         cb `Reject ;
                       None
                   | `Within_capacity ->
@@ -933,7 +972,7 @@ let create ?wallets (config : Config.t) =
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
-                          Coda_state.Protocol_state.hash state
+                          Mina_state.Protocol_state.hash state
                         in
                         let k_breadcrumbs =
                           Transition_frontier.root frontier
@@ -971,7 +1010,7 @@ let create ?wallets (config : Config.t) =
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
-                  let git_commit = Coda_version.commit_id_short in
+                  let git_commit = Mina_version.commit_id_short in
                   let uptime_minutes =
                     let now = Time.now () in
                     let minutes_float =
@@ -1084,6 +1123,15 @@ let create ?wallets (config : Config.t) =
               ~get_transition_chain:
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
+              ~get_transition_knowledge:(fun _q ->
+                return
+                  ( match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                  | None ->
+                      []
+                  | Some frontier ->
+                      Sync_handler.best_tip_path ~frontier ) )
           in
           (* tie the first knot *)
           net_ref := Some net ;
@@ -1154,6 +1202,7 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                  ~catchup_mode
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
@@ -1192,7 +1241,7 @@ let create ?wallets (config : Config.t) =
                              breadcrumb
                          in
                          let validation_callback =
-                           Coda_net2.Validation_callback
+                           Mina_net2.Validation_callback
                            .create_without_expiration ()
                          in
                          External_transition.Validated.poke_validation_callback
@@ -1200,7 +1249,7 @@ let create ?wallets (config : Config.t) =
                          don't_wait_for
                            (* this will never throw since the callback was created without expiration *)
                            (let%map v =
-                              Coda_net2.Validation_callback.await_exn
+                              Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
                             if v = `Accept then
@@ -1391,7 +1440,7 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger
+            create_sync_status_observer ~logger:config.logger ~net
               ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:

@@ -2,7 +2,7 @@ open Core
 open Signature_lib
 open Mina_base
 open Snark_params
-module Global_slot = Coda_numbers.Global_slot
+module Global_slot = Mina_numbers.Global_slot
 open Currency
 open Pickles_types
 module Impl = Pickles.Impls.Step
@@ -1045,7 +1045,7 @@ module Base = struct
       open Snarky_backendless.Request
 
       type _ t +=
-        | State_body : Coda_state.Protocol_state.Body.Value.t t
+        | State_body : Mina_state.Protocol_state.Body.Value.t t
         | Snapp_account : [`One | `Two] -> Snapp_account.t t
         | Fee_payer_signature : Signature.t t
         | Account_signature : [`One | `Two] -> Signature.t t
@@ -1054,7 +1054,7 @@ module Base = struct
         | Two_complement : Snapp_statement.Complement.Two_proved.t t
     end
 
-    let handler ~(state_body : Coda_state.Protocol_state.Body.Value.t)
+    let handler ~(state_body : Mina_state.Protocol_state.Body.Value.t)
         ~(snapp_account1 : Snapp_account.t option)
         ~(snapp_account2 : Snapp_account.t option) (c : Snapp_command.t)
         handler : request -> response =
@@ -1602,11 +1602,11 @@ module Base = struct
         let ( ! ) = run_checked in
         let state_body =
           (* TODO: How to check this against the statement? *)
-          exists (Coda_state.Protocol_state.Body.typ ~constraint_constants)
+          exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
             ~request:(fun () -> State_body)
         in
         let curr_state =
-          Coda_state.Protocol_state.Body.view_checked state_body
+          Mina_state.Protocol_state.Body.view_checked state_body
         in
         (* Kind of a hack...
            We must have
@@ -1737,11 +1737,11 @@ module Base = struct
         let ( ! ) = run_checked in
         let state_body =
           (* TODO: How to check this against the statement? *)
-          exists (Coda_state.Protocol_state.Body.typ ~constraint_constants)
+          exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
             ~request:(fun () -> State_body)
         in
         let curr_state =
-          Coda_state.Protocol_state.Body.view_checked state_body
+          Mina_state.Protocol_state.Body.view_checked state_body
         in
         let _ = Snapp_statement.Checked.to_field_elements s1 in
         let excess =
@@ -1891,11 +1891,11 @@ module Base = struct
         in
         let state_body =
           (* TODO: How to check this against the statement? *)
-          exists (Coda_state.Protocol_state.Body.typ ~constraint_constants)
+          exists (Mina_state.Protocol_state.Body.typ ~constraint_constants)
             ~request:(fun () -> State_body)
         in
         let curr_state =
-          Coda_state.Protocol_state.Body.view_checked state_body
+          Mina_state.Protocol_state.Body.view_checked state_body
         in
         let excess =
           !(Amount.Signed.Checked.add one.body.delta two.body.delta)
@@ -2014,7 +2014,7 @@ module Base = struct
   type _ Snarky_backendless.Request.t +=
     | Transaction : Transaction_union.t Snarky_backendless.Request.t
     | State_body :
-        Coda_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
+        Mina_state.Protocol_state.Body.Value.t Snarky_backendless.Request.t
     | Init_stack : Pending_coinbase.Stack.t Snarky_backendless.Request.t
 
   let%snarkydef apply_tagged_transaction
@@ -2114,7 +2114,7 @@ module Base = struct
                    ; is_coinbase ]) ])
     in
     let current_global_slot =
-      Coda_state.Protocol_state.Body.consensus_state state_body
+      Mina_state.Protocol_state.Body.consensus_state state_body
       |> Consensus.Data.Consensus_state.global_slot_since_genesis_var
     in
     let%bind creating_new_token =
@@ -2188,7 +2188,7 @@ module Base = struct
     let%bind () =
       [%with_label "Compute coinbase stack"]
         (let%bind state_body_hash =
-           Coda_state.Protocol_state.Body.hash_checked state_body
+           Mina_state.Protocol_state.Body.hash_checked state_body
          in
          let%bind pending_coinbase_stack_with_state =
            Pending_coinbase.Stack.Checked.push_state state_body_hash
@@ -2811,7 +2811,7 @@ module Base = struct
     in
     let%bind state_body =
       exists
-        (Coda_state.Protocol_state.Body.typ ~constraint_constants)
+        (Mina_state.Protocol_state.Body.typ ~constraint_constants)
         ~request:(As_prover.return State_body)
     in
     let pc = statement.pending_coinbase_stack_state in
@@ -2861,7 +2861,7 @@ module Base = struct
     ; main_value= (fun [] _ -> []) }
 
   let transaction_union_handler handler (transaction : Transaction_union.t)
-      (state_body : Coda_state.Protocol_state.Body.Value.t)
+      (state_body : Mina_state.Protocol_state.Body.Value.t)
       (init_stack : Pending_coinbase.Stack.t) :
       Snarky_backendless.Request.request -> _ =
    fun (With {request; respond} as r) ->
@@ -3590,14 +3590,14 @@ let%test_module "transaction_snark" =
     let state_body =
       let compile_time_genesis =
         (*not using Precomputed_values.for_unit_test because of dependency cycle*)
-        Coda_state.Genesis_protocol_state.t
+        Mina_state.Genesis_protocol_state.t
           ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
           ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
           ~constraint_constants ~consensus_constants
       in
-      compile_time_genesis.data |> Coda_state.Protocol_state.body
+      compile_time_genesis.data |> Mina_state.Protocol_state.body
 
-    let state_body_hash = Coda_state.Protocol_state.Body.hash state_body
+    let state_body_hash = Mina_state.Protocol_state.Body.hash state_body
 
     let pending_coinbase_stack_target (t : Transaction.Valid.t) state_body_hash
         stack =
@@ -3620,7 +3620,7 @@ let%test_module "transaction_snark" =
         pending_coinbase_stack_state state_body handler =
       let source = Ledger.merkle_root ledger in
       let current_global_slot =
-        Coda_state.Protocol_state.Body.consensus_state state_body
+        Mina_state.Protocol_state.Body.consensus_state state_body
         |> Consensus.Data.Consensus_state.global_slot_since_genesis
       in
       let next_available_token_before = Ledger.next_available_token ledger in
@@ -3655,7 +3655,7 @@ let%test_module "transaction_snark" =
       let mk_pubkey () =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
-      let state_body_hash = Coda_state.Protocol_state.Body.hash state_body in
+      let state_body_hash = Mina_state.Protocol_state.Body.hash state_body in
       let producer = mk_pubkey () in
       let producer_id = Account_id.create producer Token_id.default in
       let receiver = mk_pubkey () in
@@ -3698,7 +3698,7 @@ let%test_module "transaction_snark" =
             Sparse_ledger.apply_transaction_exn ~constraint_constants
               sparse_ledger
               ~txn_state_view:
-                (txn_in_block.block_data |> Coda_state.Protocol_state.Body.view)
+                (txn_in_block.block_data |> Mina_state.Protocol_state.Body.view)
               txn_in_block.transaction
           in
           check_transaction txn_in_block
@@ -3746,7 +3746,7 @@ let%test_module "transaction_snark" =
                         ~len:Signed_command_memo.max_digestible_string_length))
               in
               let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body
+                Mina_state.Protocol_state.Body.consensus_state state_body
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let next_available_token_before =
@@ -3844,7 +3844,7 @@ let%test_module "transaction_snark" =
               let hash_pre = Ledger.merkle_root ledger in
               let _target, `Next_available_token _next_available_token_after =
                 let txn_state_view =
-                  Coda_state.Protocol_state.Body.view state_body
+                  Mina_state.Protocol_state.Body.view state_body
                 in
                 Ledger.merkle_root_after_snapp_command_exn ledger
                   ~txn_state_view t1
@@ -3864,7 +3864,7 @@ let%test_module "transaction_snark" =
               let i, j = (1, 2) in
               let t1 = signed_signed ~wallets i j in
               let txn_state_view =
-                Coda_state.Protocol_state.Body.view state_body
+                Mina_state.Protocol_state.Body.view state_body
               in
               let next_available_token_before =
                 Ledger.next_available_token ledger
@@ -3916,16 +3916,16 @@ let%test_module "transaction_snark" =
             let state_body =
               let state =
                 (* NB: The [previous_state_hash] is a dummy, do not use. *)
-                Coda_state.Protocol_state.create
+                Mina_state.Protocol_state.create
                   ~previous_state_hash:Tick0.Field.zero ~body:state_body
               in
               let consensus_state_at_slot =
                 Consensus.Data.Consensus_state.Value.For_tests
                 .with_global_slot_since_genesis
-                  (Coda_state.Protocol_state.consensus_state state)
+                  (Mina_state.Protocol_state.consensus_state state)
                   txn_global_slot
               in
-              Coda_state.Protocol_state.(
+              Mina_state.Protocol_state.(
                 create_value
                   ~previous_state_hash:(previous_state_hash state)
                   ~genesis_state_hash:(genesis_state_hash state)
@@ -3937,12 +3937,12 @@ let%test_module "transaction_snark" =
                 .body
             in
             let state_body_hash =
-              Coda_state.Protocol_state.Body.hash state_body
+              Mina_state.Protocol_state.Body.hash state_body
             in
             (state_body, state_body_hash)
       in
       let txn_state_view : Snapp_predicate.Protocol_state.View.t =
-        Coda_state.Protocol_state.Body.view state_body
+        Mina_state.Protocol_state.Body.view state_body
       in
       let mentioned_keys, pending_coinbase_stack_target =
         let pending_coinbase_stack =
@@ -4208,7 +4208,7 @@ let%test_module "transaction_snark" =
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body1
+                Mina_state.Protocol_state.Body.consensus_state state_body1
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let sparse_ledger =
@@ -4259,7 +4259,7 @@ let%test_module "transaction_snark" =
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let current_global_slot =
-                Coda_state.Protocol_state.Body.consensus_state state_body2
+                Mina_state.Protocol_state.Body.consensus_state state_body2
                 |> Consensus.Data.Consensus_state.global_slot_since_genesis
               in
               let sparse_ledger =
@@ -4301,14 +4301,14 @@ let%test_module "transaction_snark" =
               transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
-          Coda_state.Protocol_state.negative_one
+          Mina_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
-          |> Coda_state.Protocol_state.body
+          |> Mina_state.Protocol_state.body
         in
         let state_body_hash0 =
-          Coda_state.Protocol_state.Body.hash state_body0
+          Mina_state.Protocol_state.Body.hash state_body0
         in
         (state_body_hash0, state_body0)
       in
@@ -4323,14 +4323,14 @@ let%test_module "transaction_snark" =
               transaction t0 in b1" =
       let state_hash_and_body1 =
         let state_body0 =
-          Coda_state.Protocol_state.negative_one
+          Mina_state.Protocol_state.negative_one
             ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
             ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
             ~constraint_constants ~consensus_constants
-          |> Coda_state.Protocol_state.body
+          |> Mina_state.Protocol_state.body
         in
         let state_body_hash0 =
-          Coda_state.Protocol_state.Body.hash state_body0
+          Mina_state.Protocol_state.Body.hash state_body0
         in
         (state_body_hash0, state_body0)
       in
@@ -5762,7 +5762,7 @@ let%test_module "transaction_snark" =
 let%test_module "account timing check" =
   ( module struct
     open Core_kernel
-    open Coda_numbers
+    open Mina_numbers
     open Currency
     open Transaction_validator.For_tests
 
@@ -5893,11 +5893,11 @@ let%test_module "account timing check" =
              ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
-      let txn_global_slot = Coda_numbers.Global_slot.of_int 1_900 in
+      let txn_global_slot = Mina_numbers.Global_slot.of_int 1_900 in
       let timing_with_min_balance =
         validate_timing_with_min_balance ~account
           ~txn_amount:(Currency.Amount.of_int 100_000_000_000)
-          ~txn_global_slot:(Coda_numbers.Global_slot.of_int 1_900)
+          ~txn_global_slot:(Mina_numbers.Global_slot.of_int 1_900)
       in
       (* we're 900 slots past the cliff, which is 90 vesting periods
           subtract 90 * 100 = 9,000 from init min balance of 10,000 to get 1000
@@ -5957,7 +5957,7 @@ let%test_module "account timing check" =
              ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 101_000_000_000 in
-      let txn_global_slot = Coda_numbers.Global_slot.of_int 1_010 in
+      let txn_global_slot = Mina_numbers.Global_slot.of_int 1_010 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Error err ->

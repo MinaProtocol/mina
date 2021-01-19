@@ -14,9 +14,9 @@ module Make_numeric (Input : sig
 end) : sig
   type t = Input.t
 
-  val serialize : t -> Yojson.Basic.json
+  val serialize : t -> Yojson.Basic.t
 
-  val deserialize : Yojson.Basic.json -> t
+  val deserialize : Yojson.Basic.t -> t
 end = struct
   open Input
 
@@ -54,7 +54,7 @@ end
 module Fee = Make_numeric (Currency.Fee)
 module Amount = Make_numeric (Currency.Amount)
 module Nonce = Make_numeric (Account.Nonce)
-module Length = Make_numeric (Coda_numbers.Length)
+module Length = Make_numeric (Mina_numbers.Length)
 
 module Block_time = Make_numeric (struct
   type t = Block_time.t

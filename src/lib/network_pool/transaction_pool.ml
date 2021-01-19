@@ -339,9 +339,9 @@ struct
           (`Valid_until valid_until, `Current_global_slot current_global_slot)
         ->
           ( "expired"
-          , [ ("valid_until", Coda_numbers.Global_slot.to_yojson valid_until)
+          , [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
             ; ( "current_global_slot"
-              , Coda_numbers.Global_slot.to_yojson current_global_slot ) ] )
+              , Mina_numbers.Global_slot.to_yojson current_global_slot ) ] )
 
     let balance_of_account ~global_slot (account : Account.t) =
       match account.timing with
@@ -791,7 +791,7 @@ struct
 
       let score x = Int.max 1 (List.length x)
 
-      let max_per_second = 2
+      let max_per_15_seconds = 10
 
       let verified_size = List.length
 
@@ -991,10 +991,10 @@ struct
                                 , `Current_global_slot current_global_slot ) ->
                                 ( Expired
                                 , [ ( "valid_until"
-                                    , Coda_numbers.Global_slot.to_yojson
+                                    , Mina_numbers.Global_slot.to_yojson
                                         valid_until )
                                   ; ( "current_global_slot"
-                                    , Coda_numbers.Global_slot.to_yojson
+                                    , Mina_numbers.Global_slot.to_yojson
                                         current_global_slot ) ] )
                           in
                           let yojson_fail_reason =
@@ -1247,7 +1247,7 @@ struct
       else
         [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
               User_command.(
-                Coda_numbers.Account_nonce.compare (nonce_exn tx1)
+                Mina_numbers.Account_nonce.compare (nonce_exn tx1)
                   (nonce_exn tx2)) ) ]
   end
 
@@ -1672,7 +1672,7 @@ let%test_module _ =
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Coda_numbers.Global_slot.(succ (succ (succ curr_slot)))
+            Mina_numbers.Global_slot.(succ (succ (succ curr_slot)))
           in
           let valid_command =
             mk_payment ~valid_until:curr_slot_plus_three 1 1_000_000_000 1 9
@@ -1713,10 +1713,10 @@ let%test_module _ =
           assert_pool_txs [] ;
           let curr_slot = current_global_slot () in
           let curr_slot_plus_three =
-            Coda_numbers.Global_slot.(succ (succ (succ curr_slot)))
+            Mina_numbers.Global_slot.(succ (succ (succ curr_slot)))
           in
           let curr_slot_plus_seven =
-            Coda_numbers.Global_slot.(
+            Mina_numbers.Global_slot.(
               succ (succ (succ (succ curr_slot_plus_three))))
           in
           let few_now, _few_later =
@@ -1878,11 +1878,10 @@ let%test_module _ =
           assert_pool_txs @@ List.drop independent_cmds' 3 ;
           Deferred.unit )
 
-    let%test_unit "transaction replacement works and drops later transactions"
-        =
+    let%test_unit "transaction replacement works" =
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind assert_pool_txs, pool, _best_tip_diff_w, _frontier =
+      let%bind assert_pool_txs, pool, _best_tip_diff_w, frontier =
         setup_test ()
       in
       let set_sender idx (tx : Signed_command.t) =
@@ -1934,7 +1933,25 @@ let%test_module _ =
         ; (* sufficient *)
           mk_payment 2 20_000_000_000 1 4 721_000_000_000
         ; (* insufficient *)
-          mk_payment 3 10_000_000_000 1 4 927_000_000_000 ]
+          (let amount = 927_000_000_000 in
+           let fee =
+             let ledger = Mock_transition_frontier.best_tip frontier in
+             let sender_kp = test_keys.(3) in
+             let sender_pk = Public_key.compress sender_kp.public_key in
+             let sender_aid = Account_id.create sender_pk Token_id.default in
+             let location =
+               Mock_base_ledger.location_of_account ledger sender_aid
+               |> Option.value_exn
+             in
+             (* Spend all of the tokens in the account. Should fail because the
+                command with nonce=0 will already have spent some.
+             *)
+             let account =
+               Mock_base_ledger.get ledger location |> Option.value_exn
+             in
+             Currency.Balance.to_int account.balance - amount
+           in
+           mk_payment 3 fee 1 4 amount) ]
       in
       let%bind apply_res_2 =
         Test.Resource_pool.Diff.unsafe_apply pool

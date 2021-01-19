@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Frontier_base
 module Database = Database
 
@@ -288,7 +288,7 @@ module Instance = struct
              *)
              let transition_receipt_time = None in
              let%bind breadcrumb =
-               Breadcrumb.build ~skip_staged_ledger_verification:true
+               Breadcrumb.build ~skip_staged_ledger_verification:`All
                  ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition

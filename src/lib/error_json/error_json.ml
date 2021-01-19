@@ -49,7 +49,7 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
     | Exn exn ->
         [ ( "exn_name"
           , `String Stdlib.Obj.(extension_name (extension_constructor exn)) )
-        ; ("exn", `String (Stdlib.Printexc.to_string exn)) ]
+        ; ("exn", sexp_to_yojson (Sexplib.Conv.sexp_of_exn exn)) ]
     | Of_list (Some trunc_after, length, json) ->
         [ ("multiple", json)
         ; ("length", `Int length)
@@ -102,7 +102,9 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
 let rec info_internal_repr_to_yojson_aux (info : Info.Internal_repr.t)
     (acc : unit info_repr) : info_data info_repr =
   match info with
-  | Could_not_construct sexp | Sexp sexp ->
+  | Could_not_construct sexp ->
+      {acc with base= Sexp (List [Atom "Could_not_construct"; sexp])}
+  | Sexp sexp ->
       {acc with base= Sexp sexp}
   | String str ->
       {acc with base= String str}
