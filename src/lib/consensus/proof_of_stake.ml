@@ -3919,27 +3919,20 @@ let%test_module "Proof of stake tests" =
 
     let sum_lengths = List.fold ~init:Length.zero ~f:Length.add
 
-    let gen_pair a b =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map xa = a and xb = b in
-      (xa, xb)
-
-    let gen_triple a b c =
-      let open Quickcheck.Generator.Let_syntax in
-      let%map xa = a and xb = b and xc = c in
-      (xa, xb, xc)
-
-    let rec gen_exlusion ls ~gen ~equal =
+    let rec gen_except ~exclude ~gen ~equal =
       let open Quickcheck.Generator.Let_syntax in
       let%bind x = gen in
-      if List.mem ls x ~equal then gen_exlusion ls ~gen ~equal else return x
+      if List.mem exclude x ~equal then gen_except ~exclude ~gen ~equal
+      else return x
 
+    (* This generator is quadratic, but that should be ok since the max amount we generate with it
+     * is 8. *)
     let gen_unique_list amount ~gen ~equal =
       let rec loop n ls =
         let open Quickcheck.Generator.Let_syntax in
         if n <= 0 then return ls
         else
-          let%bind x = gen_exlusion ls ~gen ~equal in
+          let%bind x = gen_except ~exclude:ls ~gen ~equal in
           loop (n - 1) (x :: ls)
       in
       loop amount []
@@ -4032,6 +4025,14 @@ let%test_module "Proof of stake tests" =
 
     let default_slot_fill_rate_delta = 0.15
 
+    (** A root epoch of a block refers the epoch from which we can begin
+     *  simulating information for that block. Because we need to simulate 
+     *  both the staking epoch and the next staking epoch, the root epoch
+     *  is the staking epoch. The root epoch position this function generates
+     *  is the epoch number of the staking epoch and the block height the
+     *  staking epoch starts at (the simulation of all blocks preceeding the
+     *  staking epoch).
+     *)
     let gen_spot_root_epoch_position ~slot_fill_rate ~slot_fill_rate_delta =
       let open Quickcheck.Generator.Let_syntax in
       let%bind root_epoch_int = Core.Int.gen_incl 0 100 in
@@ -4057,11 +4058,14 @@ let%test_module "Proof of stake tests" =
       if compare_blake2 target output < 0 then return output
       else gen_vrf_output_gt target
 
-    (* TODO: consider abstracting positional generation into generic helpers to reduce copy-pasta *)
-
-    (* TODO:
+    (** This generator generates blocks "from thin air" by simulating
+     *  the properties of a chain up to a point in time. This avoids
+     *  the work of computing all prior blocks in order to generate
+     *  a block at some point in the chain, hence why it is coined a
+     *  "spot generator".
+     *
+     * TODO:
      *   - special case genesis
-     *   - checkpoint sharing (modularity?)
      *   - has_ancestor_in_same_checkpoint_window
      * NOTES:
      *   - vrf outputs and ledger hashes are entirely fake
@@ -4174,6 +4178,12 @@ let%test_module "Proof of stake tests" =
       ; coinbase_receiver= staker_pk
       ; supercharge_coinbase= false }
 
+    (** This generator generates pairs of spot blocks that share common checkpoints.
+     *  The overlap of the checkpoints and the root epoch positions of the blocks
+     *  that are generated can be configured independently so that this function
+     *  can be used in other generators that wish to generates pairs of spot blocks
+     *  with specific constraints.
+     *)
     let gen_spot_pair_common_checkpoints ?blockchain_length_relativity
         ?vrf_output_relativity ~a_checkpoints ~b_checkpoints
         ?(gen_a_root_epoch_position = Quickcheck.Generator.return)
@@ -4489,7 +4499,7 @@ let%test_module "Proof of stake tests" =
 
     let%test_unit "selection case: equal states" =
       Quickcheck.test
-        (gen_pair State_hash.gen (gen_spot ()))
+        (Quickcheck.Generator.tuple2 State_hash.gen (gen_spot ()))
         ~f:(fun (hash, state) ->
           let hashed_state = {With_hash.data= state; hash} in
           assert_not_selected (hashed_state, hashed_state) )
@@ -4614,7 +4624,8 @@ let%test_module "Proof of stake tests" =
         else false
       in
       let gen = gen_with_hash (gen_spot ()) in
-      Quickcheck.test (gen_triple gen gen gen)
+      Quickcheck.test
+        (Quickcheck.Generator.tuple3 gen gen gen)
         ~f:
           (assert_hashed_consensus_state_triple
              ~assertion:"chains hold partial order transitivity"
