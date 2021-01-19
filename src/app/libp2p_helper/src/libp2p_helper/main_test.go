@@ -75,7 +75,10 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
-		helper.Host.Close()
+		err := helper.Host.Close()
+		if err != nil {
+			panic(err)
+		}
 	})
 
 	return &app{
@@ -712,6 +715,7 @@ func TestRemoveStreamHandlerMsg(t *testing.T) {
 
 	go func() {
 		seqs <- 1
+		seqs <- 2
 	}()
 
 	_, err = msg.run(appA)

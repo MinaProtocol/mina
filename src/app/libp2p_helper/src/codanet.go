@@ -64,8 +64,6 @@ func parseCIDR(cidr string) gonet.IPNet {
 	return *ipnet
 }
 
-type connectionChangeFunc = func(network.Network, network.Conn)
-
 type CodaConnectionManager struct {
 	p2pManager   *p2pconnmgr.BasicConnMgr
 	OnConnect    func(network.Network, network.Conn)
@@ -139,12 +137,6 @@ func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Con
 // proxy remaining p2pconnmgr.BasicConnMgr methods for access
 func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
 	return cm.p2pManager.GetInfo()
-}
-
-func (cm *CodaConnectionManager) SetOnConnect(f connectionChangeFunc) {
-	logger.Info("SetOnConnect")
-	cm.OnConnect = f
-	logger.Info("SetOnConnect set")
 }
 
 // Helper contains all the daemon state
@@ -237,7 +229,6 @@ func isPrivate(addr ma.Multiaddr) (bool, error) {
 //
 // This is called by the network.Network implementation when dialling a peer.
 func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
-	fmt.Println("InterceptPeerDial", p)
 	allow = !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
 
 	if !allow {
