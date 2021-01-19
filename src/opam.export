@@ -94,7 +94,7 @@ installed: [
   "depext.transition"
   "digestif.0.9.0"
   "dune.2.8.1"
-  "dune-configurator.2.5.1"
+  "dune-configurator.2.8.1"
   "dune-private-libs.2.5.1"
   "easy-format.1.3.1"
   "eqaf.0.2"
