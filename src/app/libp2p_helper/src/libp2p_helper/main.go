@@ -131,6 +131,10 @@ func (w wrappedError) Error() string {
 	return fmt.Sprintf("%s error: %s", w.tag, w.e.Error())
 }
 
+func (w wrappedError) Unwrap() error {
+	return w.e
+}
+
 func wrapError(e error, tag string) error { return wrappedError{e: e, tag: tag} }
 
 func badRPC(e error) error {
@@ -1205,7 +1209,6 @@ type setGatingConfigMsg struct {
 
 func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
 	newFilter := ma.NewFilters()
-	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
 
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
@@ -1228,20 +1231,12 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 	}
 	bannedPeers := peer.NewSet()
 	for _, peerID := range gc.BannedPeerIDs {
-		id, err := peer.Decode(peerID)
-		if err != nil {
-			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
-			continue
-		}
+		id := peer.ID(peerID)
 		bannedPeers.Add(id)
 	}
 	trustedPeers := peer.NewSet()
 	for _, peerID := range gc.TrustedPeerIDs {
-		id, err := peer.Decode(peerID)
-		if err != nil {
-			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
-			continue
-		}
+		id := peer.ID(peerID)
 		trustedPeers.Add(id)
 	}
 
@@ -1254,12 +1249,11 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 	}
 
 	newState, err := gatingConfigFromJson(gc)
-
 	if err != nil {
 		return nil, badRPC(err)
 	}
 
-	*app.P2p.GatingState = *newState
+	app.P2p.GatingState = newState
 
 	return "ok", nil
 }

@@ -31,6 +31,7 @@ import (
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
@@ -51,6 +52,8 @@ var (
 		"198.18.0.0/15",
 		"169.254.0.0/16",
 	}
+
+	privateIPsNet []*gonet.IPNet
 )
 
 func parseCIDR(cidr string) gonet.IPNet {
@@ -204,10 +207,37 @@ func (gs *CodaGatingState) logGate() {
 	gs.logger.Debugf("gated a connection with config: %+v", gs)
 }
 
+func isPrivate(addr ma.Multiaddr) (bool, error) {
+	addrIP, err := manet.ToIP(addr)
+	if err != nil {
+		return false, err
+	}
+
+	if len(privateIPsNet) == 0 {
+		privateIPsNet = make([]*gonet.IPNet, len(privateIPs))
+	}
+
+	for i, cidr := range privateIPs {
+		_, privateIPsNet[i], err = gonet.ParseCIDR(cidr)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	for _, ip := range privateIPsNet {
+		if ip.Contains(addrIP) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // InterceptPeerDial tests whether we're permitted to Dial the specified peer.
 //
 // This is called by the network.Network implementation when dialling a peer.
 func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
+	fmt.Println("InterceptPeerDial", p)
 	allow = !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
 
 	if !allow {
@@ -227,7 +257,13 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 	_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
 
 	// if we want to allow connecting to private IPs, and this addr is a private IP, allow
-	if exists && gs.AddrFilters.AddrBlocked(addr) {
+	isPriv, err := isPrivate(addr)
+	if err != nil {
+		gs.logger.Debugf("multiaddress does not contain IP: %v", addr)
+		return false
+	}
+
+	if exists && gs.AddrFilters.AddrBlocked(addr) && isPriv {
 		return true
 	}
 
