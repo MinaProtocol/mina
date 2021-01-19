@@ -9,7 +9,8 @@ type engine = string * (module Engine_intf)
 
 type engine_with_cli_inputs =
   | Engine_with_cli_inputs :
-      (module Engine_intf with type Cli_inputs.t = 'cli_inputs) * 'cli_inputs
+      (module Engine_intf with type Network_config.Cli_inputs.t = 'cli_inputs)
+      * 'cli_inputs
       -> engine_with_cli_inputs
 
 type inputs = {engine: engine_with_cli_inputs; test: test; coda_image: string}
@@ -23,9 +24,9 @@ let tests : test list =
   ; ("bootstrap", (module Bootstrap_test.Make : Test_functor_intf))
   ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf))
   ; ( "pmt-timed-accts"
-    , (module Payments_timed_accounts.Make : Test_functor_intf) )
+    , (module Payments_timed_accounts_test.Make : Test_functor_intf) )
   ; ( "bp-timed-accts"
-    , (module Block_production_test_timed_accounts.Make : Test_functor_intf) )
+    , (module Block_production_timed_accounts_test.Make : Test_functor_intf) )
   ; ("peers", (module Peers_test.Make : Test_functor_intf)) ]
 
 let report_test_errors error_set
@@ -161,9 +162,13 @@ let main inputs =
       with type network = Engine.Network.t
        and type log_engine = Engine.Log_engine.t )
   in
+  (* TODO:
+   *   let (module Exec) = (module Execute.Make (Engine)) in
+   *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
+   *)
   let logger = Logger.create () in
   let images =
-    { Container_images.coda= inputs.coda_image
+    { Test_config.Container_images.coda= inputs.coda_image
     ; user_agent= "codaprotocol/coda-user-agent:0.1.5"
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
@@ -260,7 +265,7 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     let wrap_cli_inputs cli_inputs =
       Engine_with_cli_inputs ((module Engine), cli_inputs)
     in
-    Term.(const wrap_cli_inputs $ Engine.Cli_inputs.term)
+    Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
     let cons_inputs engine test coda_image = {engine; test; coda_image} in

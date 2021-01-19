@@ -23,8 +23,8 @@ module Make (Engine : Engine_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let node_a = List.nth_exn network.block_producers 0 in
-    let node_b = List.nth_exn network.block_producers 1 in
+    let node_a = List.nth_exn (Network.block_producers network) 0 in
+    let node_b = List.nth_exn (Network.block_producers network) 1 in
     (* TODO: bulk wait for init *)
     let%bind () = Log_engine.wait_for_init node_a log_engine in
     let%bind () = Log_engine.wait_for_init node_b log_engine in

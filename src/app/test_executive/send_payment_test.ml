@@ -3,6 +3,7 @@ open Integration_test_lib
 
 module Make (Engine : Engine_intf) = struct
   open Engine
+  open Network
 
   type network = Network.t
 
@@ -19,16 +20,13 @@ module Make (Engine : Engine_intf) = struct
 
   let run network log_engine =
     let open Malleable_error.Let_syntax in
-    let block_producer = Caml.List.nth network.Network.block_producers 0 in
+    let block_producer = Caml.List.nth (Network.block_producers network) 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
-    let node = Core_kernel.List.nth_exn network.block_producers 0 in
+    let node = Core_kernel.List.nth_exn (Network.block_producers network) 0 in
     let logger = Logger.create () in
     (* wait for initialization *)
     let%bind () = Log_engine.wait_for_init node log_engine in
     [%log info] "send_payment_test: done waiting for initialization" ;
-    let graphql_port = block_producer.node_graphql_port in
-    Async_kernel.Deferred.don't_wait_for
-      (Node.set_port_forwarding_exn ~logger block_producer graphql_port) ;
     (* same keypairs used by Coda_automation to populate the ledger *)
     let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs in
     (* send the payment *)

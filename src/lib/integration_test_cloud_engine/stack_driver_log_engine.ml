@@ -30,6 +30,39 @@ let or_error_list_map ls ~f =
       let%map h = f el in
       h :: t )
 
+let log_filter_of_event_type =
+  let open Event_type in
+  function
+  | Event_type Log_error ->
+      [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
+         \"Fatal\")" ]
+  | Event_type t ->
+      let event_id =
+        to_structured_event_id (Event_type t)
+        |> Option.value_exn
+             ~message:
+               "could not convert event type into log filter; no structured \
+                event id configured"
+      in
+      let filter =
+        Printf.sprintf "jsonPayload.event_id=\"%s\""
+          (Structured_log_events.string_of_id event_id)
+      in
+      [filter]
+
+let all_event_types_log_filter =
+  let event_filters =
+    List.map Event_type.all_event_types ~f:log_filter_of_event_type
+  in
+  let nest s = "(" ^ s ^ ")" in
+  let disjunction =
+    event_filters
+    |> List.map ~f:(fun filter ->
+           nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND ") )
+    |> String.concat ~sep:" OR "
+  in
+  [disjunction]
+
 module Subscription = struct
   type t = {name: string; topic: string; sink: string}
 
@@ -190,472 +223,12 @@ module Subscription = struct
         Deferred.Or_error.errorf "Invalid subscription pull result: %s" result
 end
 
-module Json_parsing = struct
-  open Yojson.Safe.Util
-
-  type 'a parser = Yojson.Safe.t -> 'a
-
-  let json : Yojson.Safe.t parser = Fn.id
-
-  let bool : bool parser = to_bool
-
-  let string : string parser = to_string
-
-  let int : int parser =
-   fun x -> try to_int x with Type_error _ -> int_of_string (to_string x)
-
-  let float : float parser =
-   fun x -> try to_float x with Type_error _ -> float_of_string (to_string x)
-
-  let list : 'a parser -> 'a list parser = fun f x -> List.map ~f (to_list x)
-
-  let state_hash : State_hash.t parser =
-    Fn.compose Result.ok_or_failwith State_hash.of_yojson
-
-  let parse (parser : 'a parser) (json : Yojson.Safe.t) : 'a Or_error.t =
-    try Ok (parser json)
-    with exn ->
-      Or_error.errorf "failed to parse json value: %s" (Exn.to_string exn)
-
-  let parser_from_of_yojson of_yojson js =
-    match of_yojson js with
-    | Ok cmd ->
-        cmd
-    | Error modl ->
-        let logger = Logger.create () in
-        [%log error] "Could not parse JSON using of_yojson"
-          ~metadata:[("module", `String modl); ("json", js)] ;
-        failwithf "Could not parse JSON using %s.of_yojson" modl ()
-
-  let valid_commands_with_statuses :
-      Mina_base.User_command.Valid.t Mina_base.With_status.t list parser =
-    function
-    | `List cmds ->
-        let cmd_or_errors =
-          List.map cmds
-            ~f:
-              (Mina_base.With_status.of_yojson
-                 Mina_base.User_command.Valid.of_yojson)
-        in
-        List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
-            match (accum, cmd_or_err) with
-            | _, Error err ->
-                let logger = Logger.create () in
-                [%log error]
-                  ~metadata:[("error", `String err)]
-                  "Failed to parse JSON for user command status" ;
-                (* fail on any error *)
-                failwith
-                  "valid_commands_with_statuses: unable to parse JSON for \
-                   user command"
-            | cmds, Ok cmd ->
-                cmd :: cmds )
-    | _ ->
-        failwith "valid_commands_with_statuses: expected `List"
-
-  let rec find (parser : 'a parser) (json : Yojson.Safe.t) (path : string list)
-      : 'a Or_error.t =
-    let open Or_error.Let_syntax in
-    match (path, json) with
-    | [], _ ->
-        parse parser json
-    | key :: path', `Assoc assoc ->
-        let%bind entry =
-          match List.Assoc.find assoc key ~equal:String.equal with
-          | Some entry ->
-              Ok entry
-          | None ->
-              Or_error.errorf
-                "failed to find path using key '%s' in json object { %s }" key
-                (String.concat ~sep:", "
-                   (List.map assoc ~f:(fun (s, json) ->
-                        sprintf "\"%s\":%s" s (Yojson.Safe.to_string json) )))
-        in
-        find parser entry path'
-    | _ ->
-        Or_error.error_string "expected json object when searching for path"
-end
-
-module Event_type = struct
-  module type Event_type_intf = sig
-    type t [@@deriving to_yojson]
-
-    val name : string
-
-    val structured_event_id : Structured_log_events.id option
-
-    val parse : Yojson.Safe.t -> t Or_error.t
-  end
-
-  module Log_error = struct
-    let name = "Log_error"
-
-    let structured_event_id = None
-
-    type t = {pod_id: string; message: Logger.Message.t} [@@deriving to_yojson]
-
-    let parse log =
-      let open Json_parsing in
-      let open Or_error.Let_syntax in
-      let%bind pod_id = find string log ["labels"; "k8s-pod/app"] in
-      let%bind payload = find json log ["jsonPayload"] in
-      let%map message =
-        parse (parser_from_of_yojson Logger.Message.of_yojson) payload
-      in
-      {pod_id; message}
-  end
-
-  module Node_initialization = struct
-    let name = "Node_initialization"
-
-    let structured_event_id =
-      Some
-        Transition_router
-        .starting_transition_frontier_controller_structured_events_id
-
-    type t = {pod_id: string} [@@deriving to_yojson]
-
-    let parse log =
-      let open Json_parsing in
-      let open Or_error.Let_syntax in
-      let%map pod_id = find string log ["labels"; "k8s-pod/app"] in
-      {pod_id}
-  end
-
-  module Breadcrumb_added = struct
-    let name = "Breadcrumb_added"
-
-    let structured_event_id =
-      Some
-        Transition_frontier.added_breadcrumb_user_commands_structured_events_id
-
-    type t = {user_commands: User_command.Valid.t With_status.t list}
-    [@@deriving to_yojson]
-
-    let parse log =
-      let open Json_parsing in
-      let open Or_error.Let_syntax in
-      let path = ["jsonPayload"; "metadata"; "user_commands"] in
-      let%map user_commands = find valid_commands_with_statuses log path in
-      {user_commands}
-  end
-
-  module Transition_frontier_diff_application = struct
-    let name = "Transition_frontier_diff_application"
-
-    let structured_event_id =
-      Some Transition_frontier.applying_diffs_structured_events_id
-
-    type root_transitioned =
-      {new_root: State_hash.t; garbage: State_hash.t list}
-    [@@deriving to_yojson]
-
-    type t =
-      { pod_id: string
-      ; new_node: State_hash.t option
-      ; best_tip_changed: State_hash.t option
-      ; root_transitioned: root_transitioned option }
-    [@@deriving lens, to_yojson]
-
-    let empty pod_id =
-      {pod_id; new_node= None; best_tip_changed= None; root_transitioned= None}
-
-    let register (lens : (t, 'a option) Lens.t) (result : t) (x : 'a) :
-        t Or_error.t =
-      match lens.get result with
-      | Some _ ->
-          Or_error.error_string
-            "same transition frontier diff type unexpectedly encountered \
-             twice in single application"
-      | None ->
-          Ok (lens.set (Some x) result)
-
-    let parse log =
-      let open Json_parsing in
-      let open Or_error.Let_syntax in
-      let%bind pod_id = find string log ["labels"; "k8s-pod/app"] in
-      let%bind diffs =
-        find (list json) log ["jsonPayload"; "metadata"; "diffs"]
-      in
-      or_error_list_fold diffs ~init:(empty pod_id) ~f:(fun res diff ->
-          match Yojson.Safe.Util.keys diff with
-          | [name] -> (
-              let%bind value = find json diff [name] in
-              match name with
-              | "New_node" ->
-                  let%bind state_hash = parse state_hash value in
-                  register new_node res state_hash
-              | "Best_tip_changed" ->
-                  let%bind state_hash = parse state_hash value in
-                  register best_tip_changed res state_hash
-              | "Root_transitioned" ->
-                  let%bind new_root = find state_hash value ["new_root"] in
-                  let%bind garbage =
-                    find (list state_hash) value ["garbage"]
-                  in
-                  let data = {new_root; garbage} in
-                  register root_transitioned res data
-              | _ ->
-                  Or_error.error_string
-                    "unexpected transition frontier diff name" )
-          | _ ->
-              Or_error.error_string
-                "unexpected transition frontier diff format" )
-  end
-
-  module Block_produced = struct
-    let name = "Block_produced"
-
-    let structured_event_id =
-      Some Block_producer.block_produced_structured_events_id
-
-    type t =
-      { block_height: int
-      ; epoch: int
-      ; global_slot: int
-      ; snarked_ledger_generated: bool }
-    [@@deriving to_yojson]
-
-    let empty =
-      { block_height= 0
-      ; epoch= 0
-      ; global_slot= 0
-      ; snarked_ledger_generated= false }
-
-    (* Aggregated values for determining timeout conditions. Note: Slots passed and epochs passed are only determined if we produce a block. Add a log for these events to calculate these independently? *)
-    type aggregated =
-      { last_seen_result: t
-      ; blocks_generated: int
-      ; snarked_ledgers_generated: int }
-    [@@deriving to_yojson]
-
-    let empty_aggregated =
-      { last_seen_result= empty
-      ; blocks_generated= 0
-      ; snarked_ledgers_generated= 0 }
-
-    let init_aggregated (result : t) =
-      { last_seen_result= result
-      ; blocks_generated= 1
-      ; snarked_ledgers_generated=
-          (if result.snarked_ledger_generated then 1 else 0) }
-
-    (*Todo: Reorg will mess up the value of snarked_ledgers_generated*)
-    let aggregate (aggregated : aggregated) (result : t) : aggregated =
-      if result.block_height > aggregated.last_seen_result.block_height then
-        { last_seen_result= result
-        ; blocks_generated= aggregated.blocks_generated + 1
-        ; snarked_ledgers_generated=
-            ( if result.snarked_ledger_generated then
-              aggregated.snarked_ledgers_generated + 1
-            else aggregated.snarked_ledgers_generated ) }
-      else aggregated
-
-    (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
-    let parse log =
-      let open Json_parsing in
-      let open Or_error.Let_syntax in
-      let breadcrumb = ["jsonPayload"; "metadata"; "breadcrumb"] in
-      let breadcrumb_consensus_state =
-        breadcrumb
-        @ [ "validated_transition"
-          ; "data"
-          ; "protocol_state"
-          ; "body"
-          ; "consensus_state" ]
-      in
-      let%bind snarked_ledger_generated =
-        find bool log (breadcrumb @ ["just_emitted_a_proof"])
-      in
-      let%bind block_height =
-        find int log (breadcrumb_consensus_state @ ["blockchain_length"])
-      in
-      let%bind global_slot =
-        find int log
-          (breadcrumb_consensus_state @ ["curr_global_slot"; "slot_number"])
-      in
-      let%map epoch =
-        find int log (breadcrumb_consensus_state @ ["epoch_count"])
-      in
-      {block_height; global_slot; epoch; snarked_ledger_generated}
-  end
-
-  type 'a t =
-    | Log_error : Log_error.t t
-    | Node_initialization : Node_initialization.t t
-    | Transition_frontier_diff_application
-        : Transition_frontier_diff_application.t t
-    | Block_produced : Block_produced.t t
-    | Breadcrumb_added : Breadcrumb_added.t t
-
-  type existential = Event_type : 'a t -> existential
-
-  let existential_to_string = function
-    | Event_type Log_error ->
-        "Log_error"
-    | Event_type Node_initialization ->
-        "Node_initialization"
-    | Event_type Transition_frontier_diff_application ->
-        "Transition_frontier_diff_application"
-    | Event_type Block_produced ->
-        "Block_produced"
-    | Event_type Breadcrumb_added ->
-        "Breadcrumb_added"
-
-  let existential_of_string = function
-    | "Log_error" ->
-        Event_type Log_error
-    | "Node_initialization" ->
-        Event_type Node_initialization
-    | "Transition_frontier_diff_application" ->
-        Event_type Transition_frontier_diff_application
-    | "Block_produced" ->
-        Event_type Block_produced
-    | "Breadcrumb_added" ->
-        Event_type Breadcrumb_added
-    | _ ->
-        failwith "invalid event type string"
-
-  let existential_to_yojson t = `String (existential_to_string t)
-
-  let existential_of_sexp = function
-    | Sexp.Atom string ->
-        existential_of_string string
-    | _ ->
-        failwith "invalid sexp"
-
-  let sexp_of_existential t = Sexp.Atom (existential_to_string t)
-
-  module Existentially_comparable = Comparable.Make (struct
-    type t = existential [@@deriving sexp]
-
-    (* polymorphic compare should be safe to use here as the variants in ['a t] are shallow *)
-    let compare = Pervasives.compare
-  end)
-
-  module Map = Existentially_comparable.Map
-
-  type event = Event : 'a t * 'a -> event
-
-  let type_of_event (Event (t, _)) = Event_type t
-
-  (* needs to contain each type in event_types *)
-  let all_event_types =
-    [ Event_type Log_error
-    ; Event_type Node_initialization
-    ; Event_type Transition_frontier_diff_application
-    ; Event_type Block_produced
-    ; Event_type Breadcrumb_added ]
-
-  let event_type_module : type a.
-      a t -> (module Event_type_intf with type t = a) = function
-    | Log_error ->
-        (module Log_error)
-    | Node_initialization ->
-        (module Node_initialization)
-    | Transition_frontier_diff_application ->
-        (module Transition_frontier_diff_application)
-    | Block_produced ->
-        (module Block_produced)
-    | Breadcrumb_added ->
-        (module Breadcrumb_added)
-
-  let event_to_yojson event =
-    let (Event (t, d)) = event in
-    let (module Type) = event_type_module t in
-    Type.to_yojson d
-
-  let to_structured_event_id event_type =
-    let (Event_type t) = event_type in
-    let (module Type) = event_type_module t in
-    Type.structured_event_id
-
-  let of_structured_event_id =
-    let open Option.Let_syntax in
-    let table =
-      all_event_types
-      |> List.filter_map ~f:(fun t ->
-             let%map event_id = to_structured_event_id t in
-             (Structured_log_events.string_of_id event_id, t) )
-      |> String.Table.of_alist_exn
-    in
-    String.Table.find table
-
-  let log_filter_of_event_type = function
-    | Event_type Log_error ->
-        [ "jsonPayload.level=(\"Warn\" OR \"Error\" OR \"Faulty_peer\" OR \
-           \"Fatal\")" ]
-    | Event_type t ->
-        let event_id =
-          to_structured_event_id (Event_type t)
-          |> Option.value_exn
-               ~message:
-                 "could not convert event type into log filter; no structured \
-                  event id configured"
-        in
-        let filter =
-          Printf.sprintf "jsonPayload.event_id=\"%s\""
-            (Structured_log_events.string_of_id event_id)
-        in
-        [filter]
-
-  let all_event_types_log_filter =
-    let event_filters = List.map all_event_types ~f:log_filter_of_event_type in
-    let nest s = "(" ^ s ^ ")" in
-    let disjunction =
-      event_filters
-      |> List.map ~f:(fun filter ->
-             nest (filter |> List.map ~f:nest |> String.concat ~sep:" AND ") )
-      |> String.concat ~sep:" OR "
-    in
-    [disjunction]
-
-  let parse_event (log : Yojson.Safe.t) : event Or_error.t =
-    let open Json_parsing in
-    let open Or_error.Let_syntax in
-    match find string log ["jsonPayload"; "insertId"] with
-    | Ok insert_id ->
-        let (Event_type event_type) =
-          of_structured_event_id insert_id
-          |> Option.value_exn
-               ~message:
-                 "could not convert incoming event log into event type; no \
-                  matching structured event id"
-        in
-        let (module Type) = event_type_module event_type in
-        let%map data = Type.parse log in
-        Event (event_type, data)
-    | Error _ ->
-        (* TODO: check log level to ensure it matches error log level *)
-        let%map data = Log_error.parse log in
-        Event (Log_error, data)
-
-  let dispatch : type a b c. a t -> a -> b t -> (b -> c) -> c =
-   fun t1 e t2 h ->
-    let error () = failwith "TODO: better error message :)" in
-    match (t1, t2) with
-    | Log_error, Log_error ->
-        h e
-    | Node_initialization, Node_initialization ->
-        h e
-    | ( Transition_frontier_diff_application
-      , Transition_frontier_diff_application ) ->
-        h e
-    | Block_produced, Block_produced ->
-        h e
-    | Breadcrumb_added, Breadcrumb_added ->
-        h e
-    | _ ->
-        error ()
-
-  (* TODO: tests on sexp and dispatch (etc) against all_event_types *)
-end
-
 (* TODO: think about buffering & temporal caching vs. network state subscriptions *)
 module Event_router = struct
   module Event_handler_id = Unique_id.Int ()
 
-  type ('a, 'b) handler_func = 'a -> [`Stop of 'b | `Continue] Deferred.t
+  type ('a, 'b) handler_func =
+    Kubernetes_network.Node.t -> 'a -> [`Stop of 'b | `Continue] Deferred.t
 
   type event_handler =
     | Event_handler :
@@ -664,8 +237,6 @@ module Event_router = struct
         * 'a Event_type.t
         * ('a, 'b) handler_func
         -> event_handler
-
-  let event_handler_id (Event_handler (id, _, _, _)) = id
 
   (* event subscriptions surface information from the handler (as type witnesses), but do not existentially hide the result parameter *)
   type _ event_subscription =
@@ -690,7 +261,7 @@ module Event_router = struct
           |> List.filter ~f:(fun (Event_handler (registered_id, _, _, _)) ->
                  List.mem ids registered_id ~equal:Event_handler_id.equal ) )
 
-  let dispatch_event handlers event =
+  let dispatch_event handlers node event =
     let open Event_type in
     let open Deferred.Let_syntax in
     let event_handlers =
@@ -709,7 +280,8 @@ module Event_router = struct
             handler
           in
           match%map
-            dispatch event_type event_data handler_type handler_callback
+            dispatch_exn event_type event_data handler_type
+              (handler_callback node)
           with
           | `Continue ->
               None
@@ -721,48 +293,76 @@ module Event_router = struct
       (Event_type.type_of_event event)
       ids_to_remove
 
-  let rec pull_subscription_in_background ~logger ~subscription ~handlers =
+  let rec pull_subscription_in_background ~logger ~network ~subscription
+      ~handlers =
     let open Interruptible in
     let open Interruptible.Let_syntax in
+    let module Or_error = Core.Or_error in
     [%log debug] "Pulling StackDriver subscription" ;
     (* TODO: improved error reporting *)
-    let%bind logs =
+    let%bind log_entries =
       uninterruptible
-        (Deferred.map ~f:Core.Or_error.ok_exn (Subscription.pull subscription))
+        (Deferred.map ~f:Or_error.ok_exn (Subscription.pull subscription))
     in
     [%log debug] "Parsing events from logs" ;
-    let%bind events =
+    let%bind events_with_nodes =
       return
-        (Core.Or_error.ok_exn
-           (or_error_list_map logs ~f:Event_type.parse_event))
+        (Or_error.ok_exn
+           (or_error_list_map log_entries ~f:(fun log_entry ->
+                let open Or_error.Let_syntax in
+                let open Json_parsing in
+                let%bind app_id =
+                  find string log_entry ["labels"; "k8s-pod/app"]
+                in
+                let%bind node =
+                  Kubernetes_network.lookup_node_by_app_id network app_id
+                  |> Option.value_map ~f:Or_error.return
+                       ~default:
+                         (Or_error.errorf
+                            "failed to find node by pod app id \"%s\"" app_id)
+                in
+                let%bind log =
+                  parse
+                    (parser_from_of_yojson Logger.Message.of_yojson)
+                    log_entry
+                in
+                let%map event = Event_type.parse_event log in
+                (event, node) )))
     in
     [%log debug] "Processing subscription events"
       ~metadata:
-        [("events", `List (List.map events ~f:Event_type.event_to_yojson))] ;
+        [ ( "events"
+          , `List
+              (List.map events_with_nodes ~f:(fun (event, _) ->
+                   Event_type.event_to_yojson event )) ) ] ;
     let%bind () =
-      uninterruptible (Deferred.List.iter events ~f:(dispatch_event handlers))
+      uninterruptible
+        (Deferred.List.iter events_with_nodes ~f:(fun (event, node) ->
+             dispatch_event handlers node event ))
     in
     let%bind () = uninterruptible (after (Time.Span.of_ms 10000.0)) in
     (* this extra bind point allows the interruptible monad to interrupt after the timeout *)
     let%bind () = return () in
-    pull_subscription_in_background ~logger ~subscription ~handlers
+    pull_subscription_in_background ~logger ~network ~subscription ~handlers
 
-  let start_background_job ~logger ~subscription ~handlers ~cancel_ivar =
+  let start_background_job ~logger ~network ~subscription ~handlers
+      ~cancel_ivar =
     let job =
       let open Interruptible.Let_syntax in
       let%bind () = Interruptible.lift Deferred.unit (Ivar.read cancel_ivar) in
-      pull_subscription_in_background ~logger ~subscription ~handlers
+      pull_subscription_in_background ~logger ~network ~subscription ~handlers
     in
     let finished_ivar = Ivar.create () in
     Interruptible.don't_wait_for
       (Interruptible.finally job ~f:(fun () -> Ivar.fill finished_ivar ())) ;
     Ivar.read finished_ivar
 
-  let create ~logger ~subscription =
+  let create ~logger ~network ~subscription =
     let cancel_ivar = Ivar.create () in
     let handlers = ref Event_type.Map.empty in
     let background_job =
-      start_background_job ~logger ~subscription ~handlers ~cancel_ivar
+      start_background_job ~logger ~network ~subscription ~handlers
+        ~cancel_ivar
     in
     {logger; subscription; handlers; cancel_ivar; background_job}
 
@@ -803,11 +403,13 @@ module Event_router = struct
         timeout_cancellation
 end
 
+type log_error = Kubernetes_network.Node.t * Event_type.Log_error.t
+
 type errors =
-  { warn: Event_type.Log_error.t DynArray.t
-  ; error: Event_type.Log_error.t DynArray.t
-  ; faulty_peer: Event_type.Log_error.t DynArray.t
-  ; fatal: Event_type.Log_error.t DynArray.t }
+  { warn: log_error DynArray.t
+  ; error: log_error DynArray.t
+  ; faulty_peer: log_error DynArray.t
+  ; fatal: log_error DynArray.t }
 
 let empty_errors () =
   { warn= DynArray.create ()
@@ -832,10 +434,10 @@ type t =
 let watch_log_errors ~logger ~event_router ~on_fatal_error =
   let error_accumulator = empty_errors () in
   ignore
-    (Event_router.on event_router Event_type.Log_error ~f:(fun log_error ->
-         let open Event_type.Log_error in
+    (Event_router.on event_router Event_type.Log_error ~f:(fun node message ->
+         let open Logger.Message in
          let acc =
-           match log_error.message.level with
+           match message.level with
            | Warn ->
                error_accumulator.warn
            | Error ->
@@ -847,11 +449,11 @@ let watch_log_errors ~logger ~event_router ~on_fatal_error =
            | _ ->
                failwith "unexpected log level encountered"
          in
-         DynArray.add acc log_error ;
-         if log_error.message.level = Fatal then (
+         DynArray.add acc (node, message) ;
+         if message.level = Fatal then (
            [%log fatal] "Error occured $error"
-             ~metadata:[("error", Logger.Message.to_yojson log_error.message)] ;
-           on_fatal_error log_error.message ) ;
+             ~metadata:[("error", Logger.Message.to_yojson message)] ;
+           on_fatal_error message ) ;
          Deferred.return `Continue )) ;
   error_accumulator
 
@@ -866,13 +468,12 @@ let watch_node_initializations ~logger ~event_router ~network =
   in
   ignore
     (Event_router.on event_router Event_type.Node_initialization
-       ~f:(fun node_init ->
-         let open Event_type.Node_initialization in
+       ~f:(fun node () ->
          let ivar =
-           match String.Map.find initialization_table node_init.pod_id with
+           match String.Map.find initialization_table node.pod_id with
            | None ->
                failwithf "Node not found in initialization table: %s"
-                 node_init.pod_id ()
+                 node.pod_id ()
            | Some ivar ->
                ivar
          in
@@ -892,7 +493,7 @@ let watch_best_tips ~event_router =
   ignore
     (Event_router.on event_router
        Event_type.Transition_frontier_diff_application
-       ~f:(fun diff_application ->
+       ~f:(fun node diff_application ->
          Option.value_map diff_application.best_tip_changed
            ~default:(return `Continue)
            ~f:(fun new_best_tip ->
@@ -900,8 +501,7 @@ let watch_best_tips ~event_router =
                Broadcast_pipe.Reader.peek best_tip_map_reader
              in
              let best_tip_map' =
-               String.Map.set best_tip_map ~key:diff_application.pod_id
-                 ~data:new_best_tip
+               String.Map.set best_tip_map ~key:node.pod_id ~data:new_best_tip
              in
              let%map () =
                Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map'
@@ -916,7 +516,7 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
       let coda_container_filter = "resource.labels.container_name=\"coda\"" in
       let filters =
         [network.testnet_log_filter; coda_container_filter]
-        @ Event_type.all_event_types_log_filter
+        @ all_event_types_log_filter
       in
       String.concat filters ~sep:"\n"
     in
@@ -925,7 +525,7 @@ let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
         ~filter:log_filter
     in
     [%log info] "Event subscription created" ;
-    let event_router = Event_router.create ~logger ~subscription in
+    let event_router = Event_router.create ~logger ~network ~subscription in
     let error_accumulator =
       watch_log_errors ~logger ~event_router ~on_fatal_error
     in
@@ -971,8 +571,10 @@ let destroy t : Test_error.Set.t Malleable_error.t =
   [%log debug] "subscription deleted" ;
   let lift error_array =
     DynArray.to_list error_array
-    |> List.map ~f:(fun {Event_type.Log_error.pod_id; message} ->
-           Test_error.Remote_error {node_id= pod_id; error_message= message} )
+    |> List.map ~f:(fun (node, message) ->
+           let open Kubernetes_network.Node in
+           Test_error.Remote_error
+             {node_id= node.pod_id; error_message= message} )
   in
   let soft_errors =
     lift error_accumulator.warn @ lift error_accumulator.faulty_peer
@@ -1070,7 +672,7 @@ let wait_for' :
     in
     (* TODO: Event_router.on_fold to thread state through handlers without refs *)
     let aggregated_ref = ref Event_type.Block_produced.empty_aggregated in
-    let handle_block_produced block_produced =
+    let handle_block_produced _node block_produced =
       let aggregated =
         Event_type.Block_produced.aggregate !aggregated_ref block_produced
       in
@@ -1165,7 +767,7 @@ let wait_for_payment ?(timeout_duration = Time.Span.of_ms 900.0) t ~logger
     ~sender ~receiver ~amount () : unit Malleable_error.t =
   let open Signature_lib in
   let open Event_type.Breadcrumb_added in
-  let handle_breadcrumb_added breadcrumb_added =
+  let handle_breadcrumb_added _node breadcrumb_added =
     let payment_opt =
       List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
           cmd_with_status.With_status.data |> User_command.forget_check

@@ -51,19 +51,16 @@ module Make (Engine : Engine_intf) = struct
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer1 = List.nth_exn network.Network.block_producers 0 in
-    let block_producer2 = List.nth_exn network.Network.block_producers 1 in
+    let block_producer1 = List.nth_exn (Network.block_producers network) 0 in
+    let block_producer2 = List.nth_exn (Network.block_producers network) 1 in
     [%log info] "Waiting for block producer 1 (of 2) to initialize" ;
     let%bind () = Log_engine.wait_for_init block_producer1 log_engine in
     [%log info] "Block producer 1 (of 2) initialized" ;
     [%log info] "Waiting for block producer 2 (of 2) to initialize" ;
     let%bind () = Log_engine.wait_for_init block_producer2 log_engine in
     [%log info] "Block producer 2 (of 2) initialized" ;
-    let graphql_port = block_producer2.node_graphql_port in
-    Async_kernel.Deferred.don't_wait_for
-      (Node.set_port_forwarding_exn ~logger block_producer2 graphql_port) ;
-    let sender = pk_of_keypair network.keypairs 1 in
-    let receiver = pk_of_keypair network.keypairs 0 in
+    let sender = pk_of_keypair (Network.keypairs network) 1 in
+    let receiver = pk_of_keypair (Network.keypairs network) 0 in
     let fee = Currency.Fee.of_int 10_000_000 in
     [%log info] "Sending payment, should succeed" ;
     let amount = Currency.Amount.of_int 300_000_000_000 in

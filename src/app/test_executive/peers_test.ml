@@ -49,12 +49,11 @@ module Make (Engine : Engine_intf) = struct
     let wait_for_init_partial node =
       Log_engine.wait_for_init node log_engine
     in
+    let peer_list = Network.block_producers network in
     let%bind () =
-      Malleable_error.List.iter network.block_producers
-        ~f:wait_for_init_partial
+      Malleable_error.List.iter peer_list ~f:wait_for_init_partial
     in
     [%log info] "mina_peers_test: done waiting for initialization" ;
-    let peer_list = network.block_producers in
     (* [%log info] "peers_list"
       ~metadata:
       [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ; *)

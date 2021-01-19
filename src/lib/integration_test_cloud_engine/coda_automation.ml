@@ -7,6 +7,8 @@ open Integration_test_lib
 open Unix
 
 module Network_config = struct
+  module Cli_inputs = Cli_inputs
+
   type block_producer_config =
     { name: string
     ; class_: string [@key "class"]
@@ -67,7 +69,8 @@ module Network_config = struct
     assoc
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
-      ~(test_config : Test_config.t) ~(images : Container_images.t) =
+      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
+      =
     let { Test_config.k
         ; delta
         ; slots_per_epoch
@@ -299,8 +302,9 @@ module Network_manager = struct
     ; testnet_log_filter: string
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
-    ; block_producer_pod_names: Kubernetes_network.Node.t list
-    ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
+    ; block_producer_nodes: Kubernetes_network.Node.t list
+    ; snark_coordinator_nodes: Kubernetes_network.Node.t list
+    ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
@@ -370,12 +374,18 @@ module Network_manager = struct
       ; Kubernetes_network.Node.node_graphql_port= port }
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1" 3085] in
-    let block_producer_pod_names =
+    let snark_coordinator_nodes = [cons_node "snark-coordinator-1" 3085] in
+    let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
           cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
       )
+    in
+    let nodes_by_app_id =
+      let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
+      all_nodes
+      |> List.map ~f:(fun node -> (node.pod_id, node))
+      |> String.Map.of_alist_exn
     in
     let t =
       { logger
@@ -386,8 +396,9 @@ module Network_manager = struct
       ; constraint_constants= network_config.constraint_constants
       ; genesis_constants= network_config.genesis_constants
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
-      ; block_producer_pod_names
-      ; snark_coordinator_pod_names
+      ; block_producer_nodes
+      ; snark_coordinator_nodes
+      ; nodes_by_app_id
       ; deployed= false
       ; keypairs= List.unzip network_config.keypairs |> snd }
     in
@@ -417,8 +428,9 @@ module Network_manager = struct
     { Kubernetes_network.namespace= t.namespace
     ; constraint_constants= t.constraint_constants
     ; genesis_constants= t.genesis_constants
-    ; block_producers= t.block_producer_pod_names
-    ; snark_coordinators= t.snark_coordinator_pod_names
+    ; block_producers= t.block_producer_nodes
+    ; snark_coordinators= t.snark_coordinator_nodes
+    ; nodes_by_app_id= t.nodes_by_app_id
     ; archive_nodes= []
     ; testnet_log_filter= t.testnet_log_filter
     ; keypairs= t.keypairs }

@@ -56,7 +56,7 @@ module Make (Engine : Engine_intf) = struct
   let run network log_engine =
     let open Network in
     let open Malleable_error.Let_syntax in
-    let block_producer = List.nth_exn network.Network.block_producers 0 in
+    let block_producer = List.nth_exn (Network.block_producers network) 0 in
     let%bind () = Log_engine.wait_for_init block_producer log_engine in
     let%bind ( `Blocks_produced blocks_produced
              , `Slots_passed slots
@@ -70,10 +70,10 @@ module Make (Engine : Engine_intf) = struct
       expected_balance blocks_produced ~slots
         (Currency.Balance.of_formatted_string block_producer_balance)
         ~slots_with_locked_tokens:7
-        ~constraint_constants:network.constraint_constants
+        ~constraint_constants:(Network.constraint_constants network)
     in
     let pk =
-      (List.hd_exn network.keypairs).public_key
+      (List.hd_exn @@ Network.keypairs network).public_key
       |> Signature_lib.Public_key.compress
     in
     let%map balance =
