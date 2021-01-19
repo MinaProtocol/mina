@@ -322,6 +322,8 @@ module type S = sig
           val close : t -> unit
 
           val merkle_root : t -> Mina_base.Ledger_hash.t
+
+          val ledger_mask : t -> Mina_base.Ledger.t
         end
       end
 
@@ -525,6 +527,8 @@ module type S = sig
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
+
+      val epoch_count : Value.t -> Length.t
 
       val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 

@@ -43,7 +43,7 @@ module Get_ledger = struct
 end
 
 module Get_staking_ledger = struct
-  type query = Current | Next [@@deriving bin_io_unversioned]
+  type query = Current | Next of bool [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]

@@ -109,7 +109,9 @@ type t =
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref }
+  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref
+  ; next_epoch_ledger_for_cli:
+      (Mina_base.Frozen_ledger_hash.t * Ledger.t) option ref }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -747,9 +749,91 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
+  |> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.ledger_mask
 
-let next_epoch_ledger t =
-  Consensus.Data.Local_state.next_epoch_ledger t.config.consensus_local_state
+let next_epoch_ledger t ~unfinalized =
+  let open Option.Let_syntax in
+  let%bind frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let root = Transition_frontier.root frontier in
+  let root_hash = Transition_frontier.Breadcrumb.state_hash root in
+  let root_epoch =
+    Transition_frontier.Breadcrumb.consensus_state root
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  let best_tip = Transition_frontier.best_tip frontier in
+  let best_tip_epoch =
+    Transition_frontier.Breadcrumb.consensus_state best_tip
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  if Mina_numbers.Length.equal root_epoch best_tip_epoch then (
+    t.next_epoch_ledger_for_cli := None ;
+    Some
+      ( Consensus.Data.Local_state.next_epoch_ledger
+          t.config.consensus_local_state
+      |> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.ledger_mask ) )
+  else if Mina_numbers.Length.(equal (succ root_epoch) best_tip_epoch) then
+    (*No blocks in the new epoch is finalized yet, return the unfinalized epoch ledger*)
+    let get_epoch_ledger () =
+      let chain = Sync_handler.best_tip_path ~frontier in
+      let root_snarked_ledger_mask =
+        Ledger.of_database (Transition_frontier.root_snarked_ledger frontier)
+      in
+      List.iter chain ~f:(fun state_hash ->
+          if not (State_hash.equal state_hash root_hash) then
+            let breadcrumb =
+              Transition_frontier.find_exn frontier state_hash
+            in
+            let epoch =
+              Transition_frontier.Breadcrumb.consensus_state breadcrumb
+              |> Consensus.Data.Consensus_state.epoch_count
+            in
+            if
+              Mina_numbers.Length.equal epoch root_epoch
+              && Transition_frontier.Breadcrumb.just_emitted_a_proof breadcrumb
+            then
+              Non_empty_list.iter
+                (Option.value_exn
+                   (Staged_ledger.proof_txns_with_state_hashes
+                      (Transition_frontier.Breadcrumb.staged_ledger breadcrumb)))
+                ~f:(fun (txn, state_hash) ->
+                  (*Validate transactions against the protocol state associated with the transaction*)
+                  let txn_state_view =
+                    Transition_frontier.find_protocol_state frontier state_hash
+                    |> Option.value_exn |> Mina_state.Protocol_state.body
+                    |> Mina_state.Protocol_state.Body.view
+                  in
+                  ignore
+                    (Or_error.ok_exn
+                       (Ledger.apply_transaction
+                          ~constraint_constants:
+                            t.config.precomputed_values.constraint_constants
+                          ~txn_state_view root_snarked_ledger_mask txn.data))
+                  ) ) ;
+      t.next_epoch_ledger_for_cli :=
+        Some
+          ( Ledger.merkle_root root_snarked_ledger_mask
+          , root_snarked_ledger_mask ) ;
+      Some root_snarked_ledger_mask
+    in
+    if unfinalized then
+      match !(t.next_epoch_ledger_for_cli) with
+      | Some (hash, ledger) ->
+          let next_epoch_ledger_hash =
+            let epoch_data =
+              Transition_frontier.Breadcrumb.consensus_state best_tip
+              |> Consensus.Data.Consensus_state.next_epoch_data
+            in
+            epoch_data.ledger.hash
+          in
+          if Mina_base.Frozen_ledger_hash.equal next_epoch_ledger_hash hash
+          then Some ledger
+          else get_epoch_ledger ()
+      | None ->
+          get_epoch_ledger ()
+    else None
+  else None
 
 let find_delegators table pk =
   Option.value_map
@@ -1480,6 +1564,7 @@ let create ?wallets (config : Config.t) =
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status
-            ; precomputed_block_writer } ) )
+            ; precomputed_block_writer
+            ; next_epoch_ledger_for_cli= ref None } ) )
 
 let net {components= {net; _}; _} = net

@@ -220,6 +220,13 @@ module Data = struct
               Mina_base.(
                 Sparse_ledger.of_any_ledger
                 @@ Ledger.Any_ledger.cast (module Ledger.Db) ledger)
+
+        let ledger_mask ledger =
+          match ledger with
+          | Genesis_epoch_ledger ledger ->
+              ledger
+          | Ledger_db db ->
+              Mina_base.Ledger.of_database db
       end
 
       type t =
@@ -2246,6 +2253,8 @@ module Data = struct
         (Global_slot.slot_number global_slot)
 
     let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
+
+    let epoch_count (t : Value.t) = t.epoch_count
 
     let supercharge_coinbase_var (t : var) = t.supercharge_coinbase
 
