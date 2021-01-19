@@ -107,6 +107,8 @@ module Reader0 = struct
   let iter_without_pushback ?consumer ?continue_on_error reader ~f =
     Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error ~f
 
+  let iter' reader ~f = Pipe.iter' reader.reader ~f
+
   let map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
@@ -219,6 +221,7 @@ module Writer = struct
     { type_: ('t, 'type_, 'write_return) type_
     ; strict_reader: 't Reader0.t
     ; writer: 't Pipe.Writer.t
+    ; warn_on_drop: bool
     ; name: string option }
 
   (* TODO: See #1281 *)
@@ -259,9 +262,10 @@ module Writer = struct
           ~on_overflow:(fun () ->
             let logger = Logger.create () in
             let my_name = Option.value writer.name ~default:"<unnamed>" in
-            [%log warn]
-              ~metadata:[("pipe_name", `String my_name)]
-              "Dropping message on pipe $pipe_name" ;
+            if writer.warn_on_drop then
+              [%log warn]
+                ~metadata:[("pipe_name", `String my_name)]
+                "Dropping message on pipe $pipe_name" ;
             ignore (Pipe.read_now writer.strict_reader.reader) ;
             Pipe.write_without_pushback writer.writer data )
           ~normal_return:()
@@ -282,12 +286,14 @@ module Writer = struct
   let is_closed {writer; _} = Pipe.is_closed writer
 end
 
-let create ?name type_ =
+let create ?name ?(warn_on_drop = true) type_ =
   let reader, writer = Pipe.create () in
   let strict_reader =
     Reader0.{reader; has_reader= false; downstreams= []; name}
   in
-  let strict_writer = Writer.{type_; strict_reader; writer; name} in
+  let strict_writer =
+    Writer.{type_; strict_reader; warn_on_drop; writer; name}
+  in
   (strict_reader, strict_writer)
 
 let transfer reader Writer.{strict_reader; writer; _} ~f =

@@ -160,7 +160,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
-      [%log trace]
+      [%log warn]
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
     (*Transition frontier visualization*)

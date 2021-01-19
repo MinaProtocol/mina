@@ -96,7 +96,7 @@ end)
     | Error (`Locally_generated res) ->
         rebroadcast res
     | Error (`Other e) ->
-        [%log' trace t.logger]
+        [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: $error"
           ~metadata:[("error", Error_json.error_to_yojson e)] ;
         Broadcast_callback.error e cb
@@ -151,7 +151,7 @@ end)
                   ~score:(Resource_pool.Diff.score diff.data)
               with
             | `Capacity_exceeded ->
-                [%log' trace t.logger]
+                [%log' debug t.logger]
                   ~metadata:[("sender", Envelope.Sender.to_yojson diff.sender)]
                   "exceeded capacity from $sender" ;
                 Broadcast_callback.error
@@ -160,7 +160,7 @@ end)
             | `Within_capacity -> (
                 match%bind Resource_pool.Diff.verify t.resource_pool diff with
                 | Error err ->
-                    [%log' trace t.logger]
+                    [%log' debug t.logger]
                       "Refusing to rebroadcast $diff. Verification error: \
                        $error"
                       ~metadata:
