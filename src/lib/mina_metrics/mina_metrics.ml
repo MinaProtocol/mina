@@ -186,6 +186,11 @@ module Runtime = struct
       (fun () -> float_of_int !current_gc.Gc.Stat.largest_free)
       ~help:"Size of the largest block freed by the GC."
 
+  let ocaml_gc_fragments =
+    simple_metric ~metric_type:Counter "ocaml_gc_fragments"
+      (fun () -> float_of_int !current_gc.Gc.Stat.fragments)
+      ~help:"No. of heap fragments."
+
   let ocaml_gc_stack_size =
     simple_metric ~metric_type:Counter "ocaml_gc_stack_size"
       (fun () -> float_of_int !current_gc.Gc.Stat.stack_size)
@@ -234,6 +239,7 @@ module Runtime = struct
     ; ocaml_gc_live_words
     ; ocaml_gc_free_words
     ; ocaml_gc_largest_free
+    ; ocaml_gc_fragments
     ; ocaml_gc_stack_size
     ; jemalloc_active_bytes
     ; jemalloc_resident_bytes
