@@ -237,7 +237,7 @@ locals {
         # Copy kube config to shared Docker path
         export CI_SHARED_CONFIG="/var/buildkite/shared/config"
         mkdir -p "$${CI_SHARED_CONFIG}"
-        cp /root/.kube/config "$${CI_SHARED_CONFIG}/.kube" && chmod ugo+rw "$${CI_SHARED_CONFIG}/.kube"
+        cp "$${KUBE_CONFIG_PATH:-/root/.kube/config}" "$${CI_SHARED_CONFIG}/.kube" && chmod ugo+rw "$${CI_SHARED_CONFIG}/.kube"
 
         # set agent default Kubernetes context for deployment
         kubectl config use-context ${var.testnet_k8s_ctx}
