@@ -109,7 +109,9 @@ type t =
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref }
+  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref
+  ; block_production_status:
+      [`Producing | `Producing_in_ms of float | `Free] ref }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -778,10 +780,89 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
+let perform_compaction t =
+  if
+    not
+      (Genesis_constants.Proof_level.equal
+         t.config.precomputed_values.proof_level Full)
+  then ()
+  else
+    let slot_duration_ms =
+      let leeway = 1000 in
+      t.config.precomputed_values.constraint_constants.block_window_duration_ms
+      + leeway
+    in
+    let expected_time_for_compaction =
+      match Sys.getenv "MINA_COMPACTION_MS" with
+      | Some ms ->
+          Float.of_string ms
+      | None ->
+          6000.
+    in
+    let span ?(incr = 0.) ms = Float.(of_int ms +. incr) |> Time.Span.of_ms in
+    let interval_configured =
+      match Sys.getenv "MINA_COMPACTION_INTERVAL_MS" with
+      | Some ms ->
+          Time.Span.of_ms (Float.of_string ms)
+      | None ->
+          span (slot_duration_ms * 2)
+    in
+    if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
+    then (
+      [%log' fatal t.config.logger]
+        "Time between compactions %f should be greater than the expected time \
+         for compaction %f"
+        (Time.Span.to_ms interval_configured)
+        expected_time_for_compaction ;
+      failwith
+        (sprintf
+           "Time between compactions %f should be greater than the expected \
+            time for compaction %f"
+           (Time.Span.to_ms interval_configured)
+           expected_time_for_compaction) ) ;
+    let call_compact () =
+      let start = Time.now () in
+      Gc.compact () ;
+      let span = Time.diff (Time.now ()) start in
+      [%log' debug t.config.logger]
+        ~metadata:[("time", `Float (Time.Span.to_ms span))]
+        "Gc.compact took $time ms"
+    in
+    let rec perform interval =
+      upon (after interval) (fun () ->
+          match !(t.block_production_status) with
+          | `Free ->
+              call_compact () ;
+              perform interval_configured
+          | `Producing ->
+              perform (span slot_duration_ms)
+          | `Producing_in_ms ms ->
+              if ms < expected_time_for_compaction then
+                (*too close to block production; perform compaction after block production*)
+                perform (span slot_duration_ms ~incr:ms)
+              else (
+                call_compact () ;
+                perform interval_configured ) )
+    in
+    perform interval_configured
+
 let start t =
+  let set_next_producer_timing timing =
+    let block_production_status =
+      match timing with
+      | `Check_again _ ->
+          `Free
+      | `Produce_now _ ->
+          `Producing
+      | `Produce (time, _, _) ->
+          `Producing_in_ms (Int64.to_float time)
+    in
+    t.block_production_status := block_production_status ;
+    t.next_producer_timing <- Some timing
+  in
   Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
-    ~prover:t.processes.prover ~trust_system:t.config.trust_system
+    ~set_next_producer_timing ~prover:t.processes.prover
+    ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
          t.components.transaction_pool)
@@ -795,6 +876,7 @@ let start t =
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
     ~precomputed_values:t.config.precomputed_values ;
+  perform_compaction t ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
@@ -1480,6 +1562,7 @@ let create ?wallets (config : Config.t) =
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status
-            ; precomputed_block_writer } ) )
+            ; precomputed_block_writer
+            ; block_production_status= ref `Free } ) )
 
 let net {components= {net; _}; _} = net
