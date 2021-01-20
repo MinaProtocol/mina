@@ -536,20 +536,22 @@ let download s d ~key ~attempts =
     "Download download $key" ;
   Downloader.download d ~key ~attempts
 
-let create_node ~downloader t ~parent x =
+let create_node ~downloader t x =
   let attempts = Attempt_history.empty in
-  let state, h, blockchain_length, result =
+  let state, h, blockchain_length, parent, result =
     match x with
     | `Root root ->
         ( Node.State.Finished root
         , Breadcrumb.state_hash root
         , Breadcrumb.blockchain_length root
+        , Breadcrumb.parent_hash root
         , Ivar.create_full (Ok root) )
-    | `Hash (h, l) ->
+    | `Hash (h, l, parent) ->
         ( Node.State.To_download
             (download "create_node" downloader ~key:(h, l) ~attempts)
         , h
         , l
+        , parent
         , Ivar.create () )
     | `Initial_validated b ->
         let t = (Cached.peek b).Envelope.Incoming.data in
@@ -557,6 +559,7 @@ let create_node ~downloader t ~parent x =
         ( Node.State.To_verify b
         , state_hash t
         , blockchain_length t
+        , parent_hash t
         , Ivar.create () )
   in
   let node =
@@ -969,7 +972,6 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                   table and prune, although in theory that should be handled by
                  the frontier calling [Full_catchup_tree.apply_diffs]. *)
                    create_node ~downloader t (`Root root)
-                     ~parent:(Breadcrumb.parent_hash root)
                | `Node node ->
                    (* TODO: Log what is going on with transition frontier. *)
                    node
@@ -981,8 +983,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                ~f:
                  (Rose_tree.iter ~f:(fun c ->
                       let node =
-                        create_node ~downloader t ~parent:target_parent_hash
-                          (`Initial_validated c)
+                        create_node ~downloader t (`Initial_validated c)
                       in
                       run_node node |> ignore )) ;
              List.fold state_hashes
@@ -991,7 +992,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                  let l = Length.succ l in
                  ( if not (Hashtbl.mem t.nodes h) then
                    let node =
-                     create_node t ~downloader ~parent (`Hash (h, l))
+                     create_node t ~downloader (`Hash (h, l, parent))
                    in
                    don't_wait_for (run_node node >>| ignore) ) ;
                  (h, l) )
