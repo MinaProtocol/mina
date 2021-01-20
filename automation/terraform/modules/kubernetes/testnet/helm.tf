@@ -5,12 +5,13 @@ provider helm {
   }
 }
 
-// data "local_file" "genesis_ledger" {
-//   filename = "genesis_ledger.json"
-//   depends_on = [
-//     null_resource.block_producer_key_generation
-//   ]
-// }
+data "local_file" "genesis_ledger" {
+  # genesis_ledger.json is not required when generate_and_upload_artifacts is set to false
+  filename = var.generate_and_upload_artifacts ? "genesis_ledger.json" : "/dev/null"
+  depends_on = [
+    null_resource.block_producer_key_generation
+  ]
+}
 
 locals {
   use_local_charts = false
@@ -21,7 +22,7 @@ locals {
   ]
 
   coda_vars = {
-    runtimeConfig      = var.runtime_config
+    runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
     image              = var.coda_image
     privkeyPass        = var.block_producer_key_pass
     seedPeers          = concat(var.additional_seed_peers, local.seed_peers)
