@@ -62,9 +62,8 @@ type app struct {
 	UnsafeNoTrustIP bool
 
 	// development configuration options
-	NoMDNS    bool
-	NoDHT     bool
-	NoUpcalls bool
+	NoMDNS bool
+	NoDHT  bool
 }
 
 var seqs = make(chan int)
@@ -109,10 +108,6 @@ type envelope struct {
 }
 
 func (app *app) writeMsg(msg interface{}) {
-	if app.NoUpcalls {
-		return
-	}
-
 	app.OutChan <- msg
 }
 
@@ -129,10 +124,6 @@ type wrappedError struct {
 
 func (w wrappedError) Error() string {
 	return fmt.Sprintf("%s error: %s", w.tag, w.e.Error())
-}
-
-func (w wrappedError) Unwrap() error {
-	return w.e
 }
 
 func wrapError(e error, tag string) error { return wrappedError{e: e, tag: tag} }
@@ -407,13 +398,8 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 
 	var topic *pubsub.Topic
 	var has bool
-
 	if topic, has = app.Topics[t.Topic]; !has {
-		topic, err = app.P2p.Pubsub.Join(t.Topic)
-		if err != nil {
-			return nil, badp2p(err)
-		}
-		app.Topics[t.Topic] = topic
+		return nil, badRPC(err)
 	}
 
 	if err := topic.Publish(app.Ctx, data); err != nil {
@@ -438,12 +424,6 @@ func codaEncode(data []byte) string {
 func codaDecode(data string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(data)
 }
-
-var (
-	acceptResult = "accept"
-	rejectResult = "reject"
-	ignoreResult = "ignore"
-)
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
@@ -527,19 +507,18 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationReject
 		case res := <-ch:
 			switch res {
-			case rejectResult:
+			case "reject":
 				app.P2p.Logger.Info("why u fail to validate :(")
 				return pubsub.ValidationReject
-			case acceptResult:
+			case "accept":
 				app.P2p.Logger.Info("validated!")
 				return pubsub.ValidationAccept
-			case ignoreResult:
+			case "ignore":
 				app.P2p.Logger.Info("ignoring valid message!")
 				return pubsub.ValidationIgnore
-			default:
-				app.P2p.Logger.Info("ignoring message that falled off the end!")
-				return pubsub.ValidationIgnore
 			}
+			app.P2p.Logger.Info("ignoring message that falled off the end!")
+			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
@@ -665,6 +644,11 @@ type streamReadCompleteUpcall struct {
 	StreamIdx int    `json:"stream_idx"`
 }
 
+type openStreamMsg struct {
+	Peer       string `json:"peer"`
+	ProtocolID string `json:"protocol"`
+}
+
 type incomingMsgUpcall struct {
 	Upcall    string `json:"upcall"`
 	StreamIdx int    `json:"stream_idx"`
@@ -709,11 +693,6 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 	}()
 }
 
-type openStreamMsg struct {
-	Peer       string `json:"peer"`
-	ProtocolID string `json:"protocol"`
-}
-
 type openStreamResult struct {
 	StreamIdx int          `json:"stream_idx"`
 	Peer      codaPeerInfo `json:"peer"`
@@ -723,9 +702,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
-
 	streamIdx := <-seqs
-
 	peer, err := peer.Decode(o.Peer)
 	if err != nil {
 		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
@@ -959,8 +936,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	app.P2p.Logger.Debug("connected to seed peers")
-
 	foundPeerCh := make(chan peer.AddrInfo)
 
 	validPeer := func(who peer.ID) bool {
@@ -971,7 +946,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	go func() {
 		for info := range foundPeerCh {
 			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer: %s", info.ID)
+				app.P2p.Logger.Debugf("discovered peer", info.ID)
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 
 				// now connect to the peer we discovered
@@ -1009,7 +984,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 
 		time.Sleep(time.Millisecond * 100)
-		app.P2p.Logger.Debugf("beginning DHT advertising")
 
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
 		if err != nil {
@@ -1211,6 +1185,7 @@ type setGatingConfigMsg struct {
 
 func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
 	newFilter := ma.NewFilters()
+	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
 
 	logger.Info("setting gating config from: %#v", gc)
 
@@ -1235,12 +1210,20 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 	}
 	bannedPeers := peer.NewSet()
 	for _, peerID := range gc.BannedPeerIDs {
-		id := peer.ID(peerID)
+		id, err := peer.Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
 		bannedPeers.Add(id)
 	}
 	trustedPeers := peer.NewSet()
 	for _, peerID := range gc.TrustedPeerIDs {
-		id := peer.ID(peerID)
+		id, err := peer.Decode(peerID)
+		if err != nil {
+			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
+			continue
+		}
 		trustedPeers.Add(id)
 	}
 
@@ -1253,11 +1236,12 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 	}
 
 	newState, err := gatingConfigFromJson(gc)
+
 	if err != nil {
 		return nil, badRPC(err)
 	}
 
-	app.P2p.GatingState = newState
+	*app.P2p.GatingState = *newState
 
 	return "ok", nil
 }
