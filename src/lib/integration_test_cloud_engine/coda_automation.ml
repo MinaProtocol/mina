@@ -16,7 +16,8 @@ module Network_config = struct
     ; run_with_user_agent: bool
     ; run_with_bots: bool
     ; enable_peer_exchange: bool
-    ; isolated: bool }
+    ; isolated: bool
+    ; libp2p_secret: string }
   [@@deriving to_yojson]
 
   type terraform_config =
@@ -204,7 +205,8 @@ module Network_config = struct
       ; run_with_user_agent= false
       ; run_with_bots= false
       ; enable_peer_exchange= false
-      ; isolated= false }
+      ; isolated= false
+      ; libp2p_secret= "" }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
