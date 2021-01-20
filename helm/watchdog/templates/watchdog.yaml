@@ -1,0 +1,57 @@
+{{ range $config := $.Values.watchdogConfigs}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $config.name }}
+  labels:
+    app: {{ $config.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $config.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $config.name }}
+        testnet: {{ $.Values.testnetName }}
+        role: block-producer
+        class: {{ default "undefined" $config.class }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: coda-network-services
+        resources:
+          requests:
+            memory: 512m
+            cpu: 1.0
+        image: gcr.io/o1labs-192920/coda-network-services:latest
+        command: ["bash"]
+        args: ["-c", "/code/main.sh"]
+        ports: 
+        - name: metrics-port
+          containerPort: 8000
+        imagePullPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+spec:
+  type: ClusterIP
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ $.Values.coda.ports.p2p }}
+    targetPort: external-port
+---
+{{ end }}
