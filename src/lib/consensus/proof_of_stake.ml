@@ -1440,7 +1440,7 @@ module Data = struct
         if
           same_sub_window
           || Global_slot.slot_number next_global_slot
-             < constants.grace_period_slots
+             < constants.grace_period_end
         then prev_min_window_density
         else Length.min new_window_length prev_min_window_density
       in
@@ -1528,7 +1528,7 @@ module Data = struct
             Global_slot.Checked.( < ) next_global_slot
               (Global_slot.Checked.of_slot_number ~constants
                  (Mina_numbers.Global_slot.Checked.Unsafe.of_integer
-                    (Length.Checked.to_integer constants.grace_period_slots)))
+                    (Length.Checked.to_integer constants.grace_period_end)))
           in
           if_
             Boolean.(same_sub_window || in_grace_period)
@@ -1592,7 +1592,7 @@ module Data = struct
             if
               sub_window_diff = 0
               || Global_slot.slot_number next_global_slot
-                 < constants.grace_period_slots
+                 < constants.grace_period_end
             then prev_min_window_density
             else Length.min new_window_length prev_min_window_density
           in
