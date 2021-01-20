@@ -1212,6 +1212,8 @@ type setGatingConfigMsg struct {
 func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
 	newFilter := ma.NewFilters()
 
+	logger.Info("setting gating config from: %#v", gc)
+
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
 		if err != nil {
