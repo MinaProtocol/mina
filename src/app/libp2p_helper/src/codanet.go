@@ -250,10 +250,6 @@ func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow 
 		gs.logGate()
 	}
 
-	// if allow && gs.InternalAddrFilters.AddrBlocked(remoteAddr) {
-	//   gs.InternalAddrFilters.AddFilter(remoteAddr, ma.ActionAllow())
-	// }
-
 	return
 }
 
