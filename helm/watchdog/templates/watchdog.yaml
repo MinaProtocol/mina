@@ -15,7 +15,7 @@ spec:
       labels:
         app: {{ $config.name }}
         testnet: {{ $.Values.testnetName }}
-        role: block-producer
+        role: watchdog
         class: {{ default "undefined" $config.class }}
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
