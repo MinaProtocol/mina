@@ -215,7 +215,8 @@ module Async : S with module M := Async.Deferred.Or_error = struct
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind result =
         Process.run ~prog:"curl"
-          ~args:["--fail"; "-o"; file_path; uri_string]
+          ~args:
+            ["--fail"; "--silent"; "--show-error"; "-o"; file_path; uri_string]
           ()
         |> Deferred.Result.map_error ~f:(fun err ->
                [%log debug] "Could not download key to key cache"
