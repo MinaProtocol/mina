@@ -10,7 +10,9 @@ git merge-tree `git merge-base origin/develop HEAD` origin/develop HEAD | grep "
 RET=$?
 
 if [ $RET -eq 0 ]; then
-  exit 0
+  # Found a conflict
+  exit 1
 else
-  exit 1;
+  # No conflicts were found
+  exit 0
 fi
