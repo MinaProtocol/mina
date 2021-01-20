@@ -13,7 +13,7 @@ import natsort
 client = docker.from_env()
 p = inflect.engine()
 
-CODA_DAEMON_IMAGE = "codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898"
+CODA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon-baked:0.2.6-5c08d6d-5c08d6d-testworld-2258826"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # Default output folders for various kinds of keys

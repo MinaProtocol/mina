@@ -6,7 +6,7 @@
 [%%import "/src/config/debug_level/some.mlh"]
 [%%import "/src/config/proof_level/check.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
-[%%import "/src/config/account_creation_fee/high.mlh"]
+[%%import "/src/config/account_creation_fee/realistic.mlh"]
 [%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
 [%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
