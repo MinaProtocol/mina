@@ -198,10 +198,12 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    Out_channel.output_lines out_channel
                      [Yojson.Safe.to_string (Lazy.force precomputed_block)] )
            ) ;
-           Option.iter log ~f:(fun `Log ->
-               [%log info] "Saw block $precomputed_block"
-                 ~metadata:[("precomputed_block", Lazy.force precomputed_block)]
-           )) ;
+           [%log info] "Saw block with state hash %s"
+             ~metadata:
+               ( if is_some log then
+                 [("precomputed_block", Lazy.force precomputed_block)]
+               else [] )
+             (State_hash.to_base58_check hash)) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block
