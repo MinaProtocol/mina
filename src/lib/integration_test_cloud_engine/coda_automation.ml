@@ -21,7 +21,8 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   type terraform_config =
-    { cluster_name: string
+    { generate_and_upload_artifacts: bool
+    ; cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
     ; k8s_context: string
@@ -216,7 +217,8 @@ module Network_config = struct
     ; constraint_constants
     ; genesis_constants
     ; terraform=
-        { cluster_name
+        { generate_and_upload_artifacts= false
+        ; cluster_name
         ; cluster_region
         ; testnet_name
         ; seed_zone
