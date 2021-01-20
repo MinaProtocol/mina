@@ -131,11 +131,11 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Base x ->
           if Ivar.is_full x.final_state then
             [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-          Ivar.fill_if_empty x.final_state `Failed
+          Ivar.fill x.final_state `Failed
       | Derivative x ->
           if Ivar.is_full x.final_state then
             [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-          Ivar.fill_if_empty x.final_state `Failed
+          Ivar.fill x.final_state `Failed
       | Pure _ ->
           failwith "cannot set consumed state of pure Cached.t"
 
@@ -143,11 +143,11 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Base x ->
           if Ivar.is_full x.final_state then
             [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-          Ivar.fill_if_empty x.final_state (`Success x.data)
+          Ivar.fill x.final_state (`Success x.data)
       | Derivative x ->
           if Ivar.is_full x.final_state then
             [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-          Ivar.fill_if_empty x.final_state (`Success x.original)
+          Ivar.fill x.final_state (`Success x.original)
       | Pure _ ->
           failwith "cannot set consumed state of pure Cached.t"
 

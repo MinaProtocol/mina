@@ -35,6 +35,8 @@ val ( - ) : t -> t -> Mina_numbers.Global_slot.t option
 
 val ( < ) : t -> t -> bool
 
+val max : t -> t -> t
+
 val succ : t -> t
 
 val create : constants:Constants.t -> epoch:Epoch.t -> slot:Slot.t -> t

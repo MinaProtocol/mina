@@ -172,6 +172,15 @@ struct
       ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
       (Bignum_bigint.gen_incl Bignum_bigint.zero
          (Bignum_bigint.of_string N.(to_string max_int)))
+
+  let gen_incl min max =
+    let open Quickcheck.Let_syntax in
+    let%map n =
+      Bignum_bigint.gen_incl
+        (Bignum_bigint.of_string (N.to_string min))
+        (Bignum_bigint.of_string (N.to_string max))
+    in
+    N.of_string (Bignum_bigint.to_string n)
 end
 
 module Make32 () : UInt32 = struct
