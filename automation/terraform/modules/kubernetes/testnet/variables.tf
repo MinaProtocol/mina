@@ -79,6 +79,11 @@ variable "archive_node_count" {
   default = 0
 }
 
+variable "runtime_config" {
+  type    = string
+  default = ""
+}
+
 # Seed Vars
 
 variable "seed_port" {

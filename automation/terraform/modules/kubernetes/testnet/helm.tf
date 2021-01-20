@@ -5,12 +5,12 @@ provider helm {
   }
 }
 
-data "local_file" "genesis_ledger" {
-  filename = "genesis_ledger.json"
-  depends_on = [
-    null_resource.block_producer_key_generation
-  ]
-}
+// data "local_file" "genesis_ledger" {
+//   filename = "genesis_ledger.json"
+//   depends_on = [
+//     null_resource.block_producer_key_generation
+//   ]
+// }
 
 locals {
   use_local_charts = false
@@ -21,7 +21,7 @@ locals {
   ]
 
   coda_vars = {
-    runtimeConfig      = data.local_file.genesis_ledger.content
+    runtimeConfig      = var.runtime_config
     image              = var.coda_image
     privkeyPass        = var.block_producer_key_pass
     seedPeers          = concat(var.additional_seed_peers, local.seed_peers)
@@ -42,7 +42,7 @@ locals {
   seed_vars = {
     testnetName = var.testnet_name
     coda        = {
-      runtimeConfig      = data.local_file.genesis_ledger.content
+      runtimeConfig      = local.coda_vars.runtimeConfig
       image              = var.coda_image
       privkeyPass        = var.block_producer_key_pass
       seedPeers          = var.additional_seed_peers
