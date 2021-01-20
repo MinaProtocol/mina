@@ -21,7 +21,6 @@ Node.Process.putEnvVar(
   "./google_sheets_credentials.json",
 );
 
-let credentials = getEnvOrFail("GOOGLE_APPLICATION_CREDENTIALS");
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
 let pgConnectionCurr = getEnvOrFail("PGCONN1");
 let pgConnectionPrev = getEnvOrFail("PGCONN2");
