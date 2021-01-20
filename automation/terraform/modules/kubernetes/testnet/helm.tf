@@ -19,7 +19,7 @@ data "local_file" "genesis_ledger" {
 
 locals {
   mina_helm_repo = "https://coda-charts.storage.googleapis.com"
-  use_local_charts = true
+  use_local_charts = false
 
   seed_peers = [
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
@@ -123,6 +123,7 @@ locals {
     }
   }
 
+
   archive_node_vars = {
     testnetName = var.testnet_name
     coda = {
@@ -161,6 +162,11 @@ locals {
         }
       }
     }
+  }
+
+  watchdog_vars = {
+    testnetName = var.testnet_name
+    coda = local.coda_vars
   }
   
 }
@@ -252,3 +258,18 @@ resource "helm_release" "archive_node" {
   timeout     = 600
   depends_on = [helm_release.seed]
 }
+
+resource "helm_release" "watchdog" {
+  name        = "${var.testnet_name}-watchdog"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
+  version     = "0.1.0"
+  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode(local.watchdog_vars)
+  ]
+  wait        = false
+  timeout     = 600
+  depends_on  = [helm_release.seed]
+}
+
