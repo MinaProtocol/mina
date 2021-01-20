@@ -1,5 +1,3 @@
-(* Only show stdout for failed inline tests. *)
-open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Signed
@@ -3877,7 +3875,7 @@ let%test_module "Proof of stake tests" =
 
     let%test_unit "vrf win rate" =
       let constants = Lazy.force Constants.for_unit_tests in
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let constraint_constants =
         Genesis_constants.Constraint_constants.for_unit_tests
       in
@@ -3937,6 +3935,722 @@ let%test_module "Proof of stake tests" =
       let within_tolerance = diff < tolerance in
       if not within_tolerance then
         failwithf "actual vs. expected: %d vs %f" actual expected ()
+
+    (* Consensus selection tests. *)
+
+    let sum_lengths = List.fold ~init:Length.zero ~f:Length.add
+
+    let rec gen_except ~exclude ~gen ~equal =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind x = gen in
+      if List.mem exclude x ~equal then gen_except ~exclude ~gen ~equal
+      else return x
+
+    (* This generator is quadratic, but that should be ok since the max amount we generate with it
+     * is 8. *)
+    let gen_unique_list amount ~gen ~equal =
+      let rec loop n ls =
+        let open Quickcheck.Generator.Let_syntax in
+        if n <= 0 then return ls
+        else
+          let%bind x = gen_except ~exclude:ls ~gen ~equal in
+          loop (n - 1) (x :: ls)
+      in
+      loop amount []
+
+    let gen_with_hash gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind data = gen in
+      let%map hash = State_hash.gen in
+      {With_hash.data; hash}
+
+    let gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta n =
+      let open Quickcheck.Generator.Let_syntax in
+      let min_blocks =
+        Float.to_int
+          ( Float.of_int n
+          *. Float.max (slot_fill_rate -. slot_fill_rate_delta) 0.0 )
+      in
+      let max_blocks =
+        Float.to_int
+          ( Float.of_int n
+          *. Float.min (slot_fill_rate +. slot_fill_rate_delta) 1.0 )
+      in
+      Core.Int.gen_incl min_blocks max_blocks >>| Length.of_int
+
+    let gen_num_blocks_in_epochs ~slot_fill_rate ~slot_fill_rate_delta n =
+      gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta
+        (n * Length.to_int constants.slots_per_epoch)
+
+    let gen_min_density_windows_from_slot_fill_rate ~slot_fill_rate
+        ~slot_fill_rate_delta =
+      let open Quickcheck.Generator.Let_syntax in
+      let constants = Lazy.force Constants.for_unit_tests in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+      in
+      let gen_sub_window_density =
+        gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta
+          (Length.to_int constants.slots_per_sub_window)
+      in
+      let%map sub_window_densities =
+        Quickcheck.Generator.list_with_length
+          constraint_constants.sub_windows_per_window gen_sub_window_density
+      in
+      let min_window_density =
+        List.fold ~init:Length.zero ~f:Length.add
+          (List.take sub_window_densities (List.length sub_window_densities - 1))
+      in
+      (min_window_density, sub_window_densities)
+
+    (* Computes currency at height, assuming every block contains coinbase (ignoring inflation scheduling). *)
+    let currency_at_height ~genesis_currency height =
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+      in
+      Option.value_exn
+        Amount.(
+          genesis_currency
+          + of_int (height * to_int constraint_constants.coinbase_amount))
+
+    (* TODO: Deprecate this in favor of just returning a constant in the monad from the outside. *)
+    let opt_gen opt ~gen =
+      match opt with Some v -> Quickcheck.Generator.return v | None -> gen
+
+    let gen_epoch_data ~genesis_currency ~starts_at_block_height
+        ?start_checkpoint ?lock_checkpoint epoch_length :
+        Epoch_data.Value.t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let height_at_end_of_epoch =
+        Length.add starts_at_block_height epoch_length
+      in
+      let%bind ledger_hash = Frozen_ledger_hash.gen in
+      let%bind seed = Epoch_seed.gen in
+      let%bind start_checkpoint =
+        opt_gen start_checkpoint ~gen:State_hash.gen
+      in
+      let%map lock_checkpoint = opt_gen lock_checkpoint ~gen:State_hash.gen in
+      let ledger : Epoch_ledger.Value.t =
+        { hash= ledger_hash
+        ; total_currency=
+            currency_at_height ~genesis_currency
+              (Length.to_int height_at_end_of_epoch) }
+      in
+      { Epoch_data.Poly.ledger
+      ; seed
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; epoch_length }
+
+    let default_slot_fill_rate = 0.65
+
+    let default_slot_fill_rate_delta = 0.15
+
+    (** A root epoch of a block refers the epoch from which we can begin
+     *  simulating information for that block. Because we need to simulate 
+     *  both the staking epoch and the next staking epoch, the root epoch
+     *  is the staking epoch. The root epoch position this function generates
+     *  is the epoch number of the staking epoch and the block height the
+     *  staking epoch starts at (the simulation of all blocks preceeding the
+     *  staking epoch).
+     *)
+    let gen_spot_root_epoch_position ~slot_fill_rate ~slot_fill_rate_delta =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind root_epoch_int = Core.Int.gen_incl 0 100 in
+      let%map root_block_height =
+        gen_num_blocks_in_epochs ~slot_fill_rate ~slot_fill_rate_delta
+          root_epoch_int
+      in
+      (UInt32.of_int root_epoch_int, root_block_height)
+
+    let gen_vrf_output =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map output = Vrf.Output.gen in
+      Vrf.Output.truncate output
+
+    (* TODO: consider shoving this logic directly into Field.gen to avoid non-deterministic cycles *)
+    let rec gen_vrf_output_gt target =
+      let open Quickcheck.Generator.Let_syntax in
+      let string_of_blake2 = Blake2.(Fn.compose to_raw_string digest_string) in
+      let compare_blake2 a b =
+        String.compare (string_of_blake2 a) (string_of_blake2 b)
+      in
+      let%bind output = gen_vrf_output in
+      if compare_blake2 target output < 0 then return output
+      else gen_vrf_output_gt target
+
+    (** This generator generates blocks "from thin air" by simulating
+     *  the properties of a chain up to a point in time. This avoids
+     *  the work of computing all prior blocks in order to generate
+     *  a block at some point in the chain, hence why it is coined a
+     *  "spot generator".
+     *
+     * TODO:
+     *   - special case genesis
+     *   - has_ancestor_in_same_checkpoint_window
+     * NOTES:
+     *   - vrf outputs and ledger hashes are entirely fake
+     *   - density windows are computed distinctly from block heights and epoch lengths, so some non-obvious invariants may be broken there
+     *)
+    let gen_spot ?root_epoch_position
+        ?(slot_fill_rate = default_slot_fill_rate)
+        ?(slot_fill_rate_delta = default_slot_fill_rate_delta)
+        ?(genesis_currency = Currency.Amount.of_int 200000)
+        ?gen_staking_epoch_length ?gen_next_epoch_length
+        ?gen_curr_epoch_position ?staking_start_checkpoint
+        ?staking_lock_checkpoint ?next_start_checkpoint ?next_lock_checkpoint
+        ?(gen_vrf_output = gen_vrf_output) () :
+        Consensus_state.Value.t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let constants = Lazy.force Constants.for_unit_tests in
+      let gen_num_blocks_in_slots =
+        gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta
+      in
+      let gen_num_blocks_in_epochs =
+        gen_num_blocks_in_epochs ~slot_fill_rate ~slot_fill_rate_delta
+      in
+      (* Populate default generators. *)
+      let gen_staking_epoch_length =
+        Option.value gen_staking_epoch_length
+          ~default:(gen_num_blocks_in_epochs 1)
+      in
+      let gen_next_epoch_length =
+        Option.value gen_next_epoch_length
+          ~default:(gen_num_blocks_in_epochs 1)
+      in
+      let gen_curr_epoch_position =
+        let default =
+          let max_epoch_slot = Length.to_int constants.slots_per_epoch - 1 in
+          let%bind curr_epoch_slot =
+            Core.Int.gen_incl 0 max_epoch_slot >>| UInt32.of_int
+          in
+          let%map curr_epoch_length =
+            gen_num_blocks_in_slots (Length.to_int curr_epoch_slot)
+          in
+          (curr_epoch_slot, curr_epoch_length)
+        in
+        Option.value gen_curr_epoch_position ~default
+      in
+      let%bind root_epoch, root_block_height =
+        match root_epoch_position with
+        | Some (root_epoch, root_block_height) ->
+            return (root_epoch, root_block_height)
+        | None ->
+            gen_spot_root_epoch_position ~slot_fill_rate ~slot_fill_rate_delta
+      in
+      (* Generate blockchain position and epoch lengths. *)
+      (* staking_epoch == root_epoch, next_staking_epoch == root_epoch + 1 *)
+      let curr_epoch = Length.add root_epoch (Length.of_int 2) in
+      let%bind staking_epoch_length = gen_staking_epoch_length in
+      let%bind next_staking_epoch_length = gen_next_epoch_length in
+      let%bind curr_epoch_slot, curr_epoch_length = gen_curr_epoch_position in
+      (* Compute state slot and length. *)
+      let curr_global_slot =
+        Global_slot.of_epoch_and_slot ~constants (curr_epoch, curr_epoch_slot)
+      in
+      let blockchain_length =
+        sum_lengths
+          [ root_block_height
+          ; staking_epoch_length
+          ; next_staking_epoch_length
+          ; curr_epoch_length ]
+      in
+      (* Compute total currency for state. *)
+      let total_currency =
+        currency_at_height ~genesis_currency (Length.to_int blockchain_length)
+      in
+      (* Generate epoch data for staking and next epochs. *)
+      let%bind staking_epoch_data =
+        gen_epoch_data ~genesis_currency
+          ~starts_at_block_height:root_block_height
+          ?start_checkpoint:staking_start_checkpoint
+          ?lock_checkpoint:staking_lock_checkpoint staking_epoch_length
+      in
+      let%bind next_staking_epoch_data =
+        gen_epoch_data ~genesis_currency
+          ~starts_at_block_height:
+            (Length.add root_block_height staking_epoch_length)
+          ?start_checkpoint:next_start_checkpoint
+          ?lock_checkpoint:next_lock_checkpoint next_staking_epoch_length
+      in
+      (* Generate chain quality and vrf output. *)
+      let%bind min_window_density, sub_window_densities =
+        gen_min_density_windows_from_slot_fill_rate ~slot_fill_rate
+          ~slot_fill_rate_delta
+      in
+      let%bind vrf_output = gen_vrf_output in
+      (* Generate block reward information (unused in chain selection). *)
+      let%map staker_pk = Public_key.Compressed.gen in
+      { Consensus_state.Poly.blockchain_length
+      ; epoch_count= curr_epoch
+      ; min_window_density
+      ; sub_window_densities
+      ; last_vrf_output= vrf_output
+      ; total_currency
+      ; curr_global_slot
+      ; staking_epoch_data
+      ; next_epoch_data= next_staking_epoch_data
+      ; global_slot_since_genesis=
+          Global_slot.slot_number curr_global_slot
+          (* These values are not used in selection, so we just set them to something. *)
+      ; has_ancestor_in_same_checkpoint_window= true
+      ; block_stake_winner= staker_pk
+      ; block_creator= staker_pk
+      ; coinbase_receiver= staker_pk
+      ; supercharge_coinbase= false }
+
+    (** This generator generates pairs of spot blocks that share common checkpoints.
+     *  The overlap of the checkpoints and the root epoch positions of the blocks
+     *  that are generated can be configured independently so that this function
+     *  can be used in other generators that wish to generates pairs of spot blocks
+     *  with specific constraints.
+     *)
+    let gen_spot_pair_common_checkpoints ?blockchain_length_relativity
+        ?vrf_output_relativity ~a_checkpoints ~b_checkpoints
+        ?(gen_a_root_epoch_position = Quickcheck.Generator.return)
+        ?(gen_b_root_epoch_position = Quickcheck.Generator.return)
+        ?(min_a_curr_epoch_slot = 0) () =
+      let open Quickcheck.Generator.Let_syntax in
+      let slot_fill_rate = default_slot_fill_rate in
+      let slot_fill_rate_delta = default_slot_fill_rate_delta in
+      (* Both states will share the same root epoch position. *)
+      let%bind base_root_epoch_position =
+        gen_spot_root_epoch_position ~slot_fill_rate:default_slot_fill_rate
+          ~slot_fill_rate_delta:default_slot_fill_rate_delta
+      in
+      (* Generate unique state hashes. *)
+      let%bind hashes =
+        gen_unique_list 2 ~gen:State_hash.gen ~equal:State_hash.equal
+      in
+      let[@warning "-8"] [hash_a; hash_b] = hashes in
+      (* Generate common checkpoints. *)
+      let%bind checkpoints =
+        gen_unique_list 2 ~gen:State_hash.gen ~equal:State_hash.equal
+      in
+      let[@warning "-8"] [start_checkpoint; lock_checkpoint] = checkpoints in
+      let%bind a, a_curr_epoch_length =
+        (* If we are constraining the second state to have a greater blockchain length than the
+         * first, we need to constrain the first blockchain length such that there is some room
+         * leftover in the epoch for at least 1 more block to be generated. *)
+        let gen_curr_epoch_position =
+          let max_epoch_slot =
+            match blockchain_length_relativity with
+            | Some `Ascending ->
+                Length.to_int constants.slots_per_epoch - 4
+                (* -1 to bring into inclusive range, -3 to provide 2 slots of fudge room *)
+            | _ ->
+                Length.to_int constants.slots_per_epoch - 1
+            (* -1 to bring into inclusive range *)
+          in
+          let%bind slot =
+            Core.Int.gen_incl min_a_curr_epoch_slot max_epoch_slot
+          in
+          let%map length =
+            gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta slot
+          in
+          (Length.of_int slot, length)
+        in
+        let ( staking_start_checkpoint
+            , staking_lock_checkpoint
+            , next_start_checkpoint
+            , next_lock_checkpoint ) =
+          a_checkpoints start_checkpoint lock_checkpoint
+        in
+        let%bind root_epoch_position =
+          gen_a_root_epoch_position base_root_epoch_position
+        in
+        let%map a =
+          gen_spot ~slot_fill_rate ~slot_fill_rate_delta ~root_epoch_position
+            ?staking_start_checkpoint ?staking_lock_checkpoint
+            ?next_start_checkpoint ?next_lock_checkpoint
+            ~gen_curr_epoch_position ()
+        in
+        let a_curr_epoch_length =
+          let _, root_epoch_length = root_epoch_position in
+          let length_till_curr_epoch =
+            sum_lengths
+              [ root_epoch_length
+              ; a.staking_epoch_data.epoch_length
+              ; a.next_epoch_data.epoch_length ]
+          in
+          Option.value_exn
+            (Length.sub a.blockchain_length length_till_curr_epoch)
+        in
+        (a, a_curr_epoch_length)
+      in
+      let%map b =
+        (* Handle relativity constriants for second state. *)
+        let ( gen_staking_epoch_length
+            , gen_next_epoch_length
+            , gen_curr_epoch_position ) =
+          let a_curr_epoch_slot = Global_slot.slot a.curr_global_slot in
+          match blockchain_length_relativity with
+          | Some `Equal ->
+              ( Some (return a.staking_epoch_data.epoch_length)
+              , Some (return a.next_epoch_data.epoch_length)
+              , Some (return (a_curr_epoch_slot, a_curr_epoch_length)) )
+          | Some `Ascending ->
+              (* Generate second state position by extending the first state's position *)
+              let gen_greater_position =
+                let max_epoch_slot =
+                  Length.to_int constants.slots_per_epoch - 1
+                in
+                (* This invariant needs to be held for the position of `a` *)
+                assert (max_epoch_slot > Length.to_int a_curr_epoch_slot + 2) ;
+                (* To make this easier, we assume there is a next block in the slot directly preceeding the block for `a`. *)
+                let%bind added_slots =
+                  Core.Int.gen_incl
+                    (Length.to_int a_curr_epoch_slot + 2)
+                    max_epoch_slot
+                in
+                let%map added_blocks =
+                  gen_num_blocks_in_slots ~slot_fill_rate ~slot_fill_rate_delta
+                    added_slots
+                in
+                let b_slot =
+                  Length.add
+                    (Length.add a_curr_epoch_slot (UInt32.of_int added_slots))
+                    UInt32.one
+                in
+                let b_blockchain_length =
+                  Length.add
+                    (Length.add a_curr_epoch_length added_blocks)
+                    UInt32.one
+                in
+                (b_slot, b_blockchain_length)
+              in
+              ( Some (return a.staking_epoch_data.epoch_length)
+              , Some (return a.next_epoch_data.epoch_length)
+              , Some gen_greater_position )
+          | None ->
+              (None, None, None)
+        in
+        let gen_vrf_output =
+          match vrf_output_relativity with
+          | Some `Equal ->
+              Some (return a.last_vrf_output)
+          | Some `Ascending ->
+              Some (gen_vrf_output_gt a.last_vrf_output)
+          | None ->
+              None
+        in
+        let ( staking_start_checkpoint
+            , staking_lock_checkpoint
+            , next_start_checkpoint
+            , next_lock_checkpoint ) =
+          b_checkpoints start_checkpoint lock_checkpoint
+        in
+        let%bind root_epoch_position =
+          gen_b_root_epoch_position base_root_epoch_position
+        in
+        gen_spot ~slot_fill_rate ~slot_fill_rate_delta ~root_epoch_position
+          ?staking_start_checkpoint ?staking_lock_checkpoint
+          ?next_start_checkpoint ?next_lock_checkpoint
+          ?gen_staking_epoch_length ?gen_next_epoch_length
+          ?gen_curr_epoch_position ?gen_vrf_output ()
+      in
+      (With_hash.{data= a; hash= hash_a}, With_hash.{data= b; hash= hash_b})
+
+    let gen_spot_pair_short_aligned ?blockchain_length_relativity
+        ?vrf_output_relativity () =
+      (* Both states will share their staking epoch checkpoints. *)
+      let checkpoints start lock = (Some start, Some lock, None, None) in
+      gen_spot_pair_common_checkpoints ?blockchain_length_relativity
+        ?vrf_output_relativity ~a_checkpoints:checkpoints
+        ~b_checkpoints:checkpoints ()
+
+    let gen_spot_pair_short_misaligned ?blockchain_length_relativity
+        ?vrf_output_relativity () =
+      let open Quickcheck.Generator.Let_syntax in
+      let slot_fill_rate = default_slot_fill_rate in
+      let slot_fill_rate_delta = default_slot_fill_rate_delta in
+      let a_checkpoints start lock = (None, None, Some start, Some lock) in
+      let b_checkpoints start lock = (Some start, Some lock, None, None) in
+      let gen_b_root_epoch_position (a_root_epoch, a_root_length) =
+        (* Compute the root epoch position of `b`. This needs to be one epoch ahead of a, so we
+         * compute it by extending the root epoch position of `a` by a single epoch *)
+        let b_root_epoch = UInt32.succ a_root_epoch in
+        let%map added_blocks =
+          gen_num_blocks_in_epochs ~slot_fill_rate ~slot_fill_rate_delta 1
+        in
+        let b_root_length = Length.add a_root_length added_blocks in
+        (b_root_epoch, b_root_length)
+      in
+      (* Constrain first state to be within last 1/3rd of its epoch (ensuring it's checkpoints and seed are fixed). *)
+      let min_a_curr_epoch_slot =
+        (2 * (Length.to_int constants.slots_per_epoch / 3)) + 1
+      in
+      gen_spot_pair_common_checkpoints ?blockchain_length_relativity
+        ?vrf_output_relativity ~a_checkpoints ~b_checkpoints
+        ~gen_b_root_epoch_position ~min_a_curr_epoch_slot ()
+
+    let gen_spot_pair_long =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind hashes =
+        gen_unique_list 2 ~gen:State_hash.gen ~equal:State_hash.equal
+      in
+      let[@warning "-8"] [hash_a; hash_b] = hashes in
+      let%bind checkpoints =
+        gen_unique_list 8 ~gen:State_hash.gen ~equal:State_hash.equal
+      in
+      let[@warning "-8"] [ a_staking_start_checkpoint
+                         ; a_staking_lock_checkpoint
+                         ; a_next_start_checkpoint
+                         ; a_next_lock_checkpoint
+                         ; b_staking_start_checkpoint
+                         ; b_staking_lock_checkpoint
+                         ; b_next_start_checkpoint
+                         ; b_next_lock_checkpoint ] =
+        checkpoints
+      in
+      let%bind a =
+        gen_spot ~staking_start_checkpoint:a_staking_start_checkpoint
+          ~staking_lock_checkpoint:a_staking_lock_checkpoint
+          ~next_start_checkpoint:a_next_start_checkpoint
+          ~next_lock_checkpoint:a_next_lock_checkpoint ()
+      in
+      let%map b =
+        gen_spot ~staking_start_checkpoint:b_staking_start_checkpoint
+          ~staking_lock_checkpoint:b_staking_lock_checkpoint
+          ~next_start_checkpoint:b_next_start_checkpoint
+          ~next_lock_checkpoint:b_next_lock_checkpoint ()
+      in
+      (With_hash.{data= a; hash= hash_a}, With_hash.{data= b; hash= hash_b})
+
+    let gen_spot_pair =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind a, b =
+        match%bind
+          Quickcheck.Generator.of_list
+            [`Short_aligned; `Short_misaligned; `Long]
+        with
+        | `Short_aligned ->
+            gen_spot_pair_short_aligned ()
+        | `Short_misaligned ->
+            gen_spot_pair_short_misaligned ()
+        | `Long ->
+            gen_spot_pair_long
+      in
+      if%map Quickcheck.Generator.bool then (a, b) else (b, a)
+
+    let assert_consensus_state_set (type t) (set : t) ~project ~assertion ~f =
+      (* TODO: make output prettier *)
+      if not (f set) then
+        let indent_size = 2 in
+        let indent = String.init indent_size ~f:(Fn.const ' ') in
+        let indented_json state =
+          state |> Consensus_state.Value.to_yojson
+          |> Yojson.Safe.pretty_to_string |> String.split ~on:'\n'
+          |> String.concat ~sep:(indent ^ "\n")
+        in
+        let message =
+          let comparison_sep = Printf.sprintf "\n%svs\n" indent in
+          let comparison =
+            set |> project |> List.map ~f:indented_json
+            |> String.concat ~sep:comparison_sep
+          in
+          Printf.sprintf "Expected pair of consensus states to be %s:\n%s"
+            assertion comparison
+        in
+        raise (Failure message)
+
+    let assert_consensus_state_pair =
+      assert_consensus_state_set ~project:(fun (a, b) -> [a; b])
+
+    let assert_hashed_consensus_state_pair =
+      assert_consensus_state_set ~project:(fun (a, b) ->
+          [With_hash.data a; With_hash.data b] )
+
+    let assert_hashed_consensus_state_triple =
+      assert_consensus_state_set ~project:(fun (a, b, c) ->
+          [With_hash.data a; With_hash.data b; With_hash.data c] )
+
+    let is_selected ?(log = false) (a, b) =
+      let logger = if log then Logger.create () else Logger.null () in
+      let constants = Lazy.force Constants.for_unit_tests in
+      Hooks.select ~constants ~existing:a ~candidate:b ~logger = `Take
+
+    let is_not_selected ?(log = false) (a, b) =
+      let logger = if log then Logger.create () else Logger.null () in
+      let constants = Lazy.force Constants.for_unit_tests in
+      Hooks.select ~constants ~existing:a ~candidate:b ~logger = `Keep
+
+    let assert_selected =
+      assert_hashed_consensus_state_pair ~assertion:"trigger selection"
+        ~f:is_selected
+
+    let assert_not_selected =
+      assert_hashed_consensus_state_pair ~assertion:"do not trigger selection"
+        ~f:is_not_selected
+
+    let%test_unit "generator sanity check: equal states are always in short \
+                   fork range" =
+      let constants = Lazy.force Constants.for_unit_tests in
+      Quickcheck.test (gen_spot ()) ~f:(fun state ->
+          assert_consensus_state_pair (state, state)
+            ~assertion:"within long range" ~f:(fun (a, b) ->
+              Hooks.is_short_range a b ~constants ) )
+
+    let%test_unit "generator sanity check: gen_spot_pair_short_aligned always \
+                   generates pairs of states in short fork range" =
+      let constants = Lazy.force Constants.for_unit_tests in
+      Quickcheck.test (gen_spot_pair_short_aligned ()) ~f:(fun (a, b) ->
+          assert_consensus_state_pair
+            (With_hash.data a, With_hash.data b)
+            ~assertion:"within short range"
+            ~f:(fun (a, b) -> Hooks.is_short_range a b ~constants) )
+
+    let%test_unit "generator sanity check: gen_spot_pair_short_misaligned \
+                   always generates pairs of states in short fork range" =
+      let constants = Lazy.force Constants.for_unit_tests in
+      Quickcheck.test (gen_spot_pair_short_misaligned ()) ~f:(fun (a, b) ->
+          assert_consensus_state_pair
+            (With_hash.data a, With_hash.data b)
+            ~assertion:"within short range"
+            ~f:(fun (a, b) -> Hooks.is_short_range a b ~constants) )
+
+    let%test_unit "generator sanity check: gen_spot_pair_long always \
+                   generates pairs of states in long fork range" =
+      let constants = Lazy.force Constants.for_unit_tests in
+      Quickcheck.test gen_spot_pair_long ~f:(fun (a, b) ->
+          assert_consensus_state_pair
+            (With_hash.data a, With_hash.data b)
+            ~assertion:"within long range"
+            ~f:(fun (a, b) -> not (Hooks.is_short_range ~constants a b)) )
+
+    let%test_unit "selection case: equal states" =
+      Quickcheck.test
+        (Quickcheck.Generator.tuple2 State_hash.gen (gen_spot ()))
+        ~f:(fun (hash, state) ->
+          let hashed_state = {With_hash.data= state; hash} in
+          assert_not_selected (hashed_state, hashed_state) )
+
+    let%test_unit "selection case: aligned checkpoints & different lengths" =
+      Quickcheck.test
+        (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Ascending
+           ())
+        ~f:assert_selected
+
+    let%test_unit "selection case: aligned checkpoints & equal lengths & \
+                   different vrfs" =
+      Quickcheck.test
+        (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
+           ~vrf_output_relativity:`Ascending ())
+        ~f:assert_selected
+
+    let%test_unit "selection case: aligned checkpoints & equal lengths & \
+                   equal vrfs & different hashes" =
+      Quickcheck.test
+        (gen_spot_pair_short_aligned ~blockchain_length_relativity:`Equal
+           ~vrf_output_relativity:`Equal ())
+        ~f:(fun (a, b) ->
+          if State_hash.(With_hash.hash b > With_hash.hash a) then
+            assert_selected (a, b)
+          else assert_selected (b, a) )
+
+    let%test_unit "selection case: misaligned checkpoints & different lengths"
+        =
+      Quickcheck.test
+        (gen_spot_pair_short_misaligned
+           ~blockchain_length_relativity:`Ascending ())
+        ~f:assert_selected
+
+    (* TODO: This test always succeeds, but this could be a false positive as the blockchain length equality constraint
+     * is broken for misaligned short forks.
+     *)
+    let%test_unit "selection case: misaligned checkpoints & equal lengths & \
+                   different vrfs" =
+      Quickcheck.test
+        (gen_spot_pair_short_misaligned ~blockchain_length_relativity:`Equal
+           ~vrf_output_relativity:`Ascending ())
+        ~f:assert_selected
+
+    (* TODO: This test fails because the blockchain length equality constraint is broken for misaligned short forks.
+    let%test_unit "selection case: misaligned checkpoints & equal lengths & equal vrfs & different hashes" =
+      Quickcheck.test
+        (gen_spot_pair_short_misaligned ~blockchain_length_relativity:`Equal ~vrf_output_relativity:`Equal ())
+        ~f:(fun (a, b) ->
+          if State_hash.compare (With_hash.hash a) (With_hash.hash b) > 0 then
+            assert_selected (a, b)
+          else
+            assert_selected (b, a))
+    *)
+
+    (* TODO: expand long fork generation to support relativity constraints
+    let%test_unit "selection case: distinct checkpoints & different min window densities" =
+      failwith "TODO"
+
+    let%test_unit "selection case: distinct checkpoints & equal min window densities & different lengths" =
+      failwith "TODO"
+
+    let%test_unit "selection case: distinct checkpoints & equal min window densities & equal lengths & different vrfs" =
+      failwith "TODO"
+
+    let%test_unit "selection case: distinct checkpoints & equal min window densities & equal lengths & qequals vrfs & different hashes" =
+      failwith "TODO"
+    *)
+
+    let%test_unit "selection invariant: candidate selections are not \
+                   commutative" =
+      let logger = Logger.null () in
+      let constants = Lazy.force Constants.for_unit_tests in
+      let select existing candidate =
+        Hooks.select ~constants ~existing ~candidate ~logger
+      in
+      Quickcheck.test gen_spot_pair
+        ~f:
+          (assert_hashed_consensus_state_pair
+             ~assertion:"chains do not trigger a selection cycle"
+             ~f:(fun (a, b) -> (select a b, select b a) <> (`Take, `Take)))
+
+    (* We define a homogeneous binary relation for consensus states by adapting the binary chain
+     * selection rule and extending it to consider equality of chains. From this, we can test
+     * that this extended relations forms a non-strict partial order over the set of consensus
+     * states.
+     *
+     * We omit partial order reflexivity and antisymmetry tests as they are merely testing properties
+     * of equality related to the partial order we define from binary chain selection. Chain
+     * selection, as is written, will always reject equal elements, so the only property we are
+     * truly interested in it holding is transitivity (when lifted to a homogeneous binary relation).
+     *
+     * TODO: Improved quickcheck generator which better explores related states via our spot
+     * pair generation rules. Doing this requires re-working our spot pair generators to
+     * work by extending an already generated consensus state with some relative constraints.
+     *)
+    let%test_unit "selection invariant: partial order transitivity" =
+      let logger = Logger.null () in
+      let constants = Lazy.force Constants.for_unit_tests in
+      let select existing candidate =
+        Hooks.select ~constants ~existing ~candidate ~logger
+      in
+      let ( <= ) a b =
+        match (select a b, select b a) with
+        | `Keep, `Keep ->
+            true
+        | `Keep, `Take ->
+            true
+        | `Take, `Keep ->
+            false
+        | `Take, `Take ->
+            assert_hashed_consensus_state_pair (a, b)
+              ~assertion:"chains do not trigger a selection cycle"
+              ~f:(Fn.const false) ;
+            (* unreachable *)
+            false
+      in
+      let chains_hold_transitivity (a, b, c) =
+        if a <= b then if b <= c then a <= c else c <= b
+        else if b <= c then if c <= a then b <= a else a <= c
+        else if c <= a then if a <= b then c <= b else b <= a
+        else false
+      in
+      let gen = gen_with_hash (gen_spot ()) in
+      Quickcheck.test
+        (Quickcheck.Generator.tuple3 gen gen gen)
+        ~f:
+          (assert_hashed_consensus_state_triple
+             ~assertion:"chains hold partial order transitivity"
+             ~f:chains_hold_transitivity)
   end )
 
 module Exported = struct
