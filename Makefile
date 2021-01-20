@@ -169,17 +169,6 @@ check-format:
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
 
-########################################
-## Merlin fixup for docker builds
-
-merlin-fixup:
-ifeq ($(USEDOCKER),TRUE)
-	@echo "Fixing up .merlin files for Docker build"
-	@./scripts/merlin-fixup.sh
-else
-	@echo "Not building in Docker, .merlin files unchanged"
-endif
-
 #######################################
 ## Environment setup
 
