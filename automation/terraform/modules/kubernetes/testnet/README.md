@@ -1,4 +1,4 @@
-# Testnet Terraoform Module (K8s/GKE)
+# Testnet Terraform Module (K8s/GKE)
 
 ## Providers
 
