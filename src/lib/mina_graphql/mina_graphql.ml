@@ -2655,7 +2655,7 @@ module Queries = struct
       ~resolve:account_resolver
 
   let account =
-    field "account" ~doc:"Find any account via a public key"
+    field "account" ~doc:"Find any account via a public key and token"
       ~typ:Types.AccountObj.account
       ~args:
         Arg.
@@ -2785,6 +2785,24 @@ module Queries = struct
             ; proof= genesis_proof }
         ; hash } )
 
+  (* used by best_chain, block below *)
+  let block_of_breadcrumb coda breadcrumb =
+    let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let transition =
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+    in
+    let transactions =
+      Mina_transition.External_transition.Validated.transactions
+        ~constraint_constants:
+          (Mina_lib.config coda).precomputed_values.constraint_constants
+        transition
+    in
+    With_hash.Stable.Latest.
+      { data=
+          Filtered_external_transition.of_transition transition `All
+            transactions
+      ; hash }
+
   let best_chain =
     field "bestChain"
       ~doc:
@@ -2802,22 +2820,31 @@ module Queries = struct
       ~resolve:(fun {ctx= coda; _} () max_length ->
         let open Option.Let_syntax in
         let%map best_chain = Mina_lib.best_chain ?max_length coda in
-        List.map best_chain ~f:(fun breadcrumb ->
-            let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-            let transition =
-              Transition_frontier.Breadcrumb.validated_transition breadcrumb
-            in
-            let transactions =
-              Mina_transition.External_transition.Validated.transactions
-                ~constraint_constants:
-                  (Mina_lib.config coda).precomputed_values
-                    .constraint_constants transition
-            in
-            With_hash.Stable.Latest.
-              { data=
-                  Filtered_external_transition.of_transition transition `All
-                    transactions
-              ; hash } ) )
+        List.map best_chain ~f:(block_of_breadcrumb coda) )
+
+  let block =
+    field "block"
+      ~doc:
+        "Retrieve a block with the given state hash, if contained in the \
+         transition frontier."
+      ~typ:Types.block
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:(non_null string) ]
+      ~resolve:(fun {ctx= coda; _} () (state_hash : string) ->
+        let transition_frontier_pipe = Mina_lib.transition_frontier coda in
+        let open Option.Let_syntax in
+        let%bind transition_frontier =
+          Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
+        in
+        let%bind state_hash =
+          State_hash.of_base58_check state_hash |> Or_error.ok
+        in
+        let%map breadcrumb =
+          Transition_frontier.find transition_frontier state_hash
+        in
+        block_of_breadcrumb coda breadcrumb )
 
   let initial_peers =
     field "initialPeers"
@@ -2920,6 +2947,7 @@ module Queries = struct
     ; token_owner
     ; current_snark_worker
     ; best_chain
+    ; block
     ; genesis_block
     ; initial_peers
     ; get_peers
