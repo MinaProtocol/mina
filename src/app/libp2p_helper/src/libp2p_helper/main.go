@@ -1187,6 +1187,8 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 	newFilter := ma.NewFilters()
 	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
 
+	logger.Info("setting gating config from: %#v", gc)
+
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
 		if err != nil {
