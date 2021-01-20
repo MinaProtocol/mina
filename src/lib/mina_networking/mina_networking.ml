@@ -333,6 +333,57 @@ module Rpcs = struct
     end
   end
 
+  module Get_transition_knowledge = struct
+    module Master = struct
+      let name = "Get_transition_knowledge"
+
+      module T = struct
+        type query = unit [@@deriving sexp, to_yojson]
+
+        type response = State_hash.t list
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response = State_hash.Stable.V1.t list
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+  end
+
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -624,6 +675,10 @@ module Rpcs = struct
           rpc
     | Get_transition_chain
         : (Get_transition_chain.query, Get_transition_chain.response) rpc
+    | Get_transition_knowledge
+        : ( Get_transition_knowledge.query
+          , Get_transition_knowledge.response )
+          rpc
     | Get_transition_chain_proof
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
@@ -653,6 +708,8 @@ module Rpcs = struct
         (module Answer_sync_ledger_query)
     | Get_transition_chain ->
         (module Get_transition_chain)
+    | Get_transition_knowledge ->
+        (module Get_transition_knowledge)
     | Get_transition_chain_proof ->
         (module Get_transition_chain_proof)
     | Get_ancestry ->
@@ -798,7 +855,10 @@ let create (config : Config.t)
        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
     ~(get_transition_chain :
           Rpcs.Get_transition_chain.query Envelope.Incoming.t
-       -> Rpcs.Get_transition_chain.response Deferred.t) =
+       -> Rpcs.Get_transition_chain.response Deferred.t)
+    ~(get_transition_knowledge :
+          Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_knowledge.response Deferred.t) =
   let logger = config.logger in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
@@ -1001,6 +1061,16 @@ let create (config : Config.t)
     in
     record_unknown_item result sender action_msg msg_args
   in
+  let get_transition_knowledge_rpc conn ~version:_ query =
+    [%log info] "Sending transition_knowledge to $peer" ~metadata:(md conn) ;
+    let action_msg = "Get_transition_knowledge query: $query" in
+    let msg_args =
+      [("query", Rpcs.Get_transition_knowledge.query_to_yojson query)]
+    in
+    run_for_rpc_result conn query ~f:get_transition_knowledge action_msg
+      msg_args
+    >>| fst
+  in
   let get_transition_chain_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain query: $query" in
@@ -1069,6 +1139,11 @@ let create (config : Config.t)
         { rpc= Get_ancestry
         ; f= get_ancestry_rpc
         ; budget= (5, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_transition_knowledge
+        ; f= get_transition_knowledge_rpc
+        ; budget= (1, `Per minute)
         ; cost= unit }
     ; Rpc_handler
         { rpc= Get_transition_chain
@@ -1186,8 +1261,6 @@ include struct
 
   let random_peers = lift random_peers
 
-  let random_peers_except = lift random_peers_except
-
   let query_peer ?heartbeat_timeout ?timeout {gossip_net; _} =
     query_peer ?heartbeat_timeout ?timeout gossip_net
 
@@ -1242,20 +1315,6 @@ let broadcast_snark_pool_diff t diff =
              Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
          })
 
-(* TODO: This is kinda inefficient *)
-let find_map xs ~f =
-  let open Async in
-  let ds = List.map xs ~f in
-  let filter ~f =
-    Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-  in
-  let none_worked =
-    Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-        if List.for_all ds ~f:Option.is_none then return None
-        else Deferred.never () )
-  in
-  Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
-
 (* TODO: Don't copy and paste *)
 let find_map' xs ~f =
   let open Async in
@@ -1290,16 +1349,17 @@ let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
   | Failed_to_connect e ->
       Error (Error.tag e ~tag:"failed-to-connect")
 
-let get_transition_chain_proof ?timeout t =
-  make_rpc_request ?timeout ~rpc:Rpcs.Get_transition_chain_proof
-    ~label:"transition chain proof" t
+let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
+  make_rpc_request ?heartbeat_timeout ?timeout
+    ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition chain proof" t
 
 let get_transition_chain ?heartbeat_timeout ?timeout t =
   make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
     ~label:"chain of transitions" t
 
-let get_best_tip ?timeout t peer =
-  make_rpc_request ?timeout ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
+let get_best_tip ?heartbeat_timeout ?timeout t peer =
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
+    ~label:"best tip" t peer ()
 
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
@@ -1428,88 +1488,8 @@ module Sl_downloader = struct
 
               let key = fst
             end)
+            (Ledger_hash)
 end
-
-let glue_sync_ledger :
-       t
-    -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
-       Pipe_lib.Linear_pipe.Reader.t
-    -> ( Mina_base.Ledger_hash.t
-       * Mina_base.Sync_ledger.Query.t
-       * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
-       Pipe_lib.Linear_pipe.Writer.t
-    -> unit =
- fun t query_reader response_writer ->
-  (* We attempt to query 3 random peers, retry_max times. We keep track of the
-          peers that couldn't answer a particular query and won't try them
-          again. *)
-  let retry_max = 6 in
-  let retry_interval = Core.Time.Span.of_ms 200. in
-  let rec answer_query ctr peers_tried query =
-    O1trace.trace_event "ask sync ledger query" ;
-    let%bind peers = random_peers_except t 3 ~except:peers_tried in
-    [%log' trace t.logger]
-      !"SL: Querying the following peers %{sexp: Peer.t list}"
-      peers ;
-    match%bind
-      find_map peers ~f:(fun peer ->
-          [%log' trace t.logger]
-            !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
-              Ledger_hash.t}"
-            peer (fst query) ;
-          match%map
-            query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
-          with
-          | Connected {data= Ok (Ok answer); sender; _} ->
-              [%log' trace t.logger]
-                !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
-                  %{sexp: Ledger_hash.t}"
-                peer (fst query) ;
-              (* TODO : here is a place where an envelope could contain
-                a Peer.t, and not just an IP address, if desired
-            *)
-              Some (Envelope.Incoming.wrap ~data:answer ~sender)
-          | Connected {data= Ok (Error e); _} ->
-              [%log' info t.logger]
-                "Peer $peer didn't have enough information to answer \
-                 ledger_hash query. See error for more details: $error"
-                ~metadata:
-                  [ ("error", Error_json.error_to_yojson e)
-                  ; ("peer", Peer.to_yojson peer) ] ;
-              Hash_set.add peers_tried peer ;
-              None
-          | Connected {data= Error e; _} ->
-              [%log' info t.logger]
-                "RPC error during ledger_hash query See error for more \
-                 details: $error"
-                ~metadata:[("error", Error_json.error_to_yojson e)] ;
-              Hash_set.add peers_tried peer ;
-              None
-          | Failed_to_connect err ->
-              [%log' warn t.logger] "Network error: %s"
-                (Error.to_string_mach err) ;
-              None )
-    with
-    | Some answer ->
-        [%log' trace t.logger]
-          !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-          (fst query) ;
-        (* TODO *)
-        Linear_pipe.write_if_open response_writer (fst query, snd query, answer)
-    | None ->
-        [%log' info t.logger]
-          !"None of the peers contacted were able to answer ledger_hash query \
-            -- trying more" ;
-        if ctr > retry_max then Deferred.unit
-        else
-          let%bind () = Clock.after retry_interval in
-          answer_query (ctr + 1) peers_tried query
-  in
-  Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
-    ~f:(answer_query 0 (Peer.Hash_set.of_list []))
-  |> don't_wait_for
-
-let _ = glue_sync_ledger
 
 let glue_sync_ledger :
        t
@@ -1522,21 +1502,36 @@ let glue_sync_ledger :
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
  fun t ~preferred query_reader response_writer ->
-  (* We attempt to query 3 random peers, retry_max times. We keep track of the
-          peers that couldn't answer a particular query and won't try them
-          again. *)
-  (*
-  let retry_max = 6 in
-  let retry_interval = Core.Time.Span.of_ms 200. in
-    *)
   let downloader =
+    let heartbeat_timeout = Time_ns.Span.of_sec 20. in
+    let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
+    let knowledge h peer =
+      match%map
+        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
+          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+      with
+      | Connected {data= Ok _; _} ->
+          `Call (fun (h', _) -> Ledger_hash.equal h' h)
+      | Failed_to_connect _ | Connected {data= Error _; _} ->
+          `Some []
+    in
+    let%bind _ = Linear_pipe.values_available query_reader in
+    let root_hash_r, root_hash_w =
+      Broadcast_pipe.create
+        (Option.value_exn (Linear_pipe.peek query_reader) |> fst)
+    in
     Sl_downloader.create ~preferred ~max_batch_size:100
-      ~stop:(Pipe_lib.Linear_pipe.closed query_reader)
+      ~peers:(fun () -> peers t)
+      ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
       ~trust_system:t.trust_system
-      ~get:(fun peer qs ->
+      ~get:(fun (peer : Peer.t) qs ->
+        List.iter qs ~f:(fun (h, _) ->
+            if
+              not
+                (Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r))
+            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
         let%map rs =
-          query_peer' ~how:`Parallel
-            ~heartbeat_timeout:(Time_ns.Span.of_sec 20.)
+          query_peer' ~how:`Parallel ~heartbeat_timeout
             ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
             t peer.peer_id Rpcs.Answer_sync_ledger_query qs
         in
@@ -1556,7 +1551,6 @@ let glue_sync_ledger :
                   (List.filter_map ps ~f:(fun (q, r) ->
                        match r with Ok r -> Some (q, r) | Error _ -> None )) )
           ) )
-      ~peers:(fun () -> peers t)
   in
   don't_wait_for
     (let%bind downloader = downloader in

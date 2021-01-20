@@ -33,7 +33,7 @@ end = struct
     | Some (ivar, _) ->
         if Ivar.is_full ivar then
           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-        Ivar.fill_if_empty ivar () ;
+        Ivar.fill ivar () ;
         t.task <- None
     | None ->
         ()
@@ -64,7 +64,7 @@ let lift_sync f =
     (Deferred.create (fun ivar ->
          if Ivar.is_full ivar then
            [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
-         Ivar.fill_if_empty ivar (f ()) ))
+         Ivar.fill ivar (f ()) ))
 
 module Singleton_scheduler : sig
   type t

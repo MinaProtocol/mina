@@ -119,6 +119,13 @@ module Multiaddr : sig
   val of_string : string -> t
 
   val to_peer : t -> Network_peer.Peer.t option
+
+  (** can a multiaddr plausibly be used as a Peer.t?
+      a syntactic check only; a return value of
+       true does not guarantee that the multiaddress can
+       be used as a peer by libp2p
+  *)
+  val valid_as_peer : t -> bool
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -369,7 +376,7 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
 
-(** Configure the connection gateway. 
+(** Configure the connection gateway.
 
     This will fail if any of the trusted or banned peers are on IPv6. *)
 val set_connection_gating_config :

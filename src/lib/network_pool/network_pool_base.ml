@@ -160,7 +160,7 @@ end)
             | `Within_capacity -> (
                 match%bind Resource_pool.Diff.verify t.resource_pool diff with
                 | Error err ->
-                    [%log' warn t.logger]
+                    [%log' debug t.logger]
                       "Refusing to rebroadcast $diff. Verification error: \
                        $error"
                       ~metadata:

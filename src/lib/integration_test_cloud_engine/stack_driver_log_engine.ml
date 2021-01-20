@@ -638,7 +638,7 @@ let start_background_query (type r)
     (finally subscription_task ~f:(fun () ->
          if Ivar.is_full finished_ivar then
            [%log error] "Ivar.fill bug is here!" ;
-         Ivar.fill_if_empty finished_ivar () )) ;
+         Ivar.fill finished_ivar () )) ;
   (subscription, Ivar.read finished_ivar)
 
 let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
