@@ -1,12 +1,7 @@
 provider helm {
-  debug = true
+  alias = "testnet_deploy"
   kubernetes {
-    # config_context  = var.k8s_context
-    host                   = "https://${data.google_container_cluster.cluster.endpoint}"
-    client_certificate     = base64decode(data.google_container_cluster.cluster.master_auth[0].client_certificate)
-    client_key             = base64decode(data.google_container_cluster.cluster.master_auth[0].client_key)
-    cluster_ca_certificate = base64decode(data.google_container_cluster.cluster.master_auth[0].cluster_ca_certificate)
-    token                  = data.google_client_config.current.access_token
+    config_context  = var.k8s_context
   }
 }
 
@@ -19,8 +14,8 @@ data "local_file" "genesis_ledger" {
 }
 
 locals {
-  mina_helm_repo = "https://coda-charts.storage.googleapis.com"
-  use_local_charts = true
+  use_local_charts = false
+  mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
@@ -173,11 +168,13 @@ resource "kubernetes_role_binding" "helm_release" {
     name      = "admin-role"
     namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
   }
+
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
     name      = "admin"
   }
+
   subject {
     kind      = "ServiceAccount"
     name      = "default"
@@ -186,10 +183,12 @@ resource "kubernetes_role_binding" "helm_release" {
 }
 
 resource "helm_release" "seed" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-seed"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version     = "0.3.2"
+  version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -206,10 +205,12 @@ resource "helm_release" "seed" {
 # Block Producer
 
 resource "helm_release" "block_producers" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-block-producers"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version     = "0.4.3"
+  version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -222,10 +223,12 @@ resource "helm_release" "block_producers" {
 # Snark Worker
 
 resource "helm_release" "snark_workers" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-snark-worker"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version     = "0.3.3"
+  version     = "0.4.5"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
@@ -238,12 +241,14 @@ resource "helm_release" "snark_workers" {
 # Archive Node
 
 resource "helm_release" "archive_node" {
+  provider   = helm.testnet_deploy
+
   count       = var.archive_node_count
   
-  name        = "archive-node-${count.index}"
+  name        = "archive-node-${count.index + 1}"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version     = "0.3.3"
+  version     = "0.4.6"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
     yamlencode(local.archive_node_vars)
