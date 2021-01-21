@@ -287,13 +287,21 @@ WITH RECURSIVE chain AS (
 
   module User_commands = struct
     module Extras = struct
-      let fee_payer (x, _, _) = `Pk x
+      type t = {fee_payer: string; source: string; receiver: string}
+      [@@deriving hlist]
 
-      let source (_, y, _) = `Pk y
+      let fee_payer t = `Pk t.fee_payer
 
-      let receiver (_, _, z) = `Pk z
+      let source t = `Pk t.source
 
-      let typ = Caqti_type.(tup3 string string string)
+      let receiver t = `Pk t.receiver
+
+      let typ =
+        let open Archive_lib.Processor.Caqti_type_spec in
+        let spec = Caqti_type.[string; string; string] in
+        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        Caqti_type.custom ~encode ~decode (to_rep spec)
     end
 
     let typ =
