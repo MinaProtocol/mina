@@ -2889,72 +2889,68 @@ module Queries = struct
       ~resolve:
         (fun {ctx= coda; _} () (state_hash_base58_opt : string option)
              (height_opt : int option) ->
-        let have_state_hash = Option.is_some state_hash_base58_opt in
-        let have_height = Option.is_some height_opt in
-        if Bool.equal have_state_hash have_height then
-          Error "Must provide exactly one of state hash, height"
-        else
-          let open Result.Let_syntax in
+        let open Result.Let_syntax in
+        let get_transition_frontier () =
           let transition_frontier_pipe = Mina_lib.transition_frontier coda in
-          let%bind transition_frontier =
-            Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
-            |> Result.of_option ~error:"Could not obtain transition frontier"
+          Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
+          |> Result.of_option ~error:"Could not obtain transition frontier"
+        in
+        let block_from_state_hash state_hash state_hash_base58 =
+          let%bind transition_frontier = get_transition_frontier () in
+          let%map breadcrumb =
+            Transition_frontier.find transition_frontier state_hash
+            |> Result.of_option
+                 ~error:
+                   (sprintf
+                      "Block with state hash %s not found in transition \
+                       frontier"
+                      state_hash_base58)
           in
-          let block_from_state_hash state_hash state_hash_base58 =
-            let%map breadcrumb =
-              Transition_frontier.find transition_frontier state_hash
-              |> Result.of_option
-                   ~error:
-                     (sprintf
-                        "Breadcrumb for state hash %s not found in transition \
-                         frontier"
-                        state_hash_base58)
-            in
-            block_of_breadcrumb coda breadcrumb
-          in
-          let block_from_height height =
-            let height_uint32 =
-              (* GraphQL int is signed 32-bit
+          block_of_breadcrumb coda breadcrumb
+        in
+        let block_from_height height =
+          let height_uint32 =
+            (* GraphQL int is signed 32-bit
                  empirically, conversion does not raise even if
                  - the number is negative
                  - the number is not representable using 32 bits
               *)
-              Unsigned.UInt32.of_int height
-            in
-            let breadcrumbs =
-              Transition_frontier.all_breadcrumbs transition_frontier
-            in
-            let%map desired_breadcrumb =
-              List.find breadcrumbs ~f:(fun bc ->
-                  let validated_transition =
-                    Transition_frontier.Breadcrumb.validated_transition bc
-                  in
-                  let block_height =
-                    Mina_transition.External_transition.Validated
-                    .blockchain_length validated_transition
-                  in
-                  Unsigned.UInt32.equal block_height height_uint32 )
-              |> Result.of_option
-                   ~error:
-                     (sprintf
-                        "Could not find breadcrumb in transition frontier \
-                         with height %d"
-                        height)
-            in
-            block_of_breadcrumb coda desired_breadcrumb
+            Unsigned.UInt32.of_int height
           in
-          if have_state_hash then
-            let state_hash_base58 = Option.value_exn state_hash_base58_opt in
+          let%bind transition_frontier = get_transition_frontier () in
+          let breadcrumbs =
+            Transition_frontier.all_breadcrumbs transition_frontier
+          in
+          let%map desired_breadcrumb =
+            List.find breadcrumbs ~f:(fun bc ->
+                let validated_transition =
+                  Transition_frontier.Breadcrumb.validated_transition bc
+                in
+                let block_height =
+                  Mina_transition.External_transition.Validated
+                  .blockchain_length validated_transition
+                in
+                Unsigned.UInt32.equal block_height height_uint32 )
+            |> Result.of_option
+                 ~error:
+                   (sprintf
+                      "Could not find block in transition frontier with \
+                       height %d"
+                      height)
+          in
+          block_of_breadcrumb coda desired_breadcrumb
+        in
+        match (state_hash_base58_opt, height_opt) with
+        | Some state_hash_base58, None ->
             let%bind state_hash =
               State_hash.of_base58_check state_hash_base58
               |> Result.map_error ~f:Error.to_string_hum
             in
             block_from_state_hash state_hash state_hash_base58
-          else if have_height then
-            let height = Option.value_exn height_opt in
+        | None, Some height ->
             block_from_height height
-          else (* unreachable *)
-            Error "internal error" )
+        | None, None | Some _, Some _ ->
+            Error "Must provide exactly one of state hash, height" )
 
   let initial_peers =
     field "initialPeers"
