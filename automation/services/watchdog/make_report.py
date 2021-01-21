@@ -2,7 +2,7 @@
 
 # example of running locally
 # MAKE_REPORT_DISCORD_WEBHOOK_URL=""
-# python3 services/coda-network-services/make_report.py -n $namespace --discord_webhook_url $MAKE_REPORT_DISCORD_WEBHOOK_URL -a "$(cat accounts.csv)"
+# python3 services/watchdog/make_report.py -n $namespace --discord_webhook_url $MAKE_REPORT_DISCORD_WEBHOOK_URL -a "$(cat accounts.csv)"
 
 import sys
 import traceback

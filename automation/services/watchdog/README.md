@@ -3,27 +3,3 @@
 # Mina :link: Network Services
 
 Watchdog for Mina testnet
-
-## coda-network-services
-
-### usage
-
-**Required**
-
-...
-
-**Optional**
-
-...
-
-## network-utilities
-
-### usage
-
-**Required**
-
-...
-
-**Optional**
-
-...

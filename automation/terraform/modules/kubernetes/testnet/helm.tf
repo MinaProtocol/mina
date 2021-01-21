@@ -36,15 +36,6 @@ locals {
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
   }
   
-  coda_network_services_vars = {
-    restartEveryMins = var.restart_nodes_every_mins
-    restartNodes = var.restart_nodes
-    makeReports = var.make_reports
-    makeReportEveryMins = var.make_report_every_mins
-    makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
-    makeReportAccounts = var.make_report_accounts
-  }
-
   seed_vars = {
     testnetName = var.testnet_name
     coda        = {
@@ -65,7 +56,6 @@ locals {
       active = true
       discovery_keypair = var.seed_discovery_keypairs[0]
     }
-    codaNetworkServicesConfig = local.coda_network_services_vars
   }
 
   block_producer_vars = {
