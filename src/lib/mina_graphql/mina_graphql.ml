@@ -2895,7 +2895,11 @@ module Queries = struct
           Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
           |> Result.of_option ~error:"Could not obtain transition frontier"
         in
-        let block_from_state_hash state_hash state_hash_base58 =
+        let block_from_state_hash state_hash_base58 =
+          let%bind state_hash =
+            State_hash.of_base58_check state_hash_base58
+            |> Result.map_error ~f:Error.to_string_hum
+          in
           let%bind transition_frontier = get_transition_frontier () in
           let%map breadcrumb =
             Transition_frontier.find transition_frontier state_hash
@@ -2942,11 +2946,7 @@ module Queries = struct
         in
         match (state_hash_base58_opt, height_opt) with
         | Some state_hash_base58, None ->
-            let%bind state_hash =
-              State_hash.of_base58_check state_hash_base58
-              |> Result.map_error ~f:Error.to_string_hum
-            in
-            block_from_state_hash state_hash state_hash_base58
+            block_from_state_hash state_hash_base58
         | None, Some height ->
             block_from_height height
         | None, None | Some _, Some _ ->
