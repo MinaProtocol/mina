@@ -8296,6 +8296,33 @@
               "deprecationReason": null
             },
             {
+              "name": "block",
+              "description": "Retrieve a block with the given state hash, if contained in the transition frontier.",
+              "args": [
+                {
+                  "name": "stateHash",
+                  "description": "The state hash of the desired block",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Block",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "genesisBlock",
               "description": "Get the genesis block",
               "args": [],
