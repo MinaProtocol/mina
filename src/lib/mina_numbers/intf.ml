@@ -35,6 +35,8 @@ module type S_unchecked = sig
 
   val gen : t Quickcheck.Generator.t
 
+  val gen_incl : t -> t -> t Quickcheck.Generator.t
+
   val zero : t
 
   val succ : t -> t

@@ -314,7 +314,8 @@ end = struct
     let create ~preferred ~all_peers =
       let knowledge =
         Peer.Table.of_alist_exn
-          (List.map all_peers ~f:(fun p -> (p, Knowledge.create ())))
+          (List.map (List.dedup_and_sort ~compare:Peer.compare all_peers)
+             ~f:(fun p -> (p, Knowledge.create ())))
       in
       let r, w =
         Strict_pipe.create ~name:"useful_peers-available" ~warn_on_drop:false
