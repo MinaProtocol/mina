@@ -192,20 +192,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   (metadata @ [("error", Error_json.error_to_yojson error)])
                 "Error while building breadcrumb in the transition handler \
                  processor: $error" ;
-              let (_
-                    : External_transition.Initial_validated.t
-                      Envelope.Incoming.t) =
-                Cached.invalidate_with_failure
-                  cached_initially_validated_transition
-              in
               Deferred.return (Error ())
           | Error (`Fatal_error exn) ->
-              let (_
-                    : External_transition.Initial_validated.t
-                      Envelope.Incoming.t) =
-                Cached.invalidate_with_failure
-                  cached_initially_validated_transition
-              in
               raise exn
           | Ok breadcrumb ->
               Deferred.return (Ok breadcrumb) )
