@@ -173,6 +173,12 @@ locals {
         metrics = "8081"
       }
     }
+    restartEveryMins = var.restart_nodes_every_mins
+    restartNodes = var.restart_nodes
+    makeReports = var.make_reports
+    makeReportEveryMins = var.make_report_every_mins
+    makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
+    makeReportAccounts = var.make_report_accounts
   }
   
 }
