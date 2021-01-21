@@ -129,8 +129,20 @@ module Timing_info = struct
     let open Deferred.Result.Let_syntax in
     let%bind pk_id = Public_key.find (module Conn) acc.public_key in
     Conn.find
-      (Caqti_request.find Caqti_type.int Caqti_type.int
-         "SELECT id FROM timing_info WHERE public_key_id = ?")
+      (Caqti_request.find Caqti_type.int typ
+         "SELECT public_key_id, token, initial_balance, \
+          initial_minimum_balance, cliff_time, cliff_amount, vesting_period, \
+          vesting_increment FROM timing_info WHERE public_key_id = ?")
+      pk_id
+
+  let find_by_pk_opt (module Conn : CONNECTION) public_key =
+    let open Deferred.Result.Let_syntax in
+    let%bind pk_id = Public_key.find (module Conn) public_key in
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.int typ
+         "SELECT public_key_id, token, initial_balance, \
+          initial_minimum_balance, cliff_time, cliff_amount, vesting_period, \
+          vesting_increment FROM timing_info WHERE public_key_id = ?")
       pk_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
