@@ -14,6 +14,8 @@ let optional_public_key = Option.map ~f:public_key
 
 let uint64 json = Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 
+let optional_uint64 json = Option.map json ~f:uint64
+
 let uint32 json = Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
 
 let balance json =
