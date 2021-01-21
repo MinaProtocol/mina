@@ -352,15 +352,15 @@ module Types = struct
             ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
         ] )
 
-  let account_timing =
+  let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "initial_minimum_balance" ~typ:(non_null uint64)
-            ~doc:"The initial minimum balance for an account"
+        [ field "timed_minimum_balance" ~typ:(non_null uint64)
+            ~doc:"The timed minimum balance for an account"
             ~args:Arg.[]
-            ~resolve:(fun _ {Account.Poly.timing; _} ->
+            ~resolve:(fun _ timing ->
               match timing with
-              | Untimed ->
-                  Balance.zero |> Balance.to_uint64
+              | Account_timing.Untimed ->
+                  Balance.(zero |> to_uint64)
               | Timed timing_info ->
                   timing_info.initial_minimum_balance |> Balance.to_uint64 ) ]
     )
