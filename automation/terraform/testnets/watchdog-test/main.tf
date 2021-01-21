@@ -58,6 +58,17 @@ locals {
   seed_discovery_keypairs = [
   "CAESQBEHe2zCcQDHcSaeIydGggamzmTapdCS8SP0hb5FWvYhe9XEygmlUGV4zNu2P8zAIba4X84Gm4usQFLamjRywA8=,CAESIHvVxMoJpVBleMzbtj/MwCG2uF/OBpuLrEBS2po0csAP,12D3KooWJ9mNdbUXUpUNeMnejRumKzmQF15YeWwAPAhTAWB6dhiv",
   "CAESQO+8qvMqTaQEX9uh4NnNoyOy4Xwv3U80jAsWweQ1J37AVgx7kgs4pPVSBzlP7NDANP1qvSvEPOTh2atbMMUO8EQ=,CAESIFYMe5ILOKT1Ugc5T+zQwDT9ar0rxDzk4dmrWzDFDvBE,12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5" ]
+
+  # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
+  make_report_discord_webhook_url = <<EOT
+    ${file("../../../discord_webhook_url.txt")}
+  EOT
+
+  # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
+  make_report_accounts = <<EOT
+    ${file("../../../${local.testnet_name}-accounts.csv")}
+  EOT
+
 }
 
 
@@ -137,4 +148,14 @@ module "testnet_east" {
   agent_send_every_mins = "1"
 
   upload_blocks_to_gcloud = false
+
+  restart_nodes = false
+  restart_nodes_every_mins = "60"
+
+  make_reports = true
+  make_report_every_mins = "5"
+
+  make_report_discord_webhook_url = local.make_report_discord_webhook_url
+  make_report_accounts = local.make_report_accounts
+
 }
