@@ -1534,6 +1534,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                 Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering") ) ;
+            Hashtbl.clear outstanding_requests ;
             if
               (not killed)
               && not
