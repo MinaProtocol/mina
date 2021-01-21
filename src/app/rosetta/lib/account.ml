@@ -25,7 +25,7 @@ module Get_balance =
         }
         nonce
       }
-  }
+    }
 |}]
 
 module Balance = struct
