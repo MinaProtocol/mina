@@ -166,7 +166,12 @@ locals {
 
   watchdog_vars = {
     testnetName = var.testnet_name
-    coda = local.coda_vars
+    coda = {
+      image = var.coda_image
+      ports = {
+        metrics = "8081"
+      }
+    }
   }
   
 }

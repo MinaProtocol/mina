@@ -1,2 +1,11 @@
 testnetName: "coda-testnet"
+name: "watchdog"
+
+coda:
+  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "10001"
+    p2p: "10909"
 
