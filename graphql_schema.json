@@ -6492,7 +6492,7 @@
         {
           "kind": "OBJECT",
           "name": "AnnotatedBalance",
-          "description": "A total balance annotated with the amount that is currently unknown with the invariant: unknown <= total",
+          "description": "A total balance annotated with the amount that is currently unknown with the invariant unknown <= total, as well as the currently liquid and locked balances.",
           "fields": [
             {
               "name": "total",
@@ -6525,6 +6525,28 @@
               },
               "isDeprecated": true,
               "deprecationReason": null
+            },
+            {
+              "name": "liquid",
+              "isDeprecated": true,
+              "args": [],
+              "deprecationReason": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64"
+              },
+              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping."
+            },
+            {
+              "name": "locked",
+              "isDeprecated": true,
+              "args": [],
+              "deprecationReason": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64"
+              },
+              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping."
             },
             {
               "name": "blockHeight",
