@@ -2831,9 +2831,14 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "stateHash" ~doc:"The state hash of the desired block"
-              ~typ:(non_null string) ]
-      ~resolve:(fun {ctx= coda; _} () (state_hash_base58 : string) ->
+              ~typ:string ]
+      ~resolve:
+        (fun {ctx= coda; _} () (state_hash_base58_opt : string option) ->
         let open Result.Let_syntax in
+        let%bind state_hash_base58 =
+          state_hash_base58_opt
+          |> Result.of_option ~error:"Must provide a state hash"
+        in
         let transition_frontier_pipe = Mina_lib.transition_frontier coda in
         let%bind transition_frontier =
           Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
