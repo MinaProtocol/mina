@@ -781,70 +781,70 @@ let last_epoch_delegators t ~pk =
   find_delegators last_epoch_delegatee_table pk
 
 let perform_compaction t =
-  if
-    not
-      (Genesis_constants.Proof_level.equal
-         t.config.precomputed_values.proof_level Full)
-  then ()
-  else
-    let slot_duration_ms =
-      let leeway = 1000 in
-      t.config.precomputed_values.constraint_constants.block_window_duration_ms
-      + leeway
-    in
-    let expected_time_for_compaction =
-      match Sys.getenv "MINA_COMPACTION_MS" with
-      | Some ms ->
-          Float.of_string ms
-      | None ->
-          6000.
-    in
-    let span ?(incr = 0.) ms = Float.(of_int ms +. incr) |> Time.Span.of_ms in
-    let interval_configured =
-      match Sys.getenv "MINA_COMPACTION_INTERVAL_MS" with
-      | Some ms ->
-          Time.Span.of_ms (Float.of_string ms)
-      | None ->
-          span (slot_duration_ms * 2)
-    in
-    if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
-    then (
-      [%log' fatal t.config.logger]
-        "Time between compactions %f should be greater than the expected time \
-         for compaction %f"
-        (Time.Span.to_ms interval_configured)
-        expected_time_for_compaction ;
-      failwith
-        (sprintf
-           "Time between compactions %f should be greater than the expected \
-            time for compaction %f"
-           (Time.Span.to_ms interval_configured)
-           expected_time_for_compaction) ) ;
-    let call_compact () =
-      let start = Time.now () in
-      Gc.compact () ;
-      let span = Time.diff (Time.now ()) start in
-      [%log' debug t.config.logger]
-        ~metadata:[("time", `Float (Time.Span.to_ms span))]
-        "Gc.compact took $time ms"
-    in
-    let rec perform interval =
-      upon (after interval) (fun () ->
-          match !(t.block_production_status) with
-          | `Free ->
-              call_compact () ;
-              perform interval_configured
-          | `Producing ->
-              perform (span slot_duration_ms)
-          | `Producing_in_ms ms ->
-              if ms < expected_time_for_compaction then
-                (*too close to block production; perform compaction after block production*)
-                perform (span slot_duration_ms ~incr:ms)
-              else (
+  match Mina_compile_config.compaction_interval_ms with
+  | None ->
+      ()
+  | Some compaction_interval_compiled ->
+      let slot_duration_ms =
+        let leeway = 1000 in
+        t.config.precomputed_values.constraint_constants
+          .block_window_duration_ms + leeway
+      in
+      let expected_time_for_compaction =
+        match Sys.getenv "MINA_COMPACTION_MS" with
+        | Some ms ->
+            Float.of_string ms
+        | None ->
+            6000.
+      in
+      let span ?(incr = 0.) ms =
+        Float.(of_int ms +. incr) |> Time.Span.of_ms
+      in
+      let interval_configured =
+        match Sys.getenv "MINA_COMPACTION_INTERVAL_MS" with
+        | Some ms ->
+            Time.Span.of_ms (Float.of_string ms)
+        | None ->
+            span compaction_interval_compiled
+      in
+      if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
+      then (
+        [%log' fatal t.config.logger]
+          "Time between compactions %f should be greater than the expected \
+           time for compaction %f"
+          (Time.Span.to_ms interval_configured)
+          expected_time_for_compaction ;
+        failwith
+          (sprintf
+             "Time between compactions %f should be greater than the expected \
+              time for compaction %f"
+             (Time.Span.to_ms interval_configured)
+             expected_time_for_compaction) ) ;
+      let call_compact () =
+        let start = Time.now () in
+        Gc.compact () ;
+        let span = Time.diff (Time.now ()) start in
+        [%log' debug t.config.logger]
+          ~metadata:[("time", `Float (Time.Span.to_ms span))]
+          "Gc.compact took $time ms"
+      in
+      let rec perform interval =
+        upon (after interval) (fun () ->
+            match !(t.block_production_status) with
+            | `Free ->
                 call_compact () ;
-                perform interval_configured ) )
-    in
-    perform interval_configured
+                perform interval_configured
+            | `Producing ->
+                perform (span slot_duration_ms)
+            | `Producing_in_ms ms ->
+                if ms < expected_time_for_compaction then
+                  (*too close to block production; perform compaction after block production*)
+                  perform (span slot_duration_ms ~incr:ms)
+                else (
+                  call_compact () ;
+                  perform interval_configured ) )
+      in
+      perform interval_configured
 
 let start t =
   let set_next_producer_timing timing =
