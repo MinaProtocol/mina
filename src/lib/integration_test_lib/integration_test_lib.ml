@@ -54,7 +54,7 @@ type constants =
   ; genesis: Genesis_constants.t }
 
 module Network_time_span = struct
-  type t = Epochs of int | Slots of int | Literal of Time.Span.t
+  type t = Epochs of int | Slots of int | Literal of Time.Span.t | None
 
   let to_span t ~(constants : constants) =
     let open Int64 in
@@ -64,16 +64,19 @@ module Network_time_span = struct
     in
     match t with
     | Epochs n ->
-        slots (of_int n * of_int constants.genesis.protocol.slots_per_epoch)
+        Some
+          (slots (of_int n * of_int constants.genesis.protocol.slots_per_epoch))
     | Slots n ->
-        slots (of_int n)
+        Some (slots (of_int n))
     | Literal span ->
-        span
+        Some span
+    | None ->
+        None
 end
 
 module Condition = struct
   type t =
-    { condition_subscription: Network_state.t -> bool
+    { predicate: Network_state.t -> bool
     ; soft_timeout: Network_time_span.t
     ; hard_timeout: Network_time_span.t }
 end
@@ -176,10 +179,8 @@ module type Engine_intf = sig
 
     val destroy : t -> Test_error.Set.t Malleable_error.t
 
-    (** waits until a block is produced with at least one of the following conditions being true
-      1. Blockchain length = blocks
-      2. epoch of the block = epoch_reached
-      3. Has seen some number of slots/epochs crossed/snarked ledgers generated or x milliseconds has passed
+    (** waits until a block is produced with the given condition passing (or failing when the hard timeout in
+        the condition is reached).
     Note: Varying number of snarked ledgers generated because of reorgs is not captured here *)
     val wait_for :
          t

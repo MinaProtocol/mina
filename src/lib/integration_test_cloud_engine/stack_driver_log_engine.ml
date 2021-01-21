@@ -815,14 +815,15 @@ let wait_for' :
       if not (Pipe.is_closed w) then Pipe.close w
     in
     let add_timeout time x =
-      timeouts :=
-        Clock.Event.run_after
-          (Network_time_span.to_span ~constants:t.constants time)
-          (fun () ->
-            Pipe.write_without_pushback_if_open w x ;
-            finish () )
-          ()
-        :: !timeouts
+      Option.iter (Network_time_span.to_span ~constants:t.constants time)
+        ~f:(fun span ->
+          timeouts :=
+            Clock.Event.run_after span
+              (fun () ->
+                Pipe.write_without_pushback_if_open w x ;
+                finish () )
+              ()
+            :: !timeouts )
     in
     add_timeout cond.hard_timeout
       (Error
@@ -854,7 +855,7 @@ let wait_for' :
     r
   in
   let conditions_passed (acc : Block_produced_query.Result.Aggregated.t) =
-    cond.condition_subscription
+    cond.predicate
       { block_height= acc.last_seen_result.block_height
       ; epoch= acc.last_seen_result.epoch
       ; global_slot= acc.last_seen_result.global_slot
