@@ -32,17 +32,17 @@ spec:
         args: ["-c", "/code/main.sh"]
         env:
           - name: "RESTART_EVERY_MINS"
-            value: {{ .Values.codaNetworkServicesConfig.restartEveryMins | quote }}
+            value: {{ .Values.restartEveryMins | quote }}
           - name: "RESTART_NODES"
-            value: {{ .Values.codaNetworkServicesConfig.restartNodes | quote }}
+            value: {{ .Values.restartNodes | quote }}
           - name: "MAKE_REPORTS"
-            value: {{ .Values.codaNetworkServicesConfig.makeReports | quote }}
+            value: {{ .Values.makeReports | quote }}
           - name: "MAKE_REPORT_EVERY_MINS"
-            value: {{ .Values.codaNetworkServicesConfig.makeReportEveryMins | quote }}
+            value: {{ .Values.makeReportEveryMins | quote }}
           - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
-            value: {{ .Values.codaNetworkServicesConfig.makeReportDiscordWebhookUrl | quote }}
+            value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
           - name: "MAKE_REPORT_ACCOUNTS"
-            value: {{ .Values.codaNetworkServicesConfig.makeReportAccounts | quote }}
+            value: {{ .Values.makeReportAccounts | quote }}
         ports: 
         - name: metrics-port
           containerPort: 8000
