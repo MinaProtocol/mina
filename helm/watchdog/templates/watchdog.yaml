@@ -1,22 +1,20 @@
-{{ range $config := $.Values.watchdogConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $config.name }}
+  name: {{ .Values.name }}
   labels:
-    app: {{ $config.name }}
+    app: {{ .Values.name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ $config.name }}
+      app: {{ .Values.name }}
   template:
     metadata:
       labels:
-        app: {{ $config.name }}
+        app: {{ .Values.name }}
         testnet: {{ $.Values.testnetName }}
         role: watchdog
-        class: {{ default "undefined" $config.class }}
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
@@ -37,21 +35,3 @@ spec:
           containerPort: 8000
         imagePullPolicy: Always
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $config.name }}
-spec:
-  type: ClusterIP
-  # We want all pods to have their addresses published for the sake of the
-  # other testnet pods even before they're ready, since they
-  # have to be able to talk to each other in order to become ready.
-  publishNotReadyAddresses: true
-  selector:
-    app: {{ $config.name }}
-  ports:
-  - name: tcp-p2p
-    port: {{ $.Values.coda.ports.p2p }}
-    targetPort: external-port
----
-{{ end }}
