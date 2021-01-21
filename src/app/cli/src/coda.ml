@@ -398,7 +398,7 @@ let setup_daemon logger =
         | None ->
             return None
         | Some s ->
-            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn
+            Secrets.Libp2p_keypair.Terminal_stdin.read_from_env_exn ~logger
               ~which:"libp2p keypair" s
             |> Deferred.map ~f:Option.some )
     in
@@ -772,7 +772,7 @@ let setup_daemon logger =
             Deferred.return None
         | Some sk_file, _ ->
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
                 ~which:"block producer keypair" sk_file
             in
             Some kp
@@ -783,7 +783,7 @@ let setup_daemon logger =
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
                 ~which:"block producer keypair" sk_file
             in
             Some kp
@@ -898,6 +898,12 @@ let setup_daemon logger =
                    (ex: /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
                   file )
       in
+      List.iter libp2p_peers_raw ~f:(fun raw_peer ->
+          if not Mina_net2.Multiaddr.(valid_as_peer @@ of_string raw_peer) then
+            Mina_user_error.raisef ~where:"decoding peer as a multiaddress"
+              "The given peer \"%s\" is not a valid multiaddress (ex: \
+               /ip4/IPADDR/tcp/PORT/p2p/PEERID)"
+              raw_peer ) ;
       let initial_peers =
         List.concat
           [ List.map ~f:Mina_net2.Multiaddr.of_string libp2p_peers_raw
@@ -1434,7 +1440,7 @@ let () =
    let is_help_flag = make_list_mem ["-help"; "-?"] in
    match Sys.argv with
    | [|_coda_exe; version|] when is_version_cmd version ->
-       print_version_info ()
+       Mina_version.print_version ()
    | [|coda_exe; version; help|]
      when is_version_cmd version && is_help_flag help ->
        print_version_help coda_exe version
