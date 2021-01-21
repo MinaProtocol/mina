@@ -928,7 +928,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	for _, info := range app.AddedPeers {
-		app.P2p.Logger.Error("Trying to connect to: ", info)
+		app.P2p.Logger.Info("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())
@@ -1186,6 +1186,8 @@ type setGatingConfigMsg struct {
 func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
 	newFilter := ma.NewFilters()
 	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
+
+	logger.Info("setting gating config from: %#v", gc)
 
 	if gc.Isolate {
 		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
