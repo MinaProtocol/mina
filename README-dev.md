@@ -80,11 +80,6 @@ of the repo.
 
 #### Customizing your dev environment for autocomplete/merlin
 
-- If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
-  build
-
-`make USEDOCKER=TRUE merlin-fixup`
-
 - If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 
 ```bash
