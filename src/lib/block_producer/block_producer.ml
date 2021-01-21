@@ -383,7 +383,7 @@ let time ~logger ~time_controller label f =
   let span = Time.diff (Time.now time_controller) t0 in
   [%log info]
     ~metadata:[("time", `Int (Time.Span.to_ms span |> Int64.to_int_exn))]
-    !"%s%!" label ;
+    !"%s: $time %!" label ;
   x
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
