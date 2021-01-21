@@ -2823,26 +2823,34 @@ module Queries = struct
         List.map best_chain ~f:(block_of_breadcrumb coda) )
 
   let block =
-    field "block"
+    result_field "block"
       ~doc:
         "Retrieve a block with the given state hash, if contained in the \
          transition frontier."
-      ~typ:Types.block
+      ~typ:(non_null Types.block)
       ~args:
         Arg.
           [ arg "stateHash" ~doc:"The state hash of the desired block"
               ~typ:(non_null string) ]
-      ~resolve:(fun {ctx= coda; _} () (state_hash : string) ->
+      ~resolve:(fun {ctx= coda; _} () (state_hash_base58 : string) ->
+        let open Result.Let_syntax in
         let transition_frontier_pipe = Mina_lib.transition_frontier coda in
-        let open Option.Let_syntax in
         let%bind transition_frontier =
           Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
+          |> Result.of_option ~error:"Could not obtain transition frontier"
         in
         let%bind state_hash =
-          State_hash.of_base58_check state_hash |> Or_error.ok
+          State_hash.of_base58_check state_hash_base58
+          |> Result.map_error ~f:Error.to_string_hum
         in
         let%map breadcrumb =
           Transition_frontier.find transition_frontier state_hash
+          |> Result.of_option
+               ~error:
+                 (sprintf
+                    "Breadcrumb for state hash %s not found in transition \
+                     frontier"
+                    state_hash_base58)
         in
         block_of_breadcrumb coda breadcrumb )
 
