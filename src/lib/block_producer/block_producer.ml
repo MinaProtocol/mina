@@ -653,7 +653,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                        ~f:(Fn.compose Deferred.return Option.is_some)
                    in
                    check_next_block_timing ())
-            | Some transition_frontier -> (
+            | Some transition_frontier ->
                 let consensus_state =
                   Transition_frontier.best_tip transition_frontier
                   |> Breadcrumb.consensus_state
@@ -665,38 +665,39 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
                    = None ) ; *)
-                let now = Time.now time_controller in
-                let next_producer_timing =
-                  measure "asking consensus what to do" (fun () ->
-                      Consensus.Hooks.next_producer_timing
-                        ~constraint_constants ~constants:consensus_constants
-                        (time_to_ms now) consensus_state
-                        ~local_state:consensus_local_state ~keypairs
-                        ~coinbase_receiver ~logger )
-                in
-                set_next_producer_timing next_producer_timing ;
-                match next_producer_timing with
-                | `Check_again time ->
-                    Singleton_scheduler.schedule scheduler (time_of_ms time)
-                      ~f:check_next_block_timing
-                | `Produce_now (data, winner_pk) ->
-                    Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-                    Interruptible.finally
-                      (Singleton_supervisor.dispatch production_supervisor
-                         (now, data, winner_pk))
-                      ~f:check_next_block_timing
-                    |> ignore
-                | `Produce (time, data, winner_pk) ->
-                    Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-                    let scheduled_time = time_of_ms time in
-                    Singleton_scheduler.schedule scheduler scheduled_time
-                      ~f:(fun () ->
-                        ignore
-                          (Interruptible.finally
-                             (Singleton_supervisor.dispatch
-                                production_supervisor
-                                (scheduled_time, data, winner_pk))
-                             ~f:check_next_block_timing) ) ) )
+                don't_wait_for
+                  (let now = Time.now time_controller in
+                   let%map next_producer_timing =
+                     measure "asking consensus what to do" (fun () ->
+                         Consensus.Hooks.next_producer_timing
+                           ~constraint_constants ~constants:consensus_constants
+                           (time_to_ms now) consensus_state
+                           ~local_state:consensus_local_state ~keypairs
+                           ~coinbase_receiver ~logger )
+                   in
+                   set_next_producer_timing next_producer_timing ;
+                   match next_producer_timing with
+                   | `Check_again time ->
+                       Singleton_scheduler.schedule scheduler (time_of_ms time)
+                         ~f:check_next_block_timing
+                   | `Produce_now (data, winner_pk) ->
+                       Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                       Interruptible.finally
+                         (Singleton_supervisor.dispatch production_supervisor
+                            (now, data, winner_pk))
+                         ~f:check_next_block_timing
+                       |> ignore
+                   | `Produce (time, data, winner_pk) ->
+                       Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
+                       let scheduled_time = time_of_ms time in
+                       Singleton_scheduler.schedule scheduler scheduled_time
+                         ~f:(fun () ->
+                           ignore
+                             (Interruptible.finally
+                                (Singleton_supervisor.dispatch
+                                   production_supervisor
+                                   (scheduled_time, data, winner_pk))
+                                ~f:check_next_block_timing) )) )
       in
       let start () =
         (* Schedule to wake up immediately on the next tick of the producer loop
