@@ -114,7 +114,6 @@ locals {
     }
   }
 
-
   archive_node_vars = {
     testnetName = var.testnet_name
     coda = {
