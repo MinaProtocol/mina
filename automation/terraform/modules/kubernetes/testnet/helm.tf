@@ -164,17 +164,17 @@ locals {
 # Cluster-Local Seed Node
 
 resource "kubernetes_role_binding" "helm_release" {
-  # provider   = helm.testnet_deploy
-
   metadata {
     name      = "admin-role"
     namespace = kubernetes_namespace.testnet_namespace.metadata[0].name
   }
+
   role_ref {
     api_group = "rbac.authorization.k8s.io"
     kind      = "ClusterRole"
     name      = "admin"
   }
+
   subject {
     kind      = "ServiceAccount"
     name      = "default"
