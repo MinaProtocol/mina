@@ -1,4 +1,12 @@
-// K8s Cluster Vars
+# Control Vars
+
+# when set to true, this module generates and uploads artifacts from `genesis_ledger.json`
+variable "generate_and_upload_artifacts" {
+  type = bool
+  default = true
+}
+
+# K8s Cluster Vars
 
 variable "cluster_name" {
   type = string
@@ -77,6 +85,12 @@ variable "additional_seed_peers" {
 variable "archive_node_count" {
   type    = number
   default = 0
+}
+
+# only used if `generate_and_upload_artifacts` is set to false
+variable "runtime_config" {
+  type    = string
+  default = ""
 }
 
 # Seed Vars
