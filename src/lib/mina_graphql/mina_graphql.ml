@@ -3004,7 +3004,7 @@ module Queries = struct
         Ok config )
 
   let validate_payment =
-    io_field "sendPayment"
+    io_field "validatePayment"
       ~doc:"Validate the format and signature of a payment"
       ~typ:(non_null bool)
       ~args:
