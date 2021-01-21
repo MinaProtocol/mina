@@ -322,9 +322,9 @@ module Event_router = struct
                             "failed to find node by pod app id \"%s\"" app_id)
                 in
                 let%bind log =
-                  parse
+                  find
                     (parser_from_of_yojson Logger.Message.of_yojson)
-                    log_entry
+                    log_entry ["jsonPayload"]
                 in
                 let%map event = Event_type.parse_event log in
                 (event, node) )))
