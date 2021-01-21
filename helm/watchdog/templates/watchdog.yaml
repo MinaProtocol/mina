@@ -27,7 +27,7 @@ spec:
           requests:
             memory: 512m
             cpu: 1.0
-        image: gcr.io/o1labs-192920/watchdog:latest
+        image: {{ .Values.image }}
         command: ["bash"]
         args: ["-c", "/code/main.sh"]
         ports: 
