@@ -13,7 +13,8 @@ type engine_with_cli_inputs =
       * 'cli_inputs
       -> engine_with_cli_inputs
 
-type inputs = {engine: engine_with_cli_inputs; test: test; coda_image: string}
+type inputs =
+  {engine: engine_with_cli_inputs; test: test; coda_image: string; debug: bool}
 
 let engines : engine list =
   [("cloud", (module Integration_test_cloud_engine : Engine_intf))]
@@ -182,8 +183,20 @@ let main inputs =
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
   let f_dispatch_cleanup =
-    dispatch_cleanup ~logger
-      ~network_cleanup_func:Engine.Network_manager.cleanup
+    let rec prompt_continue ~f =
+      print_string "Pausing cleanup. Enter [y/Y] to continue: " ;
+      let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
+      let c = Option.value_exn In_channel.(input_char stdin) in
+      if c = 'y' || c = 'Y' then f ()
+      else ( print_newline () ; prompt_continue ~f )
+    in
+    let network_cleanup_func network_manager =
+      if inputs.debug then
+        prompt_continue ~f:(fun () ->
+            Engine.Network_manager.cleanup network_manager )
+      else Engine.Network_manager.cleanup network_manager
+    in
+    dispatch_cleanup ~logger ~network_cleanup_func
       ~log_engine_cleanup_func:Engine.Log_engine.destroy ~net_manager_ref
       ~log_engine_ref ~cleanup_deferred_ref
       (module T : Test_intf)
@@ -254,6 +267,13 @@ let coda_image_arg =
     & opt (some string) None
     & info ["coda-image"] ~env ~docv:"CODA_IMAGE" ~doc)
 
+let debug_arg =
+  let doc =
+    "Enable debug mode. On failure, the test executive will pause for user \
+     input before destroying the network it deployed."
+  in
+  Arg.(value & flag & info ["debug"; "d"] ~doc)
+
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
@@ -268,10 +288,12 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs engine test coda_image = {engine; test; coda_image} in
+    let cons_inputs engine test coda_image debug =
+      {engine; test; coda_image; debug}
+    in
     Term.(
       const cons_inputs $ engine_with_cli_inputs_arg $ test_arg
-      $ coda_image_arg)
+      $ coda_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)
