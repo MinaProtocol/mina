@@ -1440,7 +1440,7 @@ let () =
    let is_help_flag = make_list_mem ["-help"; "-?"] in
    match Sys.argv with
    | [|_coda_exe; version|] when is_version_cmd version ->
-       print_version_info ()
+       Mina_version.print_version ()
    | [|coda_exe; version; help|]
      when is_version_cmd version && is_help_flag help ->
        print_version_help coda_exe version
