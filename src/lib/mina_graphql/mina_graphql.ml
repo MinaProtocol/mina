@@ -346,6 +346,19 @@ module Types = struct
             ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
         ] )
 
+  let account_timing =
+    obj "AccountTiming" ~fields:(fun _ ->
+        [ field "initial_minimum_balance" ~typ:(non_null uint64)
+            ~doc:"The initial minimum balance for an account"
+            ~args:Arg.[]
+            ~resolve:(fun _ {Account.Poly.timing; _} ->
+              match timing with
+              | Untimed ->
+                  Balance.zero |> Balance.to_uint64
+              | Timed timing_info ->
+                  timing_info.initial_minimum_balance |> Balance.to_uint64 ) ]
+    )
+
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
         [ field "prover"
@@ -747,6 +760,10 @@ module Types = struct
                  ~doc:"The token associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} -> account.Account.Poly.token_id)
+             ; field "timing" ~typ:(non_null account_timing)
+                 ~doc:"The timing associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ {account; _} -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
                  ~doc:"The amount of coda owned by the account"
