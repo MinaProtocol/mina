@@ -14,13 +14,8 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
       Command.Config::{
         commands = [
           Cmd.run (
-            -- assume head or first dependency specified by spec represents the primary artifact dependency step
-            let artifactUploadScope = Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type dependsOn)
-
-            in
-
             "if [ ! -f ${deployEnv} ]; then " ++
-                "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${deployEnv} .; " ++
+                "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
             "fi"
           ),
           Cmd.run (
