@@ -51,35 +51,31 @@ let main = () => {
           Js.log("Metrics - Finished");
 
           UploadLeaderboardPoints.uploadChallengePoints(
-            spreadsheetId,
-            metrics,
-            () => {
-              UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
-
-              Postgres.makeQuery(currPool, Postgres.getBlockHeight, result => {
-                switch (result) {
-                | Ok(blockHeightQuery) =>
-                  Belt.Option.(
-                    Js.Json.(
-                      blockHeightQuery[0]
-                      ->decodeObject
-                      ->flatMap(__x => Js.Dict.get(__x, "max"))
-                      ->flatMap(decodeString)
-                      ->mapWithDefault((), height => {
-                          UploadLeaderboardData.uploadData(
-                            spreadsheetId,
-                            height,
-                          )
-                        })
-                    )
-                  );
-                  Postgres.endPool(currPool);
-                  Postgres.endPool(prevPool);
-                | Error(error) => Js.log(error)
-                }
-              });
-            },
-          );
+            spreadsheetId, metrics, () => {
+            Postgres.makeQuery(currPool, Postgres.getBlockHeight, result => {
+              switch (result) {
+              | Ok(blockHeightQuery) =>
+                Belt.Option.(
+                  Js.Json.(
+                    blockHeightQuery[0]
+                    ->decodeObject
+                    ->flatMap(__x => Js.Dict.get(__x, "max"))
+                    ->flatMap(decodeString)
+                    ->mapWithDefault((), height => {
+                        UploadLeaderboardData.uploadData(
+                          spreadsheetId,
+                          height,
+                        )
+                      })
+                  )
+                );
+                UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+                Postgres.endPool(currPool);
+                Postgres.endPool(prevPool);
+              | Error(error) => Js.log(error)
+              }
+            })
+          });
 
         | Error(error) => Js.log(error)
         }

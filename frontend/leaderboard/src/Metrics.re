@@ -91,7 +91,6 @@ let getTransactionSentByUser = blocks => {
   blocks |> calculateProperty(calculateTransactionSent);
 };
 
-
 /*
   Due to snarkJobs not being apart of the archive API, we calculate
   snark fees differently in the meantime.
@@ -227,18 +226,14 @@ let calculateMetrics = blocks => {
   let blocksCreated = getBlocksCreatedByUser(blocks);
   let transactionSent = getTransactionSentByUser(blocks);
   let snarkFeesCollected = getSnarkFeesCollected(blocks);
-  let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
-  let transactionsReceivedByEcho =
-    getTransactionsSentToAddress(blocks, echoBotPublicKeys);
-  let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
+  let highestSnarkFeeCollected = StringMap.empty;
+  let transactionsReceivedByEcho = StringMap.empty;
+  let coinbaseReceiverChallenge = StringMap.empty;
 
   calculateAllUsers([
     throwAwayValues(blocksCreated),
     throwAwayValues(transactionSent),
     throwAwayValues(snarkFeesCollected),
-    throwAwayValues(highestSnarkFeeCollected),
-    throwAwayValues(transactionsReceivedByEcho),
-    throwAwayValues(coinbaseReceiverChallenge),
   ])
   |> StringMap.filter((key, _) => {!List.mem(key, excludePublicKeys)})
   |> StringMap.mapi((key, _) =>
