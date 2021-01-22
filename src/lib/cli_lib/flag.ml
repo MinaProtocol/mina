@@ -262,19 +262,26 @@ module Log = struct
     flag "log-json" no_arg
       ~doc:"Print log output as JSON (default: plain text)"
 
+  let all_levels () =
+    String.concat ~sep:"|" (List.map ~f:Logger.Level.show Logger.Level.all)
+
   let level =
     let log_level = Arg_type.log_level in
     let open Command.Param in
-    flag "log-level"
-      (optional_with_default Logger.Level.Info log_level)
-      ~doc:"Set log level (default: Info)"
+    let doc =
+      sprintf "LEVEL Set log level (%s, default: Info)" (all_levels ())
+    in
+    flag "log-level" ~doc (optional_with_default Logger.Level.Info log_level)
 
   let file_log_level =
     let log_level = Arg_type.log_level in
     let open Command.Param in
-    flag "file-log-level"
+    let doc =
+      sprintf "LEVEL Set log level for the log file (%s, default: Info)"
+        (all_levels ())
+    in
+    flag "file-log-level" ~doc
       (optional_with_default Logger.Level.Trace log_level)
-      ~doc:"Set log level for the log file (default: Trace)"
 end
 
 type signed_command_common =
