@@ -35,6 +35,8 @@ val create :
   -> persistent_root_instance:Persistent_root.Instance.t
   -> t
 
+val persistent_root_instance : t -> Persistent_root.Instance.t
+
 val close : loc:string -> t -> unit
 
 val root_data : t -> Root_data.t

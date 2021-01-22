@@ -77,7 +77,8 @@ let%test_module "Full_frontier tests" =
         ; protocol_states= [] }
       in
       let persistent_root =
-        Persistent_root.create ~logger ~directory:Filename.temp_dir_name
+        Persistent_root.create ~logger
+          ~directory:(Filename.temp_file "snarked_ledger" "")
           ~ledger_depth
       in
       Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
@@ -100,7 +101,11 @@ let%test_module "Full_frontier tests" =
                 Full_frontier.find_exn frontier
                   (Breadcrumb.state_hash breadcrumb)
               in
-              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ) )
+              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
+              let persistent_root_instance =
+                Full_frontier.persistent_root_instance
+              in
+              Persistent_root.Instance.destroy persistent_root_instance ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =
       let gen_branches =
@@ -135,8 +140,11 @@ let%test_module "Full_frontier tests" =
               add_breadcrumbs frontier (List.tl_exn long_branch) ;
               test_best_tip
                 (List.last_exn long_branch)
-                ~message:"best tip should change when all of best tip is added"
-          ) )
+                ~message:"best tip should change when all of best tip is added" ;
+              let persistent_root_instance =
+                Full_frontier.persistent_root_instance
+              in
+              Persistent_root.Instance.destroy persistent_root_instance ) )
 
     let%test_unit "The root should be updated after (> max_length) nodes are \
                    added in sequence" =
@@ -169,7 +177,11 @@ let%test_module "Full_frontier tests" =
                          ~message:
                            "roots should be the same before max_length \
                             breadcrumbs" ;
-                     i + 1 ) ) )
+                     i + 1 ) ;
+              let persistent_root_instance =
+                Full_frontier.persistent_root_instance
+              in
+              Persistent_root.Instance.destroy persistent_root_instance ) )
 
     let%test_unit "Protocol states are available for every transaction in the \
                    frontier" =
@@ -192,7 +204,11 @@ let%test_module "Full_frontier tests" =
                     ~f:(fun hash ->
                       Full_frontier.For_tests.find_protocol_state_exn frontier
                         hash
-                      |> ignore ) ) ) )
+                      |> ignore ) ) ;
+              let persistent_root_instance =
+                Full_frontier.persistent_root_instance
+              in
+              Persistent_root.Instance.destroy persistent_root_instance ) )
 
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =
@@ -210,8 +226,11 @@ let%test_module "Full_frontier tests" =
                   [%test_pred: int] (( >= ) max_length)
                     (List.length
                        Full_frontier.(
-                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) )
-      )
+                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) ;
+              let persistent_root_instance =
+                Full_frontier.persistent_root_instance
+              in
+              Persistent_root.Instance.destroy persistent_root_instance ) )
 
     let%test_unit "Common ancestor can be reliably found" =
       let ancestor_length = (max_length / 2) - 1 in
@@ -242,5 +261,9 @@ let%test_module "Full_frontier tests" =
               add_breadcrumbs frontier (branch_a @ branch_b) ;
               [%test_eq: State_hash.t]
                 (Full_frontier.common_ancestor frontier tip_a tip_b)
-                (Breadcrumb.state_hash youngest_ancestor) ) )
+                (Breadcrumb.state_hash youngest_ancestor) ;
+              let persistent_root_instance =
+                Full_frontier.persistent_root_instance
+              in
+              Persistent_root.Instance.destroy persistent_root_instance ) )
   end )

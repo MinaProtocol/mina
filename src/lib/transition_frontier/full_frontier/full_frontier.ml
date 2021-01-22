@@ -69,6 +69,9 @@ type t =
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
+let persistent_root_instance {persistent_root_instance; _} =
+  persistent_root_instance
+
 let all_breadcrumbs t =
   List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
 
