@@ -830,7 +830,7 @@ module Data = struct
       let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
 
       (*  Check if
-          vrf_output / 2^256 <= c * (1 - f)^(amount / total_stake)
+          vrf_output / 2^256 <= c * (1 - (1 - f)^(amount / total_stake))
       *)
       let is_satisfied ~my_stake ~total_stake vrf_output =
         let input =
@@ -3165,7 +3165,7 @@ module Hooks = struct
     let epoch_end_time = Epoch.end_time ~constants epoch |> ms_since_epoch in
     if Keypair.And_compressed_pk.Set.is_empty keypairs then (
       [%log info] "No block producers running, skipping check for now." ;
-      `Check_again epoch_end_time )
+      Deferred.return (`Check_again epoch_end_time) )
     else
       let next_slot =
         [%log debug]
@@ -3278,21 +3278,23 @@ module Hooks = struct
             ~finish:(fun () -> None)
         in
         let rec find_winning_slot (slot : Slot.t) =
-          if slot >= constants.epoch_size then None
+          if slot >= constants.epoch_size then Deferred.return None
           else
-            match Local_state.seen_slot local_state epoch slot with
+            match%bind
+              Local_state.seen_slot local_state epoch slot |> Deferred.return
+            with
             | `All_seen ->
                 find_winning_slot (Slot.succ slot)
             | `Unseen pks -> (
-              match block_data pks slot with
-              | None ->
-                  find_winning_slot (Slot.succ slot)
-              | Some (data, delegator_pk) ->
-                  Some (slot, data, delegator_pk) )
+                match%bind block_data pks slot |> Deferred.return with
+                | None ->
+                    find_winning_slot (Slot.succ slot)
+                | Some (data, delegator_pk) ->
+                    Deferred.return (Some (slot, data, delegator_pk)) )
         in
         find_winning_slot slot
       in
-      match next_slot with
+      match%map next_slot with
       | Some (next_slot, data, delegator_pk) ->
           [%log info] "Producing block in %d slots"
             (Slot.to_int next_slot - Slot.to_int slot) ;

@@ -31,14 +31,14 @@ variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon:0.0.17-beta6-develop"
+  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.6-compatible-automation-fixes-b4a681e"
 }
 
 variable "coda_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.0.17-beta6-develop"
+  default     = "gcr.io/o1labs-192920/coda-archive:0.2.6-compatible-automation-fixes-b4a681e"
 }
 
 variable "whale_count" {
@@ -47,6 +47,11 @@ variable "whale_count" {
 }
 
 variable "fish_count" {
+  type    = number
+  default = 1
+}
+
+variable "archive_count" {
   type    = number
   default = 1
 }
@@ -69,20 +74,22 @@ module "ci_testnet" {
   providers = { google = google.google-us-east4 }
   source    = "../../modules/kubernetes/testnet"
 
-  cluster_name          = "coda-infra-east4"
-  cluster_region        = "us-east4"
+  cluster_name          = "mina-integration-west1"
+  cluster_region        = "us-west1"
+  k8s_context           = "gke_o1labs-192920_us-west1_mina-integration-west1"
   testnet_name          = var.testnet_name
 
   coda_image            = var.coda_image
   coda_archive_image    = var.coda_archive_image
-  coda_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
-  coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"
+  coda_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
+  coda_bots_image       = "codaprotocol/bots:1.0.0"
   coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
 
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"
 
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/2f36b15d48e956e5242c0abc134f1fa7711398dd/src/app/archive/create_schema.sql"
+  archive_node_count    = var.archive_count
+  mina_archive_schema   = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
 
   additional_seed_peers = []
 
@@ -105,6 +112,7 @@ module "ci_testnet" {
         class                  = "whale"
         id                     = i + 1
         private_key_secret     = "online-whale-account-${i + 1}-key"
+        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
         enable_gossip_flooding = false
         run_with_user_agent    = false
         run_with_bots          = false
@@ -118,8 +126,9 @@ module "ci_testnet" {
         class                  = "fish"
         id                     = i + 1
         private_key_secret     = "online-fish-account-${i + 1}-key"
+        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
         enable_gossip_flooding = false
-        run_with_user_agent    = false
+        run_with_user_agent    = true
         run_with_bots          = false
         enable_peer_exchange   = true
         isolated               = false
