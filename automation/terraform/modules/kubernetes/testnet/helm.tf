@@ -29,13 +29,23 @@ locals {
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
   ]
 
-  static_peers = [ for name in keys(data.local_file.libp2p_peers) : "/dns4/${name}.${var.testnet_name}/tcp/10501/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}"]
+  static_peers = { for index, name in keys(data.local_file.libp2p_peers) :
+    name => {
+      full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port + index }/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}",
+      port      = var.block_producer_starting_host_port + index
+      name      = name
+    }
+  }
 
   coda_vars = {
     runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
     image              = var.coda_image
     privkeyPass        = var.block_producer_key_pass
-    seedPeers          = concat(var.additional_seed_peers, local.seed_peers, local.static_peers)
+    seedPeers          = concat(
+      var.additional_seed_peers,
+      local.seed_peers,
+      [ for name in keys(local.static_peers) : local.static_peers[name].full_peer ]
+    )
     logLevel           = var.log_level
     logSnarkWorkGossip = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
@@ -101,7 +111,7 @@ locals {
       for index, config in var.block_producer_configs: {
         name                 = config.name
         class                = config.class
-        externalPort         = var.block_producer_starting_host_port + index
+        externalPort         = local.static_peers[config.name].port
         runWithUserAgent     = config.run_with_user_agent
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
