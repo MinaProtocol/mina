@@ -960,7 +960,7 @@ struct
                         ~f:(Base_ledger.get ledger)
                     in
                     let new_ledger_hash = Base_ledger.merkle_root ledger in
-                    if Ledger_hash.equal ledger_hash new_ledger_hash then (
+                    if Ledger_hash.equal ledger_hash new_ledger_hash then
                       (* We return an interrupted [Interruptible.t] here
                          directly rather than wrapping the code below using a
                          bind. The underlying async bind may otherwise yeild to
@@ -970,13 +970,13 @@ struct
                       *)
                       let error =
                         Error.createf
-                           "Ledger hash changed from %s to %s while \
-                            attempting to apply transaction pool diff"
-                           (Ledger_hash.to_base58_check ledger_hash)
-                           (Ledger_hash.to_base58_check new_ledger_hash)
+                          "Ledger hash changed from %s to %s while attempting \
+                           to apply transaction pool diff"
+                          (Ledger_hash.to_base58_check ledger_hash)
+                          (Ledger_hash.to_base58_check new_ledger_hash)
                       in
                       Interruptible.lift (Deferred.never ())
-                        (Deferred.return error) )
+                        (Deferred.return error)
                     else
                       match account ledger (User_command.fee_payer tx) with
                       | None ->
