@@ -598,8 +598,8 @@ let rec pull_subscription_in_background ~logger ~subscription_name
       let%bind logs = Subscription.pull subscription in
       Malleable_error.List.map logs ~f:parse_subscription)
   in
-  (* [%log debug] "Pulling subscription $subscription_name"
-    ~metadata:[("subscription_name", `String subscription_name)] ; *)
+  [%log debug] "Pulling subscription $subscription_name"
+    ~metadata:[("subscription_name", `String subscription_name)] ;
   let%bind () =
     uninterruptible
       ( match results with
