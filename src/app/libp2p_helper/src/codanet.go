@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	gonet "net"
-	"os"
 	"path"
 	"time"
 
@@ -55,21 +54,22 @@ var (
 		"198.18.0.0/15",
 		"169.254.0.0/16",
 	}
-	__privateIpFilter *ma.Filters = nil
+	privateIpFilter *ma.Filters = nil
 )
 
-func privateIpFilter() *ma.Filters {
-	if __privateIpFilter == nil {
-		__privateIpFilter = ma.NewFilters()
-		for _, cidr := range privateCIDRs {
-			__privateIpFilter.AddFilter(parseCIDR(cidr), ma.ActionDeny)
-		}
+func initPrivateIpFilter() {
+	privateIpFilter = ma.NewFilters()
+	for _, cidr := range privateCIDRs {
+		privateIpFilter.AddFilter(parseCIDR(cidr), ma.ActionDeny)
 	}
-	return __privateIpFilter
+}
+
+func Init() {
+	initPrivateIpFilter()
 }
 
 func isPrivateAddr(addr ma.Multiaddr) bool {
-	return !privateIpFilter().AddrBlocked(addr)
+	return !privateIpFilter.AddrBlocked(addr)
 }
 
 type CodaConnectionManager struct {
@@ -176,7 +176,7 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 
 	// we initialize the known private addr filters to reject all ip addresses initially
 	knownPrivateAddrFilters := ma.NewFilters()
-	knownPrivateAddrFilters.AddFilter(parseCIDR("255.255.255.255/0"), ma.ActionDeny)
+	knownPrivateAddrFilters.AddFilter(parseCIDR("0.0.0.0/0"), ma.ActionDeny)
 
 	return &CodaGatingState{
 		logger:                  logger,
@@ -194,27 +194,28 @@ func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
 			panic(err)
 		}
 
+		bits := len(ip) * 8
 		ipNet := gonet.IPNet{
 			IP:   ip,
-			Mask: gonet.CIDRMask(32, 32),
+			Mask: gonet.CIDRMask(bits, bits),
 		}
 		gs.KnownPrivateAddrFilters.AddFilter(ipNet, ma.ActionAccept)
 	}
 }
 
+// checks if a peer id is allowed to dial/accept
 func (gs *CodaGatingState) isAllowedPeer(p peer.ID) bool {
 	return !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
 }
 
+// checks if an address is allowed to dial/accept
 func (gs *CodaGatingState) isAllowedAddr(addr ma.Multiaddr) bool {
-	if gs.AddrFilters.AddrBlocked(addr) {
-		return false
-	} else if isPrivateAddr(addr) {
-		_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-		return exists || !gs.KnownPrivateAddrFilters.AddrBlocked(addr)
-	} else {
-		return true
-	}
+	return !gs.AddrFilters.AddrBlocked(addr) && (!isPrivateAddr(addr) || !gs.KnownPrivateAddrFilters.AddrBlocked(addr))
+}
+
+// checks if a peer is allowed to dial/accept; if the peer is in the whitelist, the address checks are overriden
+func (gs *CodaGatingState) isAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) bool {
+	return gs.AllowedPeers.Contains(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
 }
 
 func (gs *CodaGatingState) logGate() {
@@ -241,7 +242,7 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	allow = gs.isAllowedPeer(id) && gs.isAllowedAddr(addr)
+	allow = gs.isAllowedPeerWithAddr(id, addr)
 
 	if !allow {
 		gs.logger.Infof("disallowing peer dial from: %v", id)
@@ -264,6 +265,8 @@ func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow 
 		gs.logGate()
 	}
 
+	// If we are receiving a connection, and the remote address is private,
+	// then we infer that we should be able to connect to that private address.
 	if allow {
 		gs.MarkPrivateAddrAsKnown(remoteAddr)
 	}
@@ -282,7 +285,7 @@ func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, add
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.isAllowedPeer(id)
+	allow = gs.isAllowedPeerWithAddr(id, remoteAddr)
 
 	if !allow {
 		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v", remoteAddr)
