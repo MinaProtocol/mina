@@ -47,10 +47,10 @@ end)
                      ()
                  | Error e ->
                      [%log error] "Error writing Web client pipe data: $error"
-                       ~metadata:[("error", `String (Error.to_string_hum e))]
-             ))
+                       ~metadata:[("error", Error_json.error_to_yojson e)] ))
       | Error e ->
-          [%log error] "Unable to create request: %s" (Error.to_string_hum e)
+          [%log error] "Unable to create request: $error"
+            ~metadata:[("error", Error_json.error_to_yojson e)]
     in
     t
 

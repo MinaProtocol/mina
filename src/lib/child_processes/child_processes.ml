@@ -12,12 +12,13 @@ type t =
   ; stdout_pipe: string Strict_pipe.Reader.t
   ; stderr_pipe: string Strict_pipe.Reader.t
   ; stdin: Writer.t
-  ; terminated_ivar: Unix.Exit_or_signal.t Ivar.t
+  ; terminated_ivar: Unix.Exit_or_signal.t Or_error.t Ivar.t
   ; mutable killing: bool
   ; mutable termination_response:
       [ `Always_raise
       | `Raise_on_failure
-      | `Handler of killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
+      | `Handler of
+        killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
       | `Ignore ] }
 
 let stdout_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stdout_pipe
@@ -26,7 +27,7 @@ let stderr_lines : t -> string Strict_pipe.Reader.t = fun t -> t.stderr_pipe
 
 let stdin : t -> Writer.t = fun t -> t.stdin
 
-let termination_status : t -> Unix.Exit_or_signal.t option =
+let termination_status : t -> Unix.Exit_or_signal.t Or_error.t option =
  fun t -> Ivar.peek t.terminated_ivar
 
 (** Try running [f] until it returns [Ok], returning the first [Ok] or [Error]
@@ -240,7 +241,9 @@ let start_custom :
     -> termination:[ `Always_raise
                    | `Raise_on_failure
                    | `Handler of
-                     killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
+                        killed:bool
+                     -> Unix.Exit_or_signal.t Or_error.t
+                     -> unit Deferred.t
                    | `Ignore ]
     -> t Deferred.Or_error.t =
  fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
@@ -274,7 +277,7 @@ let start_custom :
          ; relative_to_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
-      ~f:(fun prog -> Process.create ~prog ~args ())
+      ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   let%bind () =
     Deferred.map ~f:Or_error.return
@@ -305,7 +308,9 @@ let start_custom :
   in
   don't_wait_for
     (let open Deferred.Let_syntax in
-    let%bind termination_status = Process.wait process in
+    let%bind termination_status =
+      Deferred.Or_error.try_with (fun () -> Process.wait process)
+    in
     [%log trace] "child process %s died" name ;
     don't_wait_for
       (let%bind () = after (Time.Span.of_sec 1.) in
@@ -315,11 +320,15 @@ let start_custom :
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =
+      let exit_or_signal =
+        match termination_status with
+        | Ok termination_status ->
+            `String (Unix.Exit_or_signal.to_string_hum termination_status)
+        | Error err ->
+            Error_json.error_to_yojson err
+      in
       [%log fatal] "Process died unexpectedly: $exit_or_signal"
-        ~metadata:
-          [ ( "exit_or_signal"
-            , `String (Unix.Exit_or_signal.to_string_hum termination_status) )
-          ] ;
+        ~metadata:[("exit_or_signal", exit_or_signal)] ;
       raise Child_died
     in
     match (t.termination_response, termination_status) with
@@ -327,9 +336,9 @@ let start_custom :
         Deferred.unit
     | `Always_raise, _ ->
         log_bad_termination ()
-    | `Raise_on_failure, Error _ ->
+    | `Raise_on_failure, (Error _ | Ok (Error _)) ->
         log_bad_termination ()
-    | `Raise_on_failure, Ok () ->
+    | `Raise_on_failure, Ok (Ok ()) ->
         Deferred.unit
     | `Handler f, _ ->
         f ~killed:t.killing termination_status) ;
@@ -338,9 +347,13 @@ let start_custom :
 let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
  fun t ->
   match Ivar.peek t.terminated_ivar with
-  | None ->
-      if t.killing then
-        Deferred.map (Ivar.read t.terminated_ivar) ~f:Or_error.return
+  | None | Some (Error _) ->
+      (* The [Error] termination status indicates that we were not able to
+         monitor this process, and it may still be running. In these cases, it
+         is reasonable to call [kill], and we should attempt to end the process
+         if it is running.
+      *)
+      if t.killing then Ivar.read t.terminated_ivar
       else (
         t.killing <- true ;
         ( match t.termination_response with
@@ -350,7 +363,7 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
             t.termination_response <- `Ignore ) ;
         match Signal.send Signal.term (`Pid (Process.pid t.process)) with
         | `Ok ->
-            Deferred.map (Ivar.read t.terminated_ivar) ~f:Or_error.return
+            Ivar.read t.terminated_ivar
         | `No_such_process ->
             Deferred.Or_error.error_string
               "No such process running. This should be impossible." )
@@ -392,7 +405,8 @@ let%test_module _ =
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
           let%bind () = after process_wait_timeout in
-          [%test_eq: Unix.Exit_or_signal.t option] (Some (Ok ()))
+          [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
+            (Some (Ok (Ok ())))
             (termination_status process) ;
           Deferred.unit )
 
@@ -457,10 +471,10 @@ let%test_module _ =
             mk_process () |> Deferred.map ~f:Or_error.ok_exn
           in
           let%bind () = after process_wait_timeout in
-          [%test_eq: Unix.Exit_or_signal.t option]
+          [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
             (termination_status process1)
-            (Some (Error (`Signal Core.Signal.term))) ;
-          [%test_eq: Unix.Exit_or_signal.t option]
+            (Some (Ok (Error (`Signal Core.Signal.term)))) ;
+          [%test_eq: Unix.Exit_or_signal.t Or_error.t option]
             (termination_status process2)
             None ;
           let%bind _ = kill process2 in

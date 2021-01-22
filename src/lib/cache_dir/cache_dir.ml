@@ -38,24 +38,31 @@ let env_path =
       manual_install_path
 
 let possible_paths base =
-  List.map [env_path; brew_install_path; s3_install_path; autogen_path]
-    ~f:(fun d -> d ^/ base)
+  List.map
+    [ env_path
+    ; brew_install_path
+    ; s3_install_path
+    ; autogen_path
+    ; manual_install_path ] ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   Deferred.map ~f:Result.join
   @@ Monitor.try_with (fun () ->
          let each_uri (uri_string, file_path) =
            let open Deferred.Let_syntax in
-           let%map result =
+           [%log trace] "Downloading file from S3"
+             ~metadata:
+               [ ("url", `String uri_string)
+               ; ("local_file_path", `String file_path) ] ;
+           let%map _result =
              Process.run_exn ~prog:"curl"
                ~args:["--fail"; "-o"; file_path; uri_string]
                ()
            in
-           [%log debug] "Curl finished"
+           [%log trace] "Download finished"
              ~metadata:
                [ ("url", `String uri_string)
-               ; ("local_file_path", `String file_path)
-               ; ("result", `String result) ] ;
+               ; ("local_file_path", `String file_path) ] ;
            Result.return ()
          in
          Deferred.List.map ~f:each_uri

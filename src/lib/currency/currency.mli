@@ -30,8 +30,6 @@ module Fee : sig
 
   include Codable.S with type t := t
 
-  val scale : t -> int -> t option
-
   (* TODO: Get rid of signed fee, use signed amount *)
   [%%ifdef consensus_mechanism]
 
@@ -51,7 +49,7 @@ module Fee : sig
       Checked_arithmetic_intf
       with type var := var
        and type signed_var := Signed.var
-       and type t := t
+       and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -102,7 +100,7 @@ module Amount : sig
       Checked_arithmetic_intf
       with type var := var
        and type signed_var := Signed.var
-       and type t := t
+       and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
@@ -142,6 +140,8 @@ module Balance : sig
   [%%ifdef consensus_mechanism]
 
   module Checked : sig
+    type t = var
+
     val add_signed_amount : var -> Amount.Signed.var -> (var, _) Checked.t
 
     val add_amount : var -> Amount.var -> (var, _) Checked.t
@@ -154,9 +154,26 @@ module Balance : sig
     val add_amount_flagged :
       var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
+    val add_signed_amount_flagged :
+         var
+      -> Amount.Signed.var
+      -> (var * [`Overflow of Boolean.var], _) Checked.t
+
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
+
+    val equal : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( = ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( < ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( > ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( <= ) : var -> var -> (Boolean.var, _) Checked.t
+
+    val ( >= ) : var -> var -> (Boolean.var, _) Checked.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
   end

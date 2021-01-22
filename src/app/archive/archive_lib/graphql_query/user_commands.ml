@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 open Signature_lib
 
 module Query_first_seen =
@@ -37,7 +37,7 @@ module Query =
         user_commands(where: {hash: {_eq: $hash}} ) {
             fee @bsDecoder (fn: "Base_types.Fee.deserialize")
             hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-            memo @bsDecoder(fn: "User_command_memo.of_string")
+            memo @bsDecoder(fn: "Signed_command_memo.of_string")
             nonce @bsDecoder (fn: "Base_types.Nonce.deserialize")
             sender {
                 value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")

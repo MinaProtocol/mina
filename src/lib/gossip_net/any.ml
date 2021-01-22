@@ -1,7 +1,7 @@
 open Async_kernel
 
 module type S = sig
-  module Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf
+  module Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf
 
   module type Implementation_intf =
     Intf.Gossip_net_intf with module Rpc_intf := Rpc_intf
@@ -19,7 +19,7 @@ module type S = sig
   val create : creatable -> t creator
 end
 
-module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
@@ -40,13 +40,19 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
   let peers (Any ((module M), t)) = M.peers t
 
+  let add_peer (Any ((module M), t)) xs = M.add_peer t xs
+
   let initial_peers (Any ((module M), t)) = M.initial_peers t
 
   let random_peers (Any ((module M), t)) = M.random_peers t
 
   let random_peers_except (Any ((module M), t)) = M.random_peers_except t
 
-  let query_peer (Any ((module M), t)) = M.query_peer t
+  let query_peer ?heartbeat_timeout ?timeout (Any ((module M), t)) =
+    M.query_peer ?heartbeat_timeout ?timeout t
+
+  let query_peer' ?how ?heartbeat_timeout ?timeout (Any ((module M), t)) =
+    M.query_peer' ?how ?heartbeat_timeout ?timeout t
 
   let query_random_peers (Any ((module M), t)) = M.query_random_peers t
 
@@ -65,5 +71,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   let ban_notification_reader (Any ((module M), t)) =
     M.ban_notification_reader t
 
-  let net2 (Any ((module M), t)) = M.net2 t
+  let connection_gating (Any ((module M), t)) = M.connection_gating t
+
+  let set_connection_gating (Any ((module M), t)) config =
+    M.set_connection_gating t config
+
+  let restart_helper (Any ((module M), t)) = M.restart_helper t
 end

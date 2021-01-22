@@ -79,14 +79,18 @@ module Transport : sig
 
   module File_system : sig
     (** Dumb_logrotate is a Transport which persists logs
-     *  to the file system by using 2 log files. This
-     *  Transport will rotate the 2 logs, ensuring that
+     *  to the file system by using `num_rotate` log files. This
+     *  Transport will rotate these logs, ensuring that
      *  each log file is less than some maximum size
      *  before writing to it. When the logs reach max
      *  size, the old log is deleted and a new log is
      *  started. *)
     val dumb_logrotate :
-      directory:string -> log_filename:string -> max_size:int -> t
+         directory:string
+      -> log_filename:string
+      -> max_size:int
+      -> num_rotate:int
+      -> t
   end
 end
 
@@ -99,14 +103,17 @@ end
  *  ensure the code does not accidentally attach the same
  *  consumer multiple times. *)
 module Consumer_registry : sig
+  type id = string
+
   val register :
-    id:string -> processor:Processor.t -> transport:Transport.t -> unit
+    id:id -> processor:Processor.t -> transport:Transport.t -> unit
 end
 
 type 'a log_function =
      t
   -> module_:string
   -> location:string
+  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ?event_id:Structured_log_events.id
   -> ('a, unit, string, unit) format4
@@ -136,6 +143,7 @@ val error : _ log_function
 (** spam is a special log level that omits location information *)
 val spam :
      t
+  -> ?tags:Tags.t list
   -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
   -> ('a, unit, string, unit) format4
   -> 'a
@@ -155,6 +163,7 @@ module Structured : sig
        t
     -> module_:string
     -> location:string
+    -> ?tags:Tags.t list
     -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
     -> Structured_log_events.t
     -> unit
@@ -172,6 +181,13 @@ module Structured : sig
   val fatal : log_function
 
   val faulty_peer_without_punishment : log_function
+
+  val best_tip_diff :
+       t
+    -> ?tags:Tags.t list
+    -> ?metadata:(string, Yojson.Safe.t) List.Assoc.t
+    -> Structured_log_events.t
+    -> unit
 end
 
 (** Short alias for Structured. *)

@@ -9,6 +9,7 @@
 [%%import "/src/config/account_creation_fee/standard.mlh"]
 [%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
+[%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
 
 [%%define time_offsets true]
 
@@ -23,9 +24,10 @@
 
 [%%define download_snark_keys false]
 
-[%%define mock_frontend_data false]
-
 [%%define print_versioned_types false]
 
 [%%define daemon_expiry "never"]
 [%%define test_full_epoch false]
+[%%import "/src/config/fork.mlh"]
+[%%import "/src/config/features/dev.mlh"]
+[%%undef compaction_interval]

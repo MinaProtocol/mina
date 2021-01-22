@@ -7,12 +7,27 @@ module Base = struct
 
     type ledger_proof
 
-    val verify_blockchain_snark :
-      t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
+    val verify_commands :
+         t
+      -> Mina_base.User_command.Verifiable.t list
+         (* The first level of error represents failure to verify, the second a failure in
+   communicating with the verifier. *)
+      -> [ `Valid of Mina_base.User_command.Valid.t
+         | `Invalid
+         | `Valid_assuming of
+           ( Pickles.Side_loaded.Verification_key.t
+           * Mina_base.Snapp_statement.t
+           * Pickles.Side_loaded.Proof.t )
+           list ]
+         list
+         Deferred.Or_error.t
+
+    val verify_blockchain_snarks :
+      t -> Blockchain_snark.Blockchain.t list -> bool Or_error.t Deferred.t
 
     val verify_transaction_snarks :
          t
-      -> (ledger_proof * Coda_base.Sok_message.t) list
+      -> (ledger_proof * Mina_base.Sok_message.t) list
       -> bool Or_error.t Deferred.t
   end
 end

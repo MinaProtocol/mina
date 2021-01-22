@@ -43,17 +43,17 @@ include (
     end )
 
 let token_id =
-  Command.Arg_type.map ~f:Coda_base.Token_id.of_string Command.Param.string
+  Command.Arg_type.map ~f:Mina_base.Token_id.of_string Command.Param.string
 
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
-    ~f:Coda_base.Receipt.Chain_hash.of_string
+    ~f:Mina_base.Receipt.Chain_hash.of_string
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let global_slot =
-  Command.Arg_type.map Command.Param.int ~f:Coda_numbers.Global_slot.of_int
+  Command.Arg_type.map Command.Param.int ~f:Mina_numbers.Global_slot.of_int
 
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_formatted_string
@@ -63,11 +63,11 @@ let txn_amount =
     ~f:Currency.Amount.of_formatted_string
 
 let txn_nonce =
-  let open Coda_base in
+  let open Mina_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
 let hd_index =
-  Command.Arg_type.map Command.Param.string ~f:Coda_numbers.Hd_index.of_string
+  Command.Arg_type.map Command.Param.string ~f:Mina_numbers.Hd_index.of_string
 
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
@@ -92,11 +92,10 @@ let log_level =
 
 let user_command =
   Command.Arg_type.create (fun s ->
-      try Coda_base.User_command.of_base58_check_exn s
+      try Mina_base.Signed_command.of_base58_check_exn s
       with e ->
-        failwithf "Couldn't decode transaction id: %s\n"
-          (Error.to_string_hum (Error.of_exn e))
-          () )
+        Error.tag (Error.of_exn e) ~tag:"Couldn't decode transaction id"
+        |> Error.raise )
 
 module Work_selection_method = struct
   [%%versioned

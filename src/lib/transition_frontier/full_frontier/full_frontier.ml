@@ -1,7 +1,7 @@
 open Core_kernel
-open Coda_base
-open Coda_state
-open Coda_transition
+open Mina_base
+open Mina_state
+open Mina_transition
 open Frontier_base
 
 module Node = struct
@@ -58,7 +58,6 @@ type t =
   { root_ledger: Ledger.Any_ledger.witness
   ; mutable root: State_hash.t
   ; mutable best_tip: State_hash.t
-  ; mutable hash: Frontier_hash.t
   ; logger: Logger.t
   ; table: Node.t State_hash.Table.t
   ; mutable protocol_states_for_root_scan_state:
@@ -68,10 +67,6 @@ type t =
   ; precomputed_values: Precomputed_values.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
-
-let set_hash_unsafe t (`I_promise_this_is_safe hash) = t.hash <- hash
-
-let hash t = t.hash
 
 let all_breadcrumbs t =
   List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
@@ -101,15 +96,16 @@ let protocol_states_for_root_scan_state t =
 
 let best_tip t = find_exn t t.best_tip
 
-let close t =
-  Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
+let close ~loc t =
+  Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
-    (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
+    (Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
        (Breadcrumb.mask (root t)))
 
-let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
-    ~max_length ~precomputed_values =
+let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
+    ~precomputed_values =
   let open Root_data in
+  let transition_receipt_time = None in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
   in
@@ -131,19 +127,20 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
          (Ledger.Any_ledger.M.merkle_root root_ledger))
       root_blockchain_state_ledger_hash ) ;
   let root_breadcrumb =
-    Breadcrumb.create root_data.transition root_data.staged_ledger
+    Breadcrumb.create ~validated_transition:root_data.transition
+      ~staged_ledger:root_data.staged_ledger ~just_emitted_a_proof:false
+      ~transition_receipt_time
   in
   let root_node =
     {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
   in
   let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-  Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
+  Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
   let t =
     { logger
     ; root_ledger
     ; root= root_hash
     ; best_tip= root_hash
-    ; hash= base_hash
     ; table
     ; consensus_local_state
     ; max_length
@@ -181,17 +178,22 @@ let rec successors_rec t breadcrumb =
   List.bind (successors t breadcrumb) ~f:(fun succ ->
       succ :: successors_rec t succ )
 
-let path_map t breadcrumb ~f =
-  let rec find_path b =
-    let elem = f b in
-    let parent_hash = Breadcrumb.parent_hash b in
-    if State_hash.equal (Breadcrumb.state_hash b) t.root then []
-    else if State_hash.equal parent_hash t.root then [elem]
-    else elem :: find_path (find_exn t parent_hash)
+let path_map ?max_length t breadcrumb ~f =
+  let rec find_path b count_opt acc =
+    match count_opt with
+    | Some count when count <= 0 ->
+        acc
+    | _ ->
+        let count_opt = Option.map ~f:(fun x -> x - 1) count_opt in
+        let elem = f b in
+        let parent_hash = Breadcrumb.parent_hash b in
+        if State_hash.equal (Breadcrumb.state_hash b) t.root then acc
+        else if State_hash.equal parent_hash t.root then elem :: acc
+        else find_path (find_exn t parent_hash) count_opt (elem :: acc)
   in
-  List.rev (find_path breadcrumb)
+  find_path breadcrumb max_length []
 
-let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
+let best_tip_path ?max_length t = path_map ?max_length t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
@@ -314,7 +316,7 @@ let calculate_root_transition_diff t heir =
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
 
 let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
-    ~ignore_consensus_local_state =
+    ~enable_epoch_ledger_sync =
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -356,14 +358,24 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
    *)
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
+  let genesis_ledger_hash =
+    Breadcrumb.blockchain_state old_root_node.breadcrumb
+    |> Blockchain_state.genesis_ledger_hash
+  in
   (* STEP 0 *)
-  if not ignore_consensus_local_state then
-    O1trace.measure "calling consensus hook frontier_root_transition"
-      (fun () ->
-        Consensus.Hooks.frontier_root_transition
-          (Breadcrumb.consensus_state old_root_node.breadcrumb)
-          (Breadcrumb.consensus_state new_root_node.breadcrumb)
-          ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ) ;
+  let () =
+    match enable_epoch_ledger_sync with
+    | `Enabled snarked_ledger ->
+        O1trace.measure "calling consensus hook frontier_root_transition"
+          (fun () ->
+            Consensus.Hooks.frontier_root_transition
+              (Breadcrumb.consensus_state old_root_node.breadcrumb)
+              (Breadcrumb.consensus_state new_root_node.breadcrumb)
+              ~local_state:t.consensus_local_state ~snarked_ledger
+              ~genesis_ledger_hash )
+    | `Disabled ->
+        ()
+  in
   let new_staged_ledger =
     let m0 = Breadcrumb.mask old_root_node.breadcrumb in
     let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -375,7 +387,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
-        ignore (Ledger.Maskable.unregister_mask_exn mask) ;
+        ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask) ;
         Hashtbl.remove t.table hash ) ;
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
@@ -416,28 +428,33 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun (txn, state_hash) ->
           (*Validate transactions against the protocol state associated with the transaction*)
-          let txn_global_slot =
+          let txn_state_view =
             find_protocol_state t state_hash
-            |> Option.value_exn |> Protocol_state.consensus_state
-            |> Consensus.Data.Consensus_state.curr_global_slot
+            |> Option.value_exn |> Protocol_state.body
+            |> Protocol_state.Body.view
           in
           ignore
             (Or_error.ok_exn
                (Ledger.apply_transaction
                   ~constraint_constants:
-                    t.precomputed_values.constraint_constants ~txn_global_slot
+                    t.precomputed_values.constraint_constants ~txn_state_view
                   mt txn.data)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
-      ignore (Ledger.Maskable.unregister_mask_exn mt) ) ;
+      ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt) ) ;
     new_staged_ledger
   in
   (* rewrite the new root breadcrumb to contain the new root mask *)
   let new_root_breadcrumb =
     Breadcrumb.create
-      (Breadcrumb.validated_transition new_root_node.breadcrumb)
-      new_staged_ledger
+      ~validated_transition:
+        (Breadcrumb.validated_transition new_root_node.breadcrumb)
+      ~staged_ledger:new_staged_ledger
+      ~just_emitted_a_proof:
+        (Breadcrumb.just_emitted_a_proof new_root_node.breadcrumb)
+      ~transition_receipt_time:
+        (Breadcrumb.transition_receipt_time new_root_node.breadcrumb)
   in
   (*Update the protocol states required for scan state at the new root.
   Note: this should be after applying the transactions to the snarked ledger (Step 5)
@@ -477,8 +494,8 @@ let calculate_diffs t breadcrumb =
         if
           Consensus.Hooks.select
             ~constants:t.precomputed_values.consensus_constants
-            ~existing:(Breadcrumb.consensus_state current_best_tip)
-            ~candidate:(Breadcrumb.consensus_state breadcrumb)
+            ~existing:(Breadcrumb.consensus_state_with_hash current_best_tip)
+            ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
             ~logger:
               (Logger.extend t.logger
                  [ ( "selection_context"
@@ -492,7 +509,7 @@ let calculate_diffs t breadcrumb =
 
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
 let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
-    ~ignore_consensus_local_state : mutant * State_hash.t option =
+    ~enable_epoch_ledger_sync : mutant * State_hash.t option =
   match diff with
   | New_node (Full breadcrumb) ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
@@ -517,46 +534,44 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
         Root_data.Limited.protocol_states new_root
       in
       move_root t ~new_root_hash ~new_root_protocol_states ~garbage
-        ~ignore_consensus_local_state ;
+        ~enable_epoch_ledger_sync ;
       (old_root_hash, Some new_root_hash)
-  (* These are invalid inhabitants for the type signature of this function,
-   * but the OCaml compiler isn't smart enough to realize this. *)
-  | Root_transitioned {garbage= Lite _; _} ->
-      failwith "impossible"
-  | New_node (Lite _) ->
-      failwith "impossible"
 
 let update_metrics_with_diff (type mutant) t
     (diff : (Diff.full, mutant) Diff.t) : unit =
   match diff with
   | New_node _ ->
-      Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
-      Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
+      Mina_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
+      Mina_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
   | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
       let new_root_breadcrumb = root t in
+      let best_tip_breadcrumb = best_tip t in
       let consensus_state = Breadcrumb.consensus_state new_root_breadcrumb in
       let blockchain_length =
         Int.to_float
           ( Consensus.Data.Consensus_state.blockchain_length consensus_state
-          |> Coda_numbers.Length.to_int )
+          |> Mina_numbers.Length.to_int )
       in
       let global_slot =
         Consensus.Data.Consensus_state.consensus_time consensus_state
         |> Consensus.Data.Consensus_time.to_uint32 |> Unsigned.UInt32.to_int
         |> Float.of_int
       in
-      Coda_metrics.(
+      Mina_metrics.(
+        let best_tip_user_txns =
+          Int.to_float (List.length (Breadcrumb.commands best_tip_breadcrumb))
+        in
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
         let num_finalized_staged_txns =
-          Int.to_float
-            (List.length (Breadcrumb.user_commands new_root_breadcrumb))
+          Int.to_float (List.length (Breadcrumb.commands new_root_breadcrumb))
         in
         Gauge.dec Transition_frontier.active_breadcrumbs
           num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
           num_finalized_staged_txns ;
+        Gauge.set Transition_frontier.best_tip_user_txns best_tip_user_txns ;
         Counter.inc Transition_frontier.finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc_one Transition_frontier.root_transitions ;
@@ -585,11 +600,10 @@ let update_metrics_with_diff (type mutant) t
   | _ ->
       ()
 
-let apply_diffs t diffs ~ignore_consensus_local_state =
+let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   let open Root_identifier.Stable.Latest in
-  [%log' trace t.logger] "Applying %d diffs to full frontier (%s --> ?)"
-    (List.length diffs)
-    (Frontier_hash.to_string t.hash) ;
+  [%log' trace t.logger] "Applying %d diffs to full frontier "
+    (List.length diffs) ;
   let consensus_constants = t.precomputed_values.consensus_constants in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
@@ -600,25 +614,21 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   let new_root, diffs_with_mutants =
     List.fold diffs ~init:(None, [])
       ~f:(fun (prev_root, diffs_with_mutants) (Diff.Full.E.E diff) ->
-        let mutant, new_root =
-          apply_diff t diff ~ignore_consensus_local_state
-        in
-        t.hash <- Frontier_hash.merge_diff t.hash (Diff.to_lite diff) mutant ;
+        let mutant, new_root = apply_diff t diff ~enable_epoch_ledger_sync in
         update_metrics_with_diff t diff ;
         let new_root =
           match new_root with
           | None ->
               prev_root
           | Some state_hash ->
-              Some {state_hash; frontier_hash= t.hash}
+              Some {state_hash}
         in
         (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
     )
   in
-  [%log' trace t.logger]
-    "Reached state %s after applying diffs to full frontier"
-    (Frontier_hash.to_string t.hash) ;
-  if not ignore_consensus_local_state then
+  [%log' trace t.logger] "after applying diffs to full frontier" ;
+  if (not (enable_epoch_ledger_sync = `Disabled)) && not has_long_catchup_job
+  then
     Debug_assert.debug_assert (fun () ->
         match
           Consensus.Hooks.required_local_state_sync

@@ -268,21 +268,28 @@ module Log = struct
     flag "log-level"
       (optional_with_default Logger.Level.Info log_level)
       ~doc:"Set log level (default: Info)"
+
+  let file_log_level =
+    let log_level = Arg_type.log_level in
+    let open Command.Param in
+    flag "file-log-level"
+      (optional_with_default Logger.Level.Trace log_level)
+      ~doc:"Set log level for the log file (default: Trace)"
 end
 
-type user_command_common =
+type signed_command_common =
   { sender: Signature_lib.Public_key.Compressed.t
   ; fee: Currency.Fee.t
-  ; nonce: Coda_base.Account.Nonce.t option
+  ; nonce: Mina_base.Account.Nonce.t option
   ; memo: string option }
 
-let user_command_common : user_command_common Command.Param.t =
+let signed_command_common : signed_command_common Command.Param.t =
   let open Command.Let_syntax in
   let open Arg_type in
   let%map_open sender =
     flag "sender"
       (required public_key_compressed)
-      ~doc:"KEY Public key from which you want to send the transaction"
+      ~doc:"PUBLICKEY Public key from which you want to send the transaction"
   and fee =
     flag "fee"
       ~doc:
@@ -290,8 +297,9 @@ let user_command_common : user_command_common Command.Param.t =
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
-              Coda_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
+              Mina_compile_config.default_transaction_fee)
+           (Currency.Fee.to_formatted_string
+              Mina_base.Signed_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -306,11 +314,11 @@ let user_command_common : user_command_common Command.Param.t =
       (optional string)
   in
   { sender
-  ; fee= Option.value fee ~default:Coda_compile_config.default_transaction_fee
+  ; fee= Option.value fee ~default:Mina_compile_config.default_transaction_fee
   ; nonce
   ; memo }
 
-module User_command = struct
+module Signed_command = struct
   open Arg_type
 
   let hd_index =
@@ -336,8 +344,9 @@ module User_command = struct
            "FEE Amount you are willing to pay to process the transaction \
             (default: %s) (minimum: %s)"
            (Currency.Fee.to_formatted_string
-              Coda_compile_config.default_transaction_fee)
-           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
+              Mina_compile_config.default_transaction_fee)
+           (Currency.Fee.to_formatted_string
+              Mina_base.Signed_command.minimum_fee))
       (optional txn_fee)
 
   let valid_until =
@@ -366,6 +375,6 @@ module User_command = struct
       ~doc:
         (sprintf
            "STRING Memo accompanying the transaction (up to %d characters)"
-           Coda_base.User_command_memo.max_input_length)
+           Mina_base.Signed_command_memo.max_input_length)
       (optional string)
 end

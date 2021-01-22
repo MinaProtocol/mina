@@ -19,9 +19,8 @@ module Wrap = struct
 
     type _ t +=
       | Evals :
-          ( ( Field.Constant.t array Dlog_marlin_types.Evals.t
-            * Field.Constant.t )
-            Tuple_lib.Triple.t
+          ( (Field.Constant.t array Dlog_plonk_types.Evals.t * Field.Constant.t)
+            Tuple_lib.Double.t
           , max_branching )
           Vector.t
           t
@@ -31,15 +30,14 @@ module Wrap = struct
       | Proof_state :
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
-              , Field.Constant.t
-              , ( ( Challenge.Constant.t Scalar_challenge.t
-                  , bool )
+              , Field.Constant.t Shifted_value.t
+              , ( Challenge.Constant.t Scalar_challenge.t
                   Bulletproof_challenge.t
                 , Tock.Rounds.n )
                 Vector.t
-              , Digest.Constant.t )
-              Types.Pairing_based.Proof_state.Per_proof.t
-              * bool
+              , Digest.Constant.t
+              , bool )
+              Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
             , max_branching )
             Vector.t
           , Digest.Constant.t )
@@ -47,13 +45,13 @@ module Wrap = struct
           t
       | Messages :
           ( Tock.Inner_curve.Affine.t
-          , Tick.Field.t )
-          Dlog_marlin_types.Messages.t
+          , Tock.Inner_curve.Affine.t Or_infinity.t )
+          Dlog_plonk_types.Messages.t
           t
       | Openings_proof :
           ( Tock.Inner_curve.Affine.t
           , Tick.Field.t )
-          Dlog_marlin_types.Openings.Bulletproof.t
+          Dlog_plonk_types.Openings.Bulletproof.t
           t
   end
 
@@ -75,8 +73,8 @@ module Wrap = struct
 
       type _ t +=
         | Evals :
-            (Tock.Field.t array Dlog_marlin_types.Evals.t * Tock.Field.t)
-            Tuple_lib.Triple.t
+            (Tock.Field.t array Dlog_plonk_types.Evals.t * Tock.Field.t)
+            Tuple_lib.Double.t
             vec
             t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
@@ -85,15 +83,14 @@ module Wrap = struct
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t
-                , Tock.Field.t
-                , ( ( Challenge.Constant.t Scalar_challenge.t
-                    , bool )
+                , Tock.Field.t Shifted_value.t
+                , ( Challenge.Constant.t Scalar_challenge.t
                     Bulletproof_challenge.t
                   , Tock.Rounds.n )
                   Vector.t
-                , Digest.Constant.t )
-                Types.Pairing_based.Proof_state.Per_proof.t
-                * bool
+                , Digest.Constant.t
+                , bool )
+                Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
               , max_branching )
               Vector.t
             , Digest.Constant.t )
@@ -101,13 +98,13 @@ module Wrap = struct
             t
         | Messages :
             ( Tock.Inner_curve.Affine.t
-            , Tick.Field.t )
-            Dlog_marlin_types.Messages.t
+            , Tock.Inner_curve.Affine.t Or_infinity.t )
+            Dlog_plonk_types.Messages.t
             t
         | Openings_proof :
             ( Tock.Inner_curve.Affine.t
             , Tick.Field.t )
-            Dlog_marlin_types.Openings.Bulletproof.t
+            Dlog_plonk_types.Openings.Bulletproof.t
             t
     end in
     (module R)
@@ -135,7 +132,7 @@ module Step = struct
           , local_branches )
           H3.T(Per_proof_witness.Constant).t
           t
-      | Wrap_index : Tock.Curve.Affine.t array Abc.t Matrix_evals.t t
+      | Wrap_index : Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
       | App_state : statement t
   end
 
@@ -167,7 +164,8 @@ module Step = struct
             , local_branches )
             H3.T(Per_proof_witness.Constant).t
             t
-        | Wrap_index : Tock.Curve.Affine.t array Abc.t Matrix_evals.t t
+        | Wrap_index :
+            Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
         | App_state : statement t
     end in
     (module R)

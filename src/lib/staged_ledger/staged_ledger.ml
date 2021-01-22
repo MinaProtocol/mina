@@ -1,9 +1,11 @@
 [%%import
 "/src/config.mlh"]
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
-open Coda_base
+open Mina_base
 open Currency
 open O1trace
 open Signature_lib
@@ -22,14 +24,21 @@ module T = struct
       | Invalid_proofs of
           ( Ledger_proof.t
           * Transaction_snark.Statement.t
-          * Coda_base.Sok_message.t )
+          * Mina_base.Sok_message.t )
           list
+      | Couldn't_reach_verifier of Error.t
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
+      | Mismatched_statuses of
+          Transaction.t With_status.t * Transaction_status.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
     let to_string = function
+      | Couldn't_reach_verifier e ->
+          Format.asprintf
+            !"The verifier could not be reached: %{sexp:Error.t}"
+            e
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
@@ -52,6 +61,11 @@ module T = struct
                    @@ Public_key.Compressed.to_yojson m.prover ) ))
       | Insufficient_work str ->
           str
+      | Mismatched_statuses (transaction, status) ->
+          Format.asprintf
+            !"Got a different status %{sexp: Transaction_status.t} when \
+              applying the transaction %{sexp: Transaction.t With_status.t}"
+            status transaction
       | Unexpected e ->
           Error.to_string_hum e
 
@@ -83,7 +97,7 @@ module T = struct
               ) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
-      Deferred.return false
+      Deferred.return (Or_error.error_string err_str)
     in
     if
       List.exists proofs ~f:(fun (proof, statement, _msg) ->
@@ -101,7 +115,7 @@ module T = struct
                        (Ledger_proof.statement p) )) ) ]
     else
       let start = Time.now () in
-      match%bind
+      match%map
         Verifier.verify_transaction_snarks verifier
           (List.map proofs ~f:(fun (proof, _, msg) -> (proof, msg)))
       with
@@ -115,7 +129,7 @@ module T = struct
                          `Int (Transaction_snark.Statement.hash s) )) )
               ; ("time", `Float time_ms) ]
             "Verification in apply_diff for work $work_id took $time ms" ;
-          Deferred.return b
+          Ok b
       | Error e ->
           [%log fatal]
             ~metadata:
@@ -123,10 +137,10 @@ module T = struct
                 , `List
                     (List.map proofs ~f:(fun (_, s, _) ->
                          Transaction_snark.Statement.to_yojson s )) )
-              ; ("error", `String (Error.to_string_hum e)) ]
+              ; ("error", Error_json.error_to_yojson e) ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
-          exit 21
+          Error e
 
   let map_opt xs ~f =
     with_return (fun {return} ->
@@ -149,10 +163,12 @@ module T = struct
           |> to_staged_ledger_or_error )
     | Some proof_statement_msgs -> (
         match%map verify_proofs ~logger ~verifier proof_statement_msgs with
-        | true ->
+        | Ok true ->
             Ok ()
-        | _ ->
-            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs) )
+        | Ok false ->
+            Error (Staged_ledger_error.Invalid_proofs proof_statement_msgs)
+        | Error e ->
+            Error (Couldn't_reach_verifier e) )
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
@@ -160,7 +176,7 @@ module T = struct
               (struct
                 type t = unit
 
-                let verify ~verifier:() _proofs = Deferred.return true
+                let verify ~verifier:() _proofs = Deferred.return (Ok true)
               end)
   end
 
@@ -194,7 +210,7 @@ module T = struct
   let scan_state {scan_state; _} = scan_state
 
   let all_work_pairs t
-      ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+      ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
       =
     Scan_state.all_work_pairs t.scan_state ~get_state
 
@@ -210,23 +226,29 @@ module T = struct
     in
     target
 
-  let verify_scan_state_after_apply ~constraint_constants
-      ~next_available_token_before ~next_available_token_after ledger
-      (scan_state : Scan_state.t) =
+  let verify_scan_state_after_apply ~constraint_constants ~next_available_token
+      ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
+    in
+    let next_available_token_begin ((proof, _), _) =
+      let {Transaction_snark.Statement.next_available_token_after; _} =
+        Ledger_proof.statement proof
+      in
+      next_available_token_after
     in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
           ~verifier:() ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:None ~next_available_token_before
-          ~next_available_token_after
+          ~ledger_hash_begin:None ~next_available_token_begin:None
+          ~next_available_token_end:next_available_token
     | Some proof ->
         Statement_scanner.check_invariants ~constraint_constants scan_state
           ~verifier:() ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
-          ~next_available_token_before ~next_available_token_after
+          ~next_available_token_begin:(Some (next_available_token_begin proof))
+          ~next_available_token_end:next_available_token
 
   let statement_exn ~constraint_constants t =
     let open Deferred.Let_syntax in
@@ -262,8 +284,8 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-        ~next_available_token_before:snarked_next_available_token
-        ~next_available_token_after:(Ledger.next_available_token ledger)
+        ~next_available_token_begin:(Some snarked_next_available_token)
+        ~next_available_token_end:(Ledger.next_available_token ledger)
     in
     return t
 
@@ -281,8 +303,8 @@ module T = struct
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-        ~next_available_token_before:snarked_next_available_token
-        ~next_available_token_after:(Ledger.next_available_token ledger)
+        ~next_available_token_begin:(Some snarked_next_available_token)
+        ~next_available_token_end:(Ledger.next_available_token ledger)
     in
     return t
 
@@ -307,19 +329,18 @@ module T = struct
           let%map.Async () = Async.Scheduler.yield () in
           let%bind.Or_error.Let_syntax txn_with_info =
             Ledger.apply_transaction ~constraint_constants
-              ~txn_global_slot:
-                ( Coda_state.Protocol_state.consensus_state protocol_state
-                |> Consensus.Data.Consensus_state.curr_global_slot )
+              ~txn_state_view:
+                (Mina_state.Protocol_state.Body.view protocol_state.body)
               snarked_ledger tx.data
           in
           let computed_status =
-            Ledger.Undo.user_command_status txn_with_info
+            Ledger.Transaction_applied.user_command_status txn_with_info
           in
-          if User_command_status.equal tx.status computed_status then Ok ()
+          if Transaction_status.equal tx.status computed_status then Ok ()
           else
             Or_error.errorf
               !"Mismatched user command status. Expected: %{sexp: \
-                User_command_status.t} Got: %{sexp: User_command_status.t}"
+                Transaction_status.t} Got: %{sexp: Transaction_status.t}"
               tx.status computed_status )
     in
     let%bind () =
@@ -358,7 +379,7 @@ module T = struct
   call_logger]
 
   let hash t =
-    Coda_debug.Call_logger.record_call "Staged_ledger.hash" ;
+    Mina_debug.Call_logger.record_call "Staged_ledger.hash" ;
     hash t
 
   [%%endif]
@@ -416,9 +437,33 @@ module T = struct
       ; init_stack: Pending_coinbase.Stack.t }
   end
 
+  let coinbase_amount ~supercharge_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+    if supercharge_coinbase then
+      Currency.Amount.scale constraint_constants.coinbase_amount
+        constraint_constants.supercharged_coinbase_factor
+    else Some constraint_constants.coinbase_amount
+
+  let _coinbase_amount_or_error ~supercharge_coinbase
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
+    if supercharge_coinbase then
+      Option.value_map
+        ~default:
+          (Error
+             (Pre_diff_info.Error.Coinbase_error
+                (sprintf
+                   !"Overflow when calculating coinbase amount: Supercharged \
+                     coinbase factor (%d) x coinbase amount (%{sexp: \
+                     Currency.Amount.t})"
+                   constraint_constants.supercharged_coinbase_factor
+                   constraint_constants.coinbase_amount)))
+        (coinbase_amount ~supercharge_coinbase ~constraint_constants)
+        ~f:(fun x -> Ok x)
+    else Ok constraint_constants.coinbase_amount
+
   let apply_transaction_and_get_statement ~constraint_constants ledger
       (pending_coinbase_stack_state : Stack_state_with_init_stack.t) s
-      txn_global_slot =
+      txn_state_view =
     let open Result.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
@@ -434,12 +479,12 @@ module T = struct
     let new_init_stack =
       push_coinbase pending_coinbase_stack_state.init_stack s
     in
-    let%map undo =
-      Ledger.apply_transaction ~constraint_constants ~txn_global_slot ledger s
+    let%map applied_txn =
+      Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger s
       |> to_staged_ledger_or_error
     in
     let next_available_token_after = Ledger.next_available_token ledger in
-    ( undo
+    ( applied_txn
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
@@ -454,12 +499,12 @@ module T = struct
       ; init_stack= new_init_stack } )
 
   let apply_transaction_and_get_witness ~constraint_constants ledger
-      pending_coinbase_stack_state s txn_global_slot state_and_body_hash =
-    let open Deferred.Let_syntax in
-    let account_ids = function
-      | Transaction.Fee_transfer t ->
+      pending_coinbase_stack_state s status txn_state_view state_and_body_hash
+      =
+    let account_ids : Transaction.t -> _ = function
+      | Fee_transfer t ->
           Fee_transfer.receivers t
-      | User_command t ->
+      | Command t ->
           let t = (t :> User_command.t) in
           let next_available_token = Ledger.next_available_token ledger in
           User_command.accounts_accessed ~next_available_token t
@@ -474,24 +519,47 @@ module T = struct
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (account_ids s) )
     in
-    let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ~constraint_constants ledger
-            pending_coinbase_stack_state s txn_global_slot )
+            pending_coinbase_stack_state s txn_state_view )
     in
-    let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
-    let%map undo, statement, updated_pending_coinbase_stack_state = r in
-    ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
+    let%bind applied_txn, statement, updated_pending_coinbase_stack_state =
+      r
+    in
+    let%map () =
+      match status with
+      | None ->
+          return ()
+      | Some status ->
+          (* Validate that command status matches. *)
+          let got_status =
+            Ledger.Transaction_applied.user_command_status applied_txn
+          in
+          if Transaction_status.equal status got_status then return ()
+          else
+            Result.fail
+              (Staged_ledger_error.Mismatched_statuses
+                 ({With_status.data= s; status}, got_status))
+    in
+    ( { Scan_state.Transaction_with_witness.transaction_with_info= applied_txn
       ; state_hash= state_and_body_hash
+      ; state_view= txn_state_view
       ; ledger_witness
       ; init_stack= Base pending_coinbase_stack_state.init_stack
       ; statement }
     , updated_pending_coinbase_stack_state )
 
+  let rec partition size = function
+    | [] ->
+        []
+    | ls ->
+        let sub, rest = List.split_n ls size in
+        sub :: partition size rest
+
   let update_ledger_and_get_statements ~constraint_constants ledger
-      current_stack ts current_global_slot state_and_body_hash =
+      current_stack ts current_state_view state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let current_stack_with_state =
       push_state current_stack (snd state_and_body_hash)
@@ -502,22 +570,28 @@ module T = struct
         ; init_stack= current_stack }
       in
       let exception Exit of Staged_ledger_error.t in
-      try
-        let%bind.Async ret =
-          Deferred.List.fold ts ~init:([], pending_coinbase_stack_state)
-            ~f:(fun (acc, pending_coinbase_stack_state) t ->
-              match%map.Async
-                apply_transaction_and_get_witness ~constraint_constants ledger
-                  pending_coinbase_stack_state t.With_status.data
-                  current_global_slot state_and_body_hash
-              with
-              | Ok (res, updated_pending_coinbase_stack_state) ->
-                  (res :: acc, updated_pending_coinbase_stack_state)
-              | Error err ->
-                  raise (Exit err) )
-        in
-        return ret
-      with Exit err -> Deferred.Result.fail err
+      Async.try_with ~extract_exn:true (fun () ->
+          let tss = partition 10 ts in
+          Deferred.List.fold tss ~init:([], pending_coinbase_stack_state)
+            ~f:(fun (acc, pending_coinbase_stack_state) ts ->
+              let open Deferred.Let_syntax in
+              let%map () = Async.Scheduler.yield () in
+              List.fold ts ~init:(acc, pending_coinbase_stack_state)
+                ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  match
+                    apply_transaction_and_get_witness ~constraint_constants
+                      ledger pending_coinbase_stack_state t.With_status.data
+                      (Some t.status) current_state_view state_and_body_hash
+                  with
+                  | Ok (res, updated_pending_coinbase_stack_state) ->
+                      (res :: acc, updated_pending_coinbase_stack_state)
+                  | Error err ->
+                      raise (Exit err) ) ) )
+      |> Deferred.Result.map_error ~f:(function
+           | Exit err ->
+               err
+           | exn ->
+               raise exn )
     in
     (List.rev res_rev, pending_coinbase_stack_state.pc.target)
 
@@ -547,8 +621,10 @@ module T = struct
       List.fold_right ~init:(Ok []) data
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let open Or_error.Let_syntax in
-          let%bind acc = acc in
-          let%map t = d.transaction_with_info |> Ledger.Undo.transaction in
+          let%map acc = acc in
+          let t =
+            d.transaction_with_info |> Ledger.Transaction_applied.transaction
+          in
           t :: acc )
     in
     let total_fee_excess txns =
@@ -577,8 +653,17 @@ module T = struct
       ~f:(fun _ -> check (List.drop data (fst partitions.first)) partitions)
       partitions.second
 
+  let time ~logger label f =
+    let start = Core.Time.now () in
+    let%map x = f () in
+    [%log debug]
+      ~metadata:
+        [("time_elapsed", `Float Core.Time.(Span.to_ms @@ diff (now ()) start))]
+      "%s took $time_elapsed" label ;
+    x
+
   let update_coinbase_stack_and_get_data ~constraint_constants scan_state
-      ledger pending_coinbase_collection transactions current_global_slot
+      ledger pending_coinbase_collection transactions current_state_view
       state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
@@ -607,8 +692,7 @@ module T = struct
           in
           let%map data, updated_stack =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack transactions current_global_slot
-              state_and_body_hash
+              working_stack transactions current_state_view state_and_body_hash
           in
           ( is_new_stack
           , data
@@ -632,7 +716,7 @@ module T = struct
           in
           let%bind data1, updated_stack1 =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack1 txns_for_partition1 current_global_slot
+              working_stack1 txns_for_partition1 current_state_view
               state_and_body_hash
           in
           let txns_for_partition2 = List.drop transactions slots in
@@ -642,7 +726,7 @@ module T = struct
           in
           let%map data2, updated_stack2 =
             update_ledger_and_get_statements ~constraint_constants ledger
-              working_stack2 txns_for_partition2 current_global_slot
+              working_stack2 txns_for_partition2 current_state_view
               state_and_body_hash
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
@@ -732,8 +816,8 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  let apply_diff ~logger ~constraint_constants t pre_diff_info
-      ~current_global_slot ~state_and_body_hash ~log_prefix =
+  let apply_diff ?(skip_verification = false) ~logger ~constraint_constants t
+      pre_diff_info ~current_state_view ~state_and_body_hash ~log_prefix =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2 t.constraint_constants.transaction_capacity_log_2
@@ -743,14 +827,14 @@ module T = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let next_available_token_before = Ledger.next_available_token t.ledger in
     let new_mask = Ledger.Mask.create ~depth:(Ledger.depth t.ledger) () in
     let new_ledger = Ledger.register_mask t.ledger new_mask in
-    let transactions, works, user_commands_count, coinbases = pre_diff_info in
+    let transactions, works, commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
-      update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
-        new_ledger t.pending_coinbase_collection transactions
-        current_global_slot state_and_body_hash
+      time ~logger "update_coinbase_stack_start_time" (fun () ->
+          update_coinbase_stack_and_get_data ~constraint_constants t.scan_state
+            new_ledger t.pending_coinbase_collection transactions
+            current_state_view state_and_body_hash )
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -758,66 +842,75 @@ module T = struct
       Scan_state.work_statements_for_new_diff t.scan_state
     in
     let%bind () =
-      let required = List.length required_pairs in
-      if
-        work_count < required
-        && List.length data
-           > Scan_state.free_space t.scan_state - required + work_count
-      then
-        Deferred.return
-          (Error
-             (Staged_ledger_error.Insufficient_work
-                (sprintf
-                   !"Insufficient number of transaction snark work (slots \
-                     occupying: %d)  required %d, got %d"
-                   slots required work_count)))
-      else Deferred.return (Ok ())
+      time ~logger "sufficient work check" (fun () ->
+          let required = List.length required_pairs in
+          if
+            work_count < required
+            && List.length data
+               > Scan_state.free_space t.scan_state - required + work_count
+          then
+            Deferred.return
+              (Error
+                 (Staged_ledger_error.Insufficient_work
+                    (sprintf
+                       !"Insufficient number of transaction snark work (slots \
+                         occupying: %d)  required %d, got %d"
+                       slots required work_count)))
+          else Deferred.return (Ok ()) )
     in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
-      let r =
-        Scan_state.fill_work_and_enqueue_transactions t.scan_state data works
-      in
-      Or_error.iter_error r ~f:(fun e ->
-          let data_json =
-            `List
-              (List.map data
-                 ~f:(fun {Scan_state.Transaction_with_witness.statement; _} ->
-                   Transaction_snark.Statement.to_yojson statement ))
+      time ~logger "fill_work_and_enqueue_transactions" (fun () ->
+          let r =
+            Scan_state.fill_work_and_enqueue_transactions t.scan_state data
+              works
           in
-          [%log error]
-            ~metadata:
-              [ ( "scan_state"
-                , `String (Scan_state.snark_job_list_json t.scan_state) )
-              ; ("data", data_json)
-              ; ("error", `String (Error.to_string_hum e))
-              ; ("prefix", `String log_prefix) ]
-            !"$prefix: Unexpected error when applying diff data $data to the \
-              scan_state $scan_state: $error" ) ;
-      Deferred.return (to_staged_ledger_or_error r)
+          Or_error.iter_error r ~f:(fun e ->
+              let data_json =
+                `List
+                  (List.map data
+                     ~f:(fun {Scan_state.Transaction_with_witness.statement; _}
+                        -> Transaction_snark.Statement.to_yojson statement ))
+              in
+              [%log error]
+                ~metadata:
+                  [ ( "scan_state"
+                    , `String (Scan_state.snark_job_list_json t.scan_state) )
+                  ; ("data", data_json)
+                  ; ("error", Error_json.error_to_yojson e)
+                  ; ("prefix", `String log_prefix) ]
+                !"$prefix: Unexpected error when applying diff data $data to \
+                  the scan_state $scan_state: $error" ) ;
+          Deferred.return (to_staged_ledger_or_error r) )
     in
     let%bind updated_pending_coinbase_collection' =
-      update_pending_coinbase_collection
-        ~depth:t.constraint_constants.pending_coinbase_depth
-        t.pending_coinbase_collection stack_update ~is_new_stack
-        ~ledger_proof:res_opt
-      |> Deferred.return
+      time ~logger "update_pending_coinbase_collection" (fun () ->
+          update_pending_coinbase_collection
+            ~depth:t.constraint_constants.pending_coinbase_depth
+            t.pending_coinbase_collection stack_update ~is_new_stack
+            ~ledger_proof:res_opt
+          |> Deferred.return )
     in
     let%bind coinbase_amount =
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-      Deferred.(
-        verify_scan_state_after_apply ~constraint_constants
-          ~next_available_token_before
-          ~next_available_token_after:(Ledger.next_available_token new_ledger)
-          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-          scan_state'
-        >>| to_staged_ledger_or_error)
+      time ~logger
+        (sprintf "verify_scan_state_after_apply (skip=%b)" skip_verification)
+        (fun () ->
+          if skip_verification then Deferred.return (Ok ())
+          else
+            Deferred.(
+              verify_scan_state_after_apply ~constraint_constants
+                ~next_available_token:(Ledger.next_available_token new_ledger)
+                (Frozen_ledger_hash.of_ledger_hash
+                   (Ledger.merkle_root new_ledger))
+                scan_state'
+              >>| to_staged_ledger_or_error) )
     in
     [%log debug]
       ~metadata:
-        [ ("user_command_count", `Int user_commands_count)
+        [ ("user_command_count", `Int commands_count)
         ; ("coinbase_count", `Int (List.length coinbases))
         ; ("spots_available", `Int spots_available)
         ; ("proof_bundles_waiting", `Int proofs_waiting)
@@ -837,20 +930,22 @@ module T = struct
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
-    , `Pending_coinbase_data
-        (is_new_stack, coinbase_amount, stack_update_in_snark) )
+    , `Pending_coinbase_update
+        ( is_new_stack
+        , { Pending_coinbase.Update.Poly.action= stack_update_in_snark
+          ; coinbase_amount } ) )
 
   let update_metrics (t : t) (witness : Staged_ledger_diff.t) =
     let open Or_error.Let_syntax in
-    let user_commands = Staged_ledger_diff.user_commands witness in
+    let commands = Staged_ledger_diff.commands witness in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind total_txn_fee =
-      sum_fees user_commands ~f:(fun {data= cmd; _} -> User_command.fee cmd)
+      sum_fees commands ~f:(fun {data= cmd; _} -> User_command.fee_exn cmd)
     in
     let%bind total_snark_fee = sum_fees work ~f:Transaction_snark_work.fee in
     let%bind () = Scan_state.update_metrics t.scan_state in
     Or_error.try_with (fun () ->
-        let open Coda_metrics in
+        let open Mina_metrics in
         Gauge.set Scan_state_metrics.snark_fee_per_block
           (Int.to_float @@ Fee.to_int total_snark_fee) ;
         Gauge.set Scan_state_metrics.transaction_fees_per_block
@@ -862,25 +957,112 @@ module T = struct
              (List.length (Scan_state.all_work_statements_exn t.scan_state)))
     )
 
-  let apply ~constraint_constants t witness ~logger ~verifier
-      ~current_global_slot ~state_and_body_hash =
+  let forget_prediff_info
+      ((a : Transaction.Valid.t With_status.t list), b, c, d) =
+    ((a :> Transaction.t With_status.t list), b, c, d)
+
+  [%%if
+  feature_snapps]
+
+  let check_commands ledger ~verifier (cs : User_command.t list) =
+    match
+      Or_error.try_with (fun () ->
+          List.map cs
+            ~f:
+              (let open Ledger in
+              User_command.to_verifiable_exn ~ledger ~get ~location_of_account)
+      )
+    with
+    | Error e ->
+        Deferred.return (Error e)
+    | Ok cs ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map xs = Verifier.verify_commands verifier cs in
+        Result.all
+          (List.map xs ~f:(function
+            | `Valid x ->
+                Ok x
+            | `Invalid ->
+                Error
+                  (Verifier.Failure.Verification_failed
+                     (Error.of_string "verification failed on command"))
+            | `Valid_assuming _ ->
+                Error
+                  (Verifier.Failure.Verification_failed
+                     (Error.of_string "batch verification failed")) ))
+
+  [%%else]
+
+  (* imeckler: added this version because the call to the verifier was
+   causing super catchup to proceed more slowly than it could have otherwise.
+
+   The reason is as follows: catchup would have, say 100 blocks in the "to verify"
+   queue and 20 in the "already verified, to apply" queue. Those 20 would be
+   processed very slowly because each one would have to call the verifier, which
+   the other queue was trying to call as well. *)
+  let check_commands _ledger ~verifier:_ (cs : User_command.t list) :
+      (User_command.Valid.t list, _) result Deferred.Or_error.t =
+    Result.all
+      (List.map cs ~f:(function
+        | Snapp_command _ ->
+            Error
+              (Verifier.Failure.Verification_failed
+                 (Error.of_string "check_commands: snapp commands disabled"))
+        | Signed_command c -> (
+          match Signed_command.check c with
+          | Some c ->
+              Ok (User_command.Signed_command c)
+          | None ->
+              Error
+                (Verifier.Failure.Verification_failed
+                   (Error.of_string "signature failed to verify")) ) ))
+    |> Deferred.Or_error.return
+
+  [%%endif]
+
+  let apply ?skip_verification ~constraint_constants t
+      (witness : Staged_ledger_diff.t) ~logger ~verifier ~current_state_view
+      ~state_and_body_hash ~coinbase_receiver ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
-    let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
+    let%bind () =
+      time ~logger "check_completed_works" (fun () ->
+          match skip_verification with
+          | Some `All | Some `Proofs ->
+              return ()
+          | None ->
+              check_completed_works ~logger ~verifier t.scan_state work )
+    in
     let%bind prediff =
-      Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get ~constraint_constants witness
-      |> Deferred.return
+      Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
+        ~supercharge_coinbase
+        ~check:(check_commands t.ledger ~verifier)
+      |> Deferred.map
+           ~f:
+             (Result.map_error ~f:(fun error ->
+                  Staged_ledger_error.Pre_diff error ))
     in
+    let apply_diff_start_time = Core.Time.now () in
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
-      apply_diff ~constraint_constants t prediff ~logger ~current_global_slot
-        ~state_and_body_hash ~log_prefix:"apply_diff"
+      apply_diff
+        ~skip_verification:(skip_verification = Some `All)
+        ~constraint_constants t
+        (forget_prediff_info prediff)
+        ~logger ~current_state_view ~state_and_body_hash
+        ~log_prefix:"apply_diff"
     in
+    [%log debug]
+      ~metadata:
+        [ ( "time_elapsed"
+          , `Float
+              Core.Time.(Span.to_ms @@ diff (now ()) apply_diff_start_time) )
+        ]
+      "Staged_ledger.apply_diff take $time_elapsed" ;
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
           [%log error]
-            ~metadata:[("error", `String (Error.to_string_hum e))]
+            ~metadata:[("error", Error_json.error_to_yojson e)]
             !"Error updating metrics after applying staged_ledger diff: $error"
       )
     in
@@ -888,28 +1070,31 @@ module T = struct
 
   let apply_diff_unchecked ~constraint_constants t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) ~logger
-      ~current_global_slot ~state_and_body_hash =
+      ~current_state_view ~state_and_body_hash ~coinbase_receiver
+      ~supercharge_coinbase =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
-      @@ Pre_diff_info.get_unchecked ~constraint_constants sl_diff
+      @@ Pre_diff_info.get_unchecked ~constraint_constants ~coinbase_receiver
+           ~supercharge_coinbase sl_diff
       |> Deferred.return
     in
-    apply_diff t prediff ~constraint_constants ~logger ~current_global_slot
-      ~state_and_body_hash ~log_prefix:"apply_diff_unchecked"
+    apply_diff t
+      (forget_prediff_info prediff)
+      ~constraint_constants ~logger ~current_state_view ~state_and_body_hash
+      ~log_prefix:"apply_diff_unchecked"
 
   module Resources = struct
     module Discarded = struct
       type t =
-        { user_commands_rev:
-            User_command.With_valid_signature.t With_status.t Sequence.t
+        { commands_rev: User_command.Valid.t With_status.t Sequence.t
         ; completed_work: Transaction_snark_work.Checked.t Sequence.t }
       [@@deriving sexp_of]
 
       let add_user_command t uc =
         { t with
-          user_commands_rev=
-            Sequence.append t.user_commands_rev (Sequence.singleton uc) }
+          commands_rev= Sequence.append t.commands_rev (Sequence.singleton uc)
+        }
 
       let add_completed_work t cw =
         { t with
@@ -921,16 +1106,16 @@ module T = struct
       { max_space: int (*max space available currently*)
       ; max_jobs: int
             (*Required amount of work for max_space that can be purchased*)
-      ; user_commands_rev:
-          User_command.With_valid_signature.t With_status.t Sequence.t
+      ; commands_rev: User_command.Valid.t With_status.t Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Fee.t Public_key.Compressed.Map.t
       ; add_coinbase: bool
       ; coinbase: Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t
+      ; supercharge_coinbase: bool
       ; receiver_pk: Public_key.Compressed.t
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
-      ; is_coinbase_reciever_new: bool
+      ; is_coinbase_receiver_new: bool
       ; logger: Logger.t sexp_opaque }
     [@@deriving sexp_of]
 
@@ -958,7 +1143,7 @@ module T = struct
     let coinbase_work
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
         ?(is_two = false) (works : Transaction_snark_work.Checked.t Sequence.t)
-        ~is_coinbase_reciever_new =
+        ~is_coinbase_receiver_new ~supercharge_coinbase =
       let open Option.Let_syntax in
       let min1, min2 = cheapest_two_work works in
       let diff ws ws' =
@@ -968,10 +1153,12 @@ module T = struct
               ~equal:Transaction_snark_work.Statement.equal
             |> not )
       in
-      let coinbase_amount = constraint_constants.coinbase_amount in
+      let%bind coinbase_amount =
+        coinbase_amount ~supercharge_coinbase ~constraint_constants
+      in
       let%bind budget =
         (*if the coinbase receiver is new then the account creation fee will be deducted from the reward*)
-        if is_coinbase_reciever_new then
+        if is_coinbase_receiver_new then
           Currency.Amount.(
             sub coinbase_amount
               (of_fee constraint_constants.account_creation_fee))
@@ -1027,7 +1214,8 @@ module T = struct
               (cb, works) )
 
     let init_coinbase_and_fee_transfers ~constraint_constants cw_seq
-        ~add_coinbase ~job_count ~slots ~is_coinbase_reciever_new =
+        ~add_coinbase ~job_count ~slots ~is_coinbase_receiver_new
+        ~supercharge_coinbase =
       let cw_unchecked work =
         Sequence.map work ~f:Transaction_snark_work.forget
       in
@@ -1035,7 +1223,7 @@ module T = struct
         match
           ( add_coinbase
           , coinbase_work ~constraint_constants cw_seq
-              ~is_coinbase_reciever_new )
+              ~is_coinbase_receiver_new ~supercharge_coinbase )
         with
         | true, Some (ft, rem_cw) ->
             (ft, rem_cw)
@@ -1058,10 +1246,10 @@ module T = struct
       (coinbase, singles)
 
     let init ~constraint_constants
-        (uc_seq : User_command.With_valid_signature.t With_status.t Sequence.t)
+        (uc_seq : User_command.Valid.t With_status.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
-        (slots, job_count) ~receiver_pk ~add_coinbase logger
-        ~is_coinbase_reciever_new =
+        (slots, job_count) ~receiver_pk ~add_coinbase ~supercharge_coinbase
+        logger ~is_coinbase_receiver_new =
       let seq_rev seq =
         let rec go seq rev_seq =
           match Sequence.next seq with
@@ -1074,7 +1262,8 @@ module T = struct
       in
       let coinbase, singles =
         init_coinbase_and_fee_transfers ~constraint_constants cw_seq
-          ~add_coinbase ~job_count ~slots ~is_coinbase_reciever_new
+          ~add_coinbase ~job_count ~slots ~is_coinbase_receiver_new
+          ~supercharge_coinbase
       in
       let fee_transfers =
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
@@ -1083,7 +1272,7 @@ module T = struct
       let budget =
         Or_error.map2
           (sum_fees (Sequence.to_list uc_seq) ~f:(fun t ->
-               User_command.fee (t.data :> User_command.t) ))
+               User_command.fee_exn (t.data :> User_command.t) ))
           (sum_fees
              (List.filter
                 ~f:(fun (k, _) ->
@@ -1094,22 +1283,22 @@ module T = struct
         |> Or_error.join
       in
       let discarded =
-        { Discarded.completed_work= Sequence.empty
-        ; user_commands_rev= Sequence.empty }
+        {Discarded.completed_work= Sequence.empty; commands_rev= Sequence.empty}
       in
       { max_space= slots
       ; max_jobs= job_count
-      ; user_commands_rev=
+      ; commands_rev=
           uc_seq
           (*Completed work in reverse order for faster removal of proofs if budget doesn't suffice*)
       ; completed_work_rev= seq_rev cw_seq
       ; fee_transfers
       ; add_coinbase
+      ; supercharge_coinbase
       ; receiver_pk
       ; coinbase
       ; budget
       ; discarded
-      ; is_coinbase_reciever_new
+      ; is_coinbase_receiver_new
       ; logger }
 
     let reselect_coinbase_work ~constraint_constants t =
@@ -1123,7 +1312,8 @@ module T = struct
         | One _ -> (
           match
             coinbase_work ~constraint_constants t.completed_work_rev
-              ~is_coinbase_reciever_new:t.is_coinbase_reciever_new
+              ~is_coinbase_receiver_new:t.is_coinbase_receiver_new
+              ~supercharge_coinbase:t.supercharge_coinbase
           with
           | None ->
               (One None, t.completed_work_rev)
@@ -1132,7 +1322,8 @@ module T = struct
         | Two _ -> (
           match
             coinbase_work ~constraint_constants t.completed_work_rev
-              ~is_two:true ~is_coinbase_reciever_new:t.is_coinbase_reciever_new
+              ~is_two:true ~is_coinbase_receiver_new:t.is_coinbase_receiver_new
+              ~supercharge_coinbase:t.supercharge_coinbase
           with
           | None ->
               (Two None, t.completed_work_rev)
@@ -1157,8 +1348,8 @@ module T = struct
       (*get the correct coinbase and calculate the fee transfers*)
       let open Or_error.Let_syntax in
       let payment_fees =
-        sum_fees (Sequence.to_list t.user_commands_rev) ~f:(fun t ->
-            User_command.fee (t.data :> User_command.t) )
+        sum_fees (Sequence.to_list t.commands_rev) ~f:(fun t ->
+            User_command.fee_exn (t.data :> User_command.t) )
       in
       let prover_fee_others =
         Public_key.Compressed.Map.fold t.fee_transfers ~init:(Ok Fee.zero)
@@ -1200,7 +1391,7 @@ module T = struct
       let total_fee_transfer_pks =
         Public_key.Compressed.Map.length other_provers + fee_for_self
       in
-      Sequence.length t.user_commands_rev
+      Sequence.length t.commands_rev
       + ((total_fee_transfer_pks + 1) / 2)
       + coinbase_added t
 
@@ -1278,18 +1469,18 @@ module T = struct
         | Two (Some (ft1, Some ft2)) ->
             update_fee_transfers t ft2 (One (Some ft1))
       in
-      match Sequence.next t.user_commands_rev with
+      match Sequence.next t.commands_rev with
       | None ->
           (* If we have reached here then it means we couldn't afford a slot for coinbase as well *)
           (decr_coinbase t, None)
       | Some (uc, rem_seq) ->
           let discarded = Discarded.add_user_command t.discarded uc in
-          let new_t = {t with user_commands_rev= rem_seq; discarded} in
+          let new_t = {t with commands_rev= rem_seq; discarded} in
           let budget =
             match t.budget with
             | Ok b ->
                 option "Fee insufficient"
-                  (Fee.sub b (User_command.fee (uc.data :> User_command.t)))
+                  (Fee.sub b (User_command.fee_exn (uc.data :> User_command.t)))
             | _ ->
                 rebudget new_t
           in
@@ -1347,7 +1538,7 @@ module T = struct
             res''
         | Error e ->
             [%log' error t.logger] "Error when increasing coinbase: $error"
-              ~metadata:[("error", `String (Error.to_string_hum e))] ;
+              ~metadata:[("error", Error_json.error_to_yojson e)] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1376,8 +1567,8 @@ module T = struct
           let resources', uc_opt = Resources.discard_user_command resources in
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map uc_opt ~default:log ~f:(fun uc ->
-                 Diff_creation_log.discard_user_command `No_space
-                   (User_command.forget_check uc.data)
+                 Diff_creation_log.discard_command `No_space
+                   (uc.data :> User_command.t)
                    log ))
       else
         (* insufficient budget; reduce the cost*)
@@ -1393,22 +1584,23 @@ module T = struct
       let resources', uc_opt = Resources.discard_user_command resources in
       check_constraints_and_update ~constraint_constants resources'
         (Option.value_map uc_opt ~default:log ~f:(fun uc ->
-             Diff_creation_log.discard_user_command `No_work
-               (User_command.forget_check uc.data)
+             Diff_creation_log.discard_command `No_work
+               (uc.data :> User_command.t)
                log ))
 
   let one_prediff ~constraint_constants cw_seq ts_seq ~receiver ~add_coinbase
-      slot_job_count logger ~is_coinbase_reciever_new partition =
+      slot_job_count logger ~is_coinbase_receiver_new partition
+      ~supercharge_coinbase =
     O1trace.measure "one_prediff" (fun () ->
         let init_resources =
           Resources.init ~constraint_constants ts_seq cw_seq slot_job_count
             ~receiver_pk:receiver ~add_coinbase logger
-            ~is_coinbase_reciever_new
+            ~is_coinbase_receiver_new ~supercharge_coinbase
         in
         let log =
           Diff_creation_log.init
             ~completed_work:init_resources.completed_work_rev
-            ~user_commands:init_resources.user_commands_rev
+            ~commands:init_resources.commands_rev
             ~coinbase:init_resources.coinbase ~partition
             ~available_slots:(fst slot_job_count)
             ~required_work_count:(snd slot_job_count)
@@ -1417,7 +1609,8 @@ module T = struct
     )
 
   let generate ~constraint_constants logger cw_seq ts_seq ~receiver
-      ~is_coinbase_reciever_new (partitions : Scan_state.Space_partition.t) =
+      ~is_coinbase_receiver_new ~supercharge_coinbase
+      (partitions : Scan_state.Space_partition.t) =
     let pre_diff_with_one (res : Resources.t) :
         Staged_ledger_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_one_coinbase =
@@ -1434,22 +1627,26 @@ module T = struct
                 Zero
           in
           (* We have to reverse here because we only know they work in THIS order *)
-          { Staged_ledger_diff.Pre_diff_one.user_commands=
-              Sequence.to_list_rev res.user_commands_rev
+          { Staged_ledger_diff.Pre_diff_one.commands=
+              Sequence.to_list_rev res.commands_rev
           ; completed_works= Sequence.to_list_rev res.completed_work_rev
-          ; coinbase= to_at_most_one res.coinbase } )
+          ; coinbase= to_at_most_one res.coinbase
+          ; internal_command_balances=
+              (* These will get filled in by the caller. *) [] } )
     in
     let pre_diff_with_two (res : Resources.t) :
         Staged_ledger_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_two_coinbase =
       (* We have to reverse here because we only know they work in THIS order *)
-      { user_commands= Sequence.to_list_rev res.user_commands_rev
+      { commands= Sequence.to_list_rev res.commands_rev
       ; completed_works= Sequence.to_list_rev res.completed_work_rev
-      ; coinbase= res.coinbase }
+      ; coinbase= res.coinbase
+      ; internal_command_balances=
+          (* These will get filled in by the caller. *) [] }
     in
     let end_log ((res : Resources.t), (log : Diff_creation_log.t)) =
       Diff_creation_log.end_log log ~completed_work:res.completed_work_rev
-        ~user_commands:res.user_commands_rev ~coinbase:res.coinbase
+        ~commands:res.commands_rev ~coinbase:res.coinbase
     in
     let make_diff res1 = function
       | Some res2 ->
@@ -1458,16 +1655,16 @@ module T = struct
       | None ->
           ((pre_diff_with_two (fst res1), None), [end_log res1])
     in
-    let has_no_user_commands (res : Resources.t) =
-      Sequence.length res.user_commands_rev = 0
+    let has_no_commands (res : Resources.t) =
+      Sequence.length res.commands_rev = 0
     in
     let second_pre_diff (res : Resources.t) partition ~add_coinbase work =
-      one_prediff ~constraint_constants work res.discarded.user_commands_rev
-        ~receiver partition ~add_coinbase logger ~is_coinbase_reciever_new
-        `Second
+      one_prediff ~constraint_constants work res.discarded.commands_rev
+        ~receiver partition ~add_coinbase logger ~is_coinbase_receiver_new
+        ~supercharge_coinbase `Second
     in
     let isEmpty (res : Resources.t) =
-      has_no_user_commands res && Resources.coinbase_added res = 0
+      has_no_commands res && Resources.coinbase_added res = 0
     in
     (*Partitioning explained in PR #687 *)
     match partitions.second with
@@ -1475,7 +1672,7 @@ module T = struct
         let res, log =
           one_prediff ~constraint_constants cw_seq ts_seq ~receiver
             partitions.first ~add_coinbase:true logger
-            ~is_coinbase_reciever_new `First
+            ~is_coinbase_receiver_new ~supercharge_coinbase `First
         in
         make_diff (res, log) None
     | Some y ->
@@ -1485,7 +1682,7 @@ module T = struct
         let res, log1 =
           one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
             partitions.first ~add_coinbase:false logger
-            ~is_coinbase_reciever_new `First
+            ~is_coinbase_receiver_new ~supercharge_coinbase `First
         in
         let incr_coinbase_and_compute res count =
           let new_res =
@@ -1495,7 +1692,7 @@ module T = struct
             (*All slots could not be filled either because of budget constraints or not enough work done. Don't create the second prediff instead recompute first diff with just once coinbase*)
             ( one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
                 partitions.first ~add_coinbase:true logger
-                ~is_coinbase_reciever_new `First
+                ~is_coinbase_receiver_new ~supercharge_coinbase `First
             , None )
           else
             let res2, log2 =
@@ -1505,17 +1702,17 @@ module T = struct
               (*Don't create the second prediff instead recompute first diff with just once coinbase*)
               ( one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
                   partitions.first ~add_coinbase:true logger
-                  ~is_coinbase_reciever_new `First
+                  ~is_coinbase_receiver_new ~supercharge_coinbase `First
               , None )
             else ((new_res, log1), Some (res2, log2))
         in
         let try_with_coinbase () =
           one_prediff ~constraint_constants cw_seq_1 ts_seq ~receiver
             partitions.first ~add_coinbase:true logger
-            ~is_coinbase_reciever_new `First
+            ~is_coinbase_receiver_new ~supercharge_coinbase `First
         in
         let res1, res2 =
-          if Sequence.is_empty res.user_commands_rev then
+          if Sequence.is_empty res.commands_rev then
             let res = try_with_coinbase () in
             (res, None)
           else
@@ -1547,17 +1744,21 @@ module T = struct
           let res = try_with_coinbase () in
           make_diff res None
 
+  let can_apply_supercharged_coinbase_exn ~winner ~epoch_ledger ~global_slot =
+    Sparse_ledger.has_locked_tokens_exn ~global_slot
+      ~account_id:(Account_id.create winner Token_id.default)
+      epoch_ledger
+    |> not
+
   let create_diff
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ?(log_block_creation = false) t ~self ~coinbase_receiver ~logger
-      ~current_global_slot
-      ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
+      ?(log_block_creation = false) t ~coinbase_receiver ~logger
+      ~current_state_view
+      ~(transactions_by_fee : User_command.Valid.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
-         -> Transaction_snark_work.Checked.t option) =
-    let coinbase_receiver =
-      match coinbase_receiver with `Producer -> self | `Other pk -> pk
-    in
+         -> Transaction_snark_work.Checked.t option) ~supercharge_coinbase =
+    let open Result.Let_syntax in
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     let is_new_account pk =
@@ -1566,7 +1767,11 @@ module T = struct
         (Account_id.create pk Token_id.default)
       |> Option.is_none
     in
-    let is_coinbase_reciever_new = is_new_account coinbase_receiver in
+    let is_coinbase_receiver_new = is_new_account coinbase_receiver in
+    if supercharge_coinbase then
+      [%log info]
+        "No locked tokens in the delegator/delegatee account, applying \
+         supercharged coinbase" ;
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
@@ -1621,42 +1826,52 @@ module T = struct
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let valid_on_this_ledger =
-      Sequence.fold_until transactions_by_fee ~init:Sequence.empty
-        ~f:(fun seq txn ->
+      Sequence.fold_until transactions_by_fee ~init:(Sequence.empty, 0)
+        ~f:(fun (seq, count) txn ->
           match
             O1trace.measure "validate txn" (fun () ->
                 Transaction_validator.apply_transaction ~constraint_constants
-                  validating_ledger ~txn_global_slot:current_global_slot
-                  (User_command txn) )
+                  validating_ledger ~txn_state_view:current_state_view
+                  (Command (txn :> User_command.t)) )
           with
           | Error e ->
-              let error_message =
-                sprintf
-                  !"Staged_ledger_diff creation: Invalid user command! Error \
-                    was: %s, command was: $user_command"
-                  (Error.to_string_hum e)
-              in
-              [%log fatal]
+              [%log error]
                 ~metadata:
-                  [ ( "user_command"
-                    , User_command.With_valid_signature.to_yojson txn ) ]
-                !"%s" error_message ;
-              Stop seq
+                  [ ("user_command", User_command.Valid.to_yojson txn)
+                  ; ("error", Error_json.error_to_yojson e) ]
+                "Staged_ledger_diff creation: Skipping user command: \
+                 $user_command due to error: $error" ;
+              Continue (seq, count)
           | Ok status ->
               let txn_with_status = {With_status.data= txn; status} in
               let seq' =
                 Sequence.append (Sequence.singleton txn_with_status) seq
               in
-              if Sequence.length seq' = Scan_state.free_space t.scan_state then
-                Stop seq'
-              else Continue seq' )
-        ~finish:Fn.id
+              let count' = count + 1 in
+              if count' >= Scan_state.free_space t.scan_state then Stop seq'
+              else Continue (seq', count') )
+        ~finish:fst
     in
     let diff, log =
       O1trace.measure "generate diff" (fun () ->
           generate ~constraint_constants logger completed_works_seq
             valid_on_this_ledger ~receiver:coinbase_receiver
-            ~is_coinbase_reciever_new partitions )
+            ~is_coinbase_receiver_new ~supercharge_coinbase partitions )
+    in
+    let%map diff =
+      (* Fill in the statuses for commands. *)
+      let generate_status =
+        let status_ledger = Transaction_validator.create t.ledger in
+        fun txn ->
+          O1trace.measure "get txn status" (fun () ->
+              Transaction_validator.apply_transaction ~constraint_constants
+                status_ledger ~txn_state_view:current_state_view txn )
+      in
+      Pre_diff_info.compute_statuses ~constraint_constants ~diff
+        ~coinbase_amount:
+          (Option.value_exn
+             (coinbase_amount ~constraint_constants ~supercharge_coinbase))
+        ~coinbase_receiver ~generate_status ~forget:User_command.forget_check
     in
     let summaries, detailed = List.unzip log in
     [%log debug]
@@ -1673,9 +1888,7 @@ module T = struct
             , Diff_creation_log.detail_list_to_yojson
                 (List.map ~f:List.rev detailed) ) ] ;
     trace_event "prediffs done" ;
-    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
-    ; creator= self
-    ; coinbase_receiver }
+    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff}
 end
 
 include T
@@ -1697,15 +1910,35 @@ let%test_module "test" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
+    let supercharge_coinbase ~ledger ~winner ~global_slot =
+      (*using staged ledger to confirm coinbase amount is correctly generated*)
+      let epoch_ledger =
+        Sparse_ledger.of_ledger_subset_exn ledger
+          (List.map [winner] ~f:(fun k -> Account_id.create k Token_id.default))
+      in
+      Sl.can_apply_supercharged_coinbase_exn ~winner ~global_slot ~epoch_ledger
+
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply_with_state_body_hash current_global_slot
-        state_and_body_hash sl logger pids txns stmt_to_work =
+    let create_and_apply_with_state_body_hash
+        ?(coinbase_receiver = coinbase_receiver) ?(winner = self_pk)
+        ~(current_state_view : Snapp_predicate.Protocol_state.View.t)
+        ~state_and_body_hash sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
+      let supercharge_coinbase =
+        supercharge_coinbase ~ledger:(Sl.ledger !sl) ~winner
+          ~global_slot:current_state_view.global_slot_since_genesis
+      in
       let diff =
-        Sl.create_diff ~constraint_constants !sl ~self:self_pk ~logger
-          ~current_global_slot ~transactions_by_fee:txns
-          ~get_completed_work:stmt_to_work
-          ~coinbase_receiver:(`Other coinbase_receiver)
+        Sl.create_diff ~constraint_constants !sl ~logger ~current_state_view
+          ~transactions_by_fee:txns ~get_completed_work:stmt_to_work
+          ~supercharge_coinbase ~coinbase_receiver
+      in
+      let diff =
+        match diff with
+        | Ok x ->
+            x
+        | Error e ->
+            Error.raise (Pre_diff_info.Error.to_error e)
       in
       let diff' = Staged_ledger_diff.forget diff in
       let%bind verifier =
@@ -1714,11 +1947,11 @@ let%test_module "test" =
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Pending_coinbase_data
-                  (is_new_stack, coinbase_amount, pc_action) ) =
+              , `Pending_coinbase_update (is_new_stack, pc_update) ) =
         match%map
           Sl.apply ~constraint_constants !sl diff' ~logger ~verifier
-            ~current_global_slot ~state_and_body_hash
+            ~current_state_view ~state_and_body_hash ~coinbase_receiver
+            ~supercharge_coinbase
         with
         | Ok x ->
             x
@@ -1727,13 +1960,35 @@ let%test_module "test" =
       in
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
-      (ledger_proof, diff', coinbase_amount, is_new_stack, pc_action)
+      (ledger_proof, diff', is_new_stack, pc_update, supercharge_coinbase)
 
-    let create_and_apply sl logger pids txns stmt_to_work =
+    let dummy_state_view
+        ?(global_slot_since_genesis = Mina_numbers.Global_slot.zero) () =
+      let state_body =
+        let consensus_constants =
+          let genesis_constants = Genesis_constants.for_unit_tests in
+          Consensus.Constants.create ~constraint_constants
+            ~protocol_constants:genesis_constants.protocol
+        in
+        let compile_time_genesis =
+          (*not using Precomputed_values.for_unit_test because of dependency cycle*)
+          Mina_state.Genesis_protocol_state.t
+            ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+            ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+            ~constraint_constants ~consensus_constants
+        in
+        compile_time_genesis.data |> Mina_state.Protocol_state.body
+      in
+      { (Mina_state.Protocol_state.Body.view state_body) with
+        global_slot_since_genesis }
+
+    let create_and_apply ?(coinbase_receiver = coinbase_receiver)
+        ?(winner = self_pk) sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let%map ledger_proof, diff, _, _, _ =
-        create_and_apply_with_state_body_hash Coda_numbers.Global_slot.zero
-          (State_hash.dummy, State_body_hash.dummy)
+        create_and_apply_with_state_body_hash ~coinbase_receiver ~winner
+          ~current_state_view:(dummy_state_view ())
+          ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
           sl logger pids txns stmt_to_work
       in
       (ledger_proof, diff)
@@ -1755,7 +2010,8 @@ let%test_module "test" =
           in
           let sl = ref @@ Sl.create_exn ~constraint_constants ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-          ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
+          ignore @@ Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ test_mask
+      )
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
@@ -1765,7 +2021,7 @@ let%test_module "test" =
            Ledger.t
         -> coinbase_cost:Currency.Fee.t
         -> Sl.t
-        -> User_command.With_valid_signature.t list
+        -> User_command.Valid.t list
         -> int
         -> Account_id.t list
         -> unit =
@@ -1789,10 +2045,11 @@ let%test_module "test" =
         function
         | [] ->
             return ()
-        | cmd :: cmds ->
+        | (cmd : User_command.Valid.t) :: cmds ->
             let%bind _ =
-              Ledger.apply_user_command ~constraint_constants test_ledger
-                ~txn_global_slot:Coda_numbers.Global_slot.zero cmd
+              Ledger.apply_transaction ~constraint_constants test_ledger
+                ~txn_state_view:(dummy_state_view ())
+                (Command (cmd :> User_command.t))
             in
             apply_cmds cmds
       in
@@ -1859,6 +2116,14 @@ let%test_module "test" =
         ; proofs= proofs stmts
         ; prover }
 
+    let stmt_to_work_zero_fee ~prover
+        (stmts : Transaction_snark_work.Statement.t) :
+        Transaction_snark_work.Checked.t option =
+      Some
+        { Transaction_snark_work.Checked.fee= Currency.Fee.zero
+        ; proofs= proofs stmts
+        ; prover }
+
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
       Quickcheck.random_value ~seed:(`Deterministic "snark worker")
@@ -1914,14 +2179,9 @@ let%test_module "test" =
     *)
 
     (* Get the public keys from a ledger init state. *)
-    let init_pks
-        (init :
-          ( Signature_lib.Keypair.t
-          * Currency.Amount.t
-          * Coda_numbers.Account_nonce.t )
-          array) =
+    let init_pks (init : Ledger.init_state) =
       Array.to_sequence init
-      |> Sequence.map ~f:(fun (kp, _, _) ->
+      |> Sequence.map ~f:(fun (kp, _, _, _) ->
              Account_id.create
                (Public_key.compress kp.public_key)
                Token_id.default )
@@ -1944,16 +2204,14 @@ let%test_module "test" =
     (* Abstraction for the pattern of taking a list of commands and applying it
        in chunks up to a given max size. *)
     let rec iter_cmds_acc :
-           User_command.With_valid_signature.t list
-           (** All the commands to apply. *)
+           User_command.Valid.t list (** All the commands to apply. *)
         -> int option list
            (** A list of chunk sizes. If a chunk's size is None, apply as many
             commands as possible. *)
         -> 'acc
-        -> (   User_command.With_valid_signature.t list
-               (** All commands remaining. *)
+        -> (   User_command.Valid.t list (** All commands remaining. *)
             -> int option (* Current chunk size. *)
-            -> User_command.With_valid_signature.t Sequence.t
+            -> User_command.Valid.t Sequence.t
                (* Sequence of commands to apply. *)
             -> 'acc
             -> (Staged_ledger_diff.t * 'acc) Deferred.t)
@@ -1975,7 +2233,7 @@ let%test_module "test" =
             f cmds count_opt (Sequence.of_list cmds_this_iter_max) acc
           in
           let cmds_applied_count =
-            List.length @@ Staged_ledger_diff.user_commands diff
+            List.length @@ Staged_ledger_diff.commands diff
           in
           iter_cmds_acc (List.drop cmds cmds_applied_count) counts_rest acc' f
 
@@ -1983,7 +2241,7 @@ let%test_module "test" =
 
     let test_simple :
            Ledger.init_state
-        -> User_command.With_valid_signature.t list
+        -> User_command.Valid.t list
         -> int option list
         -> Sl.t ref
         -> ?expected_proof_count:int option
@@ -2008,7 +2266,7 @@ let%test_module "test" =
             in
             assert_fee_excess ledger_proof ;
             let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.user_commands diff
+              List.length @@ Staged_ledger_diff.commands diff
             in
             let cb = coinbase_count diff in
             ( match provers with
@@ -2023,7 +2281,7 @@ let%test_module "test" =
                 assert (
                   cmds_applied_this_iter <= Sequence.length cmds_this_iter ) ;
                 [%test_eq: User_command.t list]
-                  (List.map (Staged_ledger_diff.user_commands diff)
+                  (List.map (Staged_ledger_diff.commands diff)
                      ~f:(fun {With_status.data; _} -> data))
                   ( Sequence.take cmds_this_iter cmds_applied_this_iter
                     |> Sequence.to_list
@@ -2055,17 +2313,15 @@ let%test_module "test" =
     (** Generator for when we always have enough commands to fill all slots. *)
 
     let gen_at_capacity :
-        ( Ledger.init_state
-        * User_command.With_valid_signature.t list
-        * int option list )
+        (Ledger.init_state * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.With_valid_signature.Gen.sequence ~length:total_cmds
-          ~sign_type:`Real ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
+          ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -2073,17 +2329,15 @@ let%test_module "test" =
     (*Same as gen_at_capacity except that the number of iterations[iters] is
     the function of [extra_block_count] and is same for all generated values*)
     let gen_at_capacity_fixed_blocks extra_block_count :
-        ( Ledger.init_state
-        * User_command.With_valid_signature.t list
-        * int option list )
+        (Ledger.init_state * User_command.Valid.t list * int option list)
         Quickcheck.Generator.t =
       let open Quickcheck.Generator.Let_syntax in
       let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
       let iters = max_blocks_for_coverage extra_block_count in
       let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.With_valid_signature.Gen.sequence ~length:total_cmds
-          ~sign_type:`Real ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
+          ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -2107,8 +2361,8 @@ let%test_module "test" =
       in
       let total_cmds = List.sum (module Int) ~f:Fn.id cmds_per_iter in
       let%bind cmds =
-        User_command.With_valid_signature.Gen.sequence ~length:total_cmds
-          ~sign_type:`Real ledger_init_state
+        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
+          ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
@@ -2119,7 +2373,7 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Coda_base.User_command.With_valid_signature.t list
+            * Mina_base.User_command.Valid.t list
             * int option list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
@@ -2132,22 +2386,21 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Coda_base.User_command.With_valid_signature.t list
+            * Mina_base.User_command.Valid.t list
             * int option list] ~trials:15
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_simple ledger_init_state cmds iters sl test_mask
                 `Many_provers stmt_to_work_random_prover ) )
 
-    let%test_unit "Be able to include random number of user_commands" =
+    let%test_unit "Be able to include random number of commands" =
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_simple ledger_init_state cmds iters sl test_mask
                 `Many_provers stmt_to_work_random_prover ) )
 
-    let%test_unit "Be able to include random number of user_commands (One \
-                   prover)" =
+    let%test_unit "Be able to include random number of commands (One prover)" =
       Quickcheck.test (gen_below_capacity ()) ~trials:20
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
@@ -2172,56 +2425,68 @@ let%test_module "test" =
               in
               assert (
                 Option.is_none
-                  (Coda_base.Ledger.location_of_account test_mask
+                  (Mina_base.Ledger.location_of_account test_mask
                      (Account_id.create snark_worker_pk Token_id.default)) ) )
       )
 
+    let compute_statuses ~ledger ~coinbase_amount diff =
+      let generate_status =
+        let status_ledger = Transaction_validator.create ledger in
+        fun txn ->
+          O1trace.measure "get txn status" (fun () ->
+              Transaction_validator.apply_transaction ~constraint_constants
+                status_ledger ~txn_state_view:(dummy_state_view ()) txn )
+      in
+      Pre_diff_info.compute_statuses ~constraint_constants ~diff
+        ~coinbase_amount ~coinbase_receiver ~generate_status ~forget:Fn.id
+      |> Result.map_error ~f:Pre_diff_info.Error.to_error
+      |> Or_error.ok_exn
+
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
-      let create_diff_with_non_zero_fee_excess txns completed_works
-          (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t
-          =
+      let create_diff_with_non_zero_fee_excess ~ledger ~coinbase_amount txns
+          completed_works (partition : Sl.Scan_state.Space_partition.t) :
+          Staged_ledger_diff.t =
         (*With exact number of user commands in partition.first, the fee transfers that settle the fee_excess would be added to the next tree causing a non-zero fee excess*)
         let slots, job_count1 = partition.first in
         match partition.second with
         | None ->
             { diff=
-                ( { completed_works= List.take completed_works job_count1
-                  ; user_commands= List.take txns slots
-                  ; coinbase= Zero }
-                , None )
-            ; creator= self_pk
-            ; coinbase_receiver }
+                compute_statuses ~ledger ~coinbase_amount
+                @@ ( { completed_works= List.take completed_works job_count1
+                     ; commands= List.take txns slots
+                     ; coinbase= Zero
+                     ; internal_command_balances= [] }
+                   , None ) }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
               ( { completed_works= List.take completed_works job_count1
-                ; user_commands= List.take txns slots
-                ; coinbase= Zero }
+                ; commands= List.take txns slots
+                ; coinbase= Zero
+                ; internal_command_balances= [] }
               , Some
                   { completed_works=
                       ( if List.is_empty txns_in_second_diff then []
                       else List.drop completed_works job_count1 )
-                  ; user_commands= txns_in_second_diff
-                  ; coinbase= Zero } )
+                  ; commands= txns_in_second_diff
+                  ; coinbase= Zero
+                  ; internal_command_balances= [] } )
             in
-            {diff; creator= self_pk; coinbase_receiver}
+            {diff= compute_statuses ~ledger ~coinbase_amount diff}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
             ( { completed_works= []
-              ; user_commands= []
-              ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-            , None )
-        ; coinbase_receiver
-        ; creator= self_pk }
+              ; commands= []
+              ; coinbase= Staged_ledger_diff.At_most_two.Zero
+              ; internal_command_balances= [] }
+            , None ) }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
-            * User_command.With_valid_signature.t list
-            * int option list] ~trials:10
-        ~f:(fun (ledger_init_state, cmds, iters) ->
+            Ledger.init_state * User_command.Valid.t list * int option list]
+        ~trials:10 ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in
               let pids = Child_processes.Termination.create_pid_table () in
@@ -2249,21 +2514,25 @@ let%test_module "test" =
                              { With_status.data= (cmd :> User_command.t)
                              ; status=
                                  Applied
-                                   User_command_status.Auxiliary_data.empty }
+                                   ( Transaction_status.Auxiliary_data.empty
+                                   , Transaction_status.Balance_data.empty ) }
                          )
                     in
                     let diff =
-                      create_diff_with_non_zero_fee_excess cmds_this_iter
-                        work_done partitions
+                      create_diff_with_non_zero_fee_excess
+                        ~ledger:(Sl.ledger !sl)
+                        ~coinbase_amount:constraint_constants.coinbase_amount
+                        cmds_this_iter work_done partitions
                     in
                     let%bind verifier =
                       Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
                     in
                     let%bind apply_res =
                       Sl.apply ~constraint_constants !sl diff ~logger ~verifier
-                        ~current_global_slot:Coda_numbers.Global_slot.zero
+                        ~current_state_view:(dummy_state_view ())
                         ~state_and_body_hash:
                           (State_hash.dummy, State_body_hash.dummy)
+                        ~coinbase_receiver ~supercharge_coinbase:true
                     in
                     let checked', diff' =
                       match apply_res with
@@ -2272,13 +2541,14 @@ let%test_module "test" =
                       | Error err ->
                           failwith
                           @@ sprintf
-                               !"Wrong error: %{sexp: Sl.Staged_ledger_error.t}"
+                               !"Expecting Non-zero-fee-excess error, got \
+                                 %{sexp: Sl.Staged_ledger_error.t}"
                                err
                       | Ok
                           ( `Hash_after_applying _hash
                           , `Ledger_proof _ledger_proof
                           , `Staged_ledger sl'
-                          , `Pending_coinbase_data _ ) ->
+                          , `Pending_coinbase_update _ ) ->
                           sl := sl' ;
                           (false, diff)
                     in
@@ -2302,9 +2572,7 @@ let%test_module "test" =
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
           [%sexp_of:
-            Ledger.init_state
-            * User_command.With_valid_signature.t list
-            * int option list]
+            Ledger.init_state * User_command.Valid.t list * int option list]
         ~shrinker:
           (Quickcheck.Shrinker.create (fun (init_state, cmds, iters) ->
                if List.length iters > 1 then
@@ -2320,13 +2588,18 @@ let%test_module "test" =
               iter_cmds_acc cmds iters ()
                 (fun _cmds_left _count_opt cmds_this_iter () ->
                   let diff =
-                    Sl.create_diff ~constraint_constants !sl ~self:self_pk
-                      ~logger
-                      ~current_global_slot:Coda_numbers.Global_slot.zero
-                      ~transactions_by_fee:cmds_this_iter
-                      ~get_completed_work:stmt_to_work
-                      ~coinbase_receiver:(`Other coinbase_receiver)
-                    |> Staged_ledger_diff.forget
+                    let diff =
+                      Sl.create_diff ~constraint_constants !sl ~logger
+                        ~current_state_view:(dummy_state_view ())
+                        ~transactions_by_fee:cmds_this_iter
+                        ~get_completed_work:stmt_to_work ~coinbase_receiver
+                        ~supercharge_coinbase:true
+                    in
+                    match diff with
+                    | Ok x ->
+                        Staged_ledger_diff.forget x
+                    | Error e ->
+                        Error.raise (Pre_diff_info.Error.to_error e)
                   in
                   (*No proofs were purchased since the fee for the proofs are not sufficient to pay for account creation*)
                   assert (no_work_included diff) ;
@@ -2358,7 +2631,7 @@ let%test_module "test" =
 
     let test_random_number_of_proofs :
            Ledger.init_state
-        -> User_command.With_valid_signature.t list
+        -> User_command.Valid.t list
         -> int option list
         -> int list
         -> Sl.t ref
@@ -2386,7 +2659,7 @@ let%test_module "test" =
             in
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.user_commands diff
+              List.length @@ Staged_ledger_diff.commands diff
             in
             let cb = coinbase_count diff in
             assert (proofs_available_this_iter = 0 || cb > 0) ;
@@ -2468,7 +2741,7 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * User_command.With_valid_signature.t list
+            * User_command.Valid.t list
             * int option list
             * int list] ~trials:50
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
@@ -2476,7 +2749,7 @@ let%test_module "test" =
               test_random_number_of_proofs ledger_init_state cmds iters
                 proofs_available sl test_mask `Many_provers ) )
 
-    let%test_unit "Random number of user_commands-random number of proofs-one \
+    let%test_unit "Random number of commands-random number of proofs-one \
                    prover)" =
       let g =
         let open Quickcheck.Generator.Let_syntax in
@@ -2515,7 +2788,7 @@ let%test_module "test" =
     *)
     let test_random_proof_fee :
            Ledger.init_state
-        -> User_command.With_valid_signature.t list
+        -> User_command.Valid.t list
         -> int option list
         -> (int * Fee.t list) list
         -> Sl.t ref
@@ -2657,7 +2930,7 @@ let%test_module "test" =
         ~sexp_of:
           [%sexp_of:
             Ledger.init_state
-            * Coda_base.User_command.With_valid_signature.t list
+            * Mina_base.User_command.Valid.t list
             * int option list
             * (int * Fee.t list) list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
@@ -2665,23 +2938,12 @@ let%test_module "test" =
               test_random_proof_fee ledger_init_state cmds iters
                 proofs_available sl test_mask `Many_provers ) )
 
-    let check_pending_coinbase proof diff ~sl_before ~sl_after
-        (_state_hash, state_body_hash) pc_action ~coinbase_amount ~is_new_stack
-        =
+    let check_pending_coinbase ~supercharge_coinbase proof ~sl_before ~sl_after
+        (_state_hash, state_body_hash) pc_update ~is_new_stack =
       let pending_coinbase_before = Sl.pending_coinbase_collection sl_before in
       let root_before = Pending_coinbase.merkle_root pending_coinbase_before in
       let unchecked_root_after =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
-      in
-      let coinbase_data =
-        let create amount fee_transfer =
-          Coinbase.create ~amount
-            ~receiver:(Staged_ledger_diff.coinbase_receiver diff)
-            ~fee_transfer
-          |> Or_error.ok_exn
-        in
-        Pending_coinbase.Coinbase_data.of_coinbase
-          (create coinbase_amount None)
       in
       let f_pop_and_add =
         let open Snark_params.Tick in
@@ -2694,12 +2956,15 @@ let%test_module "test" =
             ~proof_emitted
             (Hash.var_of_t root_before)
         in
-        let action = Update.Action.var_of_t pc_action in
-        let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+        let pc_update_var = Update.var_of_t pc_update in
+        let coinbase_receiver =
+          Public_key.Compressed.(var_of_t coinbase_receiver)
+        in
+        let supercharge_coinbase = Boolean.var_of_value supercharge_coinbase in
         let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
         Pending_coinbase.Checked.add_coinbase ~constraint_constants
-          root_after_popping
-          (action, coinbase_var, state_body_hash_var)
+          root_after_popping pc_update_var ~coinbase_receiver
+          ~supercharge_coinbase state_body_hash_var
       in
       let checked_root_after_update =
         let open Snark_params.Tick in
@@ -2721,17 +2986,17 @@ let%test_module "test" =
 
     let test_pending_coinbase :
            Ledger.init_state
-        -> User_command.With_valid_signature.t list
+        -> User_command.Valid.t list
         -> int option list
         -> int list
         -> (State_hash.t * State_body_hash.t) list
-        -> Coda_numbers.Global_slot.t
+        -> Mina_base.Snapp_predicate.Protocol_state.View.t
         -> Sl.t ref
         -> Ledger.Mask.Attached.t
         -> [`One_prover | `Many_provers]
         -> unit Deferred.t =
      fun init_state cmds cmd_iters proofs_available state_body_hashes
-         current_global_slot sl test_mask provers ->
+         current_state_view sl test_mask provers ->
       let logger = Logger.null () in
       let pids = Child_processes.Termination.create_pid_table () in
       let%map proofs_available_left, _state_body_hashes_left =
@@ -2749,18 +3014,20 @@ let%test_module "test" =
             in
             let sl_before = !sl in
             let state_body_hash = List.hd_exn state_body_hashes in
-            let%map proof, diff, coinbase_amount, is_new_stack, pc_action =
-              create_and_apply_with_state_body_hash current_global_slot
-                state_body_hash sl logger pids cmds_this_iter
+            let%map proof, diff, is_new_stack, pc_update, supercharge_coinbase
+                =
+              create_and_apply_with_state_body_hash ~current_state_view
+                ~state_and_body_hash:state_body_hash sl logger pids
+                cmds_this_iter
                 (stmt_to_work_restricted
                    (List.take work_list proofs_available_this_iter)
                    provers)
             in
-            check_pending_coinbase proof diff ~sl_before ~sl_after:!sl
-              state_body_hash pc_action ~coinbase_amount ~is_new_stack ;
+            check_pending_coinbase proof ~supercharge_coinbase ~sl_before
+              ~sl_after:!sl state_body_hash pc_update ~is_new_stack ;
             assert_fee_excess proof ;
             let cmds_applied_this_iter =
-              List.length @@ Staged_ledger_diff.user_commands diff
+              List.length @@ Staged_ledger_diff.commands diff
             in
             let cb = coinbase_count diff in
             assert (proofs_available_this_iter = 0 || cb > 0) ;
@@ -2795,7 +3062,7 @@ let%test_module "test" =
         return
           (ledger_init_state, cmds, iters, proofs_available, state_body_hashes)
       in
-      let current_global_slot = Coda_numbers.Global_slot.zero in
+      let current_state_view = dummy_state_view () in
       Quickcheck.test g ~trials:5
         ~f:(fun ( ledger_init_state
                 , cmds
@@ -2805,14 +3072,241 @@ let%test_module "test" =
            ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_pending_coinbase ledger_init_state cmds iters
-                proofs_available state_body_hashes current_global_slot sl
+                proofs_available state_body_hashes current_state_view sl
                 test_mask prover ) )
 
     let%test_unit "Validate pending coinbase for random number of \
-                   user_commands-random number of proofs-one prover)" =
+                   commands-random number of proofs-one prover)" =
       pending_coinbase_test `One_prover
 
     let%test_unit "Validate pending coinbase for random number of \
-                   user_commands-random number of proofs-many provers)" =
+                   commands-random number of proofs-many provers)" =
       pending_coinbase_test `Many_provers
+
+    let timed_account n =
+      let keypair =
+        Quickcheck.random_value
+          ~seed:(`Deterministic (sprintf "timed_account_%d" n))
+          Keypair.gen
+      in
+      let account_id =
+        Account_id.create
+          (Public_key.compress keypair.public_key)
+          Token_id.default
+      in
+      let balance = Balance.of_int 100_000_000_000 in
+      (*Should fully vest by slot = 7*)
+      let acc =
+        Account.create_timed account_id balance
+          ~initial_minimum_balance:balance
+          ~cliff_time:(Mina_numbers.Global_slot.of_int 4)
+          ~cliff_amount:Amount.zero
+          ~vesting_period:(Mina_numbers.Global_slot.of_int 2)
+          ~vesting_increment:(Amount.of_int 50_000_000_000)
+        |> Or_error.ok_exn
+      in
+      (keypair, acc)
+
+    let untimed_account n =
+      let keypair =
+        Quickcheck.random_value
+          ~seed:(`Deterministic (sprintf "untimed_account_%d" n))
+          Keypair.gen
+      in
+      let account_id =
+        Account_id.create
+          (Public_key.compress keypair.public_key)
+          Token_id.default
+      in
+      let balance = Balance.of_int 100_000_000_000 in
+      let acc = Account.create account_id balance in
+      (keypair, acc)
+
+    let supercharge_coinbase_test ~(self : Account.t) ~(delegator : Account.t)
+        ~block_count f_expected_balance sl =
+      let coinbase_receiver = self in
+      let init_balance = coinbase_receiver.balance in
+      let check_receiver_account sl count =
+        let location =
+          Ledger.location_of_account (Sl.ledger sl)
+            (Account.identifier coinbase_receiver)
+          |> Option.value_exn
+        in
+        let account = Ledger.get (Sl.ledger sl) location |> Option.value_exn in
+        [%test_eq: Balance.t]
+          (f_expected_balance count init_balance)
+          account.balance
+      in
+      let logger = Logger.null () in
+      let pids = Child_processes.Termination.create_pid_table () in
+      Deferred.List.iter
+        (List.init block_count ~f:(( + ) 1))
+        ~f:(fun block_count ->
+          let%bind _ =
+            create_and_apply_with_state_body_hash ~winner:delegator.public_key
+              ~coinbase_receiver:coinbase_receiver.public_key sl logger pids
+              ~current_state_view:
+                (dummy_state_view
+                   ~global_slot_since_genesis:
+                     (Mina_numbers.Global_slot.of_int block_count)
+                   ())
+              ~state_and_body_hash:(State_hash.dummy, State_body_hash.dummy)
+              Sequence.empty
+              (stmt_to_work_zero_fee ~prover:self.public_key)
+          in
+          check_receiver_account !sl block_count ;
+          return () )
+
+    let normal_coinbase = constraint_constants.coinbase_amount
+
+    let scale_exn amt i = Amount.scale amt i |> Option.value_exn
+
+    let supercharged_coinbase =
+      scale_exn constraint_constants.coinbase_amount
+        constraint_constants.supercharged_coinbase_factor
+
+    let g = Ledger.gen_initial_ledger_state
+
+    let%test_unit "Supercharged coinbase - staking" =
+      let keypair_self, self = timed_account 1 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens + 5 in
+      let f_expected_balance block_no init_balance =
+        if block_no <= slots_with_locked_tokens then
+          Balance.add_amount init_balance (scale_exn normal_coinbase block_no)
+          |> Option.value_exn
+        else
+          (* init balance +
+                (normal_coinbase * slots_with_locked_tokens) +
+                (supercharged_coinbase * remaining slots))*)
+          Balance.add_amount
+            ( Balance.add_amount init_balance
+                (scale_exn normal_coinbase slots_with_locked_tokens)
+            |> Option.value_exn )
+            (scale_exn supercharged_coinbase
+               (block_no - slots_with_locked_tokens))
+          |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , Balance.to_amount self.balance
+                 , self.nonce
+                 , self.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self ~delegator:self ~block_count
+                f_expected_balance sl ) )
+
+    let%test_unit "Supercharged coinbase - unlocked account delegating to \
+                   locked account" =
+      let keypair_self, locked_self = timed_account 1 in
+      let keypair_delegator, unlocked_delegator = untimed_account 1 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens + 2 in
+      let f_expected_balance block_no init_balance =
+        Balance.add_amount init_balance
+          (scale_exn supercharged_coinbase block_no)
+        |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , Balance.to_amount locked_self.balance
+                 , locked_self.nonce
+                 , locked_self.timing )
+               ; ( keypair_delegator
+                 , Balance.to_amount unlocked_delegator.balance
+                 , unlocked_delegator.nonce
+                 , unlocked_delegator.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self:locked_self
+                ~delegator:unlocked_delegator ~block_count f_expected_balance
+                sl ) )
+
+    let%test_unit "Supercharged coinbase - locked account delegating to \
+                   unlocked account" =
+      let keypair_self, unlocked_self = untimed_account 1 in
+      let keypair_delegator, locked_delegator = timed_account 1 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for the timed_account*)
+      in
+      let block_count = slots_with_locked_tokens + 2 in
+      let f_expected_balance block_no init_balance =
+        if block_no <= slots_with_locked_tokens then
+          Balance.add_amount init_balance (scale_exn normal_coinbase block_no)
+          |> Option.value_exn
+        else
+          (* init balance +
+                (normal_coinbase * slots_with_locked_tokens) +
+                (supercharged_coinbase * remaining slots))*)
+          Balance.add_amount
+            ( Balance.add_amount init_balance
+                (scale_exn normal_coinbase slots_with_locked_tokens)
+            |> Option.value_exn )
+            (scale_exn supercharged_coinbase
+               (block_no - slots_with_locked_tokens))
+          |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , Balance.to_amount unlocked_self.balance
+                 , unlocked_self.nonce
+                 , unlocked_self.timing )
+               ; ( keypair_delegator
+                 , Balance.to_amount locked_delegator.balance
+                 , locked_delegator.nonce
+                 , locked_delegator.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self:unlocked_self
+                ~delegator:locked_delegator ~block_count f_expected_balance sl
+          ) )
+
+    let%test_unit "Supercharged coinbase - locked account delegating to \
+                   locked account" =
+      let keypair_self, locked_self = timed_account 1 in
+      let keypair_delegator, locked_delegator = timed_account 2 in
+      let slots_with_locked_tokens =
+        7
+        (*calculated from the timing values for timed_accounts*)
+      in
+      let block_count = slots_with_locked_tokens in
+      let f_expected_balance block_no init_balance =
+        (*running the test as long as both the accounts remain locked and hence normal coinbase in all the blocks*)
+        Balance.add_amount init_balance (scale_exn normal_coinbase block_no)
+        |> Option.value_exn
+      in
+      Quickcheck.test g ~trials:1 ~f:(fun ledger_init_state ->
+          let ledger_init_state =
+            Array.append
+              [| ( keypair_self
+                 , Balance.to_amount locked_self.balance
+                 , locked_self.nonce
+                 , locked_self.timing )
+               ; ( keypair_delegator
+                 , Balance.to_amount locked_delegator.balance
+                 , locked_delegator.nonce
+                 , locked_delegator.timing ) |]
+              ledger_init_state
+          in
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              supercharge_coinbase_test ~self:locked_self
+                ~delegator:locked_delegator ~block_count f_expected_balance sl
+          ) )
   end )

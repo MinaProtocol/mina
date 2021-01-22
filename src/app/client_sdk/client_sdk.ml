@@ -1,4 +1,4 @@
-(* sign_js.ml *)
+(* client_sdk.ml *)
 
 [%%import
 "/src/config.mlh"]
@@ -7,14 +7,16 @@
 consensus_mechanism]
 
 [%%error
-"Client_sdk cannot be built if \"consensus_mechanism\" is defined"]
+"Client SDK cannot be built if \"consensus_mechanism\" is defined"]
 
 [%%endif]
 
 open Js_of_ocaml
 open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
-open Coda_base_nonconsensus
+open Mina_base_nonconsensus
+open Rosetta_lib_nonconsensus
+open Rosetta_coding_nonconsensus
 open Js_util
 
 let _ =
@@ -45,7 +47,7 @@ let _ =
          let sk =
            Js.to_string sk_base58_check_js |> Private_key.of_base58_check_exn
          in
-         Public_key.of_private_key_exn sk |> Raw.of_public_key
+         Public_key.of_private_key_exn sk |> Coding.of_public_key |> Js.string
 
        (** return public key in raw hex format for Rosetta *)
        method rawPublicKeyOfPublicKey (pk_base58_check_js : string_js) =
@@ -53,12 +55,12 @@ let _ =
            Js.to_string pk_base58_check_js
            |> Public_key.Compressed.of_base58_check_exn
          in
-         Raw.of_public_key_compressed pk
+         Coding.of_public_key_compressed pk |> Js.string
 
        (** return public key, given that key in raw hex format for Rosetta *)
        method publicKeyOfRawPublicKey (pk_raw_js : string_js) =
          let pk_raw_str = Js.to_string pk_raw_js in
-         Raw.to_public_key_compressed pk_raw_str
+         Coding.to_public_key_compressed pk_raw_str
          |> Public_key.Compressed.to_base58_check |> Js.string
 
        (** sign arbitrary string with private key *)
@@ -96,7 +98,7 @@ let _ =
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_payment_js payment_js in
          let signature =
-           User_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload sk payload |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -109,7 +111,7 @@ let _ =
 
        (** verify signed payments *)
        method verifyPaymentSignature (signed_payment : signed_payment) =
-         let payload : User_command_payload.t =
+         let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
          let signer =
@@ -118,8 +120,8 @@ let _ =
            |> Public_key.decompress_exn
          in
          let signature = signature_of_js_object signed_payment##.signature in
-         let signed = User_command.Poly.{payload; signer; signature} in
-         User_command.check_signature signed
+         let signed = Signed_command.Poly.{payload; signer; signature} in
+         Signed_command.check_signature signed
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
@@ -129,7 +131,7 @@ let _ =
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_stake_delegation_js stake_delegation_js in
          let signature =
-           User_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload sk payload |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -143,7 +145,7 @@ let _ =
        (** verify signed delegations *)
        method verifyStakeDelegationSignature
              (signed_stake_delegation : signed_stake_delegation) =
-         let payload : User_command_payload.t =
+         let payload : Signed_command_payload.t =
            payload_of_stake_delegation_js
              signed_stake_delegation##.stakeDelegation
          in
@@ -155,8 +157,72 @@ let _ =
          let signature =
            signature_of_js_object signed_stake_delegation##.signature
          in
-         let signed = User_command.Poly.{payload; signer; signature} in
-         User_command.check_signature signed
+         let signed = Signed_command.Poly.{payload; signer; signature} in
+         Signed_command.check_signature signed
 
-       method runUnitTests () : bool Js.t = Raw.run_unit_tests () ; Js._true
+       (** sign a transaction in Rosetta rendered format *)
+       method signRosettaTransaction (sk_base58_check_js : string_js)
+           (unsignedRosettaTxn : string_js) =
+         let sk_base58_check = Js.to_string sk_base58_check_js in
+         let sk = Private_key.of_base58_check_exn sk_base58_check in
+         let unsigned_txn_json =
+           Js.to_string unsignedRosettaTxn |> Yojson.Safe.from_string
+         in
+         let make_error err =
+           let json = `Assoc [("error", `String err)] in
+           Js.string (Yojson.Safe.to_string json)
+         in
+         let make_signed_transaction command nonce =
+           let payload_or_err =
+             command
+             |> Rosetta_lib_nonconsensus.User_command_info.Partial
+                .to_user_command_payload ~nonce
+           in
+           match payload_or_err with
+           | Ok payload -> (
+               let signature =
+                 Signed_command.sign_payload sk payload |> Signature.Raw.encode
+               in
+               let signed_txn =
+                 Transaction.Signed.{command; nonce; signature}
+               in
+               match Transaction.Signed.render signed_txn with
+               | Ok signed ->
+                   let json = Transaction.Signed.Rendered.to_yojson signed in
+                   let json' = `Assoc [("data", json)] in
+                   Js.string (Yojson.Safe.to_string json')
+               | Error errs ->
+                   make_error (Rosetta_lib_nonconsensus.Errors.show errs) )
+           | Error errs ->
+               make_error (Rosetta_lib_nonconsensus.Errors.show errs)
+         in
+         match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
+         | Ok
+             { random_oracle_input= _
+             ; payment= Some payment
+             ; stake_delegation= None
+             ; create_token= None
+             ; create_token_account= None
+             ; mint_tokens= None } ->
+             let command = Transaction.Unsigned.of_rendered_payment payment in
+             make_signed_transaction command payment.nonce
+         | Ok
+             { random_oracle_input= _
+             ; payment= None
+             ; stake_delegation= Some delegation
+             ; create_token= None
+             ; create_token_account= None
+             ; mint_tokens= None } ->
+             let command =
+               Transaction.Unsigned.of_rendered_delegation delegation
+             in
+             make_signed_transaction command delegation.nonce
+         | Ok _ ->
+             make_error
+               "Unsigned transaction must contain a payment or a delegation, \
+                exclusively"
+         | Error msg ->
+             make_error msg
+
+       method runUnitTests () : bool Js.t = Coding.run_unit_tests () ; Js._true
     end)

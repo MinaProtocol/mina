@@ -1,6 +1,6 @@
-open Coda_base
+open Mina_base
 open Signature_lib
-open Coda_numbers
+open Mina_numbers
 open Core_kernel
 open Async_kernel
 
@@ -47,7 +47,7 @@ module Stable : sig
       ( Payload.Stable.V1.t
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
-      User_command.Poly.Stable.V1.t
+      Signed_command.Poly.Stable.V1.t
     [@@deriving sexp, to_yojson]
   end
 end]
@@ -60,21 +60,28 @@ val create :
   -> fee_token:Token_id.t
   -> fee_payer_pk:Public_key.Compressed.t
   -> valid_until:Global_slot.t option
-  -> memo:User_command_memo.t
-  -> body:User_command_payload.Body.t
+  -> memo:Signed_command_memo.t
+  -> body:Signed_command_payload.Body.t
   -> signer:Public_key.Compressed.t
   -> sign_choice:Sign_choice.t
   -> unit
   -> t
 
 val to_user_command :
-     ?nonce_map:Account.Nonce.t Account_id.Map.t
-  -> get_current_nonce:(Account_id.t -> (Account_nonce.t, string) Result.t)
+     ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
+  -> get_current_nonce:(   Account_id.t
+                        -> ( [`Min of Account_nonce.t] * Account_nonce.t
+                           , string )
+                           Result.t)
   -> t
-  -> (User_command.t * Account.Nonce.t Account_id.Map.t) Deferred.Or_error.t
+  -> (Signed_command.t * (Account.Nonce.t * Account.Nonce.t) Account_id.Map.t)
+     Deferred.Or_error.t
 
 val to_user_commands :
-     ?nonce_map:Account.Nonce.t Account_id.Map.t
-  -> get_current_nonce:(Account_id.t -> (Account_nonce.t, string) Result.t)
+     ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
+  -> get_current_nonce:(   Account_id.t
+                        -> ( [`Min of Account_nonce.t] * Account_nonce.t
+                           , string )
+                           Result.t)
   -> t list
-  -> User_command.t list Deferred.Or_error.t
+  -> Signed_command.t list Deferred.Or_error.t

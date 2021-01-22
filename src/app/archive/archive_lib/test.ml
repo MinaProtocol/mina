@@ -1,6 +1,6 @@
 open Async
 open Core
-open Coda_base
+open Mina_base
 open Pipe_lib
 open Signature_lib
 
@@ -32,7 +32,7 @@ let%test_module "Archive node unit tests" =
 
     let user_command_gen =
       User_command.Gen.payment_with_random_participants ~keys ~max_amount:1000
-        ~max_fee:10 ()
+        ~fee_range:10 ()
 
     let fee_transfer_gen =
       Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
@@ -50,9 +50,7 @@ let%test_module "Archive node unit tests" =
       @@ fun () ->
       Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
         user_command_gen ~f:(fun user_command ->
-          let transaction_hash =
-            Transaction_hash.hash_user_command user_command
-          in
+          let transaction_hash = Transaction_hash.hash_command user_command in
           match%map
             let open Deferred.Result.Let_syntax in
             let%bind user_command_id =
@@ -70,11 +68,19 @@ let%test_module "Archive node unit tests" =
               failwith @@ Caqti_error.show e )
 
     let%test_unit "Fee_transfer: read and write" =
+      let kind_gen =
+        let open Quickcheck.Generator in
+        let open Quickcheck.Generator.Let_syntax in
+        let%map b = bool in
+        if b then `Normal else `Via_coinbase
+      in
       let conn = Lazy.force conn_lazy in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      Async.Quickcheck.async_test ~sexp_of:[%sexp_of: Fee_transfer.Single.t]
-        fee_transfer_gen ~f:(fun fee_transfer ->
+      Async.Quickcheck.async_test
+        ~sexp_of:[%sexp_of: [`Normal | `Via_coinbase] * Fee_transfer.Single.t]
+        (Quickcheck.Generator.tuple2 kind_gen fee_transfer_gen)
+        ~f:(fun (kind, fee_transfer) ->
           let transaction_hash =
             Transaction_hash.hash_fee_transfer fee_transfer
           in
@@ -82,9 +88,11 @@ let%test_module "Archive node unit tests" =
             let open Deferred.Result.Let_syntax in
             let%bind fee_transfer_id =
               Processor.Fee_transfer.add_if_doesn't_exist conn fee_transfer
+                kind
             in
             let%map result =
               Processor.Internal_command.find conn ~transaction_hash
+                ~typ:(Processor.Fee_transfer.Kind.to_string kind)
             in
             [%test_result: int] ~expect:fee_transfer_id
               (Option.value_exn result)
@@ -108,6 +116,7 @@ let%test_module "Archive node unit tests" =
             in
             let%map result =
               Processor.Internal_command.find conn ~transaction_hash
+                ~typ:Processor.Coinbase.coinbase_typ
             in
             [%test_result: int] ~expect:coinbase_id (Option.value_exn result)
           with
@@ -155,7 +164,7 @@ let%test_module "Archive node unit tests" =
               ~f:(fun () breadcrumb ->
                 let open Deferred.Result.Let_syntax in
                 match%bind
-                  Processor.Block.find conn
+                  Processor.Block.find_opt conn
                     ~state_hash:
                       (Transition_frontier.Breadcrumb.state_hash breadcrumb)
                 with
@@ -182,6 +191,7 @@ let%test_module "Archive node unit tests" =
           | Error e ->
               failwith @@ Caqti_error.show e )
 
+    (*
     let%test_unit "Block: read and write with pruning" =
       let conn = Lazy.force conn_lazy in
       Quickcheck.test ~trials:20
@@ -232,7 +242,7 @@ let%test_module "Archive node unit tests" =
                   |> Transition_frontier.Breadcrumb.blockchain_length
                 in
                 match%bind
-                  Processor.Block.find conn
+                  Processor.Block.find_opt conn
                     ~state_hash:
                       (Transition_frontier.Breadcrumb.state_hash breadcrumb)
                 with
@@ -252,12 +262,13 @@ let%test_module "Archive node unit tests" =
                     else
                       let%map.Async () =
                         Deferred.List.iter
-                          (Transition_frontier.Breadcrumb.user_commands
-                             breadcrumb) ~f:(fun cmd ->
+                          (Transition_frontier.Breadcrumb.commands breadcrumb)
+                          ~f:(fun cmd ->
                             match%map.Async
                               Processor.User_command.find conn
                                 ~transaction_hash:
-                                  (Transaction_hash.hash_user_command cmd.data)
+                                  (Transaction_hash.hash_command
+                                     (User_command.forget_check cmd.data))
                             with
                             | Ok (Some _) ->
                                 ()
@@ -267,7 +278,7 @@ let%test_module "Archive node unit tests" =
                                      !"The user command %{sexp: \
                                        User_command.t} was pruned when it \
                                        should not have been"
-                                     cmd.data)
+                                     (User_command.forget_check cmd.data))
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
                       in
@@ -287,12 +298,13 @@ let%test_module "Archive node unit tests" =
                     else
                       let%map.Async () =
                         Deferred.List.iter
-                          (Transition_frontier.Breadcrumb.user_commands
-                             breadcrumb) ~f:(fun cmd ->
+                          (Transition_frontier.Breadcrumb.commands breadcrumb)
+                          ~f:(fun cmd ->
                             match%map.Async
                               Processor.User_command.find conn
                                 ~transaction_hash:
-                                  (Transaction_hash.hash_user_command cmd.data)
+                                  (Transaction_hash.hash_command
+                                     (User_command.forget_check cmd.data))
                             with
                             | Ok None ->
                                 ()
@@ -302,7 +314,7 @@ let%test_module "Archive node unit tests" =
                                      !"The user command %{sexp: \
                                        User_command.t} was not pruned when it \
                                        should have been"
-                                     cmd.data)
+                                     (User_command.forget_check cmd.data))
                             | Error e ->
                                 failwith @@ Caqti_error.show e )
                       in
@@ -312,4 +324,5 @@ let%test_module "Archive node unit tests" =
               ()
           | Error e ->
               failwith @@ Caqti_error.show e )
+    *)
   end )

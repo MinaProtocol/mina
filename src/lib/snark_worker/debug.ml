@@ -7,7 +7,7 @@ module Inputs = struct
   module Worker_state = struct
     include Unit
 
-    let create ~proof_level () =
+    let create ~constraint_constants:_ ~proof_level () =
       match proof_level with
       | Genesis_constants.Proof_level.Full ->
           failwith "Unable to handle proof-level=Full"
@@ -18,8 +18,8 @@ module Inputs = struct
   end
 
   let perform_single () ~message s =
-    Ok
+    Deferred.Or_error.return
       ( ( Snark_work_lib.Work.Single.Spec.statement s
-        , Coda_base.Sok_message.digest message )
+        , Mina_base.Sok_message.digest message )
       , Time.Span.zero )
 end

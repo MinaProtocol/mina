@@ -91,7 +91,7 @@ module Compressed = struct
           Quickcheck.random_value
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
-        let known_good_digest = "951b667e8f1216097665190fc0a7b78a" in
+        let known_good_digest = "35c836b0252293061bf974490f5bd515" in
         Ppx_version_runtime.Serialization.check_serialization
           (module V1)
           point known_good_digest
@@ -247,18 +247,6 @@ module Uncompressed = struct
   let%test_unit "point-compression: decompress . compress = id" =
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk) )
-
-  (* TODO: Implement this properly to spec *)
-  module Hex = struct
-    let encode (a, b) = Field.to_string a ^ "," ^ Field.to_string b
-
-    let decode raw =
-      match String.split ~on:',' raw with
-      | [a; b] ->
-          Or_error.return (Field.of_string a, Field.of_string b)
-      | _ ->
-          Or_error.error_string "Malformed hex encoding"
-  end
 
   [%%ifdef
   consensus_mechanism]

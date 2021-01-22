@@ -1,0 +1,23 @@
+opam-version: "2"
+name: "cstubs_applicative"
+maintainer: "opensource@o1labs.org"
+authors: ["O(1) Labs, LLC <opensource@o1labs.org>"]
+homepage: "https://github.com/CodaProtocol/coda"
+bug-reports: "https://github.com/CodaProtocol/coda/issues"
+dev-repo: "https://github.com/CodaProtocol/coda.git"
+license: "Apache"
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "base"
+  "ctypes"
+  "dune"                {build & >= "2.0"}
+  "ppx_version"         {build}
+]
+synopsis: "Cstubs extended with applicative interface"
+description: "
+Cstubs interface with additional tooling and changes to support mapping over
+the results of bindings
+"
+

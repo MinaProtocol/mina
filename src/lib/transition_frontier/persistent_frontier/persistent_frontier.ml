@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
-open Coda_base
-open Coda_state
-open Coda_transition
+open Mina_base
+open Mina_state
+open Mina_transition
 open Frontier_base
 module Database = Database
 
@@ -59,20 +59,18 @@ let construct_staged_ledger_at_root
              Ledger.apply_transaction
                ~constraint_constants:precomputed_values.constraint_constants
                mask
-               ~txn_global_slot:
-                 ( Protocol_state.consensus_state protocol_state
-                 |> Consensus.Data.Consensus_state.curr_global_slot )
+               ~txn_state_view:(Protocol_state.Body.view protocol_state.body)
                txn.data
            in
            let computed_status =
-             Ledger.Undo.user_command_status txn_with_info
+             Ledger.Transaction_applied.user_command_status txn_with_info
            in
-           if User_command_status.equal txn.status computed_status then
+           if Transaction_status.equal txn.status computed_status then
              Or_error.return ()
            else
              Or_error.errorf
                !"Mismatched user command status. Expected: %{sexp: \
-                 User_command_status.t} Got: %{sexp: User_command_status.t}"
+                 Transaction_status.t} Got: %{sexp: Transaction_status.t}"
                txn.status computed_status )
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
@@ -120,12 +118,11 @@ module Instance = struct
 
   let start_sync ~constraint_constants t =
     let open Result.Let_syntax in
-    let%bind () = assert_no_sync t in
-    let%map base_hash = Database.get_frontier_hash t.db in
+    let%map () = assert_no_sync t in
     t.sync
     <- Some
          (Sync.create ~constraint_constants ~logger:t.factory.logger
-            ~time_controller:t.factory.time_controller ~base_hash ~db:t.db)
+            ~time_controller:t.factory.time_controller ~db:t.db)
 
   let stop_sync t =
     let open Deferred.Let_syntax in
@@ -134,10 +131,9 @@ module Instance = struct
         t.sync <- None ;
         Ok () )
 
-  let notify_sync t ~diffs ~hash_transition =
+  let notify_sync t ~diffs =
     assert_sync t ~f:(fun sync ->
-        Sync.notify sync ~diffs ~hash_transition ;
-        Deferred.Result.return () )
+        Sync.notify sync ~diffs ; Deferred.Result.return () )
 
   let destroy t =
     let open Deferred.Let_syntax in
@@ -163,8 +159,6 @@ module Instance = struct
     >>= Database.get_transition t.db
     |> Result.map_error ~f:Database.Error.message
 
-  let set_frontier_hash t = Database.set_frontier_hash t.db
-
   let fast_forward t target_root :
       (unit, [> `Failure of string | `Bootstrap_required]) Result.t =
     let open Root_identifier.Stable.Latest in
@@ -177,14 +171,7 @@ module Instance = struct
     let root_hash = Root_data.Minimal.hash root in
     if State_hash.equal root_hash target_root.state_hash then
       (* If the target hash is already the root hash, no fast forward required, but we should check the frontier hash. *)
-      let%bind frontier_hash =
-        lift_error
-          (Database.get_frontier_hash t.db)
-          "failed to get frontier hash"
-      in
-      Result.ok_if_true
-        (Frontier_hash.equal frontier_hash target_root.frontier_hash)
-        ~error:`Frontier_hash_does_not_match
+      Ok ()
     else (
       [%log' warn t.factory.logger]
         ~metadata:
@@ -202,7 +189,9 @@ module Instance = struct
         , [`Invalid_genesis_protocol_state] )
         Result.t =
       let open Result.Let_syntax in
-      let transition, _ = External_transition.Validated.erase transition in
+      let transition =
+        External_transition.Validation.forget_validation_with_hash transition
+      in
       let%map t =
         External_transition.Validation.wrap transition
         |> External_transition.skip_time_received_validation
@@ -221,22 +210,16 @@ module Instance = struct
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind ( root
-             , root_transition
-             , best_tip
-             , base_hash
-             , protocol_states
-             , root_hash ) =
+    let%bind root, root_transition, best_tip, protocol_states, root_hash =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let root_hash = Root_data.Minimal.hash root in
       let%bind root_transition = Database.get_transition t.db root_hash in
       let%bind best_tip = Database.get_best_tip t.db in
-      let%bind protocol_states =
+      let%map protocol_states =
         Database.get_protocol_states_for_root_scan_state t.db
       in
-      let%map base_hash = Database.get_frontier_hash t.db in
-      (root, root_transition, best_tip, base_hash, protocol_states, root_hash))
+      (root, root_transition, best_tip, protocol_states, root_hash))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
@@ -259,7 +242,7 @@ module Instance = struct
     in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
-      Full_frontier.create ~logger:t.factory.logger ~base_hash
+      Full_frontier.create ~logger:t.factory.logger
         ~root_data:
           { transition= root_transition
           ; staged_ledger= root_staged_ledger
@@ -277,7 +260,10 @@ module Instance = struct
     in
     let apply_diff diff =
       let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
-        Full_frontier.apply_diffs frontier [diff] ~ignore_consensus_local_state
+        Full_frontier.apply_diffs frontier [diff] ~has_long_catchup_job:false
+          ~enable_epoch_ledger_sync:
+            ( if ignore_consensus_local_state then `Disabled
+            else `Enabled root_ledger )
       in
       Extensions.notify extensions ~frontier ~diffs_with_mutants
       |> Deferred.map ~f:Result.return
@@ -297,11 +283,16 @@ module Instance = struct
                    Error (`Fatal_error (Invalid_genesis_state_hash transition))
                    |> Deferred.return
              in
+             (* we're loading transitions from persistent storage,
+                don't assign a timestamp
+             *)
+             let transition_receipt_time = None in
              let%bind breadcrumb =
-               Breadcrumb.build ~logger:t.factory.logger ~precomputed_values
+               Breadcrumb.build ~skip_staged_ledger_verification:`All
+                 ~logger:t.factory.logger ~precomputed_values
                  ~verifier:t.factory.verifier
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
-                 ~sender:None
+                 ~sender:None ~transition_receipt_time ()
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
              breadcrumb ))
@@ -324,10 +315,6 @@ module Instance = struct
                 `Failure (Database.Error.not_found_message err) ))
     in
     let%map () = apply_diff Diff.(E (Best_tip_changed best_tip)) in
-    (* reset the frontier hash at the end so it matches the persistent frontier hash (for future sanity checks) *)
-    [%log' trace t.factory.logger] "Pinning frontier hash at %s"
-      (Frontier_hash.to_string base_hash) ;
-    Full_frontier.set_hash_unsafe frontier (`I_promise_this_is_safe base_hash) ;
     (frontier, extensions)
 end
 
@@ -352,7 +339,7 @@ let with_instance_exn t ~f =
   let%map () = Instance.destroy instance in
   x
 
-let reset_database_exn t ~root_data =
+let reset_database_exn t ~root_data ~genesis_state_hash =
   let open Root_data.Limited in
   let open Deferred.Let_syntax in
   [%log' info t.logger]
@@ -364,15 +351,17 @@ let reset_database_exn t ~root_data =
     "Resetting transition frontier database to new root" ;
   let%bind () = destroy_database_exn t in
   with_instance_exn t ~f:(fun instance ->
-      Database.initialize instance.db ~root_data ~base_hash:Frontier_hash.empty ;
+      Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
       Debug_assert.debug_assert (fun () ->
-          Database.check instance.db
+          Database.check instance.db ~genesis_state_hash
           |> Result.map_error ~f:(function
                | `Invalid_version ->
                    "invalid version"
                | `Not_initialized ->
                    "not initialized"
+               | `Genesis_state_mismatch _ ->
+                   "genesis state mismatch"
                | `Corrupt err ->
                    Database.Error.message err )
           |> Result.ok_or_failwith ) )

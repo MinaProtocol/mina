@@ -8,6 +8,10 @@ module Block = {
       | MintTokens
       | Unknown;
 
+    type userCommandStatus =
+      | Applied
+      | Failed;
+
     let userCommandTypeOfString = s => {
       switch (s) {
       | "payment" => Payment
@@ -19,13 +23,26 @@ module Block = {
       };
     };
 
+    let userCommandStatusOfString = s => {
+      Belt.Option.mapWithDefault(s, None, status => {
+        switch (status) {
+        | "applied" => Some(Applied)
+        | "failed" => Some(Failed)
+        | _ => None
+        }
+      });
+    };
+
     type t = {
       id: int,
       type_: userCommandType,
+      status: option(userCommandStatus),
       fromAccount: string,
       toAccount: string,
+      feePayerAccount: string,
       fee: string,
       amount: option(string),
+      token: string,
     };
 
     module Decode = {
@@ -39,10 +56,17 @@ module Block = {
               json
               |> field("usercommandtype", string)
               |> userCommandTypeOfString,
+            status:
+              json
+              |> optional(field("usercommandstatus", string))
+              |> userCommandStatusOfString,
             fromAccount: json |> field("usercommandfromaccount", string),
             toAccount: json |> field("usercommandtoaccount", string),
+            feePayerAccount:
+              json |> field("usercommandfeepayeraccount", string),
             fee: json |> field("usercommandfee", string),
             amount: json |> optional(field("usercommandamount", string)),
+            token: json |> field("usercommandtoken", string),
           }
           ->Some
         | exception (DecodeError(_)) => None
@@ -99,14 +123,18 @@ module Block = {
       timestamp: string,
       height: string,
       creatorAccount: string,
+      coinbaseReceiver: option(string),
     };
 
     module Decode = {
       open Json.Decode;
       let blockchainState = json => {
-        creatorAccount: json |> field("blockcreatoraccount", string),
-        timestamp: json |> field("timestamp", string),
-        height: json |> field("height", string),
+        {
+          creatorAccount: json |> field("blockcreatoraccount", string),
+          coinbaseReceiver: None,
+          timestamp: json |> field("timestamp", string),
+          height: json |> field("height", string),
+        };
       };
     };
   };
@@ -130,8 +158,23 @@ module Block = {
 
   let addCommandIfSome = (command, commands) => {
     switch (command) {
-    | Some(command) => Js.Array.push(command, commands) |> ignore
+    | Some(command) =>
+      if (!Array.mem(command, commands)) {
+        Js.Array.push(command, commands) |> ignore;
+      }
     | None => ()
+    };
+  };
+
+  let addCoinbaseReceiverIfSome = (block, coinbaseReceiver) => {
+    switch (coinbaseReceiver) {
+    | Some(_) =>
+      let updatedBlockchainState = {
+        ...block.blockchainState,
+        coinbaseReceiver,
+      };
+      {...block, blockchainState: updatedBlockchainState};
+    | None => block
     };
   };
 
@@ -152,6 +195,16 @@ module Block = {
              let internalCommand =
                InternalCommand.Decode.internalCommand(block);
 
+             let coinbaseReceiver =
+               switch (internalCommand) {
+               | Some(internalCommand) =>
+                 switch (internalCommand.type_) {
+                 | Coinbase => Some(internalCommand.receiverAccount)
+                 | _ => None
+                 }
+               | _ => None
+               };
+
              if (has(blockMap, newBlock.id)) {
                update(blockMap, newBlock.id, block => {
                  switch (block) {
@@ -161,14 +214,21 @@ module Block = {
                      internalCommand,
                      currentBlock.internalCommands,
                    );
-                   Some(currentBlock);
+                   let block =
+                     addCoinbaseReceiverIfSome(
+                       currentBlock,
+                       coinbaseReceiver,
+                     );
+                   Some(block);
                  | None => None
                  }
                });
              } else {
                addCommandIfSome(userCommand, newBlock.userCommands);
                addCommandIfSome(internalCommand, newBlock.internalCommands);
-               set(blockMap, newBlock.id, newBlock);
+               let block =
+                 addCoinbaseReceiverIfSome(newBlock, coinbaseReceiver);
+               set(blockMap, block.id, block);
              };
            },
            empty,
@@ -185,7 +245,9 @@ module Metrics = {
     | SnarkFeesCollected
     | HighestSnarkFeeCollected
     | TransactionsReceivedByEcho
-    | CoinbaseReceiver;
+    | CoinbaseReceiver
+    | CreateAndSendToken
+    | ReceiveToken;
 
   type t = {
     blocksCreated: option(int),
@@ -194,5 +256,6 @@ module Metrics = {
     highestSnarkFeeCollected: option(int64),
     transactionsReceivedByEcho: option(int),
     coinbaseReceiver: option(bool),
+    createAndSendToken: option(int),
   };
 };

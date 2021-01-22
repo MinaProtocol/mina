@@ -33,7 +33,22 @@ curve_size]
 "ledger_depth", ledger_depth]
 
 module Field = struct
-  include Tweedle.Fq
+  open Core_kernel
+
+  [%%versioned_asserted
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = Pasta.Fp.t [@@deriving eq, compare, yojson, sexp, hash]
+
+      let to_latest x = x
+    end
+
+    module Tests = struct end
+  end]
+
+  include Pasta.Fp
 
   let size = order |> Snarkette.Nat.to_string |> Bigint.of_string
 
@@ -48,23 +63,25 @@ end
 
 module Tock = struct
   module Field = struct
-    type t = Tweedle.Fp.t
+    type t = Pasta.Fq.t
 
-    let unpack (t : t) = Tweedle.Fp.to_bits t
+    let unpack (t : t) = Pasta.Fq.to_bits t
 
-    let size_in_bits = Tweedle.Fp.length_in_bits
+    let size_in_bits = Pasta.Fq.length_in_bits
 
     let project bits =
       Core_kernel.Option.value_exn
         ~message:"Snark_params_nonconsensus.Tock.Field.project"
-        (Tweedle.Fp.of_bits bits)
+        (Pasta.Fq.of_bits bits)
   end
 end
 
 module Inner_curve = struct
-  type t = Tweedle.Dee.t [@@deriving sexp]
+  module C = Pasta.Pallas
 
-  module Coefficients = Tweedle.Dee.Coefficients
+  type t = C.t [@@deriving sexp]
+
+  module Coefficients = C.Coefficients
 
   let find_y x =
     let open Field in
@@ -72,20 +89,20 @@ module Inner_curve = struct
     if is_square y2 then Some (sqrt y2) else None
 
   [%%define_locally
-  Tweedle.Dee.(of_affine, to_affine, to_affine_exn, one, ( + ), negate)]
+  C.(of_affine, to_affine, to_affine_exn, one, ( + ), negate)]
 
   module Scalar = struct
     (* though we have bin_io, not versioned here; this type exists for Private_key.t,
        where it is versioned-asserted and its serialization tested
      *)
-    type t = Tweedle.Fp.t [@@deriving bin_io_unversioned, sexp]
+    type t = Pasta.Fq.t [@@deriving bin_io_unversioned, sexp]
 
     type _unused = unit constraint t = Tock.Field.t
 
-    let size = Tweedle.Fp.order
+    let size = Pasta.Fq.order
 
     [%%define_locally
-    Tweedle.Fp.
+    Pasta.Fq.
       ( to_string
       , of_string
       , equal
@@ -100,19 +117,23 @@ module Inner_curve = struct
       , negate
       , hash_fold_t )]
 
-    (* Tweedle.Fp.gen uses the interval starting at zero
+    (* Pasta.Fq.gen uses the interval starting at zero
        here we follow the gen in Snark_params.Make_inner_curve_scalar, using
          an interval starting at one
     *)
 
-    let gen = Tweedle.Fp.(gen_incl one (zero - one))
+    let gen = Pasta.Fq.(gen_incl one (zero - one))
 
     let gen_uniform = gen_uniform_incl one (zero - one)
 
+    let unpack t = Tock.Field.unpack t
+
     let of_bits bits = Tock.Field.project bits
+
+    let project = of_bits
   end
 
-  let scale t (scalar : Scalar.t) = Tweedle.Dee.scale t (scalar :> Nat.t)
+  let scale (t : t) (scalar : Scalar.t) = C.scale t (scalar :> Nat.t)
 
-  let scale_field t x = scale t (Tweedle.Fp.of_bigint x :> Scalar.t)
+  let scale_field (t : t) x = scale t (Pasta.Fq.of_bigint x :> Scalar.t)
 end

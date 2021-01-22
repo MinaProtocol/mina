@@ -1,4 +1,5 @@
 open Core_kernel
+open Rosetta_lib
 
 let assert_ ~f ~expected ~actual =
   let eq x y =

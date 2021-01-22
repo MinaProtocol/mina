@@ -5,9 +5,9 @@ open Core_kernel
 open Async
 open Unsigned
 open Signature_lib
-open Coda_base
-open Coda_state
-open Coda_transition
+open Mina_base
+open Mina_state
+open Mina_transition
 open Snark_params
 open Blockchain_snark
 open Consensus
@@ -98,11 +98,11 @@ module Vrf_distribution = struct
                  with
                  | `Check_again _ ->
                      None
-                 | `Produce_now (_, proposal_data) ->
+                 | `Produce_now (_, proposal_data, _) ->
                      let slot_span = constants.block_window_duration_ms in
                      let proposal_time = Block_time.add curr_time slot_span in
                      Some (proposal_time, proposal_data)
-                 | `Produce (proposal_time, _, proposal_data) ->
+                 | `Produce (proposal_time, _, proposal_data, _) ->
                      Some
                        ( Block_time.(
                            of_span_since_epoch @@ Span.of_ms proposal_time)
@@ -132,7 +132,7 @@ module Vrf_distribution = struct
    *  to simulate any regular properties of how a real chain would be built. *)
   let pick_chain_unrealistically dist =
     let constants = Constants.compiled in
-    let default_window_size = UInt32.to_int constants.delta in
+    let default_window_size = UInt32.to_int constants.delta + 1 in
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
       let window_expired =
@@ -311,7 +311,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   in
   Or_error.iter_error res ~f:(fun e ->
       [%log error]
-        ~metadata:[("error", `String (Error.to_string_hum e))]
+        ~metadata:[("error", Error_json.error_to_yojson e)]
         "Prover threw an error while extending block: $error" ) ;
   res
 
@@ -345,7 +345,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   in
   Or_error.iter_error res ~f:(fun e ->
       [%log error]
-        ~metadata:[("error", `String (Error.to_string_hum e))]
+        ~metadata:[("error", Error_json.error_to_yojson e)]
         "Prover threw an error while extending block: $error" ) ;
   res
 
@@ -401,8 +401,8 @@ let propose_block_onto_chain ~logger ~keys
   let%map ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger staged_ledger
-          , `Pending_coinbase_data
-              (is_new_stack, coinbase_amount, pending_coinbase_action) ) =
+          , `Pending_coinbase_update (is_new_stack, pending_coinbase_update) )
+      =
     let%map res =
       Staged_ledger.apply_diff_unchecked previous_staged_ledger ~logger
         staged_ledger_diff ~state_body_hash:previous_protocol_state_body_hash
@@ -436,7 +436,7 @@ let propose_block_onto_chain ~logger ~keys
       ~transactions:
         ( Staged_ledger_diff.With_valid_signatures_and_proofs.user_commands
             staged_ledger_diff
-          :> User_command.t list )
+          :> Signed_command.t list )
       ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
   in
   let snark_transition =
@@ -452,8 +452,7 @@ let propose_block_onto_chain ~logger ~keys
            ~f:(fun (proof, _) -> (Ledger_proof.statement proof).supply_increase)
            ledger_proof_opt)
       ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-      ~consensus_transition ~coinbase_receiver:proposer_pk ~coinbase_amount
-      ~pending_coinbase_action ()
+      ~consensus_transition ~pending_coinbase_update ()
   in
   let internal_transition =
     Internal_transition.create ~snark_transition
@@ -492,7 +491,8 @@ let main () =
       ~transport:
         (Transport.File_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
-           ~max_size:(500 * 1024 * 1024))) ;
+           ~max_size:(500 * 1024 * 1024)
+           ~num_rotate:1)) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()

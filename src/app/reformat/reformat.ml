@@ -15,6 +15,7 @@ let dirs_trustlist =
   ; "node_modules"
   ; "tablecloth"
   ; "zexe"
+  ; "marlin"
   ; "snarky" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =

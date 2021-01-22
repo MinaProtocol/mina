@@ -1,7 +1,7 @@
 open Snark_params
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 open Async
 
 let create_hd_account_summary =
@@ -86,14 +86,14 @@ let compute_public_key ~hd_index =
     ( "python3"
     , [ "-m" ^ hardware_wallet_script
       ; "--request=publickey"
-      ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
+      ; "--nonce=" ^ Mina_numbers.Hd_index.to_string hd_index ] )
   in
   Process.run ~prog ~args ()
   |> Deferred.Result.map_error ~f:report_process_error
   |> Deferred.map ~f:(Result.bind ~f:decode_public_key)
 
 let sign ~hd_index ~public_key ~user_command_payload :
-    (User_command.With_valid_signature.t, string) Deferred.Result.t =
+    (Signed_command.With_valid_signature.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let input =
     Transaction_union_payload.to_input
@@ -112,7 +112,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
         ; "--request=sign"
         ; "--msgx=" ^ messages.(0)
         ; "--msgm=" ^ messages.(1)
-        ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
+        ; "--nonce=" ^ Mina_numbers.Hd_index.to_string hd_index ] )
     in
     let%bind signature_str =
       Process.run ~prog ~args ()
@@ -120,7 +120,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
     in
     let%bind signature = decode_signature signature_str |> Deferred.return in
     match
-      User_command.create_with_signature_checked signature
+      Signed_command.create_with_signature_checked signature
         (Public_key.compress public_key)
         user_command_payload
     with
@@ -142,5 +142,5 @@ let sign ~hd_index ~public_key ~user_command_payload :
 
 let write_exn ~hd_index ~index_path : unit Deferred.t =
   let%bind index_file = Writer.open_file index_path in
-  Writer.write_line index_file (Coda_numbers.Hd_index.to_string hd_index) ;
+  Writer.write_line index_file (Mina_numbers.Hd_index.to_string hd_index) ;
   Writer.close index_file

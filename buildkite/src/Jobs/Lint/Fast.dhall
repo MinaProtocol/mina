@@ -1,4 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 
@@ -24,7 +27,7 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.everything ],
+      dirtyWhen = [ S.strictlyStart (S.contains "src/") ],
       path = "Lint",
       name = "Fast"
     },
@@ -45,7 +48,7 @@ Pipeline.build
           , label = "Optional fast lint steps; versions compatability changes"
           , key = "lint-optional-types"
           , target = Size.Medium
-          , soft_fail = Some (Command.SoftFail.Boolean True)
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         },
       Command.build
@@ -56,7 +59,7 @@ Pipeline.build
           , label = "Optional fast lint steps; binable compatability changes"
           , key = "lint-optional-binable"
           , target = Size.Medium
-          , soft_fail = Some (Command.SoftFail.Boolean True)
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]

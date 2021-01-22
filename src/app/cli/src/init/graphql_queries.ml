@@ -1,4 +1,7 @@
-module Decoders = Graphql_client.Decoders
+(* exclude from bisect_ppx to avoid type error on GraphQL modules *)
+[@@@coverage exclude_file]
+
+module Decoders = Graphql_lib.Decoders
 
 module Get_tracked_accounts =
 [%graphql
@@ -17,12 +20,21 @@ query {
 module Get_tracked_account =
 [%graphql
 {|
-query ($public_key: PublicKey) {
-  account(publicKey: $public_key) {
-    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+query ($public_key: PublicKey, $token: UInt64) {
+  account(publicKey: $public_key, token: $token) {
     balance {
       total @bsDecoder(fn: "Decoders.balance")
     }
+  }
+}
+|}]
+
+module Get_all_accounts =
+[%graphql
+{|
+query ($public_key: PublicKey) {
+  accounts(publicKey: $public_key) {
+    token @bsDecoder(fn: "Decoders.token")
   }
 }
 |}]
@@ -142,8 +154,7 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
-          $token: UInt64,
-          $fee: UInt64!,
+          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
           $nonce: UInt32,
           $memo: String) {
   sendPayment(input:
@@ -227,6 +238,18 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
+module Export_logs =
+[%graphql
+{|
+mutation ($basename: String) {
+  exportLogs(basename: $basename) {
+    exportLogs {
+      tarfile
+    }
+  }
+}
+|}]
+
 module Get_token_owner =
 [%graphql
 {|
@@ -257,7 +280,65 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Coda_base.User_command_memo.of_string")
+    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_string")
+  }
+}
+|}]
+
+module Next_available_token =
+[%graphql
+{|
+query next_available_token {
+  nextAvailableToken @bsDecoder(fn: "Decoders.token")
+}
+|}]
+
+module Time_offset = [%graphql {|
+query time_offset {
+  timeOffset
+}
+|}]
+
+module Get_peers =
+[%graphql
+{|
+query get_peers {
+  getPeers {
+    host
+    libp2pPort
+    peerId
+  }
+}
+|}]
+
+module Add_peers =
+[%graphql
+{|
+mutation ($peers: [NetworkPeer!]!) {
+  addPeers(peers: $peers) {
+    host
+    libp2pPort
+    peerId
+  }
+}
+|}]
+
+module Archive_precomputed_block =
+[%graphql
+{|
+mutation ($block: PrecomputedBlock!) {
+  archivePrecomputedBlock(block: $block) {
+      applied
+  }
+}
+|}]
+
+module Archive_extensional_block =
+[%graphql
+{|
+mutation ($block: ExtensionalBlock!) {
+  archiveExtensionalBlock(block: $block) {
+      applied
   }
 }
 |}]

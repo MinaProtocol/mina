@@ -1,7 +1,7 @@
 open Core
 open Async
 open Signature_lib
-open Coda_base
+open Mina_base
 
 module Client = Graphql_lib.Client.Make (struct
   let preprocess_variables_string = Fn.id
@@ -54,39 +54,103 @@ let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
     flag "public-key"
-      ~doc:"KEY Public key for which you want to check the balance"
+      ~doc:"PUBLICKEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
+  let token_flag =
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
+  in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.graphql_init pk_flag
-       ~f:(fun graphql_endpoint public_key ->
+    (Cli_lib.Background_daemon.graphql_init (Args.zip2 pk_flag token_flag)
+       ~f:(fun graphql_endpoint (public_key, token) ->
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Get_tracked_account.make
-                ~public_key:(Graphql_client.Encoders.public_key public_key)
+                ~public_key:(Graphql_lib.Encoders.public_key public_key)
+                ~token:(Graphql_lib.Encoders.token token)
                 ())
              graphql_endpoint
          in
          match response#account with
          | Some account ->
-             printf "Balance: %s coda\n"
-               (Currency.Balance.to_formatted_string (account#balance)#total)
+             if Token_id.(equal default) token then
+               printf "Balance: %s mina\n"
+                 (Currency.Balance.to_formatted_string (account#balance)#total)
+             else
+               printf "Balance: %s tokens\n"
+                 (Currency.Balance.to_formatted_string (account#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
 
-let print_trust_status status json =
+let get_tokens_graphql =
+  let open Command.Param in
+  let pk_flag =
+    flag "public-key"
+      ~doc:"PUBLICKEY Public key for which you want to find accounts"
+      (required Cli_lib.Arg_type.public_key_compressed)
+  in
+  Command.async ~summary:"Get all token IDs that a public key has accounts for"
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint public_key ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_all_accounts.make
+                ~public_key:(Graphql_lib.Encoders.public_key public_key)
+                ())
+             graphql_endpoint
+         in
+         printf "Accounts are held for token IDs:\n" ;
+         Array.iter response#accounts ~f:(fun account ->
+             printf "%s " (Token_id.to_string account#token) ) ))
+
+let get_time_offset_graphql =
+  Command.async
+    ~summary:
+      "Get the time offset in seconds used by the daemon to convert real time \
+       into blockchain time"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Time_offset.make ())
+             graphql_endpoint
+         in
+         let time_offset = response#timeOffset in
+         printf
+           "Current time offset:\n\
+            %i\n\n\
+            Start other daemons with this offset by setting the \
+            CODA_TIME_OFFSET environment variable in the shell before \
+            executing them:\n\
+            export CODA_TIME_OFFSET=%i\n"
+           time_offset time_offset ))
+
+let print_trust_statuses statuses json =
   if json then
     printf "%s\n"
-      (Yojson.Safe.to_string (Trust_system.Peer_status.to_yojson status))
+      (Yojson.Safe.to_string
+         (`List
+           (List.map
+              ~f:(fun (peer, status) ->
+                `List
+                  [ Network_peer.Peer.to_yojson peer
+                  ; Trust_system.Peer_status.to_yojson status ] )
+              statuses)))
   else
-    let ban_status =
-      match status.banned with
+    let ban_status status =
+      match status.Trust_system.Peer_status.banned with
       | Unbanned ->
           "Unbanned"
       | Banned_until tm ->
           sprintf "Banned_until %s" (Time.to_string_abs tm ~zone:Time.Zone.utc)
     in
-    printf "%0.04f, %s\n" status.trust ban_status
+    List.fold ~init:()
+      ~f:(fun () (peer, status) ->
+        printf "%s, %0.04f, %s\n"
+          (Network_peer.Peer.to_multiaddr_string peer)
+          status.trust (ban_status status) )
+      statuses
 
 let round_trust_score trust_status =
   let open Trust_system.Peer_status in
@@ -112,8 +176,12 @@ let get_trust_status =
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status.rpc
              ip_address port
          with
-         | Ok status ->
-             print_trust_status (round_trust_score status) json
+         | Ok statuses ->
+             print_trust_statuses
+               (List.map
+                  ~f:(fun (peer, status) -> (peer, round_trust_score status))
+                  statuses)
+               json
          | Error e ->
              printf "Failed to get trust status %s\n" (Error.to_string_hum e)
      ))
@@ -126,15 +194,6 @@ let ip_trust_statuses_to_yojson ip_trust_statuses =
           ; ("status", Trust_system.Peer_status.to_yojson status) ] )
   in
   `List items
-
-let print_ip_trust_statuses ip_statuses json =
-  if json then
-    printf "%s\n"
-      (Yojson.Safe.to_string @@ ip_trust_statuses_to_yojson ip_statuses)
-  else
-    List.iter ip_statuses ~f:(fun (ip_addr, status) ->
-        printf "%s : " (Unix.Inet_addr.to_string ip_addr) ;
-        print_trust_status status false )
 
 let get_trust_status_all =
   let open Command.Param in
@@ -165,7 +224,7 @@ let get_trust_status_all =
                      not Float.(equal status.trust zero) )
                else ip_rounded_trust_statuses
              in
-             print_ip_trust_statuses filtered_ip_trust_statuses json
+             print_trust_statuses filtered_ip_trust_statuses json
          | Error e ->
              printf "Failed to get trust statuses %s\n" (Error.to_string_hum e)
      ))
@@ -190,7 +249,7 @@ let reset_trust_status =
              ip_address port
          with
          | Ok status ->
-             print_trust_status status json
+             print_trust_statuses status json
          | Error e ->
              printf "Failed to reset trust status %s\n" (Error.to_string_hum e)
      ))
@@ -217,36 +276,6 @@ let get_public_keys =
              ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
-
-let generate_receipt =
-  let open Daemon_rpcs in
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receipt_hash_flag =
-    flag "receipt-chain-hash"
-      ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
-        \        generate a receipt for"
-      (required receipt_chain_hash)
-  in
-  let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key_compressed)
-  in
-  let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
-  in
-  Command.async ~summary:"Generate a receipt for a sent payment"
-    (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 receipt_hash_flag address_flag token_flag)
-       ~f:(fun port (receipt_chain_hash, pk, token_id) ->
-         let account_id = Account_id.create pk token_id in
-         Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, account_id)
-           port ~success:Cli_lib.Render.Prove_receipt.to_text
-           ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
 let read_json filepath ~flag =
   let%map res =
@@ -281,9 +310,8 @@ let verify_receipt =
       (required public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
@@ -349,9 +377,8 @@ let get_nonce_cmd =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
-      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
-    Command.Param.return Token_id.default
+    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   let flags = Args.zip2 address_flag token_flag in
   Command.async ~summary:"Get the current nonce for an account"
@@ -409,7 +436,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
+      ; valid_until: Mina_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -427,7 +454,7 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until= Some (Coda_numbers.Global_slot.random ())
+          ; valid_until= Some (Mina_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -443,14 +470,17 @@ let batch_send_payments =
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+    let%bind keypair =
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+        privkey_path
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
           let signer_pk = Public_key.compress keypair.public_key in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
-            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty ~valid_until
+            ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
+            ~valid_until
             ~body:
               (Payment
                  { source_pk= signer_pk
@@ -475,6 +505,7 @@ let batch_send_payments =
 let send_payment_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
@@ -488,7 +519,7 @@ let send_payment_graphql =
       (optional token_id)
   in
   let args =
-    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
       token_flag
   in
   Command.async ~summary:"Send payment to an address"
@@ -497,15 +528,14 @@ let send_payment_graphql =
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount, token)
           ->
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_payment.make
-                  ~receiver:(Encoders.public_key receiver)
-                  ~sender:(Encoders.public_key sender)
-                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
-                  ?token:(Option.map ~f:Encoders.token token)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_payment.make
+                ~receiver:(Encoders.public_key receiver)
+                ~sender:(Encoders.public_key sender)
+                ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                ?token:(Option.map ~f:Encoders.token token)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
@@ -514,26 +544,26 @@ let send_payment_graphql =
 let delegate_stake_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver"
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
+  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver)
           ->
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_delegation.make
-                  ~receiver:(Encoders.public_key receiver)
-                  ~sender:(Encoders.public_key sender)
-                  ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_delegation.make
+                ~receiver:(Encoders.public_key receiver)
+                ~sender:(Encoders.public_key sender)
+                ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
@@ -542,11 +572,12 @@ let delegate_stake_graphql =
 let create_new_token_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
       (optional public_key_compressed)
   in
-  let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
+  let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
   Command.async ~summary:"Create a new token"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
@@ -554,14 +585,13 @@ let create_new_token_graphql =
           ->
          let receiver = Option.value ~default:sender receiver in
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_create_token.make
-                  ~sender:(Encoders.public_key sender)
-                  ~receiver:(Encoders.public_key receiver)
-                  ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_create_token.make
+                ~sender:(Encoders.public_key sender)
+                ~receiver:(Encoders.public_key receiver)
+                ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched create new token command with TRANSACTION_ID %s\n"
@@ -570,6 +600,7 @@ let create_new_token_graphql =
 let create_new_account_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver" ~doc:"PUBLICKEY Public key to create the new account for"
       (required public_key_compressed)
@@ -583,7 +614,7 @@ let create_new_account_graphql =
       (required token_id)
   in
   let args =
-    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag token_owner_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_owner_flag
       token_flag
   in
   Command.async ~summary:"Create a new account for a token"
@@ -600,8 +631,8 @@ let create_new_account_graphql =
                Deferred.return token_owner
            | None when Token_id.(equal default) token ->
                (* NOTE: Doesn't matter who we say the owner is for the default
-                  token, arbitrarily choose the receiver.
-               *)
+                        token, arbitrarily choose the receiver.
+                  *)
                Deferred.return receiver
            | None -> (
                let%map token_owner =
@@ -613,22 +644,21 @@ let create_new_account_graphql =
                in
                match token_owner#tokenOwner with
                | Some token_owner ->
-                   Graphql_client.Decoders.public_key token_owner
+                   Graphql_lib.Decoders.public_key token_owner
                | None ->
                    failwith
                      "Unknown token: Cannot find the owner for the given token"
                )
          in
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_create_token_account.make
-                  ~sender:(Encoders.public_key sender)
-                  ~receiver:(Encoders.public_key receiver)
-                  ~tokenOwner:(Encoders.public_key token_owner)
-                  ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_create_token_account.make
+                ~sender:(Encoders.public_key sender)
+                ~receiver:(Encoders.public_key receiver)
+                ~tokenOwner:(Encoders.public_key token_owner)
+                ~token:(Encoders.token token) ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf
@@ -638,6 +668,7 @@ let create_new_account_graphql =
 let mint_tokens_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let receiver_flag =
     flag "receiver"
       ~doc:
@@ -654,7 +685,7 @@ let mint_tokens_graphql =
       (required txn_amount)
   in
   let args =
-    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag token_flag
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_flag
       amount_flag
   in
   Command.async ~summary:"Mint more of a token owned by the command's sender"
@@ -663,15 +694,14 @@ let mint_tokens_graphql =
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, token, amount)
           ->
          let%map response =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Send_mint_tokens.make
-                  ~sender:(Encoders.public_key sender)
-                  ?receiver:(Option.map ~f:Encoders.public_key receiver)
-                  ~token:(Encoders.token token)
-                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
-                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                  ?memo ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Send_mint_tokens.make
+                ~sender:(Encoders.public_key sender)
+                ?receiver:(Option.map ~f:Encoders.public_key receiver)
+                ~token:(Encoders.token token) ~amount:(Encoders.amount amount)
+                ~fee:(Encoders.fee fee)
+                ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                ?memo ())
              graphql_endpoint
          in
          printf "Dispatched mint token command with TRANSACTION_ID %s\n"
@@ -689,53 +719,32 @@ let cancel_transaction_graphql =
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
-         let receiver_pk = User_command.receiver_pk user_command in
-         let cancel_sender_pk = User_command.fee_payer_pk user_command in
+         let receiver_pk = Signed_command.receiver_pk user_command in
+         let cancel_sender_pk = Signed_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
-         let%bind nonce_response =
-           let open Graphql_client.Encoders in
-           Graphql_client.query_exn
-             (Graphql_queries.Get_inferred_nonce.make
-                ~public_key:(public_key cancel_sender_pk)
-                ())
-             graphql_endpoint
-         in
-         let maybe_inferred_nonce =
-           let open Option.Let_syntax in
-           let%bind account = nonce_response#account in
-           let%map nonce = account#inferredNonce in
-           int_of_string nonce
-         in
-         let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int (User_command.nonce user_command)
-         in
-         let inferred_nonce =
-           Option.value maybe_inferred_nonce ~default:cancelled_nonce
-         in
          let cancel_fee =
-           let diff =
-             Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
+           let fee =
+             Currency.Fee.to_uint64 (Signed_command.fee user_command)
            in
-           let fee = Currency.Fee.to_uint64 (User_command.fee user_command) in
            let replace_fee =
              Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
            in
            let open Unsigned.UInt64.Infix in
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
-           Currency.Fee.of_uint64 (fee + (replace_fee * diff))
+           Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
-           let open Graphql_client.Encoders in
+           let open Graphql_lib.Encoders in
            Graphql_queries.Send_payment.make
              ~sender:(public_key cancel_sender_pk)
              ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
-                  (Coda_numbers.Account_nonce.to_uint32
-                     (User_command.nonce user_command)))
+                  (Mina_numbers.Account_nonce.to_uint32
+                     (Signed_command.nonce user_command)))
              ()
          in
          let%map cancel_response =
@@ -744,18 +753,57 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
+module Export_logs = struct
+  let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
+
+  let tarfile_flag =
+    let open Command.Param in
+    flag "tarfile"
+      ~doc:"STRING Basename of the tar archive (default: date_time)"
+      (optional string)
+
+  let export_via_graphql =
+    Command.async ~summary:"Export daemon logs to tar archive"
+      (Cli_lib.Background_daemon.graphql_init tarfile_flag
+         ~f:(fun graphql_endpoint basename ->
+           let%map response =
+             Graphql_client.query_exn
+               (Graphql_queries.Export_logs.make ?basename ())
+               graphql_endpoint
+           in
+           pp_export_result ((response#exportLogs)#exportLogs)#tarfile ))
+
+  let export_locally =
+    let run ~tarfile ~conf_dir =
+      let open Mina_lib in
+      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      fun () ->
+        match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
+        | Ok result ->
+            pp_export_result result
+        | Error err ->
+            failwithf "Error when exporting logs: %s"
+              (Error_json.error_to_yojson err |> Yojson.Safe.to_string)
+              ()
+    in
+    let open Command.Let_syntax in
+    Command.async ~summary:"Export local logs (no daemon) to tar archive"
+      (let%map tarfile = tarfile_flag and conf_dir = Cli_lib.Flag.conf_dir in
+       run ~tarfile ~conf_dir)
+end
+
 let get_transaction_status =
   Command.async ~summary:"Get the status of a transaction"
     (Cli_lib.Background_daemon.rpc_init
        Command.Param.(anon @@ ("txn-id" %: string))
        ~f:(fun port serialized_transaction ->
-         match User_command.of_base58_check serialized_transaction with
+         match Signed_command.of_base58_check serialized_transaction with
          | Ok user_command ->
              Daemon_rpcs.Client.dispatch_with_message
                Daemon_rpcs.Get_transaction_status.rpc user_command port
                ~success:(fun status ->
                  sprintf !"Transaction status : %s\n"
-                 @@ Transaction_status.State.to_string status )
+                 @@ Transaction_inclusion_status.State.to_string status )
                ~error:(fun e ->
                  sprintf "Failed to get transaction status : %s"
                    (Error.to_string_hum e) )
@@ -785,50 +833,72 @@ let dump_keypair =
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
+    let%map kp =
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+        privkey_path
+    in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
 
+let handle_dump_ledger_response ~json = function
+  | Error e ->
+      Daemon_rpcs.Client.print_rpc_error e
+  | Ok (Error e) ->
+      printf !"Ledger not found: %s\n" (Error.to_string_hum e)
+  | Ok (Ok accounts) ->
+      if json then (
+        Yojson.Safe.pretty_print Format.std_formatter
+          (Runtime_config.Accounts.to_yojson
+             (List.map accounts ~f:(fun a ->
+                  Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
+        printf "\n" )
+      else printf !"%{sexp:Account.t list}\n" accounts
+
 let dump_ledger =
   let sl_hash_flag =
     Command.Param.(
-      flag "staged-ledger-hash (default: hash of best staged ledger)"
-        ~doc:"STAGED-LEDGER-HASH Staged ledger hash" (optional string))
+      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+        (optional string))
   in
   let json_flag = Cli_lib.Flag.json in
   let flags = Args.zip2 sl_hash_flag json_flag in
   Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (sl_hash, json) ->
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
-         let staged_ledger_hash =
-           Option.map sl_hash ~f:(fun s ->
-               Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp
-           )
-         in
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
-           staged_ledger_hash port
-         >>| function
-         | Error e ->
-             Daemon_rpcs.Client.print_rpc_error e
-         | Ok (Error e) ->
-             printf !"Ledger not found: %s\n" (Error.to_string_hum e)
-         | Ok (Ok accounts) ->
-             if json then
-               List.iter accounts ~f:(fun acct ->
-                   printf "%s\n"
-                     (Yojson.Safe.to_string
-                        (Account.Stable.Latest.to_yojson acct)) )
-             else printf !"%{sexp:Account.t list}\n" accounts ))
+         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
+         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
+         >>| handle_dump_ledger_response ~json ))
+
+let dump_staking_ledger =
+  let which =
+    let t =
+      Command.Param.Arg_type.of_alist_exn
+        [("current", Daemon_rpcs.Get_staking_ledger.Current); ("next", Next)]
+    in
+    Command.Param.(anon ("current|next" %: t))
+  in
+  Command.async ~summary:"Print either the staking or next epoch ledger"
+    (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)
+       ~f:(fun port (which, json) ->
+         (* TODO: allow input in Base58Check format: issue #3036 *)
+         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
+           port
+         >>| handle_dump_ledger_response ~json ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
+         (* TODO: Allow these to be configurable. *)
+         let proof_level = Genesis_constants.Proof_level.compiled in
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
          let all =
-           Transaction_snark.constraint_system_digests ()
+           Transaction_snark.constraint_system_digests ~constraint_constants ()
            @ Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-               ()
+               ~proof_level ~constraint_constants ()
          in
          let all =
            List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
@@ -899,8 +969,8 @@ let pooled_user_commands =
            `List
              ( List.map
                  ~f:
-                   (Fn.compose Graphql_client.User_command.to_yojson
-                      (Fn.compose Graphql_client.User_command.of_obj
+                   (Fn.compose Graphql_client.Signed_command.to_yojson
+                      (Fn.compose Graphql_client.Signed_command.of_obj
                          unwrap_user_command))
              @@ Array.to_list response#pooledUserCommands )
          in
@@ -931,7 +1001,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Coda_base.Frozen_ledger_hash.of_string
+                            Mina_base.Frozen_ledger_hash.of_string
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id= w#work_id
@@ -950,7 +1020,8 @@ let pending_snark_work =
 let start_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
+  Command.async
+    ~summary:"Start async tracing to $config-directory/trace/$pid.trace"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
@@ -976,6 +1047,7 @@ let stop_tracing =
 let set_staking_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
+  let open Graphql_lib in
   let pk_flag =
     flag "public-key"
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
@@ -991,11 +1063,10 @@ let set_staking_graphql =
                   (Array.map ~f:Public_key.Compressed.to_base58_check arr))
          in
          let%map result =
-           Graphql_client.(
-             Graphql_client.query_exn
-               (Graphql_queries.Set_staking.make
-                  ~public_key:(Encoders.public_key public_key)
-                  ()))
+           Graphql_client.query_exn
+             (Graphql_queries.Set_staking.make
+                ~public_key:(Encoders.public_key public_key)
+                ())
              graphql_endpoint
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
@@ -1022,7 +1093,7 @@ let set_snark_worker =
          let graphql =
            Graphql_queries.Set_snark_worker.make
              ~public_key:
-               Graphql_client.Encoders.(
+               Graphql_lib.Encoders.(
                  optional optional_public_key ~f:public_key)
              ()
          in
@@ -1047,7 +1118,7 @@ let set_snark_work_fee =
        ~f:(fun graphql_endpoint fee ->
          let graphql =
            Graphql_queries.Set_snark_work_fee.make
-             ~fee:(Graphql_client.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
+             ~fee:(Graphql_lib.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
              ()
          in
          Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
@@ -1077,7 +1148,8 @@ let import_key =
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+           Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+             privkey_path
          in
          let pk = Public_key.compress public_key in
          let%bind wallets =
@@ -1112,7 +1184,7 @@ let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   let pk_flag =
     let open Command.Param in
-    flag "public-key" ~doc:"KEY Public key of account to be exported"
+    flag "public-key" ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let conf_dir = Cli_lib.Flag.conf_dir in
@@ -1237,13 +1309,15 @@ let create_account =
 
 let create_hd_account =
   Command.async ~summary:Secrets.Hardware_wallets.create_hd_account_summary
-    (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.User_command.hd_index
+    (Cli_lib.Background_daemon.graphql_init
+       Cli_lib.Flag.Signed_command.hd_index
        ~f:(fun graphql_endpoint hd_index ->
          let%map response =
            Graphql_client.(
              query_exn
                (Graphql_queries.Create_hd_account.make
-                  ~hd_index:(Encoders.uint32 hd_index) ()))
+                  ~hd_index:(Graphql_lib.Encoders.uint32 hd_index)
+                  ()))
              graphql_endpoint
          in
          let pk_string =
@@ -1251,13 +1325,13 @@ let create_hd_account =
              (response#createHDAccount)#public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
-           (Coda_numbers.Hd_index.to_string hd_index)
+           (Mina_numbers.Hd_index.to_string hd_index)
            pk_string ))
 
 let unlock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key to be unlocked"
+    flag "public-key" ~doc:"PUBLICKEY Public key to be unlocked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
@@ -1273,7 +1347,7 @@ let unlock_account =
              let%map response =
                Graphql_client.query_exn
                  (Graphql_queries.Unlock_account.make
-                    ~public_key:(Graphql_client.Encoders.public_key pk_str)
+                    ~public_key:(Graphql_lib.Encoders.public_key pk_str)
                     ~password:(Bytes.to_string password_bytes)
                     ())
                  graphql_endpoint
@@ -1291,7 +1365,7 @@ let unlock_account =
 let lock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"KEY Public key of account to be locked"
+    flag "public-key" ~doc:"PUBLICKEY Public key of account to be locked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
@@ -1300,7 +1374,7 @@ let lock_account =
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Lock_account.make
-                ~public_key:(Graphql_client.Encoders.public_key pk)
+                ~public_key:(Graphql_lib.Encoders.public_key pk)
                 ())
              graphql_endpoint
          in
@@ -1323,18 +1397,22 @@ let generate_libp2p_keypair =
       let logger = Logger.null () in
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
-          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          match%bind
+            Mina_net2.create ~logger ~conf_dir:tmpd
+              ~on_unexpected_termination:(fun () ->
+                raise Child_processes.Child_died )
+          with
           | Ok net ->
-              let%bind me = Coda_net2.Keypair.random net in
-              let%bind () = Coda_net2.shutdown net in
+              let%bind me = Mina_net2.Keypair.random net in
+              let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
                   me
               in
-              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ~metadata:[("error", Error_json.error_to_yojson e)] ;
               exit 20 )))
 
 let trustlist_ip_flag =
@@ -1393,6 +1471,70 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let get_peers_graphql =
+  Command.async ~summary:"List the peers currently connected to the daemon"
+    (Cli_lib.Background_daemon.graphql_init
+       Command.Param.(return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Get_peers.make ())
+             graphql_endpoint
+         in
+         Array.iter response#getPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
+
+let add_peers_graphql =
+  let open Command in
+  let peers =
+    Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
+  in
+  Command.async
+    ~summary:
+      "Add peers to the daemon\n\n\
+       Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
+    (Cli_lib.Background_daemon.graphql_init peers
+       ~f:(fun graphql_endpoint input_peers ->
+         let open Deferred.Let_syntax in
+         let peers =
+           Array.of_list_map input_peers ~f:(fun peer ->
+               match
+                 Mina_net2.Multiaddr.of_string peer
+                 |> Mina_net2.Multiaddr.to_peer
+                 |> Option.map ~f:Network_peer.Peer.to_display
+               with
+               | Some peer ->
+                   object
+                     method host = peer.host
+
+                     method libp2p_port = peer.libp2p_port
+
+                     method peer_id = peer.peer_id
+                   end
+               | None ->
+                   eprintf
+                     "Could not parse %s as a peer address. It should use the \
+                      format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
+                     peer ;
+                   Core.exit 1 )
+         in
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Add_peers.make ~peers ())
+             graphql_endpoint
+         in
+         printf "Requested to add peers:\n" ;
+         Array.iter response#addPeers ~f:(fun peer ->
+             printf "%s\n"
+               (Network_peer.Peer.to_multiaddr_string
+                  { host= Unix.Inet_addr.of_string peer#host
+                  ; libp2p_port= peer#libp2pPort
+                  ; peer_id= peer#peerId }) ) ))
+
 let compile_time_constants =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
@@ -1441,7 +1583,6 @@ let compile_time_constants =
                      .block_window_duration_ms )
              ; ( "delta"
                , `Int (Unsigned.UInt32.to_int consensus_constants.delta) )
-             ; ("c", `Int (Unsigned.UInt32.to_int consensus_constants.c))
              ; ( "sub_windows_per_window"
                , `Int
                    (Unsigned.UInt32.to_int
@@ -1505,11 +1646,203 @@ let telemetry =
              List.iter all_telem_data ~f:(fun peer_telem_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Coda_networking.Rpcs.Get_telemetry_data
+                   @@ Mina_networking.Rpcs.Get_telemetry_data
                       .response_to_yojson peer_telem_data ) )
          | Error err ->
              printf "Failed to get telemetry data: %s\n%!"
                (Error.to_string_hum err) ))
+
+let next_available_token_cmd =
+  Command.async
+    ~summary:
+      "The next token ID that has not been allocated. Token IDs are allocated \
+       sequentially, so all lower token IDs have been allocated"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Next_available_token.make ())
+             graphql_endpoint
+         in
+         printf "Next available token ID: %s\n"
+           (Token_id.to_string response#nextAvailableToken) ))
+
+let object_lifetime_statistics =
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Dump internal object lifetime statistics to JSON"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map
+           Client.dispatch Get_object_lifetime_statistics.rpc () port
+         with
+         | Ok stats ->
+             print_endline stats
+         | Error err ->
+             printf "Failed to get object lifetime statistics: %s\n%!"
+               (Error.to_string_hum err) ))
+
+let archive_blocks =
+  let params =
+    let open Command.Let_syntax in
+    let%map_open files =
+      Command.Param.anon
+        Command.Anons.(sequence ("FILES" %: Command.Param.string))
+    and success_file =
+      Command.Param.flag "successful-files"
+        ~doc:"PATH Appends the list of files that were processed successfully"
+        (Command.Flag.optional Command.Param.string)
+    and failure_file =
+      Command.Param.flag "failed-files"
+        ~doc:"PATH Appends the list of files that failed to be processed"
+        (Command.Flag.optional Command.Param.string)
+    and log_successes =
+      Command.Param.flag "log-successful"
+        ~doc:
+          "true/false Whether to log messages for files that were processed \
+           successfully"
+        (Command.Flag.optional_with_default true Command.Param.bool)
+    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
+    and precomputed_flag =
+      Command.Param.flag "precomputed" no_arg
+        ~doc:"Blocks are in precomputed JSON format"
+    and extensional_flag =
+      Command.Param.flag "extensional" no_arg
+        ~doc:"Blocks are in extensional JSON format"
+    in
+    ( files
+    , success_file
+    , failure_file
+    , log_successes
+    , archive_process_location
+    , precomputed_flag
+    , extensional_flag )
+  in
+  Command.async
+    ~summary:
+      "Archive a block from a file.\n\n\
+       If an archive address is given, this process will communicate with the \
+       archive node directly; otherwise it will communicate through the \
+       daemon over the rest-server"
+    (Cli_lib.Background_daemon.graphql_init params
+       ~f:(fun graphql_endpoint
+          ( files
+          , success_file
+          , failure_file
+          , log_successes
+          , archive_process_location
+          , precomputed_flag
+          , extensional_flag )
+          ->
+         if Bool.equal precomputed_flag extensional_flag then
+           failwith
+             "Must provide exactly one of -precomputed and -extensional flags" ;
+         let make_send_block ~graphql_make ~archive_dispatch ~block_to_yojson
+             block =
+           match archive_process_location with
+           | Some archive_process_location ->
+               (* Connect directly to the archive node. *)
+               archive_dispatch archive_process_location block
+           | None ->
+               (* Send the requests over GraphQL. *)
+               let block = block_to_yojson block |> Yojson.Safe.to_basic in
+               let%map.Deferred.Or_error.Let_syntax _res =
+                 (* Don't catch this error: [query_exn] already handles
+                    printing etc.
+                 *)
+                 Graphql_client.query (graphql_make ~block ()) graphql_endpoint
+                 |> Deferred.Result.map_error ~f:(function
+                      | `Failed_request e ->
+                          Error.create "Unable to connect to Coda daemon" ()
+                            (fun () ->
+                              Sexp.List
+                                [ List
+                                    [ Atom "uri"
+                                    ; Atom
+                                        (Uri.to_string graphql_endpoint.value)
+                                    ]
+                                ; List
+                                    [ Atom "uri_flag"
+                                    ; Atom graphql_endpoint.name ]
+                                ; List [Atom "error_message"; Atom e] ] )
+                      | `Graphql_error e ->
+                          Error.createf "GraphQL error: %s" e )
+               in
+               ()
+         in
+         let output_file_line path =
+           match path with
+           | Some path ->
+               let file = Out_channel.create ~append:true path in
+               fun line -> Out_channel.output_lines file [line]
+           | None ->
+               fun _line -> ()
+         in
+         let add_to_success_file = output_file_line success_file in
+         let add_to_failure_file = output_file_line failure_file in
+         let send_precomputed_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_precomputed_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_precomputed_block
+             ~block_to_yojson:
+               Mina_transition.External_transition.Precomputed_block.to_yojson
+         in
+         let send_extensional_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_extensional_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_extensional_block
+             ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson
+         in
+         Deferred.List.iter files ~f:(fun path ->
+             match%map
+               let%bind.Deferred.Or_error.Let_syntax block_json =
+                 Or_error.try_with (fun () ->
+                     In_channel.with_file path ~f:(fun in_channel ->
+                         Yojson.Safe.from_channel in_channel ) )
+                 |> Result.map_error ~f:(fun err ->
+                        Error.tag_arg err "Could not parse JSON from file" path
+                          String.sexp_of_t )
+                 |> Deferred.return
+               in
+               let open Deferred.Or_error.Let_syntax in
+               if precomputed_flag then
+                 let%bind precomputed_block =
+                   Mina_transition.External_transition.Precomputed_block
+                   .of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as a precomputed block from \
+                             file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_precomputed_block precomputed_block
+               else if extensional_flag then
+                 let%bind extensional_block =
+                   Archive_lib.Extensional.Block.of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as an extensional block \
+                             from file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_extensional_block extensional_block
+               else
+                 (* should be unreachable *)
+                 failwith
+                   "Expected exactly one of precomputed, extensional flags"
+             with
+             | Ok () ->
+                 if log_successes then
+                   Format.printf "Sent block to archive node from %s@." path ;
+                 add_to_success_file path
+             | Error err ->
+                 Format.eprintf
+                   "Failed to send block to archive node from %s. Error:@.%s@."
+                   path (Error.to_string_hum err) ;
+                 add_to_failure_file path ) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1569,6 +1902,7 @@ let client =
   Command.group ~summary:"Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
+    ; ("get-tokens", get_tokens_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("create-token", create_new_token_graphql)
@@ -1578,6 +1912,8 @@ let client =
     ; ("set-staking", set_staking_graphql)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("export-logs", Export_logs.export_via_graphql)
+    ; ("export-local-logs", Export_logs.export_locally)
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
@@ -1601,6 +1937,7 @@ let advanced =
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
+    ; ("dump-staking-ledger", dump_staking_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
@@ -1612,6 +1949,11 @@ let advanced =
     ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
-    ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
-    ; ("generate-keypair", Cli_lib.Commands.generate_keypair) ]
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
+    ; ("next-available-token", next_available_token_cmd)
+    ; ("time-offset", get_time_offset_graphql)
+    ; ("get-peers", get_peers_graphql)
+    ; ("add-peers", add_peers_graphql)
+    ; ("object-lifetime-statistics", object_lifetime_statistics)
+    ; ("archive-blocks", archive_blocks) ]

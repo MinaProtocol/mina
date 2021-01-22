@@ -1,19 +1,24 @@
 -- Commands are the individual command steps that CI runs
 
 let Prelude = ../External/Prelude.dhall
+let B = ../External/Buildkite.dhall
+
+let Map = Prelude.Map
 let List/map = Prelude.List.map
 let List/concat = Prelude.List.concat
 let Optional/map = Prelude.Optional.map
 let Optional/toList = Prelude.Optional.toList
-let B = ../External/Buildkite.dhall
+
 let B/Plugins/Partial = B.definitions/commandStep/properties/plugins/Type
 -- Retry bits
 let B/ExitStatus = B.definitions/automaticRetry/properties/exit_status/Type
 let B/AutoRetryChunk = B.definitions/automaticRetry/Type.Type
 let B/Retry = B.definitions/commandStep/properties/retry/properties/automatic/Type
 let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
+
+-- Job requirement/flake mgmt bits
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-let Map = Prelude.Map
+let B/Skip = B.definitions/commandStep/properties/skip/Type
 
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
@@ -48,6 +53,7 @@ let B/DependsOn =
   }
 
 let B/ArtifactPaths = B.definitions/commandStep/properties/artifact_paths/Type
+let B/Env = B.definitions/commandStep/properties/env/Type
 
 -- A type to make sure we don't accidentally forget the prefix on keys
 let TaggedKey = {
@@ -83,6 +89,7 @@ let Config =
       { commands : List Cmd.Type
       , depends_on : List TaggedKey.Type
       , artifact_paths : List SelectFiles.Type
+      , env : List TaggedKey.Type
       , label : Text
       , key : Text
       , target : Size
@@ -91,6 +98,7 @@ let Config =
       , summon : Optional Summon.Type
       , retries : List Retry.Type
       , soft_fail : Optional B/SoftFail
+      , skip: Optional B/Skip
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -98,8 +106,10 @@ let Config =
     , docker_login = None DockerLogin.Type
     , summon = None Summon.Type
     , artifact_paths = [] : List SelectFiles.Type
+    , env = [] : List TaggedKey.Type
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
+    , skip = None B/Skip
     }
   }
 
@@ -156,8 +166,15 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                           Natural/toInteger
                           retry.limit
                     })
-                    -- per https://buildkite.com/docs/agent/v3#exit-codes, ensure automatic retries on -1 exit status (infra error)
-                    ([Retry::{ exit_status = -1, limit = Some 2 }] #
+                    -- per https://buildkite.com/docs/agent/v3#exit-codes:
+                    ([
+                      -- ensure automatic retries on -1 exit status (infra error)
+                      Retry::{ exit_status = -1, limit = Some 2 },
+                      -- automatically retry on 100 exit status (apt-get update race condition error)
+                      Retry::{ exit_status = +100, limit = Some 2 },
+                      -- automatically retry on 1 exit status (common/flake error)
+                      Retry::{ exit_status = +1, limit = Some 1 }
+                    ] #
                     -- and the retries that are passed in (if any)
                     c.retries)
                 in
@@ -165,6 +182,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
               manual = None B/Manual
           },
     soft_fail = c.soft_fail,
+    skip = c.skip,
     plugins =
       let dockerPart =
         Optional/toList
@@ -200,5 +218,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, SoftFail = B/SoftFail}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
 

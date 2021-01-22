@@ -7,6 +7,7 @@ let blocks = [|
     Types.Block.id: 1,
     blockchainState: {
       creatorAccount: "publickey1",
+      coinbaseReceiver: None,
       timestamp: "0",
       height: "1",
     },
@@ -17,6 +18,7 @@ let blocks = [|
     id: 2,
     blockchainState: {
       creatorAccount: "publickey1",
+      coinbaseReceiver: None,
       timestamp: "1548878462542",
       height: "2",
     },
@@ -27,6 +29,7 @@ let blocks = [|
     id: 3,
     blockchainState: {
       creatorAccount: "publickey1",
+      coinbaseReceiver: None,
       timestamp: "1548878464058",
       height: "3",
     },
@@ -37,6 +40,7 @@ let blocks = [|
     id: 4,
     blockchainState: {
       creatorAccount: "publickey1",
+      coinbaseReceiver: None,
       timestamp: "1548878466000",
       height: "4",
     },
@@ -47,6 +51,7 @@ let blocks = [|
     id: 5,
     blockchainState: {
       creatorAccount: "publickey2",
+      coinbaseReceiver: None,
       timestamp: "1548878468000",
       height: "5",
     },
@@ -57,6 +62,7 @@ let blocks = [|
     id: 6,
     blockchainState: {
       creatorAccount: "publickey2",
+      coinbaseReceiver: None,
       timestamp: "1548878470000",
       height: "6",
     },
@@ -67,6 +73,7 @@ let blocks = [|
     id: 7,
     blockchainState: {
       creatorAccount: "publickey2",
+      coinbaseReceiver: None,
       timestamp: "1548878472000",
       height: "7",
     },
@@ -77,6 +84,7 @@ let blocks = [|
     id: 8,
     blockchainState: {
       creatorAccount: "publickey3",
+      coinbaseReceiver: None,
       timestamp: "1548878474000",
       height: "8",
     },
@@ -87,6 +95,7 @@ let blocks = [|
     id: 9,
     blockchainState: {
       creatorAccount: "publickey3",
+      coinbaseReceiver: None,
       timestamp: "1548878476000",
       height: "9",
     },
@@ -97,6 +106,7 @@ let blocks = [|
     id: 10,
     blockchainState: {
       creatorAccount: "publickey4",
+      coinbaseReceiver: None,
       timestamp: "1548878478000",
       height: "10",
     },
@@ -137,7 +147,7 @@ describe("Points functions", () => {
   describe("addPointsToAtleastN", () => {
     describe("adds correct number of points with atleast 1", () => {
       let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
+        Points.addPointsToUsersWithAtleastN(
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           1,
           1000,
@@ -162,7 +172,7 @@ describe("Points functions", () => {
     });
     describe("adds correct number of points with atleast 3", () => {
       let blockPoints =
-        Challenges.addPointsToUsersWithAtleastN(
+        Points.addPointsToUsersWithAtleastN(
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
           3,
           1000,
@@ -185,7 +195,7 @@ describe("Points functions", () => {
   describe("applyTopNPoints", () => {
     describe("adds correct number of points to top 3", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -209,7 +219,7 @@ describe("Points functions", () => {
     });
     describe("adds correct number of points to 1st place and 2-3 place", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(0, 2000), (2, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,
@@ -234,7 +244,7 @@ describe("Points functions", () => {
     describe(
       "adds correct number of points to 1st and 2nd place and 3-4 place", () => {
       let blockPoints =
-        Challenges.applyTopNPoints(
+        Points.applyTopNPoints(
           [|(0, 3000), (1, 2000), (5, 1000)|],
           blockMetrics,
           (metricRecord: Types.Metrics.t) => metricRecord.blocksCreated,

@@ -5,6 +5,7 @@ module Types = Composition_types
 module Digest = Types.Digest
 module Spec = Types.Spec
 module Bulletproof_challenge = Types.Bulletproof_challenge
-module Domain = Marlin_checks.Domain
+module Domain = Pickles_base.Domain
+module Domains = Pickles_base.Domains
 
 let debug = false

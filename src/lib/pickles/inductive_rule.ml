@@ -12,7 +12,8 @@ end
      allow predecessor proofs to conditionally fail to verify
 *)
 type ('prev_vars, 'prev_values, 'widths, 'heights, 'a_var, 'a_value) t =
-  { prevs: ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
+  { identifier: string
+  ; prevs: ('prev_vars, 'prev_values, 'widths, 'heights) H4.T(Tag).t
   ; main: 'prev_vars H1.T(Id).t -> 'a_var -> 'prev_vars H1.T(E01(B)).t
   ; main_value:
       'prev_values H1.T(Id).t -> 'a_value -> 'prev_vars H1.T(E01(Bool)).t }

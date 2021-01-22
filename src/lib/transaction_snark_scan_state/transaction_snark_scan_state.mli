@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 
 [%%versioned:
 module Stable : sig
@@ -13,8 +13,9 @@ end]
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Transaction_applied.t
     ; state_hash: State_hash.t * State_body_hash.t
+    ; state_view: Mina_base.Snapp_predicate.Protocol_state.View.Stable.V1.t
     ; statement: Transaction_snark.Statement.t
     ; init_stack: Transaction_snark.Pending_coinbase_stack_state.Init_stack.t
     ; ledger_witness: Sparse_ledger.t }
@@ -54,7 +55,9 @@ module Make_statement_scanner
         type t
 
         val verify :
-          verifier:t -> Ledger_proof_with_sok_message.t list -> sexp_bool M.t
+             verifier:t
+          -> Ledger_proof_with_sok_message.t list
+          -> sexp_bool M.Or_error.t
     end) : sig
   val scan_statement :
        constraint_constants:Genesis_constants.Constraint_constants.t
@@ -69,8 +72,8 @@ module Make_statement_scanner
     -> error_prefix:string
     -> ledger_hash_end:Frozen_ledger_hash.t
     -> ledger_hash_begin:Frozen_ledger_hash.t option
-    -> next_available_token_before:Token_id.t
-    -> next_available_token_after:Token_id.t
+    -> next_available_token_begin:Token_id.t option
+    -> next_available_token_end:Token_id.t
     -> (unit, Error.t) result M.t
 end
 
@@ -114,13 +117,13 @@ val hash : t -> Staged_ledger_hash.Aux_hash.t
 val target_merkle_root : t -> Frozen_ledger_hash.t option
 
 (** All the transactions in the order in which they were applied*)
-val staged_transactions : t -> Transaction.t With_status.t list Or_error.t
+val staged_transactions : t -> Transaction.t With_status.t list
 
 (** All the transactions with parent protocol state of the block in which they were included in the order in which they were applied*)
 val staged_transactions_with_protocol_states :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> (Transaction.t With_status.t * Coda_state.Protocol_state.value) list
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
+  -> (Transaction.t With_status.t * Mina_state.Protocol_state.value) list
      Or_error.t
 
 (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
@@ -156,13 +159,13 @@ val required_state_hashes : t -> State_hash.Set.t
 (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
 val check_required_protocol_states :
      t
-  -> protocol_states:Coda_state.Protocol_state.value list
-  -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
+  -> protocol_states:Mina_state.Protocol_state.value list
+  -> (State_hash.t * Mina_state.Protocol_state.value) list Or_error.t
 
 (** All the proof bundles for snark workers*)
 val all_work_pairs :
      t
-  -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
+  -> get_state:(State_hash.t -> Mina_state.Protocol_state.value Or_error.t)
   -> ( Transaction.t
      , Transaction_witness.t
      , Ledger_proof.t )

@@ -15,13 +15,14 @@ open Sheets.Core;
    Upload "Genesis Members", "Block Count", and "Participants" to the Data tab
  */
 let uploadData = (spreadsheetId, totalBlocks) => {
+  let dataSheet = Sheets.getSheet(Sheets.Data);
   let client = createClient();
 
   getRange(
     client,
     initSheetsQuery(
       spreadsheetId,
-      "All-Time Leaderboard!C4:G",
+      Sheets.getSheet(Sheets.AllTimeLeaderboard).range,
       "FORMATTED_VALUE",
     ),
     result => {
@@ -33,6 +34,7 @@ let uploadData = (spreadsheetId, totalBlocks) => {
         "Genesis Members",
         "Block Count",
         "Participants",
+        "Last Updated",
       |];
 
       let statisticsData = [|
@@ -55,7 +57,7 @@ let uploadData = (spreadsheetId, totalBlocks) => {
         client,
         initSheetsUpdate(
           spreadsheetId,
-          "Data!A1:C",
+          dataSheet.range,
           "USER_ENTERED",
           Array.append([|columnHeaders|], [|statisticsData|]),
         ),
@@ -70,46 +72,61 @@ let uploadData = (spreadsheetId, totalBlocks) => {
   });
 };
 
-let computeMapping = (usernameIndex, users, propertyMap) => {
+/*
+   Takes a map of users and column values and adds the column value
+   to the user row that will be uploaded. If the value in the map was
+ */
+
+let addPropertyToUserRow = (users, userColumnValueMap) => {
   users
   |> Array.map(userRow => {
-       let username = Belt.Option.getExn(userRow[usernameIndex]);
-       if (StringMap.mem(username, propertyMap)) {
-         let property = StringMap.find(username, propertyMap);
-         Belt.Array.concat(userRow, [|Some(property)|]);
+       let username = Belt.Option.getExn(userRow[0]);
+       if (StringMap.mem(username, userColumnValueMap)) {
+         let columnValue = StringMap.find(username, userColumnValueMap);
+         Belt.Array.concat(userRow, [|Some(columnValue)|]);
        } else {
          Belt.Array.concat(userRow, [|None|]);
        };
      });
 };
 
-let computeProperty = (propertyIndex, userIndex, pointsData, users) => {
-  pointsData
+/*
+    Iterates through all user rows and creates a map of usernames as keys
+    and column values as values. If the username or column value does not exist,
+    we don't do anything and move on.
+ */
+let createColumnUserMap = (columnValue, usernameColumn, userData) => {
+  userData
   |> Array.fold_left(
        (map, userRow) => {
          switch (
-           Belt.Array.get(userRow, userIndex),
-           Belt.Array.get(userRow, propertyIndex),
+           Belt.Array.get(userRow, usernameColumn),
+           Belt.Array.get(userRow, columnValue),
          ) {
-         | (Some(usernameOption), Some(propertyOption)) =>
-           switch (usernameOption, propertyOption) {
-           | (Some(username), Some(property)) =>
-             StringMap.add(username, property, map)
+         | (Some(username), Some(columnValue)) =>
+           switch (username, columnValue) {
+           | (Some(username), Some(column)) =>
+             StringMap.add(username, column, map)
            | (_, _) => map
            }
          | (_, _) => map
          }
        },
        StringMap.empty,
-     )
-  |> computeMapping(0, users);
+     );
 };
 
-let computeUsers = (userIndex, userData) => {
+let addPropertyToUserRow = (columnValue, usernameColumn, pointsData, users) => {
+  pointsData
+  |> createColumnUserMap(columnValue, usernameColumn)
+  |> addPropertyToUserRow(users);
+};
+
+let getAllValidUsers = (usernameColumn, userData) => {
   userData
   |> Array.fold_left(
        (a, row) => {
-         switch (Belt.Array.get(row, userIndex)) {
+         switch (Belt.Array.get(row, usernameColumn)) {
          | Some(usernameOption) =>
            switch (usernameOption) {
            | Some(username) => Array.append(a, [|[|Some(username)|]|])
@@ -122,83 +139,85 @@ let computeUsers = (userIndex, userData) => {
      );
 };
 
-let computeMemberProfileData = (allTimeData, phaseData, releaseData) => {
-  let allTimeUserIndex = 4; /* usernames are located in the 5th column */
-  let phaseUserIndex = 2; /* usernames are located in the 3rd column */
-  let releaseUserIndex = 1; /* usernames are located in the 2nd column */
+/*
+   Queries all rows in the `main` tab and aggregates data on each individual user row.
+   The information we are interested in gathering for a particular user is:
+     - username column
+     - all time points column
+     - phase points column
+     - release points column
+     - all time rank column
+     - phase rank column
+     - release rank column
+     - GFM badge column
+     - technical badge column
+     - mvp badge column
+ */
+
+let computeMemberProfileData = mainData => {
+  let mainUserIndex = 2; /* usernames are located in the 3rd column */
+  let allTimePoints = 19; /* all time points are located in the 20th column */
+  let phasePoints = 16; /* all time points are located in the 17th column */
+  let releasePoints = 39; /* all time points are located in the 40th column */
+
+  let allTimeRank = 18; /* all time points are located in the 19th column */
+  let phaseRank = 15; /* all time points are located in the 16th column */
+  let releaseRank = 40; /* all time points are located in the 41st column */
+
+  let genesisBadge = 4; /* all time points are located in the 17th column */
+  let technicalBadge = 5; /* all time points are located in the 17th column */
+  let mvpBadge = 6; /* all time points are located in the 17th column */
 
   /* compute users */
-  computeUsers(allTimeUserIndex, allTimeData)
-  /* compute genesis */
-  |> computeProperty(3, allTimeUserIndex, allTimeData)
+  getAllValidUsers(mainUserIndex, mainData)
   /* compute all time points */
-  |> computeProperty(5, allTimeUserIndex, allTimeData)
+  |> addPropertyToUserRow(allTimePoints, mainUserIndex, mainData)
   /* compute phase points */
-  |> computeProperty(3, phaseUserIndex, phaseData)
-  /* compute release points */
-  |> computeProperty(6, phaseUserIndex, phaseData)
-  /* compute all time rank */
-  |> computeProperty(0, allTimeUserIndex, allTimeData)
+  |> addPropertyToUserRow(phasePoints, mainUserIndex, mainData)
+  // /* compute release points */
+  |> addPropertyToUserRow(releasePoints, mainUserIndex, mainData)
+  // /* compute all time rank */
+  |> addPropertyToUserRow(allTimeRank, mainUserIndex, mainData)
   /* compute phase rank */
-  |> computeProperty(0, phaseUserIndex, phaseData)
+  |> addPropertyToUserRow(phaseRank, mainUserIndex, mainData)
   /* compute release rank */
-  |> computeProperty(0, releaseUserIndex, releaseData);
+  |> addPropertyToUserRow(releaseRank, mainUserIndex, mainData)
+  /* compute genesis member badge*/
+  |> addPropertyToUserRow(genesisBadge, mainUserIndex, mainData)
+  /* compute technical MVP badge */
+  |> addPropertyToUserRow(technicalBadge, mainUserIndex, mainData)
+  /* compute community MVP badge */
+  |> addPropertyToUserRow(mvpBadge, mainUserIndex, mainData);
 };
 
 let uploadUserProfileData = spreadsheetId => {
   let client = createClient();
-  /* Fetch all-time leaderboard data */
+
+  /* Fetch main leaderboard data */
   getRange(
     client,
     initSheetsQuery(
       spreadsheetId,
-      "All-Time Leaderboard!C4:H",
+      Sheets.getSheet(Sheets.Main).range,
       "FORMATTED_VALUE",
     ),
     result => {
     switch (result) {
-    | Ok(allTimeResult) =>
-      let allTimeData = allTimeResult |> decodeGoogleSheets;
-      /* Fetch current phase leaderboard data */
-      getRange(
+    | Ok(mainResult) =>
+      let mainData = mainResult |> decodeGoogleSheets;
+      let data = computeMemberProfileData(mainData);
+
+      updateRange(
         client,
-        initSheetsQuery(
+        initSheetsUpdate(
           spreadsheetId,
-          "Phase 3 Leaderboard!B4:Z",
-          "FORMATTED_VALUE",
+          Sheets.getSheet(Sheets.MemberProfileData).range,
+          "USER_ENTERED",
+          encodeGoogleSheets(data),
         ),
         result => {
         switch (result) {
-        | Ok(phaseResult) =>
-          let phaseData = phaseResult |> decodeGoogleSheets;
-          /* Fetch current release leaderboard data */
-          getRange(
-            client,
-            initSheetsQuery(spreadsheetId, "3.2b!A4:B", "FORMATTED_VALUE"),
-            result => {
-            switch (result) {
-            | Ok(releaseResult) =>
-              let releaseData = releaseResult |> decodeGoogleSheets;
-              let data =
-                computeMemberProfileData(allTimeData, phaseData, releaseData);
-
-              updateRange(
-                client,
-                initSheetsUpdate(
-                  spreadsheetId,
-                  "Member_Profile_Data!A2:Z",
-                  "USER_ENTERED",
-                  encodeGoogleSheets(data),
-                ),
-                result => {
-                switch (result) {
-                | Ok(_) => Js.log({j|Uploaded member data|j})
-                | Error(error) => Js.log(error)
-                }
-              });
-            | Error(error) => Js.log(error)
-            }
-          });
+        | Ok(_) => Js.log({j|Uploaded member data|j})
         | Error(error) => Js.log(error)
         }
       });

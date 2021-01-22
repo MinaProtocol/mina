@@ -1,6 +1,6 @@
 open Async_kernel
 open Core_kernel
-open Coda_base
+open Mina_base
 open Pipe_lib
 open Network_peer
 
@@ -10,6 +10,8 @@ open Network_peer
  *  its [Resource_pool_diff_intf] *)
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
+
+  val label : string
 
   type transition_frontier_diff
 
@@ -25,6 +27,8 @@ module type Resource_pool_base_intf = sig
 
   val create :
        constraint_constants:Genesis_constants.Constraint_constants.t
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
@@ -45,20 +49,42 @@ module type Resource_pool_diff_intf = sig
 
   type t [@@deriving sexp, to_yojson]
 
+  type verified [@@deriving sexp, to_yojson]
+
   (** Part of the diff that was not added to the resource pool*)
   type rejected [@@deriving sexp, to_yojson]
+
+  val empty : t
+
+  val reject_overloaded_diff : verified -> rejected
+
+  (** Used to check whether or not information was filtered out of diffs
+   *  during diff application. Assumes that diff size will be the equal or
+   *  smaller after application is completed. *)
+  val size : t -> int
+
+  val verified_size : verified -> int
+
+  (** How big to consider this diff for purposes of metering. *)
+  val score : t -> int
+
+  (** The maximum "diff score" permitted per IP/peer-id per 15 seconds. *)
+  val max_per_15_seconds : int
 
   val summary : t -> string
 
   (** Warning: It must be safe to call this function asynchronously! *)
-  val verify : pool -> t Envelope.Incoming.t -> bool Deferred.t
-
-  (** Warning: Using this directly could corrupt the resource pool if it
-  conincides with applying locally generated diffs or diffs from the network
-  or diffs from transition frontier extensions.*)
-  val unsafe_apply :
+  val verify :
        pool
     -> t Envelope.Incoming.t
+    -> verified Envelope.Incoming.t Deferred.Or_error.t
+
+  (** Warning: Using this directly could corrupt the resource pool if it
+      conincides with applying locally generated diffs or diffs from the network
+      or diffs from transition frontier extensions.*)
+  val unsafe_apply :
+       pool
+    -> verified Envelope.Incoming.t
     -> ( t * rejected
        , [`Locally_generated of t * rejected | `Other of Error.t] )
        Result.t
@@ -77,13 +103,13 @@ module type Resource_pool_intf = sig
   (** Locally generated items (user commands and snarks) should be periodically
       rebroadcast, to ensure network unreliability doesn't mean they're never
       included in a block. This function gets the locally generated items that
-      are currently rebroadcastable. [is_expired] is a function that returns
+      are currently rebroadcastable. [has_timed_out] is a function that returns
       true if an item that was added at a given time should not be rebroadcast
       anymore. If it does, the implementation should not return that item, and
       remove it from the set of potentially-rebroadcastable item.
   *)
   val get_rebroadcastable :
-    t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
+    t -> has_timed_out:(Time.t -> [`Timed_out | `Ok]) -> Diff.t list
 end
 
 (** A [Network_pool_base_intf] is the core implementation of a
@@ -101,6 +127,8 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type resource_pool_diff_verified
+
   type rejected_diff
 
   type transition_frontier_diff
@@ -109,10 +137,19 @@ module type Network_pool_base_intf = sig
 
   type transition_frontier
 
+  module Broadcast_callback : sig
+    type t =
+      | Local of ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+      | External of Mina_net2.Validation_callback.t
+  end
+
   val create :
        config:config
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -127,7 +164,8 @@ module type Network_pool_base_intf = sig
        resource_pool
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+    -> incoming_diffs:( resource_pool_diff Envelope.Incoming.t
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
                    * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
@@ -142,9 +180,8 @@ module type Network_pool_base_intf = sig
 
   val apply_and_broadcast :
        t
-    -> resource_pool_diff Envelope.Incoming.t
-       * (bool -> unit)
-       * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+    -> resource_pool_diff_verified Envelope.Incoming.t
+    -> Broadcast_callback.t
     -> unit Deferred.t
 end
 
@@ -154,12 +191,10 @@ module type Snark_resource_pool_intf = sig
   include Resource_pool_base_intf
 
   val make_config :
-    trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
-
-  (* TODO: we don't seem to be using the bin_io here, can this type be removed? *)
-  type serializable [@@deriving bin_io]
-
-  val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
+       trust_system:Trust_system.t
+    -> verifier:Verifier.t
+    -> disk_location:string
+    -> Config.t
 
   val add_snark :
        ?is_local:bool
@@ -197,7 +232,10 @@ module type Snark_pool_diff_intf = sig
     | Add_solved_work of
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
+    | Empty
   [@@deriving compare, sexp]
+
+  type verified = t [@@deriving compare, sexp]
 
   type compact =
     { work: Transaction_snark_work.Statement.t
@@ -206,11 +244,14 @@ module type Snark_pool_diff_intf = sig
   [@@deriving yojson]
 
   include
-    Resource_pool_diff_intf with type t := t and type pool := resource_pool
+    Resource_pool_diff_intf
+    with type t := t
+     and type verified := t
+     and type pool := resource_pool
 
-  val to_compact : t -> compact
+  val to_compact : t -> compact option
 
-  val compact_json : t -> Yojson.Safe.t
+  val compact_json : t -> Yojson.Safe.t option
 
   val of_result :
        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
@@ -237,6 +278,8 @@ module type Transaction_pool_diff_intf = sig
       | Overflow
       | Bad_token
       | Unwanted_fee_token
+      | Expired
+      | Overloaded
     [@@deriving sexp, yojson]
   end
 
@@ -257,7 +300,10 @@ module type Transaction_resource_pool_intf = sig
   include Resource_pool_base_intf with type t := t
 
   val make_config :
-    trust_system:Trust_system.t -> pool_max_size:int -> Config.t
+       trust_system:Trust_system.t
+    -> pool_max_size:int
+    -> verifier:Verifier.t
+    -> Config.t
 
   val member :
     t -> Transaction_hash.User_command_with_valid_signature.t -> bool
@@ -278,4 +324,18 @@ module type Transaction_resource_pool_intf = sig
        t
     -> Transaction_hash.t
     -> Transaction_hash.User_command_with_valid_signature.t option
+end
+
+module type Base_ledger_intf = sig
+  type t
+
+  module Location : sig
+    type t
+  end
+
+  val location_of_account : t -> Account_id.t -> Location.t option
+
+  val get : t -> Location.t -> Account.t option
+
+  val detached_signal : t -> unit Deferred.t
 end

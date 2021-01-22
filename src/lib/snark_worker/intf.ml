@@ -1,5 +1,5 @@
 open Core
-open Coda_base
+open Mina_base
 open Async
 
 let command_name = "snark-worker"
@@ -13,19 +13,22 @@ module type Inputs_intf = sig
     type t
 
     val create :
-      proof_level:Genesis_constants.Proof_level.t -> unit -> t Deferred.t
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> proof_level:Genesis_constants.Proof_level.t
+      -> unit
+      -> t Deferred.t
 
     val worker_wait_time : float
   end
 
   val perform_single :
        Worker_state.t
-    -> message:Coda_base.Sok_message.t
+    -> message:Mina_base.Sok_message.t
     -> ( Transaction.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Work.Single.Spec.t
-    -> (Ledger_proof.t * Time.Span.t) Or_error.t
+    -> (Ledger_proof.t * Time.Span.t) Deferred.Or_error.t
 end
 
 module type Rpc_master = sig

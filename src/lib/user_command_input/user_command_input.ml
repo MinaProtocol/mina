@@ -1,6 +1,6 @@
-open Coda_base
+open Mina_base
 open Signature_lib
-open Coda_numbers
+open Mina_numbers
 open Core_kernel
 open Async_kernel
 
@@ -15,8 +15,8 @@ module Payload = struct
           , Token_id.Stable.V1.t
           , Account_nonce.Stable.V1.t option
           , Global_slot.Stable.V1.t
-          , User_command_memo.Stable.V1.t )
-          User_command_payload.Common.Poly.Stable.V1.t
+          , Signed_command_memo.Stable.V1.t )
+          Signed_command_payload.Common.Poly.Stable.V1.t
         [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
@@ -26,27 +26,34 @@ module Payload = struct
     let create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo : t =
       {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
-    let to_user_command_common (t : t) ~inferred_nonce :
-        (User_command_payload.Common.t, string) Result.t =
+    let to_user_command_common (t : t) ~minimum_nonce ~inferred_nonce :
+        (Signed_command_payload.Common.t, string) Result.t =
       let open Result.Let_syntax in
-      let%map () =
+      let%map nonce =
         match t.nonce with
         | None ->
             (*User did not provide a nonce, use inferred*)
-            Ok ()
+            Ok inferred_nonce
         | Some nonce ->
-            if Account_nonce.equal inferred_nonce nonce then Ok ()
+            (* NB: A lower, explicitly given nonce can be used to cancel
+               transactions or to re-issue them with a higher fee.
+            *)
+            if
+              Account_nonce.(minimum_nonce <= nonce && nonce <= inferred_nonce)
+            then Ok nonce
             else
               Error
                 (sprintf
-                   !"Input nonce %s different from inferred nonce %s"
+                   !"Input nonce %s either different from inferred nonce %s \
+                     or below minimum_nonce %s"
                    (Account_nonce.to_string nonce)
-                   (Account_nonce.to_string inferred_nonce))
+                   (Account_nonce.to_string inferred_nonce)
+                   (Account_nonce.to_string minimum_nonce))
       in
-      { User_command_payload.Common.Poly.fee= t.fee
+      { Signed_command_payload.Common.Poly.fee= t.fee
       ; fee_token= t.fee_token
       ; fee_payer_pk= t.fee_payer_pk
-      ; nonce= inferred_nonce
+      ; nonce
       ; valid_until= t.valid_until
       ; memo= t.memo }
 
@@ -59,8 +66,8 @@ module Payload = struct
     module V1 = struct
       type t =
         ( Common.Stable.V1.t
-        , User_command_payload.Body.Stable.V1.t )
-        User_command_payload.Poly.Stable.V1.t
+        , Signed_command_payload.Body.Stable.V1.t )
+        Signed_command_payload.Poly.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -73,11 +80,13 @@ module Payload = struct
         Common.create ~fee ~fee_token ~fee_payer_pk ?nonce ~valid_until ~memo
     ; body }
 
-  let to_user_command_payload (t : t) ~inferred_nonce :
-      (User_command_payload.t, string) Result.t =
+  let to_user_command_payload (t : t) ~minimum_nonce ~inferred_nonce :
+      (Signed_command_payload.t, string) Result.t =
     let open Result.Let_syntax in
-    let%map common = Common.to_user_command_common t.common ~inferred_nonce in
-    {User_command_payload.Poly.common; body= t.body}
+    let%map common =
+      Common.to_user_command_common t.common ~minimum_nonce ~inferred_nonce
+    in
+    {Signed_command_payload.Poly.common; body= t.body}
 
   let fee_payer ({common; _} : t) = Common.fee_payer common
 end
@@ -104,7 +113,7 @@ module Stable = struct
       ( Payload.Stable.V1.t
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
-      User_command.Poly.Stable.V1.t
+      Signed_command.Poly.Stable.V1.t
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
@@ -125,15 +134,16 @@ let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body
   in
   {payload; signer; signature= sign_choice}
 
-let sign ~signer ~(user_command_payload : User_command_payload.t) = function
+let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
-        (User_command.create_with_signature_checked signature signer
+        (Signed_command.create_with_signature_checked signature signer
            user_command_payload)
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
-      Deferred.Result.return (User_command.sign signer_kp user_command_payload)
+      Deferred.Result.return
+        (Signed_command.sign signer_kp user_command_payload)
   | Hd_index hd_index ->
       Secrets.Hardware_wallets.sign ~hd_index
         ~public_key:(Public_key.decompress_exn signer)
@@ -143,15 +153,19 @@ let inferred_nonce ~get_current_nonce ~(fee_payer : Account_id.t) ~nonce_map =
   let open Result.Let_syntax in
   let update_map = Map.set nonce_map ~key:fee_payer in
   match Map.find nonce_map fee_payer with
-  | Some nonce ->
+  | Some (min_nonce, nonce) ->
       (* Multiple user commands from the same fee-payer. *)
       let next_nonce = Account_nonce.succ nonce in
-      let updated_map = update_map ~data:next_nonce in
-      Ok (next_nonce, updated_map)
+      let updated_map = update_map ~data:(min_nonce, next_nonce) in
+      Ok (min_nonce, next_nonce, updated_map)
   | None ->
-      let%map txn_pool_or_account_nonce = get_current_nonce fee_payer in
-      let updated_map = update_map ~data:txn_pool_or_account_nonce in
-      (txn_pool_or_account_nonce, updated_map)
+      let%map `Min min_nonce, txn_pool_or_account_nonce =
+        get_current_nonce fee_payer
+      in
+      let updated_map =
+        update_map ~data:(min_nonce, txn_pool_or_account_nonce)
+      in
+      (min_nonce, txn_pool_or_account_nonce, updated_map)
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     (client_input : t) =
@@ -164,21 +178,22 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
   @@
   let open Deferred.Result.Let_syntax in
   let fee_payer = fee_payer client_input in
-  let%bind inferred_nonce, updated_nonce_map =
+  let%bind minimum_nonce, inferred_nonce, updated_nonce_map =
     inferred_nonce ~get_current_nonce ~fee_payer ~nonce_map |> Deferred.return
   in
   let%bind user_command_payload =
-    Payload.to_user_command_payload client_input.payload ~inferred_nonce
+    Payload.to_user_command_payload client_input.payload ~minimum_nonce
+      ~inferred_nonce
     |> Deferred.return
   in
   let%map signed_user_command =
     sign ~signer:client_input.signer ~user_command_payload
       client_input.signature
   in
-  (User_command.forget_check signed_user_command, updated_nonce_map)
+  (Signed_command.forget_check signed_user_command, updated_nonce_map)
 
 let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    uc_inputs : User_command.t list Deferred.Or_error.t =
+    uc_inputs : Signed_command.t list Deferred.Or_error.t =
   (* When batching multiple user commands, keep track of the nonces and send
       all the user commands if they are valid or none if there is an error in
       one of them.
