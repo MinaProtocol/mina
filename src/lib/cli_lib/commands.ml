@@ -53,7 +53,6 @@ let validate_keypair =
       match%map Secrets.Keypair.read ~privkey_path ~password with
       | Ok keypair ->
           validate_transaction keypair
-      (* TODO: add validation using VRF eval_and_test_public_key *)
       | Error err ->
           eprintf "Could not read the specified keypair: %s\n"
             (Secrets.Privkey_error.to_string err) ;
