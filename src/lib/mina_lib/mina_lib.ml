@@ -703,34 +703,34 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
+let get_current_nonce t aid =
+  match
+    Participating_state.active
+      (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
+    |> Option.join
+  with
+  | None ->
+      Error
+        "Couldn't infer nonce for transaction from specified `sender` since \
+         `sender` is not in the ledger or sent a transaction in transaction \
+         pool."
+  | Some nonce ->
+      let ledger_nonce =
+        Participating_state.active (get_account t aid)
+        |> Option.join
+        |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
+        |> Option.value ~default:nonce
+      in
+      Ok (`Min ledger_nonce, nonce)
+
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let get_current_nonce aid =
-    match
-      Participating_state.active
-        (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
-      |> Option.join
-    with
-    | None ->
-        Error
-          "Couldn't infer nonce for transaction from specified `sender` since \
-           `sender` is not in the ledger or sent a transaction in transaction \
-           pool."
-    | Some nonce ->
-        let ledger_nonce =
-          Participating_state.active (get_account t aid)
-          |> Option.join
-          |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
-          |> Option.value ~default:nonce
-        in
-        Ok (`Min ledger_nonce, nonce)
-  in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     ( uc_inputs
     , ( if Ivar.is_full result_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill result_ivar )
-    , get_current_nonce )
+    , get_current_nonce t )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
