@@ -47,4 +47,3 @@ spec:
         - name: metrics-port
           containerPort: 8000
         imagePullPolicy: Always
----
