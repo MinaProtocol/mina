@@ -60,16 +60,14 @@ locals {
   "CAESQO+8qvMqTaQEX9uh4NnNoyOy4Xwv3U80jAsWweQ1J37AVgx7kgs4pPVSBzlP7NDANP1qvSvEPOTh2atbMMUO8EQ=,CAESIFYMe5ILOKT1Ugc5T+zQwDT9ar0rxDzk4dmrWzDFDvBE,12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5" ]
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
-  # make_report_discord_webhook_url = <<EOT
-  #   ${file("../../../discord_webhook_url.txt")}
-  # EOT
-  make_report_discord_webhook_url = ""
+  make_report_discord_webhook_url = <<EOT
+    ${file("../../../discord_webhook_url.txt")}
+  EOT
 
   # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
-  # make_report_accounts = <<EOT
-  #   ${file("../../../${local.testnet_name}-accounts.csv")}
-  # EOT
-  make_report_accounts = ""
+  make_report_accounts = <<EOT
+    ${file("../../../${local.testnet_name}-accounts.csv")}
+  EOT
 
 }
 
