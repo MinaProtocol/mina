@@ -103,7 +103,7 @@ let%test_module "Full_frontier tests" =
               in
               [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
               let persistent_root_instance =
-                Full_frontier.persistent_root_instance
+                Full_frontier.persistent_root_instance frontier
               in
               Persistent_root.Instance.destroy persistent_root_instance ) )
 
@@ -142,7 +142,7 @@ let%test_module "Full_frontier tests" =
                 (List.last_exn long_branch)
                 ~message:"best tip should change when all of best tip is added" ;
               let persistent_root_instance =
-                Full_frontier.persistent_root_instance
+                Full_frontier.persistent_root_instance frontier
               in
               Persistent_root.Instance.destroy persistent_root_instance ) )
 
@@ -179,7 +179,7 @@ let%test_module "Full_frontier tests" =
                             breadcrumbs" ;
                      i + 1 ) ;
               let persistent_root_instance =
-                Full_frontier.persistent_root_instance
+                Full_frontier.persistent_root_instance frontier
               in
               Persistent_root.Instance.destroy persistent_root_instance ) )
 
@@ -206,7 +206,7 @@ let%test_module "Full_frontier tests" =
                         hash
                       |> ignore ) ) ;
               let persistent_root_instance =
-                Full_frontier.persistent_root_instance
+                Full_frontier.persistent_root_instance frontier
               in
               Persistent_root.Instance.destroy persistent_root_instance ) )
 
@@ -228,7 +228,7 @@ let%test_module "Full_frontier tests" =
                        Full_frontier.(
                          path_map frontier (best_tip frontier) ~f:Fn.id)) ) ;
               let persistent_root_instance =
-                Full_frontier.persistent_root_instance
+                Full_frontier.persistent_root_instance frontier
               in
               Persistent_root.Instance.destroy persistent_root_instance ) )
 
@@ -263,7 +263,7 @@ let%test_module "Full_frontier tests" =
                 (Full_frontier.common_ancestor frontier tip_a tip_b)
                 (Breadcrumb.state_hash youngest_ancestor) ;
               let persistent_root_instance =
-                Full_frontier.persistent_root_instance
+                Full_frontier.persistent_root_instance frontier
               in
               Persistent_root.Instance.destroy persistent_root_instance ) )
   end )
