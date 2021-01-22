@@ -9,11 +9,11 @@ let Cmd = ../Lib/Cmds.dhall in
     Command.build
       Command.Config::{
         commands = [
-          Cmd.runInDocker
-            Cmd.Docker::{
-              image = (../Constants/ContainerImages.dhall).codaToolchain
-            }
-            "cd coda-automation/terraform/testnets/${testnetName} && terraform init && terraform apply -auto-approve"
+          Cmd.run (
+            -- TODO: update to allow for custom post-apply step(s)
+            "cd coda-automation/terraform/testnets/${testnetName} && terraform init && terraform apply -auto-approve" ++
+                "; terraform destroy -auto-approve"
+            )
         ],
         label = "Deploy testnet: ${testnetName}",
         key = "deploy-testnet-${testnetName}",
