@@ -7,8 +7,7 @@ let DeployTestnet = ../../Command/DeployTestnet.dhall
 
 let testTestnet = "ci-net"
 let dependsOn = [
-    { name = "MinaArtifact", key = "mina-docker-image" },
-    { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
+    { name = "MinaArtifact", key = "mina-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{

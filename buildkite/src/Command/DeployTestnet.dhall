@@ -11,9 +11,10 @@ let Cmd = ../Lib/Cmds.dhall in
         commands = [
           Cmd.run (
             -- TODO: update to allow for custom post-apply step(s)
-            "cd coda-automation/terraform/testnets/${testnetName} && terraform init && terraform apply -auto-approve" ++
-                "; terraform destroy -auto-approve"
-            )
+            "cd coda-automation/terraform/testnets/${testnetName} && terraform init" ++
+            " && terraform apply -auto-approve -var coda_archive_image='gcr.io/o1labs-192920/coda-archive:0.2.6-compatible'" ++
+            "; terraform destroy -auto-approve"
+          )
         ],
         label = "Deploy testnet: ${testnetName}",
         key = "deploy-testnet-${testnetName}",
