@@ -4,6 +4,7 @@ module StringMap = Map.Make(String);
 let blocks = [|
   {
     Types.Block.stateHash: "stateHash1",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -14,6 +15,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash2",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -24,6 +26,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash3",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -34,6 +37,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash4",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey1",
       coinbaseReceiver: None,
@@ -44,6 +48,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash5",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
@@ -54,6 +59,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash6",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
@@ -64,6 +70,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash7",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey2",
       coinbaseReceiver: None,
@@ -74,6 +81,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash8",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey3",
       coinbaseReceiver: None,
@@ -84,6 +92,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash9",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey3",
       coinbaseReceiver: None,
@@ -94,6 +103,7 @@ let blocks = [|
   },
   {
     Types.Block.stateHash: "stateHash10",
+    slot: "0",
     blockchainState: {
       creatorAccount: "publickey4",
       coinbaseReceiver: None,

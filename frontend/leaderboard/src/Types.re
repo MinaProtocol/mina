@@ -138,6 +138,7 @@ module Block = {
 
   type t = {
     stateHash: string,
+    slot: string,
     blockchainState: BlockChainState.t,
     userCommands: array(UserCommand.t),
     internalCommands: array(InternalCommand.t),
@@ -147,6 +148,7 @@ module Block = {
     open Json.Decode;
     let block = json => {
       stateHash: json |> field("state_hash", string),
+      slot: json |> field("globalslot", string),
       blockchainState: json |> BlockChainState.Decode.blockchainState,
       userCommands: [||],
       internalCommands: [||],
@@ -181,6 +183,28 @@ module Block = {
       === 0
         ? Js.Array.push(newCommand, block.internalCommands) |> ignore : ()
     };
+  };
+
+  let filterDuplicateBlockCreatorSlots = blocks => {
+    open Belt.Map.String;
+    let creatorSlots = ref(empty);
+
+    blocks->Belt.Array.keep(block => {
+      let creatorId = block.blockchainState.creatorAccount;
+      let slot = block.slot;
+      let slotsSeen =
+        switch (get(creatorSlots^, creatorId)) {
+        | Some(slotsSeen) => slotsSeen
+        | None => [||]
+        };
+      if (Array.mem(slot, slotsSeen)) {
+        false;
+      } else {
+        let newSlots = Belt.Array.concat(slotsSeen, [|slot|]);
+        creatorSlots := set(creatorSlots^, creatorId, newSlots);
+        true;
+      };
+    });
   };
 
   /*

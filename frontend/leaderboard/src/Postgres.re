@@ -1,6 +1,6 @@
 open Bindings.Postgres;
 
-let getBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, uc.hash AS userCommandHash, uc.nonce as userCommandNonce, uc.id AS internalCommandId, ic.hash AS internalCommandHash, b.state_hash, pk1.value AS blockcreatorAccount, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, uc.type AS userCommandType, uc.status AS userCommandStatus, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount
+let getBlocks = "SELECT b.id AS blockid, b.global_slot AS globalslot, uc.id AS userCommandId, uc.hash AS userCommandHash, uc.nonce as userCommandNonce, uc.id AS internalCommandId, ic.hash AS internalCommandHash, b.state_hash, pk1.value AS blockcreatorAccount, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, uc.type AS userCommandType, uc.status AS userCommandStatus, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount
 FROM blocks AS b
 LEFT JOIN public_keys AS pk1 ON b.creator_id = pk1.id
 

@@ -40,11 +40,14 @@ let main = () => {
           Js.log("Second Query - Finished");
           let blocks = Belt.Array.concat(prevBlocks, currBlocks);
           Js.log("Length of all blocks: ");
-          Js.log(Array.length(blocks));
 
           Js.log("Metrics - In Progress");
           let metrics =
-            blocks |> Types.Block.parseBlocks |> Metrics.calculateMetrics;
+            blocks
+            |> Types.Block.parseBlocks
+            |> Types.Block.filterDuplicateBlockCreatorSlots
+            |> Metrics.calculateMetrics;
+
           Js.log("Metrics - Finished");
 
           UploadLeaderboardPoints.uploadChallengePoints(
