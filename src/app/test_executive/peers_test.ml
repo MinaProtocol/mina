@@ -23,7 +23,7 @@ module Make (Engine : Engine_intf) = struct
     in
     { default with
       block_producers=
-        [ {balance= "1000"; timing}
+        [ {balance= "1000"; timing= Untimed}
         ; {balance= "1000"; timing}
         ; {balance= "1000"; timing} ]
     ; num_snark_workers= 0 }
