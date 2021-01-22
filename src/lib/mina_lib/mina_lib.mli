@@ -75,6 +75,11 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val snark_job_state : t -> Work_selector.State.t
 
+val get_current_nonce :
+     t
+  -> Account_id.t
+  -> ([> `Min of Account.Nonce.t] * Account.Nonce.t, string) result
+
 val add_transactions :
      t
   -> User_command_input.t list

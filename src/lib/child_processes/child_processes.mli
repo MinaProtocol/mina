@@ -1,5 +1,6 @@
 (** Management of starting, tracking, and killing child processes. *)
 
+open Core_kernel
 open Async
 open Pipe_lib
 
@@ -18,7 +19,7 @@ val stderr_lines : t -> string Strict_pipe.Reader.t
 val stdin : t -> Writer.t
 
 (** [None] if the process is still running, [Some] when it's exited *)
-val termination_status : t -> Unix.Exit_or_signal.t option
+val termination_status : t -> Unix.Exit_or_signal.t Or_error.t option
 
 (** What to do with one of standard out or standard error. If the first
     component is [`Log] and the process outputs valid messages in our JSON
@@ -52,10 +53,16 @@ val start_custom :
   -> termination:[ `Always_raise
                  | `Raise_on_failure
                  | `Handler of
-                   killed:bool -> Unix.Exit_or_signal.t -> unit Deferred.t
+                      killed:bool
+                   -> Unix.Exit_or_signal.t Or_error.t
+                   -> unit Deferred.t
                  | `Ignore ]
      (** What to do when the process exits. Note that an exception will not be
-         raised after you run [kill] on it, regardless of this value. *)
+         raised after you run [kill] on it, regardless of this value.
+         An [Error _] passed to a [`Handler _] indicates that there was an
+         error monitoring the process, and that it is unknown whether the
+         process started.
+     *)
   -> t Deferred.Or_error.t
 
 val kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t
