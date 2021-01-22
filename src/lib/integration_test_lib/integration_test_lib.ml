@@ -61,6 +61,8 @@ module type Engine_intf = sig
       ; pod_id: string
       ; node_graphql_port: int }
 
+    val node_to_string : t -> Core.String.t
+
     val start : fresh_state:bool -> t -> unit Malleable_error.t
 
     val stop : t -> unit Malleable_error.t
