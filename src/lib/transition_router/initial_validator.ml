@@ -17,8 +17,10 @@ type validation_error =
   | `Invalid_protocol_version ]
 
 let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
-    ~trust_system ~sender ~state_hash ~delta (error : validation_error) =
+    ~trust_system ~sender ~transition_with_hash ~delta
+    (error : validation_error) =
   let open Trust_system.Actions in
+  let state_hash = With_hash.hash transition_with_hash in
   let punish action message =
     let message' =
       "external transition with state hash $state_hash"
@@ -68,7 +70,12 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
   [%log' debug rejected_blocks_logger]
-    ~metadata
+    ~metadata:
+      ( ( "protocol_state"
+        , Protocol_state.Value.to_yojson
+            (External_transition.protocol_state
+               (With_hash.data transition_with_hash)) )
+      :: metadata )
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
   match error with
@@ -267,7 +274,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                    Interruptible.uninterruptible
                    @@ handle_validation_error ~logger ~rejected_blocks_logger
                         ~time_received ~trust_system ~sender
-                        ~state_hash:(With_hash.hash transition_with_hash)
+                        ~transition_with_hash
                         ~delta:genesis_constants.protocol.delta error
              in
              Interruptible.force computation >>| ignore )
