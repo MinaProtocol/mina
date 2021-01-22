@@ -875,11 +875,9 @@ let dump_staking_ledger =
   let which =
     let t =
       Command.Param.Arg_type.of_alist_exn
-        [ ("current", Daemon_rpcs.Get_staking_ledger.Current)
-        ; ("next", Next true)
-        ; ("next", Next false) ]
+        [("current", Daemon_rpcs.Get_staking_ledger.Current); ("next", Next)]
     in
-    Command.Param.(anon ("current|next [unfinalized]" %: t))
+    Command.Param.(anon ("current|next" %: t))
   in
   Command.async ~summary:"Print either the staking or next epoch ledger"
     (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)

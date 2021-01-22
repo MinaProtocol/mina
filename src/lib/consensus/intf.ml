@@ -322,8 +322,6 @@ module type S = sig
           val close : t -> unit
 
           val merkle_root : t -> Mina_base.Ledger_hash.t
-
-          val ledger_mask : t -> Mina_base.Ledger.t
         end
       end
 

@@ -218,13 +218,6 @@ module Data = struct
               Mina_base.(
                 Sparse_ledger.of_any_ledger
                 @@ Ledger.Any_ledger.cast (module Ledger.Db) ledger)
-
-        let ledger_mask ledger =
-          match ledger with
-          | Genesis_epoch_ledger ledger ->
-              ledger
-          | Ledger_db db ->
-              Mina_base.Ledger.of_database db
       end
 
       type t =

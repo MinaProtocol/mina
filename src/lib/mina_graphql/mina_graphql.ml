@@ -791,22 +791,41 @@ module Types = struct
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
                    let account_id = account_id account in
-                   let%bind staking_ledger = Mina_lib.staking_ledger coda in
-                   match
-                     let open Option.Let_syntax in
-                     account_id
-                     |> Ledger.location_of_account staking_ledger
-                     >>= Ledger.get staking_ledger
-                   with
-                   | Some delegate_account ->
+                   match%bind Mina_lib.staking_ledger coda with
+                   | Genesis_epoch_ledger staking_ledger -> (
+                     match
+                       let open Option.Let_syntax in
+                       account_id
+                       |> Ledger.location_of_account staking_ledger
+                       >>= Ledger.get staking_ledger
+                     with
+                     | Some delegate_account ->
+                         let delegate_key = delegate_account.public_key in
+                         Some (get_best_ledger_account_pk coda delegate_key)
+                     | None ->
+                         [%log' warn (Mina_lib.top_level_logger coda)]
+                           "Could not retrieve delegate account from the \
+                            genesis ledger. The account was not present in \
+                            the ledger." ;
+                         None )
+                   | Ledger_db staking_ledger -> (
+                     try
+                       let index =
+                         Mina_base.Ledger.Db.index_of_account_exn
+                           staking_ledger account_id
+                       in
+                       let delegate_account =
+                         Mina_base.Ledger.Db.get_at_index_exn staking_ledger
+                           index
+                       in
                        let delegate_key = delegate_account.public_key in
                        Some (get_best_ledger_account_pk coda delegate_key)
-                   | None ->
+                     with e ->
                        [%log' warn (Mina_lib.top_level_logger coda)]
-                         "Could not retrieve delegate account from the \
-                          genesis ledger. The account was not present in the \
-                          ledger." ;
-                       None )
+                         ~metadata:[("error", `String (Exn.to_string e))]
+                         "Could not retrieve delegate account from sparse \
+                          ledger. The account may not be in the ledger: $error" ;
+                       None ) )
              ; field "receiptChainHash" ~typ:string
                  ~doc:"Top hash of the receipt chain merkle-list"
                  ~args:Arg.[]

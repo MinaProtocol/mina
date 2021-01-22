@@ -37,9 +37,14 @@ val replace_block_production_keypairs :
 
 val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
-val staking_ledger : t -> Mina_base.Ledger.t option
+val staking_ledger :
+  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
-val next_epoch_ledger : t -> unfinalized:bool -> Mina_base.Ledger.t option
+val next_epoch_ledger :
+     t
+  -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     | `Notfinalized ]
+     option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
