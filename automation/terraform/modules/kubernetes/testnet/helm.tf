@@ -269,12 +269,14 @@ resource "helm_release" "archive_node" {
 # Watchdog
 
 resource "helm_release" "watchdog" {
+  provider   = helm.testnet_deploy
+
   name        = "${var.testnet_name}-watchdog"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
   version     = "0.1.0"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
-  values = [
+  values      = [
     yamlencode(local.watchdog_vars)
   ]
   wait        = false
