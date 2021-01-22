@@ -949,6 +949,10 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 				app.P2p.Logger.Debugf("discovered peer", info.ID)
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 
+				for _, addr := range info.Addrs {
+					app.P2p.GatingState.MarkPrivateAddrAsKnown(addr)
+				}
+
 				// now connect to the peer we discovered
 				err := app.P2p.Host.Connect(app.Ctx, info)
 				if err != nil {
