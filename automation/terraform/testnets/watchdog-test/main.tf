@@ -78,6 +78,7 @@ module "testnet_east" {
 
   cluster_name          = "coda-infra-east4"
   cluster_region        = "us-east4"
+  k8s_context           = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name          = local.testnet_name
 
   coda_image            = local.coda_image
