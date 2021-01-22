@@ -29,13 +29,13 @@ locals {
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
   ]
 
-  all_seed_peers = [ for name in keys(data.local_file.libp2p_peers) : "/dns4/${name}.${var.testnet_name}/tcp/10501/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}"]
+  static_peers = [ for name in keys(data.local_file.libp2p_peers) : "/dns4/${name}.${var.testnet_name}/tcp/10501/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}"]
 
   coda_vars = {
     runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
     image              = var.coda_image
     privkeyPass        = var.block_producer_key_pass
-    seedPeers          = concat(var.additional_seed_peers, local.seed_peers)
+    seedPeers          = concat(var.additional_seed_peers, local.seed_peers, local.static_peers)
     logLevel           = var.log_level
     logSnarkWorkGossip = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
@@ -109,7 +109,6 @@ locals {
         libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
-        seedPeers            = local.all_seed_peers
       }
     ]
   }
@@ -172,8 +171,8 @@ locals {
   
 }
 
-output all_seed_peers {
-  value = local.all_seed_peers
+output static_peers {
+  value = local.static_peers
 }
 
 # Cluster-Local Seed Node
