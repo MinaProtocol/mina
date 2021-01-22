@@ -86,8 +86,34 @@ resource "google_container_node_pool" "west1_integration_primary" {
   cluster    = google_container_cluster.mina_integration_west1.name
   node_count = 5
   autoscaling {
-    min_node_count = 0
-    max_node_count = 20
+    min_node_count = 1
+    max_node_count = 5
+  }
+  node_config {
+    preemptible  = false
+    machine_type = "n1-standard-16"
+    disk_size_gb = 100
+
+    metadata = {
+      disable-legacy-endpoints = "true"
+    }
+
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/logging.write",
+      "https://www.googleapis.com/auth/monitoring",
+    ]
+  }
+}
+
+resource "google_container_node_pool" "west1_integration_preemptible" {
+  provider = google.google_west1
+  name       = "mina-integration-preemptible"
+  location   = local.west1_region
+  cluster    = google_container_cluster.mina_integration_west1.name
+  node_count = 5
+  autoscaling {
+    min_node_count = 1
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
