@@ -31,15 +31,6 @@ locals {
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
   }
   
-  coda_network_services_vars = {
-    restartEveryMins = var.restart_nodes_every_mins
-    restartNodes = var.restart_nodes
-    makeReports = var.make_reports
-    makeReportEveryMins = var.make_report_every_mins
-    makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
-    makeReportAccounts = var.make_report_accounts
-  }
-
   seed_vars = {
     testnetName = var.testnet_name
     coda        = {
@@ -60,7 +51,6 @@ locals {
       active = true
       discovery_keypair = var.seed_discovery_keypairs[0]
     }
-    codaNetworkServicesConfig = local.coda_network_services_vars
   }
 
   block_producer_vars = {
@@ -157,6 +147,23 @@ locals {
         }
       }
     }
+  }
+
+  watchdog_vars = {
+    testnetName = var.testnet_name
+    image = var.watchdog_image
+    coda = {
+      image = var.coda_image
+      ports = {
+        metrics = "8081"
+      }
+    }
+    restartEveryMins = var.restart_nodes_every_mins
+    restartNodes = var.restart_nodes
+    makeReports = var.make_reports
+    makeReportEveryMins = var.make_report_every_mins
+    makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
+    makeReportAccounts = var.make_report_accounts
   }
   
 }
@@ -258,3 +265,22 @@ resource "helm_release" "archive_node" {
   timeout     = 600
   depends_on = [helm_release.seed]
 }
+
+# Watchdog
+
+resource "helm_release" "watchdog" {
+  provider   = helm.testnet_deploy
+
+  name        = "${var.testnet_name}-watchdog"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
+  version     = "0.1.0"
+  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values      = [
+    yamlencode(local.watchdog_vars)
+  ]
+  wait        = false
+  timeout     = 600
+  depends_on  = [helm_release.seed]
+}
+
