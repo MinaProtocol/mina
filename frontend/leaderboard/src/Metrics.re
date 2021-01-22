@@ -133,7 +133,7 @@ let filterNonePromises = challenges => {
   );
 };
 
-<<<<<<< HEAD
+
 let calculateMetrics =
     (users, blocksChallenge, snarkChallenge, transactionChallenge) => {
   let usersMap =
@@ -142,12 +142,6 @@ let calculateMetrics =
       StringMap.empty,
       users,
     );
-=======
-
-/*
-  Due to snarkJobs not being apart of the archive API, we calculate
-  snark fees differently in the meantime.
->>>>>>> feat: removed unneeded data from query for challenges
 
   let highestSnarkFeeCollected = StringMap.empty;
   let transactionsReceivedByEcho = StringMap.empty;
@@ -276,7 +270,6 @@ let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
 
                  Js.log("Computing Metrics - In Progress");
 
-<<<<<<< HEAD
                  let metrics =
                    calculateMetrics(
                      users,
@@ -297,36 +290,4 @@ let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
             resolve();
           })
      });
-=======
-let calculateMetrics = blocks => {
-  let blocksCreated = getBlocksCreatedByUser(blocks);
-  let transactionSent = getTransactionSentByUser(blocks);
-  let snarkFeesCollected = getSnarkFeesCollected(blocks);
-  let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
-  let transactionsReceivedByEcho =
-    getTransactionsSentToAddress(blocks, echoBotPublicKeys);
-  let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
-
-  calculateAllUsers([
-    throwAwayValues(blocksCreated),
-    throwAwayValues(transactionSent),
-    throwAwayValues(snarkFeesCollected),
-    throwAwayValues(highestSnarkFeeCollected),
-    throwAwayValues(transactionsReceivedByEcho),
-    throwAwayValues(coinbaseReceiverChallenge),
-  ])
-  |> StringMap.filter((key, _) => {!List.mem(key, excludePublicKeys)})
-  |> StringMap.mapi((key, _) =>
-       {
-         Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
-         transactionSent: StringMap.find_opt(key, transactionSent),
-         snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
-         highestSnarkFeeCollected:
-           StringMap.find_opt(key, highestSnarkFeeCollected),
-         transactionsReceivedByEcho:
-           StringMap.find_opt(key, transactionsReceivedByEcho),
-         coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
-       }
-     );
->>>>>>> feat: removed unneeded data from query for challenges
 };
