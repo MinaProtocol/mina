@@ -110,8 +110,8 @@ type t =
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
   ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref
-  ; next_epoch_ledger_for_cli:
-      (Mina_base.Frozen_ledger_hash.t * Ledger.t) option ref }
+  ; block_production_status:
+      [`Producing | `Producing_in_ms of float | `Free] ref }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -749,15 +749,13 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
     ~consensus_state ~local_state
-  |> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.ledger_mask
 
-let next_epoch_ledger t ~unfinalized =
+let next_epoch_ledger t =
   let open Option.Let_syntax in
-  let%bind frontier =
+  let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
   let root = Transition_frontier.root frontier in
-  let root_hash = Transition_frontier.Breadcrumb.state_hash root in
   let root_epoch =
     Transition_frontier.Breadcrumb.consensus_state root
     |> Consensus.Data.Consensus_state.epoch_count
@@ -767,73 +765,16 @@ let next_epoch_ledger t ~unfinalized =
     Transition_frontier.Breadcrumb.consensus_state best_tip
     |> Consensus.Data.Consensus_state.epoch_count
   in
-  if Mina_numbers.Length.equal root_epoch best_tip_epoch then (
-    t.next_epoch_ledger_for_cli := None ;
-    Some
-      ( Consensus.Data.Local_state.next_epoch_ledger
-          t.config.consensus_local_state
-      |> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.ledger_mask ) )
-  else if Mina_numbers.Length.(equal (succ root_epoch) best_tip_epoch) then
-    (*No blocks in the new epoch is finalized yet, return the unfinalized epoch ledger*)
-    let get_epoch_ledger () =
-      let chain = Sync_handler.best_tip_path ~frontier in
-      let root_snarked_ledger_mask =
-        Ledger.of_database (Transition_frontier.root_snarked_ledger frontier)
-      in
-      List.iter chain ~f:(fun state_hash ->
-          if not (State_hash.equal state_hash root_hash) then
-            let breadcrumb =
-              Transition_frontier.find_exn frontier state_hash
-            in
-            let epoch =
-              Transition_frontier.Breadcrumb.consensus_state breadcrumb
-              |> Consensus.Data.Consensus_state.epoch_count
-            in
-            if
-              Mina_numbers.Length.equal epoch root_epoch
-              && Transition_frontier.Breadcrumb.just_emitted_a_proof breadcrumb
-            then
-              Non_empty_list.iter
-                (Option.value_exn
-                   (Staged_ledger.proof_txns_with_state_hashes
-                      (Transition_frontier.Breadcrumb.staged_ledger breadcrumb)))
-                ~f:(fun (txn, state_hash) ->
-                  (*Validate transactions against the protocol state associated with the transaction*)
-                  let txn_state_view =
-                    Transition_frontier.find_protocol_state frontier state_hash
-                    |> Option.value_exn |> Mina_state.Protocol_state.body
-                    |> Mina_state.Protocol_state.Body.view
-                  in
-                  ignore
-                    (Or_error.ok_exn
-                       (Ledger.apply_transaction
-                          ~constraint_constants:
-                            t.config.precomputed_values.constraint_constants
-                          ~txn_state_view root_snarked_ledger_mask txn.data))
-                  ) ) ;
-      t.next_epoch_ledger_for_cli :=
-        Some
-          ( Ledger.merkle_root root_snarked_ledger_mask
-          , root_snarked_ledger_mask ) ;
-      Some root_snarked_ledger_mask
-    in
-    if unfinalized then
-      match !(t.next_epoch_ledger_for_cli) with
-      | Some (hash, ledger) ->
-          let next_epoch_ledger_hash =
-            let epoch_data =
-              Transition_frontier.Breadcrumb.consensus_state best_tip
-              |> Consensus.Data.Consensus_state.next_epoch_data
-            in
-            epoch_data.ledger.hash
-          in
-          if Mina_base.Frozen_ledger_hash.equal next_epoch_ledger_hash hash
-          then Some ledger
-          else get_epoch_ledger ()
-      | None ->
-          get_epoch_ledger ()
-    else None
-  else None
+  if
+    Mina_numbers.Length.(
+      equal root_epoch best_tip_epoch || equal root_epoch zero)
+  then
+    `Finalized
+      (Consensus.Data.Local_state.next_epoch_ledger
+         t.config.consensus_local_state)
+  else
+    (*No blocks in the new epoch is finalized yet, return nothing*)
+    `Notfinalized
 
 let find_delegators table pk =
   Option.value_map
@@ -862,10 +803,89 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
+let perform_compaction t =
+  match Mina_compile_config.compaction_interval_ms with
+  | None ->
+      ()
+  | Some compaction_interval_compiled ->
+      let slot_duration_ms =
+        let leeway = 1000 in
+        t.config.precomputed_values.constraint_constants
+          .block_window_duration_ms + leeway
+      in
+      let expected_time_for_compaction =
+        match Sys.getenv "MINA_COMPACTION_MS" with
+        | Some ms ->
+            Float.of_string ms
+        | None ->
+            6000.
+      in
+      let span ?(incr = 0.) ms =
+        Float.(of_int ms +. incr) |> Time.Span.of_ms
+      in
+      let interval_configured =
+        match Sys.getenv "MINA_COMPACTION_INTERVAL_MS" with
+        | Some ms ->
+            Time.Span.of_ms (Float.of_string ms)
+        | None ->
+            span compaction_interval_compiled
+      in
+      if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
+      then (
+        [%log' fatal t.config.logger]
+          "Time between compactions %f should be greater than the expected \
+           time for compaction %f"
+          (Time.Span.to_ms interval_configured)
+          expected_time_for_compaction ;
+        failwith
+          (sprintf
+             "Time between compactions %f should be greater than the expected \
+              time for compaction %f"
+             (Time.Span.to_ms interval_configured)
+             expected_time_for_compaction) ) ;
+      let call_compact () =
+        let start = Time.now () in
+        Gc.compact () ;
+        let span = Time.diff (Time.now ()) start in
+        [%log' debug t.config.logger]
+          ~metadata:[("time", `Float (Time.Span.to_ms span))]
+          "Gc.compact took $time ms"
+      in
+      let rec perform interval =
+        upon (after interval) (fun () ->
+            match !(t.block_production_status) with
+            | `Free ->
+                call_compact () ;
+                perform interval_configured
+            | `Producing ->
+                perform (span slot_duration_ms)
+            | `Producing_in_ms ms ->
+                if ms < expected_time_for_compaction then
+                  (*too close to block production; perform compaction after block production*)
+                  perform (span slot_duration_ms ~incr:ms)
+                else (
+                  call_compact () ;
+                  perform interval_configured ) )
+      in
+      perform interval_configured
+
 let start t =
+  let set_next_producer_timing timing =
+    let block_production_status =
+      match timing with
+      | `Check_again _ ->
+          `Free
+      | `Produce_now _ ->
+          `Producing
+      | `Produce (time, _, _) ->
+          `Producing_in_ms (Int64.to_float time)
+    in
+    t.block_production_status := block_production_status ;
+    t.next_producer_timing <- Some timing
+  in
   Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
-    ~prover:t.processes.prover ~trust_system:t.config.trust_system
+    ~set_next_producer_timing ~prover:t.processes.prover
+    ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
          t.components.transaction_pool)
@@ -879,6 +899,7 @@ let start t =
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
     ~precomputed_values:t.config.precomputed_values ;
+  perform_compaction t ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
@@ -1565,6 +1586,6 @@ let create ?wallets (config : Config.t) =
             ; subscriptions
             ; sync_status
             ; precomputed_block_writer
-            ; next_epoch_ledger_for_cli= ref None } ) )
+            ; block_production_status= ref `Free } ) )
 
 let net {components= {net; _}; _} = net

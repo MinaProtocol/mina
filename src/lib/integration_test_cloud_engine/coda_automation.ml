@@ -16,11 +16,13 @@ module Network_config = struct
     ; run_with_user_agent: bool
     ; run_with_bots: bool
     ; enable_peer_exchange: bool
-    ; isolated: bool }
+    ; isolated: bool
+    ; libp2p_secret: string }
   [@@deriving to_yojson]
 
   type terraform_config =
-    { cluster_name: string
+    { generate_and_upload_artifacts: bool
+    ; cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
     ; k8s_context: string
@@ -204,7 +206,8 @@ module Network_config = struct
       ; run_with_user_agent= false
       ; run_with_bots= false
       ; enable_peer_exchange= false
-      ; isolated= false }
+      ; isolated= false
+      ; libp2p_secret= "" }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
@@ -214,7 +217,8 @@ module Network_config = struct
     ; constraint_constants
     ; genesis_constants
     ; terraform=
-        { cluster_name
+        { generate_and_upload_artifacts= false
+        ; cluster_name
         ; cluster_region
         ; testnet_name
         ; seed_zone

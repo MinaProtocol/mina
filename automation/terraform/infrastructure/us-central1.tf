@@ -29,17 +29,9 @@ locals {
         }
       ]
     }
-    serverFiles = {
-      alerting_rules.yml = local.testnet_alerts
-    }
-    alertmanagerFiles = {
-      alertmanager.yml = {
-        receivers = local.pagerduty_receivers
-        route = {
-          group_by = "[testnet]"
-          receiver = "pagerduty-primary"
-        }
-      }
+    # Disable per-region instances due to grafanacloud aggregator setup
+    alertmanager = {
+      enabled = false
     }
   }
 }

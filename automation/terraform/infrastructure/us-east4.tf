@@ -30,6 +30,10 @@ locals {
         }
       ]
     }
+    # Disable per-region instances due to grafanacloud aggregator setup
+    alertmanager = {
+      enabled = false
+    }
   }
 }
 
@@ -264,7 +268,7 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
           spec {
             container {
               name    = "integration-test-janitor"
-              image   = "gcr.io/o1labs-192920/coda-network-services:0.3.0"
+              image   = "gcr.io/o1labs-192920/watchdog:0.1.0"
               args = [
                 "/scripts/network-utilities.py",
                 "janitor",
