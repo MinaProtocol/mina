@@ -313,6 +313,9 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
   let time_metadata =
     ("time", `Int (Time.Span.to_ms span |> Int64.to_int_exn))
   in
+  let state_metadata =
+    ("protocol_state", Protocol_state.Value.to_yojson protocol_state)
+  in
   match x with
   | Ok x ->
       return x
@@ -348,17 +351,15 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       in
       let metadata =
         [ ("expected", state_yojson previous_protocol_state)
-        ; ("got", state_yojson protocol_state)
-        ; time_metadata ]
+        ; ("got", state_yojson protocol_state) ]
       in
       [%log warn] ~metadata msg ;
-      [%log' debug rejected_blocks_logger] ~metadata msg ;
+      [%log' debug rejected_blocks_logger]
+        ~metadata:([time_metadata; state_metadata] @ metadata)
+        msg ;
       return ()
   | Error `Already_in_frontier ->
-      let metadata =
-        [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
-        ; time_metadata ]
-      in
+      let metadata = [time_metadata; state_metadata] in
       [%log error] ~metadata "%sproduced transition is already in frontier"
         transition_error_msg_prefix ;
       [%log' debug rejected_blocks_logger]
@@ -366,7 +367,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         transition_error_msg_prefix ;
       return ()
   | Error `Not_selected_over_frontier_root ->
-      let metadata = [time_metadata] in
+      let metadata = [time_metadata; state_metadata] in
       [%log warn] ~metadata
         "%sproduced transition is not selected over the root of transition \
          frontier.%s"
@@ -378,7 +379,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         transition_error_msg_prefix transition_reason_for_failure ;
       return ()
   | Error `Parent_missing_from_frontier ->
-      let metadata = [time_metadata] in
+      let metadata = [time_metadata; state_metadata] in
       [%log warn] ~metadata
         "%sparent of produced transition is missing from the frontier.%s"
         transition_error_msg_prefix transition_reason_for_failure ;
@@ -401,11 +402,12 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       in
       let metadata =
         [ ("error", Error_json.error_to_yojson e)
-        ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff)
-        ; time_metadata ]
+        ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff) ]
       in
       [%log error] ~metadata msg ;
-      [%log' debug rejected_blocks_logger] ~metadata msg ;
+      [%log' debug rejected_blocks_logger]
+        ~metadata:([time_metadata; state_metadata] @ metadata)
+        msg ;
       return ()
 
 let time ~logger ~time_controller label f =
@@ -658,14 +660,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                         let span =
                           Time.diff (Time.now time_controller) start
                         in
+                        let metadata =
+                          [ ( "time"
+                            , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
+                            )
+                          ; ( "protocol_state"
+                            , Protocol_state.Value.to_yojson protocol_state )
+                          ]
+                          @ metadata
+                        in
                         [%log' debug rejected_blocks_logger] ~metadata msg ;
-                        [%log fatal]
-                          ~metadata:
-                            ( ( "time"
-                              , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
-                              )
-                            :: metadata )
-                          msg ;
+                        [%log fatal] ~metadata msg ;
                         return ()
                   in
                   let%bind res = emit_breadcrumb () in
