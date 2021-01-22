@@ -205,7 +205,22 @@ let main inputs =
           Deferred.bind ~f:Malleable_error.return
             (Engine.Network_manager.deploy net_manager)
         in
+        let node_list_to_string (nl : Engine.Node.t list) : String.t =
+          Format.sprintf "[ %s ]"
+            (String.concat ~sep:",  "
+               (List.map nl ~f:Engine.Node.node_to_string))
+        in
+        let snark_coordinators_list =
+          node_list_to_string network.snark_coordinators
+        in
+        let block_producers_list =
+          node_list_to_string network.block_producers
+        in
+        let archive_nodes_list = node_list_to_string network.archive_nodes in
         [%log info] "Network deployed" ;
+        [%log info] "snark_coordinators_list: %s" snark_coordinators_list ;
+        [%log info] "block_producers_list: %s" block_producers_list ;
+        [%log info] "archive_nodes_list: %s" archive_nodes_list ;
         let%bind log_engine =
           Engine.Log_engine.create ~logger ~network
             ~on_fatal_error:(fun message ->
