@@ -332,19 +332,26 @@ let setup_daemon logger =
     (* 512MB logrotate max size = 1GB max filesystem usage *)
     let logrotate_max_size = 1024 * 1024 * 10 in
     let logrotate_num_rotate = 50 in
-    Logger.Consumer_registry.register ~id:"default"
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
       ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"coda.log" ~max_size:logrotate_max_size
            ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
-    Logger.Consumer_registry.register ~id:"best_tip_diff"
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
       ~processor:(Logger.Processor.raw ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
            ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
            ~num_rotate:1) ;
+    let rejected_blocks_log_size = 1024 * 1024 * 5 in
+    Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
+      ~processor:(Logger.Processor.raw ())
+      ~transport:
+        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+           ~log_filename:"mina-rejected-blocks.log"
+           ~max_size:rejected_blocks_log_size ~num_rotate:50) ;
     let version_metadata =
       [ ("commit", `String Mina_version.commit_id)
       ; ("branch", `String Mina_version.branch)
