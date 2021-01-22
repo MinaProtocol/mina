@@ -8,7 +8,7 @@ resource "null_resource" "block_producer_key_generation" {
 resource "null_resource" "prepare_keys_for_deployment" {
   count = var.generate_and_upload_artifacts ? 1 : 0
   provisioner "local-exec" {
-      command = "sudo chmod -R a+rwX ../../../keys"
+      command = "sudo -n chmod -R a+rwX ../../../keys"
   }
   depends_on  = [kubernetes_namespace.testnet_namespace, null_resource.block_producer_key_generation]
 }

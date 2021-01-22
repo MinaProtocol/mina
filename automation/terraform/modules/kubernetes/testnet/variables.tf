@@ -60,6 +60,11 @@ variable "coda_points_image" {
   default = ""
 }
 
+variable "watchdog_image" {
+  type = string
+  default = "gcr.io/o1labs-192920/watchdog:latest"
+}
+
 # this must be a string to avoid scientific notation truncation
 variable "coda_faucet_amount" {
   type    = string
