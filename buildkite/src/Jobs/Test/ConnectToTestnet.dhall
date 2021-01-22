@@ -14,11 +14,11 @@ in Pipeline.build Pipeline.Config::{
   spec =
     JobSpec::{
     dirtyWhen = [
-      S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
-      S.strictlyStart (S.contains "src")
+      S.strictlyStart (S.contains "src"),
+      S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh"
     ],
     path = "Test",
-    name = "TestnetIntegrationTest"
+    name = "ConnectToTestnet"
   },
   steps = [
     ConnectToTestnet.step dependsOn
