@@ -275,7 +275,7 @@ module Log = struct
     let log_level = Arg_type.log_level in
     let open Command.Param in
     let doc =
-      sprintf "LEVEL Set log level for the log file (%s, default: Info)"
+      sprintf "LEVEL Set log level for the log file (%s, default: Trace)"
         all_levels
     in
     flag "file-log-level" ~doc
