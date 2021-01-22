@@ -203,10 +203,10 @@ then
 else
   output_dir="$(pwd)/keys/testnet-keys/bots_keyfiles/"
   generate_key_files 2 "bots_keyfiles" "${output_dir}"
-  mv ${output_dir}/bots_keyfiles_1.pub ${output_dir}/echo_service.pub
-  mv ${output_dir}/bots_keyfiles_1 ${output_dir}/echo_service
-  mv ${output_dir}/bots_keyfiles_2.pub ${output_dir}/faucet_service.pub
-  mv ${output_dir}/bots_keyfiles_2 ${output_dir}/faucet_service
+  mv ${output_dir}/bots_keyfiles_account_1.pub ${output_dir}/echo_service.pub
+  mv ${output_dir}/bots_keyfiles_account_1 ${output_dir}/echo_service
+  mv ${output_dir}/bots_keyfiles_account_2.pub ${output_dir}/faucet_service.pub
+  mv ${output_dir}/bots_keyfiles_account_2 ${output_dir}/faucet_service
 
   build_keyset_from_testnet_keys "${output_dir}" "bots_keyfiles"
 fi
@@ -301,7 +301,7 @@ PROMPT_KEYSETS="${PROMPT_KEYSETS}n
 # Handle passing the above keyset info into interactive 'coda-network genesis' prompts
 while read input
 do echo "$input"
-  sleep 1
+  sleep 2
 done < <(echo -n "$PROMPT_KEYSETS") | coda-network genesis
 
 GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
