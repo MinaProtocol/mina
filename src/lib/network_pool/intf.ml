@@ -26,7 +26,8 @@ module type Resource_pool_base_intf = sig
     transition_frontier_diff -> t -> unit Deferred.t
 
   val create :
-       constraint_constants:Genesis_constants.Constraint_constants.t
+       ledger_hash:Ledger_hash.t
+    -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
@@ -145,6 +146,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        config:config
+    -> ledger_hash:Ledger_hash.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
@@ -338,4 +340,6 @@ module type Base_ledger_intf = sig
   val get : t -> Location.t -> Account.t option
 
   val detached_signal : t -> unit Deferred.t
+
+  val merkle_root : t -> Ledger_hash.t
 end

@@ -53,7 +53,9 @@ type t =
   ; size: int
   ; constraint_constants: Genesis_constants.Constraint_constants.t
   ; consensus_constants: Consensus.Constants.t
-  ; time_controller: Block_time.Controller.t }
+  ; time_controller: Block_time.Controller.t
+  ; valid_against_ledger: Ledger_hash.t
+  ; next_revalidate: Ledger_hash.t Async.Ivar.t }
 [@@deriving sexp_of]
 
 module Command_error = struct
@@ -285,7 +287,8 @@ module For_tests = struct
     [%test_eq: int] (Map.length all_by_hash) size
 end
 
-let empty ~constraint_constants ~consensus_constants ~time_controller : t =
+let empty ~ledger_hash ~constraint_constants ~consensus_constants
+    ~time_controller : t =
   { applicable_by_fee= Currency.Fee.Map.empty
   ; all_by_sender= Account_id.Map.empty
   ; all_by_fee= Currency.Fee.Map.empty
@@ -294,7 +297,9 @@ let empty ~constraint_constants ~consensus_constants ~time_controller : t =
   ; size= 0
   ; constraint_constants
   ; consensus_constants
-  ; time_controller }
+  ; time_controller
+  ; valid_against_ledger= ledger_hash
+  ; next_revalidate= Async.Ivar.create () }
 
 let size : t -> int = fun t -> t.size
 
@@ -491,14 +496,21 @@ let drop_until_sufficient_balance :
   in
   go queue currency_reserved Sequence.empty
 
+let mark_transitioned_to_new_ledger t ledger_hash =
+  Async.Ivar.fill_if_empty t.next_revalidate ledger_hash ;
+  { t with
+    next_revalidate= Async.Ivar.create ()
+  ; valid_against_ledger= ledger_hash }
+
 (* Iterate over all commands in the pool, removing them if they require too much
    currency or have too low of a nonce.
 *)
 let revalidate :
        t
+    -> Ledger_hash.t
     -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
     -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t =
- fun ({constraint_constants; _} as t) f ->
+ fun ({constraint_constants; _} as t) ledger_hash f ->
   Map.fold t.all_by_sender ~init:(t, Sequence.empty)
     ~f:(fun ~key:sender
        ~data:(queue, currency_reserved)
@@ -552,6 +564,8 @@ let revalidate :
                   Map.set t''.all_by_sender ~key:sender
                     ~data:(keep_queue', currency_reserved'') }
             , Sequence.append dropped_acc to_drop ) )
+  |> fun (t, dropped_cmds) ->
+  (mark_transitioned_to_new_ledger t ledger_hash, dropped_cmds)
 
 let remove_expired t :
     Transaction_hash.User_command_with_valid_signature.t Sequence.t * t =
@@ -777,7 +791,9 @@ let rec add_from_gossip_exn :
         ; size= t.size + 1
         ; constraint_constants
         ; consensus_constants
-        ; time_controller }
+        ; time_controller
+        ; valid_against_ledger= t.valid_against_ledger
+        ; next_revalidate= t.next_revalidate }
       , Sequence.empty )
   | Some (queued_cmds, reserved_currency) ->
       (* commands queued for this sender *)
@@ -976,7 +992,9 @@ let add_from_backtrack :
       ; size= t.size + 1
       ; constraint_constants
       ; consensus_constants
-      ; time_controller }
+      ; time_controller
+      ; valid_against_ledger= t.valid_against_ledger
+      ; next_revalidate= Async.Ivar.create () }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
       if
@@ -1018,7 +1036,13 @@ let add_from_backtrack :
       ; size= t.size + 1
       ; constraint_constants
       ; consensus_constants
-      ; time_controller }
+      ; time_controller
+      ; valid_against_ledger= t.valid_against_ledger
+      ; next_revalidate= t.next_revalidate }
+
+let valid_against_ledger t = t.valid_against_ledger
+
+let wait_for_next_revalidation t = Async.Ivar.read t.next_revalidate
 
 let%test_module _ =
   ( module struct
@@ -1039,12 +1063,17 @@ let%test_module _ =
 
     let consensus_constants = precomputed_values.consensus_constants
 
+    let ledger_hash =
+      Ledger.merkle_root
+        (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
+
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
     let empty =
-      empty ~constraint_constants ~consensus_constants ~time_controller
+      empty ~ledger_hash ~constraint_constants ~consensus_constants
+        ~time_controller
 
     let%test_unit "empty invariants" = assert_invariants empty
 

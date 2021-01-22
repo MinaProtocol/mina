@@ -388,6 +388,7 @@ struct
       *)
       let global_slot = Indexed_pool.current_global_slot t.pool in
       t.best_tip_ledger <- Some best_tip_ledger ;
+      let ledger_hash = Base_ledger.merkle_root best_tip_ledger in
       let pool_max_size = t.config.pool_max_size in
       let log_indexed_pool_error error_str ~metadata cmd =
         [%log' debug t.logger]
@@ -621,15 +622,19 @@ struct
                     cmd ) ] ;
           Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
       ) ;
+      let pool =
+        Indexed_pool.mark_transitioned_to_new_ledger pool ledger_hash
+      in
       t.pool <- pool ;
       Deferred.unit
 
-    let create ~constraint_constants ~consensus_constants ~time_controller
-        ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
+    let create ~ledger_hash ~constraint_constants ~consensus_constants
+        ~time_controller ~frontier_broadcast_pipe ~config ~logger
+        ~tf_diff_writer =
       let t =
         { pool=
-            Indexed_pool.empty ~constraint_constants ~consensus_constants
-              ~time_controller
+            Indexed_pool.empty ~ledger_hash ~constraint_constants
+              ~consensus_constants ~time_controller
         ; locally_generated_uncommitted=
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
@@ -678,8 +683,9 @@ struct
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
                  let global_slot = Indexed_pool.current_global_slot t.pool in
+                 let ledger_hash = Base_ledger.merkle_root validation_ledger in
                  let new_pool, dropped =
-                   Indexed_pool.revalidate t.pool (fun sender ->
+                   Indexed_pool.revalidate t.pool ledger_hash (fun sender ->
                        match
                          Base_ledger.location_of_account validation_ledger
                            sender
@@ -897,6 +903,33 @@ struct
               "Got transaction pool diff when transition frontier is \
                unavailable, ignoring."
         | Some ledger -> (
+            let open Deferred.Or_error.Let_syntax in
+            let pool_ledger_hash = Indexed_pool.valid_against_ledger t.pool in
+            let ledger_hash = Base_ledger.merkle_root ledger in
+            let%bind ledger_hash, ledger =
+              if Ledger_hash.equal pool_ledger_hash ledger_hash then
+                Deferred.Or_error.return (ledger_hash, ledger)
+              else
+                let%bind.Async new_ledger_hash =
+                  Indexed_pool.wait_for_next_revalidation t.pool
+                in
+                let%map ledger =
+                  if Ledger_hash.equal ledger_hash new_ledger_hash then
+                    Deferred.Or_error.return ledger
+                  else
+                    match t.best_tip_ledger with
+                    | Some ledger
+                      when Ledger_hash.equal new_ledger_hash
+                             (Base_ledger.merkle_root ledger) ->
+                        Deferred.Or_error.return ledger
+                    | _ ->
+                        Deferred.Or_error.error_string
+                          "Could not find the ledger against which the \
+                           transaction pool is valid."
+                in
+                (ledger_hash, ledger)
+            in
+            let open Deferred.Let_syntax in
             let trust_record =
               Trust_system.record_envelope_sender t.config.trust_system
                 t.logger sender
@@ -926,260 +959,290 @@ struct
                         (Base_ledger.location_of_account ledger account_id)
                         ~f:(Base_ledger.get ledger)
                     in
-                    match account ledger (User_command.fee_payer tx) with
-                    | None ->
-                        let%bind _ =
-                          trust_record
-                            ( Trust_system.Actions.Sent_useless_gossip
-                            , Some
-                                ( "account does not exist for command: $cmd"
-                                , [("cmd", User_command.to_yojson tx)] ) )
-                        in
-                        go txs'' pool
-                          ( accepted
-                          , ( tx
-                            , Diff_versioned.Diff_error
-                              .Sender_account_does_not_exist )
-                            :: rejected )
-                    | Some sender_account ->
-                        if has_sufficient_fee pool tx ~pool_max_size then (
-                          let add_res =
-                            Indexed_pool.add_from_gossip_exn pool
-                              (`Unchecked tx') sender_account.nonce
-                              ~verify:check_command
-                            @@ Currency.Balance.to_amount
-                            @@ balance_of_account ~global_slot sender_account
-                          in
-                          let of_indexed_pool_error = function
-                            | Indexed_pool.Command_error.Invalid_nonce
-                                (`Between (low, hi), nonce) ->
-                                let nonce_json = Account.Nonce.to_yojson in
-                                ( Diff_versioned.Diff_error.Invalid_nonce
-                                , [ ( "between"
-                                    , `Assoc
-                                        [ ("low", nonce_json low)
-                                        ; ("hi", nonce_json hi) ] )
-                                  ; ("nonce", nonce_json nonce) ] )
-                            | Invalid_nonce (`Expected enonce, nonce) ->
-                                let nonce_json = Account.Nonce.to_yojson in
-                                ( Diff_versioned.Diff_error.Invalid_nonce
-                                , [ ("expected_nonce", nonce_json enonce)
-                                  ; ("nonce", nonce_json nonce) ] )
-                            | Insufficient_funds (`Balance bal, amt) ->
-                                let amt_json = Currency.Amount.to_yojson in
-                                ( Insufficient_funds
-                                , [ ("balance", amt_json bal)
-                                  ; ("amount", amt_json amt) ] )
-                            | Insufficient_replace_fee (`Replace_fee rfee, fee)
-                              ->
-                                let fee_json = Currency.Fee.to_yojson in
-                                ( Insufficient_replace_fee
-                                , [ ("replace_fee", fee_json rfee)
-                                  ; ("fee", fee_json fee) ] )
-                            | Overflow ->
-                                (Overflow, [])
-                            | Bad_token ->
-                                (Bad_token, [])
-                            | Invalid_transaction ->
-                                (Diff_error.Invalid_signature, [])
-                            | Unwanted_fee_token fee_token ->
-                                ( Unwanted_fee_token
-                                , [("fee_token", Token_id.to_yojson fee_token)]
-                                )
-                            | Expired
-                                ( `Valid_until valid_until
-                                , `Current_global_slot current_global_slot ) ->
-                                ( Expired
-                                , [ ( "valid_until"
-                                    , Mina_numbers.Global_slot.to_yojson
-                                        valid_until )
-                                  ; ( "current_global_slot"
-                                    , Mina_numbers.Global_slot.to_yojson
-                                        current_global_slot ) ] )
-                          in
-                          let yojson_fail_reason =
-                            Fn.compose
-                              (fun s -> `String s)
-                              (function
-                                | Indexed_pool.Command_error.Invalid_nonce _ ->
-                                    "invalid nonce"
-                                | Insufficient_funds _ ->
-                                    "insufficient funds"
-                                | Invalid_transaction ->
-                                    "transaction had bad signature or was \
-                                     malformed"
-                                | Insufficient_replace_fee _ ->
-                                    "insufficient replace fee"
-                                | Overflow ->
-                                    "overflow"
-                                | Bad_token ->
-                                    "bad token"
-                                | Unwanted_fee_token _ ->
-                                    "unwanted fee token"
-                                | Expired _ ->
-                                    "expired" )
-                          in
-                          match add_res with
-                          | Ok (verified, pool', dropped) ->
-                              let%bind _ =
-                                trust_record
-                                  ( Trust_system.Actions.Sent_useful_gossip
-                                  , Some
-                                      ( "$cmd"
-                                      , [("cmd", User_command.to_yojson tx)] )
-                                  )
-                              in
-                              if is_sender_local then
-                                Hashtbl.add_exn t.locally_generated_uncommitted
-                                  ~key:verified ~data:(Time.now ()) ;
-                              let pool'', dropped_for_size =
-                                drop_until_below_max_size pool' ~pool_max_size
-                              in
-                              let seq_cmd_to_yojson seq =
-                                `List
-                                  Sequence.(
-                                    to_list
-                                    @@ map
-                                         ~f:
-                                           Transaction_hash
-                                           .User_command_with_valid_signature
-                                           .to_yojson seq)
-                              in
-                              if not (Sequence.is_empty dropped) then
-                                [%log' debug t.logger]
-                                  "dropped commands due to transaction \
-                                   replacement: $dropped"
-                                  ~metadata:
-                                    [("dropped", seq_cmd_to_yojson dropped)] ;
-                              if not (Sequence.is_empty dropped_for_size) then
-                                [%log' debug t.logger]
-                                  "dropped commands to maintain max size: $cmds"
-                                  ~metadata:
-                                    [ ( "cmds"
-                                      , seq_cmd_to_yojson dropped_for_size ) ] ;
-                              let locally_generated_dropped =
-                                Sequence.filter
-                                  (Sequence.append dropped dropped_for_size)
-                                  ~f:(fun tx_dropped ->
-                                    Hashtbl.find_and_remove
-                                      t.locally_generated_uncommitted
-                                      tx_dropped
-                                    |> Option.is_some )
-                                |> Sequence.to_list
-                              in
-                              if not (List.is_empty locally_generated_dropped)
-                              then
-                                [%log' info t.logger]
-                                  "Dropped locally generated commands $cmds \
-                                   from transaction pool due to replacement \
-                                   or max size"
-                                  ~metadata:
-                                    [ ( "cmds"
-                                      , `List
-                                          (List.map
-                                             ~f:
-                                               Transaction_hash
-                                               .User_command_with_valid_signature
-                                               .to_yojson
-                                             locally_generated_dropped) ) ] ;
-                              go txs'' pool'' (tx :: accepted, rejected)
-                          | Error
-                              (Insufficient_replace_fee
-                                (`Replace_fee rfee, fee)) ->
-                              (* We can't punish peers for this, since an
-                             attacker can simultaneously send different
-                             transactions at the same nonce to different
-                             nodes, which will then naturally gossip them.
-                          *)
-                              let f_log =
-                                if is_sender_local then [%log' error t.logger]
-                                else [%log' debug t.logger]
-                              in
-                              f_log
-                                "rejecting $cmd because of insufficient \
-                                 replace fee ($rfee > $fee)"
-                                ~metadata:
-                                  [ ("cmd", User_command.to_yojson tx)
-                                  ; ("rfee", Currency.Fee.to_yojson rfee)
-                                  ; ("fee", Currency.Fee.to_yojson fee) ] ;
-                              go txs'' pool
-                                ( accepted
-                                , ( tx
-                                  , Diff_versioned.Diff_error
-                                    .Insufficient_replace_fee )
-                                  :: rejected )
-                          | Error (Unwanted_fee_token fee_token) ->
-                              (* We can't punish peers for this, since these
-                                   are our specific preferences.
-                                *)
-                              let f_log =
-                                if is_sender_local then [%log' error t.logger]
-                                else [%log' debug t.logger]
-                              in
-                              f_log
-                                "rejecting $cmd because we don't accept fees \
-                                 in $token"
-                                ~metadata:
-                                  [ ("cmd", User_command.to_yojson tx)
-                                  ; ("token", Token_id.to_yojson fee_token) ] ;
-                              go txs'' pool
-                                ( accepted
-                                , ( tx
-                                  , Diff_versioned.Diff_error
-                                    .Unwanted_fee_token )
-                                  :: rejected )
-                          | Error Invalid_transaction ->
-                              let%bind _ =
-                                trust_record
-                                  ( Trust_system.Actions.Sent_useless_gossip
-                                  , Some
-                                      ( "rejecting command because had \
-                                         invalid signature or was malformed"
-                                      , [] ) )
-                              in
-                              go txs'' pool
-                                ( accepted
-                                , ( tx
-                                  , Diff_versioned.Diff_error.Invalid_signature
-                                  )
-                                  :: rejected )
-                          | Error err ->
-                              let diff_err, error_extra =
-                                of_indexed_pool_error err
-                              in
-                              if is_sender_local then
-                                [%str_log' error t.logger]
-                                  (Rejecting_command_for_reason
-                                     { command= tx
-                                     ; reason= diff_err
-                                     ; error_extra }) ;
-                              let%bind _ =
-                                trust_record
-                                  ( Trust_system.Actions.Sent_useless_gossip
-                                  , Some
-                                      ( "rejecting $cmd because of $reason. \
-                                         ($error_extra)"
-                                      , [ ("cmd", User_command.to_yojson tx)
-                                        ; ("reason", yojson_fail_reason err)
-                                        ; ("error_extra", `Assoc error_extra)
-                                        ] ) )
-                              in
-                              go txs'' pool
-                                (accepted, (tx, diff_err) :: rejected) )
-                        else
+                    let new_ledger_hash = Base_ledger.merkle_root ledger in
+                    if Ledger_hash.equal ledger_hash new_ledger_hash then (
+                      (* We return an interrupted [Interruptible.t] here
+                         directly rather than wrapping the code below using a
+                         bind. The underlying async bind may otherwise yeild to
+                         the scheduler and create the error condition we're
+                         trying to handle here **between** us checking it and
+                         the code we're protecting.
+                      *)
+                      let error =
+                        Error.createf
+                           "Ledger hash changed from %s to %s while \
+                            attempting to apply transaction pool diff"
+                           (Ledger_hash.to_base58_check ledger_hash)
+                           (Ledger_hash.to_base58_check new_ledger_hash)
+                      in
+                      Interruptible.lift (Deferred.never ())
+                        (Deferred.return error) )
+                    else
+                      match account ledger (User_command.fee_payer tx) with
+                      | None ->
                           let%bind _ =
                             trust_record
                               ( Trust_system.Actions.Sent_useless_gossip
                               , Some
-                                  ( sprintf
-                                      "rejecting command $cmd due to \
-                                       insufficient fee."
+                                  ( "account does not exist for command: $cmd"
                                   , [("cmd", User_command.to_yojson tx)] ) )
                           in
                           go txs'' pool
                             ( accepted
-                            , (tx, Diff_versioned.Diff_error.Insufficient_fee)
-                              :: rejected ) )
+                            , ( tx
+                              , Diff_versioned.Diff_error
+                                .Sender_account_does_not_exist )
+                              :: rejected )
+                      | Some sender_account ->
+                          if has_sufficient_fee pool tx ~pool_max_size then (
+                            let add_res =
+                              Indexed_pool.add_from_gossip_exn pool
+                                (`Unchecked tx') sender_account.nonce
+                                ~verify:check_command
+                              @@ Currency.Balance.to_amount
+                              @@ balance_of_account ~global_slot sender_account
+                            in
+                            let of_indexed_pool_error = function
+                              | Indexed_pool.Command_error.Invalid_nonce
+                                  (`Between (low, hi), nonce) ->
+                                  let nonce_json = Account.Nonce.to_yojson in
+                                  ( Diff_versioned.Diff_error.Invalid_nonce
+                                  , [ ( "between"
+                                      , `Assoc
+                                          [ ("low", nonce_json low)
+                                          ; ("hi", nonce_json hi) ] )
+                                    ; ("nonce", nonce_json nonce) ] )
+                              | Invalid_nonce (`Expected enonce, nonce) ->
+                                  let nonce_json = Account.Nonce.to_yojson in
+                                  ( Diff_versioned.Diff_error.Invalid_nonce
+                                  , [ ("expected_nonce", nonce_json enonce)
+                                    ; ("nonce", nonce_json nonce) ] )
+                              | Insufficient_funds (`Balance bal, amt) ->
+                                  let amt_json = Currency.Amount.to_yojson in
+                                  ( Insufficient_funds
+                                  , [ ("balance", amt_json bal)
+                                    ; ("amount", amt_json amt) ] )
+                              | Insufficient_replace_fee
+                                  (`Replace_fee rfee, fee) ->
+                                  let fee_json = Currency.Fee.to_yojson in
+                                  ( Insufficient_replace_fee
+                                  , [ ("replace_fee", fee_json rfee)
+                                    ; ("fee", fee_json fee) ] )
+                              | Overflow ->
+                                  (Overflow, [])
+                              | Bad_token ->
+                                  (Bad_token, [])
+                              | Invalid_transaction ->
+                                  (Diff_error.Invalid_signature, [])
+                              | Unwanted_fee_token fee_token ->
+                                  ( Unwanted_fee_token
+                                  , [ ( "fee_token"
+                                      , Token_id.to_yojson fee_token ) ] )
+                              | Expired
+                                  ( `Valid_until valid_until
+                                  , `Current_global_slot current_global_slot )
+                                ->
+                                  ( Expired
+                                  , [ ( "valid_until"
+                                      , Mina_numbers.Global_slot.to_yojson
+                                          valid_until )
+                                    ; ( "current_global_slot"
+                                      , Mina_numbers.Global_slot.to_yojson
+                                          current_global_slot ) ] )
+                            in
+                            let yojson_fail_reason =
+                              Fn.compose
+                                (fun s -> `String s)
+                                (function
+                                  | Indexed_pool.Command_error.Invalid_nonce _
+                                    ->
+                                      "invalid nonce"
+                                  | Insufficient_funds _ ->
+                                      "insufficient funds"
+                                  | Invalid_transaction ->
+                                      "transaction had bad signature or was \
+                                       malformed"
+                                  | Insufficient_replace_fee _ ->
+                                      "insufficient replace fee"
+                                  | Overflow ->
+                                      "overflow"
+                                  | Bad_token ->
+                                      "bad token"
+                                  | Unwanted_fee_token _ ->
+                                      "unwanted fee token"
+                                  | Expired _ ->
+                                      "expired" )
+                            in
+                            match add_res with
+                            | Ok (verified, pool', dropped) ->
+                                let%bind _ =
+                                  trust_record
+                                    ( Trust_system.Actions.Sent_useful_gossip
+                                    , Some
+                                        ( "$cmd"
+                                        , [("cmd", User_command.to_yojson tx)]
+                                        ) )
+                                in
+                                if is_sender_local then
+                                  Hashtbl.add_exn
+                                    t.locally_generated_uncommitted
+                                    ~key:verified ~data:(Time.now ()) ;
+                                let pool'', dropped_for_size =
+                                  drop_until_below_max_size pool'
+                                    ~pool_max_size
+                                in
+                                let seq_cmd_to_yojson seq =
+                                  `List
+                                    Sequence.(
+                                      to_list
+                                      @@ map
+                                           ~f:
+                                             Transaction_hash
+                                             .User_command_with_valid_signature
+                                             .to_yojson seq)
+                                in
+                                if not (Sequence.is_empty dropped) then
+                                  [%log' debug t.logger]
+                                    "dropped commands due to transaction \
+                                     replacement: $dropped"
+                                    ~metadata:
+                                      [("dropped", seq_cmd_to_yojson dropped)] ;
+                                if not (Sequence.is_empty dropped_for_size)
+                                then
+                                  [%log' debug t.logger]
+                                    "dropped commands to maintain max size: \
+                                     $cmds"
+                                    ~metadata:
+                                      [ ( "cmds"
+                                        , seq_cmd_to_yojson dropped_for_size )
+                                      ] ;
+                                let locally_generated_dropped =
+                                  Sequence.filter
+                                    (Sequence.append dropped dropped_for_size)
+                                    ~f:(fun tx_dropped ->
+                                      Hashtbl.find_and_remove
+                                        t.locally_generated_uncommitted
+                                        tx_dropped
+                                      |> Option.is_some )
+                                  |> Sequence.to_list
+                                in
+                                if
+                                  not (List.is_empty locally_generated_dropped)
+                                then
+                                  [%log' info t.logger]
+                                    "Dropped locally generated commands $cmds \
+                                     from transaction pool due to replacement \
+                                     or max size"
+                                    ~metadata:
+                                      [ ( "cmds"
+                                        , `List
+                                            (List.map
+                                               ~f:
+                                                 Transaction_hash
+                                                 .User_command_with_valid_signature
+                                                 .to_yojson
+                                               locally_generated_dropped) ) ] ;
+                                go txs'' pool'' (tx :: accepted, rejected)
+                            | Error
+                                (Insufficient_replace_fee
+                                  (`Replace_fee rfee, fee)) ->
+                                (* We can't punish peers for this, since an
+                             attacker can simultaneously send different
+                             transactions at the same nonce to different
+                             nodes, which will then naturally gossip them.
+                          *)
+                                let f_log =
+                                  if is_sender_local then
+                                    [%log' error t.logger]
+                                  else [%log' debug t.logger]
+                                in
+                                f_log
+                                  "rejecting $cmd because of insufficient \
+                                   replace fee ($rfee > $fee)"
+                                  ~metadata:
+                                    [ ("cmd", User_command.to_yojson tx)
+                                    ; ("rfee", Currency.Fee.to_yojson rfee)
+                                    ; ("fee", Currency.Fee.to_yojson fee) ] ;
+                                go txs'' pool
+                                  ( accepted
+                                  , ( tx
+                                    , Diff_versioned.Diff_error
+                                      .Insufficient_replace_fee )
+                                    :: rejected )
+                            | Error (Unwanted_fee_token fee_token) ->
+                                (* We can't punish peers for this, since these
+                                   are our specific preferences.
+                                *)
+                                let f_log =
+                                  if is_sender_local then
+                                    [%log' error t.logger]
+                                  else [%log' debug t.logger]
+                                in
+                                f_log
+                                  "rejecting $cmd because we don't accept \
+                                   fees in $token"
+                                  ~metadata:
+                                    [ ("cmd", User_command.to_yojson tx)
+                                    ; ("token", Token_id.to_yojson fee_token)
+                                    ] ;
+                                go txs'' pool
+                                  ( accepted
+                                  , ( tx
+                                    , Diff_versioned.Diff_error
+                                      .Unwanted_fee_token )
+                                    :: rejected )
+                            | Error Invalid_transaction ->
+                                let%bind _ =
+                                  trust_record
+                                    ( Trust_system.Actions.Sent_useless_gossip
+                                    , Some
+                                        ( "rejecting command because had \
+                                           invalid signature or was malformed"
+                                        , [] ) )
+                                in
+                                go txs'' pool
+                                  ( accepted
+                                  , ( tx
+                                    , Diff_versioned.Diff_error
+                                      .Invalid_signature )
+                                    :: rejected )
+                            | Error err ->
+                                let diff_err, error_extra =
+                                  of_indexed_pool_error err
+                                in
+                                if is_sender_local then
+                                  [%str_log' error t.logger]
+                                    (Rejecting_command_for_reason
+                                       { command= tx
+                                       ; reason= diff_err
+                                       ; error_extra }) ;
+                                let%bind _ =
+                                  trust_record
+                                    ( Trust_system.Actions.Sent_useless_gossip
+                                    , Some
+                                        ( "rejecting $cmd because of $reason. \
+                                           ($error_extra)"
+                                        , [ ("cmd", User_command.to_yojson tx)
+                                          ; ("reason", yojson_fail_reason err)
+                                          ; ("error_extra", `Assoc error_extra)
+                                          ] ) )
+                                in
+                                go txs'' pool
+                                  (accepted, (tx, diff_err) :: rejected) )
+                          else
+                            let%bind _ =
+                              trust_record
+                                ( Trust_system.Actions.Sent_useless_gossip
+                                , Some
+                                    ( sprintf
+                                        "rejecting command $cmd due to \
+                                         insufficient fee."
+                                    , [("cmd", User_command.to_yojson tx)] ) )
+                            in
+                            go txs'' pool
+                              ( accepted
+                              , (tx, Diff_versioned.Diff_error.Insufficient_fee)
+                                :: rejected ) )
             in
             match%map
               Interruptible.force
@@ -1297,6 +1360,8 @@ let%test_module _ =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let ledger_hash = Snark_params.Tick.Field.zero
+
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
         type t = Mock_staged_ledger.t
@@ -1390,8 +1455,8 @@ let%test_module _ =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
       let pool =
-        Test.create ~config ~logger ~constraint_constants ~consensus_constants
-          ~time_controller ~incoming_diffs:incoming_diff_r
+        Test.create ~config ~logger ~ledger_hash ~constraint_constants
+          ~consensus_constants ~time_controller ~incoming_diffs:incoming_diff_r
           ~local_diffs:local_diff_r ~frontier_broadcast_pipe:tf_pipe_r
         |> Test.resource_pool
       in
@@ -1831,7 +1896,7 @@ let%test_module _ =
               ~verifier
           in
           let pool =
-            Test.create ~config ~logger ~constraint_constants
+            Test.create ~config ~logger ~ledger_hash ~constraint_constants
               ~consensus_constants ~time_controller
               ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
               ~frontier_broadcast_pipe:frontier_pipe_r

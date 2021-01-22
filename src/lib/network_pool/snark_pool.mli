@@ -42,6 +42,7 @@ module type S = sig
   val load :
        config:Resource_pool.Config.t
     -> logger:Logger.t
+    -> ledger_hash:Mina_base.Ledger_hash.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t

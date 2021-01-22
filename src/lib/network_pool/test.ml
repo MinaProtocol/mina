@@ -19,6 +19,8 @@ let%test_module "network pool test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let ledger_hash = Snark_params.Tick.Field.zero
+
     module Mock_snark_pool =
       Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
         (Mocks.Transition_frontier)
@@ -57,9 +59,9 @@ let%test_module "network pool test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-              ~local_diffs:local_reader
+            Mock_snark_pool.create ~config ~logger ~ledger_hash
+              ~constraint_constants ~consensus_constants ~time_controller
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let%bind () = Mocks.Transition_frontier.refer_statements tf [work] in
@@ -131,9 +133,9 @@ let%test_module "network pool test" =
         in
         let config = config verifier in
         let network_pool =
-          Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
-            ~local_diffs:local_reader
+          Mock_snark_pool.create ~config ~logger ~ledger_hash
+            ~constraint_constants ~consensus_constants ~time_controller
+            ~incoming_diffs:pool_reader ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         let%bind () = Mocks.Transition_frontier.refer_statements tf works in

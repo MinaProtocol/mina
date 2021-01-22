@@ -20,6 +20,8 @@ module Base_ledger = struct
   let get t l = Map.find t l
 
   let detached_signal _ = Deferred.never ()
+
+  let merkle_root (_ : t) = Snark_params.Tick.Field.zero
 end
 
 module Staged_ledger = struct

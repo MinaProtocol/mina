@@ -97,6 +97,7 @@ module type S = sig
   val load :
        config:Resource_pool.Config.t
     -> logger:Logger.t
+    -> ledger_hash:Mina_base.Ledger_hash.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
@@ -312,7 +313,7 @@ struct
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~constraint_constants ~consensus_constants:_
+      let create ~ledger_hash:_ ~constraint_constants ~consensus_constants:_
           ~time_controller:_ ~frontier_broadcast_pipe ~config ~logger
           ~tf_diff_writer =
         let t =
@@ -529,8 +530,9 @@ struct
 
   let loaded = ref false
 
-  let load ~config ~logger ~constraint_constants ~consensus_constants
-      ~time_controller ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe =
+  let load ~config ~logger ~ledger_hash ~constraint_constants
+      ~consensus_constants ~time_controller ~incoming_diffs ~local_diffs
+      ~frontier_broadcast_pipe =
     if !loaded then
       failwith
         "Snark_pool.load should only be called once. It has been called twice." ;
@@ -557,8 +559,8 @@ struct
             frontier_broadcast_pipe pool ~tf_diff_writer ;
           network_pool
       | Error _e ->
-          create ~config ~logger ~constraint_constants ~consensus_constants
-            ~time_controller ~incoming_diffs ~local_diffs
+          create ~config ~logger ~ledger_hash ~constraint_constants
+            ~consensus_constants ~time_controller ~incoming_diffs ~local_diffs
             ~frontier_broadcast_pipe
     in
     store_periodically (resource_pool res) ;
@@ -628,6 +630,8 @@ let%test_module "random set test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let ledger_hash = Snark_params.Tick.Field.zero
+
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
         (Mocks.Transition_frontier)
@@ -684,8 +688,8 @@ let%test_module "random set test" =
         in
         let config = config verifier in
         let resource_pool =
-          Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~consensus_constants ~time_controller
+          Mock_snark_pool.create ~config ~logger ~ledger_hash
+            ~constraint_constants ~consensus_constants ~time_controller
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
           |> Mock_snark_pool.resource_pool
@@ -875,7 +879,7 @@ let%test_module "random set test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~config ~constraint_constants
+            Mock_snark_pool.create ~config ~ledger_hash ~constraint_constants
               ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
               ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -967,8 +971,8 @@ let%test_module "random set test" =
             in
             let config = config verifier in
             let network_pool =
-              Mock_snark_pool.create ~logger ~config ~constraint_constants
-                ~consensus_constants ~time_controller
+              Mock_snark_pool.create ~logger ~config ~ledger_hash
+                ~constraint_constants ~consensus_constants ~time_controller
                 ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
@@ -1029,8 +1033,9 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~constraint_constants ~consensus_constants ~time_controller
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~ledger_hash ~constraint_constants ~consensus_constants
+              ~time_controller ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

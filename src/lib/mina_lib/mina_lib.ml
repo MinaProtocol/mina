@@ -1232,9 +1232,15 @@ let create ?wallets (config : Config.t) =
               ~pool_max_size:
                 config.precomputed_values.genesis_constants.txpool_max_size
           in
+          let ledger_hash =
+            Ledger.merkle_root
+              (Lazy.force
+                 (Genesis_ledger.Packed.t
+                    config.precomputed_values.genesis_ledger))
+          in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
-              ~constraint_constants ~consensus_constants
+              ~ledger_hash ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Mina_networking.transaction_pool_diffs net)
               ~local_diffs:local_txns_reader
@@ -1444,7 +1450,7 @@ let create ?wallets (config : Config.t) =
               ~disk_location:config.snark_pool_disk_location
           in
           let%bind snark_pool =
-            Network_pool.Snark_pool.load ~config:snark_pool_config
+            Network_pool.Snark_pool.load ~config:snark_pool_config ~ledger_hash
               ~constraint_constants ~consensus_constants
               ~time_controller:config.time_controller ~logger:config.logger
               ~incoming_diffs:(Mina_networking.snark_pool_diffs net)

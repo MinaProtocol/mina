@@ -120,6 +120,7 @@ let%test_module "transaction_status" =
       in
       let transaction_pool =
         Transaction_pool.create ~config
+          ~ledger_hash:(Ledger.merkle_root (Lazy.force Genesis_ledger.t))
           ~constraint_constants:precomputed_values.constraint_constants
           ~consensus_constants:precomputed_values.consensus_constants
           ~time_controller ~incoming_diffs:pool_reader ~logger

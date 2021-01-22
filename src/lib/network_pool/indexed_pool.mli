@@ -38,7 +38,8 @@ type t [@@deriving sexp_of]
 
 (** Empty pool *)
 val empty :
-     constraint_constants:Genesis_constants.Constraint_constants.t
+     ledger_hash:Ledger_hash.t
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
   -> consensus_constants:Consensus.Constants.t
   -> time_controller:Block_time.Controller.t
   -> t
@@ -132,12 +133,32 @@ val find_by_hash :
 *)
 val revalidate :
      t
+  -> Ledger_hash.t
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Get the current global slot according to the pool's time controller. *)
 val current_global_slot : t -> Mina_numbers.Global_slot.t
+
+(** Get the root hash of the ledger against which this pool is valid. *)
+val valid_against_ledger : t -> Ledger_hash.t
+
+(** Wait until the next call to [revalidate].
+    This should be used in the case where the ledger has changed but the pool
+    has not yet been revalidated against the new ledger due to async
+    scheduling.
+*)
+val wait_for_next_revalidation : t -> Ledger_hash.t Async.Deferred.t
+
+(** Manually mark transition to a new ledger. This updates to a new ledger and
+    fires any [wait_for_next_revalidation] calls without requiring a full call
+    to [revalidate].
+    This should be used when handling a transition frontier diff, where we know
+    exactly the commands that were newly added (which should be removed from
+    the pool) and that were dropped (which may be re-added to the pool).
+*)
+val mark_transitioned_to_new_ledger : t -> Ledger_hash.t -> t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception
