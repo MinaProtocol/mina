@@ -2168,15 +2168,24 @@ module Mutations = struct
     User_command_input.create ~signer ~fee ~fee_token ~fee_payer_pk
       ?nonce:nonce_opt ~valid_until ~memo ~body ~sign_choice ()
 
-  let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
+  let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
       ~fee_token ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind signature = signature |> Deferred.return in
-    let%bind user_command_input =
+    let%map user_command_input =
       create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_token
         ~fee_payer_pk ~valid_until ~body
         ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
+    in
+    user_command_input
+
+  let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
+      ~fee_token ~fee_payer_pk ~valid_until ~body =
+    let open Deferred.Result.Let_syntax in
+    let%bind user_command_input =
+      make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
+        ~fee_token ~fee_payer_pk ~valid_until ~body
     in
     let%map cmd = send_user_command coda user_command_input in
     { With_hash.data= cmd
@@ -3040,6 +3049,46 @@ module Queries = struct
         let%map config = Mina_networking.connection_gating_config net in
         Ok config )
 
+  let validate_payment =
+    io_field "validatePayment"
+      ~doc:"Validate the format and signature of a payment"
+      ~typ:(non_null bool)
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.send_payment)
+          ; Types.Input.Fields.signature ]
+      ~resolve:
+        (fun {ctx= mina; _} ()
+             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
+             signature ->
+        let open Deferred.Result.Let_syntax in
+        let body =
+          Signed_command_payload.Body.Payment
+            { source_pk= from
+            ; receiver_pk= to_
+            ; token_id= Option.value ~default:Token_id.default token_id
+            ; amount= Amount.of_uint64 amount }
+        in
+        let fee_token = Token_id.default in
+        let%bind signature =
+          match signature with
+          | Some signature ->
+              return signature
+          | None ->
+              Deferred.Result.fail "Signature field is missing"
+        in
+        let%bind user_command_input =
+          Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
+            ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
+        in
+        let%map user_command, _ =
+          User_command_input.to_user_command
+            ~get_current_nonce:(Mina_lib.get_current_nonce mina)
+            user_command_input
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        Signed_command.check_signature user_command )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -3065,7 +3114,8 @@ module Queries = struct
     ; pending_snark_work
     ; genesis_constants
     ; time_offset
-    ; next_available_token ]
+    ; next_available_token
+    ; validate_payment ]
 end
 
 let schema =
