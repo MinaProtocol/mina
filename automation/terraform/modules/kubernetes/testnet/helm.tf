@@ -13,6 +13,14 @@ data "local_file" "genesis_ledger" {
   ]
 }
 
+data "local_file" "libp2p_peers" {
+  for_each = toset([ for config in var.block_producer_configs : config.name ])
+  filename = "../../../keys/libp2p/${var.testnet_name}/${each.key}"
+  depends_on = [
+    null_resource.block_producer_key_generation
+  ]
+}
+
 locals {
   use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
@@ -20,6 +28,8 @@ locals {
   seed_peers = [
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
   ]
+
+  all_seed_peers = [ for name in keys(data.local_file.libp2p_peers) : "/dns4/${name}.${var.testnet_name}/tcp/10501/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}"]
 
   coda_vars = {
     runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
@@ -99,6 +109,7 @@ locals {
         libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
+        seedPeers            = local.all_seed_peers
       }
     ]
   }
@@ -159,6 +170,10 @@ locals {
     }
   }
   
+}
+
+output all_seed_peers {
+  value = local.all_seed_peers
 }
 
 # Cluster-Local Seed Node

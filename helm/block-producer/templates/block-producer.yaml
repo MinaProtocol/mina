@@ -173,7 +173,7 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
-          {{- range $.Values.coda.seedPeers }}
+          {{- range $config.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
           "-config-directory", "/root/.coda-config",
