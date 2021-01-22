@@ -76,8 +76,9 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
 ls -lh mina*.deb
 
-# Remove generate-keypair binary before other builds with the same dir
+# Remove generate-keypair, validate-keypair binaries before other builds with the same dir
 rm -f "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+rm -f "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
