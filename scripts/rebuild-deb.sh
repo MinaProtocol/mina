@@ -47,7 +47,7 @@ License: Apache-2.0
 Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
-Installed-Size: 
+Installed-Size:
 Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
 Section: base
 Priority: optional
@@ -64,6 +64,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
