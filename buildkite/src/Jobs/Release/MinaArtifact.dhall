@@ -55,9 +55,6 @@ Pipeline.build
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
 
-      -- Tests that depend on the debian package
-      ConnectToTestnet.step dependsOn,
-
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
