@@ -960,7 +960,7 @@ struct
                         ~f:(Base_ledger.get ledger)
                     in
                     let new_ledger_hash = Base_ledger.merkle_root ledger in
-                    if Ledger_hash.equal ledger_hash new_ledger_hash then
+                    if not (Ledger_hash.equal ledger_hash new_ledger_hash) then
                       (* We return an interrupted [Interruptible.t] here
                          directly rather than wrapping the code below using a
                          bind. The underlying async bind may otherwise yeild to
