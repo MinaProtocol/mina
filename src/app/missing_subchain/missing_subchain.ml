@@ -147,28 +147,17 @@ let fill_in_user_command pool block_state_hash =
       in
       let memo = user_cmd.memo |> Signed_command_memo.of_string in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
-      let status = user_cmd.status in
-      let failure_reason =
-        Option.map user_cmd.failure_reason ~f:(fun s ->
-            match Transaction_status.Failure.of_string s with
-            | Ok fail ->
-                fail
-            | Error err ->
-                failwithf "Not a transaction status failure: %s, error: %s" s
-                  err () )
-      in
-      let fee_payer_account_creation_fee_paid =
-        Option.map user_cmd.fee_payer_account_creation_fee_paid ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
-      in
-      let receiver_account_creation_fee_paid =
-        Option.map user_cmd.receiver_account_creation_fee_paid ~f:(fun amt ->
-            Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
-      in
-      let created_token =
-        Option.map user_cmd.created_token ~f:(fun tok ->
-            Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64 )
-      in
+      (* TODO(psteckler): The status, failure_reason,
+       *   fee_payer_account_creation_fee_paid,
+       *   receiver_account_creation_fee_paid, and created_token columns were
+       *   moved from the user_columns table to the blocks_user_columns table so
+       *   an additional query is needed here in order to fill them in properly.
+       *)
+      let status = None in
+      let failure_reason = None in
+      let fee_payer_account_creation_fee_paid = None in
+      let receiver_account_creation_fee_paid = None in
+      let created_token = None in
       return
         { Extensional.User_command.sequence_no
         ; typ
