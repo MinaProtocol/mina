@@ -205,7 +205,6 @@ let main inputs =
           Deferred.bind ~f:Malleable_error.return
             (Engine.Network_manager.deploy net_manager)
         in
-        [%log info] "Network deployed" ;
         let%bind log_engine =
           Engine.Log_engine.create ~logger ~network
             ~on_fatal_error:(fun message ->
