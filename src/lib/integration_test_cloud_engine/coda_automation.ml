@@ -418,14 +418,24 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    { Kubernetes_network.namespace= t.namespace
-    ; constraint_constants= t.constraint_constants
-    ; genesis_constants= t.genesis_constants
-    ; block_producers= t.block_producer_pod_names
-    ; snark_coordinators= t.snark_coordinator_pod_names
-    ; archive_nodes= []
-    ; testnet_log_filter= t.testnet_log_filter
-    ; keypairs= t.keypairs }
+    let result =
+      { Kubernetes_network.namespace= t.namespace
+      ; constraint_constants= t.constraint_constants
+      ; genesis_constants= t.genesis_constants
+      ; block_producers= t.block_producer_pod_names
+      ; snark_coordinators= t.snark_coordinator_pod_names
+      ; archive_nodes= []
+      ; testnet_log_filter= t.testnet_log_filter
+      ; keypairs= t.keypairs }
+    in
+    [%log' info t.logger] "Network deployed" ;
+    [%log' info t.logger] "snark_coordinators_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.snark_coordinators) ;
+    [%log' info t.logger] "block_producers_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.block_producers) ;
+    [%log' info t.logger] "archive_nodes_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.archive_nodes) ;
+    result
 
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
