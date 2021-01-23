@@ -113,7 +113,7 @@ module Network_config = struct
       let keypairs =
         List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
       in
-      if List.length block_producers > List.length keypairs then
+      if num_block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
       let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
