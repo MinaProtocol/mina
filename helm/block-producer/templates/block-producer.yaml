@@ -188,8 +188,8 @@ spec:
           {{- end }}
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end -}}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
