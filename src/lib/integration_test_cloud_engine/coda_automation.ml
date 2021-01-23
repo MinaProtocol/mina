@@ -109,8 +109,11 @@ module Network_config = struct
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
-      let keypairs = Array.to_list (Lazy.force Sample_keypairs.keypairs) in
-      if List.length block_producers > List.length keypairs then
+      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
+      let keypairs =
+        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
+      in
+      if num_block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
       let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
