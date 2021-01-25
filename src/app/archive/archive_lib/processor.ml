@@ -323,10 +323,9 @@ module User_command = struct
     let load (module Conn : CONNECTION) ~(id : int) =
       Conn.find
         (Caqti_request.find Caqti_type.int typ
-           {sql| SELECT type,fee_payer_id,source_id,receiver_id,fee_token,token,
-                  nonce,amount,fee,valid_until,memo,hash,status,failure_reason,
-                  fee_payer_account_creation_fee_paid,receiver_account_creation_fee_paid,
-                  created_token
+           {sql| SELECT type,fee_payer_id,source_id,receiver_id,
+                 fee_token,token,
+                 nonce,amount,fee,valid_until,memo,hash
                  FROM user_commands
                  WHERE id = ?
            |sql})
@@ -722,6 +721,34 @@ module Block_and_internal_command = struct
 end
 
 module Block_and_signed_command = struct
+  type t =
+    { block_id: int
+    ; user_command_id: int
+    ; sequence_no: int
+    ; status: string option
+    ; failure_reason: string option
+    ; fee_payer_account_creation_fee_paid: int64 option
+    ; receiver_account_creation_fee_paid: int64 option
+    ; created_token: int64 option }
+  [@@deriving hlist]
+
+  let typ =
+    let open Caqti_type_spec in
+    let spec =
+      Caqti_type.
+        [ int
+        ; int
+        ; int
+        ; option string
+        ; option string
+        ; option int64
+        ; option int64
+        ; option int64 ]
+    in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
   let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
     Conn.exec
       (Caqti_request.exec
@@ -815,6 +842,23 @@ module Block_and_signed_command = struct
         return ()
     | None ->
         add (module Conn) ~block_id ~user_command_id ~sequence_no
+
+  let load (module Conn : CONNECTION) ~block_id ~user_command_id =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup2 int int)
+         typ
+         {sql| SELECT block_id, user_command_id,
+               sequence_no,
+               status,failure_reason,
+               fee_payer_account_creation_fee_paid,
+               receiver_account_creation_fee_paid,
+               created_token
+               FROM blocks_user_commands
+               WHERE block_id = $1
+               AND user_command_id = $2
+           |sql})
+      (block_id, user_command_id)
 end
 
 module Block = struct
