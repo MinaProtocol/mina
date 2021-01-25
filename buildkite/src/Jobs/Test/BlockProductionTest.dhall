@@ -33,6 +33,7 @@ Pipeline.build
           [ S.strictlyStart (S.contains "buildkite/src/Jobs/Test/BlockProductionTest")
           , S.strictlyStart (S.contains "buildkite/scripts/run-test.sh")
           , S.strictlyStart (S.contains "src/lib") ]
+        , path = "Test"
         , name = name
         }
     , steps = [ runTestExecutive ]
