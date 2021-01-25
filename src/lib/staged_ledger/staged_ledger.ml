@@ -591,7 +591,9 @@ module T = struct
                   | Some _ ->
                       ()
                   | None ->
-                      raise (Exit (Invalid_public_key fee_payer)) ) ;
+                      (* TODO: Enable this check. *)
+                      (*raise (Exit (Invalid_public_key fee_payer))*)
+                      () ) ;
                   match
                     apply_transaction_and_get_witness ~constraint_constants
                       ledger pending_coinbase_stack_state t.With_status.data
