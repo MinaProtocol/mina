@@ -9,7 +9,7 @@ let defaultArtifactStep = { name = "MinaArtifact", key = "mina-docker-image" }
 
 let deployEnv = "DOCKER_DEPLOY_ENV" in
 
-{ step = \(testnetName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
+{ step = \(testnetName : Text) -> \(dependsOn : List Command.TaggedKey.Type) -> \(postDeploy : Text) ->
     Command.build
       Command.Config::{
         commands = [
@@ -20,9 +20,11 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
           ),
           Cmd.run (
             -- TODO: update to allow for custom post-apply step(s)
-            "source ${deployEnv} && cd automation/terraform/testnets/${testnetName} && terraform init && terraform plan" ++
-            " && terraform apply -auto-approve -var coda_image=\\\"gcr.io/o1labs-192920/coda-daemon:\\\$CODA_DEB_VERSION\\\"" ++
-            " -var coda_archive_image=\\\"gcr.io/o1labs-192920/coda-archive:0.2.6-compatible\\\""
+            "source ${deployEnv} && cd automation/terraform/testnets/${testnetName}" ++
+            " && terraform init && terraform plan" ++
+            " && terraform apply -auto-approve -var coda_image=\\\"gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH\\\"" ++
+            " -var coda_archive_image=\\\"gcr.io/o1labs-192920/coda-archive:0.2.6-compatible\\\"" ++
+            " && ${postDeploy}"
           )
         ],
         label = "Deploy testnet: ${testnetName}",

@@ -21,6 +21,6 @@ in Pipeline.build Pipeline.Config::{
     name = "DeployTestnetAndDestroy"
   },
   steps = [
-    DeployTestnet.step testTestnet dependsOn
+    DeployTestnet.step testTestnet dependsOn "terraform destroy"
   ]
 }
