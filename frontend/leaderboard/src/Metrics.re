@@ -133,7 +133,6 @@ let filterNonePromises = challenges => {
   );
 };
 
-
 let calculateMetrics =
     (users, blocksChallenge, snarkChallenge, transactionChallenge) => {
   let usersMap =
