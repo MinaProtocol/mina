@@ -222,14 +222,14 @@ locals {
 
         set -eou pipefail
 
-        # Download and install NodeJS tools
+        # Download and install NodeJS
         curl -sL https://deb.nodesource.com/setup_12.x | bash -
         apt-get install -y nodejs
 
-        # Build coda-network libraries
-        mkdir -p /tmp/test && git clone https://github.com/MinaProtocol/mina.git /tmp/test
-        cd /tmp/test/mina/automation && npm install -g && npm install -g yarn
-        yarn install & yarn build
+        # Build coda-network library
+        mkdir -p /tmp/mina && git clone https://github.com/MinaProtocol/mina.git /tmp/mina
+        cd /tmp/mina/automation && npm install -g && npm install -g yarn
+        yarn install && yarn build
         chmod +x bin/coda-network && ln --symbolic --force bin/coda-network /usr/local/bin/coda-network
       EOF
 
