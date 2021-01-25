@@ -672,6 +672,30 @@ module Coinbase = struct
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
+module Balance = struct
+  type t = {id: int; public_key_id: int; balance: int64} [@@deriving hlist]
+
+  let typ =
+    let open Caqti_type_spec in
+    let spec = Caqti_type.[int; int; int64] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let add (module Conn : CONNECTION) ~(public_key_id : int)
+      ~(balance : Currency.Balance.t) =
+    let balance =
+      balance |> Currency.Balance.to_amount |> Currency.Amount.to_uint64
+      |> Unsigned.UInt64.to_int64
+    in
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup2 int int64)
+         Caqti_type.int
+         {sql| INSERT INTO balances (public_key_id, balance) VALUES (?, ?) RETURNING id |sql})
+      (public_key_id, balance)
+end
+
 module Block_and_internal_command = struct
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
