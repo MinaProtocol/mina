@@ -6,7 +6,7 @@ pub struct CamlPointer<T>(pub Rc<T>);
 
 impl<T> CamlPointer<T> {
     extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
-        let mut v: ocaml::Pointer<CamlPointer<T>> = ocaml::FromValue::from_value(v);
+        let v: ocaml::Pointer<CamlPointer<T>> = ocaml::FromValue::from_value(v);
         unsafe {
             v.drop_in_place();
         }
