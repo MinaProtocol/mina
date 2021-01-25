@@ -354,16 +354,54 @@ module Types = struct
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "timed_minimum_balance" ~typ:(non_null uint64)
-            ~doc:"The timed minimum balance for an account"
+        [ field "timed_minimum_balance" ~typ:uint64
+            ~doc:"The timed minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
               match timing with
               | Account_timing.Untimed ->
-                  Balance.(zero |> to_uint64)
+                  None
               | Timed timing_info ->
-                  timing_info.initial_minimum_balance |> Balance.to_uint64 ) ]
-    )
+                  Some (Balance.to_uint64 timing_info.initial_minimum_balance)
+              )
+        ; field "cliff_time" ~typ:uint32
+            ~doc:"The cliff time for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some timing_info.cliff_time )
+        ; field "cliff_amount" ~typ:uint64
+            ~doc:"The cliff amount for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some (Currency.Amount.to_uint64 timing_info.cliff_amount) )
+        ; field "vesting_period" ~typ:uint32
+            ~doc:"The vesting period for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some timing_info.vesting_period )
+        ; field "vesting_increment" ~typ:uint64
+            ~doc:"The vesting increment for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some
+                    (Currency.Amount.to_uint64 timing_info.vesting_increment)
+              ) ] )
 
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
