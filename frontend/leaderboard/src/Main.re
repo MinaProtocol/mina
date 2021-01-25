@@ -1,10 +1,10 @@
 /*
  Main.re is the entry point of the leaderboard project.
 
- Main.re has the responsibilities for querying the archive postgres database for
- all the blockchain data and parsing the rows into blocks.
+ Main.re has the responsibilities of being the driver to upload all necessary
+ information to the google sheets.
 
- Additionally, Main.re expects to have the credentials, spreadsheet id, and postgres
+ Additionally, Main.re expects to have the  spreadsheet id, and postgres
  connection string available in the form of environment variables.  */
 
 let getEnvOrFail = name =>
@@ -26,64 +26,33 @@ let pgConnectionCurr = getEnvOrFail("PGCONN1");
 let pgConnectionPrev = getEnvOrFail("PGCONN2");
 
 let main = () => {
-  let currPool = Postgres.createPool(pgConnectionCurr);
-  let prevPool = Postgres.createPool(pgConnectionPrev);
-  Js.log("First Query - In Progress");
-  Postgres.makeQuery(prevPool, Postgres.getBlocks, result => {
-    switch (result) {
-    | Ok(prevBlocks) =>
-      Js.log("First Query - Finished");
-      Js.log("Second Query - In Progress");
-      Postgres.makeQuery(currPool, Postgres.getBlocks, result => {
-        switch (result) {
-        | Ok(currBlocks) =>
-          Js.log("Second Query - Finished");
-          let blocks = Belt.Array.concat(prevBlocks, currBlocks);
-          Js.log("Length of all blocks: ");
+  open Js.Promise;
+  let pool = Postgres.createPool(pgConnectionCurr);
+  let poolOld = Postgres.createPool(pgConnectionPrev);
 
-          Js.log("Metrics - In Progress");
-          let metrics =
-            blocks
-            |> Types.Block.parseBlocks
-            |> Types.Block.filterDuplicateBlockCreatorSlots
-            |> Metrics.calculateMetrics;
-
-          Js.log("Metrics - Finished");
-
-          UploadLeaderboardPoints.uploadChallengePoints(
-            spreadsheetId, metrics, () => {
-            Postgres.makeQuery(currPool, Postgres.getBlockHeight, result => {
-              switch (result) {
-              | Ok(blockHeightQuery) =>
-                Belt.Option.(
-                  Js.Json.(
-                    blockHeightQuery[0]
-                    ->decodeObject
-                    ->flatMap(__x => Js.Dict.get(__x, "max"))
-                    ->flatMap(decodeString)
-                    ->mapWithDefault((), height => {
-                        UploadLeaderboardData.uploadData(
-                          spreadsheetId,
-                          height,
-                        )
-                      })
-                  )
-                );
-                UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
-                Postgres.endPool(currPool);
-                Postgres.endPool(prevPool);
-              | Error(error) => Js.log(error)
-              }
-            })
-          });
-
-        | Error(error) => Js.log(error)
-        }
-      });
-
-    | Error(error) => Js.log(error)
-    }
-  });
+  Metrics.calculateMetricsAndUploadPoints(pool, poolOld, spreadsheetId)
+  |> then_(_ => {
+       Postgres.makeQuery(pool, Postgres.getBlockHeight)
+       |> then_(blockHeight => {
+            switch (Postgres.getRow(blockHeight, "max", 0)) {
+            | Some(height) =>
+              UploadLeaderboardData.uploadData(spreadsheetId, height)
+            | None => ()
+            };
+            resolve();
+          })
+       |> then_(_ => {
+            UploadLeaderboardData.uploadUserProfileData(spreadsheetId);
+            resolve();
+          })
+       |> then_(_ => {
+            Postgres.endPool(pool);
+            Postgres.endPool(poolOld);
+            resolve();
+          })
+       |> ignore;
+       resolve();
+     });
 };
 
 main();

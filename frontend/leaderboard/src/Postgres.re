@@ -1,34 +1,78 @@
 open Bindings.Postgres;
 
-let getBlocks = "SELECT b.id AS blockid, b.global_slot AS globalslot, uc.id AS userCommandId, uc.hash AS userCommandHash, uc.nonce as userCommandNonce, uc.id AS internalCommandId, ic.hash AS internalCommandHash, b.state_hash, pk1.value AS blockcreatorAccount, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, uc.type AS userCommandType, uc.status AS userCommandStatus, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount
-FROM blocks AS b
-LEFT JOIN public_keys AS pk1 ON b.creator_id = pk1.id
+let getUsers = "SELECT * FROM public_keys";
 
-LEFT JOIN blocks_internal_commands AS bic ON b.id = bic.block_id
-LEFT JOIN internal_commands AS ic ON ic.id = bic.internal_command_id
+let getBlocksChallenge = pk => {
+  {j|
+    SELECT COUNT(*)
+    FROM
+      (SELECT DISTINCT ON (global_slot) global_slot, state_hash
+      FROM blocks
+      INNER JOIN public_keys AS p ON creator_id=p.id
+      WHERE p.value = '$(pk)') AS blocksCreated
+  |j};
+};
 
-LEFT JOIN blocks_user_commands AS buc ON b.id = buc.block_id
-LEFT JOIN user_commands AS uc ON uc.id = buc.user_command_id
+let getTransactionsSentChallenge = pk => {
+  {j|
+    SELECT COUNT(*)
+    FROM user_commands
+    INNER JOIN public_keys AS p ON source_id=p.id
+    WHERE status = 'applied'
+    AND type = 'payment'
+    AND p.value = '$(pk)'
+  |j};
+};
 
-LEFT JOIN public_keys AS pk2 ON ic.receiver_id = pk2.id
-LEFT JOIN public_keys AS pk4 ON uc.source_id = pk4.id
-LEFT JOIN public_keys AS pk5 ON uc.receiver_id = pk5.id";
+let getSnarkFeeChallenge = pk => {
+  {j|
+    SELECT SUM(fee)
+    FROM internal_commands
+    INNER JOIN public_keys AS p ON receiver_id=p.id
+    WHERE type = 'fee_transfer'
+    AND p.value = '$(pk)'
+  |j};
+};
 
 let getBlockHeight = "SELECT MAX(height) FROM blocks";
 
 let createPool = pgConn => {
-  makePool({connectionString: pgConn, connectionTimeoutMillis: 5000});
+  makePool({connectionString: pgConn, connectionTimeoutMillis: 900000});
 };
 
 let endPool = pool => {
   endPool(pool);
 };
 
-let makeQuery = (pool, queryText, cb) => {
-  query(pool, queryText, (~error, ~res) => {
-    switch (Js.Nullable.toOption(error)) {
-    | None => cb(Ok(res.rows))
-    | Some(error) => cb(Error(error))
-    }
+let makeQuery = (pool, queryText) => {
+  Js.Promise.make((~resolve, ~reject) => {
+    query(pool, queryText, (~error, ~res) => {
+      switch (Js.Nullable.toOption(error)) {
+      | None => resolve(. res.rows)
+      | Some(error) => reject(. failwith(error))
+      }
+    })
   });
+};
+
+let getColumn = (cell, columnName) => {
+  Belt.Option.(
+    Js.Json.(
+      cell
+      ->decodeObject
+      ->flatMap(x => Js.Dict.get(x, columnName))
+      ->flatMap(decodeString)
+    )
+  );
+};
+
+let getRow = (cell, columnName, index) => {
+  Belt.Option.(
+    Js.Json.(
+      cell[index]
+      ->decodeObject
+      ->flatMap(x => Js.Dict.get(x, columnName))
+      ->flatMap(decodeString)
+    )
+  );
 };
