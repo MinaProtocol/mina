@@ -608,6 +608,32 @@ let setup_daemon logger =
                 ; ("error", Error_json.error_to_yojson err) ] ;
             Error.raise err
       in
+      let module T = struct
+        type t =
+          Proof.Stable.Latest.t
+          * Mina_state.Protocol_state.Value.Stable.Latest.t
+          * Account.Stable.Latest.t
+          * [ `Left of Ledger_hash.Stable.Latest.t
+            | `Right of Ledger_hash.Stable.Latest.t ]
+            list
+        [@@deriving bin_io_unversioned]
+      end in
+      (let ledger =
+         Genesis_ledger.Packed.t precomputed_values.genesis_ledger
+         |> Lazy.force
+       in
+       let loc, account =
+         with_return (fun {return} ->
+             Ledger.iteri ledger ~f:(fun i a -> return (i, a)) ;
+             failwith "empty" )
+       in
+       let path = Ledger.merkle_path_at_index_exn ledger loc in
+       Core.printf "the size is %d\n%!"
+         (T.bin_size_t
+            ( precomputed_values.genesis_proof
+            , precomputed_values.protocol_state_with_hash.data
+            , account
+            , path ))) ;
       let rev_daemon_configs =
         List.rev_filter_map config_jsons ~f:(fun (config_file, config_json) ->
             Option.map
