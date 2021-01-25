@@ -22,7 +22,7 @@ let runTestExecutive =
       , key = "run-test-executive"
       , target = Size.Large
       , docker = None Docker.Type
-      , depends_on = [ { name = "Artifact", key = "docker-artifact" } ]
+      , depends_on = [ { name = "MinaArtifact", key = "build-deb-pkg" } ]
       }
 in
 Pipeline.build
