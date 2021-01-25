@@ -86,3 +86,14 @@ let next_available_token (t : t) next_available_token =
       next_available_token
   | Coinbase _ ->
       next_available_token
+
+let fee_payer_pk (t : t) =
+  match t with
+  | Command (Signed_command cmd) ->
+      Signed_command.fee_payer_pk cmd
+  | Command (Snapp_command t) ->
+      Snapp_command.fee_payer t |> Account_id.public_key
+  | Fee_transfer ft ->
+      Fee_transfer.fee_payer_pk ft
+  | Coinbase cb ->
+      Coinbase.fee_payer_pk cb

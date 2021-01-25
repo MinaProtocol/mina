@@ -457,8 +457,19 @@ struct
                     false )
         in
         match One_or_two.zip proofs statements with
-        | Ok pairs ->
-            verify pairs
+        | Ok pairs -> (
+          match Signature_lib.Public_key.decompress prover with
+          | Some _ ->
+              verify pairs
+          | None ->
+              (* We may need to decompress the key when paying the fee
+                 transfer, so check that we can do it now.
+              *)
+              [%log' error t.logger] "Proof had an invalid key: $public_key"
+                ~metadata:
+                  [ ( "public_key"
+                    , Signature_lib.Public_key.Compressed.to_yojson prover ) ] ;
+              Deferred.return false )
         | Error e ->
             [%log' error t.logger]
               ~metadata:[("error", Error_json.error_to_yojson e)]
