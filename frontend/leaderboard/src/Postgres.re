@@ -27,10 +27,22 @@ let getTransactionsSentChallenge = pk => {
 let getSnarkFeeChallenge = pk => {
   {j|
     SELECT SUM(fee)
-    FROM internal_commands
-    INNER JOIN public_keys AS p ON receiver_id=p.id
+    FROM internal_commands as ic
+    INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
+    INNER JOIN blocks as b ON b.id = bic.block_id
+    INNER JOIN public_keys as p ON p.id=ic.receiver_id
     WHERE type = 'fee_transfer'
-    AND p.value = '$(pk)'
+    AND value = '$(pk)'
+    AND b.id NOT IN
+    (
+      SELECT b.id
+      FROM internal_commands as ic
+      INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
+      INNER JOIN blocks as b ON b.id = bic.block_id
+      INNER JOIN public_keys as p ON p.id=b.creator_id
+      WHERE type = 'coinbase'
+      AND value = '$(pk)'
+    )
   |j};
 };
 
