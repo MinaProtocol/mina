@@ -77,7 +77,11 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer
                 ; token_locked= false } }
-        ; signer= Public_key.decompress_exn pk2
+        ; signer=
+            ( try Public_key.decompress_exn pk2
+              with _ ->
+                let keypairs = Lazy.force Sample_keypairs.keypairs in
+                Public_key.decompress_exn (fst keypairs.(0)) )
         ; signature= Signature.dummy }
       in
       match Fee_transfer.to_singles tr with
