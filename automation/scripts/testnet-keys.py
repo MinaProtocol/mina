@@ -13,7 +13,7 @@ import natsort
 client = docker.from_env()
 p = inflect.engine()
 
-CODA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon-baked:0.2.6-5c08d6d-5c08d6d-testworld-2258826"
+CODA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:0.2.6-5c08d6d"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # Default output folders for various kinds of keys
@@ -322,7 +322,7 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                     online_fish_accounts_directory,
                     offline_fish_accounts_directory, staker_csv_file):
     """
-    Generates a Genesis Ledger based on previously generated Whale, Fish, and Block Producer keys. 
+    Generates a Genesis Ledger based on previously generated Whale, Fish, and Block Producer keys.
     If keys are not present on the filesystem at the specified location, they are not generated.
     """
 
