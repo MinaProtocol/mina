@@ -23,7 +23,7 @@ module Make (Engine : Engine_intf) = struct
     in
     { default with
       block_producers=
-        [ {balance= "1000"; timing= Untimed}
+        [ {balance= "1000"; timing}
         ; {balance= "1000"; timing}
         ; {balance= "1000"; timing} ]
     ; num_snark_workers= 0 }
@@ -81,8 +81,11 @@ module Make (Engine : Engine_intf) = struct
         (String.concat ~sep:" " visible_peers_of_node) ;
       List.iter expected_peers_of_node ~f:(fun p ->
           assert (List.exists visible_peers_of_node ~f:(String.equal p)) )
-      (* loop through visible_peers_of_node and make sure everything in that list is also in expected_peers_of_node *)
+      (* loop through expected_peers_of_node and make sure everything in that list is also in visible_peers_of_node  *)
     in
     [%log info] "mina_peers_test: making assertions" ;
-    return (List.iter query_results ~f:test_compare_func)
+    let result = return (List.iter query_results ~f:test_compare_func) in
+    [%log info]
+      "mina_peers_test: assertions passed, peers test successfully ran!!!" ;
+    result
 end
