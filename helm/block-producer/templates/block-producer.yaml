@@ -173,6 +173,9 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
+          {{- if $config.libp2pSecret }}
+          "-discovery-keypair", "/root/libp2p-keys/key",
+          {{- end -}}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
@@ -210,6 +213,10 @@ spec:
           value: "mina_network_block_data"
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
+        {{- if $config.libp2pSecret }}
+        - name: CODA_LIBP2P_PASS
+          value: {{ $.Values.coda.privkeyPass | quote }}
+        {{- end -}}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
@@ -235,6 +242,10 @@ spec:
           mountPath: /root/wallet-keys
         - name: config-dir
           mountPath: /root/.coda-config
+        {{- if $config.libp2pSecret }}
+        - name: libp2p-keys
+          mountPath: /root/libp2p-keys
+        {{- end -}}
         {{- if $.Values.coda.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
@@ -254,6 +265,17 @@ spec:
             path: key
           - key: pub
             path: key.pub
+      {{- if $config.libp2pSecret }}
+      - name: libp2p-keys
+        secret:
+          secretName: {{ $config.libp2pSecret }}
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end -}}
       {{ if $config.runWithBots }}
       - name: echo-service-key
         secret:
