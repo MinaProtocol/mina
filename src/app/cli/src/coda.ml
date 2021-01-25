@@ -608,6 +608,13 @@ let setup_daemon logger =
                 ; ("error", Error_json.error_to_yojson err) ] ;
             Error.raise err
       in
+      let module Merkle_path = struct
+        type t =
+          [ `Left of Ledger_hash.Stable.Latest.t
+          | `Right of Ledger_hash.Stable.Latest.t ]
+          list
+        [@@deriving bin_io_unversioned]
+      end in
       let module T = struct
         type t =
           Proof.Stable.Latest.t
@@ -628,7 +635,15 @@ let setup_daemon logger =
              failwith "empty" )
        in
        let path = Ledger.merkle_path_at_index_exn ledger loc in
-       Core.printf "the size is %d\n%!"
+       Core.printf "Proof size: %d\n%!"
+         (Proof.Stable.Latest.bin_size_t precomputed_values.genesis_proof) ;
+       Core.printf "Protocol State size: %d\n%!"
+         (Mina_state.Protocol_state.Value.Stable.Latest.bin_size_t
+            precomputed_values.protocol_state_with_hash.data) ;
+       Core.printf "Account size: %d\n%!"
+         (Account.Stable.Latest.bin_size_t account) ;
+       Core.printf "Path size: %d\n%!" (Merkle_path.bin_size_t path) ;
+       Core.printf "Total size (combined): %d\n%!"
          (T.bin_size_t
             ( precomputed_values.genesis_proof
             , precomputed_values.protocol_state_with_hash.data
@@ -692,10 +707,10 @@ let setup_daemon logger =
       (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
       let _max_concurrent_connections =
         (*if
-             or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
-               ~default:true limit_connections
-           then Some 40
-           else *)
+          or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
+          ~default:true limit_connections
+          then Some 40
+          else *)
         None
       in
       let work_selection_method =
