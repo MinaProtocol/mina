@@ -99,7 +99,10 @@ CREATE TABLE blocks_user_commands
 , failure_reason  text
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
-, created_token   bigint
+, created_token     bigint
+, fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
+, source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
+, receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE
 , PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
 
