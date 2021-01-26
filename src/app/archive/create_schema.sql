@@ -89,7 +89,7 @@ CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
 , sequence_no     int NOT NULL
-, status          user_command_status
+, status          user_command_status NOT NULL
 , failure_reason  text
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint

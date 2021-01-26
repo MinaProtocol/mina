@@ -725,7 +725,7 @@ module Block_and_signed_command = struct
     { block_id: int
     ; user_command_id: int
     ; sequence_no: int
-    ; status: string option
+    ; status: string
     ; failure_reason: string option
     ; fee_payer_account_creation_fee_paid: int64 option
     ; receiver_account_creation_fee_paid: int64 option
@@ -739,7 +739,7 @@ module Block_and_signed_command = struct
         [ int
         ; int
         ; int
-        ; option string
+        ; string
         ; option string
         ; option int64
         ; option int64
@@ -819,12 +819,12 @@ module Block_and_signed_command = struct
     ignore (fee_payer_balance, source_balance, receiver_balance) ;
     add
       (module Conn)
-      ~block_id ~user_command_id ~sequence_no ~status:(Some status_str)
+      ~block_id ~user_command_id ~sequence_no ~status:status_str
       ~failure_reason ~fee_payer_account_creation_fee_paid
       ~receiver_account_creation_fee_paid ~created_token
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~user_command_id ~sequence_no =
+      ~user_command_id ~sequence_no ~(status : string) =
     let open Deferred.Result.Let_syntax in
     match%bind
       Conn.find_opt
@@ -843,8 +843,8 @@ module Block_and_signed_command = struct
     | None ->
         add
           (module Conn)
-          ~block_id ~user_command_id ~sequence_no ~status:None
-          ~failure_reason:None ~fee_payer_account_creation_fee_paid:None
+          ~block_id ~user_command_id ~sequence_no ~status ~failure_reason:None
+          ~fee_payer_account_creation_fee_paid:None
           ~receiver_account_creation_fee_paid:None ~created_token:None
 
   let load (module Conn : CONNECTION) ~block_id ~user_command_id =
@@ -1210,7 +1210,7 @@ module Block = struct
             ; timestamp= block.timestamp |> Block_time.to_int64 }
     in
     (* add user commands *)
-    let%bind user_cmd_ids_and_seq_nos =
+    let%bind user_cmds_with_ids =
       let%map user_cmd_ids_rev =
         deferred_result_list_fold block.user_cmds ~init:[]
           ~f:(fun acc user_cmd ->
@@ -1221,19 +1221,17 @@ module Block = struct
             in
             cmd_id :: acc )
       in
-      let sequence_nos =
-        List.map block.user_cmds ~f:(fun user_cmd -> user_cmd.sequence_no)
-      in
-      List.zip_exn (List.rev user_cmd_ids_rev) sequence_nos
+      List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
     in
     (* add user commands to join table *)
     let%bind () =
-      deferred_result_list_fold user_cmd_ids_and_seq_nos ~init:()
-        ~f:(fun () (user_command_id, sequence_no) ->
+      deferred_result_list_fold user_cmds_with_ids ~init:()
+        ~f:(fun () (user_command, user_command_id) ->
           (* TODO: Have this use Block_and_signed_command.add_with_status instead *)
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
-            ~block_id ~user_command_id ~sequence_no )
+            ~block_id ~user_command_id ~sequence_no:user_command.sequence_no
+            ~status:user_command.status )
     in
     (* add internal commands *)
     let%bind internal_cmd_ids_and_seq_nos =
