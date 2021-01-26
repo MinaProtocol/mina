@@ -6598,8 +6598,8 @@
           "description": null,
           "fields": [
             {
-              "name": "timed_minimum_balance",
-              "description": "The timed minimum balance for an account",
+              "name": "initial_mininum_balance",
+              "description": "The initial minimum balance for a time-locked account",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -6611,7 +6611,7 @@
             },
             {
               "name": "cliff_time",
-              "description": "Cliff amount",
+              "description": "The cliff time for a time-locked account",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -6623,7 +6623,7 @@
             },
             {
               "name": "cliff_amount",
-              "description": "Cliff amount",
+              "description": "The cliff amount for a time-locked account",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -6635,7 +6635,7 @@
             },
             {
               "name": "vesting_period",
-              "description": "",
+              "description": "The vesting period for a time-locked account",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -6647,7 +6647,7 @@
             },
             {
               "name": "vesting_increment",
-              "description": "Cliff amount",
+              "description": "The vesting increment for a time-locked account",
               "args": [],
               "type": {
                 "kind": "SCALAR",

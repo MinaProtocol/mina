@@ -354,8 +354,8 @@ module Types = struct
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
-        [ field "timed_minimum_balance" ~typ:uint64
-            ~doc:"The timed minimum balance for a time-locked account"
+        [ field "initial_mininum_balance" ~typ:uint64
+            ~doc:"The initial minimum balance for a time-locked account"
             ~args:Arg.[]
             ~resolve:(fun _ timing ->
               match timing with
