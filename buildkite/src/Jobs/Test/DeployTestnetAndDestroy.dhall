@@ -9,7 +9,7 @@ let testTestnet = "ci-net"
 let dependsOn = [
     { name = "MinaArtifact", key = "mina-docker-image" }
 ]
-let deployDestroyOp = "terraform destroy"
+let deployDestroyOp = "sleep 60 && terraform destroy -auto-approve"
 
 in Pipeline.build Pipeline.Config::{
   spec =
