@@ -22,7 +22,7 @@ data "local_file" "libp2p_peers" {
 }
 
 locals {
-  use_local_charts = false
+  use_local_charts = true
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
@@ -234,7 +234,7 @@ resource "helm_release" "block_producers" {
   name        = "${var.testnet_name}-block-producers"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version     = "0.4.5"
+  version     = "0.5.0"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)

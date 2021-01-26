@@ -43,6 +43,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-2"
     externalPort: 2
     runWithUserAgent: true
@@ -51,6 +52,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-3"
     externalPort: 3
     runWithUserAgent: false
@@ -59,6 +61,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-4"
     externalPort: 4
     runWithUserAgent: true
@@ -67,6 +70,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
 
 healthcheck:
   failureThreshold: 60

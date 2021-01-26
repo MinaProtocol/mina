@@ -60,6 +60,19 @@ spec:
         env: 
           - name: CODA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
+      {{ if $config.libp2pSecret -}}
+      - name: libp2p-perms
+        image: {{ $.Values.coda.image | quote }}
+        command:
+        - bash
+        - -c
+        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: libp2p-keys
+          mountPath: /libp2p-keys
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+      {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
@@ -216,7 +229,7 @@ spec:
         {{- if $config.libp2pSecret }}
         - name: CODA_LIBP2P_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
-        {{- end -}}
+        {{- end }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
@@ -243,9 +256,9 @@ spec:
         - name: config-dir
           mountPath: /root/.coda-config
         {{- if $config.libp2pSecret }}
-        - name: libp2p-keys
+        - name: actual-libp2p
           mountPath: /root/libp2p-keys
-        {{- end -}}
+        {{- end }}
         {{- if $.Values.coda.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
@@ -269,13 +282,13 @@ spec:
       - name: libp2p-keys
         secret:
           secretName: {{ $config.libp2pSecret }}
-          defaultMode: 256
+          defaultMode: 0700
           items:
           - key: key
             path: key
           - key: pub
             path: key.pub
-      {{- end -}}
+      {{- end }}
       {{ if $config.runWithBots }}
       - name: echo-service-key
         secret:
@@ -299,6 +312,8 @@ spec:
       - name: wallet-keys
         emptyDir: {}
       - name: config-dir
+        emptyDir: {}
+      - name: actual-libp2p
         emptyDir: {}
       {{- if $.Values.coda.runtimeConfig }}
       - name: daemon-config
