@@ -3076,7 +3076,7 @@
               "isDeprecated": false,
               "deprecationReason": null
             },
-	    {
+            {
               "name": "archiveExtensionalBlock",
               "description": null,
               "args": [
@@ -4024,7 +4024,7 @@
             },
             {
               "name": "amount",
-	      "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4088,7 +4088,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4409,7 +4409,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4730,7 +4730,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5055,7 +5055,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5280,7 +5280,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description": "Amount that the source is sending to receiver - 0 for commands that are not associated with an amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6492,7 +6492,7 @@
         {
           "kind": "OBJECT",
           "name": "AnnotatedBalance",
-          "description": "A total balance annotated with the amount that is currently unknown with the invariant: unknown <= total",
+          "description": "A total balance annotated with the amount that is currently unknown with the invariant unknown <= total, as well as the currently liquid and locked balances.",
           "fields": [
             {
               "name": "total",
@@ -6525,6 +6525,28 @@
               },
               "isDeprecated": true,
               "deprecationReason": null
+            },
+            {
+              "name": "liquid",
+              "isDeprecated": true,
+              "args": [],
+              "deprecationReason": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64"
+              },
+              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping."
+            },
+            {
+              "name": "locked",
+              "isDeprecated": true,
+              "args": [],
+              "deprecationReason": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64"
+              },
+              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping."
             },
             {
               "name": "blockHeight",
@@ -7821,6 +7843,26 @@
               "deprecationReason": null
             },
             {
+              "name": "catchupStatus",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "blockProductionKeys",
               "description": null,
               "args": [],
@@ -8151,7 +8193,7 @@
             },
             {
               "name": "account",
-              "description": "Find any account via a public key",
+              "description": "Find any account via a public key and token",
               "args": [
                 {
                   "name": "token",
@@ -8291,6 +8333,33 @@
                     "ofType": null
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "block",
+              "description": "Retrieve a block with the given state hash, if contained in the transition frontier.",
+              "args": [
+                {
+                  "name": "stateHash",
+                  "description": "The state hash of the desired block",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Block",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8592,6 +8661,47 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "validatePayment",
+              "description": "Validate the format and signature of a payment",
+              "args": [
+                {
+                  "name": "signature",
+                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "SignatureInput",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SendPaymentInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },

@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Coda protocol Testnet snark-coordinator and associated workers.
+This chart bootstraps a Mina protocol Testnet snark-coordinator and associated workers.
 
-## Add Coda Helm chart repository:
+## Add Mina Helm chart repository:
 
  ```console
- helm repo add coda https://coda-charts.storage.googleapis.com
+ helm repo add mina https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -17,9 +17,9 @@ The following table lists the configurable parameters of the `snark-worker` char
 
 Parameter | Description
 --- | ---
-`testnetName` | Coda protocol testnet name to deploy to
-`coordinator.publicKey` | Coda account/wallet public key to use for registering for SNARK work payments
-`coda.seedPeers` | peers to bootstrap the the archive node's Coda daemon
+`testnetName` | Mina protocol testnet name to deploy to
+`coordinator.publicKey` | Mina account/wallet public key to use for registering for SNARK work payments
+`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon
 
 ### Optional Settings
 
@@ -29,16 +29,16 @@ Parameter | Description | Default
 `coordinator.fullname` | k8s pod name of snark coordinator to deploy | `see [default] values.yaml`
 `coordinator.snarkFee` | Fee to charge for processing SNARK work | `0.025`
 `coordinator.workSelectionAlgorithm` | SNARK work selection and assignment algorithm | `seq`
-`coordinator.hostPort` | Coda client external port | `10001`
-`coordinator.rpcPort` | Coda client peer communication port | `8301`
+`coordinator.hostPort` | Mina client external port | `10001`
+`coordinator.rpcPort` | Mina client peer communication port | `8301`
 `worker.active` | Whether to activate testnet client with SNARK workers | `true`
 `worker.fullname` | k8s pod name of snark worker to deploy | `see [default] values.yaml`
 `worker.numReplicas` | Number of SNARK workers to provision and manage by coordinator | `1`
 `worker.remoteCoordinatorHost` | Host address to access a remote coordinator | `see [default] values.yaml`
 `worker.remoteCoordinatorPort` | Host port to access a remote coordinator | `8301`
-`coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.12-beta-develop-589b507`
-`coda.genesis` | Coda genesis constants | `see [defaults] values.yaml`
-`coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
+`coda.image` | container image to use for operating the archive node's Mina daemon | `codaprotocol/coda-daemon:0.0.12-beta-develop-589b507`
+`coda.genesis` | Mina genesis constants | `see [defaults] values.yaml`
+`coda.runtimeConfig` | Mina daemon configuration to use at runtime | `undefined`
 
 ## snark-worker launch examples
 

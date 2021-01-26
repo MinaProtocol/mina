@@ -9,4 +9,4 @@ namespace="$1"
 seed=$(kubectl get pods -n $namespace | grep 'seed' | sed -n '1 p' | awk '{print $1;}');
 
 
-kubectl exec $seed -n $namespace -c coda-network-services -- /bin/bash -c "kill \$(ls /proc | grep -v [a-z] | tr '\n' ' ')"
+kubectl exec $seed -n $namespace -c watchdog -- /bin/bash -c "kill \$(ls /proc | grep -v [a-z] | tr '\n' ' ')"

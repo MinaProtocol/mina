@@ -29,11 +29,17 @@ module Make (Engine : Engine_intf) = struct
     let%bind () = Log_engine.wait_for_init node_a log_engine in
     let%bind () = Log_engine.wait_for_init node_b log_engine in
     let%bind _ =
-      Log_engine.wait_for ~blocks:2 ~timeout:(`Slots 20) log_engine
+      Log_engine.wait_for log_engine
+        { hard_timeout= Slots 20
+        ; soft_timeout= None
+        ; predicate= (fun s -> s.blocks_generated >= 2) }
     in
     let%bind () = Node.stop node_b in
     let%bind _ =
-      Log_engine.wait_for ~blocks:3 ~timeout:(`Slots 10) log_engine
+      Log_engine.wait_for log_engine
+        { hard_timeout= Slots 10
+        ; soft_timeout= None
+        ; predicate= (fun s -> s.blocks_generated >= 3) }
     in
     let%bind () = Node.start ~fresh_state:true node_b in
     let%bind () = Log_engine.wait_for_init node_b log_engine in

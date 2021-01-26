@@ -61,8 +61,14 @@ module Make (Engine : Engine_intf) = struct
     let%bind ( `Blocks_produced blocks_produced
              , `Slots_passed slots
              , `Snarked_ledgers_generated _snarked_ledger_generated ) =
-      Log_engine.wait_for ~blocks:8 ~snarked_ledgers_generated:1
-        ~timeout:(`Slots 30) log_engine
+      Log_engine.wait_for log_engine
+        { hard_timeout= None
+        ; soft_timeout= None
+        ; predicate=
+            (fun s ->
+              s.blocks_generated >= 8
+              || s.snarked_ledgers_generated >= 1
+              || s.global_slot >= 30 ) }
     in
     let logger = Logger.create () in
     [%log info] "blocks produced %d slots passed %d" blocks_produced slots ;

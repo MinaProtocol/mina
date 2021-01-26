@@ -417,13 +417,9 @@ let empty_errors () =
   ; faulty_peer= DynArray.create ()
   ; fatal= DynArray.create () }
 
-type constants =
-  { constraints: Genesis_constants.Constraint_constants.t
-  ; genesis: Genesis_constants.t }
-
 type t =
   { logger: Logger.t
-  ; constants: constants
+  ; constants: Test_config.constants
   ; subscription: Subscription.t
   ; event_router: Event_router.t
   ; error_accumulator: errors
@@ -584,6 +580,8 @@ let destroy t : Test_error.Set.t Malleable_error.t =
   in
   {Test_error.Set.soft_errors; hard_errors}
 
+(**************************************************************************************************)
+
 (*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
 let wait_for' :
        blocks:int
@@ -736,6 +734,112 @@ let wait_for :
   match%bind
     wait_for' ~blocks ~epoch_reached ~snarked_ledgers_generated ~timeout t
   with
+  | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
+      [%log' fatal t.logger] "wait_for failed with error: $error"
+        ~metadata:[("error", Error_json.error_to_yojson e.error)] ;
+      Deferred.return
+        (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
+  | res ->
+      Deferred.return res
+
+(**************************************************************************************************)
+
+let wait_for' :
+       t
+    -> Condition.t
+    -> ( [> `Blocks_produced of int]
+       * [> `Slots_passed of int]
+       * [> `Snarked_ledgers_generated of int] )
+       Malleable_error.t =
+ fun t cond ->
+  let finished = Ivar.create () in
+  let stop = Ivar.read finished in
+  let updates =
+    let r, w = Pipe.create () in
+    upon stop (fun () -> if not (Pipe.is_closed w) then Pipe.close w) ;
+    let timeouts = ref [] in
+    let finish () =
+      Ivar.fill_if_empty finished () ;
+      List.iter !timeouts ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
+      if not (Pipe.is_closed w) then Pipe.close w
+    in
+    let add_timeout time x =
+      Option.iter (Condition.Network_time_span.to_span ~constants:t.constants time)
+        ~f:(fun span ->
+          timeouts :=
+            Clock.Event.run_after span
+              (fun () ->
+                Pipe.write_without_pushback_if_open w x ;
+                finish () )
+              ()
+            :: !timeouts )
+    in
+    add_timeout cond.hard_timeout
+      (Error
+         { Malleable_error.Hard_fail.hard_error=
+             Test_error.raw_internal_error (Error.of_string "timed out")
+         ; soft_errors= [] }) ;
+    add_timeout cond.soft_timeout
+      (Ok
+         { Malleable_error.Accumulator.computation_result= []
+         ; soft_errors=
+             [Test_error.raw_internal_error (Error.of_string "soft timeout")]
+         }) ;
+    let interval =
+      Time.Span.of_ms
+        (Int.to_float t.constants.constraints.block_window_duration_ms /. 2.0)
+    in
+    Clock.every' ~stop interval (fun () ->
+        [%log' info t.logger] "Pulling blocks produced subscription" ;
+        let%bind res = Subscription.pull t.subscriptions.blocks_produced in
+        let d = Pipe.write_if_open w res in
+        ( match res with
+        | Ok {computation_result= logs; _} ->
+            [%log' info t.logger]
+              ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
+              "Pulled $n logs for blocks produced: $logs"
+        | Error _ ->
+            finish () ) ;
+        d ) ;
+    r
+  in
+  let conditions_passed (acc : Block_produced_query.Result.Aggregated.t) =
+    cond.predicate
+      { block_height= acc.last_seen_result.block_height
+      ; epoch= acc.last_seen_result.epoch
+      ; global_slot= acc.last_seen_result.global_slot
+      ; snarked_ledgers_generated= acc.snarked_ledgers_generated
+      ; blocks_generated= acc.blocks_generated }
+  in
+  let rec go acc =
+    let finish (acc : Block_produced_query.Result.Aggregated.t) =
+      Ivar.fill_if_empty finished () ;
+      Malleable_error.return
+        ( `Blocks_produced acc.blocks_generated
+        , `Slots_passed acc.last_seen_result.global_slot
+        , `Snarked_ledgers_generated acc.snarked_ledgers_generated )
+    in
+    match%bind Pipe.read updates with
+    | `Eof ->
+        finish acc
+    | `Ok r ->
+        let open Malleable_error.Let_syntax in
+        let%bind logs = Deferred.return r in
+        let%bind finished, acc =
+          Malleable_error.List.fold_left_while logs ~init:(false, acc)
+            ~f:(fun (_, acc) log ->
+              let open Malleable_error.Let_syntax in
+              let%map result = Block_produced_query.parse log in
+              let acc = Block_produced_query.Result.aggregate acc result in
+              if conditions_passed acc then `Stop (true, acc)
+              else `Continue (false, acc) )
+        in
+        if finished then finish acc else go acc
+  in
+  go Block_produced_query.Result.Aggregated.empty
+
+let wait_for t cond =
+  match%bind wait_for' t cond with
   | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
         ~metadata:[("error", Error_json.error_to_yojson e.error)] ;

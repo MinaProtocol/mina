@@ -11,6 +11,15 @@ module Node = struct
 
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
+  let node_to_string (n : t) : String.t =
+    Format.sprintf
+      "{cluster: %s; namespace: %s; pod_id: %s; node_graphql_port: %d}"
+      n.cluster n.namespace n.pod_id n.node_graphql_port
+
+  let node_list_to_string (nl : t list) : String.t =
+    Format.sprintf "[ %s ]"
+      (String.concat ~sep:",  " (List.map nl ~f:node_to_string))
+
   let run_in_container node cmd =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in

@@ -1,4 +1,4 @@
-(*module Event_router = Event_router*)
+module Condition = Condition
 module Event_type = Event_type
 module Json_parsing = Json_parsing
 module Malleable_error = Malleable_error
