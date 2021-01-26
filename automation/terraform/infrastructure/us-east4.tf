@@ -2,6 +2,7 @@ locals {
   east4_k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
   east4_region = "us-east4"
   k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
+  bk_k8s_context = "gke_o1labs-192920_us-east4_buildkite-infra-east4"
 
   east4_prometheus_helm_values = {
     server = {
@@ -23,7 +24,7 @@ locals {
           write_relabel_configs = [
             {
               source_labels: ["__name__"]
-              regex: "(container.*|Coda.*)"
+              regex: "(buildkite.*|container.*|Coda.*)"
               action: "keep"
             }
           ]
@@ -228,8 +229,16 @@ provider helm {
   }
 }
 
+provider helm {
+  alias = "bk_helm_east4"
+  kubernetes {
+    config_context = local.bk_east4_k8s_context
+  }
+}
+
 resource "helm_release" "east4_prometheus" {
   provider  = helm.helm_east4
+
   name      = "east4-prometheus"
   chart     = "stable/prometheus"
   namespace = "default"
@@ -238,6 +247,20 @@ resource "helm_release" "east4_prometheus" {
   ]
   wait       = true
   depends_on = [google_container_cluster.coda_cluster_east4]
+  force_update  = true
+}
+
+resource "helm_release" "bk_east4_prometheus" {
+  provider  = helm.bk_helm_east4
+
+  name      = "bk-east4-prometheus"
+  chart     = "stable/prometheus"
+  namespace = "default"
+  values = [
+    yamlencode(local.east4_prometheus_helm_values)
+  ]
+  wait       = true
+  depends_on = [google_container_cluster.buildkite_infra_east4]
   force_update  = true
 }
 

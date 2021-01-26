@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import json
 import os
+import requests
 import time
 
 import asyncio
@@ -17,29 +18,6 @@ ORG_SLUG = os.getenv("BUILDKITE_ORG_SLUG", "o-1-labs-2")
 PIPELINE_SLUG = os.getenv("BUILDKITE_PIPELINE_SLUG", "o-1-labs-2/coda").strip()
 BRANCH = os.getenv("BUILDKITE_BRANCH", "*")
 
-_monitored_jobs = [
-    "_prepare-monorepo",
-    "_monorepo-triage-cmds",
-    "_OCaml-check",
-    "_Rust-lint-trace-tool",
-    "_Fast-lint",
-    "_Fast-lint-optional-types",
-    "_Fast-lint-optional-binable",
-    "_TraceTool-build-trace-tool",
-    "_CompareSignatures-compare-test-signatures",
-    "_ValidationService-test",
-    "_CheckDhall-check",
-    "_Artifact-libp2p-helper",
-    "_Artifact-artifacts-build",
-    "_Artifact-docker-artifact",
-    "_UnitTest-unit-test-dev",
-    "_UnitTest-unit-test-nonconsensus_medium_curves",
-    "_ArchiveNode-build-client-sdk",
-    "_ClientSdk-install-yarn-deps,",
-    "_ClientSdk-client-sdk-build-unittests,",
-    "_ClientSdk-prepublish-client-sdk"
-]
-JOBS = os.getenv("BUILDKITE_JOBS", ','.join(_monitored_jobs))
 MAX_JOB_COUNT = os.getenv("BUILDKITE_MAX_JOB_COUNT", 500)
 
 MAX_AGENT_COUNT = os.getenv("BUILDKITE_MAX_AGENT_COUNT", 500)
@@ -85,6 +63,16 @@ class Exporter(object):
         return asyncio.run(self.ql_client.execute_async(query=query, variables=vars))
 
     @timing
+    def list_pipeline_stepkeys(self):
+        headers = {'Authorization': "Bearer {token}".format(token=API_KEY)}
+        response = requests.get(
+            "https://api.buildkite.com/v2/organizations/{org}/pipelines/{pipeline}/builds".format(org=self.org_slug, pipeline=self.pipeline_slug),
+            headers=headers)
+        data = response.json()
+
+        return [d['step_key'] for d in data['jobs']]
+
+    @timing
     def collect(self):
         print("Collecting...")
 
@@ -92,24 +80,24 @@ class Exporter(object):
         metrics = {}
         metrics['job'] = {
             'runtime':
-                GaugeMetricFamily('job_runtime', 'Total job runtime',
+                GaugeMetricFamily('buildkite_job_runtime', 'Total job runtime',
                 labels=['branch', 'exitStatus', 'state', 'passed', 'job', 'agentName', 'agentRules']),
             'waittime':
-                GaugeMetricFamily('job_waittime', 'Total time job waited to start (from time scheduled)',
+                GaugeMetricFamily('buildkite_job_waittime', 'Total time job waited to start (from time scheduled)',
                 labels=['branch', 'exitStatus', 'state', 'passed', 'job', 'agentName', 'agentRules']),
             'status':
-                CounterMetricFamily('job_status', 'Count of in-progress job statuses over <scan-interval>',
+                CounterMetricFamily('buildkite_job_status', 'Count of in-progress job statuses over <scan-interval>',
                 labels=['branch', 'state', 'job']),
             'exit_status':
-                CounterMetricFamily('job_exit_status', 'Count of job exit statuses over <scan-interval>',
+                CounterMetricFamily('buildkite_job_exit_status', 'Count of job exit statuses over <scan-interval>',
                 labels=['branch', 'exitStatus', 'softFailed', 'state', 'passed', 'job', 'agentName', 'agentRules']),
             'artifact_size':
-                GaugeMetricFamily('job_artifact_size', 'Total size of uploaded artifact (bytes)',
+                GaugeMetricFamily('buildkite_job_artifact_size', 'Total size of uploaded artifact (bytes)',
                 labels=['branch', 'exitStatus', 'state', 'path', 'downloadURL', 'mimeType', 'job', 'agentName', 'agentRules']),
         }
         metrics['agent'] = {
             'total_count':
-                CounterMetricFamily('agent_total_count', 'Count of active Buildkite agents within <org>',
+                CounterMetricFamily('buildkite_agent_total_count', 'Count of active Buildkite agents within <org>',
                 labels=['version', 'versionHasKnownIssues','os', 'isRunning', 'metadata', 'connectionState'])
         }
 
@@ -341,7 +329,12 @@ def main():
     }
     client = GraphqlClient(endpoint=API_URL, headers=headers)
 
-    REGISTRY.register(Exporter(client))
+    exporter = Exporter(client)
+    REGISTRY.register(exporter)
+
+    _monitored_jobs = exporter.list_pipeline_stepkeys()
+    JOBS = os.getenv("BUILDKITE_JOBS", ','.join(_monitored_jobs))
+
     start_http_server(METRICS_PORT)
     print("Metrics on Port {}".format(METRICS_PORT))
 
