@@ -26,6 +26,10 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH"
           ),
           Cmd.run (
+            -- upload genesis_ledger and related generated json files
+            "buildkite-agent artifact upload *.json"
+          ),
+          Cmd.run (
             -- always execute post-deploy operation
             "${postDeploy}"
           )

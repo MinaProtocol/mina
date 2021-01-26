@@ -83,12 +83,13 @@ function generate_key_files {
       --mount type=bind,source=${output_dir},target=/keys \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
       -c "CODA_LIBP2P_PASS='${privkey_pass}' coda advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
-    # ensure proper r+w permissions for access to keys external to container
-    docker run \
-      -v "${output_dir}:/keys:z" \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "chmod -R +rw /keys"
   done
+
+  # ensure proper r+w permissions for access to keys external to container
+  docker run \
+    -v "${output_dir}:/keys:z" \
+    --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+    -c "chmod -R +rw /keys"
 }
 
 function build_keyset_from_testnet_keys {
