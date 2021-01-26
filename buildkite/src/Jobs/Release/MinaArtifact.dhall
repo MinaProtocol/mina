@@ -27,6 +27,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "src"),
+          S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
