@@ -719,15 +719,16 @@ end
 
 module Block_and_internal_command = struct
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
-      ~sequence_no ~secondary_sequence_no =
+      ~sequence_no ~secondary_sequence_no ~receiver_balance_id =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup4 int int int int)
+         Caqti_type.(tup2 (tup4 int int int int) int)
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
-                VALUES (?, ?, ?, ?)
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no, receiver_balance)
+                VALUES (?, ?, ?, ?, ?)
          |sql})
-      (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+      ( (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+      , receiver_balance_id )
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
@@ -744,7 +745,8 @@ module Block_and_internal_command = struct
       (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~internal_command_id ~sequence_no ~secondary_sequence_no =
+      ~internal_command_id ~sequence_no ~secondary_sequence_no
+      ~receiver_balance_id =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -757,12 +759,7 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-
-  let add_with_balance conn ~block_id ~internal_command_id ~sequence_no
-      ~secondary_sequence_no ~balance =
-    (* TODO(omerzach): Store balance. *)
-    let () = ignore balance in
-    add conn ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+          ~receiver_balance_id
 end
 
 module Block_and_signed_command = struct
@@ -1113,7 +1110,7 @@ module Block = struct
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
-                let%bind fee_transfer_ids =
+                let%bind fee_transfer_infos =
                   deferred_result_list_fold fee_transfers ~init:[]
                     ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
                       let%map id =
@@ -1121,10 +1118,11 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Normal
                       in
-                      (id, secondary_sequence_no) :: acc )
+                      (id, secondary_sequence_no, fee_transfer.receiver_pk)
+                      :: acc )
                 in
-                let fee_transfer_ids =
-                  match fee_transfer_ids with
+                let fee_transfer_infos =
+                  match fee_transfer_infos with
                   | [id] ->
                       [(id, balances.receiver1_balance)]
                   | [id1; id2] ->
@@ -1136,14 +1134,26 @@ module Block = struct
                          transfer transaction"
                 in
                 let%map () =
-                  deferred_result_list_fold fee_transfer_ids ~init:()
+                  deferred_result_list_fold fee_transfer_infos ~init:()
                     ~f:(fun ()
-                       ((fee_transfer_id, secondary_sequence_no), balance)
+                       ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
+                       , balance )
                        ->
-                      Block_and_internal_command.add_with_balance
+                      let%bind receiver_id =
+                        Public_key.add_if_doesn't_exist
+                          (module Conn)
+                          receiver_pk
+                      in
+                      let%bind receiver_balance_id =
+                        Balance.add_if_doesn't_exist
+                          (module Conn)
+                          ~public_key_id:receiver_id ~balance
+                      in
+                      Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
-                        ~sequence_no ~secondary_sequence_no ~balance
+                        ~sequence_no ~secondary_sequence_no
+                        ~receiver_balance_id
                       >>| ignore )
                 in
                 sequence_no + 1
@@ -1166,24 +1176,44 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Via_coinbase
                       in
-                      Block_and_internal_command.add_with_balance
+                      let%bind fee_transfer_receiver_id =
+                        Public_key.add_if_doesn't_exist
+                          (module Conn)
+                          receiver_pk
+                      in
+                      let%bind receiver_balance_id =
+                        Balance.add_if_doesn't_exist
+                          (module Conn)
+                          ~public_key_id:fee_transfer_receiver_id
+                          ~balance:
+                            (Option.value_exn
+                               balances.fee_transfer_receiver_balance)
+                      in
+                      Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
-                        ~secondary_sequence_no:0
-                        ~balance:
-                          (Option.value_exn
-                             balances.fee_transfer_receiver_balance)
+                        ~secondary_sequence_no:0 ~receiver_balance_id
                       >>| ignore
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
                 in
+                let%bind coinbase_receiver_id =
+                  Public_key.add_if_doesn't_exist
+                    (module Conn)
+                    coinbase.receiver
+                in
+                let%bind receiver_balance_id =
+                  Balance.add_if_doesn't_exist
+                    (module Conn)
+                    ~public_key_id:coinbase_receiver_id
+                    ~balance:balances.coinbase_receiver_balance
+                in
                 let%map () =
-                  Block_and_internal_command.add_with_balance
+                  Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0
-                    ~balance:balances.coinbase_receiver_balance
+                    ~secondary_sequence_no:0 ~receiver_balance_id
                   >>| ignore
                 in
                 sequence_no + 1 )
@@ -1324,10 +1354,13 @@ module Block = struct
         ~f:(fun ()
            (internal_command_id, (sequence_no, secondary_sequence_no))
            ->
+          (* TODO(psteckler): Add receiver_balance column to Extensional.Internal_command
+           *   then replace dummy value with real balance here *)
+          let receiver_balance_id = 0 in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-      )
+            ~receiver_balance_id )
     in
     return block_id
 
