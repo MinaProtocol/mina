@@ -24,7 +24,7 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
           ),
           Cmd.run (
             "source ${deployEnv} && terraform apply -auto-approve" ++
-              " -var coda_image=\\\"gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH\\\""
+              " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH"
           ),
           Cmd.run (
             -- always execute post-deploy operation
