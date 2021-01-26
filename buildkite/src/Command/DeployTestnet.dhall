@@ -19,12 +19,16 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
             "fi"
           ),
           Cmd.run (
-            -- TODO: update to allow for custom post-apply step(s)
-            "source ${deployEnv} && cd automation/terraform/testnets/${testnetName}" ++
-            " && terraform init && terraform plan" ++
-            " && terraform apply -auto-approve -var coda_image=\\\"gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH\\\"" ++
-            " -var coda_archive_image=\\\"gcr.io/o1labs-192920/coda-archive:0.2.6-compatible\\\"" ++
-            " && ${postDeploy}"
+            -- initialization steps
+            "cd automation/terraform/testnets/${testnetName} && terraform init && terraform plan"
+          ),
+          Cmd.run (
+            "source ${deployEnv} && terraform apply -auto-approve" ++
+              " -var coda_image=\\\"gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH\\\""
+          ),
+          Cmd.run (
+            -- always execute post-deploy operation
+            "${postDeploy}"
           )
         ],
         label = "Deploy testnet: ${testnetName}",

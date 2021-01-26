@@ -9,6 +9,7 @@ let testTestnet = "ci-net"
 let dependsOn = [
     { name = "MinaArtifact", key = "mina-docker-image" }
 ]
+let deployDestroyOp = "terraform destroy"
 
 in Pipeline.build Pipeline.Config::{
   spec =
@@ -21,6 +22,6 @@ in Pipeline.build Pipeline.Config::{
     name = "DeployTestnetAndDestroy"
   },
   steps = [
-    DeployTestnet.step testTestnet dependsOn "terraform destroy"
+    DeployTestnet.step testTestnet dependsOn deployDestroyOp
   ]
 }
