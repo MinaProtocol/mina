@@ -24,10 +24,10 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
   | Error e ->
       [%log fatal]
         ~metadata:[("error", `String (Caqti_error.show e))]
-        "Failed to create a Caqti pool for Postgresql" ;
+        "Failed to create a Caqti connection to Postgresql" ;
       exit 1
   | Ok conn ->
-      [%log info] "Successfully created Caqti pool for Postgresql" ;
+      [%log info] "Successfully created Caqti connection to Postgresql" ;
       let make_add_block of_yojson add_block_aux ~json ~file =
         match of_yojson json with
         | Ok block -> (
