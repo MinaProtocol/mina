@@ -749,15 +749,30 @@ module Block_and_signed_command = struct
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
-  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
+  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no
+      ~status ~failure_reason ~fee_payer_account_creation_fee_paid
+      ~receiver_account_creation_fee_paid ~created_token =
     Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(tup3 int int int)
+      (Caqti_request.exec typ
          {sql| INSERT INTO blocks_user_commands
-                 (block_id, user_command_id, sequence_no)
-               VALUES (?, ?, ?)
+                 (block_id,
+                 user_command_id,
+                 sequence_no,
+                 status,
+                 failure_reason,
+                 fee_payer_account_creation_fee_paid,
+                 receiver_account_creation_fee_paid,
+                 created_token)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          |sql})
-      (block_id, user_command_id, sequence_no)
+      { block_id
+      ; user_command_id
+      ; sequence_no
+      ; status
+      ; failure_reason
+      ; fee_payer_account_creation_fee_paid
+      ; receiver_account_creation_fee_paid
+      ; created_token }
 
   let add_with_status (module Conn : CONNECTION) ~block_id ~user_command_id
       ~sequence_no ~(status : Transaction_status.t) =
@@ -802,26 +817,11 @@ module Block_and_signed_command = struct
     in
     (* TODO: Record these with the transaction *)
     ignore (fee_payer_balance, source_balance, receiver_balance) ;
-    Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(
-           tup3 (tup3 int int int)
-             (tup3 (option string) (option string) (option int64))
-             (tup2 (option int64) (option int64)))
-         {sql| INSERT INTO blocks_user_commands
-                 (block_id,
-                 user_command_id,
-                 sequence_no,
-                 status,
-                 failure_reason,
-                 fee_payer_account_creation_fee_paid,
-                 receiver_account_creation_fee_paid,
-                 created_token)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         |sql})
-      ( (block_id, user_command_id, sequence_no)
-      , (Some status_str, failure_reason, fee_payer_account_creation_fee_paid)
-      , (receiver_account_creation_fee_paid, created_token) )
+    add
+      (module Conn)
+      ~block_id ~user_command_id ~sequence_no ~status:(Some status_str)
+      ~failure_reason ~fee_payer_account_creation_fee_paid
+      ~receiver_account_creation_fee_paid ~created_token
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
       ~user_command_id ~sequence_no =
@@ -841,7 +841,11 @@ module Block_and_signed_command = struct
     | Some _ ->
         return ()
     | None ->
-        add (module Conn) ~block_id ~user_command_id ~sequence_no
+        add
+          (module Conn)
+          ~block_id ~user_command_id ~sequence_no ~status:None
+          ~failure_reason:None ~fee_payer_account_creation_fee_paid:None
+          ~receiver_account_creation_fee_paid:None ~created_token:None
 
   let load (module Conn : CONNECTION) ~block_id ~user_command_id =
     Conn.find
