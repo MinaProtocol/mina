@@ -44,4 +44,3 @@ export AWS_DEFAULT_REGION=$AWS_REGION
 echo "--- Run test executive"
 
 ./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" --coda-automation-location ./automation block-production
-
