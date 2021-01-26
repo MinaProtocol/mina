@@ -154,9 +154,7 @@ locals {
     image = var.watchdog_image
     coda = {
       image = var.coda_image
-      ports = {
-        metrics = "8081"
-      }
+      ports =  { metrics: 8000 }
     }
     restartEveryMins = var.restart_nodes_every_mins
     restartNodes = var.restart_nodes
