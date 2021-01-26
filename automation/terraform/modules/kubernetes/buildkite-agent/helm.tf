@@ -58,7 +58,7 @@ locals {
     },
     {
       "name" = "KUBE_CONFIG_PATH"
-      "value" = "~/.kube/config"
+      "value" = "/root/.kube/config"
     },
     # AWS EnvVars
     {
