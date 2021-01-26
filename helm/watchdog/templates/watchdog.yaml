@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app: {{ .Values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+        testnet: {{ $.Values.testnetName }}
+        role: watchdog
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
+        prometheus.io/path: '/metrics'
+    spec:
+      containers:
+      - name: watchdog
+        resources:
+          requests:
+            memory: 512m
+            cpu: 1.0
+        image: {{ .Values.image }}
+        command: ["bash"]
+        args: ["-c", "/code/main.sh"]
+        env:
+          - name: "RESTART_EVERY_MINS"
+            value: {{ .Values.restartEveryMins | quote }}
+          - name: "RESTART_NODES"
+            value: {{ .Values.restartNodes | quote }}
+          - name: "MAKE_REPORTS"
+            value: {{ .Values.makeReports | quote }}
+          - name: "MAKE_REPORT_EVERY_MINS"
+            value: {{ .Values.makeReportEveryMins | quote }}
+          - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
+            value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
+          - name: "MAKE_REPORT_ACCOUNTS"
+            value: {{ .Values.makeReportAccounts | quote }}
+        ports: 
+        - name: metrics-port
+          containerPort: 8000
+        imagePullPolicy: Always

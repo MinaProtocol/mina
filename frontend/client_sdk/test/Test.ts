@@ -2,6 +2,7 @@ import * as CodaSDK from "../src/SDKWrapper";
 import { deepStrictEqual } from "assert";
 
 let key = CodaSDK.genKeys();
+let publicKey = CodaSDK.derivePublicKey(key.privateKey);
 let signed = CodaSDK.signMessage("hello", key);
 CodaSDK.verifyMessage(signed);
 
@@ -27,3 +28,5 @@ let sd2 = CodaSDK.signStakeDelegation(
     key);
 
 deepStrictEqual(sd1, sd2, "Stake delegation signatures don't match (string vs numeric inputs)");
+
+deepStrictEqual(publicKey, key.publicKey, "Public keys do not match");
