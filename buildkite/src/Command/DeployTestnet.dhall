@@ -14,16 +14,15 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
       Command.Config::{
         commands = [
           Cmd.run (
+            "cd automation/terraform/testnets/${testnetName} && terraform init"
+          ),
+          Cmd.run (
             "if [ ! -f ${deployEnv} ]; then " ++
                 "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
             "fi"
           ),
           Cmd.run (
-            -- initialization steps
-            "cd automation/terraform/testnets/${testnetName} && terraform init && terraform plan"
-          ),
-          Cmd.run (
-            "source ${deployEnv} && terraform apply -auto-approve" ++
+            "set -euo pipefail; source ${deployEnv} && terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH"
           ),
           Cmd.run (
