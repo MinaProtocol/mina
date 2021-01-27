@@ -76,8 +76,9 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
 ls -lh mina*.deb
 
-# Remove generate-keypair binary before other builds with the same dir
+# Remove generate-keypair, validate-keypair binaries before other builds with the same dir
 rm -f "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+rm -f "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
@@ -106,6 +107,7 @@ echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path

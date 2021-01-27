@@ -69,6 +69,7 @@ blockProducerConfigs:
     enablePeerExchange: false
 
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
