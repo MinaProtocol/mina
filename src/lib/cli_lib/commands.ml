@@ -121,5 +121,5 @@ let validate_transaction =
       Format.printf "Some transactions failed to verify@." ;
       exit 1 )
     else (
-      Format.fprintf "All transactions were valid@." ;
+      Format.printf "All transactions were valid@." ;
       exit 0 ) )
