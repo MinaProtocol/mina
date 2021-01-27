@@ -93,6 +93,7 @@ installed: [
   "ctypes-foreign.0.4.0"
   "depext.transition"
   "digestif.0.9.0"
+  "dot-merlin-reader.3.4.2"
   "dune.2.8.2"
   "dune-configurator.2.8.2"
   "dune-private-libs.2.6.2"
