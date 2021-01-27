@@ -76,27 +76,6 @@ struct
       in
       branch_data.rule.main_value prevs next_state
     in
-    (*
-    let prev_with_proofs =
-      let rec go
-        : type a b c.
-          (a, b, c) H3.T(P.With_data).t
-          -> (a, b, c) H3.T(E03(Bool)).t
-          -> (a, b, c) H3.T(P.With_data).t
-        =
-        fun ps must_verifys ->
-          match ps, must_verifys with
-          | [], [] -> []
-          | T p :: ps, must_verify :: must_verifys ->
-            let sg =
-              if not must_verify then
-                Ipa.Wrap.compute_sg u.deferred_values.bulletproof_challenges
-              else sg 
-            in
-      in
-      go
-    in
-*)
     let module X_hat = struct
       type t = Tock.Field.t Double.t
     end in
@@ -105,7 +84,6 @@ struct
         ( Challenge.Constant.t
         , Challenge.Constant.t Scalar_challenge.t
         , Tick.Field.t Shifted_value.t
-        , bool
         , Tock.Field.t
         , Digest.Constant.t
         , Digest.Constant.t
@@ -141,7 +119,9 @@ struct
                                                                        .which_branch)
           in
           let to_field =
-            SC.to_field_constant (module Tick.Field) ~endo:Endo.Dum.scalar
+            SC.to_field_constant
+              (module Tick.Field)
+              ~endo:Endo.Wrap_inner_curve.scalar
           in
           let alpha = to_field plonk0.alpha in
           let zeta = to_field plonk0.zeta in
@@ -152,7 +132,7 @@ struct
           time "plonk_checks" (fun () ->
               Plonk_checks.derive_plonk
                 (module Tick.Field)
-                ~endo:Endo.Dee.base ~shift:Shifts.tick
+                ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
                 ~mds:Tick_field_sponge.params.mds
                 ~domain:
                   (Plonk_checks.domain
@@ -166,7 +146,8 @@ struct
                 (Plonk_checks.evals_of_split_evals
                    (module Tick.Field)
                    t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
-          )
+                (fst t.prev_x_hat)
+              |> fst )
         in
         let data = Types_map.lookup_basic tag in
         let (module Local_max_branching) = data.max_branching in
@@ -235,7 +216,9 @@ struct
         let r = scalar_chal O.u in
         let sponge_digest_before_evaluations = O.digest_before_evaluations o in
         let to_field =
-          SC.to_field_constant (module Tock.Field) ~endo:Endo.Dee.scalar
+          SC.to_field_constant
+            (module Tock.Field)
+            ~endo:Endo.Step_inner_curve.scalar
         in
         let module As_field = struct
           let r = to_field r
@@ -330,7 +313,7 @@ struct
         let plonk =
           Plonk_checks.derive_plonk
             (module Tock.Field)
-            ~shift:Shifts.tock ~endo:Endo.Dum.base
+            ~shift:Shifts.tock ~endo:Endo.Wrap_inner_curve.base
             ~mds:Tock_field_sponge.params.mds
             ~domain:
               (Plonk_checks.domain
@@ -342,6 +325,8 @@ struct
                (module Tock.Field)
                t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
                ~zeta:As_field.zeta ~zetaw)
+            x_hat_1
+          |> fst
         in
         let shifted_value =
           Shifted_value.of_field (module Tock.Field) ~shift:Shifts.tock
@@ -358,6 +343,7 @@ struct
               ; xi
               ; bulletproof_challenges= new_bulletproof_challenges
               ; b= shifted_value b }
+          ; should_finalize= must_verify
           ; sponge_digest_before_evaluations=
               Digest.Constant.of_tock_field sponge_digest_before_evaluations }
         , prev_statement_with_hashes
@@ -396,17 +382,10 @@ struct
       go prev_with_proofs Maxes.maxes branch_data.rule.prevs inners_must_verify
         prev_vars_length
     in
-    let inners_must_verify =
-      let module V = H1.To_vector (Bool) in
-      V.f prev_vars_length inners_must_verify
-    in
     let next_statement : _ Types.Pairing_based.Statement.t =
-      let unfinalized_proofs =
-        Vector.zip unfinalized_proofs inners_must_verify
-      in
       let unfinalized_proofs_extended =
         Vector.extend unfinalized_proofs lte Max_branching.n
-          (Unfinalized.Constant.dummy, false)
+          Unfinalized.Constant.dummy
       in
       let pass_through =
         let module M =
@@ -515,8 +494,8 @@ struct
           Impls.Step.generate_witness_conv
             ~f:
               (fun {Impls.Step.Proof_inputs.auxiliary_inputs; public_inputs} ->
-              Zexe_backend.Tweedle.Dum_based_plonk.Proof.create_async
-                ~primary:public_inputs ~auxiliary:auxiliary_inputs
+              Backend.Tick.Proof.create_async ~primary:public_inputs
+                ~auxiliary:auxiliary_inputs
                 ~message:
                   (* emphatically NOT padded with dummies *)
                   Vector.(

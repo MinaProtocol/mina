@@ -280,7 +280,7 @@ query user_commands($public_key: PublicKey) {
     to_: to @bsDecoder(fn: "Decoders.public_key")
     amount @bsDecoder(fn: "Decoders.amount")
     fee @bsDecoder(fn: "Decoders.fee")
-    memo @bsDecoder(fn: "Coda_base.Signed_command_memo.of_string")
+    memo @bsDecoder(fn: "Mina_base.Signed_command_memo.of_string")
   }
 }
 |}]
@@ -319,6 +319,26 @@ mutation ($peers: [NetworkPeer!]!) {
     host
     libp2pPort
     peerId
+  }
+}
+|}]
+
+module Archive_precomputed_block =
+[%graphql
+{|
+mutation ($block: PrecomputedBlock!) {
+  archivePrecomputedBlock(block: $block) {
+      applied
+  }
+}
+|}]
+
+module Archive_extensional_block =
+[%graphql
+{|
+mutation ($block: ExtensionalBlock!) {
+  archiveExtensionalBlock(block: $block) {
+      applied
   }
 }
 |}]

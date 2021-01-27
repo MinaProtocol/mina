@@ -1,6 +1,6 @@
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 
 let name = "transaction-snark-profiler"
 
@@ -119,15 +119,15 @@ let rec pair_up = function
 let precomputed_values = Precomputed_values.compiled
 
 let state_body =
-  Coda_state.(
+  Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
         values.protocol_state_with_hash.data |> Protocol_state.body ))
 
 let curr_state_view =
-  Lazy.map state_body ~f:Coda_state.Protocol_state.Body.view
+  Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
 let state_body_hash =
-  Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
+  Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
@@ -298,7 +298,7 @@ let generate_base_snarks_witness sparse_ledger0
 let run profiler num_transactions repeats preeval =
   let ledger, transactions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
+    Mina_base.Sparse_ledger.of_ledger_subset_exn ledger
       ( fst
       @@ List.fold
            ~init:([], Ledger.next_available_token ledger)

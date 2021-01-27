@@ -1,15 +1,15 @@
 open Core_kernel
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 open Async_kernel
-open Coda_transition
+open Mina_transition
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Best_tip_prover_intf
+  Mina_intf.Best_tip_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
@@ -65,7 +65,8 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
     let best_tip =
-      External_transition.Validation.forget_validation best_verified_tip
+      External_transition.Validation.forget_validation_with_hash
+        best_verified_tip
     in
     let root =
       Transition_frontier.root frontier

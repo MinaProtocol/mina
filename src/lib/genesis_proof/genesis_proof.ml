@@ -1,5 +1,5 @@
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 
 module Inputs = struct
   type t =
@@ -98,7 +98,7 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
   in
   let curr = t.protocol_state_with_hash.data in
   let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
-    { sok_digest= Coda_base.Sok_message.Digest.default
+    { sok_digest= Mina_base.Sok_message.Digest.default
     ; source=
         Blockchain_state.snarked_ledger_hash
           (Protocol_state.blockchain_state prev_state)
@@ -110,8 +110,8 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     ; next_available_token_before= Token_id.(next default)
     ; next_available_token_after= Token_id.(next default)
     ; pending_coinbase_stack_state=
-        { source= Coda_base.Pending_coinbase.Stack.empty
-        ; target= Coda_base.Pending_coinbase.Stack.empty } }
+        { source= Mina_base.Pending_coinbase.Stack.empty
+        ; target= Mina_base.Pending_coinbase.Stack.empty } }
   in
   let genesis_epoch_ledger =
     match t.genesis_epoch_data with

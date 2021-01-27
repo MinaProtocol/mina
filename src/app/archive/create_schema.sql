@@ -5,6 +5,20 @@ CREATE TABLE public_keys
 
 CREATE INDEX idx_public_keys_value ON public_keys(value);
 
+CREATE TABLE timing_info
+( id                      serial    PRIMARY KEY
+, public_key_id           int       NOT NULL REFERENCES public_keys(id)
+, token                   bigint    NOT NULL
+, initial_balance         bigint    NOT NULL
+, initial_minimum_balance bigint    NOT NULL
+, cliff_time              bigint    NOT NULL
+, cliff_amount            bigint    NOT NULL
+, vesting_period          bigint    NOT NULL
+, vesting_increment       bigint    NOT NULL
+);
+
+CREATE INDEX idx_public_key_id ON timing_info(public_key_id);
+
 CREATE TABLE snarked_ledger_hashes
 ( id    serial PRIMARY KEY
 , value text   NOT NULL UNIQUE
@@ -30,11 +44,6 @@ CREATE TABLE user_commands
 , valid_until    bigint
 , memo           text                NOT NULL
 , hash           text                NOT NULL UNIQUE
-, status         user_command_status
-, failure_reason text
-, fee_payer_account_creation_fee_paid  bigint
-, receiver_account_creation_fee_paid   bigint
-, created_token  bigint
 );
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_transfer', 'coinbase');
@@ -58,14 +67,17 @@ CREATE TABLE epoch_data
 CREATE TABLE blocks
 ( id                      serial PRIMARY KEY
 , state_hash              text   NOT NULL UNIQUE
-, parent_id               int    NOT NULL        REFERENCES blocks(id)
+, parent_id               int                    REFERENCES blocks(id)
+, parent_hash             text   NOT NULL
 , creator_id              int    NOT NULL        REFERENCES public_keys(id)
+, block_winner_id         int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id  int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , staking_epoch_data_id   int    NOT NULL        REFERENCES epoch_data(id)
 , next_epoch_data_id      int    NOT NULL        REFERENCES epoch_data(id)
 , ledger_hash             text   NOT NULL
 , height                  bigint NOT NULL
 , global_slot             bigint NOT NULL
+, global_slot_since_genesis bigint NOT NULL
 , timestamp               bigint NOT NULL
 );
 
@@ -77,6 +89,11 @@ CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
 , sequence_no     int NOT NULL
+, status          user_command_status
+, failure_reason  text
+, fee_payer_account_creation_fee_paid bigint
+, receiver_account_creation_fee_paid bigint
+, created_token   bigint
 , PRIMARY KEY (block_id, user_command_id)
 );
 

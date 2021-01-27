@@ -1,7 +1,7 @@
 (* TODO: check if this is needed *)
 open Core_kernel
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 
 [%%versioned:
 module Stable : sig

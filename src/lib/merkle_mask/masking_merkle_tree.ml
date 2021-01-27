@@ -25,7 +25,16 @@ module Make (Inputs : Inputs_intf.S) = struct
       attached one. We can capture this with a GADT but there's some annoying
       issues with bin_io to do so *)
   module Parent = struct
-    type t = Base.t option [@@deriving sexp]
+    type t = (Base.t, string (* Location where null was set *)) Result.t
+    [@@deriving sexp]
+  end
+
+  module Detached_parent_signal = struct
+    type t = unit Async.Ivar.t
+
+    let sexp_of_t (_ : t) = Sexp.List []
+
+    let t_of_sexp (_ : Sexp.t) : t = Async.Ivar.create ()
   end
 
   type t =
@@ -34,6 +43,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     ; token_owners: Key.Stable.Latest.t Token_id.Table.t
     ; mutable next_available_token: Token_id.t option
     ; mutable parent: Parent.t
+    ; detached_parent_signal: Detached_parent_signal.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Account_id.Table.t
     ; mutable current_location: Location.t option
@@ -44,7 +54,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let create ~depth () =
     { uuid= Uuid_unix.create ()
-    ; parent= None
+    ; parent= Error __LOC__
+    ; detached_parent_signal= Async.Ivar.create ()
     ; account_tbl= Location_binable.Table.create ()
     ; token_owners= Token_id.Table.create ()
     ; next_available_token= None
@@ -78,7 +89,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     exception Location_is_not_account of Location.t
 
-    exception Dangling_parent_reference of Uuid.t
+    exception
+      Dangling_parent_reference of
+        Uuid.t * (* Location where null was set*) string
 
     let create () =
       failwith
@@ -90,26 +103,30 @@ module Make (Inputs : Inputs_intf.S) = struct
         "Mask.Attached.with_ledger: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
-    let unset_parent t =
-      assert (Option.is_some t.parent) ;
-      t.parent <- None ;
+    let unset_parent ?(trigger_signal = true) ~loc t =
+      assert (Result.is_ok t.parent) ;
+      t.parent <- Error loc ;
+      if trigger_signal then
+        Async.Ivar.fill_if_empty t.detached_parent_signal () ;
       t
 
     let assert_is_attached t =
       match t.parent with
-      | None ->
-          raise (Dangling_parent_reference t.uuid)
-      | Some _ ->
+      | Error loc ->
+          raise (Dangling_parent_reference (t.uuid, loc))
+      | Ok _ ->
           ()
 
+    let detached_signal t = Async.Ivar.read t.detached_parent_signal
+
     let get_parent ({parent= opt; _} as t) =
-      assert_is_attached t ; Option.value_exn opt
+      assert_is_attached t ; Result.ok_or_failwith opt
 
     let get_uuid t = assert_is_attached t ; t.uuid
 
     let get_directory t =
       assert_is_attached t ;
-      Option.bind ~f:Base.get_directory t.parent
+      Base.get_directory (Result.ok_or_failwith t.parent)
 
     let depth t = assert_is_attached t ; t.depth
 
@@ -382,7 +399,8 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* copy tables in t; use same parent *)
     let copy t =
       { uuid= Uuid_unix.create ()
-      ; parent= Some (get_parent t)
+      ; parent= Ok (get_parent t)
+      ; detached_parent_signal= Async.Ivar.create ()
       ; account_tbl= Location_binable.Table.copy t.account_tbl
       ; token_owners= Token_id.Table.copy t.token_owners
       ; next_available_token= t.next_available_token
@@ -567,7 +585,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       Location_binable.Table.clear t.account_tbl ;
       t.next_available_token <- None ;
       Addr.Table.clear t.hash_tbl ;
-      Account_id.Table.clear t.location_tbl
+      Account_id.Table.clear t.location_tbl ;
+      Async.Ivar.fill_if_empty t.detached_parent_signal ()
 
     let index_of_account_exn t key =
       assert_is_attached t ;
@@ -744,9 +763,10 @@ module Make (Inputs : Inputs_intf.S) = struct
   end
 
   let set_parent t parent =
-    assert (Option.is_none t.parent) ;
+    assert (Result.is_error t.parent) ;
+    assert (Option.is_none (Async.Ivar.peek t.detached_parent_signal)) ;
     assert (Int.equal t.depth (Base.depth parent)) ;
-    t.parent <- Some parent ;
+    t.parent <- Ok parent ;
     t.current_location <- Attached.last_filled t ;
     t
 

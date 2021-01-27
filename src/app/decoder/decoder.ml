@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 let () =
   if Array.length Sys.argv < 2 then failwith "MISSING ARGUMENT"

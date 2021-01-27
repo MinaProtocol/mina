@@ -3,7 +3,7 @@
  (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
-   coda_base
+   mina_base
    crypto_params
    dummy_values
    genesis_proof

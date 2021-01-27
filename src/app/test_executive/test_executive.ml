@@ -26,7 +26,7 @@ let tests : test list =
     , (module Payments_timed_accounts.Make : Test_functor_intf) )
   ; ( "bp-timed-accts"
     , (module Block_production_test_timed_accounts.Make : Test_functor_intf) )
-  ; ("peers", (module Mina_peers_test.Make : Test_functor_intf)) ]
+  ; ("peers", (module Peers_test.Make : Test_functor_intf)) ]
 
 let report_test_errors error_set
     (missing_event_reprs : Structured_log_events.repr list) =
@@ -67,17 +67,19 @@ let report_test_errors error_set
     Out_channel.(flush stderr) ) ;
   if num_errors > 0 || num_missing_events > 0 then exit 1 else Deferred.unit
 
-let dispatch_cleanup ~logger ~cleanup_func ~destroy_func ~net_manager_ref
-    ~log_engine_ref ~cleanup_deferred_ref (module T : Test_intf) reason
-    (test_result : unit Malleable_error.t) : unit Deferred.t =
+let dispatch_cleanup ~logger ~network_cleanup_func ~log_engine_cleanup_func
+    ~net_manager_ref ~log_engine_ref ~cleanup_deferred_ref
+    (module T : Test_intf) reason (test_result : unit Malleable_error.t) :
+    unit Deferred.t =
   let cleanup () : unit Deferred.t =
-    let%bind () =
-      Option.value_map !net_manager_ref ~default:Deferred.unit ~f:cleanup_func
-    in
     let log_engine_cleanup_result =
       Option.value_map !log_engine_ref
         ~default:(Malleable_error.return Test_error.Set.empty)
-        ~f:destroy_func
+        ~f:log_engine_cleanup_func
+    in
+    let%bind () =
+      Option.value_map !net_manager_ref ~default:Deferred.unit
+        ~f:network_cleanup_func
     in
     let%bind log_engine_error_set =
       match%map Malleable_error.lift_error_set log_engine_cleanup_result with
@@ -175,9 +177,10 @@ let main inputs =
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
   let cleanup_deferred_ref = ref None in
   let f_dispatch_cleanup =
-    dispatch_cleanup ~logger ~cleanup_func:Engine.Network_manager.cleanup
-      ~destroy_func:Engine.Log_engine.destroy ~net_manager_ref ~log_engine_ref
-      ~cleanup_deferred_ref
+    dispatch_cleanup ~logger
+      ~network_cleanup_func:Engine.Network_manager.cleanup
+      ~log_engine_cleanup_func:Engine.Log_engine.destroy ~net_manager_ref
+      ~log_engine_ref ~cleanup_deferred_ref
       (module T : Test_intf)
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
@@ -202,7 +205,6 @@ let main inputs =
           Deferred.bind ~f:Malleable_error.return
             (Engine.Network_manager.deploy net_manager)
         in
-        [%log info] "Network deployed" ;
         let%bind log_engine =
           Engine.Log_engine.create ~logger ~network
             ~on_fatal_error:(fun message ->

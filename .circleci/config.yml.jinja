@@ -18,7 +18,7 @@
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-linux-v1-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                    - opam-linux-v2-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
             - run:
                 name: Install opam dependencies - opam -- make setup-opam
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make setup-opam'
@@ -75,9 +75,6 @@ jobs:
             - run:
                   name: Publish dist wallet
                   command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
-            - run:
-                  name: Lint website
-                  command: cd frontend/website && yarn install && yarn run reformat && git diff --exit-code src
             - run: cd frontend/bot && yarn
             - run:
                   name: Lint bot
@@ -147,7 +144,7 @@ jobs:
             {{ opam_init_linux }}
             - save_cache:
                 name: Save cache - opam
-                key: opam-linux-v1-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                key: opam-linux-v2-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
                 paths:
                     - "/home/opam/.opam"
                 no_output_timeout: 1h
@@ -253,7 +250,7 @@ jobs:
             {{ checkout_no_lfs }}
             - run:
                   name: Update branch protection rule from test configuration
-                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status ${CIRCLE_BRANCH}
 
     run-leaderboard:
         docker:
@@ -334,6 +331,9 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
+            - run:
+                name: Standardize rust flags (remove unsupported flags)
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/zexe-standardize.sh'
             ### dune
             - run:
                 name: Build ocaml
@@ -399,10 +399,14 @@ jobs:
                 name: Build portable binary
                 command: |
                     make macos-portable
+                    # Remove copies of keys to make some space
+                    rm -r /tmp/s3_cache_dir/ $TMPDIR/coda_cache_dir ||:
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
+                  environment:
+                    CLOUDSDK_PYTHON: /usr/local/opt/python@3.8/libexec/bin/python
             - store_artifacts:
                   path: package
 
@@ -715,15 +719,17 @@ workflows:
             - lint-opt
             - compare-test-signatures
             - client-sdk-unit-tests
-            - update-branch-protection:
-                filters:
-                  branches:
-                    only: develop
+            #- update-branch-protection:
+                #filters:
+                  #branches:
+                    #only:
+                    #- develop
+                    #- master
+                    #- develop-until-4.1-hardfork
+                    #- develop-until-adversarial
             - tracetool
-            - build-wallet
             - test-archive
             - build-archive
-            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

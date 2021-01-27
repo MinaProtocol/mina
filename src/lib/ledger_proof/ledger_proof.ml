@@ -2,7 +2,7 @@
 "../../config.mlh"]
 
 open Core_kernel
-open Coda_base
+open Mina_base
 
 module type S = Ledger_proof_intf.S
 

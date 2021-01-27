@@ -12,6 +12,7 @@ let OpamInit = ../../Command/OpamInit.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
+let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
@@ -29,6 +30,8 @@ Pipeline.build
           S.strictly (S.contains "Makefile"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
+          S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
+          S.exactly "dockerfiles/scripts/healthcheck-utilities" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
         path = "Release",
@@ -51,6 +54,9 @@ Pipeline.build
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
+
+      -- Tests that depend on the debian package
+      ConnectToTestnet.step dependsOn,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{

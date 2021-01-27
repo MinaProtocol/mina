@@ -1,6 +1,6 @@
 open Core_kernel
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 
 module Common = struct
   [%%versioned
@@ -69,8 +69,8 @@ module Limited = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; protocol_states:
-            ( Coda_base.State_hash.Stable.V1.t
-            * Coda_state.Protocol_state.Value.Stable.V1.t )
+            ( Mina_base.State_hash.Stable.V1.t
+            * Mina_state.Protocol_state.Value.Stable.V1.t )
             list
         ; common: Common.Stable.V1.t }
 
@@ -148,7 +148,7 @@ type t =
   { transition: External_transition.Validated.t
   ; staged_ledger: Staged_ledger.t
   ; protocol_states:
-      (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
+      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list }
 
 let minimize {transition; staged_ledger; protocol_states= _} =
   let scan_state = Staged_ledger.scan_state staged_ledger in

@@ -9,13 +9,15 @@
     breadcrumbs from those transitions, which will write the breadcrumbs back
     into the processor as if catchup had successfully completed. *)
 
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Network_peer
 
 type t =
@@ -100,7 +102,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 Writer.write catchup_breadcrumbs_writer
                   (trees_of_breadcrumbs, `Catchup_scheduler)
             | Error err ->
-                [%log trace]
+                [%log debug]
                   !"Error during buildup breadcrumbs inside \
                     catchup_scheduler: $error"
                   ~metadata:[("error", Error_json.error_to_yojson err)] ;
@@ -167,7 +169,7 @@ let rec remove_tree t parent_hash =
     Option.value ~default:[] (Hashtbl.find t.collected_transitions parent_hash)
   in
   Hashtbl.remove t.collected_transitions parent_hash ;
-  Coda_metrics.(
+  Mina_metrics.(
     Gauge.dec_one
       Transition_frontier_controller.transitions_in_catchup_scheduler) ;
   List.iter children ~f:(fun child ->
@@ -188,13 +190,13 @@ let watch t ~timeout_duration ~cached_transition =
     Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
         let forest = extract_forest t parent_hash in
         Hashtbl.remove t.parent_root_timeouts parent_hash ;
-        Coda_metrics.(
+        Mina_metrics.(
           Gauge.dec_one
             Transition_frontier_controller.transitions_in_catchup_scheduler) ;
         remove_tree t parent_hash ;
         [%log' info t.logger]
           ~metadata:
-            [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
+            [ ("parent_hash", Mina_base.State_hash.to_yojson parent_hash)
             ; ( "duration"
               , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
             ; ( "cached_transition"
@@ -221,7 +223,7 @@ let watch t ~timeout_duration ~cached_transition =
                 ~f:(fun _ remaining_time ->
                   Block_time.Span.min remaining_time timeout_duration )))
       |> ignore ;
-      Coda_metrics.(
+      Mina_metrics.(
         Gauge.inc_one
           Transition_frontier_controller.transitions_in_catchup_scheduler)
   | Some cached_sibling_transitions ->
@@ -243,7 +245,7 @@ let watch t ~timeout_duration ~cached_transition =
           ~data:(cached_transition :: cached_sibling_transitions) ;
         Hashtbl.update t.collected_transitions hash
           ~f:(Option.value ~default:[]) ;
-        Coda_metrics.(
+        Mina_metrics.(
           Gauge.inc_one
             Transition_frontier_controller.transitions_in_catchup_scheduler)
 

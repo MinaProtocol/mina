@@ -17,11 +17,12 @@ module Make (Engine : Engine_intf) = struct
     let open Currency in
     let balance = Balance.of_int 100_000_000_000 in
     (*Should fully vest by slot = 7 provided blocks are produced from slot 1*)
-    let timing : Coda_base.Account_timing.t =
+    let timing : Mina_base.Account_timing.t =
       Timed
         { initial_minimum_balance= balance
-        ; cliff_time= Coda_numbers.Global_slot.of_int 4
-        ; vesting_period= Coda_numbers.Global_slot.of_int 2
+        ; cliff_time= Mina_numbers.Global_slot.of_int 4
+        ; cliff_amount= Amount.zero
+        ; vesting_period= Mina_numbers.Global_slot.of_int 2
         ; vesting_increment= Amount.of_int 50_000_000_000 }
     in
     {default with block_producers= [{balance= block_producer_balance; timing}]}
@@ -60,8 +61,14 @@ module Make (Engine : Engine_intf) = struct
     let%bind ( `Blocks_produced blocks_produced
              , `Slots_passed slots
              , `Snarked_ledgers_generated _snarked_ledger_generated ) =
-      Log_engine.wait_for ~blocks:8 ~snarked_ledgers_generated:1
-        ~timeout:(`Slots 30) log_engine
+      Log_engine.wait_for log_engine
+        { hard_timeout= None
+        ; soft_timeout= None
+        ; predicate=
+            (fun s ->
+              s.blocks_generated >= 8
+              || s.snarked_ledgers_generated >= 1
+              || s.global_slot >= 30 ) }
     in
     let logger = Logger.create () in
     [%log info] "blocks produced %d slots passed %d" blocks_produced slots ;
@@ -77,7 +84,7 @@ module Make (Engine : Engine_intf) = struct
     in
     let%map balance =
       Node.get_balance ~logger
-        ~account_id:Coda_base.(Account_id.create pk Token_id.default)
+        ~account_id:Mina_base.(Account_id.create pk Token_id.default)
         block_producer
     in
     [%test_eq: Currency.Balance.t] balance expected_balance ;

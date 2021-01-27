@@ -13,8 +13,8 @@ module Allocation_statistics = struct
   type t = {count: int; lifetimes: quartiles} [@@deriving yojson]
 
   let write_metrics {count; lifetimes} object_id =
-    let open Coda_metrics in
-    let open Coda_metrics.Object_lifetime_statistics in
+    let open Mina_metrics in
+    let open Mina_metrics.Object_lifetime_statistics in
     let {q1; q2; q3; q4} = lifetimes in
     let q x = lifetime_quartile_ms ~name:object_id ~quartile:x in
     Gauge.set (live_count ~name:object_id) (Int.to_float count) ;
@@ -62,7 +62,9 @@ module Allocation_data = struct
       if m mod 2 = 0 then [m / 2] else [m / 2; (m / 2) + 1]
     in
     let mean offset length =
-      let indices = mean_indices length in
+      let indices =
+        mean_indices length |> List.filter ~f:(fun x -> x < count)
+      in
       let sum =
         List.fold_left indices ~init:0.0 ~f:(fun acc i ->
             acc +. get_lifetime_ms (count - 1 - (i + offset)) )
@@ -84,6 +86,12 @@ module Allocation_data = struct
           Allocation_statistics.{q1; q2; q3; q4}
     in
     Allocation_statistics.{count; lifetimes}
+
+  let compute_statistics t =
+    try compute_statistics t
+    with _ ->
+      Allocation_statistics.
+        {count= 0; lifetimes= Allocation_statistics.make_quartiles 0.}
 
   let%test_module "Allocation_data unit tests" =
     ( module struct
@@ -166,7 +174,7 @@ let capture object_id =
   let statistics = Allocation_data.compute_statistics data in
   String.Table.set table ~key:object_id ~data:{data; statistics} ;
   Allocation_statistics.write_metrics statistics object_id ;
-  Coda_metrics.(
+  Mina_metrics.(
     Counter.inc_one
       (Object_lifetime_statistics.allocated_count ~name:object_id)) ;
   allocation_id
@@ -179,7 +187,7 @@ let release ~object_id ~allocation_id =
   let statistics = Allocation_data.compute_statistics info.data in
   String.Table.set table ~key:object_id ~data:{info with statistics} ;
   Allocation_statistics.write_metrics statistics object_id ;
-  Coda_metrics.(
+  Mina_metrics.(
     Counter.inc_one
       (Object_lifetime_statistics.collected_count ~name:object_id))
 

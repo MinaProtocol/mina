@@ -5,14 +5,15 @@
    ; opam deps
    async core
    ; libs
-   coda_base coda_graphql coda_lib coda_state coda_net2
-   coda_transition coda_version parallel protocol_version
+   mina_base mina_graphql mina_lib mina_state mina_net2
+   mina_transition mina_version parallel protocol_version
    node_addrs_and_ports transition_frontier
    ; internal deps
    init)
  (preprocessor_deps ../../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
+               ppx_assert
                ppx_coda
                ppx_version
                ppx_optcomp ppx_bin_prot ppx_let

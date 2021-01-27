@@ -33,7 +33,9 @@ module Variant = struct
     | `Unsupported_operation_for_construction
     | `Signature_missing
     | `Public_key_format_not_valid
-    | `Exception of string ]
+    | `No_options_provided
+    | `Exception of string
+    | `Signature_invalid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -93,8 +95,12 @@ end = struct
         "Unsupported operation for construction"
     | `Signature_missing ->
         "Signature missing"
+    | `No_options_provided ->
+        "No options provided"
     | `Exception _ ->
         "Exception"
+    | `Signature_invalid ->
+        "Invalid signature"
 
   let context = function
     | `Sql msg ->
@@ -106,7 +112,7 @@ end = struct
     | `Network_doesn't_exist (req, conn) ->
         Some
           (sprintf
-             !"You are requesting the status for the network %s but you are \
+             !"You are requesting the status for the network %s, but you are \
                connected to the network %s\n"
              req conn)
     | `Chain_info_missing ->
@@ -118,21 +124,23 @@ end = struct
     | `Account_not_found addr ->
         Some
           (sprintf
-             !"You attempt to lookup %s but we couldn't find it in the ledger."
+             !"You attempted to lookup %s, but we couldn't find it in the \
+               ledger."
              addr)
     | `Invariant_violation ->
         None
     | `Transaction_not_found hash ->
         Some
           (sprintf
-             "You attempt to lookup %s but it is missing from the mempool. \
-              This may be due to it's inclusion in a block -- try looking for \
+             "You attempted to lookup %s, but it is missing from the mempool. \
+              This may be due to its inclusion in a block -- try looking for \
               this transaction in a recent block. It also could be due to the \
               transaction being evicted from the mempool."
              hash)
     | `Block_missing ->
-        (* TODO: Add context around the query made *)
-        None
+        Some
+          "We couldn't find the block you specified in the archive node. Ask \
+           a friend for the missing data."
     | `Malformed_public_key ->
         None
     | `Operations_not_valid reasons ->
@@ -147,8 +155,12 @@ end = struct
         None
     | `Signature_missing ->
         None
+    | `No_options_provided ->
+        None
     | `Exception s ->
         Some (sprintf "Exception when processing request: %s" s)
+    | `Signature_invalid ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -179,8 +191,52 @@ end = struct
         false
     | `Signature_missing ->
         false
+    | `No_options_provided ->
+        false
     | `Exception _ ->
         false
+    | `Signature_invalid ->
+        false
+
+  (* Unlike message above, description can be updated whenever we see fit *)
+  let description = function
+    | `Sql _ ->
+        "We encountered a SQL failure."
+    | `Json_parse _ ->
+        "We encountered an error while parsing JSON."
+    | `Graphql_coda_query _ ->
+        "The GraphQL query failed."
+    | `Network_doesn't_exist _ ->
+        "The network doesn't exist."
+    | `Chain_info_missing ->
+        "Some chain info is missing."
+    | `Account_not_found _ ->
+        "That account could not be found."
+    | `Invariant_violation ->
+        "One of our internal invariants was violated. (That means you found a \
+         bug!)"
+    | `Transaction_not_found _ ->
+        "That transaction could not be found."
+    | `Block_missing ->
+        "We couldn't find the block you specified in the archive node. Ask a \
+         friend for the missing data."
+    | `Malformed_public_key ->
+        "The public key you provided was malformed."
+    | `Operations_not_valid _ ->
+        "We could not convert those operations to a valid transaction."
+    | `Public_key_format_not_valid ->
+        "The public key you provided had an invalid format."
+    | `Unsupported_operation_for_construction ->
+        "An operation you provided isn't supported for construction."
+    | `Signature_missing ->
+        "Your request is missing a signature."
+    | `Signature_invalid ->
+        "Your request has an invalid signature."
+    | `No_options_provided ->
+        "Your request is missing options."
+    | `Exception _ ->
+        "We encountered an internal exception while processing your request. \
+         (That means you found a bug!)"
 
   let create ?context kind = {extra_context= context; kind}
 
@@ -201,7 +257,8 @@ end = struct
               (`Assoc
                 [ ("body", Variant.to_yojson t.kind)
                 ; ("error", `String context1)
-                ; ("extra", `String context2) ]) ) }
+                ; ("extra", `String context2) ]) )
+    ; description= Some (description t.kind) }
 
   (* The most recent rosetta-cli denies errors that have details in them. When
    * future versions of the spec allow for more detailed descriptions we can
