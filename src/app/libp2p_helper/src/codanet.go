@@ -195,7 +195,7 @@ func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Fi
 
 func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
 	if isPrivateAddr(addr) && gs.KnownPrivateAddrFilters.AddrBlocked(addr) {
-		gs.logger.Debugf("marking private addr %v as known", addr)
+		gs.logger.Infof("marking private addr %v as known", addr)
 
 		ip, err := manet.ToIP(addr)
 		if err != nil {
@@ -270,7 +270,7 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 	allow = gs.isAllowedPeerWithAddr(id, addr)
 
 	if !allow {
-		gs.logger.Infof("disallowing peer dial to: %v (peer + address)", id)
+		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address)", id, addr)
 		gs.logGate()
 	}
 

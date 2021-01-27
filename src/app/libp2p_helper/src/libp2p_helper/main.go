@@ -904,6 +904,17 @@ const (
 	PEER_DISCOVERY_SOURCE_ROUTING
 )
 
+func (source peerDisoverySource) String() string {
+	switch source {
+	case PEER_DISCOVERY_SOURCE_MDNS:
+		return "PEER_DISCOVERY_SOURCE_MDNS"
+	case PEER_DISCOVERY_SOURCE_ROUTING:
+		return "PEER_DISCOVERY_SOURCE_ROUTING"
+	default:
+		return fmt.Sprintf("%d", int(e))
+	}
+}
+
 type peerDiscovery struct {
 	info   peer.AddrInfo
 	source peerDisoverySource
@@ -961,7 +972,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	go func() {
 		for discovery := range foundPeerCh {
 			if validPeer(discovery.info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", discovery.info.ID)
+				app.P2p.Logger.Debugf("discovered peer %v via %v", discovery.info.ID, discovery.source)
 				app.P2p.Host.Peerstore().AddAddrs(discovery.info.ID, discovery.info.Addrs, peerstore.ConnectedAddrTTL)
 
 				if discovery.source == PEER_DISCOVERY_SOURCE_MDNS {
