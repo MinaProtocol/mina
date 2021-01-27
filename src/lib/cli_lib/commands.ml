@@ -64,7 +64,8 @@ let validate_keypair =
 let validate_transaction =
   Command.async
     ~summary:
-      "Validate the signature on one or more transactions, provided to stdin"
+      "Validate the signature on one or more transactions, provided to stdin \
+       in rosetta format"
     ( Command.Param.return
     @@ fun () ->
     let num_fails = ref 0 in
@@ -104,16 +105,21 @@ let validate_transaction =
         with
         | Ok cmd ->
             if Mina_base.Signed_command.check_signature cmd then
-              Format.printf "Transaction was valid@."
+              Format.eprintf "Transaction was valid@."
             else (
               incr num_fails ;
-              Format.printf "Transaction was invalid@." )
+              Format.eprintf "Transaction was invalid@." )
         | Error err ->
             incr num_fails ;
-            Format.printf
+            Format.eprintf
               "Failed to validate transaction:@.%s@.Failed with error:%s@."
               (Yojson.Safe.pretty_to_string transaction_json)
               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
         )
       jsons ;
-    if !num_fails > 0 then exit 1 else exit 0 )
+    if !num_fails > 0 then (
+      Format.printf "Some transactions failed to verify@." ;
+      exit 1 )
+    else (
+      Format.fprintf "All transactions were valid@." ;
+      exit 0 ) )
