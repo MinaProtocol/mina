@@ -77,17 +77,6 @@ module Command_error = struct
   [@@deriving sexp_of, to_yojson]
 end
 
-exception Command_error of Command_error.t
-
-let () =
-  Sexplib.Conv.Exn_converter.add [%extension_constructor Command_error]
-    (function
-    | Command_error t ->
-        Sexp.List [Sexp.Atom "Command_error"; Command_error.sexp_of_t t]
-    | _ ->
-        (* Reaching this branch indicates a bug in sexplib. *)
-        assert false )
-
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.
 *)
@@ -905,12 +894,8 @@ let rec add_from_gossip_exn :
               (* We've already removed them, so this should always be empty. *)
               assert (Sequence.is_empty dropped') ;
               Result.Ok (v, t'', dropped)
-          | Error ((Insufficient_funds _ | Overflow) as err) ->
-              Error err
-              (* C2 *)
-              (* C4 *)
           | Error err ->
-              raise (Command_error err)
+              Error err
         in
         let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
         let increment =
@@ -949,13 +934,11 @@ let rec add_from_gossip_exn :
                 | Ok (_v, t', dropped_) ->
                     assert (Sequence.is_empty dropped_) ;
                     go t' increment dropped' None current_nonce
-                | Error (Insufficient_funds _) ->
+                | Error _err ->
                     (* Re-evaluate with the same [dropped] to calculate the new
                        fee increment.
                     *)
-                    go t' increment dropped (Some dropped') current_nonce
-                | Error err ->
-                    raise (Command_error err) )
+                    go t' increment dropped (Some dropped') current_nonce )
           in
           go t'' increment drop_tail None current_nonce
         in
