@@ -2303,7 +2303,8 @@ module Types = struct
             ~coerce:
               (fun snarked_ledger_hash snarked_next_available_token timestamp
                    blockchain_length min_window_density total_currency
-                   curr_global_slot staking_epoch_data next_epoch_data ->
+                   curr_global_slot global_slot_since_genesis
+                   staking_epoch_data next_epoch_data ->
               ( { snarked_ledger_hash
                 ; snarked_next_available_token
                 ; timestamp=
@@ -2316,6 +2317,7 @@ module Types = struct
                     Predicate.map_closed_interval ~f:Amount.of_uint64
                       total_currency
                 ; curr_global_slot
+                ; global_slot_since_genesis
                 ; staking_epoch_data
                 ; next_epoch_data }
                 : Snapp_predicate.Protocol_state.t ) )
@@ -2351,6 +2353,12 @@ module Types = struct
               ; arg' "currentGlobalSlot"
                   ~doc:
                     "The predicate to be evaluated on the current global slot"
+                  ~typ:(Predicate.closed_interval uint32_arg)
+                  ~default:Ignore
+              ; arg' "globalSlotSinceGenesis"
+                  ~doc:
+                    "The predicate to be evaluated on the current global slot \
+                     since genesis"
                   ~typ:(Predicate.closed_interval uint32_arg)
                   ~default:Ignore
               ; arg' "stakingEpochData"
@@ -2555,67 +2563,6 @@ module Types = struct
                    paid as part of the snapp command"
                 ~typ:Types.feePayment ]
     end
-  end
-
-  module Pagination = struct
-    module Signed_command = struct
-      module Inputs = struct
-        module Type = struct
-          type t = (Signed_command.t, Transaction_hash.t) With_hash.t
-
-          type repr = (Coda_lib.t, t) abstract_value
-
-          let conv = UserCommand.mk_user_command
-
-          let typ = user_command
-
-          let name = "UserCommand"
-        end
-
-        module Cursor = struct
-          type t = (Signed_command.t, Transaction_hash.t) With_hash.t
-
-          let serialize ({data; _} : t) = Signed_command.to_base58_check data
-
-          let deserialize ?error serialized_payment =
-            result_of_or_error
-              (Signed_command.of_base58_check serialized_payment)
-              ~error:(Option.value error ~default:"Invalid cursor")
-            |> Result.map ~f:(fun cmd ->
-                   { With_hash.data= cmd
-                   ; hash= Transaction_hash.hash_command (Signed_command cmd)
-                   } )
-
-          let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
-        end
-
-        module Pagination_database = Auxiliary_database.Transaction_database
-
-        let get_database = Coda_lib.transaction_database
-
-        let filter_argument = Input.user_command_filter_input
-
-        let query_name = "userCommands"
-
-        let to_cursor = Fn.id
-      end
-
-      include Pagination.Make (Inputs)
-    end
-
-    module Blocks = struct
-      module Inputs = struct
-        module Type = struct
-          type t =
-            ( Auxiliary_database.Filtered_external_transition.t
-            , State_hash.t )
-            With_hash.t
-
-          type repr = t
-
-          let conv = Fn.id
-
-          let typ = block
 
     let set_connection_gating_config =
       obj "SetConnectionGatingConfigInput"

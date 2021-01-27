@@ -1,6 +1,6 @@
 open Core_kernel
-open Coda_numbers
-open Coda_base
+open Mina_numbers
+open Mina_base
 
 module Authorization = struct
   [%%versioned
