@@ -14,6 +14,8 @@ let optional_public_key = Option.map ~f:public_key
 
 let uint64 json = Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 
+let optional_uint64 json = Option.map json ~f:uint64
+
 let uint32 json = Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
 
 let balance json =
@@ -24,7 +26,7 @@ let amount json = Yojson.Basic.Util.to_string json |> Currency.Amount.of_string
 let fee json = Yojson.Basic.Util.to_string json |> Currency.Fee.of_string
 
 let nonce json =
-  Yojson.Basic.Util.to_string json |> Coda_base.Account.Nonce.of_string
+  Yojson.Basic.Util.to_string json |> Mina_base.Account.Nonce.of_string
 
 let token json =
-  Yojson.Basic.Util.to_string json |> Coda_base.Token_id.of_string
+  Yojson.Basic.Util.to_string json |> Mina_base.Token_id.of_string

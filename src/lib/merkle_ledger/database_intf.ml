@@ -3,6 +3,8 @@ module type S = sig
 
   val create : ?directory_name:string -> depth:int -> unit -> t
 
+  val create_checkpoint : t -> directory_name:string -> unit -> t
+
   val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
   module For_tests : sig

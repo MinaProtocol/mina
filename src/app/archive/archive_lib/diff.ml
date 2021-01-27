@@ -1,6 +1,6 @@
-open Coda_transition
+open Mina_transition
 open Core_kernel
-open Coda_base
+open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb
 
 (* TODO: We should be able to fully deserialize and serialize via json *)

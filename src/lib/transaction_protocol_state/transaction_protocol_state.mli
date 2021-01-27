@@ -8,7 +8,7 @@ module Block_data : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Coda_state.Protocol_state.Body.Value.Stable.V1.t
+      type t = Mina_state.Protocol_state.Body.Value.Stable.V1.t
       [@@deriving sexp]
     end
   end]

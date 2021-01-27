@@ -4,4 +4,5 @@
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_optcomp ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
  (modes native))

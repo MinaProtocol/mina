@@ -9,15 +9,23 @@ let%test_module "network pool test" =
 
     let logger = Logger.null ()
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
-    let constraint_constants =
-      Genesis_constants.Constraint_constants.for_unit_tests
+    let constraint_constants = precomputed_values.constraint_constants
 
-    module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
+    let consensus_constants = precomputed_values.consensus_constants
+
+    let proof_level = precomputed_values.proof_level
+
+    let time_controller = Block_time.Controller.basic ~logger
+
+    module Mock_snark_pool =
+      Snark_pool.Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
+        (Mocks.Transition_frontier)
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
+        ~disk_location:"/tmp/snark-pool"
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
@@ -27,7 +35,8 @@ let%test_module "network pool test" =
       let local_reader, _local_writer =
         Strict_pipe.(create ~name:"Network pool test" Synchronous)
       in
-      let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
+      let tf = Mocks.Transition_frontier.create [] in
+      let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
       let work =
         `One
           (Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
@@ -49,16 +58,19 @@ let%test_module "network pool test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~logger ~constraint_constants
-              ~incoming_diffs:pool_reader ~local_diffs:local_reader
+              ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let%bind () = Mocks.Transition_frontier.refer_statements tf [work] in
           let command =
             Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               (work, priced_proof)
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command, Fn.const (), Fn.const ())) ;
+               (Envelope.Incoming.local command)
+               (Mock_snark_pool.Broadcast_callback.Local (Fn.const ()))) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -98,7 +110,10 @@ let%test_module "network pool test" =
           Strict_pipe.(create ~name:"Network pool test" Synchronous)
         in
         List.map (List.take works per_reader) ~f:create_work
-        |> List.map ~f:(fun work -> (Envelope.Incoming.local work, Fn.const ()))
+        |> List.map ~f:(fun work ->
+               ( Envelope.Incoming.local work
+               , Mina_net2.Validation_callback.create_without_expiration () )
+           )
         |> List.iter ~f:(fun diff ->
                Strict_pipe.Writer.write pool_writer diff
                |> Deferred.don't_wait_for ) ;
@@ -107,9 +122,8 @@ let%test_module "network pool test" =
                Strict_pipe.Writer.write local_writer (diff, Fn.const ())
                |> Deferred.don't_wait_for ) ;
         let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
-        let frontier_broadcast_pipe_r, _ =
-          Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
-        in
+        let tf = Mocks.Transition_frontier.create [] in
+        let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create (Some tf) in
         let%bind verifier =
           Verifier.create ~logger ~proof_level
             ~pids:(Child_processes.Termination.create_pid_table ())
@@ -118,9 +132,11 @@ let%test_module "network pool test" =
         let config = config verifier in
         let network_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
-            ~incoming_diffs:pool_reader ~local_diffs:local_reader
+            ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
+            ~local_diffs:local_reader
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
+        let%bind () = Mocks.Transition_frontier.refer_statements tf works in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
              ~f:(fun work_command ->
@@ -129,6 +145,8 @@ let%test_module "network pool test" =
                  | Mock_snark_pool.Resource_pool.Diff.Add_solved_work (work, _)
                    ->
                      work
+                 | Mock_snark_pool.Resource_pool.Diff.Empty ->
+                     assert false
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

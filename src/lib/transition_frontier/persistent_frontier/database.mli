@@ -9,8 +9,8 @@
 
 open Async_kernel
 open Core_kernel
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Frontier_base
 
 type t
@@ -22,7 +22,7 @@ module Error : sig
     | `Frontier_hash
     | `Root_transition
     | `Best_tip_transition
-    | `Parent_transition
+    | `Parent_transition of State_hash.t
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
@@ -31,7 +31,9 @@ module Error : sig
 
   type not_found = [`Not_found of not_found_member]
 
-  type t = [not_found | `Invalid_version]
+  type raised = [`Raised of Error.t]
+
+  type t = [not_found | raised | `Invalid_version]
 
   val not_found_message : not_found -> string
 
@@ -44,9 +46,11 @@ val close : t -> unit
 
 val check :
      t
+  -> genesis_state_hash:State_hash.t
   -> ( unit
      , [> `Not_initialized
        | `Invalid_version
+       | `Genesis_state_mismatch of State_hash.t
        | `Corrupt of
          [> `Not_found of
             [> `Best_tip
@@ -56,17 +60,18 @@ val check :
             | `Root_transition
             | `Transition of State_hash.t
             | `Arcs of State_hash.t
-            | `Protocol_states_for_root_scan_state ] ] ] )
+            | `Protocol_states_for_root_scan_state ]
+         | `Raised of Core_kernel.Error.t ] ] )
      Result.t
 
-val initialize :
-  t -> root_data:Root_data.Limited.t -> base_hash:Frontier_hash.t -> unit
+val initialize : t -> root_data:Root_data.Limited.t -> unit
 
 val add :
      t
   -> transition:External_transition.Validated.t
   -> ( unit
-     , [> `Not_found of [> `Parent_transition | `Arcs of State_hash.t]] )
+     , [> `Not_found of
+          [> `Parent_transition of State_hash.t | `Arcs of State_hash.t] ] )
      Result.t
 
 val move_root :
@@ -93,7 +98,7 @@ val get_root : t -> (Root_data.Minimal.t, [> `Not_found of [> `Root]]) Result.t
 
 val get_protocol_states_for_root_scan_state :
      t
-  -> ( Coda_state.Protocol_state.value list
+  -> ( Mina_state.Protocol_state.value list
      , [> `Not_found of [> `Protocol_states_for_root_scan_state]] )
      Result.t
 
@@ -104,11 +109,6 @@ val get_best_tip :
 
 val set_best_tip :
   t -> State_hash.t -> (State_hash.t, [> `Not_found of [> `Best_tip]]) Result.t
-
-val get_frontier_hash :
-  t -> (Frontier_hash.t, [> `Not_found of [> `Frontier_hash]]) Result.t
-
-val set_frontier_hash : t -> Frontier_hash.t -> unit
 
 val crawl_successors :
      t
