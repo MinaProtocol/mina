@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 val verify :
      target_hash:State_hash.t

@@ -1,9 +1,9 @@
 open Core_kernel
-open Coda_numbers
+open Mina_numbers
 open Async
 open Currency
 open Signature_lib
-open Coda_base
+open Mina_base
 
 module type Constants = sig
   [%%versioned:
@@ -60,6 +60,7 @@ module type Blockchain_state = sig
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.t
     -> snarked_ledger_hash:Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Frozen_ledger_hash.t
     -> snarked_next_available_token:Token_id.t
     -> timestamp:Block_time.t
     -> Value.t
@@ -68,6 +69,9 @@ module type Blockchain_state = sig
     ('staged_ledger_hash, _, _, _) Poly.t -> 'staged_ledger_hash
 
   val snarked_ledger_hash :
+    (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
+
+  val genesis_ledger_hash :
     (_, 'frozen_ledger_hash, _, _) Poly.t -> 'frozen_ledger_hash
 
   val snarked_next_available_token : (_, _, 'token_id, _) Poly.t -> 'token_id
@@ -219,7 +223,9 @@ module type State_hooks = sig
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
     -> block_data:block_data
-    -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+    -> supercharge_coinbase:bool
+    -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+    -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
@@ -232,12 +238,10 @@ module type State_hooks = sig
   val next_state_checked :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> prev_state:protocol_state_var
-    -> prev_state_hash:Coda_base.State_hash.var
+    -> prev_state_hash:Mina_base.State_hash.var
     -> snark_transition_var
     -> Currency.Amount.var
-    -> ( [`Success of Snark_params.Tick.Boolean.var]
-         * [`Supercharge_coinbase of Snark_params.Tick.Boolean.var]
-         * consensus_state_var
+    -> ( [`Success of Snark_params.Tick.Boolean.var] * consensus_state_var
        , _ )
        Snark_params.Tick.Checked.t
 
@@ -249,9 +253,11 @@ module type State_hooks = sig
       -> constants:Constants.t
       -> gen_slot_advancement:int Quickcheck.Generator.t
       -> (   previous_protocol_state:( protocol_state
-                                     , Coda_base.State_hash.t )
+                                     , Mina_base.State_hash.t )
                                      With_hash.t
-          -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+          -> snarked_ledger_hash:Mina_base.Frozen_ledger_hash.t
+          -> coinbase_receiver:Public_key.Compressed.t
+          -> supercharge_coinbase:bool
           -> consensus_state)
          Quickcheck.Generator.t
   end
@@ -276,8 +282,6 @@ module type S = sig
         type t =
           { delta: int
           ; k: int
-          ; c: int
-          ; c_times_k: int
           ; slots_per_epoch: int
           ; slot_duration: int
           ; epoch_duration: int
@@ -293,13 +297,43 @@ module type S = sig
       -> t
   end
 
+  module Genesis_epoch_data : sig
+    module Data : sig
+      type t = {ledger: Mina_base.Ledger.t Lazy.t; seed: Mina_base.Epoch_seed.t}
+    end
+
+    type tt = {staking: Data.t; next: Data.t option}
+
+    type t = tt option
+
+    val for_unit_tests : t
+
+    val compiled : t
+  end
+
   module Data : sig
     module Local_state : sig
-      type t [@@deriving sexp, to_yojson]
+      module Snapshot : sig
+        module Ledger_snapshot : sig
+          type t =
+            | Genesis_epoch_ledger of Mina_base.Ledger.t
+            | Ledger_db of Mina_base.Ledger.Db.t
+
+          val close : t -> unit
+
+          val merkle_root : t -> Mina_base.Ledger_hash.t
+        end
+      end
+
+      type t [@@deriving to_yojson]
 
       val create :
            Signature_lib.Public_key.Compressed.Set.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> epoch_ledger_location:string
+        -> ledger_depth:int
+        -> genesis_state_hash:State_hash.t
         -> t
 
       val current_block_production_keys :
@@ -307,14 +341,18 @@ module type S = sig
 
       val current_epoch_delegatee_table :
            local_state:t
-        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+        -> Mina_base.Account.t Mina_base.Account.Index.Table.t
            Public_key.Compressed.Table.t
 
       val last_epoch_delegatee_table :
            local_state:t
-        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+        -> Mina_base.Account.t Mina_base.Account.Index.Table.t
            Public_key.Compressed.Table.t
            option
+
+      val next_epoch_ledger : t -> Snapshot.Ledger_snapshot.t
+
+      val staking_epoch_ledger : t -> Snapshot.Ledger_snapshot.t
 
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
@@ -340,13 +378,13 @@ module type S = sig
 
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
-        -> genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t
         -> Snark_params.Tick.Handler.t
 
       val handler :
            t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
-        -> pending_coinbase:Coda_base.Pending_coinbase_witness.t
+        -> pending_coinbase:Mina_base.Pending_coinbase_witness.t
         -> Snark_params.Tick.Handler.t
 
       val ledger_depth : t -> int
@@ -393,6 +431,10 @@ module type S = sig
       val start_time : constants:Constants.t -> t -> Block_time.t
 
       val end_time : constants:Constants.t -> t -> Block_time.t
+
+      val to_global_slot : t -> Mina_numbers.Global_slot.t
+
+      val zero : constants:Constants.t -> t
     end
 
     module Consensus_state : sig
@@ -400,12 +442,13 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, sexp, to_yojson]
+            type t [@@deriving hash, eq, compare, sexp, yojson]
           end
         end]
 
         module For_tests : sig
-          val with_curr_global_slot : t -> Global_slot.t -> t
+          val with_global_slot_since_genesis :
+            t -> Mina_numbers.Global_slot.t -> t
         end
       end
 
@@ -418,19 +461,25 @@ module type S = sig
         -> (var, Value.t) Snark_params.Tick.Typ.t
 
       val negative_one :
-        genesis_ledger:Ledger.t Lazy.t -> constants:Constants.t -> Value.t
+           genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
+        -> constants:Constants.t
+        -> constraint_constants:Genesis_constants.Constraint_constants.t
+        -> Value.t
 
       val create_genesis_from_transition :
-           negative_one_protocol_state_hash:Coda_base.State_hash.t
+           negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
 
       val create_genesis :
-           negative_one_protocol_state_hash:Coda_base.State_hash.t
+           negative_one_protocol_state_hash:Mina_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_epoch_data:Genesis_epoch_data.t
         -> constraint_constants:Genesis_constants.Constraint_constants.t
         -> constants:Constants.t
         -> Value.t
@@ -448,6 +497,14 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val block_stake_winner : Value.t -> Public_key.Compressed.t
+
+      val block_creator : Value.t -> Public_key.Compressed.t
+
+      val coinbase_receiver : Value.t -> Public_key.Compressed.t
+
+      val coinbase_receiver_var : var -> Public_key.Compressed.var
+
       val curr_global_slot_var : var -> Global_slot.Checked.t
 
       val blockchain_length_var : var -> Length.Checked.t
@@ -456,31 +513,56 @@ module type S = sig
 
       val total_currency_var : var -> Amount.Checked.t
 
-      val staking_epoch_data_var : var -> Coda_base.Epoch_data.var
+      val staking_epoch_data_var : var -> Mina_base.Epoch_data.var
 
-      val next_epoch_data_var : var -> Coda_base.Epoch_data.var
+      val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
+
+      val next_epoch_data_var : var -> Mina_base.Epoch_data.var
+
+      val next_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
 
-      val curr_global_slot : Value.t -> Coda_numbers.Global_slot.t
+      val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
+
+      val global_slot_since_genesis : Value.t -> Mina_numbers.Global_slot.t
+
+      val global_slot_since_genesis_var :
+        var -> Mina_numbers.Global_slot.Checked.t
 
       val is_genesis_state : Value.t -> bool
 
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
+
+      val supercharge_coinbase_var : var -> Boolean.var
+
+      val supercharge_coinbase : Value.t -> bool
     end
 
     module Block_data : sig
       type t
 
-      val epoch_ledger : t -> Coda_base.Sparse_ledger.t
+      val epoch_ledger : t -> Mina_base.Sparse_ledger.t
 
-      val global_slot : t -> Coda_numbers.Global_slot.t
+      val global_slot : t -> Mina_numbers.Global_slot.t
 
       val prover_state : t -> Prover_state.t
+
+      val global_slot_since_genesis : t -> Mina_numbers.Global_slot.t
+
+      val coinbase_receiver : t -> Public_key.Compressed.t
     end
+  end
+
+  module Coinbase_receiver : sig
+    (* Producer: block producer receives coinbases
+       Other: specified account (with default token) receives coinbases
+    *)
+
+    type t = [`Producer | `Other of Public_key.Compressed.t]
   end
 
   module Hooks : sig
@@ -498,7 +580,7 @@ module type S = sig
       type query =
         { query:
             'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-            -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
+            -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -520,20 +602,16 @@ module type S = sig
     *)
     val select :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t
-      -> candidate:Consensus_state.Value.t
+      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> [`Keep | `Take]
 
     type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Produce_now of
-        Signature_lib.Keypair.t * Block_data.t * Public_key.Compressed.t
-      | `Produce of
-        Unix_timestamp.t
-        * Signature_lib.Keypair.t
-        * Block_data.t
-        * Public_key.Compressed.t ]
+      | `Produce_now of Block_data.t * Public_key.Compressed.t
+      | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t
+      ]
 
     (**
      * Determine if and when to next produce a block. Either informs the callee
@@ -549,8 +627,9 @@ module type S = sig
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
+      -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
-      -> block_producer_timing
+      -> block_producer_timing Async.Deferred.t
 
     (**
      * A hook for managing local state when the locked tip is updated.
@@ -559,7 +638,8 @@ module type S = sig
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
+      -> snarked_ledger:Mina_base.Ledger.Db.t
+      -> genesis_ledger_hash:Mina_base.Frozen_ledger_hash.t
       -> unit
 
     (**
@@ -567,8 +647,8 @@ module type S = sig
      *)
     val should_bootstrap :
          constants:Constants.t
-      -> existing:Consensus_state.Value.t
-      -> candidate:Consensus_state.Value.t
+      -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
+      -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> bool
 
@@ -576,7 +656,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> Coda_base.Sparse_ledger.t
+      -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]
@@ -599,6 +679,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
+      -> ledger_depth:int
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 

@@ -22,6 +22,8 @@ let main () =
     ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
     ~delete_older_than:None
+    ~runtime_config_opt:
+      (Some (Lazy.force Runtime_config.Test_configs.transactions))
   |> don't_wait_for ;
   let public_key =
     Precomputed_values.largest_account_pk_exn precomputed_values
@@ -54,16 +56,16 @@ let main () =
     ~f:(fun With_hash.{hash; data= transition} ->
       match%map
         let open Deferred.Result.Let_syntax in
-        match%bind Archive_lib.Processor.Block.find conn ~state_hash:hash with
+        match%bind
+          Archive_lib.Processor.Block.find_opt conn ~state_hash:hash
+        with
         | Some id ->
             let%bind Archive_lib.Processor.Block.{parent_id; _} =
               Archive_lib.Processor.Block.load conn ~id
             in
             Archive_lib.Processor.For_test.assert_parent_exist conn ~parent_id
               ~parent_hash:
-                transition
-                  .Auxiliary_database.Filtered_external_transition
-                   .protocol_state
+                transition.Filtered_external_transition.protocol_state
                   .previous_state_hash
         | None ->
             failwith "Failed to find saved block in database"

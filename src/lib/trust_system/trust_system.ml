@@ -21,6 +21,8 @@ module Actions = struct
         (** Peer sent us some data that doesn't hash to the expected value *)
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
+    | Sent_snapp_transaction
+        (** Peer sent us a snapp transaction, but they are currently disabled. *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
     | Sent_invalid_signature_or_proof
         (** Peer either sent us a proof or a signature that does not verify. *)
@@ -52,6 +54,10 @@ module Actions = struct
           date, etc.
       *)
     | Sent_old_gossip  (** Peer sent us a gossip item we already knew. *)
+    | No_reply_from_preferred_peer
+        (** A peer that should have had the response to a query did not provide it. *)
+    | Unknown_rpc  (** A peer made an unknown RPC. *)
+    | Decoding_failed  (** A gossip message could not be decoded. *)
   [@@deriving show]
 
   (** The action they took, paired with a message and associated JSON metadata
@@ -84,6 +90,7 @@ module Actions = struct
          * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
          *)
         let c = 0.1 in
+        (* this delta has not been updated for delta=0. Leaving since this system is off and likely to be replaced*)
         let y = (Float.of_int delta ** 2.0) /. 2.0 in
         let f x = (1.0 /. y *. (x ** 2.0)) +. c in
         Trust_decrease (f (Int64.to_float slot_diff))
@@ -96,6 +103,8 @@ module Actions = struct
     | Sent_bad_hash ->
         Insta_ban
     | Sent_invalid_signature ->
+        Insta_ban
+    | Sent_snapp_transaction ->
         Insta_ban
     | Sent_invalid_proof ->
         Insta_ban
@@ -117,6 +126,8 @@ module Actions = struct
     | Incoming_connection_error ->
         Trust_decrease 0.05
     | Outgoing_connection_error ->
+        Trust_decrease 0.05
+    | No_reply_from_preferred_peer ->
         Trust_decrease 0.05
     | Violated_protocol ->
         Insta_ban
@@ -142,6 +153,19 @@ module Actions = struct
         Trust_decrease (old_gossip_increment *. 3.)
     | Sent_old_gossip ->
         Trust_decrease old_gossip_increment
+    | Unknown_rpc ->
+        (* TODO: Should do a soft ban of some kind if this happens enough. *)
+        Trust_decrease 0.05
+    | Decoding_failed ->
+        Insta_ban
+
+  (* Disabling everything except insta-ban *)
+  let to_trust_response t =
+    match to_trust_response t with
+    | Insta_ban ->
+        Peer_trust.Trust_response.Insta_ban
+    | _ ->
+        Trust_decrease 0.
 
   let to_log : t -> string * (string, Yojson.Safe.t) List.Assoc.t =
    fun (action, extra_opt) ->
@@ -171,5 +195,5 @@ let record_envelope_sender :
         ~metadata:(("action", `String action_fmt) :: action_metadata)
         "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
-  | Remote (inet_addr, _peer_id) ->
-      record t logger inet_addr action
+  | Remote peer ->
+      record t logger peer action

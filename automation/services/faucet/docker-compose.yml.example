@@ -1,0 +1,15 @@
+version: "3"
+services:
+  tiny:
+    build: .
+    network_mode: host
+    environment:
+      DISCORD_API_KEY: <API_KEY>
+      DAEMON_HOSTNAME: localhost
+      DAEMON_PORT: 8304
+      FAUCET_PUBLIC_KEY: <PUBLIC_KEY> 
+    volumes: 
+      - .:/code
+    command: 
+      python3 tiny.py
+  

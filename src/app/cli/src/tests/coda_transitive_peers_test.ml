@@ -23,7 +23,7 @@ let main () =
   let acceptable_delay =
     Time.Span.of_ms
       ( block_production_interval
-        * Unsigned.UInt32.to_int consensus_constants.delta
+        * (Unsigned.UInt32.to_int consensus_constants.delta + 1)
       |> Float.of_int )
   in
   let work_selection_method =
@@ -53,7 +53,7 @@ let main () =
       ~f:(fun (peer_addrs, peers) (p, k) ->
         ( Node_addrs_and_ports.to_multiaddr_exn p :: peer_addrs
         , Network_peer.Peer.create p.external_ip ~libp2p_port:p.libp2p_port
-            ~peer_id:(Coda_net2.Keypair.to_peer_id k)
+            ~peer_id:(Mina_net2.Keypair.to_peer_id k)
           :: peers ) )
   in
   let addrs_and_ports, libp2p_keypair =

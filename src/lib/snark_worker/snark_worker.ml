@@ -19,7 +19,7 @@ module Worker = struct
 
   module Rpcs_versioned = struct
     open Core_kernel
-    open Coda_base
+    open Mina_base
     open Signature_lib
 
     module Work = struct

@@ -7,7 +7,7 @@ open Signature_lib
 type locked_key =
   | Locked of string
   | Unlocked of (string * Keypair.t)
-  | Hd_account of Coda_numbers.Hd_index.t
+  | Hd_account of Mina_numbers.Hd_index.t
 
 (* A simple cache on top of the fs *)
 type t = {cache: locked_key Public_key.Compressed.Table.t; path: string}
@@ -38,7 +38,7 @@ let decode_public_key key file path logger =
         ~metadata:
           [ ("file", `String file)
           ; ("path", `String path)
-          ; ("error", `String (Error.to_string_hum e)) ] ;
+          ; ("error", Error_json.error_to_yojson e) ] ;
       None
 
 let reload ~logger {cache; path} : unit Deferred.t =
@@ -74,7 +74,7 @@ let reload ~logger {cache; path} : unit Deferred.t =
                          @@ Public_key.Compressed.Table.add cache ~key:pk
                               ~data:
                                 (Hd_account
-                                   (Coda_numbers.Hd_index.of_string hd_index))
+                                   (Mina_numbers.Hd_index.of_string hd_index))
                      )
               | _ ->
                   () )

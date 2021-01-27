@@ -6,21 +6,12 @@
 set -euo pipefail
 
 # Set up variables for build
-SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPT_PATH}/../.."
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+cd "${SCRIPTPATH}/../.."
 
-GIT_HASH=$(git rev-parse --short=7 HEAD)
-GIT_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GIT_TAG=$(git describe --abbrev=0)
+source "buildkite/scripts/export-git-env-vars.sh"
 
-PROJECT="coda-archive"
-
-if [ "$GIT_BRANCH" == "master" ]; then
-    VERSION="${GIT_TAG}"
-else
-    VERSION="${GIT_TAG}-${GIT_BRANCH}-${GIT_HASH}"
-fi
-
+PROJECT="mina-archive"
 BUILD_DIR="deb_build"
 
 mkdir -p "${BUILD_DIR}/DEBIAN"
@@ -32,11 +23,11 @@ Priority: optional
 Architecture: amd64
 Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
 License: Apache-2.0
-Homepage: https://codaprotocol.com/
+Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
-Description: Coda Archive Process
- Compatible with Coda Daemon
- Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL}
+Description: Mina Archive Process
+ Compatible with Mina Daemon
+ Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
 echo "------------------------------------------------------------"
@@ -59,7 +50,7 @@ find "${BUILD_DIR}"
 # Build the package
 echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${VERSION}.deb
-ls -lh coda*.deb
+ls -lh mina*.deb
 
 ###
 # Release the .deb
@@ -67,10 +58,14 @@ ls -lh coda*.deb
 
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
-
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-
-DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
+#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
+#>> Checking for existing lock file
+#>> Repository is locked by another user:  at host dc7eaad3c537
+#>> Attempting to obtain a lock
+#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions 
+--lock 
+--cache-control=max-age=120'
 
 # check for AWS Creds
 set +u
@@ -84,31 +79,47 @@ else
         master)
             CODENAME='release'
             ;;
-        develop)
-            CODENAME='develop'
-            ;;
-        release*)
-            CODENAME='stable'
-            ;;
         *)
             CODENAME='unstable'
             ;;
     esac
 
     echo "Publishing debs:"
-    ls coda-*.deb
+    ls mina-*.deb
     set -x
-    ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
+    # Upload the deb files to s3.
+    # If this fails, attempt to remove the lockfile and retry.
+    ${DEBS3} --codename ${CODENAME} --component main mina-*.deb \
+    || (  scripts/clear-deb-s3-lockfile.sh \
+       && ${DEBS3} --codename main mina-*.deb)
 fi
 
 ###
 # Build and Publish Docker
 ###
-mkdir docker_build 
-mv coda-*.deb docker_build/.
+if [ -n "${BUILDKITE+x}" ]; then
+    set -x
 
-echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+    # Export variables for use with downstream steps
+    echo "export CODA_SERVICE=coda-archive" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export CODA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
 
-docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
+    set +x
+else
+    mkdir docker_build 
+    mv mina-*.deb docker_build/.
 
-docker push codaprotocol/coda-archive:$VERSION
+    echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+
+    docker build \
+      -t codaprotocol/coda-archive:$DOCKER_TAG \
+      -f $SCRIPTPATH/Dockerfile \
+      --build-arg coda_deb_version=$VERSION \
+      --build-arg deb_repo=$CODENAME \
+      docker_build
+
+    docker push codaprotocol/coda-archive:$DOCKER_TAG
+fi
