@@ -1,6 +1,8 @@
 testnetName: "coda-testnet"
 
 coda:
+  runtimeConfig:
+  generateGenesisProof: true
   logLevel: "Debug"
   logSnarkWorkGossip: false
   image: codaprotocol/coda-daemon:0.0.16-beta7-develop
