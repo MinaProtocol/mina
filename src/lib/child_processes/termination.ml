@@ -29,7 +29,7 @@ let get_signal_cause_opt =
   let open Signal in
   let signal_causes_tbl : string Table.t = Table.create () in
   List.iter
-    [ (kill, "Process likely killed because out of memory")
+    [ (kill, "Process killed because out of memory")
     ; (int, "Process interrupted by user or other program") ]
     ~f:(fun (signal, msg) ->
       Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg) ) ;
