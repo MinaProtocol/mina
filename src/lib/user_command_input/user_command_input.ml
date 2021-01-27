@@ -44,9 +44,11 @@ module Payload = struct
             else
               Error
                 (sprintf
-                   !"Input nonce %s different from inferred nonce %s"
+                   !"Input nonce %s either different from inferred nonce %s \
+                     or below minimum_nonce %s"
                    (Account_nonce.to_string nonce)
-                   (Account_nonce.to_string inferred_nonce))
+                   (Account_nonce.to_string inferred_nonce)
+                   (Account_nonce.to_string minimum_nonce))
       in
       { Signed_command_payload.Common.Poly.fee= t.fee
       ; fee_token= t.fee_token

@@ -943,7 +943,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	for _, info := range app.AddedPeers {
-		app.P2p.Logger.Error("Trying to connect to: ", info)
+		app.P2p.Logger.Info("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())

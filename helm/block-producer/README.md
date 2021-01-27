@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Coda protocol Testnet block producer.
+This chart bootstraps a Mina protocol Testnet block producer.
 
-## Add Coda Helm chart repository:
+## Add Mina Helm chart repository:
 
  ```console
- helm repo add coda https://coda-charts.storage.googleapis.com
+ helm repo add mina https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -17,28 +17,28 @@ The following table lists the configurable parameters of the `block-producer` ch
 
 Parameter | Description
 --- | ---
-`testnetName` | Coda protocol testnet name to deploy to
-`coda.seedPeers` | peers to bootstrap the the archive node's Coda daemon
+`testnetName` | Mina protocol testnet name to deploy to
+`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon
 
 ### Optional Settings
 
 Parameter | Description | Default
 --- | --- | ---
-`userAgent.image` | Container image to use for a Coda protocol user-agent sidecar | ""
-`bots.image` | Container image to use for a Codaprotocol faucet and echo service sidecars | ""
-`coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.12-beta-new-genesis-01eca9b`
-`blockProducerConfigs` | list of Coda protocol block producer config and provisioning settings | `see [default] values.yaml`
+`userAgent.image` | Container image to use for a Mina protocol user-agent sidecar | ""
+`bots.image` | Container image to use for a Mina protocol faucet and echo service sidecars | ""
+`coda.image` | container image to use for operating the archive node's Mina daemon | `codaprotocol/coda-daemon:0.0.12-beta-new-genesis-01eca9b`
+`blockProducerConfigs` | list of Mina protocol block producer config and provisioning settings | `see [default] values.yaml`
 `blockProducerConfigs[].name` | Name of block producer configuration and deployment object | `<item-data>`
 `blockProducerConfigs[].class` | Testnet block producer class based on account balance (e.g. fish or whale) | `<item-data>`
-`blockProducerConfigs[].runWithBots` | Whether to run with certain Coda protocol testnet bots | `<item-data>`
+`blockProducerConfigs[].runWithBots` | Whether to run with certain Mina protocol testnet bots | `<item-data>`
 `blockProducerConfigs[].runWithUserAgent` | Whether to run with a user-agent which periodically sends transactions | `<item-data>`
 `blockProducerConfigs[].enableGossipFlooding` | Whether to enable gossip flooding | `<item-data>`
-`blockProducerConfigs[].privateKeySecret` | account wallet private key secret associated with Coda test account/wallet | `<item-data>`
-`blockProducerConfigs[].externalPort` | Port Coda clients use for connecting to the external network | `<item-data>`
-`coda.logLevel` | log level to set for Coda daemon | `TRACE` 
-`coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
-`coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
-`coda.privKeyPass` | public-private key-pair associated with Coda daemon account | `see [default] values.yaml`
+`blockProducerConfigs[].privateKeySecret` | account wallet private key secret associated with Mina test account/wallet | `<item-data>`
+`blockProducerConfigs[].externalPort` | Port Mina clients use for connecting to the external network | `<item-data>`
+`coda.logLevel` | log level to set for Mina daemon | `TRACE` 
+`coda.logSnarkWorkGossip` | whether the Mina daemon should log SNARK work gossip | `false`
+`coda.runtimeConfig` | Mina daemon configuration to use at runtime | `undefined`
+`coda.privKeyPass` | public-private key-pair associated with Mina daemon account | `see [default] values.yaml`
 `userAgent.minFee` | Minimum fee to accept for sending network transactions | ""
 `userAgent.maxFee` | Maximum fee to accept for sending network transactions | ""
 `userAgent.minTx` | Minimum transaction amount to send by the user-agent | ""

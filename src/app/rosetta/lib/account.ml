@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Rosetta_lib
 open Rosetta_models
+module Decoders = Graphql_lib.Decoders
 
 module Get_balance =
 [%graphql
@@ -21,11 +22,11 @@ module Get_balance =
         balance {
           blockHeight @bsDecoder(fn: "Decoders.uint32")
           stateHash
-          total @bsDecoder(fn: "Decoders.uint64")
+          liquid @bsDecoder(fn: "Decoders.optional_uint64")
         }
         nonce
       }
-  }
+    }
 |}]
 
 module Balance = struct
@@ -82,7 +83,8 @@ module Balance = struct
 
                             method stateHash = Some "STATE_HASH_TIP"
 
-                            method total = Unsigned.UInt64.of_int 66_000
+                            method liquid =
+                              Some (Unsigned.UInt64.of_int 66_000)
                           end
 
                         method nonce = Some "2"
@@ -119,7 +121,7 @@ module Balance = struct
         | Some account ->
             M.return account
       in
-      let%map state_hash =
+      let%bind state_hash =
         match (account#balance)#stateHash with
         | None ->
             M.fail
@@ -131,6 +133,18 @@ module Balance = struct
         | Some state_hash ->
             M.return state_hash
       in
+      let%map liquid_balance =
+        match (account#balance)#liquid with
+        | None ->
+            M.fail
+              (Errors.create
+                 ~context:
+                   "Unable to access liquid balance since your Mina daemon \
+                    isn't fully bootstrapped."
+                 `Chain_info_missing)
+        | Some liquid_balance ->
+            M.return liquid_balance
+      in
       { Account_balance_response.block_identifier=
           { Block_identifier.index=
               Unsigned.UInt32.to_int64 (account#balance)#blockHeight
@@ -141,7 +155,7 @@ module Balance = struct
                 Amount_of.coda
             | Some token_id ->
                 Amount_of.token token_id )
-              (account#balance)#total ]
+              liquid_balance ]
       ; metadata=
           Option.map
             ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])

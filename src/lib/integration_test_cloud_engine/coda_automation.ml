@@ -16,11 +16,13 @@ module Network_config = struct
     ; run_with_user_agent: bool
     ; run_with_bots: bool
     ; enable_peer_exchange: bool
-    ; isolated: bool }
+    ; isolated: bool
+    ; libp2p_secret: string }
   [@@deriving to_yojson]
 
   type terraform_config =
-    { cluster_name: string
+    { generate_and_upload_artifacts: bool
+    ; cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
     ; k8s_context: string
@@ -107,8 +109,11 @@ module Network_config = struct
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
-      let keypairs = Array.to_list (Lazy.force Sample_keypairs.keypairs) in
-      if List.length block_producers > List.length keypairs then
+      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
+      let keypairs =
+        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
+      in
+      if num_block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
       let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
@@ -204,7 +209,8 @@ module Network_config = struct
       ; run_with_user_agent= false
       ; run_with_bots= false
       ; enable_peer_exchange= false
-      ; isolated= false }
+      ; isolated= false
+      ; libp2p_secret= "" }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
@@ -214,7 +220,8 @@ module Network_config = struct
     ; constraint_constants
     ; genesis_constants
     ; terraform=
-        { cluster_name
+        { generate_and_upload_artifacts= false
+        ; cluster_name
         ; cluster_region
         ; testnet_name
         ; seed_zone
@@ -414,14 +421,24 @@ module Network_manager = struct
             ; "--from-file=pub=" ^ secret ^ ".pub" ] )
     in
     t.deployed <- true ;
-    { Kubernetes_network.namespace= t.namespace
-    ; constraint_constants= t.constraint_constants
-    ; genesis_constants= t.genesis_constants
-    ; block_producers= t.block_producer_pod_names
-    ; snark_coordinators= t.snark_coordinator_pod_names
-    ; archive_nodes= []
-    ; testnet_log_filter= t.testnet_log_filter
-    ; keypairs= t.keypairs }
+    let result =
+      { Kubernetes_network.namespace= t.namespace
+      ; constraint_constants= t.constraint_constants
+      ; genesis_constants= t.genesis_constants
+      ; block_producers= t.block_producer_pod_names
+      ; snark_coordinators= t.snark_coordinator_pod_names
+      ; archive_nodes= []
+      ; testnet_log_filter= t.testnet_log_filter
+      ; keypairs= t.keypairs }
+    in
+    [%log' info t.logger] "Network deployed" ;
+    [%log' info t.logger] "snark_coordinators_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.snark_coordinators) ;
+    [%log' info t.logger] "block_producers_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.block_producers) ;
+    [%log' info t.logger] "archive_nodes_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.archive_nodes) ;
+    result
 
   let destroy t =
     [%log' info t.logger] "Destroying network" ;

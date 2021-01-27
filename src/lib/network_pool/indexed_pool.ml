@@ -77,6 +77,17 @@ module Command_error = struct
   [@@deriving sexp_of, to_yojson]
 end
 
+exception Command_error of Command_error.t
+
+let () =
+  Sexplib.Conv.Exn_converter.add [%extension_constructor Command_error]
+    (function
+    | Command_error t ->
+        Sexp.List [Sexp.Atom "Command_error"; Command_error.sexp_of_t t]
+    | _ ->
+        (* Reaching this branch indicates a bug in sexplib. *)
+        assert false )
+
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.
 *)
@@ -112,29 +123,45 @@ let currency_consumed_unchecked :
         let open Snapp_command.Party in
         let f (x1 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t)
             (x2 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option)
-            =
+            token_id (fee_payment : Mina_base.Other_fee_payer.t option) =
+          let fee_payer =
+            match fee_payment with
+            | Some {payload= {pk; token_id; _}; _} ->
+                Some (Account_id.create pk token_id)
+            | None ->
+                None
+          in
           let ps =
             x1.data.body
             :: Option.(to_list (map x2 ~f:(fun x2 -> x2.data.body)))
           in
-          List.find_map_exn ps ~f:(fun p ->
-              match p.delta.sgn with
-              | Pos ->
+          List.find_map ps ~f:(fun p ->
+              match fee_payer with
+              | Some fee_payer
+                when not
+                       (Account_id.equal fee_payer
+                          (Account_id.create p.pk token_id)) ->
+                  (* Fee payer is distinct from this account. *)
                   None
-              | Neg ->
-                  Some p.delta.magnitude )
+              | _ -> (
+                match p.delta.sgn with
+                | Pos ->
+                    None
+                | Neg ->
+                    Some p.delta.magnitude ) )
+          |> Option.value ~default:Currency.Amount.zero
         in
         match c with
         | Proved_proved r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Proved_signed r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Signed_signed r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Proved_empty r ->
-            f r.one r.two
+            f r.one r.two r.token_id r.fee_payment
         | Signed_empty r ->
-            f r.one r.two )
+            f r.one r.two r.token_id r.fee_payment )
   in
   fee_amt + amt
 
@@ -868,17 +895,22 @@ let rec add_from_gossip_exn :
           Transaction_hash.User_command_with_valid_signature.t Sequence.t]
           dropped
           (F_sequence.to_seq drop_queue) ;
+        let%bind cmd = verified () in
         (* Add the new transaction *)
         let%bind cmd, t'', _ =
-          match add_from_gossip_exn t' ~verify cmd0 current_nonce balance with
+          match
+            add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce balance
+          with
           | Ok (v, t'', dropped') ->
               (* We've already removed them, so this should always be empty. *)
               assert (Sequence.is_empty dropped') ;
               Result.Ok (v, t'', dropped)
-          | Error (Insufficient_funds _ as err) ->
-              Error err (* C2 *)
-          | _ ->
-              failwith "recursive add_exn failed"
+          | Error ((Insufficient_funds _ | Overflow) as err) ->
+              Error err
+              (* C2 *)
+              (* C4 *)
+          | Error err ->
+              raise (Command_error err)
         in
         let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
         let increment =
@@ -922,8 +954,8 @@ let rec add_from_gossip_exn :
                        fee increment.
                     *)
                     go t' increment dropped (Some dropped') current_nonce
-                | _ ->
-                    failwith "recursive add_exn failed" )
+                | Error err ->
+                    raise (Command_error err) )
           in
           go t'' increment drop_tail None current_nonce
         in
