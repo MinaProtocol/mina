@@ -905,12 +905,8 @@ let rec add_from_gossip_exn :
               (* We've already removed them, so this should always be empty. *)
               assert (Sequence.is_empty dropped') ;
               Result.Ok (v, t'', dropped)
-          | Error ((Insufficient_funds _ | Overflow | Expired _) as err) ->
-              Error err
-              (* C2 *)
-              (* C4 *)
           | Error err ->
-              raise (Command_error err)
+              Error err
         in
         let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
         let increment =
@@ -949,13 +945,11 @@ let rec add_from_gossip_exn :
                 | Ok (_v, t', dropped_) ->
                     assert (Sequence.is_empty dropped_) ;
                     go t' increment dropped' None current_nonce
-                | Error (Insufficient_funds _ | Expired _) ->
+                | Error _err ->
                     (* Re-evaluate with the same [dropped] to calculate the new
                        fee increment.
                     *)
-                    go t' increment dropped (Some dropped') current_nonce
-                | Error err ->
-                    raise (Command_error err) )
+                    go t' increment dropped (Some dropped') current_nonce )
           in
           go t'' increment drop_tail None current_nonce
         in
