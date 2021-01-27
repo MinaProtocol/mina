@@ -488,14 +488,19 @@ let setup_daemon logger =
           | Error err -> (
             match err with
             | `Signal signal ->
-                [%log info]
+                [%log error]
                   "Daemon child process $child_pid terminated after receiving \
                    signal $signal"
                   ~metadata:
                     ( ("signal", `String (Signal.to_string signal))
-                    :: child_pid_metadata )
+                    :: child_pid_metadata ) ;
+                Option.value_map
+                  (Child_processes.Termination.get_signal_cause_opt signal)
+                  ~default:() ~f:(fun cause ->
+                    [%log error] "Possible reason for signal: $cause"
+                      ~metadata:[("cause", `String cause)] )
             | `Exit_non_zero exit_code ->
-                [%log info]
+                [%log error]
                   "Daemon child process $child_pid terminated with nonzero \
                    exit code $exit_code"
                   ~metadata:
