@@ -1,4 +1,5 @@
 open Signature_lib
+open Core_kernel
 open Async
 
 let generate_keypair =
@@ -59,3 +60,60 @@ let validate_keypair =
           exit 1
     in
     exit 0)
+
+let validate_transaction =
+  Command.async
+    ~summary:
+      "Validate the signature on one or more transactions, provided to stdin"
+    ( Command.Param.return
+    @@ fun () ->
+    let num_fails = ref 0 in
+    let jsons = Yojson.Safe.stream_from_channel In_channel.stdin in
+    Caml.Stream.iter
+      (fun transaction_json ->
+        match
+          Or_error.try_with_join (fun () ->
+              let open Or_error.Let_syntax in
+              let%bind rosetta_transaction =
+                Rosetta_lib.Transaction.Signed.Rendered.of_yojson
+                  transaction_json
+                |> Result.map_error ~f:Error.of_string
+              in
+              let%bind rosetta_transaction =
+                Rosetta_lib.Transaction.Signed.of_rendered rosetta_transaction
+                |> Result.map_error ~f:(fun err ->
+                       Error.of_string (Rosetta_lib.Errors.show err) )
+              in
+              let pk (`Pk x) = Public_key.Compressed.of_base58_check_exn x in
+              let%map payload =
+                Rosetta_lib.User_command_info.Partial.to_user_command_payload
+                  rosetta_transaction.command ~nonce:rosetta_transaction.nonce
+                |> Result.map_error ~f:(fun err ->
+                       Error.of_string (Rosetta_lib.Errors.show err) )
+              in
+              let command : Mina_base.Signed_command.t =
+                { Mina_base.Signed_command.Poly.signature=
+                    Mina_base.Signature.of_base58_check_exn
+                      rosetta_transaction.signature
+                ; signer=
+                    pk rosetta_transaction.command.fee_payer
+                    |> Public_key.decompress_exn
+                ; payload }
+              in
+              command )
+        with
+        | Ok cmd ->
+            if Mina_base.Signed_command.check_signature cmd then
+              Format.printf "Transaction was valid@."
+            else (
+              incr num_fails ;
+              Format.printf "Transaction was invalid@." )
+        | Error err ->
+            incr num_fails ;
+            Format.printf
+              "Failed to validate transaction:@.%s@.Failed with error:%s@."
+              (Yojson.Safe.pretty_to_string transaction_json)
+              (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err))
+        )
+      jsons ;
+    if !num_fails > 0 then exit 1 else exit 0 )

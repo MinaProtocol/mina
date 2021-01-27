@@ -1952,6 +1952,7 @@ let advanced =
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
+    ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
