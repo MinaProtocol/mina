@@ -307,7 +307,7 @@ PROMPT_KEYSETS="${PROMPT_KEYSETS}n
 # Handle passing the above keyset info into interactive 'coda-network genesis' prompts
 while read input
 do echo "$input"
-  sleep 2
+  sleep 5
 done < <(echo -n "$PROMPT_KEYSETS") | coda-network genesis
 
 GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
