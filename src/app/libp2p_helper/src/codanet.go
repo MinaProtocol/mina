@@ -153,30 +153,30 @@ func (cm *CodaConnectionManager) GetInfo() p2pconnmgr.CMInfo {
 type CodaGatingState struct {
 	logger                  logging.EventLogger
 	KnownPrivateAddrFilters *ma.Filters
-	DeniedAddrFilters       *ma.Filters
-	AllowedAddrFilters      *ma.Filters
-	DeniedPeers             *peer.Set
-	AllowedPeers            *peer.Set
+	BannedAddrFilters       *ma.Filters
+	TrustedAddrFilters      *ma.Filters
+	BannedPeers             *peer.Set
+	TrustedPeers            *peer.Set
 }
 
 // NewCodaGatingState returns a new CodaGatingState
-func NewCodaGatingState(deniedAddrFilters *ma.Filters, allowedAddrFilters *ma.Filters, deniedPeers *peer.Set, allowedPeers *peer.Set) *CodaGatingState {
+func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Filters, bannedPeers *peer.Set, trustedPeers *peer.Set) *CodaGatingState {
 	logger := logging.Logger("codanet.CodaGatingState")
 
-	if deniedAddrFilters == nil {
-		deniedAddrFilters = ma.NewFilters()
+	if bannedAddrFilters == nil {
+		bannedAddrFilters = ma.NewFilters()
 	}
 
-	if allowedAddrFilters == nil {
-		allowedAddrFilters = ma.NewFilters()
+	if trustedAddrFilters == nil {
+		trustedAddrFilters = ma.NewFilters()
 	}
 
-	if deniedPeers == nil {
-		deniedPeers = peer.NewSet()
+	if bannedPeers == nil {
+		bannedPeers = peer.NewSet()
 	}
 
-	if allowedPeers == nil {
-		allowedPeers = peer.NewSet()
+	if trustedPeers == nil {
+		trustedPeers = peer.NewSet()
 	}
 
 	// we initialize the known private addr filters to reject all ip addresses initially
@@ -185,17 +185,17 @@ func NewCodaGatingState(deniedAddrFilters *ma.Filters, allowedAddrFilters *ma.Fi
 
 	return &CodaGatingState{
 		logger:                  logger,
-		DeniedAddrFilters:       deniedAddrFilters,
-		AllowedAddrFilters:      allowedAddrFilters,
+		BannedAddrFilters:       bannedAddrFilters,
+		TrustedAddrFilters:      trustedAddrFilters,
 		KnownPrivateAddrFilters: knownPrivateAddrFilters,
-		DeniedPeers:             deniedPeers,
-		AllowedPeers:            allowedPeers,
+		BannedPeers:             bannedPeers,
+		TrustedPeers:            trustedPeers,
 	}
 }
 
 func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
 	if isPrivateAddr(addr) && gs.KnownPrivateAddrFilters.AddrBlocked(addr) {
-		gs.logger.Infof("marking private addr %v as known", addr)
+		gs.logger.Debugf("marking private addr %v as known", addr)
 
 		ip, err := manet.ToIP(addr)
 		if err != nil {
@@ -211,36 +211,36 @@ func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
 	}
 }
 
-func (gs *CodaGatingState) isPeerWhitelisted(p peer.ID) bool {
-	return gs.AllowedPeers.Contains(p)
+func (gs *CodaGatingState) isPeerTrusted(p peer.ID) bool {
+	return gs.TrustedPeers.Contains(p)
 }
 
-func (gs *CodaGatingState) isPeerBlacklisted(p peer.ID) bool {
-	return gs.DeniedPeers.Contains(p)
+func (gs *CodaGatingState) isPeerBanned(p peer.ID) bool {
+	return gs.BannedPeers.Contains(p)
 }
 
 // checks if a peer id is allowed to dial/accept
 func (gs *CodaGatingState) isAllowedPeer(p peer.ID) bool {
-	return gs.isPeerWhitelisted(p) || !gs.isPeerBlacklisted(p)
+	return gs.isPeerTrusted(p) || !gs.isPeerBanned(p)
 }
 
-func (gs *CodaGatingState) isAddrWhitelisted(addr ma.Multiaddr) bool {
-	return !gs.AllowedAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) isAddrTrusted(addr ma.Multiaddr) bool {
+	return !gs.TrustedAddrFilters.AddrBlocked(addr)
 }
 
-func (gs *CodaGatingState) isAddrBlacklisted(addr ma.Multiaddr) bool {
-	return gs.DeniedAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) isAddrBanned(addr ma.Multiaddr) bool {
+	return gs.BannedAddrFilters.AddrBlocked(addr)
 }
 
 // checks if an address is allowed to dial/accept
 func (gs *CodaGatingState) isAllowedAddr(addr ma.Multiaddr) bool {
 	publicOrKnownPrivate := !isPrivateAddr(addr) || !gs.KnownPrivateAddrFilters.AddrBlocked(addr)
-	return gs.isAddrWhitelisted(addr) || (!gs.isAddrBlacklisted(addr) && publicOrKnownPrivate)
+	return gs.isAddrTrusted(addr) || (!gs.isAddrBanned(addr) && publicOrKnownPrivate)
 }
 
-// checks if a peer is allowed to dial/accept; if the peer is in the whitelist, the address checks are overriden
+// checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
 func (gs *CodaGatingState) isAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) bool {
-	return gs.isPeerWhitelisted(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
+	return gs.isPeerTrusted(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
 }
 
 func (gs *CodaGatingState) logGate() {
@@ -283,7 +283,7 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 // Bluetooth), straight after it has accepted a connection from its socket.
 func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.isAddrWhitelisted(remoteAddr) || !gs.isAddrBlacklisted(remoteAddr)
+	allow = gs.isAddrTrusted(remoteAddr) || !gs.isAddrBanned(remoteAddr)
 
 	if !allow {
 		gs.logger.Infof("refusing to accept inbound connection from addr: %v", remoteAddr)
