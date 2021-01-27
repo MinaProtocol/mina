@@ -86,16 +86,23 @@ let validate_transaction =
                        Error.of_string (Rosetta_lib.Errors.show err) )
               in
               let pk (`Pk x) = Public_key.Compressed.of_base58_check_exn x in
-              let%map payload =
+              let%bind payload =
                 Rosetta_lib.User_command_info.Partial.to_user_command_payload
                   rosetta_transaction.command ~nonce:rosetta_transaction.nonce
                 |> Result.map_error ~f:(fun err ->
                        Error.of_string (Rosetta_lib.Errors.show err) )
               in
+              let%map signature =
+                match
+                  Mina_base.Signature.Raw.decode rosetta_transaction.signature
+                with
+                | Some signature ->
+                    Ok signature
+                | None ->
+                    Or_error.errorf "Could not decode signature"
+              in
               let command : Mina_base.Signed_command.t =
-                { Mina_base.Signed_command.Poly.signature=
-                    Mina_base.Signature.of_base58_check_exn
-                      rosetta_transaction.signature
+                { Mina_base.Signed_command.Poly.signature
                 ; signer=
                     pk rosetta_transaction.command.fee_payer
                     |> Public_key.decompress_exn
