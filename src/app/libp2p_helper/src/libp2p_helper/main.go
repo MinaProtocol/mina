@@ -1208,28 +1208,34 @@ type setGatingConfigMsg struct {
 }
 
 func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
-	newFilter := ma.NewFilters()
 	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
 
+	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: perhaps the isolate option should just be passed down to the gating state instead
+	bannedAddrFilters := ma.NewFilters()
 	if gc.Isolate {
-		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
-		if err != nil {
-			return nil, err
-		}
-		newFilter.AddFilter(*ipnet, ma.ActionDeny)
+		bannedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 	}
 	for _, ip := range gc.BannedIPs {
-		err := filterIPString(newFilter, ip, ma.ActionDeny)
+		err := filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	trustedAddrFilters := ma.NewFilters()
+	trustedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 	for _, ip := range gc.TrustedIPs {
-		err := filterIPString(newFilter, ip, ma.ActionAccept)
+		err := filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	bannedPeers := peer.NewSet()
 	for _, peerID := range gc.BannedPeerIDs {
 		id, err := peer.Decode(peerID)
@@ -1239,6 +1245,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		}
 		bannedPeers.Add(id)
 	}
+
 	trustedPeers := peer.NewSet()
 	for _, peerID := range gc.TrustedPeerIDs {
 		id, err := peer.Decode(peerID)
@@ -1249,7 +1256,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		trustedPeers.Add(id)
 	}
 
-	return codanet.NewCodaGatingState(newFilter, bannedPeers, trustedPeers), nil
+	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
