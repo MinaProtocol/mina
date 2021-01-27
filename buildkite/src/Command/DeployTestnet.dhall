@@ -27,7 +27,7 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
           ),
           Cmd.run (
             -- upload genesis_ledger and related generated json files
-            "cd ~ && buildkite/scripts/buildkite-artifact-helper.sh automation/terraform/testnets/${testnetName}/*.json"
+            "../../../../buildkite/scripts/buildkite-artifact-helper.sh *.json"
           ),
           Cmd.run (
             -- always execute post-deploy operation
