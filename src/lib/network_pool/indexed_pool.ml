@@ -77,17 +77,6 @@ module Command_error = struct
   [@@deriving sexp_of, to_yojson]
 end
 
-exception Command_error of Command_error.t
-
-let () =
-  Sexplib.Conv.Exn_converter.add [%extension_constructor Command_error]
-    (function
-    | Command_error t ->
-        Sexp.List [Sexp.Atom "Command_error"; Command_error.sexp_of_t t]
-    | _ ->
-        (* Reaching this branch indicates a bug in sexplib. *)
-        assert false )
-
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.
 *)
