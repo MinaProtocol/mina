@@ -497,7 +497,7 @@ let setup_daemon logger =
                 Option.value_map
                   (Child_processes.Termination.get_signal_cause_opt signal)
                   ~default:() ~f:(fun cause ->
-                    [%log info] "Possible reason signal caused termination"
+                    [%log info] "Possible reason for signal: $cause"
                       ~metadata:[("cause", `String cause)] )
             | `Exit_non_zero exit_code ->
                 [%log info]
