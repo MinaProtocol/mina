@@ -1,6 +1,6 @@
 open Core
 open Async
-open Coda_base
+open Mina_base
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -54,9 +54,9 @@ module Inputs = struct
   [@@deriving sexp]
 
   let perform_single ({m; cache; proof_level} : Worker_state.t) ~message =
-    let open Or_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     let open Snark_work_lib in
-    let sok_digest = Coda_base.Sok_message.digest message in
+    let sok_digest = Mina_base.Sok_message.digest message in
     fun (single : single_spec) ->
       match proof_level with
       | Genesis_constants.Proof_level.Full -> (
@@ -64,7 +64,7 @@ module Inputs = struct
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
-            match k () with
+            match%map.Async k () with
             | Error e ->
                 let logger = Logger.create () in
                 [%log error] "SNARK worker failed: $error"
@@ -84,13 +84,15 @@ module Inputs = struct
           in
           match Cache.find cache statement with
           | Some proof ->
-              Or_error.return (proof, Time.Span.zero)
+              Deferred.Or_error.return (proof, Time.Span.zero)
           | None -> (
             match single with
             | Work.Single.Spec.Transition
                 (input, t, (w : Transaction_witness.t)) ->
                 process (fun () ->
                     let%bind t =
+                      Deferred.return
+                      @@
                       (* Validate the received transaction *)
                       match t with
                       | Command (Signed_command cmd) -> (
@@ -112,7 +114,7 @@ module Inputs = struct
                       Sparse_ledger.snapp_accounts w.ledger
                         (Transaction.forget t)
                     in
-                    Or_error.try_with (fun () ->
+                    Deferred.Or_error.try_with (fun () ->
                         M.of_transaction ~sok_digest ~snapp_account1
                           ~snapp_account2
                           ~source:input.Transaction_snark.Statement.source
@@ -128,7 +130,7 @@ module Inputs = struct
                             input
                               .Transaction_snark.Statement
                                .pending_coinbase_stack_state
-                          (unstage (Coda_base.Sparse_ledger.handler w.ledger))
+                          (unstage (Mina_base.Sparse_ledger.handler w.ledger))
                     ) )
             | Merge (_, proof1, proof2) ->
                 process (fun () -> M.merge ~sok_digest proof1 proof2) ) )
@@ -141,7 +143,7 @@ module Inputs = struct
             | Merge (stmt, _, _) ->
                 stmt
           in
-          Or_error.return
+          Deferred.Or_error.return
           @@ ( Transaction_snark.create ~source:stmt.source ~target:stmt.target
                  ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:

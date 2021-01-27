@@ -1,7 +1,7 @@
 (library
  (name archive_lib)
  (public_name archive_lib)
- (libraries core async coda_base coda_transition one_or_two transition_frontier caqti-async caqti caqti-driver-postgresql)
+ (libraries core async mina_base mina_transition one_or_two transition_frontier caqti-async caqti caqti-driver-postgresql genesis_ledger_helper)
  (inline_tests)
  (modes native)
  (instrumentation (backend bisect_ppx))

@@ -47,7 +47,7 @@ License: Apache-2.0
 Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
-Installed-Size: 
+Installed-Size:
 Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
 Section: base
 Priority: optional
@@ -64,6 +64,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/generate_keypair/generate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+cp ./default/src/app/validate_keypair/validate_keypair.exe "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -75,8 +76,9 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
 ls -lh mina*.deb
 
-# Remove generate-keypair binary before other builds with the same dir
+# Remove generate-keypair, validate-keypair binaries before other builds with the same dir
 rm -f "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
+rm -f "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
@@ -105,6 +107,7 @@ echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
@@ -114,6 +117,9 @@ chmod +w $p2p_path
 chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
+
+mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
+cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -179,7 +185,7 @@ for f in /tmp/s3_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp ../genesis_ledgers/phase_three/config.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp ../genesis_ledgers/testworld.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -227,7 +233,7 @@ rm -f "${BUILDDIR}"/var/lib/coda/wrap*
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh mina*.deb
 
-#remove build dir
+#remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
 

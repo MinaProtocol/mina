@@ -9,7 +9,7 @@ end
 
 module Test_config = struct
   module Block_producer = struct
-    type t = {balance: string; timing: Coda_base.Account_timing.t}
+    type t = {balance: string; timing: Mina_base.Account_timing.t}
   end
 
   type t =
@@ -35,8 +35,50 @@ module Test_config = struct
     ; block_producers= []
     ; snark_worker_fee= "0.025"
     ; snark_worker_public_key=
-        (let pk, _ = (Lazy.force Coda_base.Sample_keypairs.keypairs).(0) in
+        (let pk, _ = (Lazy.force Mina_base.Sample_keypairs.keypairs).(0) in
          Signature_lib.Public_key.Compressed.to_string pk) }
+end
+
+module Network_state = struct
+  (* TODO: Just replace the first 3 fields here with Protocol_state *)
+  type t =
+    { block_height: int
+    ; epoch: int
+    ; global_slot: int
+    ; snarked_ledgers_generated: int
+    ; blocks_generated: int }
+end
+
+type constants =
+  { constraints: Genesis_constants.Constraint_constants.t
+  ; genesis: Genesis_constants.t }
+
+module Network_time_span = struct
+  type t = Epochs of int | Slots of int | Literal of Time.Span.t | None
+
+  let to_span t ~(constants : constants) =
+    let open Int64 in
+    let slots n =
+      Time.Span.of_ms
+        (to_float (n * of_int constants.constraints.block_window_duration_ms))
+    in
+    match t with
+    | Epochs n ->
+        Some
+          (slots (of_int n * of_int constants.genesis.protocol.slots_per_epoch))
+    | Slots n ->
+        Some (slots (of_int n))
+    | Literal span ->
+        Some span
+    | None ->
+        None
+end
+
+module Condition = struct
+  type t =
+    { predicate: Network_state.t -> bool
+    ; soft_timeout: Network_time_span.t
+    ; hard_timeout: Network_time_span.t }
 end
 
 (** The signature of integration test engines. An integration test engine
@@ -55,7 +97,11 @@ module type Engine_intf = sig
   end
 
   module Node : sig
-    type t
+    type t =
+      { cluster: string
+      ; namespace: string
+      ; pod_id: string
+      ; node_graphql_port: int }
 
     val start : fresh_state:bool -> t -> unit Malleable_error.t
 
@@ -78,7 +124,7 @@ module type Engine_intf = sig
     val get_balance :
          logger:Logger.t
       -> t
-      -> account_id:Coda_base.Account_id.t
+      -> account_id:Mina_base.Account_id.t
       -> Currency.Balance.t Malleable_error.t
 
     val get_peer_id :
@@ -133,20 +179,12 @@ module type Engine_intf = sig
 
     val destroy : t -> Test_error.Set.t Malleable_error.t
 
-    (** waits until a block is produced with at least one of the following conditions being true
-      1. Blockchain length = blocks
-      2. epoch of the block = epoch_reached
-      3. Has seen some number of slots/epochs crossed/snarked ledgers generated or x milliseconds has passed
+    (** waits until a block is produced with the given condition passing (or failing when the hard timeout in
+        the condition is reached).
     Note: Varying number of snarked ledgers generated because of reorgs is not captured here *)
     val wait_for :
-         ?blocks:int
-      -> ?epoch_reached:int
-      -> ?snarked_ledgers_generated:int
-      -> ?timeout:[ `Slots of int
-                  | `Epochs of int
-                  | `Snarked_ledgers_generated of int
-                  | `Milliseconds of int64 ]
-      -> t
+         t
+      -> Condition.t
       -> ( [> `Blocks_produced of int]
          * [> `Slots_passed of int]
          * [> `Snarked_ledgers_generated of int] )

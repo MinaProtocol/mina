@@ -185,6 +185,7 @@ val compile :
   -> branches:(module Nat.Intf with type n = 'branches)
   -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
   -> name:string
+  -> constraint_constants:Snark_keys_header.Constraint_constants.t
   -> choices:(   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
               -> ( 'prev_varss
                  , 'prev_valuess
@@ -202,5 +203,5 @@ val compile :
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('max_branching, 'max_branching) Proof.t )
+       , ('max_branching, 'max_branching) Proof.t Async.Deferred.t )
        H3_2.T(Prover).t

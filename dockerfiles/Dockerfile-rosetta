@@ -7,6 +7,8 @@ FROM debian:buster-slim AS build-deps
 # Ocaml Version
 ARG OCAML_VERSION=4.07
 ARG OCAML_REVISION=.1
+ARG OCAML_VARIANT=+logoom
+ARG OCAML_PACKAGE=ocaml-variants
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
@@ -126,7 +128,8 @@ RUN git clone \
   --depth 1 \
   /home/opam/opam-repository \
   && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
-  && opam switch create "${OCAML_VERSION}" "ocaml-base-compiler.${OCAML_VERSION}${OCAML_REVISION}" \
+  && opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git \
+  && opam switch create "${OCAML_VERSION}" "${OCAML_PACKAGE}.${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}"
 
 # Alternate variants for 4.07 that are included in the official opam image
@@ -221,6 +224,9 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 #       and a distinct one for the mina codebase in the next stage
 ARG MINA_BRANCH=develop
 
+# repo to checkout the branch from
+ARG MINA_REPO=https://github.com/MinaProtocol/mina
+
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 
@@ -233,7 +239,7 @@ RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
-  https://github.com/MinaProtocol/mina ${HOME}/${MINA_DIR}
+  ${MINA_REPO:-https://github.com/MinaProtocol/mina} ${HOME}/${MINA_DIR}
 
 WORKDIR $HOME/${MINA_DIR}
 
@@ -249,7 +255,7 @@ RUN git pull \
    && go clean --cache --modcache --testcache -r
 
 # HACK: build without special cpu features to allow more people to run coda
-RUN sed -i 's/+bmi2,+adx/-bmi2,-adx/g' src/lib/zexe/snarky-bn382/dune src/lib/marlin_plonk_bindings/stubs/dune
+RUN ./scripts/zexe-standardize.sh
 
 # Make rosetta-crucial components and the generate_keypair tool
 RUN eval $(opam config env) \
@@ -320,9 +326,10 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.jso
 # COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
 # COPY --from=builder /tmp/mina_cache_dir /tmp/mina_cache_dir
 
-
 # Set up mina config dir with demo mode keys and genesis
 COPY --from=builder /home/opam/demo-genesis ${MINA_CONFIG_DIR}/demo-genesis
+# Fix a bad symlink by also putting this data in /home/opam
+COPY --from=builder /home/opam/demo-genesis /home/opam/demo-genesis
 COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \

@@ -9,14 +9,14 @@ module Base = struct
 
     val verify_commands :
          t
-      -> Coda_base.User_command.Verifiable.t list
+      -> Mina_base.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
    communicating with the verifier. *)
-      -> [ `Valid of Coda_base.User_command.Valid.t
+      -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
            ( Pickles.Side_loaded.Verification_key.t
-           * Coda_base.Snapp_statement.t
+           * Mina_base.Snapp_statement.t
            * Pickles.Side_loaded.Proof.t )
            list ]
          list
@@ -27,7 +27,7 @@ module Base = struct
 
     val verify_transaction_snarks :
          t
-      -> (ledger_proof * Coda_base.Sok_message.t) list
+      -> (ledger_proof * Mina_base.Sok_message.t) list
       -> bool Or_error.t Deferred.t
   end
 end

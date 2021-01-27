@@ -1,161 +1,92 @@
-use crate::tweedle_fp::{CamlTweedleFp, CamlTweedleFpPtr};
-use crate::tweedle_fq::{CamlTweedleFq, CamlTweedleFqPtr};
 use algebra::{
     curves::{AffineCurve, ProjectiveCurve},
     tweedle::{
         dee::{Affine as GAffine, Projective as GProjective},
+        fp::Fp,
         fq::Fq,
     },
-    One, UniformRand, Zero,
+    One, UniformRand,
 };
 use rand::rngs::StdRng;
 
-use commitment_dlog::commitment::PolyComm;
-
-/* Projective representation is raw bytes on the OCaml heap. */
-
-pub struct CamlTweedleDee(pub GProjective);
-pub type CamlTweedleDeePtr = ocaml::Pointer<CamlTweedleDee>;
-
-ocaml::custom!(CamlTweedleDee);
-
 #[ocaml::func]
-pub fn caml_tweedle_dee_one() -> CamlTweedleDee {
-    CamlTweedleDee(GProjective::prime_subgroup_generator())
+pub fn caml_tweedle_dee_one() -> GProjective {
+    GProjective::prime_subgroup_generator()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_add(x: CamlTweedleDeePtr, y: CamlTweedleDeePtr) -> CamlTweedleDee {
-    CamlTweedleDee(x.as_ref().0 + y.as_ref().0)
+pub fn caml_tweedle_dee_add(
+    x: ocaml::Pointer<GProjective>,
+    y: ocaml::Pointer<GProjective>,
+) -> GProjective {
+    (*x.as_ref()) + (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_sub(x: CamlTweedleDeePtr, y: CamlTweedleDeePtr) -> CamlTweedleDee {
-    CamlTweedleDee(x.as_ref().0 - y.as_ref().0)
+pub fn caml_tweedle_dee_sub(
+    x: ocaml::Pointer<GProjective>,
+    y: ocaml::Pointer<GProjective>,
+) -> GProjective {
+    (*x.as_ref()) - (*y.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_negate(x: CamlTweedleDeePtr) -> CamlTweedleDee {
-    CamlTweedleDee(-x.as_ref().0)
+pub fn caml_tweedle_dee_negate(x: ocaml::Pointer<GProjective>) -> GProjective {
+    -(*x.as_ref())
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_double(x: CamlTweedleDeePtr) -> CamlTweedleDee {
-    CamlTweedleDee(x.as_ref().0.double())
+pub fn caml_tweedle_dee_double(x: ocaml::Pointer<GProjective>) -> GProjective {
+    x.as_ref().double()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_scale(x: CamlTweedleDeePtr, y: CamlTweedleFpPtr) -> CamlTweedleDee {
-    CamlTweedleDee(x.as_ref().0.mul(y.as_ref().0))
+pub fn caml_tweedle_dee_scale(x: ocaml::Pointer<GProjective>, y: Fp) -> GProjective {
+    x.as_ref().mul(y)
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_random() -> CamlTweedleDee {
+pub fn caml_tweedle_dee_random() -> GProjective {
     let rng = &mut rand_core::OsRng;
-    CamlTweedleDee(UniformRand::rand(rng))
+    UniformRand::rand(rng)
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_rng(i: ocaml::Int) -> CamlTweedleDee {
+pub fn caml_tweedle_dee_rng(i: ocaml::Int) -> GProjective {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
-    CamlTweedleDee(UniformRand::rand(&mut rng))
+    UniformRand::rand(&mut rng)
 }
 
 #[ocaml::func]
-pub extern "C" fn caml_tweedle_dee_endo_base() -> CamlTweedleFq {
+pub extern "C" fn caml_tweedle_dee_endo_base() -> Fq {
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    CamlTweedleFq(endo_q)
+    endo_q
 }
 
 #[ocaml::func]
-pub extern "C" fn caml_tweedle_dee_endo_scalar() -> CamlTweedleFp {
+pub extern "C" fn caml_tweedle_dee_endo_scalar() -> Fp {
     let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
-    CamlTweedleFp(endo_r)
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub enum CamlTweedleDeeAffine<T> {
-    Infinity,
-    Finite((T, T)),
+    endo_r
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_to_affine(x: CamlTweedleDeePtr) -> CamlTweedleDeeAffine<CamlTweedleFq> {
-    x.as_ref().0.into_affine().into()
+pub fn caml_tweedle_dee_to_affine(x: ocaml::Pointer<GProjective>) -> GAffine {
+    x.as_ref().into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_of_affine(x: CamlTweedleDeeAffine<CamlTweedleFqPtr>) -> CamlTweedleDee {
-    CamlTweedleDee(Into::<GAffine>::into(x).into_projective())
+pub fn caml_tweedle_dee_of_affine(x: GAffine) -> GProjective {
+    Into::<GAffine>::into(x).into_projective()
 }
 
 #[ocaml::func]
-pub fn caml_tweedle_dee_of_affine_coordinates(
-    x: CamlTweedleFqPtr,
-    y: CamlTweedleFqPtr,
-) -> CamlTweedleDee {
-    CamlTweedleDee(GProjective::new(x.as_ref().0, y.as_ref().0, Fq::one()))
+pub fn caml_tweedle_dee_of_affine_coordinates(x: Fq, y: Fq) -> GProjective {
+    GProjective::new(x, y, Fq::one())
 }
 
-impl From<GAffine> for CamlTweedleDeeAffine<CamlTweedleFq> {
-    fn from(p: GAffine) -> Self {
-        if p.is_zero() {
-            CamlTweedleDeeAffine::Infinity
-        } else {
-            CamlTweedleDeeAffine::Finite((CamlTweedleFq(p.x), CamlTweedleFq(p.y)))
-        }
-    }
-}
-
-impl From<CamlTweedleDeeAffine<CamlTweedleFq>> for GAffine {
-    fn from(p: CamlTweedleDeeAffine<CamlTweedleFq>) -> Self {
-        match p {
-            CamlTweedleDeeAffine::Infinity => GAffine::zero(),
-            CamlTweedleDeeAffine::Finite((x, y)) => GAffine::new(x.0, y.0, false),
-        }
-    }
-}
-
-impl From<CamlTweedleDeeAffine<CamlTweedleFqPtr>> for GAffine {
-    fn from(p: CamlTweedleDeeAffine<CamlTweedleFqPtr>) -> Self {
-        match p {
-            CamlTweedleDeeAffine::Infinity => GAffine::zero(),
-            CamlTweedleDeeAffine::Finite((x, y)) => GAffine::new(x.as_ref().0, y.as_ref().0, false),
-        }
-    }
-}
-
-#[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlTweedleDeePolyComm<T> {
-    shifted: Option<CamlTweedleDeeAffine<T>>,
-    unshifted: Vec<CamlTweedleDeeAffine<CamlTweedleFq>>,
-}
-
-impl From<PolyComm<GAffine>> for CamlTweedleDeePolyComm<CamlTweedleFq> {
-    fn from(c: PolyComm<GAffine>) -> Self {
-        CamlTweedleDeePolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
-}
-
-impl From<CamlTweedleDeePolyComm<CamlTweedleFq>> for PolyComm<GAffine> {
-    fn from(c: CamlTweedleDeePolyComm<CamlTweedleFq>) -> Self {
-        PolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
-}
-
-impl From<CamlTweedleDeePolyComm<CamlTweedleFqPtr>> for PolyComm<GAffine> {
-    fn from(c: CamlTweedleDeePolyComm<CamlTweedleFqPtr>) -> Self {
-        PolyComm {
-            shifted: Option::map(c.shifted, Into::into),
-            unshifted: c.unshifted.into_iter().map(From::from).collect(),
-        }
-    }
+#[ocaml::func]
+pub fn caml_tweedle_dee_affine_deep_copy(x: GAffine) -> GAffine {
+    x
 }

@@ -11,13 +11,13 @@ module Field = Snark_params.Tick.Field
 [%%else]
 
 module Field = Snark_params_nonconsensus.Field
-module Coda_base = Coda_base_nonconsensus
+module Mina_base = Mina_base_nonconsensus
 module Hex = Hex_nonconsensus.Hex
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
-module Token_id = Coda_base.Token_id
+module Token_id = Mina_base.Token_id
 
 module Unsigned = struct
   type t =
@@ -98,8 +98,7 @@ module Unsigned = struct
     end
 
     type t =
-      { random_oracle_input: string (* serialize |> to_hex *)
-            [@key "randomOracleInput"]
+      { random_oracle_input: string (* hex *) [@key "randomOracleInput"]
       ; payment: Payment.t option
       ; stake_delegation: Delegation.t option [@key "stakeDelegation"]
       ; create_token: Create_token.t option [@key "createToken"]
@@ -200,6 +199,7 @@ module Unsigned = struct
     let random_oracle_input =
       Random_oracle_input.Coding.serialize ~string_of_field ~to_bool:Fn.id
         ~of_bool:Fn.id t.random_oracle_input
+      |> Hex.Safe.to_hex
     in
     match%map render_command ~nonce:t.nonce t.command with
     | `Payment payment ->
@@ -255,8 +255,8 @@ module Unsigned = struct
     ; source= `Pk r.delegator
     ; kind= `Delegation
     ; fee_payer= `Pk r.delegator
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= Coda_base.Token_id.(default |> to_uint64)
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= Mina_base.Token_id.(default |> to_uint64)
     ; fee= r.fee
     ; amount= None }
 
@@ -266,8 +266,8 @@ module Unsigned = struct
     ; source= `Pk r.receiver
     ; kind= `Create_token
     ; fee_payer= `Pk r.receiver (* TODO: reviewer, please check! *)
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= Coda_base.Token_id.(default |> to_uint64)
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= Mina_base.Token_id.(default |> to_uint64)
     ; fee= r.fee
     ; amount= None }
 
@@ -277,8 +277,8 @@ module Unsigned = struct
     ; source= `Pk r.token_owner
     ; kind= `Create_token
     ; fee_payer= `Pk r.receiver
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= r.token |> Coda_base.Token_id.to_uint64
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= r.token |> Mina_base.Token_id.to_uint64
     ; fee= r.fee
     ; amount= None }
 
@@ -288,8 +288,8 @@ module Unsigned = struct
     ; source= `Pk r.token_owner
     ; kind= `Mint_tokens
     ; fee_payer= `Pk r.token_owner
-    ; fee_token= Coda_base.Token_id.(default |> to_uint64)
-    ; token= r.token |> Coda_base.Token_id.to_uint64
+    ; fee_token= Mina_base.Token_id.(default |> to_uint64)
+    ; token= r.token |> Mina_base.Token_id.to_uint64
     ; fee= r.fee
     ; amount= Some r.amount }
 
@@ -297,7 +297,8 @@ module Unsigned = struct
     let open Result.Let_syntax in
     let%bind random_oracle_input =
       Random_oracle_input.Coding.deserialize ~field_of_string ~of_bool:Fn.id
-        (String.to_list r.random_oracle_input)
+        (String.to_list
+           (Option.value_exn (Hex.Safe.of_hex r.random_oracle_input)))
       |> Result.map_error ~f:(fun e ->
              let parse_context =
                match e with

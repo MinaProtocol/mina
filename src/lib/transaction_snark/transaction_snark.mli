@@ -1,5 +1,5 @@
 open Core
-open Coda_base
+open Mina_base
 open Snark_params
 
 (** For debugging. Logs to stderr the inputs to the top hash. *)
@@ -214,10 +214,10 @@ val create :
   -> next_available_token_before:Token_id.t
   -> next_available_token_after:Token_id.t
   -> sok_digest:Sok_message.Digest.t
-  -> proof:Coda_base.Proof.t
+  -> proof:Mina_base.Proof.t
   -> t
 
-val proof : t -> Coda_base.Proof.t
+val proof : t -> Mina_base.Proof.t
 
 val statement : t -> Statement.t
 
@@ -310,7 +310,7 @@ module type S = sig
     -> snapp_account2:Snapp_account.t option
     -> Transaction.Valid.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_user_command :
        sok_digest:Sok_message.Digest.t
@@ -322,7 +322,7 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Signed_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
   val of_fee_transfer :
        sok_digest:Sok_message.Digest.t
@@ -334,9 +334,10 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
-    -> t
+    -> t Async.Deferred.t
 
-  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
+  val merge :
+    t -> t -> sok_digest:Sok_message.Digest.t -> t Async.Deferred.Or_error.t
 end
 
 module Make (Inputs : sig

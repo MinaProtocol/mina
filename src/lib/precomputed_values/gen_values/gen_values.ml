@@ -6,7 +6,7 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
-open Coda_state
+open Mina_state
 
 (* TODO: refactor to do compile time selection *)
 [%%if
@@ -23,7 +23,7 @@ let use_dummy_values = true
 module type S = sig
   val blockchain_proof_system_id : Parsetree.expression
 
-  val base_proof_expr : Parsetree.expression
+  val base_proof_expr : Parsetree.expression Async.Deferred.t
 
   val transaction_verification : Parsetree.expression
 
@@ -52,7 +52,7 @@ let hashes =
 module Dummy = struct
   let loc = Ppxlib.Location.none
 
-  let base_proof_expr = [%expr Coda_base.Proof.blockchain_dummy]
+  let base_proof_expr = Async.return [%expr Mina_base.Proof.blockchain_dummy]
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
@@ -159,13 +159,14 @@ module Make_real () = struct
       fun () -> Lazy.force t]
 
   let base_proof_expr =
+    let%map.Async compiled_values = compiled_values in
     [%expr
       Core.Binable.of_string
-        (module Coda_base.Proof.Stable.Latest)
+        (module Mina_base.Proof.Stable.Latest)
         [%e
           estring
             (Binable.to_string
-               (module Coda_base.Proof.Stable.Latest)
+               (module Mina_base.Proof.Stable.Latest)
                compiled_values.genesis_proof)]]
 end
 
@@ -178,6 +179,7 @@ let main () =
   let (module M) =
     if use_dummy_values then (module Dummy : S) else (module Make_real () : S)
   in
+  let%bind base_proof_expr = M.base_proof_expr in
   let structure =
     [%str
       module T = Genesis_proof.T
@@ -185,12 +187,12 @@ let main () =
 
       let blockchain_proof_system_id = [%e M.blockchain_proof_system_id]
 
-      let compiled_base_proof = [%e M.base_proof_expr]
+      let compiled_base_proof = [%e base_proof_expr]
 
       let for_unit_tests =
         lazy
           (let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t
+             Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
                ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
                ~constraint_constants:
@@ -207,7 +209,7 @@ let main () =
            ; genesis_epoch_data= Consensus.Genesis_epoch_data.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
-           ; genesis_proof= Coda_base.Proof.blockchain_dummy })
+           ; genesis_proof= Mina_base.Proof.blockchain_dummy })
 
       let key_hashes = [%e M.key_hashes]
 
@@ -227,7 +229,7 @@ let main () =
                ~protocol_constants:genesis_constants.protocol
            in
            let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t
+             Mina_state.Genesis_protocol_state.t
                ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
                ~constraint_constants ~consensus_constants
            in

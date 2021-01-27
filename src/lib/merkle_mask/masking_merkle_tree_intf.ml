@@ -46,7 +46,9 @@ module type S = sig
        and type account_id := account_id
        and type account_id_set := account_id_set
 
-    exception Dangling_parent_reference of Uuid.t
+    exception
+      Dangling_parent_reference of
+        Uuid.t * (* Location where null was set*) string
 
     (** get hash from mask, if present, else from its parent *)
     val get_hash : t -> Addr.t -> hash option
@@ -54,8 +56,16 @@ module type S = sig
     (** commit all state to the parent, flush state locally *)
     val commit : t -> unit
 
-    (** remove parent *)
-    val unset_parent : t -> unattached
+    (** [unset_parent ?trigger_signal ~loc:__LOC__ t] detaches the parent from
+        [t]. The [loc] argument is shown in the [Dangling_parent_reference]
+        exception, which will be raised if [t] is used while no parent is
+        registered.
+
+        If the [trigger_signal] optional argument is [true] or omitted,
+        [detached_signal] for [t] will be resolved. This should only be set to
+        [false] when the mask will be reparented.
+    *)
+    val unset_parent : ?trigger_signal:bool -> loc:string -> t -> unattached
 
     (** get mask parent *)
     val get_parent : t -> parent

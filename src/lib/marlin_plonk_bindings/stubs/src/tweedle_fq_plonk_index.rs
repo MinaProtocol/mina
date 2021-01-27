@@ -15,14 +15,13 @@ use commitment_dlog::srs::SRS;
 use plonk_protocol_dlog::index::{Index as DlogIndex, SRSSpec};
 
 use std::{
-    fs::File,
-    io::{BufReader, BufWriter},
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
 
 use crate::index_serialization;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
-use crate::tweedle_fq::CamlTweedleFq;
 use crate::tweedle_fq_urs::CamlTweedleFqUrs;
 
 pub struct CamlTweedleFqPlonkGateVector(Vec<Gate<Fq>>);
@@ -45,13 +44,12 @@ pub fn caml_tweedle_fq_plonk_gate_vector_create() -> CamlTweedleFqPlonkGateVecto
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_gate_vector_add(
     mut v: CamlTweedleFqPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<CamlTweedleFq>>,
+    gate: CamlPlonkGate<Vec<Fq>>,
 ) {
-    let c = gate.c.iter().map(|x| x.0).collect();
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c,
+        c: gate.c,
     });
 }
 
@@ -59,16 +57,14 @@ pub fn caml_tweedle_fq_plonk_gate_vector_add(
 pub fn caml_tweedle_fq_plonk_gate_vector_get(
     v: CamlTweedleFqPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<CamlTweedleFq>> {
-    ocaml::frame!((array_value) {
-        let gate = &(v.as_ref().0)[i as usize];
-        let c = gate.c.iter().map(|x| CamlTweedleFq(*x)).collect();
-        CamlPlonkGate {
-            typ: (&gate.typ).into(),
-            wires: (&gate.wires).into(),
-            c,
-        }
-    })
+) -> CamlPlonkGate<Vec<Fq>> {
+    let gate = &(v.as_ref().0)[i as usize];
+    let c = gate.c.iter().map(|x| *x).collect();
+    CamlPlonkGate {
+        typ: (&gate.typ).into(),
+        wires: (&gate.wires).into(),
+        c,
+    }
 }
 
 #[ocaml::func]
@@ -163,8 +159,8 @@ pub fn caml_tweedle_fq_plonk_index_create(
             .unwrap())?,
             Some(cs) => cs,
         };
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -208,6 +204,7 @@ pub fn caml_tweedle_fq_plonk_index_domain_d8_size(index: CamlTweedleFqPlonkIndex
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_index_read(
+    offset: Option<ocaml::Int>,
     urs: CamlTweedleFqUrs,
     path: String,
 ) -> Result<CamlTweedleFqPlonkIndex<'static>, ocaml::Error> {
@@ -220,8 +217,14 @@ pub fn caml_tweedle_fq_plonk_index_read(
         Ok(file) => file,
     };
     let mut r = BufReader::new(file);
-    let urs_copy = Rc::clone(&urs.0);
-    let urs_copy_outer = Rc::clone(&urs.0);
+    match offset {
+        Some(offset) => {
+            r.seek(Start(offset as u64))?;
+        }
+        None => (),
+    };
+    let urs_copy = Rc::clone(&*urs);
+    let urs_copy_outer = Rc::clone(&*urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -238,10 +241,11 @@ pub fn caml_tweedle_fq_plonk_index_read(
 
 #[ocaml::func]
 pub fn caml_tweedle_fq_plonk_index_write(
+    append: Option<bool>,
     index: CamlTweedleFqPlonkIndexPtr<'static>,
     path: String,
 ) -> Result<(), ocaml::Error> {
-    let file = match File::create(path) {
+    let file = match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
         Err(_) => Err(
             ocaml::Error::invalid_argument("caml_tweedle_fq_plonk_index_write")
                 .err()

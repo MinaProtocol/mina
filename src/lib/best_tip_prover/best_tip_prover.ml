@@ -1,15 +1,15 @@
 open Core_kernel
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 open Async_kernel
-open Coda_transition
+open Mina_transition
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Best_tip_prover_intf
+  Mina_intf.Best_tip_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
@@ -65,7 +65,8 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.validated_transition best_tip_breadcrumb
     in
     let best_tip =
-      External_transition.Validation.forget_validation best_verified_tip
+      External_transition.Validation.forget_validation_with_hash
+        best_verified_tip
     in
     let root =
       Transition_frontier.root frontier
@@ -108,10 +109,10 @@ module Make (Inputs : Inputs_intf) :
     let open Deferred.Or_error.Let_syntax in
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in
-    let genesis_transition = External_transition.genesis ~precomputed_values in
-    let genesis_state_hash =
-      External_transition.Validated.state_hash genesis_transition
+    let genesis_protocol_state =
+      Precomputed_values.genesis_state_with_hash precomputed_values
     in
+    let genesis_state_hash = With_hash.hash genesis_protocol_state in
     let root_state_hash = External_transition.state_hash root in
     let root_is_genesis = State_hash.(root_state_hash = genesis_state_hash) in
     let%bind () =

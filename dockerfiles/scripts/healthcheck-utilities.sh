@@ -3,11 +3,33 @@
 #
 function isDaemonSynced() {
     status=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { syncStatus } " }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { syncStatus } " }' localhost:3085/graphql | \
             jq '.data.syncStatus'
     )
-    
-    [[ status == \"SYNCED\" ]] && return 0 || (echo "Daemon is out of sync with status: ${status}" && return 1) 
+
+    case ${status} in
+      \"BOOTSTRAP\")
+        ;&
+      \"CATCHUP\")
+        ;&
+      \"CONNECTING\")
+        ;&
+      \"SYNCED\")
+        return 0
+        ;;
+      *)
+        DAEMON_CONFIG="/root/daemon.json"
+        if [ -f "$DAEMON_CONFIG" ]; then
+            now=$(date +%s)
+            timestamp=$(grep 'timestamp' ${DAEMON_CONFIG} | awk '{print $2}' | sed -e s/\"//g)
+            timestamp_second=$(date -d ${timestamp} +%s)
+
+            [[ $now -le $timestamp_seconds ]] && return 0 # special case to claim synced before the genesis timestamp
+        fi
+        echo "Daemon is out of sync with status: ${status}"
+
+        return 1
+    esac
 }
 
 #
@@ -15,17 +37,17 @@ function isDaemonSynced() {
 #
 function isChainlengthHighestReceived() {
     chainLength=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { blockchainLength } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { blockchainLength } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.blockchainLength'
     )
 
     highestReceived=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
     [[ "${chainLength}" == "${highestReceived}" ]] && return 0 ||
-        (echo "Daemon chain length[${chainLength}] is not at highest received[${highestReceived}]." && return 1) 
+        (echo "Daemon chain length[${chainLength}] is not at highest received[${highestReceived}]." && return 1)
 }
 
 #
@@ -34,7 +56,7 @@ function isChainlengthHighestReceived() {
 function peerCountGreaterThan() {
     peerCountMinThreshold=${1:-2}
     peerCount=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { peers } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.peers | length'
     )
     
@@ -47,16 +69,18 @@ function peerCountGreaterThan() {
 #
 function ownsFunds() {
     ownedWalletCount=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets }" }' localhost:3085/graphql | \
             jq '.data.ownedWallets | length'
     )
     balanceTotal=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { ownedWallets { publicKey { balance { total } } } }" }' localhost:3085/graphql | \
-            jq '.data.ownedWallets[].balance.total'
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { ownedWallets { balance { total } } }" }' localhost:3085/graphql | \
+            jq '.data.ownedWallets[0].balance.total'
     )
+    # remove leading and trailing quotes for integer interpretation
+    balanceTotal=$(echo $balanceTotal | sed -e 's/^"//' -e 's/"$//')
     
-    [[ $ownedWalletCount -gt 1 ]] && [[ $balanceTotal -gt 0 ]] && return 0 ||
-        (echo "Owned wallet count[${ownedWalletCount}] and/or balance total[${peerCountMinThreshold}] is insufficient." && return 1) 
+    [[ $ownedWalletCount -gt 0 ]] && [[ $balanceTotal -gt 0 ]] && return 0 ||
+        (echo "Owned wallet count[${ownedWalletCount}] and/or balance total[${balanceTotal}] is insufficient." && return 1) 
 }
 
 #
@@ -65,12 +89,12 @@ function ownsFunds() {
 function hasSentUserCommandsGreaterThan() {
     userCmdMinThreshold=${1:-1}
     userCmdSent=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { userCommandsSent } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.userCommandsSent'
     )
     
     [[ $userCmdSent -gt $userCmdMinThreshold ]] && return 0 ||
-        (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1) 
+        (echo "User commands sent[${userCmdSent}] is not greater than mininum threshold[${userCmdMinThreshold}]." && return 1)
 }
 
 #
@@ -78,13 +102,13 @@ function hasSentUserCommandsGreaterThan() {
 #
 function hasSnarkWorker() {
     snarkWorker=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { snarkWorker } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.snarkWorker'
     )
     rc=$?
     
-    [[ "$rc" == 0 ]] && [[ -n "$snarkWorker" ]] && return 0 ||
-        (echo "Snark worker error: ${rc} - $snarkWorker" && return 1) 
+    [[ $rc == 0 ]] && [[ -n "$snarkWorker" ]] && return 0 ||
+        (echo "Snark worker error: ${rc} - $snarkWorker" && return 1)
 }
 
 #
@@ -106,9 +130,9 @@ function isArchiveSynced() {
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
-        curl -H "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
-    [[ highestObserved == highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}" && return 1) 
+    [[ $highestObserved == $highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}]" && return 1)
 }

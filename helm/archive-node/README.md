@@ -1,11 +1,11 @@
 ## Introduction
 
-This chart bootstraps a Coda protocol Testnet archive node and associated Postgres database.
+This chart bootstraps a Mina protocol Testnet archive node and associated Postgres database.
 
-## Add Coda Helm chart repository:
+## Add Mina Helm chart repository:
 
  ```console
- helm repo add coda https://coda-charts.storage.googleapis.com
+ helm repo add mina https://coda-charts.storage.googleapis.com
  helm repo update
  ```
 
@@ -17,8 +17,8 @@ The following table lists the configurable parameters of the `archive-node` char
 
 Parameter | Description
 --- | ---
-`testnetName` | Coda protocol testnet name to deploy to
-`coda.seedPeers` | peers to bootstrap the the archive node's Coda daemon 
+`testnetName` | Mina protocol testnet name to deploy to
+`coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon 
 `archive.nodeName` | name identifier of archive node pod
 
 ### Optional Settings
@@ -37,7 +37,6 @@ Parameter | Description | Default
 `postgres.postgresPassword` | Postgres database access password (if set) | `foobar`
 `coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898`
 `coda.logLevel` | log level to set for Coda daemon | `TRACE` 
-`coda.logReceivedBlocks` | whether the Coda daemon should log received blocks events | `false`
 `coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
 `coda.privKeyPass` | public-private key-pair associated with Coda test account/wallet | `see [default] values.yaml`

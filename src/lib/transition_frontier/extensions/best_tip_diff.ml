@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 
 module T = struct
@@ -12,7 +12,7 @@ module T = struct
 
   module Log_event = struct
     type t =
-      { protocol_state: Coda_state.Protocol_state.Value.t
+      { protocol_state: Mina_state.Protocol_state.Value.t
       ; state_hash: State_hash.t
       ; just_emitted_a_proof: bool }
     [@@deriving yojson, sexp]
@@ -28,7 +28,9 @@ module T = struct
   end
 
   let create ~logger frontier =
-    let best_tip_diff_logger = Logger.create ~id:"best_tip_diff" () in
+    let best_tip_diff_logger =
+      Logger.create ~id:Logger.Logger_id.best_tip_diff ()
+    in
     ( {logger; best_tip_diff_logger}
     , { new_commands= Breadcrumb.commands (Full_frontier.root frontier)
       ; removed_commands= []

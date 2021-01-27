@@ -11,6 +11,9 @@ module Get_coinbase_and_genesis =
       creatorAccount {
         publicKey @bsDecoder(fn: "Decoders.public_key")
       }
+      winnerAccount {
+        publicKey @bsDecoder(fn: "Decoders.public_key")
+      }
       protocolState {
         blockchainState {
           utcDate
@@ -19,12 +22,9 @@ module Get_coinbase_and_genesis =
       stateHash
     }
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
-    genesisConstants {
-      coinbase @bsDecoder(fn: "Decoders.uint64")
-    }
   }
 |}]
 
@@ -79,7 +79,7 @@ module Internal_command_info = struct
   module T (M : Monad_fail.S) = struct
     module Op_build = Op.T (M)
 
-    let to_operations ~coinbase_receiver ~coinbase (t : t) :
+    let to_operations ~coinbase_receiver (t : t) :
         (Operation.t list, Errors.t) M.t =
       (* We choose to represent the dec-side of fee transfers from txns from the
        * canonical user command that created them so we are able consistently
@@ -101,7 +101,7 @@ module Internal_command_info = struct
         ~a_eq:[%eq: [`Coinbase_inc | `Fee_payer_dec | `Fee_receiver_inc]] ~plan
         ~f:(fun ~related_operations ~operation_identifier op ->
           (* All internal commands succeed if they're in blocks *)
-          let status = Operation_statuses.name `Success in
+          let status = Some (Operation_statuses.name `Success) in
           match op.label with
           | `Coinbase_inc ->
               M.return
@@ -111,7 +111,7 @@ module Internal_command_info = struct
                 ; account=
                     Some (account_id t.receiver Amount_of.Token_id.default)
                 ; _type= Operation_types.name `Coinbase_inc
-                ; amount= Some (Amount_of.coda coinbase)
+                ; amount= Some (Amount_of.token t.token t.fee)
                 ; coin_change= None
                 ; metadata= None }
           | `Fee_receiver_inc ->
@@ -169,16 +169,21 @@ module Block_info = struct
     { block_identifier: Block_identifier.t
     ; parent_block_identifier: Block_identifier.t
     ; creator: [`Pk of string]
+    ; winner: [`Pk of string]
     ; timestamp: int64
     ; internal_info: Internal_command_info.t list
     ; user_commands: User_command_info.t list }
 
   let creator_metadata {creator= `Pk pk; _} = `Assoc [("creator", `String pk)]
 
+  let block_winner_metadata {winner= `Pk pk; _} =
+    `Assoc [("winner", `String pk)]
+
   let dummy =
     { block_identifier=
         Block_identifier.create (Int64.of_int_exn 4) "STATE_HASH_BLOCK"
     ; creator= `Pk "Alice"
+    ; winner= `Pk "Babu"
     ; parent_block_identifier=
         Block_identifier.create (Int64.of_int_exn 3) "STATE_HASH_PARENT"
     ; timestamp= Int64.of_int_exn 1594937771
@@ -189,9 +194,11 @@ end
 module Sql = struct
   module Block = struct
     module Extras = struct
-      let creator x = `Pk x
+      let creator (creator, _) = `Pk creator
 
-      let typ = Caqti_type.string
+      let winner (_, winner) = `Pk winner
+
+      let typ = Caqti_type.(tup2 string string)
     end
 
     let typ = Caqti_type.(tup3 int Archive_lib.Processor.Block.typ Extras.typ)
@@ -207,49 +214,59 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, creator_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, global_slot_since_genesis, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
   LIMIT 1)
 
   UNION ALL
 
-  SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp FROM blocks b
+  SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp FROM blocks b
   INNER JOIN chain
   ON b.id = chain.parent_id AND chain.id <> chain.parent_id
-) SELECT c.id, c.state_hash, c.parent_id, c.creator_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.timestamp, pk.value as creator FROM chain c
+) SELECT c.id, c.state_hash, c.parent_id, c.parent_hash, c.creator_id, c.block_winner_id, c.snarked_ledger_hash_id, c.staking_epoch_data_id, c.next_epoch_data_id, c.ledger_hash, c.height, c.global_slot, c.global_slot_since_genesis, c.timestamp, pk.value as creator, bw.value as winner FROM chain c
   INNER JOIN public_keys pk
   ON pk.id = c.creator_id
+  INNER JOIN public_keys bw
+  ON bw.id = c.block_winner_id
   WHERE c.height = ?
       |}
 
     let query_hash =
       Caqti_request.find_opt Caqti_type.string typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
+        INNER JOIN public_keys bw
+        ON bw.id = b.block_winner_id
         WHERE b.state_hash = ? |}
 
     let query_both =
       Caqti_request.find_opt
         Caqti_type.(tup2 string int64)
         typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
+        INNER JOIN public_keys bw
+        ON bw.id = b.block_winner_id
         WHERE b.state_hash = ? AND b.height = ? |}
 
     let query_by_id =
       Caqti_request.find_opt Caqti_type.int typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
         INNER JOIN public_keys pk
         ON pk.id = b.creator_id
+        INNER JOIN public_keys bw
+        ON bw.id = b.block_winner_id
         WHERE b.id = ? |}
 
     let query_best =
       Caqti_request.find_opt Caqti_type.unit typ
-        {| SELECT b.id, b.state_hash, b.parent_id, b.creator_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.timestamp, pk.value as creator FROM blocks b
+        {| SELECT b.id, b.state_hash, b.parent_id, b.parent_hash, b.creator_id, b.block_winner_id, b.snarked_ledger_hash_id, b.staking_epoch_data_id, b.next_epoch_data_id, b.ledger_hash, b.height, b.global_slot, b.global_slot_since_genesis, b.timestamp, pk.value as creator, bw.value as winner FROM blocks b
            INNER JOIN public_keys pk
            ON pk.id = b.creator_id
+           INNER JOIN public_keys bw
+           ON bw.id = b.block_winner_id
            WHERE b.height = (select MAX(b.height) from blocks b)
            ORDER BY timestamp ASC
            LIMIT 1 |}
@@ -270,22 +287,13 @@ WITH RECURSIVE chain AS (
 
   module User_commands = struct
     module Extras = struct
-      let fee_payer_account_creation_fee_paid (x, _, _, _) = x
+      let fee_payer (x, _, _) = `Pk x
 
-      let receiver_account_creation_fee_paid (_, y, _, _) = y
+      let source (_, y, _) = `Pk y
 
-      let created_token (_, _, z, _) = z
+      let receiver (_, _, z) = `Pk z
 
-      let fee_payer (_, _, _, (x, _, _)) = `Pk x
-
-      let source (_, _, _, (_, y, _)) = `Pk y
-
-      let receiver (_, _, _, (_, _, z)) = `Pk z
-
-      let typ =
-        Caqti_type.(
-          tup4 (option int64) (option int64) (option int64)
-            (tup3 string string string))
+      let typ = Caqti_type.(tup3 string string string)
     end
 
     let typ =
@@ -357,7 +365,11 @@ WITH RECURSIVE chain AS (
       | Some (block_id, raw_block, block_extras) ->
           M.return (block_id, raw_block, block_extras)
     in
-    let parent_id = raw_block.parent_id in
+    let%bind parent_id =
+      Option.value_map raw_block.parent_id
+        ~default:(M.fail (Errors.create `Block_missing))
+        ~f:M.return
+    in
     let%bind raw_parent_block, _parent_block_extras =
       match%bind
         Block.run_by_id (module Conn) parent_id
@@ -399,7 +411,7 @@ WITH RECURSIVE chain AS (
           in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
-          ; fee= Unsigned.UInt64.of_int ic.fee
+          ; fee= Unsigned.UInt64.of_int64 ic.fee
           ; token= Unsigned.UInt64.of_int64 ic.token
           ; hash= ic.hash } )
     in
@@ -433,10 +445,8 @@ WITH RECURSIVE chain AS (
             match uc.failure_reason with
             | None -> (
               match
-                ( User_commands.Extras.fee_payer_account_creation_fee_paid
-                    extras
-                , User_commands.Extras.receiver_account_creation_fee_paid
-                    extras )
+                ( uc.fee_payer_account_creation_fee_paid
+                , uc.receiver_account_creation_fee_paid )
               with
               | None, None ->
                   M.return
@@ -468,17 +478,18 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= Unsigned.UInt64.of_int uc.fee_token
-          ; token= Unsigned.UInt64.of_int uc.token
+          ; fee_token= Unsigned.UInt64.of_int64 uc.fee_token
+          ; token= Unsigned.UInt64.of_int64 uc.token
           ; nonce= Unsigned.UInt32.of_int uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
-          ; fee= Unsigned.UInt64.of_int uc.fee
+          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
+          ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status } )
     in
     { Block_info.block_identifier=
         {Block_identifier.index= raw_block.height; hash= raw_block.state_hash}
     ; creator= Block.Extras.creator block_extras
+    ; winner= Block.Extras.winner block_extras
     ; parent_block_identifier=
         { Block_identifier.index= raw_parent_block.height
         ; hash= raw_parent_block.state_hash }
@@ -530,11 +541,6 @@ module Specific = struct
                    object
                      method stateHash = "STATE_HASH_GENESIS"
                    end
-
-                 method genesisConstants =
-                   object
-                     method coinbase = Unsigned.UInt64.of_int 20_000_000_000
-                   end
                end )
           (* TODO: Add variants to cover every branch *)
       ; logger
@@ -572,6 +578,7 @@ module Specific = struct
                 (* parent_block_identifier for genesis block should be the same as block identifier as described https://www.rosetta-api.org/docs/common_mistakes.html#correct-example *)
             ; parent_block_identifier= genesis_block_identifier
             ; creator= `Pk (genesisBlock#creatorAccount)#publicKey
+            ; winner= `Pk (genesisBlock#winnerAccount)#publicKey
             ; timestamp=
                 Int64.of_string
                   ((genesisBlock#protocolState)#blockchainState)#utcDate
@@ -579,7 +586,6 @@ module Specific = struct
             ; user_commands= [] }
         else env.db_block query
       in
-      let coinbase = (res#genesisConstants)#coinbase in
       let coinbase_receiver =
         List.find block_info.internal_info ~f:(fun info ->
             info.Internal_command_info.kind = `Coinbase )
@@ -590,8 +596,7 @@ module Specific = struct
           ~f:(fun macc info ->
             let%bind acc = macc in
             let%map operations =
-              Internal_command_info_ops.to_operations ~coinbase_receiver
-                ~coinbase info
+              Internal_command_info_ops.to_operations ~coinbase_receiver info
             in
             [%log debug]
               ~metadata:[("info", Internal_command_info.to_yojson info)]

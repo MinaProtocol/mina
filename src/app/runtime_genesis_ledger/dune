@@ -7,9 +7,9 @@
    core
    ;; libraries
    blockchain_snark
-   coda_base
+   mina_base
    coda_genesis_proof
-   coda_state
+   mina_state
    genesis_ledger_helper
    coda_runtime_config
    snark_keys

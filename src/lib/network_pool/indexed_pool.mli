@@ -5,8 +5,8 @@
 *)
 open Core
 
-open Coda_base
-open Coda_numbers
+open Mina_base
+open Mina_numbers
 
 module Command_error : sig
   type t =
@@ -22,9 +22,10 @@ module Command_error : sig
     | Overflow
     | Bad_token
     | Expired of
-        [`Valid_until of Coda_numbers.Global_slot.t]
-        * [`Current_global_slot of Coda_numbers.Global_slot.t]
+        [`Valid_until of Mina_numbers.Global_slot.t]
+        * [`Current_global_slot of Mina_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
+    | Invalid_transaction
   [@@deriving sexp_of, to_yojson]
 end
 
@@ -88,10 +89,14 @@ val handle_committed_txn :
 *)
 val add_from_gossip_exn :
      t
-  -> Transaction_hash.User_command_with_valid_signature.t
+  -> verify:(User_command.t -> User_command.Valid.t option)
+  -> [ `Unchecked of Transaction_hash.User_command.t
+     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
   -> Account_nonce.t
   -> Currency.Amount.t
-  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+  -> ( Transaction_hash.User_command_with_valid_signature.t
+       * t
+       * Transaction_hash.User_command_with_valid_signature.t Sequence.t
      , Command_error.t )
      Result.t
 (** Returns the commands dropped as a result of adding the command, which will
@@ -106,7 +111,7 @@ val add_from_backtrack :
   -> (t, Command_error.t) Result.t
 
 (** Check whether a command is in the pool *)
-val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
+val member : t -> Transaction_hash.User_command.t -> bool
 
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
@@ -132,7 +137,7 @@ val revalidate :
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
 
 (** Get the current global slot according to the pool's time controller. *)
-val current_global_slot : t -> Coda_numbers.Global_slot.t
+val current_global_slot : t -> Mina_numbers.Global_slot.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

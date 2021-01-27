@@ -38,7 +38,7 @@ echo "========================= STARTING ARCHIVE PROCESS =======================
 sleep 3
 
 # Setup and run demo-node
-PK=${PK:-B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g}
+PK=${PK:-B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV}
 SNARK_PK=${SNARK_PK:-B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf}
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
@@ -57,6 +57,7 @@ echo "========================= STARTING DAEMON ==========================="
   -block-producer-key "$MINA_CONFIG_DIR/wallets/store/$PK" \
   -config-dir "$MINA_CONFIG_DIR" \
   -config-file "$MINA_CONFIG_DIR/daemon.json" \
+  -genesis-ledger-dir "$MINA_CONFIG_DIR/demo-genesis" \
   -demo-mode \
   -disable-telemetry \
   -external-ip 127.0.0.1 \
@@ -76,7 +77,7 @@ echo "========================= STARTING DAEMON ==========================="
 
 
 # wait for it to settle
-sleep 3
+sleep 4
 
 # rosetta
 echo "========================= STARTING ROSETTA API on PORT 3087 ==========================="

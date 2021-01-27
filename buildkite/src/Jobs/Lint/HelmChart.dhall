@@ -23,6 +23,8 @@ Pipeline.build
       dirtyWhen = [
         S.contains "helm/",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
+        -- trigger on HelmRelease job change due to dependency
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
         S.exactly "buildkite/scripts/helm-ci" "sh"
       ],
       path = "Lint",
@@ -35,7 +37,6 @@ Pipeline.build
           , label = "Helm chart lint steps"
           , key = "lint-helm-chart"
           , target = Size.Small
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]

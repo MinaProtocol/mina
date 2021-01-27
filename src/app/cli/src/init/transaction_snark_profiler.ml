@@ -1,6 +1,6 @@
 open Core
 open Signature_lib
-open Coda_base
+open Mina_base
 
 let name = "transaction-snark-profiler"
 
@@ -119,15 +119,15 @@ let rec pair_up = function
 let precomputed_values = Precomputed_values.compiled
 
 let state_body =
-  Coda_state.(
+  Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
         values.protocol_state_with_hash.data |> Protocol_state.body ))
 
 let curr_state_view =
-  Lazy.map state_body ~f:Coda_state.Protocol_state.Body.view
+  Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
 let state_body_hash =
-  Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
+  Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
@@ -168,17 +168,19 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transaction ~sok_digest:Sok_message.Digest.default
-                ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~init_stack:coinbase_stack_source ~next_available_token_before
-                ~next_available_token_after
-                ~pending_coinbase_stack_state:
-                  {source= coinbase_stack_source; target= coinbase_stack_target}
-                ~snapp_account1:None ~snapp_account2:None
-                { Transaction_protocol_state.Poly.transaction= t
-                ; block_data= Lazy.force state_body }
-                (unstage (Sparse_ledger.handler sparse_ledger)) )
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  T.of_transaction ~sok_digest:Sok_message.Digest.default
+                    ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                    ~target:(Sparse_ledger.merkle_root sparse_ledger')
+                    ~init_stack:coinbase_stack_source
+                    ~next_available_token_before ~next_available_token_after
+                    ~pending_coinbase_stack_state:
+                      { source= coinbase_stack_source
+                      ; target= coinbase_stack_target }
+                    ~snapp_account1:None ~snapp_account2:None
+                    { Transaction_protocol_state.Poly.transaction= t
+                    ; block_data= Lazy.force state_body }
+                    (unstage (Sparse_ledger.handler sparse_ledger)) ) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
         , proof ) )
@@ -193,7 +195,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
             ~f:(fun max_time (x, y) ->
               let pair_time, proof =
                 time (fun () ->
-                    T.merge ~sok_digest:Sok_message.Digest.default x y
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                        T.merge ~sok_digest:Sok_message.Digest.default x y )
                     |> Or_error.ok_exn )
               in
               (Time.Span.max max_time pair_time, proof) )
@@ -295,7 +298,7 @@ let generate_base_snarks_witness sparse_ledger0
 let run profiler num_transactions repeats preeval =
   let ledger, transactions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
+    Mina_base.Sparse_ledger.of_ledger_subset_exn ledger
       ( fst
       @@ List.fold
            ~init:([], Ledger.next_available_token ledger)

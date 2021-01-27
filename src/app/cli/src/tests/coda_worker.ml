@@ -1,7 +1,7 @@
 open Core
 open Async
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Signature_lib
 open Pipe_lib
 open Init
@@ -9,10 +9,10 @@ open Init
 module Input = struct
   type t =
     { addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t
-    ; libp2p_keypair: Coda_net2.Keypair.Stable.Latest.t
+    ; libp2p_keypair: Mina_net2.Keypair.Stable.Latest.t
     ; net_configs:
         ( Node_addrs_and_ports.Display.Stable.Latest.t
-        * Coda_net2.Keypair.Stable.Latest.t )
+        * Mina_net2.Keypair.Stable.Latest.t )
         list
         * Node_addrs_and_ports.Display.Stable.Latest.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.Latest.t option
@@ -66,7 +66,7 @@ module T = struct
     ; get_nonce:
         ( 'worker
         , Account_id.t
-        , Coda_numbers.Account_nonce.t option )
+        , Mina_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
     ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
     ; send_user_command:
@@ -83,19 +83,6 @@ module T = struct
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
     ; sync_status:
         ('worker, unit, Sync_status.t Pipe.Reader.t) Rpc_parallel.Function.t
-    ; get_all_user_commands:
-        ( 'worker
-        , Public_key.Compressed.t
-        , Signed_command.t list )
-        Rpc_parallel.Function.t
-    ; get_all_transitions:
-        ( 'worker
-        , Account_id.t
-        , ( Auxiliary_database.Filtered_external_transition.t
-          , State_hash.t )
-          With_hash.t
-          list )
-        Rpc_parallel.Function.t
     ; new_user_command:
         ( 'worker
         , Public_key.Compressed.t
@@ -104,16 +91,14 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , Coda_lib.Root_diff.t Pipe.Reader.t )
+        , Mina_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; initialization_finish_signal:
         ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
     ; new_block:
         ( 'worker
         , Account.key
-        , ( Auxiliary_database.Filtered_external_transition.t
-          , State_hash.t )
-          With_hash.t
+        , (Filtered_external_transition.t, State_hash.t) With_hash.t
           Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
@@ -136,7 +121,7 @@ module T = struct
     ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
     ; coda_get_nonce:
-        Account_id.t -> Coda_numbers.Account_nonce.t option Deferred.t
+        Account_id.t -> Mina_numbers.Account_nonce.t option Deferred.t
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Signed_command.t Or_error.t Deferred.t
@@ -146,27 +131,16 @@ module T = struct
     ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
     ; coda_new_user_command:
         Public_key.Compressed.t -> Signed_command.t Pipe.Reader.t Deferred.t
-    ; coda_get_all_user_commands:
-        Public_key.Compressed.t -> Signed_command.t list Deferred.t
     ; coda_replace_snark_worker_key:
         Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker: unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
         unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
-    ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_root_diff: unit -> Mina_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
-    ; coda_get_all_transitions:
-           Account_id.t
-        -> ( Auxiliary_database.Filtered_external_transition.t
-           , State_hash.t )
-           With_hash.t
-           list
-           Deferred.t
     ; coda_new_block:
            Account.key
-        -> ( Auxiliary_database.Filtered_external_transition.t
-           , State_hash.t )
-           With_hash.t
+        -> (Filtered_external_transition.t, State_hash.t) With_hash.t
            Pipe.Reader.t
            Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
@@ -199,9 +173,6 @@ module T = struct
 
     let new_user_command_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_new_user_command pk
-
-    let get_all_user_commands_impl ~worker_state ~conn_state:() pk =
-      worker_state.coda_get_all_user_commands pk
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
@@ -244,19 +215,6 @@ module T = struct
     let validated_transitions_keyswaptest_impl ~worker_state ~conn_state:() =
       worker_state.coda_validated_transitions_keyswaptest
 
-    let get_all_transitions_impl ~worker_state ~conn_state:() pk =
-      worker_state.coda_get_all_transitions pk
-
-    let get_all_transitions =
-      C.create_rpc ~f:get_all_transitions_impl ~name:"get_all_transitions"
-        ~bin_input:Account_id.Stable.Latest.bin_t
-        ~bin_output:
-          [%bin_type_class:
-            ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
-            , State_hash.Stable.Latest.t )
-            With_hash.Stable.Latest.t
-            list] ()
-
     let peers =
       C.create_rpc ~f:peers_impl ~name:"peers" ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.Latest.t list]
@@ -276,7 +234,7 @@ module T = struct
       C.create_rpc ~f:get_nonce_impl ~name:"get_nonce"
         ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:
-          [%bin_type_class: Coda_numbers.Account_nonce.Stable.Latest.t option]
+          [%bin_type_class: Mina_numbers.Account_nonce.Stable.Latest.t option]
         ()
 
     let root_length =
@@ -288,7 +246,7 @@ module T = struct
         ~bin_input:[%bin_type_class: Account.Key.Stable.Latest.t]
         ~bin_output:
           [%bin_type_class:
-            ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
+            ( Filtered_external_transition.Stable.Latest.t
             , State_hash.Stable.Latest.t )
             With_hash.Stable.Latest.t] ()
 
@@ -311,7 +269,7 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.Latest.t] ()
+        ~bin_output:[%bin_type_class: Mina_lib.Root_diff.Stable.Latest.t] ()
 
     let initialization_finish_signal =
       C.create_pipe ~name:"initialization_finish_signal"
@@ -326,11 +284,6 @@ module T = struct
       C.create_pipe ~name:"new_user_command" ~f:new_user_command_impl
         ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
         ~bin_output:Signed_command.Stable.Latest.bin_t ()
-
-    let get_all_user_commands =
-      C.create_rpc ~name:"get_all_user_commands" ~f:get_all_user_commands_impl
-        ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
-        ~bin_output:[%bin_type_class: Signed_command.Stable.Latest.t list] ()
 
     let dump_tf =
       C.create_rpc ~name:"dump_tf" ~f:dump_tf_impl ~bin_input:Unit.bin_t
@@ -373,11 +326,9 @@ module T = struct
       ; best_path
       ; sync_status
       ; new_user_command
-      ; get_all_user_commands
       ; replace_snark_worker_key
       ; stop_snark_worker
-      ; validated_transitions_keyswaptest
-      ; get_all_transitions }
+      ; validated_transitions_keyswaptest }
 
     let init_worker_state
         { addrs_and_ports
@@ -420,12 +371,6 @@ module T = struct
       let%bind () = File_system.create_dir conf_dir in
       O1trace.trace "worker_main" (fun () ->
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-          let%bind transaction_database_dir =
-            Unix.mkdtemp @@ conf_dir ^/ "transaction"
-          in
-          let%bind external_transition_database_dir =
-            Unix.mkdtemp @@ conf_dir ^/ "external_transition"
-          in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
@@ -433,18 +378,6 @@ module T = struct
           in
           let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
-          let transaction_database =
-            Auxiliary_database.Transaction_database.create ~logger
-              transaction_database_dir
-          in
-          trace_database_initialization "transaction_database" __LOC__
-            transaction_database_dir ;
-          let external_transition_database =
-            Auxiliary_database.External_transition_database.create ~logger
-              external_transition_database_dir
-          in
-          trace_database_initialization "external_transition_database" __LOC__
-            external_transition_database_dir ;
           let time_controller =
             Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
@@ -476,9 +409,10 @@ module T = struct
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
-              ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
+              ; initial_peers= List.map ~f:Mina_net2.Multiaddr.of_string peers
               ; addrs_and_ports=
                   Node_addrs_and_ports.of_display addrs_and_ports
+              ; metrics_port= None
               ; conf_dir
               ; chain_id
               ; logger
@@ -487,11 +421,13 @@ module T = struct
               ; trust_system
               ; flooding= false
               ; direct_peers= []
+              ; max_connections= 50
+              ; validation_queue_size= 150
               ; peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
           let net_config =
-            { Coda_networking.Config.logger
+            { Mina_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
@@ -504,7 +440,7 @@ module T = struct
                 ; transaction_pool_diff= true
                 ; new_state= true }
             ; creatable_gossip_net=
-                Coda_networking.Gossip_net.(
+                Mina_networking.Gossip_net.(
                   Any.Creatable
                     ((module Libp2p), Libp2p.create gossip_net_params)) }
           in
@@ -512,10 +448,11 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let start_time = Time.now () in
           let coda_deferred () =
-            Coda_lib.create
-              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~disable_telemetry:true
+            Mina_lib.create
+              (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                 ~chain_id ~is_seed ~disable_telemetry:true ~super_catchup:true
                  ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
@@ -523,7 +460,7 @@ module T = struct
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
                  ~snark_worker_config:
-                   Coda_lib.Config.Snark_worker_config.
+                   Mina_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key= snark_worker_key
                      ; shutdown_on_disconnect= true
                      ; num_threads= None }
@@ -534,17 +471,17 @@ module T = struct
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_block_production_keypairs ~monitor
-                 ~consensus_local_state ~transaction_database
-                 ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~precomputed_values
+                 ~consensus_local_state ~is_archive_rocksdb
+                 ~work_reassignment_wait:420000 ~precomputed_values ~start_time
+                 ~upload_blocks_to_gcloud:false
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ())
+                 ~log_precomputed_blocks:false ())
           in
-          let coda_ref : Coda_lib.t option ref = ref None in
+          let coda_ref : Mina_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
             ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
@@ -558,28 +495,20 @@ module T = struct
               ()
           in
           [%log info] "Worker finish setting up coda" ;
-          let coda_peers () = Coda_lib.peers coda in
-          let coda_start () = Coda_lib.start coda in
-          let coda_get_all_transitions pk =
-            let external_transition_database =
-              Coda_lib.external_transition_database coda
-            in
-            Auxiliary_database.External_transition_database.get_all_values
-              external_transition_database (Some pk)
-            |> Deferred.return
-          in
+          let coda_peers () = Mina_lib.peers coda in
+          let coda_start () = Mina_lib.start coda in
           let coda_get_balance account_id =
             return
-              ( Coda_commands.get_balance coda account_id
+              ( Mina_commands.get_balance coda account_id
               |> Participating_state.active_exn )
           in
           let coda_get_nonce account_id =
             return
-              ( Coda_commands.get_nonce coda account_id
+              ( Mina_commands.get_nonce coda account_id
               |> Participating_state.active_exn )
           in
           let coda_root_length () =
-            return (Coda_lib.root_length coda |> Participating_state.active_exn)
+            return (Mina_lib.root_length coda |> Participating_state.active_exn)
           in
           let coda_send_payment (sk, pk, amount, fee, memo) =
             let pk_of_sk sk =
@@ -603,25 +532,25 @@ module T = struct
             in
             let payment_input = build_user_command_input amount sk pk fee in
             Deferred.map
-              ( Coda_commands.setup_and_submit_user_command coda payment_input
+              ( Mina_commands.setup_and_submit_user_command coda payment_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
           let coda_process_user_command cmd_input =
             Deferred.map
-              ( Coda_commands.setup_and_submit_user_command coda cmd_input
+              ( Mina_commands.setup_and_submit_user_command coda cmd_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
           let coda_replace_snark_worker_key =
-            Coda_lib.replace_snark_worker_key coda
+            Mina_lib.replace_snark_worker_key coda
           in
           let coda_stop_snark_worker () =
-            Coda_lib.stop_snark_worker ~should_wait_kill:true coda
+            Mina_lib.stop_snark_worker ~should_wait_kill:true coda
           in
           let coda_new_block key =
             Deferred.return
-            @@ Coda_commands.Subscriptions.new_block coda (Some key)
+            @@ Mina_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader
@@ -631,7 +560,7 @@ module T = struct
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
+              (Strict_pipe.Reader.iter (Mina_lib.validated_transitions coda)
                  ~f:(fun t ->
                    Pipe.write_without_pushback_if_open
                      validated_transitions_keyswaptest_writer t ;
@@ -658,7 +587,7 @@ module T = struct
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
+              (Strict_pipe.Reader.iter (Mina_lib.root_diff coda)
                  ~f:(fun diff ->
                    if Pipe.is_closed w then
                      [%log error]
@@ -670,17 +599,17 @@ module T = struct
           let coda_initialization_finish_signal () =
             let r, w = Linear_pipe.create () in
             upon
-              (Ivar.read @@ Coda_lib.initialization_finish_signal coda)
+              (Ivar.read @@ Mina_lib.initialization_finish_signal coda)
               (fun () -> don't_wait_for @@ Linear_pipe.write_if_open w ()) ;
             return r.pipe
           in
           let coda_dump_tf () =
             Deferred.return
-              ( Coda_lib.dump_tf coda |> Or_error.ok
+              ( Mina_lib.dump_tf coda |> Or_error.ok
               |> Option.value ~default:"<failed to visualize>" )
           in
           let coda_best_path () =
-            let path = Coda_lib.best_path coda in
+            let path = Mina_lib.best_path coda in
             Deferred.return (Option.value ~default:[] path)
           in
           let parse_sync_status_exn = function
@@ -693,7 +622,7 @@ module T = struct
                   ()
           in
           let coda_sync_status () =
-            let schema = Coda_graphql.schema in
+            let schema = Mina_graphql.schema in
             match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with
@@ -714,16 +643,7 @@ module T = struct
           in
           let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
-          in
-          let coda_get_all_user_commands t =
-            Deferred.return
-              (List.filter_map
-                 (Coda_commands.For_tests.get_all_commands coda t) ~f:(function
-                | Signed_command c ->
-                    Some c
-                | Snapp_command _ ->
-                    None ))
+            @@ Mina_commands.For_tests.Subscriptions.new_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
@@ -741,12 +661,10 @@ module T = struct
           ; coda_best_path= with_monitor coda_best_path
           ; coda_sync_status= with_monitor coda_sync_status
           ; coda_new_user_command= with_monitor coda_new_user_command
-          ; coda_get_all_user_commands= with_monitor coda_get_all_user_commands
           ; coda_validated_transitions_keyswaptest=
               with_monitor coda_validated_transitions_keyswaptest
           ; coda_replace_snark_worker_key=
               with_monitor coda_replace_snark_worker_key
-          ; coda_get_all_transitions= with_monitor coda_get_all_transitions
           ; coda_stop_snark_worker= with_monitor coda_stop_snark_worker } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return

@@ -1130,9 +1130,9 @@ let add_merge_jobs :
                     , scan_result'
                     , List.drop jobs (Tree.required_job_count tree) )
               | Error e ->
-                  Or_error.errorf
-                    "Error while adding merge jobs to tree# %d: %s" i
-                    (Error.to_string_hum e)
+                  Error
+                    (Error.tag_arg e "Error while adding merge jobs to tree"
+                       ("tree_number", i) [%sexp_of: string * int])
             else Ok (tree :: trees, scan_result, jobs) )
       in
       match res with
@@ -1192,9 +1192,7 @@ let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
           State_or_error.return res
       | Error e ->
           return_error
-            (Error.of_string
-               (sprintf "Error while adding base jobs to the tree: %s"
-                  (Error.to_string_hum e)))
+            (Error.tag ~tag:"Error while adding base jobs to the tree" e)
             (tree, None)
     in
     let updated_trees =
@@ -1264,14 +1262,14 @@ let update_metrics t =
       List.rev (Non_empty_list.to_list t.trees)
       |> List.iteri ~f:(fun i t ->
              let name = sprintf "tree%d" i in
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_available_space ~name))
                (Int.to_float @@ Tree.available_space t) ;
              let base_job_count, merge_job_count = Tree.todo_job_count t in
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name))
                (Int.to_float @@ base_job_count) ;
-             Coda_metrics.(
+             Mina_metrics.(
                Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
                (Int.to_float @@ merge_job_count) ) )
 

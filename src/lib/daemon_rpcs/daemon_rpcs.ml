@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-open Coda_base
+open Mina_base
 open Signature_lib
 module Types = Types
 module Client = Client
@@ -8,7 +8,7 @@ module Client = Client
 module Get_transaction_status = struct
   type query = Signed_command.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response = Transaction_status.State.Stable.Latest.t Or_error.t
+  type response = Transaction_inclusion_status.State.Stable.Latest.t Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -32,7 +32,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.Latest.t option
+  type query = State_hash.Stable.Latest.t option
   [@@deriving bin_io_unversioned]
 
   type response = Account.Stable.Latest.t list Or_error.t
@@ -40,6 +40,17 @@ module Get_ledger = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_staking_ledger = struct
+  type query = Current | Next [@@deriving bin_io_unversioned]
+
+  type response = Account.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_staking_ledger" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_balance = struct
@@ -56,7 +67,9 @@ module Get_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -67,7 +80,9 @@ module Get_trust_status_all = struct
   type query = unit [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -79,7 +94,9 @@ module Reset_trust_status = struct
   type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
   type response =
-    (Network_peer.Peer.t * Trust_system.Peer_status.Stable.Latest.t) list
+    ( Network_peer.Peer.Stable.Latest.t
+    * Trust_system.Peer_status.Stable.Latest.t )
+    list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -265,19 +282,29 @@ module Get_trustlist = struct
 end
 
 (** daemon-level Get_telemetry_data; implementation invokes
-    Coda_networking's Get_telemetry_data for each provided peer
+    Mina_networking's Get_telemetry_data for each provided peer
 *)
 module Get_telemetry_data = struct
   type query = Network_peer.Peer.Id.Stable.Latest.t list option
   [@@deriving bin_io_unversioned]
 
   type response =
-    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
+    Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
     Or_error.t
     list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_telemetry_data" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Get_object_lifetime_statistics = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response = string [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_object_lifetime_statistics" ~version:0 ~bin_query
       ~bin_response
 end

@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Frontier_base
 open Network_peer
 
@@ -9,12 +9,12 @@ module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
 
   module Best_tip_prover :
-    Coda_intf.Best_tip_prover_intf
+    Mina_intf.Best_tip_prover_intf
     with type transition_frontier := Transition_frontier.t
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_intf.Sync_handler_intf
+  Mina_intf.Sync_handler_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
@@ -140,18 +140,45 @@ module Make (Inputs : Inputs_intf) :
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
-    Option.all
-    @@ List.map hashes ~f:(fun hash ->
-           let%map validated_transition =
-             Option.merge
-               Transition_frontier.(
-                 find frontier hash >>| Breadcrumb.validated_transition)
-               ( find_in_root_history frontier hash
-               >>| fun x -> Root_data.Historical.transition x )
-               ~f:Fn.const
-           in
-           External_transition.Validation.forget_validation
-             validated_transition )
+    let%bind () =
+      let requested = List.length hashes in
+      if requested <= Transition_frontier.max_catchup_chunk_length then Some ()
+      else (
+        [%log' trace (Logger.create ())]
+          ~metadata:[("n", `Int requested)]
+          "get_transition_chain requested $n > %d hashes"
+          Transition_frontier.max_catchup_chunk_length ;
+        None )
+    in
+    let get hash =
+      let%map validated_transition =
+        Option.merge
+          Transition_frontier.(
+            find frontier hash >>| Breadcrumb.validated_transition)
+          ( find_in_root_history frontier hash
+          >>| fun x -> Root_data.Historical.transition x )
+          ~f:Fn.const
+      in
+      External_transition.Validation.forget_validation validated_transition
+    in
+    match Transition_frontier.catchup_tree frontier with
+    | Full _ ->
+        (* Super catchup *)
+        Option.return @@ List.filter_map hashes ~f:get
+    | Hash _ ->
+        (* Normal catchup *)
+        Option.all @@ List.map hashes ~f:get
+
+  let best_tip_path ~frontier =
+    let rec go acc b =
+      let acc = Breadcrumb.state_hash b :: acc in
+      match Transition_frontier.find frontier (Breadcrumb.parent_hash b) with
+      | None ->
+          acc
+      | Some b' ->
+          go acc b'
+    in
+    go [] (Transition_frontier.best_tip frontier)
 
   module Root = struct
     let prove ~logger ~consensus_constants ~frontier seen_consensus_state =
@@ -164,12 +191,14 @@ module Make (Inputs : Inputs_intf) :
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.prove")])
           ~existing:
-            (External_transition.consensus_state best_tip_with_witness.data)
+            (With_hash.map ~f:External_transition.consensus_state
+               best_tip_with_witness.data)
           ~candidate:seen_consensus_state
         = `Keep
       in
       let%map () = Option.some_if is_tip_better () in
-      best_tip_with_witness
+      { best_tip_with_witness with
+        data= With_hash.data best_tip_with_witness.data }
 
     let verify ~logger ~verifier ~consensus_constants ~genesis_constants
         ~precomputed_values observed_state peer_root =
@@ -184,7 +213,8 @@ module Make (Inputs : Inputs_intf) :
           ~logger:
             (Logger.extend logger [("selection_context", `String "Root.verify")])
           ~existing:
-            (External_transition.consensus_state best_tip_transition.data)
+            (With_hash.map ~f:External_transition.consensus_state
+               best_tip_transition)
           ~candidate
         = `Keep
       in
