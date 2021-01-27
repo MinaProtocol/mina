@@ -22,7 +22,7 @@ data "local_file" "libp2p_peers" {
 }
 
 locals {
-  use_local_charts = true
+  use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
