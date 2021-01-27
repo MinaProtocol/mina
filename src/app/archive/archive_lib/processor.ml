@@ -1382,6 +1382,16 @@ let add_block_aux ~add_block ~hash ~delete_older_than
   in
   res
 
+let add_block_aux_precomputed ~constraint_constants =
+  add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
+    ~hash:(fun block ->
+      block.External_transition.Precomputed_block.protocol_state
+      |> Protocol_state.hash )
+
+let add_block_aux_extensional =
+  add_block_aux ~add_block:Block.add_from_extensional
+    ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
+
 let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
     ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
@@ -1484,12 +1494,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux
-              ~add_block:(Block.add_from_precomputed ~constraint_constants)
-              ~hash:(fun block ->
-                block.External_transition.Precomputed_block.protocol_state
-                |> Protocol_state.hash )
-              ~delete_older_than conn precomputed_block
+            add_block_aux_precomputed ~constraint_constants ~delete_older_than
+              conn precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -1505,9 +1511,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux ~add_block:Block.add_from_extensional
-              ~hash:(fun block -> block.state_hash)
-              ~delete_older_than conn extensional_block
+            add_block_aux_extensional ~delete_older_than conn extensional_block
           with
           | Error e ->
               [%log warn]
