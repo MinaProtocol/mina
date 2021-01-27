@@ -3,25 +3,6 @@ open Pipe_lib
 open Network_peer
 open Core_kernel
 
-module Snark_tables : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t =
-        { all:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-            Transaction_snark_work.Statement.Stable.V1.Table.t
-        ; rebroadcastable:
-            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-            * Core.Time.Stable.With_utc_sexp.V2.t )
-            Transaction_snark_work.Statement.Stable.V1.Table.t }
-      [@@deriving sexp]
-    end
-  end]
-end
-
 module type S = sig
   type transition_frontier
 
@@ -29,7 +10,6 @@ module type S = sig
     include
       Intf.Snark_resource_pool_intf
       with type transition_frontier := transition_frontier
-       and type serializable := Snark_tables.t
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -39,7 +19,7 @@ module type S = sig
   module For_tests : sig
     val get_rebroadcastable :
          Resource_pool.t
-      -> is_expired:(Core.Time.t -> [`Expired | `Ok])
+      -> has_timed_out:(Core.Time.t -> [`Timed_out | `Ok])
       -> Resource_pool.Diff.t list
   end
 
@@ -63,9 +43,10 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
-    -> disk_location:string
+    -> consensus_constants:Consensus.Constants.t
+    -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * (bool -> unit) )
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
@@ -80,13 +61,34 @@ end
 module type Transition_frontier_intf = sig
   type t
 
+  type staged_ledger
+
+  module Breadcrumb : sig
+    type t
+
+    val staged_ledger : t -> staged_ledger
+  end
+
+  type best_tip_diff
+
+  val best_tip : t -> Breadcrumb.t
+
+  val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
+
   val snark_pool_refcount_pipe :
        t
     -> (int * int Transaction_snark_work.Statement.Table.t)
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Transition_frontier : Transition_frontier_intf) :
+module Make
+    (Base_ledger : Intf.Base_ledger_intf) (Staged_ledger : sig
+        type t
+
+        val ledger : t -> Base_ledger.t
+    end)
+    (Transition_frontier : Transition_frontier_intf
+                           with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t
 
 include S with type transition_frontier := Transition_frontier.t
@@ -100,6 +102,7 @@ module Diff_versioned : sig
             Transaction_snark_work.Statement.Stable.V1.t
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
+        | Empty
       [@@deriving compare, sexp]
     end
   end]

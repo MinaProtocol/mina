@@ -5,8 +5,29 @@
 *)
 open Core
 
-open Coda_base
-open Coda_numbers
+open Mina_base
+open Mina_numbers
+
+module Command_error : sig
+  type t =
+    | Invalid_nonce of
+        [ `Expected of Account.Nonce.t
+        | `Between of Account.Nonce.t * Account.Nonce.t ]
+        * Account.Nonce.t
+    | Insufficient_funds of [`Balance of Currency.Amount.t] * Currency.Amount.t
+    | (* NOTE: don't punish for this, attackers can induce nodes to banlist
+          each other that way! *)
+        Insufficient_replace_fee of
+        [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
+    | Overflow
+    | Bad_token
+    | Expired of
+        [`Valid_until of Mina_numbers.Global_slot.t]
+        * [`Current_global_slot of Mina_numbers.Global_slot.t]
+    | Unwanted_fee_token of Token_id.t
+    | Invalid_transaction
+  [@@deriving sexp_of, to_yojson]
+end
 
 val replace_fee : Currency.Fee.t
 
@@ -16,7 +37,11 @@ type t [@@deriving sexp_of]
 (* TODO sexp is debug only, remove *)
 
 (** Empty pool *)
-val empty : constraint_constants:Genesis_constants.Constraint_constants.t -> t
+val empty :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
+  -> time_controller:Block_time.Controller.t
+  -> t
 
 (** How many transactions are currently in the pool *)
 val size : t -> int
@@ -27,6 +52,10 @@ val min_fee : t -> Currency.Fee.t option
 (** Remove the lowest fee command from the pool, along with any others from the
     same account with higher nonces. *)
 val remove_lowest_fee :
+  t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
+
+(** Remove all the user commands that are expired. (Valid-until < Current-global-slot) *)
+val remove_expired :
   t -> Transaction_hash.User_command_with_valid_signature.t Sequence.t * t
 
 (** Get the highest fee applicable command in the pool *)
@@ -60,23 +89,15 @@ val handle_committed_txn :
 *)
 val add_from_gossip_exn :
      t
-  -> Transaction_hash.User_command_with_valid_signature.t
+  -> verify:(User_command.t -> User_command.Valid.t option)
+  -> [ `Unchecked of Transaction_hash.User_command.t
+     | `Checked of Transaction_hash.User_command_with_valid_signature.t ]
   -> Account_nonce.t
   -> Currency.Amount.t
-  -> ( t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
-     , [> `Invalid_nonce of
-          [ `Expected of Account.Nonce.t
-          | `Between of Account.Nonce.t * Account.Nonce.t ]
-          * Account.Nonce.t
-       | `Insufficient_funds of
-         [`Balance of Currency.Amount.t] * Currency.Amount.t
-       | (* NOTE: don't punish for this, attackers can induce nodes to banlist
-          each other that way! *)
-         `Insufficient_replace_fee of
-         [`Replace_fee of Currency.Fee.t] * Currency.Fee.t
-       | `Overflow
-       | `Bad_token
-       | `Unwanted_fee_token of Token_id.t ] )
+  -> ( Transaction_hash.User_command_with_valid_signature.t
+       * t
+       * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+     , Command_error.t )
      Result.t
 (** Returns the commands dropped as a result of adding the command, which will
     be empty unless we're replacing one. *)
@@ -85,10 +106,12 @@ val add_from_gossip_exn :
     switching chains. Must be called in reverse order i.e. newest-to-oldest.
 *)
 val add_from_backtrack :
-  t -> Transaction_hash.User_command_with_valid_signature.t -> t
+     t
+  -> Transaction_hash.User_command_with_valid_signature.t
+  -> (t, Command_error.t) Result.t
 
 (** Check whether a command is in the pool *)
-val member : t -> Transaction_hash.User_command_with_valid_signature.t -> bool
+val member : t -> Transaction_hash.User_command.t -> bool
 
 (** Get all the user commands sent by a user with a particular account *)
 val all_from_account :
@@ -112,6 +135,9 @@ val revalidate :
   -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
   -> t * Transaction_hash.User_command_with_valid_signature.t Sequence.t
+
+(** Get the current global slot according to the pool's time controller. *)
+val current_global_slot : t -> Mina_numbers.Global_slot.t
 
 module For_tests : sig
   (** Checks the invariants of the data structure. If this throws an exception

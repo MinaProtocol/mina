@@ -2,7 +2,7 @@
 "../../config.mlh"]
 
 open Core_kernel
-open Coda_base
+open Mina_base
 
 module type S = Ledger_proof_intf.S
 
@@ -10,8 +10,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Transaction_snark.Stable.V1.t
-      [@@deriving compare, sexp, to_yojson]
+      type t = Transaction_snark.Stable.V1.t [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
 

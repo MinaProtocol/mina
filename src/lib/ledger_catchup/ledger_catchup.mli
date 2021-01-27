@@ -1,9 +1,10 @@
 open Async_kernel
 open Pipe_lib
 open Cache_lib
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Network_peer
+module Best_tip_lru = Best_tip_lru
 
 module Catchup_jobs : sig
   val reader : int Broadcast_pipe.Reader.t
@@ -14,7 +15,7 @@ val run :
   -> precomputed_values:Precomputed_values.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
-  -> network:Coda_networking.t
+  -> network:Mina_networking.t
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:( State_hash.t
                         * ( External_transition.Initial_validated.t

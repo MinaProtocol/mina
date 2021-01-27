@@ -61,7 +61,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
         | Ok (Some _) ->
             `Succeeded () )
       ~retry_count:5 ~initial_delay:(Span.of_ms 100.0)
-      ~each_delay:(Span.of_sec 1.0)
+      ~each_delay:(Span.of_sec 3.0)
       ~failure_reason:"Took too long to appear in mempool"
   in
   (* Pull specific account out of mempool *)
@@ -110,7 +110,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Found block index $index" ;
   (* Start staking so we get blocks *)
   let%bind _res = Poke.Staking.enable ~graphql_uri in
-  (* Wait until the newest-block is at least index>last_block_index and there is at least not a coinbase *)
+  (* Wait until the newest block has index > last_block_index and has at least one user command *)
   let%bind block =
     keep_trying
       ~step:(fun () ->
@@ -125,14 +125,15 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
                     .block_identifier
                     .index > last_block_index)
               in
-              let at_least_txn_not_coinbase : bool =
+              let has_user_command : bool =
+                (* HACK: First transaction is always an internal command and second, if present, is always a user
+                 * command, so we can just check that length > 1 *)
                 Int.(
                   List.length
                     (Option.value_exn block.Block_response.block).transactions
                   > 1)
               in
-              if newer_block && at_least_txn_not_coinbase then Some block
-              else None )
+              if newer_block && has_user_command then Some block else None )
         with
         | Error _ ->
             `Failed
@@ -154,7 +155,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Waited for the next block index $index" ;
   (* Stop noisy block production *)
   let%bind _res = Poke.Staking.disable ~graphql_uri in
-  let succesful (x : Operation_expectation.t) = {x with status= "Success"} in
+  let successful (x : Operation_expectation.t) = {x with status= "Success"} in
   [%log debug]
     ~metadata:
       [ ( "transactions"
@@ -163,9 +164,9 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     "Asserting that operations are similar in block. Transactions $transactions" ;
   Operation_expectation.assert_similar_operations ~logger
     ~expected:
-      ( List.map ~f:succesful operation_expectations
+      ( List.map ~f:successful operation_expectations
       @ Operation_expectation.
-          [ { amount= Some 20_000_000_000
+          [ { amount= Some 40_000_000_000
             ; account=
                 Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
             ; status= "Success"
@@ -312,34 +313,6 @@ let direct_graphql_create_token_account_through_block ~logger ~rosetta_uri
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
-let direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
-    ~network_response =
-  let open Deferred.Result.Let_syntax in
-  (* Unlock the sender account *)
-  let%bind _ = Poke.Account.unlock ~graphql_uri in
-  (* mint tokens; relies on earlier create_tokens so we have a valid token id *)
-  let%bind hash =
-    Poke.SendTransaction.mint_tokens ~fee:(`Int 2_000_000_000)
-      ~receiver:Poke.pk ~token:(`String "2") ~amount:(`Int 1_000_000_000)
-      ~graphql_uri ()
-  in
-  verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri ~txn_hash:hash
-    ~network_response
-    ~operation_expectations:
-      Operation_expectation.
-        [ { amount= Some (-2_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= `Check None }
-        ; { amount= Some 1_000_000_000
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
-          ; status= "Pending"
-          ; _type= "mint_tokens"
-          ; target= `Check (Some Poke.pk) } ]
-
 let construction_api_transaction_through_mempool ~logger ~rosetta_uri
     ~graphql_uri ~network_response ~operation_expectations ~operations =
   let open Deferred.Result.Let_syntax in
@@ -361,7 +334,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
   in
   let%bind metadata_res =
     Peek.Construction.metadata ~rosetta_uri ~network_response ~logger
-      ~options:(Option.value_exn preprocess_res.options)
+      ~options:preprocess_res.options
   in
   [%log debug]
     ~metadata:[("res", Construction_metadata_response.to_yojson metadata_res)]
@@ -520,28 +493,6 @@ let construction_api_create_token_account_through_mempool =
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
-let construction_api_mint_tokens_through_mempool =
-  construction_api_transaction_through_mempool
-    ~operations:(fun account_id ->
-      Poke.SendTransaction.mint_tokens_operations ~sender:account_id.address
-        ~receiver:account_id.address
-        ~amount:(Unsigned.UInt64.of_int 1_000_000_000)
-        ~fee:(Unsigned.UInt64.of_int 3_000_000_000) )
-    ~operation_expectations:
-      Operation_expectation.
-        [ { amount= Some (-3_000_000_000)
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 1}
-          ; status= "Pending"
-          ; _type= "fee_payer_dec"
-          ; target= `Check None }
-        ; { amount= Some 1_000_000_000
-          ; account=
-              Some {Account.pk= Poke.pk; token_id= Unsigned.UInt64.of_int 2}
-          ; status= "Pending"
-          ; _type= "mint_tokens"
-          ; target= `Check (Some Poke.pk) } ]
-
 (* for each possible user command, run the command via GraphQL, check that
     the command is in the transaction pool
 *)
@@ -642,19 +593,6 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
   in
   [%log info] "Created token account using construction and waited" ;
   (* Stop staking *)
-  [%log info] "Starting mint tokens check" ;
-  let%bind _res = Poke.Staking.disable ~graphql_uri in
-  let%bind () =
-    direct_graphql_mint_tokens_through_block ~logger ~rosetta_uri ~graphql_uri
-      ~network_response
-  in
-  [%log info] "Minted tokens and waited" ;
-  [%log info] "Starting construction mint tokens check" ;
-  let%bind () =
-    construction_api_mint_tokens_through_mempool ~logger ~rosetta_uri
-      ~graphql_uri ~network_response
-  in
-  [%log info] "Minted tokens using construction and waited" ;
   (* Success *)
   return ()
 

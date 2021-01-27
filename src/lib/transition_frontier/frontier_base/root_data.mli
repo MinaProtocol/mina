@@ -1,5 +1,5 @@
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 
 (* Historical root data is similar to Limited root data, except that it also
  * contains a recording of some extra computed staged ledger properties that
@@ -43,13 +43,13 @@ module Limited : sig
   val pending_coinbase : t -> Pending_coinbase.t
 
   val protocol_states :
-    t -> (State_hash.t * Coda_state.Protocol_state.value) list
+    t -> (State_hash.t * Mina_state.Protocol_state.value) list
 
   val create :
        transition:External_transition.Validated.t
     -> scan_state:Staged_ledger.Scan_state.t
     -> pending_coinbase:Pending_coinbase.t
-    -> protocol_states:(State_hash.t * Coda_state.Protocol_state.value) list
+    -> protocol_states:(State_hash.t * Mina_state.Protocol_state.value) list
     -> t
 end
 
@@ -77,8 +77,8 @@ module Minimal : sig
   val upgrade :
        t
     -> transition:External_transition.Validated.t
-    -> protocol_states:( Coda_base.State_hash.t
-                       * Coda_state.Protocol_state.Value.t )
+    -> protocol_states:( Mina_base.State_hash.t
+                       * Mina_state.Protocol_state.Value.t )
                        list
     -> Limited.t
 
@@ -93,7 +93,7 @@ type t =
   { transition: External_transition.Validated.t
   ; staged_ledger: Staged_ledger.t
   ; protocol_states:
-      (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
+      (Mina_base.State_hash.t * Mina_state.Protocol_state.Value.t) list }
 
 val minimize : t -> Minimal.t
 

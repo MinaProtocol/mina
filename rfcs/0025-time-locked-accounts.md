@@ -28,8 +28,7 @@ of a sum type with three alternatives: `Untimed` and `Timed`.
 
 `Untimed` means there are no time restrictions on sending funds.
 
-A `Timed` value contains an `initial_minimum_balance`, `cliff` time, 
-a `cliff amount`, a `vesting_period` time, and a `vesting_increment`.
+A `Timed` value contains an `initial_minimum_balance`, `cliff` time, a `vesting_period` time, and a `vesting_increment`.
 Until the cliff time has passed, the account can send only funds from 
 its balance that are in excess of the initial minimum balance. After the 
 cliff time has passed, more funds are available, by calculating a current 

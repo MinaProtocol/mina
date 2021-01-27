@@ -1,9 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
 let B = ../../External/Buildkite.dhall
 
-let B/Skip = B.definitions/commandStep/properties/skip/Type
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-let B/SoftFail/ExitStatus = B.definitions/commandStep/properties/soft_fail/union/properties/exit_status/Type
 
 let S = ../../Lib/SelectFiles.dhall
 
@@ -29,7 +27,7 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.everything ],
+      dirtyWhen = [ S.strictlyStart (S.contains "src/") ],
       path = "Lint",
       name = "Fast"
     },

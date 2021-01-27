@@ -23,7 +23,7 @@ module Query = struct
         | Num_accounts
             (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
-      [@@deriving sexp, yojson]
+      [@@deriving sexp, yojson, hash, compare]
     end
   end]
 end
@@ -255,7 +255,7 @@ end = struct
           | Error e ->
               let logger = Logger.create () in
               [%log error]
-                ~metadata:[("error", `String (Error.to_string_hum e))]
+                ~metadata:[("error", Error_json.error_to_yojson e)]
                 "When handling What_child_hashes request, the following error \
                  happended: $error" ;
               Either.Second
@@ -457,7 +457,10 @@ end = struct
   let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
-    else Ivar.fill t.validity_listener `Ok
+    else (
+      if Ivar.is_full t.validity_listener then
+        [%log' error t.logger] "Ivar.fill bug is here!" ;
+      Ivar.fill t.validity_listener `Ok )
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =

@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 
 (** This is the base signature for a full frontier, shared by any implementation
  *  of a full frontier. Currently, this includes the internal [Full_frontier]
@@ -20,16 +20,17 @@ module type S = sig
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_path : t -> Breadcrumb.t list
+  val best_tip_path : ?max_length:int -> t -> Breadcrumb.t list
 
-  val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
+  val path_map :
+    ?max_length:int -> t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
 
   val hash_path : t -> Breadcrumb.t -> State_hash.t list
 
   val find : t -> State_hash.t -> Breadcrumb.t option
 
   val find_protocol_state :
-    t -> State_hash.t -> Coda_state.Protocol_state.value option
+    t -> State_hash.t -> Mina_state.Protocol_state.value option
 
   val successor_hashes : t -> State_hash.t -> State_hash.t list
 

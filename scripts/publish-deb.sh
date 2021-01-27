@@ -3,6 +3,13 @@ set -eo pipefail
 
 # utility for publishing deb repo with commons options
 # deb-s3 https://github.com/krobertson/deb-s3
+#NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails with the following error, delete the lock file https://packages.o1test.net/dists/unstable/main/binary-/lockfile and rebuild
+#>> Checking for existing lock file
+#>> Repository is locked by another user:  at host dc7eaad3c537
+#>> Attempting to obtain a lock
+#/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
+
+echo "NOTE: Do not remove --lock flag otherwise racing deb uploads may overwrite the registry and some files will be lost. If a build fails due to the lockfile, delete https://packages.o1test.net/dists/unstable/main/binary-/lockfile from our S3 bucket (https://s3.console.aws.amazon.com/s3/buckets/packages.o1test.net?region=us-west-2&prefix=dists/unstable/main/binary-/&showversions=false) and rebuild"
 
 DEBS3='deb-s3 upload '\
 '--s3-region=us-west-2 '\
@@ -12,7 +19,7 @@ DEBS3='deb-s3 upload '\
 '--cache-control=max-age=120 '\
 '--component main'
 
-DEBS='_build/coda-*.deb'
+DEBS='_build/mina-*.deb'
 
 usage() {
     echo "Usage: $0 [-f] [-r REPONAME] [-d DEBNAME]" 1>&2;
@@ -59,7 +66,11 @@ case "$CIRCLE_JOB" in
     build-artifacts--testnet_postake_medium_curves | FORCED)
         echo "Publishing debs: ${DEBS}"
         set -x
-        ${DEBS3} --codename "${CODENAME}" "${DEBS}"
+        # Upload the deb files to s3.
+        # If this fails, attempt to remove the lockfile and retry.
+        ${DEBS3} --codename "${CODENAME}" "${DEBS}" \
+        || (  scripts/clear-deb-s3-lockfile.sh \
+           && ${DEBS3} --codename "${CODENAME}" "${DEBS}")
         echo "Exporting Variables: "
         # Export Variables for Downstream Steps
         echo "export CODA_DEB_REPO=$CODENAME" >> /tmp/DOCKER_DEPLOY_ENV

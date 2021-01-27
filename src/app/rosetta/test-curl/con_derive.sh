@@ -2,5 +2,4 @@
 
 . lib.sh
 
-req '/construction/derive' '{ network_identifier: { blockchain: "coda", network: "debug" }, public_key: { curve_type: "tweedle", "hex_bytes": "21227618273287912396165511354759877742861476866949599417678373301795282006724,11761867550482237699134088709817635784025718458005116627359241002522206048613" }, metadata: {} }'
-
+req '/construction/derive' '{"network_identifier": { "blockchain": "coda", "network": "debug" }, "public_key": { "curve_type": "tweedle", "hex_bytes": "207115e9f11a9134c2d99270354e02a0b3fcee5bea40a1fbd410e05948a181631ff4f1f372ef6ae2b2e391fd4d6254810118b3c8b2c6697d68ea10bc3b059ffb"}}'
