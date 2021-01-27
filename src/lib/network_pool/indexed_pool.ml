@@ -905,7 +905,7 @@ let rec add_from_gossip_exn :
               (* We've already removed them, so this should always be empty. *)
               assert (Sequence.is_empty dropped') ;
               Result.Ok (v, t'', dropped)
-          | Error ((Insufficient_funds _ | Overflow) as err) ->
+          | Error ((Insufficient_funds _ | Overflow | Expired _) as err) ->
               Error err
               (* C2 *)
               (* C4 *)
@@ -949,7 +949,7 @@ let rec add_from_gossip_exn :
                 | Ok (_v, t', dropped_) ->
                     assert (Sequence.is_empty dropped_) ;
                     go t' increment dropped' None current_nonce
-                | Error (Insufficient_funds _) ->
+                | Error (Insufficient_funds _ | Expired _) ->
                     (* Re-evaluate with the same [dropped] to calculate the new
                        fee increment.
                     *)
