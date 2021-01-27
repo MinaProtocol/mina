@@ -911,7 +911,7 @@ func (source peerDisoverySource) String() string {
 	case PEER_DISCOVERY_SOURCE_ROUTING:
 		return "PEER_DISCOVERY_SOURCE_ROUTING"
 	default:
-		return fmt.Sprintf("%d", int(e))
+		return fmt.Sprintf("%d", int(source))
 	}
 }
 
@@ -926,7 +926,6 @@ type mdnsListener struct {
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
-	l.app.P2p.GatingState.AllowedPeers.Add(info.ID)
 	l.FoundPeer <- peerDiscovery{
 		info:   info,
 		source: PEER_DISCOVERY_SOURCE_MDNS,
