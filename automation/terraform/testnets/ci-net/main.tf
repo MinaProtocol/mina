@@ -24,13 +24,14 @@ variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
+  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.11-develop"
 }
 
 variable "coda_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.2.6-compatible"
+  default     = "gcr.io/o1labs-192920/coda-archive:0.2.11-develop"
 }
 
 variable "whale_count" {
