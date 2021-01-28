@@ -20,18 +20,10 @@ provider "google" {
   zone    = "us-east4-b"
 }
 
-variable "testnet_name" {
-  type = string
-
-  description = "Name identifier of testnet to provision"
-  default     = "ci-net"
-}
-
 variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.6-compatible"
 }
 
 variable "coda_archive_image" {
@@ -61,6 +53,16 @@ variable "snark_worker_count" {
   default = 1
 }
 
+variable "ci_cluster_region" {
+  type    = string
+  default = "us-west1"
+}
+
+variable "ci_k8s_ctx" {
+  type    = string
+  default = "gke_o1labs-192920_us-west1_mina-integration-west1"
+}
+
 locals {
   seed_region = "us-west1"
   seed_zone = "us-west1-b"
@@ -71,9 +73,10 @@ module "ci_testnet" {
   providers = { google = google.google-us-east4 }
   source    = "../../modules/kubernetes/testnet"
 
+  # TODO: remove obsolete cluster_name var + cluster region
   cluster_name          = "mina-integration-west1"
-  cluster_region        = "us-west1"
-  k8s_context           = "gke_o1labs-192920_us-west1_mina-integration-west1"
+  cluster_region        = var.ci_cluster_region
+  k8s_context           = var.ci_k8s_ctx
   testnet_name          = "${terraform.workspace}-ci-net"
 
   coda_image            = var.coda_image

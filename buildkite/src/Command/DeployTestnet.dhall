@@ -15,7 +15,7 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
         commands = [
           -- create separate workspace based on build branch to isolate infrastructure states
           Cmd.run (
-            "cd automation/terraform/testnets/${testnetName} && terraform init && terraform workspace new \\\${BUILDKITE_BRANCH//_/-}"
+            "cd automation/terraform/testnets/${testnetName} && terraform init && (terraform workspace new \\\${BUILDKITE_BRANCH//_/-} || true)"
           ),
           Cmd.run (
             "if [ ! -f ${deployEnv} ]; then " ++
