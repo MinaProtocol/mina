@@ -973,7 +973,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	go func() {
 		for discovery := range foundPeerCh {
 			if validPeer(discovery.info.ID) {
-				app.P2p.Logger.Infof("discovered peer %v via %v; processing", discovery.info.ID, discovery.source)
+				app.P2p.Logger.Debugf("discovered peer %v via %v; processing", discovery.info.ID, discovery.source)
 				app.P2p.Host.Peerstore().AddAddrs(discovery.info.ID, discovery.info.Addrs, peerstore.ConnectedAddrTTL)
 
 				if discovery.source == PEER_DISCOVERY_SOURCE_MDNS {
@@ -989,7 +989,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 					continue
 				}
 			} else {
-				app.P2p.Logger.Infof("discovered peer %v via %v; not processing as it is not a valid peer", discovery.info.ID, discovery.source)
+				app.P2p.Logger.Debugf("discovered peer %v via %v; not processing as it is not a valid peer", discovery.info.ID, discovery.source)
 			}
 		}
 	}()
