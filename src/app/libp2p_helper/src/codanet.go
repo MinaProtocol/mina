@@ -40,9 +40,7 @@ import (
 var (
 	logger   = logging.Logger("codanet.Helper")
 	gsLogger = logging.Logger("codanet.CodaGatingState")
-)
 
-var (
 	privateIPs = []string{
 		"10.0.0.0/8",
 		"172.16.0.0/12",
@@ -51,8 +49,6 @@ var (
 		"198.18.0.0/15",
 		"169.254.0.0/16",
 	}
-
-	privateIPsNet []*gonet.IPNet
 )
 
 func parseCIDR(cidr string) gonet.IPNet {
