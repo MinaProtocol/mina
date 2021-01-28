@@ -23,7 +23,7 @@ locals {
           write_relabel_configs = [
             {
               source_labels: ["__name__"]
-              regex: "(buildkite.*|container.*|Coda.*)"
+              regex: "(buildkite.*|container.*|Coda.*|watchdog.*)"
               action: "keep"
             }
           ]
