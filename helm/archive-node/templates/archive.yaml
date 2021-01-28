@@ -45,7 +45,6 @@ spec:
           "-peer-exchange true"
           {{- end -}}
           {{- range .Values.coda.directPeers }}
-
           "-direct-peers", {{ . | quote }},
           {{- end -}}
           "-config-directory", "/root/.coda-config",
@@ -57,8 +56,8 @@ spec:
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end -}}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: DAEMON_REST_PORT
