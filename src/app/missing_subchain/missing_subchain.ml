@@ -117,11 +117,10 @@ let fill_in_user_command pool block_state_hash =
   in
   (* create extensional user command for each id, seq no *)
   Deferred.List.map user_command_ids_and_sequence_nos
-    ~f:(fun (user_command_id, sequence_no) ->
+    ~f:(fun (user_cmd_id, sequence_no) ->
       let%bind user_cmd =
-        query_db ~item:"user commands" ~f:(fun db ->
-            Processor.User_command.Signed_command.load db ~id:user_command_id
-        )
+        query_db ~item:"blocks user commands" ~f:(fun db ->
+            Processor.User_command.Signed_command.load db ~id:user_cmd_id )
       in
       let typ = user_cmd.typ in
       let%bind fee_payer = pk_of_id ~item:"fee payer" user_cmd.fee_payer_id in
@@ -148,33 +147,26 @@ let fill_in_user_command pool block_state_hash =
       in
       let memo = user_cmd.memo |> Signed_command_memo.of_string in
       let hash = user_cmd.hash |> Transaction_hash.of_base58_check_exn in
-      let%bind block_user_cmd =
-        query_db ~item:"block user commands" ~f:(fun db ->
-            Processor.Block_and_signed_command.load db ~block_id
-              ~user_command_id )
-      in
-      let status = block_user_cmd.status in
+      let status = user_cmd.status in
       let failure_reason =
-        Option.map block_user_cmd.failure_reason ~f:(fun s ->
+        Option.map user_cmd.failure_reason ~f:(fun s ->
             match Transaction_status.Failure.of_string s with
-            | Ok s ->
-                s
+            | Ok fail ->
+                fail
             | Error err ->
                 failwithf "Not a transaction status failure: %s, error: %s" s
                   err () )
       in
       let fee_payer_account_creation_fee_paid =
-        Option.map block_user_cmd.fee_payer_account_creation_fee_paid
-          ~f:(fun amt ->
+        Option.map user_cmd.fee_payer_account_creation_fee_paid ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
       in
       let receiver_account_creation_fee_paid =
-        Option.map block_user_cmd.receiver_account_creation_fee_paid
-          ~f:(fun amt ->
+        Option.map user_cmd.receiver_account_creation_fee_paid ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
       in
       let created_token =
-        Option.map block_user_cmd.created_token ~f:(fun tok ->
+        Option.map user_cmd.created_token ~f:(fun tok ->
             Unsigned.UInt64.of_int64 tok |> Token_id.of_uint64 )
       in
       return

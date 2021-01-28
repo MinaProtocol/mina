@@ -44,6 +44,11 @@ CREATE TABLE user_commands
 , valid_until    bigint
 , memo           text                NOT NULL
 , hash           text                NOT NULL UNIQUE
+, status         user_command_status
+, failure_reason text
+, fee_payer_account_creation_fee_paid  bigint
+, receiver_account_creation_fee_paid   bigint
+, created_token  bigint
 );
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer_via_coinbase', 'fee_transfer', 'coinbase');
@@ -89,11 +94,6 @@ CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
 , sequence_no     int NOT NULL
-, status          user_command_status
-, failure_reason  text
-, fee_payer_account_creation_fee_paid bigint
-, receiver_account_creation_fee_paid bigint
-, created_token   bigint
 , PRIMARY KEY (block_id, user_command_id)
 );
 
