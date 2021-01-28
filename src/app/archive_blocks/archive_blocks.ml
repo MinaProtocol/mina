@@ -53,11 +53,12 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
           (Processor.add_block_aux_precomputed
              ~constraint_constants:
                Genesis_constants.Constraint_constants.compiled conn
-             ~delete_older_than:None)
+             ~delete_older_than:None ~logger)
       in
       let add_extensional_block =
         make_add_block Archive_lib.Extensional.Block.of_yojson
-          (Processor.add_block_aux_extensional conn ~delete_older_than:None)
+          (Processor.add_block_aux_extensional ~logger conn
+             ~delete_older_than:None)
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
