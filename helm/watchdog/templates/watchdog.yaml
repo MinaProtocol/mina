@@ -72,7 +72,7 @@ kind: CronJob
 metadata:
   name: watchdog-cluster-crashes
 spec:
-  schedule: "*/1 * * * *"
+  schedule: "*/30 * * * *"
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
