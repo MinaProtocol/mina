@@ -9,7 +9,7 @@ let testTestnet = "ci-net"
 let dependsOn = [
     { name = "MinaArtifact", key = "mina-docker-image" }
 ]
-let deployDestroyOp = "sleep 10 && terraform destroy -auto-approve && terraform workspace delete \\\$(terraform workspace show)"
+let deployDestroyOp = "sleep 10 && terraform destroy -auto-approve"
 
 in Pipeline.build Pipeline.Config::{
   spec =
