@@ -13,8 +13,9 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
     Command.build
       Command.Config::{
         commands = [
+          -- create separate workspace based on build branch to isolate infrastructure states
           Cmd.run (
-            "cd automation/terraform/testnets/${testnetName} && terraform init"
+            "cd automation/terraform/testnets/${testnetName} && terraform init && terraform workspace new \\\$BUILDKITE_BRANCH"
           ),
           Cmd.run (
             "if [ ! -f ${deployEnv} ]; then " ++
@@ -22,7 +23,7 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
             "fi"
           ),
           Cmd.run (
-            "set -euo pipefail; source ${deployEnv} && terraform apply -auto-approve" ++
+            "source ${deployEnv} && terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH"
           ),
           Cmd.run (
