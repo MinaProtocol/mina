@@ -49,4 +49,40 @@ spec:
         - name: metrics-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.metrics }}
+        - name: server-port
+          protocol: TCP 
+          containerPort: 5555
         imagePullPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: watchdog-server
+  labels:
+    app: {{ .Values.name }}
+spec:
+  ports:
+  - port: 5555
+    protocol: TCP
+  selector:
+    app: {{ .Values.name }}
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: watchdog-cluster-crashes
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: watchdog
+            image: {{ .Values.image }}
+            imagePullPolicy: IfNotPresent
+            command: ["python3"]
+            args: ["/code/cluster_crashes.py"]
+          restartPolicy: OnFailure
+          

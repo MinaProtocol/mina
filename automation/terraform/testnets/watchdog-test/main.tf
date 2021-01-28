@@ -87,7 +87,7 @@ module "testnet_east" {
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"
   coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
 
-  watchdog_image = "gcr.io/o1labs-192920/watchdog:0.2.2"
+  watchdog_image = "gcr.io/o1labs-192920/watchdog:0.2.8"
 
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"

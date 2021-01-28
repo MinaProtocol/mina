@@ -8,3 +8,4 @@ graphviz
 click
 timedelta
 prometheus-client
+zmq
