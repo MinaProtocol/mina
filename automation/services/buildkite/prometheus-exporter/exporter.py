@@ -6,17 +6,20 @@ import time
 
 import asyncio
 
+from functools import wraps
+
 from python_graphql_client import GraphqlClient
 from prometheus_client import start_http_server
 from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily, REGISTRY
-
 
 API_KEY = os.getenv("BUILDKITE_API_KEY")
 API_URL = os.getenv("BUILDKITE_API_URL", "https://graphql.buildkite.com/v1")
 
 ORG_SLUG = os.getenv("BUILDKITE_ORG_SLUG", "o-1-labs-2")
-PIPELINE_SLUG = os.getenv("BUILDKITE_PIPELINE_SLUG", "o-1-labs-2/coda").strip()
+PIPELINE_SLUG = os.getenv("BUILDKITE_PIPELINE_SLUG", "o-1-labs-2/mina").strip()
 BRANCH = os.getenv("BUILDKITE_BRANCH", "*")
+
+JOBS = os.getenv("BUILDKITE_JOBS", "")
 
 MAX_JOB_COUNT = os.getenv("BUILDKITE_MAX_JOB_COUNT", 500)
 
@@ -28,7 +31,6 @@ EXPORTER_SCAN_INTERVAL = os.getenv("BUILDKITE_EXPORTER_SCAN_INTERVAL", 3600)
 
 METRICS_PORT = os.getenv("METRICS_PORT", 8000)
 
-from functools import wraps
 
 def timing(f):
     @wraps(f)
@@ -64,13 +66,17 @@ class Exporter(object):
 
     @timing
     def list_pipeline_stepkeys(self):
+        result = []
+
         headers = {'Authorization': "Bearer {token}".format(token=API_KEY)}
         response = requests.get(
-            "https://api.buildkite.com/v2/organizations/{org}/pipelines/{pipeline}/builds".format(org=self.org_slug, pipeline=self.pipeline_slug),
+            "https://api.buildkite.com/v2/organizations/{org}/pipelines/mina/builds".format(org=self.org_slug),
             headers=headers)
         data = response.json()
+        for build in data:
+          result.extend([d['step_key'] if d['step_key'] else "pipeline" for d in build['jobs']])
 
-        return [d['step_key'] for d in data['jobs']]
+        return list(set(result)) 
 
     @timing
     def collect(self):
@@ -176,7 +182,7 @@ class Exporter(object):
             "createdAtFrom": scan_from.isoformat(),
             "branch": self.branch,
             "jobLimit": MAX_JOB_COUNT,
-            "jobKey": JOBS.split(','),
+            "jobKey": JOBS.split(',') if JOBS else self.list_pipeline_stepkeys(),
             "jobArtifactLimit": MAX_ARTIFACTS_COUNT
         }
         data = self.execute_qlquery(query=query, vars=vars)
@@ -331,9 +337,6 @@ def main():
 
     exporter = Exporter(client)
     REGISTRY.register(exporter)
-
-    _monitored_jobs = exporter.list_pipeline_stepkeys()
-    JOBS = os.getenv("BUILDKITE_JOBS", ','.join(_monitored_jobs))
 
     start_http_server(METRICS_PORT)
     print("Metrics on Port {}".format(METRICS_PORT))
