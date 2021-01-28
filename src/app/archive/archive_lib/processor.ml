@@ -1363,6 +1363,8 @@ let retry ~f ~logger ~error_str retries =
         else (
           [%log warn] "Error in %s : $error. Retrying..." error_str
             ~metadata:[("error", `String (Caqti_error.show e))] ;
+          let wait_for = Random.float_range 20. 2000. in
+          let%bind () = after (Time.Span.of_ms wait_for) in
           go (retry_count - 1) )
     | Ok res ->
         return (Ok res)
