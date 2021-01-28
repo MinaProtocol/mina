@@ -1,8 +1,7 @@
 use algebra::{
-    One,
     curves::AffineCurve,
     fields::{Field, PrimeField},
-    FromBytes, ToBytes,
+    FromBytes, One, ToBytes,
 };
 
 use commitment_dlog::{
@@ -12,9 +11,9 @@ use commitment_dlog::{
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
 use plonk_5_wires_circuits::{
-    wires::COLUMNS,
     constraints::{zk_polynomial, zk_w, ConstraintSystem as PlonkConstraintSystem},
     domains::EvaluationDomains as PlonkEvaluationDomains,
+    wires::COLUMNS,
 };
 use plonk_5_wires_protocol_dlog::index::{
     Index as PlonkIndex, SRSValue as PlonkSRSValue, VerifierIndex as PlonkVerifierIndex,
@@ -165,11 +164,17 @@ where
     u64::write(&(vk.max_poly_size as u64), &mut w)?;
     u64::write(&(vk.max_quot_size as u64), &mut w)?;
 
-    for i in 0..COLUMNS {write_poly_comm(&vk.sigma_comm[i], &mut w)?};
-    for i in 0..COLUMNS {write_poly_comm(&vk.qw_comm[i], &mut w)?};
+    for i in 0..COLUMNS {
+        write_poly_comm(&vk.sigma_comm[i], &mut w)?
+    }
+    for i in 0..COLUMNS {
+        write_poly_comm(&vk.qw_comm[i], &mut w)?
+    }
     write_poly_comm(&vk.qm_comm, &mut w)?;
     write_poly_comm(&vk.qc_comm, &mut w)?;
-    for i in 0..COLUMNS {write_poly_comm(&vk.rcm_comm[i], &mut w)?};
+    for i in 0..COLUMNS {
+        write_poly_comm(&vk.rcm_comm[i], &mut w)?
+    }
     write_poly_comm(&vk.psm_comm, &mut w)?;
     write_poly_comm(&vk.add_comm, &mut w)?;
     write_poly_comm(&vk.double_comm, &mut w)?;
@@ -178,7 +183,9 @@ where
     write_poly_comm(&vk.emul_comm, &mut w)?;
     write_poly_comm(&vk.pack_comm, &mut w)?;
 
-    for i in 1..COLUMNS {G::ScalarField::write(&vk.shift[i], &mut w)?};
+    for i in 1..COLUMNS {
+        G::ScalarField::write(&vk.shift[i], &mut w)?
+    }
 
     Ok(())
 }
@@ -285,13 +292,19 @@ where
 
     write_vec(&c.gates, &mut w)?;
 
-    for i in 0..COLUMNS {write_dense_polynomial(&c.sigmam[i], &mut w)?};
-    for i in 0..COLUMNS {write_dense_polynomial(&c.qwm[i], &mut w)?};
+    for i in 0..COLUMNS {
+        write_dense_polynomial(&c.sigmam[i], &mut w)?
+    }
+    for i in 0..COLUMNS {
+        write_dense_polynomial(&c.qwm[i], &mut w)?
+    }
 
     write_dense_polynomial(&c.qmm, &mut w)?;
     write_dense_polynomial(&c.qc, &mut w)?;
 
-    for i in 0..COLUMNS {write_dense_polynomial(&c.rcm[i], &mut w)?};
+    for i in 0..COLUMNS {
+        write_dense_polynomial(&c.rcm[i], &mut w)?
+    }
 
     write_dense_polynomial(&c.psm, &mut w)?;
     write_dense_polynomial(&c.addm, &mut w)?;
@@ -301,11 +314,17 @@ where
     write_dense_polynomial(&c.emulm, &mut w)?;
     write_dense_polynomial(&c.packm, &mut w)?;
 
-    for i in 0..COLUMNS {write_plonk_evaluations(&c.qwl[i], &mut w)?};
+    for i in 0..COLUMNS {
+        write_plonk_evaluations(&c.qwl[i], &mut w)?
+    }
     write_plonk_evaluations(&c.qml, &mut w)?;
 
-    for i in 0..COLUMNS {write_vec(&c.sigmal1[i], &mut w)?};
-    for i in 0..COLUMNS {write_plonk_evaluations(&c.sigmal8[i], &mut w)?};
+    for i in 0..COLUMNS {
+        write_vec(&c.sigmal1[i], &mut w)?
+    }
+    for i in 0..COLUMNS {
+        write_plonk_evaluations(&c.sigmal8[i], &mut w)?
+    }
 
     write_vec(&c.sid, &mut w)?;
 
@@ -324,7 +343,9 @@ where
     write_plonk_evaluations(&c.zero4, &mut w)?;
     write_plonk_evaluations(&c.zero8, &mut w)?;
 
-    for i in 1..COLUMNS {G::ScalarField::write(&c.shift[i], &mut w)?};
+    for i in 1..COLUMNS {
+        G::ScalarField::write(&c.shift[i], &mut w)?
+    }
     c.endo.write(&mut w)?;
 
     Ok(())
@@ -367,7 +388,7 @@ where
     let qmm = read_dense_polynomial(&mut r)?;
     let qc = read_dense_polynomial(&mut r)?;
 
-    let rcm =  {
+    let rcm = {
         let s0 = read_dense_polynomial(&mut r)?;
         let s1 = read_dense_polynomial(&mut r)?;
         let s2 = read_dense_polynomial(&mut r)?;
