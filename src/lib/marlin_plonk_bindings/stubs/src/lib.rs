@@ -32,6 +32,7 @@ pub mod pasta_fq_urs;
 pub mod urs_utils;
 /* Gates */
 pub mod plonk_gate;
+pub mod plonk_5_wires_gate;
 /* Indices */
 pub mod index_serialization;
 pub mod index_serialization_5_wires;

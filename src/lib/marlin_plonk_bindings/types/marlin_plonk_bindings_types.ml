@@ -82,6 +82,31 @@ module Plonk_gate = struct
   type 'a t = {kind: Kind.t; wires: Wires.t; c: 'a array}
 end
 
+module Plonk_5_wires_gate = struct
+  module Kind = struct
+    type t =
+      | Zero
+      | Generic
+      | Poseidon
+      | Add
+      | Double
+      | Vbmul1
+      | Vbmul2
+      | Endomul
+      | Pack
+  end
+
+  module Wire = struct
+    type t = {row: int; col: int}
+  end
+
+  module Wires = struct
+    type t = {l: Wire.t; r: Wire.t; o: Wire.t; q: Wire.t; p: Wire.t}
+  end
+
+  type 'a t = {kind: Kind.t; row: int; wires: Wires.t; c: 'a array}
+end
+
 module Plonk_proof = struct
   module Evaluations = struct
     type 'field t =
