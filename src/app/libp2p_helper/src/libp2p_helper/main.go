@@ -309,7 +309,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig))
+	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig), app.AddedPeers)
 	if err != nil {
 		return nil, badRPC(err)
 	}
@@ -882,6 +882,8 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
+	app.P2p.GatingState.TrustedPeers.Add(info.ID)
+
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
@@ -1219,7 +1221,7 @@ type setGatingConfigMsg struct {
 	Isolate        bool     `json:"isolate"`
 }
 
-func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
+func gatingConfigFromJson(gc *setGatingConfigMsg, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
 	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
 
 	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
@@ -1267,6 +1269,9 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		}
 		trustedPeers.Add(id)
 	}
+	for _, peer := range addedPeers {
+		trustedPeers.Add(peer.ID)
+	}
 
 	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
 }
@@ -1276,7 +1281,7 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 
-	newState, err := gatingConfigFromJson(gc)
+	newState, err := gatingConfigFromJson(gc, app.AddedPeers)
 
 	if err != nil {
 		return nil, badRPC(err)
