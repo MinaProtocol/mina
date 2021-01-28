@@ -69,7 +69,7 @@ func Init() {
 }
 
 func isPrivateAddr(addr ma.Multiaddr) bool {
-	return !privateIpFilter.AddrBlocked(addr)
+	return privateIpFilter.AddrBlocked(addr)
 }
 
 type CodaConnectionManager struct {

@@ -993,7 +993,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}()
 
 	if !app.NoMDNS {
-		app.P2p.Logger.Debugf("beginning mDNS discovery")
+		app.P2p.Logger.Infof("beginning mDNS discovery")
 		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
@@ -1002,7 +1002,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	if !app.NoDHT {
-		app.P2p.Logger.Debugf("beginning DHT discovery")
+		app.P2p.Logger.Infof("beginning DHT discovery")
 		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
 		if routingDiscovery == nil {
 			return nil, errors.New("failed to create routing discovery")
