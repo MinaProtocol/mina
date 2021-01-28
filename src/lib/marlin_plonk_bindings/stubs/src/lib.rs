@@ -34,6 +34,7 @@ pub mod urs_utils;
 pub mod plonk_gate;
 /* Indices */
 pub mod index_serialization;
+pub mod index_serialization_5_wires;
 pub mod plonk_verifier_index;
 pub mod tweedle_fp_plonk_index;
 pub mod tweedle_fp_plonk_verifier_index;
