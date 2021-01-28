@@ -424,20 +424,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				as = append(as, externalAddr)
 			}
 
-			fs := ma.NewFilters()
-			for _, addr := range privateCIDRs {
-				fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
-			}
-
-			bs := []ma.Multiaddr{}
-			for _, a := range as {
-				if fs.AddrBlocked(a) {
-					continue
-				}
-				bs = append(bs, a)
-			}
-
-			return bs
+			return as
 		}),
 		p2p.NATPortMap(),
 		p2p.Routing(
