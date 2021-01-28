@@ -45,6 +45,7 @@ pub mod pasta_fp_plonk_index;
 pub mod pasta_fp_plonk_verifier_index;
 pub mod pasta_fq_plonk_index;
 pub mod pasta_fq_plonk_verifier_index;
+pub mod pasta_fp_plonk_5_wires_index;
 /* Proofs */
 pub mod tweedle_fp_plonk_proof;
 pub mod tweedle_fq_plonk_proof;
