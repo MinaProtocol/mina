@@ -1391,11 +1391,18 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
           return ()
     in
     match res with
-    | Error _ as e ->
+    | Error e as err ->
         (*Error in the current transaction*)
+        [%log warn]
+          "Error when adding block data to the database, rolling it back: \
+           $error"
+          ~metadata:[("error", `String (Caqti_error.show e))] ;
         let%map _ = Conn.rollback () in
-        e
+        err
     | Ok _ ->
+        [%log info] "Committing block data for $state_hash"
+          ~metadata:
+            [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
         Conn.commit ()
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
