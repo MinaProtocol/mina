@@ -2866,7 +2866,7 @@ module Queries = struct
       ; hash }
 
   let best_chain =
-    field "bestChain"
+    io_field "bestChain"
       ~doc:
         "Retrieve a list of blocks from transition frontier's root to the \
          current best tip. Returns null if the system is bootstrapping."
@@ -2880,9 +2880,16 @@ module Queries = struct
                  blocks closest to the best tip will be returned"
               ~typ:int ]
       ~resolve:(fun {ctx= coda; _} () max_length ->
-        let open Option.Let_syntax in
-        let%map best_chain = Mina_lib.best_chain ?max_length coda in
-        List.map best_chain ~f:(block_of_breadcrumb coda) )
+        match Mina_lib.best_chain ?max_length coda with
+        | Some best_chain ->
+            let%map blocks =
+              Deferred.List.map best_chain ~f:(fun bc ->
+                  Deferred.return @@ block_of_breadcrumb coda bc )
+            in
+            Ok (Some blocks)
+        | None ->
+            return
+            @@ Error "Could not obtain best chain from transition frontier" )
 
   let block =
     result_field2 "block"
