@@ -84,6 +84,12 @@ function generate_key_files {
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
       -c "CODA_LIBP2P_PASS='${privkey_pass}' coda advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
+
+  # ensure proper r+w permissions for access to keys external to container
+  docker run \
+    -v "${output_dir}:/keys:z" \
+    --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+    -c "chmod -R +rw /keys"
 }
 
 function build_keyset_from_testnet_keys {
@@ -301,7 +307,7 @@ PROMPT_KEYSETS="${PROMPT_KEYSETS}n
 # Handle passing the above keyset info into interactive 'coda-network genesis' prompts
 while read input
 do echo "$input"
-  sleep 2
+  sleep 5
 done < <(echo -n "$PROMPT_KEYSETS") | coda-network genesis
 
 GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
