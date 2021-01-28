@@ -217,6 +217,22 @@ locals {
         unzip terraform.zip && mv terraform /usr/bin
       EOF
 
+      "02-install-coda-network-tools" = <<-EOF
+        #!/bin/bash
+
+        set -eou pipefail
+
+        # Download and install NodeJS
+        curl -sL https://deb.nodesource.com/setup_12.x | bash -
+        apt-get install -y nodejs
+
+        # Build coda-network library
+        mkdir -p /tmp/mina && git clone https://github.com/MinaProtocol/mina.git /tmp/mina
+        cd /tmp/mina/automation && npm install -g && npm install -g yarn
+        yarn install && yarn build
+        chmod +x bin/coda-network && ln --symbolic --force bin/coda-network /usr/local/bin/coda-network
+      EOF
+
       "03-setup-k8s-ctx" = <<-EOF
         #!/bin/bash
 
