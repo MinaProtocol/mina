@@ -70,7 +70,9 @@ class Exporter(object):
 
         headers = {'Authorization': "Bearer {token}".format(token=API_KEY)}
         response = requests.get(
-            "https://api.buildkite.com/v2/organizations/{org}/pipelines/mina/builds".format(org=self.org_slug),
+            "https://api.buildkite.com/v2/organizations/{org}/pipelines/{pipeline}/builds".format(
+                org=self.org_slug,
+                pipeline=self.pipeline_slug.replace(self.org_slug + '/', "")),
             headers=headers)
         data = response.json()
         for build in data:
