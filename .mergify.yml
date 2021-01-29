@@ -1,6 +1,7 @@
 pull_request_rules:
     - name: automatically merge approved PRs with the ready-to-merge label
       conditions:
+          - "status-success=buildkite/mina-pr-gating"
           - "status-success=buildkite/mina/pr"
           - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
           - "status-success=ci/circleci: test--dev--coda-delegation-test"
@@ -16,6 +17,7 @@ pull_request_rules:
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop with the ready-to-merge-into-develop label
       conditions:
+          - "status-success=buildkite/mina-pr-gating"
           - "status-success=buildkite/mina/pr"
           - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
           - "status-success=ci/circleci: test--dev--coda-delegation-test"
@@ -32,6 +34,7 @@ pull_request_rules:
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop-until-4.1-hardfork with the ready-to-merge-into-develop label
       conditions:
+          - "status-success=buildkite/mina-pr-gating"
           - "status-success=buildkite/mina/pr"
           - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
           - "status-success=ci/circleci: test--dev--coda-delegation-test"
@@ -48,6 +51,7 @@ pull_request_rules:
           delete_head_branch: {}
     - name: automatically merge approved PRs into develop-until-adversarial with the ready-to-merge-into-develop label
       conditions:
+          - "status-success=buildkite/mina-pr-gating"
           - "status-success=buildkite/mina/pr"
           - "status-success=ci/circleci: test--dev--coda-bootstrap-test"
           - "status-success=ci/circleci: test--dev--coda-delegation-test"

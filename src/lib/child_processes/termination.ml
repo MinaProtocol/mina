@@ -24,6 +24,17 @@ let mark_termination_as_expected t child_pid =
 
 let remove : t -> Pid.t -> unit = Pid.Table.remove
 
+(* for some signals that cause termination, offer a possible explanation *)
+let get_signal_cause_opt =
+  let open Signal in
+  let signal_causes_tbl : string Table.t = Table.create () in
+  List.iter
+    [ (kill, "Process killed because out of memory")
+    ; (int, "Process interrupted by user or other program") ]
+    ~f:(fun (signal, msg) ->
+      Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg) ) ;
+  fun signal -> Signal.Table.find signal_causes_tbl signal
+
 let check_terminated_child (t : t) child_pid logger =
   if Pid.Table.mem t child_pid then
     let data = Pid.Table.find_exn t child_pid in
