@@ -158,8 +158,8 @@ type MessageStats struct {
 }
 
 func (ms *MessageStats) UpdateMetrics(val uint64) {
-    ms.Lock()
-    defer ms.Unlock()
+	ms.Lock()
+	defer ms.Unlock()
 	if ms.max < val {
 		ms.max = val
 	} else if ms.min > val {
@@ -173,26 +173,26 @@ func (ms *MessageStats) UpdateMetrics(val uint64) {
 	}
 }
 
-func(ms *MessageStats) IncrTotal(){
-    ms.Lock()
-    defer ms.Unlock()
-    ms.total++
+func (ms *MessageStats) IncrTotal() {
+	ms.Lock()
+	defer ms.Unlock()
+	ms.total++
 }
 func (ms *MessageStats) GetMin() uint64 {
-    ms.RLock()
-    defer ms.RUnlock()
+	ms.RLock()
+	defer ms.RUnlock()
 	return ms.min
 }
 
 func (ms *MessageStats) GetMax() uint64 {
-    ms.RLock()
-    defer ms.RUnlock()
+	ms.RLock()
+	defer ms.RUnlock()
 	return ms.max
 }
 
 func (ms *MessageStats) GetAvg() uint64 {
-    ms.RLock()
-    defer ms.RUnlock()
+	ms.RLock()
+	defer ms.RUnlock()
 	return ms.avg
 }
 
@@ -451,6 +451,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
-		MsgStats:       &MessageStats{},
+		MsgStats:          &MessageStats{},
 	}, nil
 }
