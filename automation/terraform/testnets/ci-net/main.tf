@@ -64,6 +64,11 @@ variable "ci_k8s_ctx" {
   default = "gke_o1labs-192920_us-west1_mina-integration-west1"
 }
 
+variable "ci_artifact_path" {
+  type    = string
+  default = "/tmp"
+}
+
 locals {
   seed_region = "us-west1"
   seed_zone = "us-west1-b"
@@ -147,4 +152,6 @@ module "ci_testnet" {
   agent_min_tx = "0.0015"
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
+
+  artifact_path = var.ci_artifact_path
 }
