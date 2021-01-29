@@ -1,16 +1,16 @@
 package main
 
 import (
-	"bufio"
-	"codanet"
 	"context"
 	crand "crypto/rand"
+	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"sync"
 	"testing"
 	"time"
+
+	"codanet"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	testTimeout  = 10 * time.Second
+	testTimeout  = 30 * time.Second
 	testProtocol = protocol.ID("/mina/")
 )
 
@@ -62,6 +62,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
 		AddedPeers:     make([]peer.AddrInfo, 0, 512),
+		OutChan:        make(chan interface{}),
 	}
 }
 
@@ -224,8 +225,8 @@ func TestMDNSDiscovery(t *testing.T) {
 	time.Sleep(time.Second * 3)
 }
 
-func createLargeMessage() []byte {
-	return make([]byte, (1 << 30))
+func createMessage(size uint64) []byte {
+	return make([]byte, size)
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
@@ -245,33 +246,42 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
+	// send large message from A to B
+	actualMessage := createMessage(1 << 30)
+
 	// create handler that reads 1<<30 bytes
 	done := make(chan struct{})
 	handler := func(stream net.Stream) {
-		r := bufio.NewReader(stream)
-		i := 0
+		handleStreamReads(appB, stream, 0)
 
-		for {
-			_, err := r.ReadByte()
-			if err == io.EOF {
-				break
-			}
+		data := <-appB.OutChan
+		require.NotEmpty(t, data)
 
-			i++
-			if i == 1<<30 {
-				close(done)
-				return
-			}
-		}
+		bytes, err := json.Marshal(data)
+		require.NoError(t, err)
+
+		var result map[string]interface{}
+		err = json.Unmarshal(bytes, &result)
+		require.NoError(t, err)
+
+		data, ok := result["data"]
+		require.True(t, ok)
+
+		expectedMessage, err := codaDecode(data.(string))
+		require.NoError(t, err)
+
+		require.Equal(t, expectedMessage, actualMessage)
+		close(done)
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
 
-	// send large message from A to B
-	msg := createLargeMessage()
-
 	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
 	require.NoError(t, err)
+
+	msgLen := uint64(len(actualMessage))
+	lenBytes := uint64ToLEB128(msgLen)
+	msg := append(lenBytes, actualMessage...)
 
 	_, err = stream.Write(msg)
 	require.NoError(t, err)
@@ -281,4 +291,82 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 		t.Fatal("B did not receive a large message from A")
 	case <-done:
 	}
+}
+
+func TestMplex_SendMultipleMessage(t *testing.T) {
+    // assert we are able to send and receive a message with size up to 1 << 30 bytes
+    appA := newTestApp(t, nil)
+    appA.NoDHT = true
+    defer appA.P2p.Host.Close()
+
+    appB := newTestApp(t, nil)
+    appB.NoDHT = true
+    defer appB.P2p.Host.Close()
+
+    // connect the two nodes
+    appAInfos, err := addrInfos(appA.P2p.Host)
+    require.NoError(t, err)
+
+    err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+    require.NoError(t, err)
+
+    // Send multiple messages from A to B
+    actualMessage := createMessage(1 << 10)
+
+    // create handler that reads 1<<30 bytes
+    done := make(chan struct{})
+    handler := func(stream net.Stream) {
+        handleStreamReads(appB, stream, 0)
+
+        for i := 1; i <= 3; {
+            data := <-appB.OutChan
+            require.NotEmpty(t, data)
+
+            bytes, err := json.Marshal(data)
+            require.NoError(t, err)
+
+            var result map[string]interface{}
+            err = json.Unmarshal(bytes, &result)
+            require.NoError(t, err)
+
+            op, ok := result["upcall"]
+            if op != "incomingStreamMsg" {
+                continue
+            }
+            i++
+
+            data, ok = result["data"]
+            require.True(t, ok)
+
+            expectedMessage, err := codaDecode(data.(string))
+            require.NoError(t, err)
+
+            require.Equal(t, expectedMessage, actualMessage)
+        }
+        close(done)
+    }
+
+    appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+
+    stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
+    require.NoError(t, err)
+
+    msgLen := uint64(len(actualMessage))
+    lenBytes := uint64ToLEB128(msgLen)
+    msg := append(lenBytes, actualMessage...)
+
+    _, err = stream.Write(msg)
+    require.NoError(t, err)
+
+    _, err = stream.Write(msg)
+    require.NoError(t, err)
+
+    _, err = stream.Write(msg)
+    require.NoError(t, err)
+
+    select {
+    case <-time.After(testTimeout):
+        t.Fatal("B did not receive a large message from A")
+    case <-done:
+    }
 }
