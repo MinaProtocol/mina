@@ -81,11 +81,21 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
         ; signature= Signature.dummy }
       in
       match Fee_transfer.to_singles tr with
-      | `One ({receiver_pk; fee= _; fee_token} as t) ->
+      | `One ({receiver_pk; fee= _; fee_token} as t) -> (
+        try
           two t
             (Fee_transfer.Single.create ~receiver_pk ~fee:Fee.zero ~fee_token)
-      | `Two (t1, t2) ->
-          try two t1 t2 with _ -> two t2 t1)
+        with _ ->
+          (* Set pk2 as the genesis winner, since we know it will decompress
+             correctly.
+          *)
+          two t
+            (Fee_transfer.Single.create
+               ~receiver_pk:
+                 (fst (Lazy.force Mina_base.Sample_keypairs.keypairs).(0))
+               ~fee:Fee.zero ~fee_token) )
+      | `Two (t1, t2) -> (
+        try two t1 t2 with _ -> two t2 t1 ) )
 
 let fee_excess (t : t) = Transaction_union_payload.fee_excess t.payload
 
