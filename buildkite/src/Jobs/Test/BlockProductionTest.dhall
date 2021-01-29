@@ -20,7 +20,7 @@ let runTestExecutive =
            ]) "bash buildkite/scripts/run-test.sh"
       , label = "Build and run test-executive"
       , key = "run-test-executive"
-      , target = Size.Large
+      , target = Size.XLarge
       , docker = None Docker.Type
       , depends_on = [ { name = "MinaArtifact", key = "mina-docker-image" } ]
       }

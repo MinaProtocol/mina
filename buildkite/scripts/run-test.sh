@@ -3,6 +3,10 @@
 set -euo pipefail
 
 eval $(opam env)
+export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
+export GO=/usr/lib/go/bin/go
+
+make build_or_download_pv_keys 2>&1
 
 # Waiting for the coda-daemon image to be built by CircleCI (this is redundent once build-artifacts works in buildkite)
 
@@ -25,7 +29,7 @@ echo "image: ${coda_daemon_image}"
 
 echo "--- Building test-executive"
 
-dune build --profile=testnet_postake_medium_curves src/app/test_executive/test_executive.exe
+dune build --verbose --profile=testnet_postake_medium_curves src/app/test_executive/test_executive.exe
 
 echo "--- Clone coda-automation repo (this would be changed in future. Nathan is suggesting linking coda-automation in coda repo)"
 
