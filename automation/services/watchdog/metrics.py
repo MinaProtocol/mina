@@ -37,3 +37,22 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
   cluster_crashes.set(fraction_recently_restarted)
 
 # ========================================================================
+
+def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
+  print('ctm')
+  pass
+
+# ========================================================================
+
+def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
+  print('cgsb')
+  pass
+
+# ========================================================================
+
+def check_seed_list_up(v1, namespace, seeds_reachable):
+  print('cslu')
+  pass
+
+# ========================================================================
+
