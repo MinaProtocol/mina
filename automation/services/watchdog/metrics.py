@@ -5,6 +5,7 @@ import util
 import asyncio
 import sys
 import traceback
+import subprocess
 
 # ========================================================================
 
@@ -40,17 +41,35 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
 
 def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
   print('ctm')
+
+  # select a seed at random
+  # call telemetry on that seed in a loop with a max number of tries
+  # collect info for each metric
+
   pass
 
 # ========================================================================
 
 def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
-  print('cgsb')
+
+  #command = 'gsutil ls -l gs://mina_network_block_data/' + namespace + '-*'
+  #subprocess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
+  #res = subprocess.stdout.read()
+
+  #import IPython; IPython.embed()
+
   pass
 
 # ========================================================================
 
 def check_seed_list_up(v1, namespace, seeds_reachable):
+
+  # get the seed list
+  # run a go process that uses libp2p ping
+  # https://docs.libp2p.io/tutorials/getting-started/go/#let-s-play-ping-pong
+
+  # collect info for each metric
+
   print('cslu')
   pass
 
