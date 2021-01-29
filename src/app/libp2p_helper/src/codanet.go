@@ -242,6 +242,8 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 		internalAddrFilters.AddFilter(parseCIDR(addr), ma.ActionDeny)
 	}
 
+	logger.Info("computed gating state addr filters: %#v", addrFilters)	
+	
 	return &CodaGatingState{
 		logger:              gsLogger,
 		AddrFilters:         addrFilters,
