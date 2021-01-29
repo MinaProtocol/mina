@@ -243,7 +243,7 @@ func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer
 	}
 
 	logger.Info("computed gating state addr filters: %#v", addrFilters)	
-	
+
 	return &CodaGatingState{
 		logger:              gsLogger,
 		AddrFilters:         addrFilters,
@@ -396,6 +396,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 			return
 		} else if err != nil {
 			logger.Errorf("failed to decode list of peers err=%s", err)
+			continue
 		}
 
 		for _, peer := range peers {
