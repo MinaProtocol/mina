@@ -94,7 +94,7 @@ CREATE TABLE blocks_user_commands
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
 , created_token   bigint
-, PRIMARY KEY (block_id, user_command_id)
+, PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
 
 CREATE TABLE blocks_internal_commands
