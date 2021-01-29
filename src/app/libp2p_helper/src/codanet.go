@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	gonet "net"
@@ -43,6 +44,7 @@ import (
 var (
 	logger   = logging.Logger("codanet.Helper")
 	gsLogger = logging.Logger("codanet.CodaGatingState")
+	NoDHT bool // option for testing to completely disable the DHT
 
 	privateIPs = []string{
 		"10.0.0.0/8",
@@ -135,15 +137,14 @@ func (cm *CodaConnectionManager) ClosedStream(net network.Network, stream networ
 	cm.p2pManager.Notifee().ClosedStream(net, stream)
 }
 func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) {
-	logger.Infof("%s connected to %s", c.LocalPeer(), c.RemotePeer())
+	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
 
-
-	logger.Infof("%s max peers=%d peercount=%d", c.LocalPeer(), cm.maxConnections, len(net.Peers()))
 	if len(net.Peers()) <= cm.maxConnections {
 		return
 	}
+	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), cm.maxConnections, len(net.Peers()))
 
 	// select random subset of our peers to send over, then disconnect
 	if cm.getRandomPeers == nil {
@@ -173,9 +174,10 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		return		
 	}
 
-	logger.Infof("wrote peers to stream %s", stream.Protocol())
+	logger.Debugf("wrote peers to stream %s", stream.Protocol())
 	go func() {
-		time.Sleep(time.Second)
+		// small delay to allow for remote peer to read from stream
+		time.Sleep(time.Millisecond * 300)
 		_ = c.Close()
 	}()
 }
@@ -377,28 +379,31 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 		}
 	}
 
-	logger.Info("random peers", ret)
+	logger.Debugf("node=%s sending random peers", h.Host.ID(), ret)
 	return ret
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
-	logger.Infof("incoming stream! from=%s", s.Conn().RemotePeer())
 	for {
 		dec := json.NewDecoder(s)
 		peers := []peer.AddrInfo{}
 		err := dec.Decode(&peers)
-		if err != nil {
-			logger.Error("failed to decode list of peers")
+		if err != nil && err == io.EOF {
+			continue
+		} else if err != nil && err.Error() == "stream reset" {
 			return
+		} else if err != nil {
+			logger.Errorf("failed to decode list of peers err=%s", err)
 		}
 
 		for _, peer := range peers {
-			logger.Infof("connecting to peer %s", peer)
-			err = h.Host.Connect(h.Ctx, peer)
-			if err != nil {
-				logger.Error("failed to connect to peer")
-			}
-			logger.Infof("connected to peer! %s", peer)
+			go func() {
+				err = h.Host.Connect(h.Ctx, peer)
+				if err != nil {
+					logger.Errorf("failed to connect to peer err=%s", err)
+				}
+				logger.Debugf("connected to peer! %s", peer)
+			}()
 		}
 	}
 }
@@ -475,7 +480,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
-				return nil , nil
+				if NoDHT {
+					return nil, nil
+				}
+
 				kad, err = dual.New(ctx, host,
 					dual.WanDHTOption(dht.Datastore(dsDht)),
 					dual.DHTOption(dht.Validator(rv)),

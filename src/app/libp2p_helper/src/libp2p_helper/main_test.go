@@ -858,31 +858,42 @@ func TestSetGatingConfigMsg(t *testing.T) {
 }
 
 func TestGetPeerMessage(t *testing.T) {
-	// only allow peer count of 1
-	appA := newTestAppWithMaxConns(t, nil, 1)
+	codanet.NoDHT = true
+	defer func() {
+		codanet.NoDHT = false
+	}()
+
+	// only allow peer count of 1 for node A
+	maxCount := 2
+	appA := newTestAppWithMaxConns(t, nil, maxCount)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
-	appB := newTestApp(t, appAInfos)
+	appB := newTestApp(t, nil)
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	// appC will try to connect to appA, appA will send peer msg containing B and disconnect
 	appC := newTestApp(t, nil)
 	err = appC.P2p.Host.Connect(appC.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	// appD will try to connect to appA, appA will send peer msg containing B and C and disconnect
+	appD := newTestApp(t, nil)
+	err = appD.P2p.Host.Connect(appD.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
 	t.Logf("a=%s", appA.P2p.Host.ID())
 	t.Logf("b=%s", appB.P2p.Host.ID())
 	t.Logf("c=%s", appC.P2p.Host.ID())
+	t.Logf("d=%s", appD.P2p.Host.ID())
 
 	done := make(chan struct{})
 
 	go func() {
 		for {
 			// check if appC is connected to appB
-			for _, peer := range appC.P2p.Host.Network().Peers() {
-				if peer == appB.P2p.Host.ID() {
+			for _, peer := range appD.P2p.Host.Network().Peers() {
+				if peer == appB.P2p.Host.ID() || peer == appC.P2p.Host.ID() {
 					close(done)
 					return
 				}
@@ -893,10 +904,10 @@ func TestGetPeerMessage(t *testing.T) {
 
 	select {
 	case <-time.After(testTimeout):
-		t.Fatal("C did not connect to B via A")
+		t.Fatal("D did not connect to B or D via A")
 	case <-done:
 	}
 
 	time.Sleep(time.Second)
-	require.Equal(t, 1, len(appA.P2p.Host.Network().Peers()))
+	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
 }
