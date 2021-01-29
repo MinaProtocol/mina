@@ -704,7 +704,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					StreamIdx: idx,
 					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
 				})
-				continue
+                return
 			}
 
 			if length == 0 {
@@ -719,7 +719,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					StreamIdx: idx,
 					Reason:    fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n),
 				})
-				continue
+                return
 			}
 
 			app.P2p.MsgStats.UpdateMetrics(length)
