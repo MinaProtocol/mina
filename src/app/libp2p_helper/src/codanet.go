@@ -271,12 +271,6 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 
 	if !allow {
 		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address)", id, addr)
-		gs.logger.Infof("gs.isPeerTrusted(%v) = %v", id, gs.isPeerTrusted(id))
-		gs.logger.Infof("gs.isPeerBanned(%v) = %v", id, gs.isPeerBanned(id))
-		gs.logger.Infof("gs.isAddrTrusted(%v) = %v", addr, gs.isAddrTrusted(addr))
-		gs.logger.Infof("gs.isAddrBanned(%v) = %v", addr, gs.isAddrBanned(addr))
-		gs.logger.Infof("isPrivateAddr(%v) = %v", addr, isPrivateAddr(addr))
-		gs.logger.Infof("gs.KnownPrivateAddrFilters.AddrBlocked(%v) = %v", addr, gs.KnownPrivateAddrFilters.AddrBlocked(addr))
 		gs.logGate()
 	}
 
