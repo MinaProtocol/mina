@@ -905,7 +905,7 @@ func TestGetPeerMessage(t *testing.T) {
 
 	select {
 	case <-time.After(testTimeout):
-		t.Fatal("D did not connect to B or D via A")
+		t.Fatal("D did not connect to B or C via A")
 	case <-done:
 	}
 

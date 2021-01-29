@@ -74,7 +74,6 @@ type CodaConnectionManager struct {
 	ctx context.Context
 	host host.Host
 	p2pManager   *p2pconnmgr.BasicConnMgr
-	maxConnections int
 	minaPeerExchange bool
 	getRandomPeers getRandomPeersFunc
 	OnConnect    func(network.Network, network.Conn)
@@ -86,7 +85,6 @@ func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaCo
 
 	return &CodaConnectionManager{
 		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(30*time.Second)),
-		maxConnections: maxConnections,
 		OnConnect:    noop,
 		OnDisconnect: noop,
 		minaPeerExchange: minaPeerExchange,
@@ -147,10 +145,12 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		return
 	}
 
-	if len(net.Peers()) <= cm.maxConnections {
+	info := cm.GetInfo()
+	if len(net.Peers()) <= info.HighWater {
 		return
 	}
-	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), cm.maxConnections, len(net.Peers()))
+	
+	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
 	// select random subset of our peers to send over, then disconnect
 	if cm.getRandomPeers == nil {
@@ -414,6 +414,8 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 				logger.Debugf("connected to peer! %s", peer)
 			}()
 		}
+
+		_ = s.Close()
 	}
 }
 
