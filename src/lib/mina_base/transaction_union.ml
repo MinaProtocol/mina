@@ -91,8 +91,7 @@ let of_transaction : Signed_command.t Transaction.Poly.t -> t = function
           *)
           two t
             (Fee_transfer.Single.create
-               ~receiver_pk:
-                 (fst (Lazy.force Mina_base.Sample_keypairs.keypairs).(0))
+               ~receiver_pk:(fst (Lazy.force Sample_keypairs.keypairs).(0))
                ~fee:Fee.zero ~fee_token) )
       | `Two (t1, t2) -> (
         try two t1 t2 with _ -> two t2 t1 ) )
