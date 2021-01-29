@@ -38,7 +38,6 @@ import (
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
-	//leb128 "github.com/go-interpreter/wagon/wasm/leb128"
 )
 
 var (
@@ -164,10 +163,6 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		logger.Error("failed to open stream", err)
 		return
 	}
-
-	//stream.SetProtocol(pxProtocolID)
-
-	//leb128.WriteVarint64(stream, int64(len(bz)))
 
 	n, err := stream.Write(bz)
 	if err != nil {
