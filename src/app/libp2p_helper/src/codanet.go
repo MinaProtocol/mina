@@ -8,6 +8,7 @@ import (
 	gonet "net"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	dsb "github.com/ipfs/go-ds-badger"
@@ -145,6 +146,54 @@ type Helper struct {
 	GatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
+	MsgStats          *MessageStats
+}
+
+type MessageStats struct {
+	min   uint64
+	avg   uint64
+	max   uint64
+	total uint64
+	sync.RWMutex
+}
+
+func (ms *MessageStats) UpdateMetrics(val uint64) {
+    ms.Lock()
+    defer ms.Unlock()
+	if ms.max < val {
+		ms.max = val
+	} else if ms.min > val {
+		ms.min = val
+	}
+
+	if ms.avg == 0 {
+		ms.avg = val
+	} else {
+		ms.avg = (ms.avg * (ms.total + 1)) / ms.total
+	}
+}
+
+func(ms *MessageStats) IncrTotal(){
+    ms.Lock()
+    defer ms.Unlock()
+    ms.total++
+}
+func (ms *MessageStats) GetMin() uint64 {
+    ms.RLock()
+    defer ms.RUnlock()
+	return ms.min
+}
+
+func (ms *MessageStats) GetMax() uint64 {
+    ms.RLock()
+    defer ms.RUnlock()
+	return ms.max
+}
+
+func (ms *MessageStats) GetAvg() uint64 {
+    ms.RLock()
+    defer ms.RUnlock()
+	return ms.avg
 }
 
 type customValidator struct {
@@ -402,5 +451,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
+		MsgStats:       &MessageStats{},
 	}, nil
 }
