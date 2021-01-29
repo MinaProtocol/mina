@@ -675,7 +675,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					StreamIdx: idx,
 					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
 				})
-                return
+				return
 			}
 
 			if length == 0 {
@@ -690,7 +690,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					StreamIdx: idx,
 					Reason:    fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n),
 				})
-                return
+				return
 			}
 
 			app.writeMsg(incomingMsgUpcall{
