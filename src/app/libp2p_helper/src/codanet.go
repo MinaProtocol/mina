@@ -3,8 +3,10 @@ package codanet
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	gonet "net"
 	"os"
 	"path"
@@ -21,6 +23,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -35,6 +38,7 @@ import (
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
+	//leb128 "github.com/go-interpreter/wagon/wasm/leb128"
 )
 
 var (
@@ -49,7 +53,13 @@ var (
 		"198.18.0.0/15",
 		"169.254.0.0/16",
 	}
+
+	numPeersToExchange = 15 // arbitrary
+
+	pxProtocolID = protocol.ID("/mina/peer-exchange")
 )
+
+type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
 func parseCIDR(cidr string) gonet.IPNet {
 	_, ipnet, err := gonet.ParseCIDR(cidr)
@@ -60,7 +70,11 @@ func parseCIDR(cidr string) gonet.IPNet {
 }
 
 type CodaConnectionManager struct {
+	ctx context.Context
+	host host.Host
 	p2pManager   *p2pconnmgr.BasicConnMgr
+	maxConnections int
+	getRandomPeers getRandomPeersFunc
 	OnConnect    func(network.Network, network.Conn)
 	OnDisconnect func(network.Network, network.Conn)
 }
@@ -70,6 +84,7 @@ func newCodaConnectionManager(maxConnections int) *CodaConnectionManager {
 
 	return &CodaConnectionManager{
 		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(30*time.Second)),
+		maxConnections: maxConnections,
 		OnConnect:    noop,
 		OnDisconnect: noop,
 	}
@@ -121,9 +136,55 @@ func (cm *CodaConnectionManager) ClosedStream(net network.Network, stream networ
 	cm.p2pManager.Notifee().ClosedStream(net, stream)
 }
 func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) {
+	logger.Infof("%s connected to %s", c.LocalPeer(), c.RemotePeer())
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
+
+
+	logger.Infof("%s max peers=%d peercount=%d", c.LocalPeer(), cm.maxConnections, len(net.Peers()))
+	if len(net.Peers()) <= cm.maxConnections {
+		return
+	}
+
+	// select random subset of our peers to send over, then disconnect
+	if cm.getRandomPeers == nil {
+		logger.Error("getRandomPeers function not set")
+		return
+	}
+
+	peers := cm.getRandomPeers(numPeersToExchange, c.RemotePeer())
+	bz, err := json.Marshal(peers)
+	if err != nil {
+		logger.Error("failed to marshal peers", err)
+		return
+	}
+
+	stream, err := cm.host.NewStream(cm.ctx, c.RemotePeer(), pxProtocolID)
+	if err != nil {
+		logger.Error("failed to open stream", err)
+		return
+	}
+
+	//stream.SetProtocol(pxProtocolID)
+
+	//leb128.WriteVarint64(stream, int64(len(bz)))
+
+	n, err := stream.Write(bz)
+	if err != nil {
+		logger.Error("failed to write to stream", err)
+		return		
+	} else if n != len(bz) {
+		logger.Error("failed to write all data to stream")
+		return		
+	}
+
+	logger.Infof("wrote peers to stream %s", stream.Protocol())
+	go func() {
+		time.Sleep(time.Second)
+		_ = c.Close()
+	}()
 }
+
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
 	cm.OnDisconnect(net, c)
 	cm.p2pManager.Notifee().Disconnected(net, c)
@@ -297,6 +358,56 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 	return cv.Base.Select(key, values)
 }
 
+func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
+	peers := h.Host.Peerstore().Peers()
+	if len(peers)-2 < num {
+		num = len(peers)-2 // -2 because excluding ourself and the peer we are sending this to
+	}
+
+	ret := make([]peer.AddrInfo, num)
+	for i := 0; i < num; i++ {
+		var idx int
+		for {
+			idx = rand.Intn(len(peers))
+			if peers[idx] != h.Host.ID() && peers[idx] != from {
+				break
+			}
+		}
+
+		ret[i] = h.Host.Peerstore().PeerInfo(peers[idx])
+		if idx != len(peers)-1 {
+			peers = append(peers[:idx], peers[idx+1:]...)
+		} else {
+			peers = peers[:len(peers)-1]
+		}
+	}
+
+	logger.Info("random peers", ret)
+	return ret
+}
+
+func (h *Helper) handlePxStreams(s network.Stream) {
+	logger.Infof("incoming stream! from=%s", s.Conn().RemotePeer())
+	for {
+		dec := json.NewDecoder(s)
+		peers := []peer.AddrInfo{}
+		err := dec.Decode(&peers)
+		if err != nil {
+			logger.Error("failed to decode list of peers")
+			return
+		}
+
+		for _, peer := range peers {
+			logger.Infof("connecting to peer %s", peer)
+			err = h.Host.Connect(h.Ctx, peer)
+			if err != nil {
+				logger.Error("failed to connect to peer")
+			}
+			logger.Infof("connected to peer! %s", peer)
+		}
+	}
+}
+
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
@@ -369,6 +480,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
+				return nil , nil
 				kad, err = dual.New(ctx, host,
 					dual.WanDHTOption(dht.Datastore(dsDht)),
 					dual.DHTOption(dht.Validator(rv)),
@@ -387,7 +499,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	}
 
 	// nil fields are initialized by beginAdvertising
-	return &Helper{
+	h := &Helper{
 		Host:              host,
 		Ctx:               ctx,
 		Mdns:              nil,
@@ -400,5 +512,10 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
-	}, nil
+	}
+	connManager.getRandomPeers = h.getRandomPeers
+	connManager.ctx = ctx
+	connManager.host = host
+	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
+	return h, nil
 }

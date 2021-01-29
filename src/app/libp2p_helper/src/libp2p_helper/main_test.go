@@ -51,7 +51,7 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 
 func testStreamHandler(_ net.Stream) {}
 
-func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
+func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
@@ -66,7 +66,7 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		string(testProtocol),
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil),
-		50,
+		maxConns,
 	)
 	require.NoError(t, err)
 	port++
@@ -92,6 +92,10 @@ func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
 		AddedPeers:     make([]peer.AddrInfo, 0, 512),
 		NoUpcalls:      true,
 	}
+}
+
+func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
+	return newTestAppWithMaxConns(t, seeds, 50)
 }
 
 func addrInfos(h host.Host) (addrInfos []peer.AddrInfo, err error) {
@@ -851,4 +855,48 @@ func TestSetGatingConfigMsg(t *testing.T) {
 
 	ok = testApp.P2p.GatingState.InterceptAddrDial(peer.ID(allowedID), allowedMultiaddr)
 	require.True(t, ok)
+}
+
+func TestGetPeerMessage(t *testing.T) {
+	// only allow peer count of 1
+	appA := newTestAppWithMaxConns(t, nil, 1)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	appB := newTestApp(t, appAInfos)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	// appC will try to connect to appA, appA will send peer msg containing B and disconnect
+	appC := newTestApp(t, nil)
+	err = appC.P2p.Host.Connect(appC.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	t.Logf("a=%s", appA.P2p.Host.ID())
+	t.Logf("b=%s", appB.P2p.Host.ID())
+	t.Logf("c=%s", appC.P2p.Host.ID())
+
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			// check if appC is connected to appB
+			for _, peer := range appC.P2p.Host.Network().Peers() {
+				if peer == appB.P2p.Host.ID() {
+					close(done)
+					return
+				}
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+	}()
+
+	select {
+	case <-time.After(testTimeout):
+		t.Fatal("C did not connect to B via A")
+	case <-done:
+	}
+
+	time.Sleep(time.Second)
+	require.Equal(t, 1, len(appA.P2p.Host.Network().Peers()))
 }
