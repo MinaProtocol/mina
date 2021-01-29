@@ -6,7 +6,7 @@ eval $(opam env)
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
 export GO=/usr/lib/go/bin/go
 
-make build_or_download_pv_keys 2>&1
+# make build_or_download_pv_keys 2>&1
 
 # Waiting for the coda-daemon image to be built by CircleCI (this is redundent once build-artifacts works in buildkite)
 
@@ -47,4 +47,4 @@ export AWS_DEFAULT_REGION=$AWS_REGION
 
 echo "--- Run test executive"
 
-./_build/default/src/app/test_executive/test_executive.exe --coda-image "$coda_daemon_image" --coda-automation-location ./automation block-production
+./_build/default/src/app/test_executive/test_executive.exe --help
