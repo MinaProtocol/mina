@@ -261,6 +261,7 @@ type configureMsg struct {
 	GatingConfig        setGatingConfigMsg `json:"gating_config"`
 	MaxConnections      int                `json:"max_connections"`
 	ValidationQueueSize int                `json:"validation_queue_size"`
+	MinaPeerExchange    bool               `json:"mina_peer_exchange"`
 }
 
 type peerConnectionUpcall struct {
@@ -323,7 +324,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections)
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange)
 	if err != nil {
 		return nil, badHelper(err)
 	}

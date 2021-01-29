@@ -67,6 +67,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *
 		seeds,
 		codanet.NewCodaGatingState(nil, nil, nil),
 		maxConns,
+		true,
 	)
 	require.NoError(t, err)
 	port++

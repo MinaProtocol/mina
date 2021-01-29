@@ -75,12 +75,13 @@ type CodaConnectionManager struct {
 	host host.Host
 	p2pManager   *p2pconnmgr.BasicConnMgr
 	maxConnections int
+	minaPeerExchange bool
 	getRandomPeers getRandomPeersFunc
 	OnConnect    func(network.Network, network.Conn)
 	OnDisconnect func(network.Network, network.Conn)
 }
 
-func newCodaConnectionManager(maxConnections int) *CodaConnectionManager {
+func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
@@ -88,6 +89,7 @@ func newCodaConnectionManager(maxConnections int) *CodaConnectionManager {
 		maxConnections: maxConnections,
 		OnConnect:    noop,
 		OnDisconnect: noop,
+		minaPeerExchange: minaPeerExchange,
 	}
 }
 
@@ -140,6 +142,10 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	logger.Debugf("%s connected to %s", c.LocalPeer(), c.RemotePeer())
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
+
+	if !cm.minaPeerExchange {
+		return
+	}
 
 	if len(net.Peers()) <= cm.maxConnections {
 		return
@@ -414,7 +420,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 // TODO: just put this into main.go?
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -449,7 +455,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(maxConnections)
+	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,
@@ -519,6 +525,11 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
 	}
+
+	if !minaPeerExchange {
+		return h, nil
+	}
+
 	connManager.getRandomPeers = h.getRandomPeers
 	connManager.ctx = ctx
 	connManager.host = host
