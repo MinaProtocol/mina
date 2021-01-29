@@ -1,7 +1,9 @@
-import zmq
 import json
 import os
 from kubernetes import client, config, stream
+import sys
+import traceback
+import asyncio
 
 def get_kubernetes():
   if os.environ.get('LOCAL_KUBERNETES') is not None:
@@ -14,11 +16,14 @@ def get_kubernetes():
   v1 = client.CoreV1Api()
   return v1, namespace
 
-def send_obj(obj):
-  context = zmq.Context()
-  socket = context.socket(zmq.REQ)
+async def run_periodically(fn, seconds_between, error_counter):
+  while True:
+    try:
+      fn()
+    except Exception as e:
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      trace = traceback.format_exc()
+      error_counter.inc()
+      print(trace)
 
-  watchdog_addr = os.environ['WATCHDOG_SERVER_PORT']
-  socket.connect(watchdog_addr)
-
-  socket.send(json.dumps(obj).encode('UTF-8'))
+    await asyncio.sleep(seconds_between)

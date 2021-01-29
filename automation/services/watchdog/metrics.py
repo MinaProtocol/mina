@@ -1,12 +1,14 @@
-import random
-import shared
+
 import itertools
 import datetime
+import util
+import asyncio
+import sys
+import traceback
 
-def main():
+# ========================================================================
 
-  v1, namespace = shared.get_kubernetes()
-
+def collect_cluster_crashes(v1, namespace, cluster_crashes):
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
   containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items ]))
@@ -32,12 +34,6 @@ def main():
   fraction_recently_restarted = len(recently_restarted_containers)/len(mina_containers)
   print(len(recently_restarted_containers), 'of', len(mina_containers), 'recently restarted')
 
-  obj = {
-    "type": "gauge",
-    "metric": "cluster_crashes",
-    "value": fraction_recently_restarted
-  }
+  cluster_crashes.set(fraction_recently_restarted)
 
-  shared.send_obj(obj)
-
-main()
+# ========================================================================
