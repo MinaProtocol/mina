@@ -584,16 +584,12 @@ module T = struct
               let%map () = Async.Scheduler.yield () in
               List.fold ts ~init:(acc, pending_coinbase_stack_state)
                 ~f:(fun (acc, pending_coinbase_stack_state) t ->
-                  let fee_payer =
-                    Transaction.fee_payer_pk t.With_status.data
-                  in
-                  ( match Signature_lib.Public_key.decompress fee_payer with
-                  | Some _ ->
-                      ()
-                  | None ->
-                      (* TODO: Enable this check. *)
-                      (*raise (Exit (Invalid_public_key fee_payer))*)
-                      () ) ;
+                  if
+                    List.exists (Transaction.public_keys t.With_status.data)
+                      ~f:(fun pk ->
+                        Option.is_none (Signature_lib.Public_key.decompress pk)
+                    )
+                  then raise (Exit (Invalid_public_key fee_payer)) ;
                   match
                     apply_transaction_and_get_witness ~constraint_constants
                       ledger pending_coinbase_stack_state t.With_status.data
