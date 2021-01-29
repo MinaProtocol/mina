@@ -45,7 +45,7 @@ done
 
 # if override not provided, default to testnets DIR
 if [[ ! $ARTIFACT_PATH ]]; then
-  ARTIFACT_PATH="terraform/testnets/${TESTNET}/"
+  ARTIFACT_PATH="terraform/testnets/${TESTNET}"
 fi
 
 WHALE_AMOUNT=2250000
