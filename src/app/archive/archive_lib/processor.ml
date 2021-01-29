@@ -1355,34 +1355,59 @@ module Block = struct
     else return ()
 end
 
-let add_block_aux ~add_block ~hash ~delete_older_than
+let retry ~f ~logger ~error_str retries =
+  let rec go retry_count =
+    match%bind f () with
+    | Error e ->
+        if retry_count <= 0 then return (Error e)
+        else (
+          [%log warn] "Error in %s : $error. Retrying..." error_str
+            ~metadata:[("error", `String (Caqti_error.show e))] ;
+          let wait_for = Random.float_range 20. 2000. in
+          let%bind () = after (Time.Span.of_ms wait_for) in
+          go (retry_count - 1) )
+    | Ok res ->
+        return (Ok res)
+  in
+  go retries
+
+let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
     (module Conn : CONNECTION) block =
-  let%bind res =
-    let open Deferred.Result.Let_syntax in
-    let%bind () = Conn.start () in
-    let%bind block_id = add_block (module Conn : CONNECTION) block in
-    (* if an existing block has a parent hash that's for the block just added,
+  let add () =
+    let%bind res =
+      let open Deferred.Result.Let_syntax in
+      let%bind () = Conn.start () in
+      let%bind block_id = add_block (module Conn : CONNECTION) block in
+      (* if an existing block has a parent hash that's for the block just added,
        set its parent id
-    *)
-    let%bind () =
-      Block.set_parent_id_if_null
-        (module Conn)
-        ~parent_hash:(hash block) ~parent_id:block_id
+      *)
+      let%bind () =
+        Block.set_parent_id_if_null
+          (module Conn)
+          ~parent_hash:(hash block) ~parent_id:block_id
+      in
+      match delete_older_than with
+      | Some num_blocks ->
+          Block.delete_if_older_than ~num_blocks (module Conn)
+      | None ->
+          return ()
     in
-    match delete_older_than with
-    | Some num_blocks ->
-        Block.delete_if_older_than ~num_blocks (module Conn)
-    | None ->
-        return ()
-  in
-  let%map () =
     match res with
-    | Error _ ->
-        Conn.rollback () >>| ignore
+    | Error e as err ->
+        (*Error in the current transaction*)
+        [%log warn]
+          "Error when adding block data to the database, rolling it back: \
+           $error"
+          ~metadata:[("error", `String (Caqti_error.show e))] ;
+        let%map _ = Conn.rollback () in
+        err
     | Ok _ ->
-        Conn.commit () >>| ignore
+        [%log info] "Committing block data for $state_hash"
+          ~metadata:
+            [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
+        Conn.commit ()
   in
-  res
+  retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
@@ -1401,7 +1426,9 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash block = With_hash.hash block in
         match%map
-          add_block_aux ~delete_older_than ~hash ~add_block (module Conn) block
+          add_block_aux ~logger ~delete_older_than ~hash ~add_block
+            (module Conn)
+            block
         with
         | Error e ->
             [%log warn]
@@ -1423,7 +1450,7 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
   match runtime_config_opt with
   | None ->
       Deferred.unit
-  | Some runtime_config ->
+  | Some runtime_config -> (
       let accounts =
         match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
         | Some (Accounts accounts) ->
@@ -1443,21 +1470,41 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
         | _ ->
             failwith "No accounts found in runtime config file"
       in
-      let%bind () =
-        Deferred.List.iter accounts ~f:(fun (_, acc) ->
-            match%map Timing_info.add_if_doesn't_exist (module Conn) acc with
-            | Error e ->
-                [%log error]
-                  ~metadata:
-                    [ ("account", Account.to_yojson acc)
-                    ; ("error", `String (Caqti_error.show e)) ]
-                  "Failed to add genesis account: $account, see $error" ;
-                Conn.rollback () |> ignore ;
-                failwith "Failed to add genesis account"
-            | Ok _ ->
-                () )
+      let add_accounts () =
+        let open Deferred.Result.Let_syntax in
+        let%bind () = Conn.start () in
+        let rec go accounts =
+          let open Deferred.Let_syntax in
+          match accounts with
+          | [] ->
+              Deferred.Result.return ()
+          | (_, account) :: accounts' -> (
+              match%bind
+                Timing_info.add_if_doesn't_exist (module Conn) account
+              with
+              | Error e as err ->
+                  [%log error]
+                    ~metadata:
+                      [ ("account", Account.to_yojson account)
+                      ; ("error", `String (Caqti_error.show e)) ]
+                    "Failed to add genesis account: $account, see $error" ;
+                  let%map _ = Conn.rollback () in
+                  err
+              | Ok _ ->
+                  go accounts' )
+        in
+        let%bind () = go accounts in
+        Conn.commit ()
       in
-      Conn.commit () >>| ignore
+      match%map
+        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+      with
+      | Error e ->
+          [%log warn] "genesis accounts could not be added"
+            ~metadata:[("error", `String (Caqti_error.show e))] ;
+          failwith "Failed to add genesis accounts"
+      | Ok () ->
+          () )
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
     ~delete_older_than ~runtime_config_opt =
@@ -1496,8 +1543,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~constraint_constants ~delete_older_than
-              conn precomputed_block
+            add_block_aux_precomputed ~logger ~constraint_constants
+              ~delete_older_than conn precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -1513,7 +1560,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~delete_older_than conn extensional_block
+            add_block_aux_extensional ~logger ~delete_older_than conn
+              extensional_block
           with
           | Error e ->
               [%log warn]
