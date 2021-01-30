@@ -751,7 +751,8 @@ let all_work_pairs t
           , { Transaction_witness.ledger= ledger_witness
             ; protocol_state_body
             ; init_stack
-            ; status } )
+            ; status
+            ; state_hash= fst state_hash } )
     | Second (p1, p2) ->
         let%map merged =
           Transaction_snark.Statement.merge

@@ -664,15 +664,108 @@ let best_chain ?max_length t =
   | _ ->
       Transition_frontier.root frontier :: best_tip_path
 
+let add_genesis_winner_path t
+    (instances :
+      ( Transaction.t
+      , Transaction_witness.t
+      , Ledger_proof.t )
+      Snark_work_lib.Work.Single.Spec.t
+      One_or_two.t) =
+  One_or_two.map instances ~f:(fun instance ->
+      match instance with
+      | Snark_work_lib.Work.Single.Spec.Merge _ ->
+          instance
+      | Transition (stmt, txn, witness) -> (
+        match txn with
+        | Transaction.Coinbase _ ->
+            instance
+        | Command _ ->
+            instance
+        | Fee_transfer fee_transfer -> (
+          match Fee_transfer.to_list fee_transfer with
+          | [_] ->
+              (*Single fee transfer; possible that the receiver key is invalid*)
+              let constraint_constants =
+                Precomputed_values.constraint_constants
+                  t.config.precomputed_values
+              in
+              let get_ledger_and_transactions () =
+                let open Option.Let_syntax in
+                let%bind best_chain = best_chain t in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek t.components.transition_frontier
+                in
+                let%bind parent_breadcrumb =
+                  Transition_frontier.find frontier witness.state_hash
+                in
+                let%map external_transition =
+                  List.find_map best_chain ~f:(fun b ->
+                      if
+                        State_hash.equal witness.state_hash
+                          (Transition_frontier.Breadcrumb.parent_hash b)
+                      then
+                        Some
+                          (Transition_frontier.Breadcrumb.validated_transition
+                             b)
+                      else None )
+                in
+                let ledger =
+                  Ledger.copy
+                    ( Transition_frontier.Breadcrumb.staged_ledger
+                        parent_breadcrumb
+                    |> Staged_ledger.ledger )
+                in
+                let transactions =
+                  External_transition.Validated.transactions
+                    ~constraint_constants external_transition
+                in
+                (ledger, transactions)
+              in
+              let ledger, transactions =
+                get_ledger_and_transactions () |> Option.value_exn
+              in
+              List.fold_until transactions ~init:instance
+                ~f:(fun acc t ->
+                  let t = With_status.data t in
+                  let _ =
+                    Mina_base.Ledger.apply_transaction ~constraint_constants
+                      ~txn_state_view:
+                        (Mina_state.Protocol_state.Body.view
+                           witness.protocol_state_body)
+                      ledger t
+                    |> Or_error.ok_exn
+                    (*should not throw error here*)
+                  in
+                  if Transaction.equal txn t then
+                    (*include genesis winner account in the witness*)
+                    let account_ids =
+                      Account_id.create
+                        (fst Mina_state.Consensus_state_hooks.genesis_winner)
+                        Token_id.default
+                      :: Fee_transfer.receivers fee_transfer
+                    in
+                    let ledger =
+                      Sparse_ledger.of_ledger_subset_exn ledger account_ids
+                    in
+                    let witness = {witness with ledger} in
+                    Continue_or_stop.Stop
+                      (Snark_work_lib.Work.Single.Spec.Transition
+                         (stmt, txn, witness))
+                  else Continue acc )
+                ~finish:Fn.id
+          | _ ->
+              instance ) ) )
+
 let request_work t =
   let (module Work_selection_method) = t.config.work_selection_method in
   let fee = snark_work_fee t in
-  let instances_opt =
+  let open Option.Let_syntax in
+  let%map instances =
     Work_selection_method.work ~logger:t.config.logger ~fee
       ~snark_pool:(snark_pool t) (snark_job_state t)
   in
-  Option.map instances_opt ~f:(fun instances ->
-      {Snark_work_lib.Work.Spec.instances; fee} )
+  let instances = add_genesis_winner_path t instances in
+  {Snark_work_lib.Work.Spec.instances; fee}
 
 let work_selection_method t = t.config.work_selection_method
 
