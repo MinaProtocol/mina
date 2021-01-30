@@ -40,18 +40,31 @@ let applyTopNPoints =
   Array.sort(f, metricsArray);
   Belt.Array.reverseInPlace(metricsArray);
 
-  metricsArray |> Array.iter(Js.log);
+  metricsArray
+  |> Array.iteri((index, metric) => {
+       Js.log("index: " ++ string_of_int(index));
+       Js.log("metric: ");
+       Js.log(metric);
+       Js.log("\n");
+     });
 
   let counter = ref(0);
   let topNArrayWithPoints =
     metricsArray
-    |> Array.mapi((i, (username, _)) =>
+    |> Array.mapi((i, (username, metric)) =>
          if (counter^ >= Array.length(threshholdPointsList)) {
            (username, 0);
          } else {
            let (place, points) = threshholdPointsList[counter^];
-           if (place == i) {
-             counter := counter^ + 1;
+           if (i < Array.length(metricsArray) - 1) {
+             let challengeMetric = getMetricValue(metric);
+             let (_, nextMetric) = metricsArray[i + 1];
+             let nextChallengeMetric = getMetricValue(nextMetric);
+
+             // handle ties by comparing to the next metric
+             if (challengeMetric !== nextChallengeMetric && i >= place) {
+               counter := counter^ + 1;
+             };
            };
            (username, points);
          }
