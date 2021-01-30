@@ -727,6 +727,20 @@ let add_genesis_winner_path t
               List.fold_until transactions ~init:instance
                 ~f:(fun acc t ->
                   let t = With_status.data t in
+                  let root_before = Mina_base.Ledger.merkle_root ledger in
+                  let witness =
+                    (*include genesis winner account in the witness*)
+                    let account_ids =
+                      Account_id.create
+                        (fst Mina_state.Consensus_state_hooks.genesis_winner)
+                        Token_id.default
+                      :: Fee_transfer.receivers fee_transfer
+                    in
+                    let sparse_ledger =
+                      Sparse_ledger.of_ledger_subset_exn ledger account_ids
+                    in
+                    {witness with ledger= sparse_ledger}
+                  in
                   let _ =
                     Mina_base.Ledger.apply_transaction ~constraint_constants
                       ~txn_state_view:
@@ -736,18 +750,11 @@ let add_genesis_winner_path t
                     |> Or_error.ok_exn
                     (*should not throw error here*)
                   in
-                  if Transaction.equal txn t then
-                    (*include genesis winner account in the witness*)
-                    let account_ids =
-                      Account_id.create
-                        (fst Mina_state.Consensus_state_hooks.genesis_winner)
-                        Token_id.default
-                      :: Fee_transfer.receivers fee_transfer
-                    in
-                    let ledger =
-                      Sparse_ledger.of_ledger_subset_exn ledger account_ids
-                    in
-                    let witness = {witness with ledger} in
+                  let root_after = Mina_base.Ledger.merkle_root ledger in
+                  if
+                    Frozen_ledger_hash.equal stmt.source root_before
+                    && Frozen_ledger_hash.equal stmt.target root_after
+                  then
                     Continue_or_stop.Stop
                       (Snark_work_lib.Work.Single.Spec.Transition
                          (stmt, txn, witness))
