@@ -7,3 +7,4 @@ numpy
 graphviz
 click
 timedelta
+prometheus-client
