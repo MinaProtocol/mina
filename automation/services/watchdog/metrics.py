@@ -3,10 +3,13 @@ import itertools
 import datetime
 import util
 import asyncio
+import os
 import sys
 import traceback
 import subprocess
 import time
+import json
+import urllib.request
 
 from google.cloud import storage
 
@@ -71,14 +74,20 @@ def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
 
 def check_seed_list_up(v1, namespace, seeds_reachable):
 
-  # get the seed list
-  # run a go process that uses libp2p ping
-  # https://docs.libp2p.io/tutorials/getting-started/go/#let-s-play-ping-pong
+  seed_peers_list_url = os.environ.get('SEED_PEERS_URL')
 
-  # collect info for each metric
+  with urllib.request.urlopen(seed_peers_list_url) as f:
+    contents = f.read().decode('utf-8')
 
-  print('cslu')
-  pass
+  seeds =  ' '.join(contents.split('\n'))
+
+  command = 'check_libp2p/check_libp2p ' + seeds
+  proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
+  res = json.loads(proc.stdout.read())
+
+  fraction_up = sum(res.values())/len(res.values())
+
+  seeds_reachable.set(fraction_up)
 
 # ========================================================================
 

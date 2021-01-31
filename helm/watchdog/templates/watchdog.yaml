@@ -45,6 +45,8 @@ spec:
             value: {{ .Values.makeReportAccounts | quote }}
           - name: "METRICS_PORT"
             value: {{ $.Values.coda.ports.metrics | quote }}
+          - name: "SEED_PEERS_URL"
+            value: {{ $.Values.coda.seedPeersURL | quote }}
         ports: 
         - name: metrics-port
           protocol: TCP 

@@ -159,4 +159,5 @@ module "testnet_east" {
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts = local.make_report_accounts
 
+  seedPeersURL = "https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt"
 }
