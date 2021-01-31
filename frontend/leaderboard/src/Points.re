@@ -66,8 +66,6 @@ let applyTopNPoints =
                  ->getMetricValue
                  ->Belt.Option.mapWithDefault((), nextChallengeMetric =>
                      if (challengeMetric !== nextChallengeMetric && i >= place) {
-                       Js.log(challengeMetric);
-                       Js.log(nextChallengeMetric);
                        counter := counter^ + 1;
                      }
                    );
