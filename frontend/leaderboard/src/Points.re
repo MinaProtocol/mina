@@ -52,25 +52,29 @@ let applyTopNPoints =
   let topNArrayWithPoints =
     metricsArray
     |> Array.mapi((i, (username, metric)) => {
-         let challengeMetric = getMetricValue(metric);
+         metric
+         ->getMetricValue
+         ->Belt.Option.mapWithDefault((username, 0), challengeMetric =>
+             if (counter^ >= Array.length(threshholdPointsList)) {
+               (username, 0);
+             } else {
+               let (place, points) = threshholdPointsList[counter^];
+               if (i < Array.length(metricsArray) - 1) {
+                 let (_, nextMetric) = metricsArray[i + 1];
 
-         if (counter^ >= Array.length(threshholdPointsList)
-             || Js.undefined === challengeMetric) {
-           (username, 0);
-         } else {
-           let (place, points) = threshholdPointsList[counter^];
-           if (i < Array.length(metricsArray) - 1) {
-             let challengeMetric = getMetricValue(metric);
-             let (_, nextMetric) = metricsArray[i + 1];
-             let nextChallengeMetric = getMetricValue(nextMetric);
-
-             // handle ties by comparing to the next metric
-             if (challengeMetric !== nextChallengeMetric && i >= place) {
-               counter := counter^ + 1;
-             };
-           };
-           (username, points);
-         };
+                 nextMetric
+                 ->getMetricValue
+                 ->Belt.Option.mapWithDefault((), nextChallengeMetric =>
+                     if (challengeMetric !== nextChallengeMetric && i >= place) {
+                       Js.log(challengeMetric);
+                       Js.log(nextChallengeMetric);
+                       counter := counter^ + 1;
+                     }
+                   );
+               };
+               (username, points);
+             }
+           )
        });
 
   Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points != 0})
