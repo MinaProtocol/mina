@@ -6,6 +6,9 @@ import asyncio
 import sys
 import traceback
 import subprocess
+import time
+
+from google.cloud import storage
 
 # ========================================================================
 
@@ -52,13 +55,17 @@ def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_s
 
 def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
 
-  #command = 'gsutil ls -l gs://mina_network_block_data/' + namespace + '-*'
-  #subprocess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
-  #res = subprocess.stdout.read()
+  bucket = 'mina_network_block_data'
+  now = time.time()
 
-  #import IPython; IPython.embed()
+  storage_client = storage.Client()
+  blobs = list(storage_client.list_blobs(bucket, prefix=namespace))
 
-  pass
+  blob_ages = [ now - b.generation/1e6 for b in blobs ]
+
+  newest_age = min([ age for age in blob_ages ])
+
+  recent_google_bucket_blocks.set(newest_age)
 
 # ========================================================================
 
