@@ -51,8 +51,11 @@ let applyTopNPoints =
   let counter = ref(0);
   let topNArrayWithPoints =
     metricsArray
-    |> Array.mapi((i, (username, metric)) =>
-         if (counter^ >= Array.length(threshholdPointsList)) {
+    |> Array.mapi((i, (username, metric)) => {
+         let challengeMetric = getMetricValue(metric);
+
+         if (counter^ >= Array.length(threshholdPointsList)
+             || Js.undefined === challengeMetric) {
            (username, 0);
          } else {
            let (place, points) = threshholdPointsList[counter^];
@@ -67,8 +70,8 @@ let applyTopNPoints =
              };
            };
            (username, points);
-         }
-       );
+         };
+       });
 
   Belt.Array.keep(topNArrayWithPoints, ((_, points)) => {points != 0})
   |> Array.fold_left(
