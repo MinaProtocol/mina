@@ -55,8 +55,6 @@ var (
 		"169.254.0.0/16",
 	}
 
-	numPeersToExchange = 15 // arbitrary
-
 	pxProtocolID = protocol.ID("/mina/peer-exchange")
 )
 
@@ -149,8 +147,12 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	if len(net.Peers()) <= info.HighWater {
 		return
 	}
-	
+
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
+
+	defer func() {
+		_ = c.Close()
+	}()
 
 	// select random subset of our peers to send over, then disconnect
 	if cm.getRandomPeers == nil {
@@ -158,7 +160,7 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		return
 	}
 
-	peers := cm.getRandomPeers(numPeersToExchange, c.RemotePeer())
+	peers := cm.getRandomPeers(info.LowWater, c.RemotePeer())
 	bz, err := json.Marshal(peers)
 	if err != nil {
 		logger.Error("failed to marshal peers", err)
@@ -181,11 +183,9 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	}
 
 	logger.Debugf("wrote peers to stream %s", stream.Protocol())
-	go func() {
-		// small delay to allow for remote peer to read from stream
-		time.Sleep(time.Millisecond * 300)
-		_ = c.Close()
-	}()
+
+	// small delay to allow for remote peer to read from stream
+	time.Sleep(time.Millisecond * 300)
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
@@ -370,21 +370,22 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 	}
 
 	ret := make([]peer.AddrInfo, num)
+	rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
+	idx := 0
+	
 	for i := 0; i < num; i++ {
-		var idx int
-		for {
-			idx = rand.Intn(len(peers))
-			if peers[idx] != h.Host.ID() && peers[idx] != from {
-				break
-			}
-		}
+	  for {
+	    if idx >= len(peers) {
+	       return ret
+	    } else if peers[idx] != h.Host.ID() && peers[idx] != from {
+	      break
+	    } else {
+	      idx += 1
+	    }
+	  }
 
-		ret[i] = h.Host.Peerstore().PeerInfo(peers[idx])
-		if idx != len(peers)-1 {
-			peers = append(peers[:idx], peers[idx+1:]...)
-		} else {
-			peers = peers[:len(peers)-1]
-		}
+	  ret[i] = h.Host.Peerstore().PeerInfo(peers[idx])
+	  idx += 1
 	}
 
 	logger.Debugf("node=%s sending random peers", h.Host.ID(), ret)
