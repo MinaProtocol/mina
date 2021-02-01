@@ -2259,6 +2259,8 @@ module Data = struct
 
     let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
 
+    let epoch_count (t : Value.t) = t.epoch_count
+
     let supercharge_coinbase_var (t : var) = t.supercharge_coinbase
 
     let supercharge_coinbase (t : Value.t) = t.supercharge_coinbase

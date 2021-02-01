@@ -751,7 +751,31 @@ let staking_ledger t =
     ~consensus_state ~local_state
 
 let next_epoch_ledger t =
-  Consensus.Data.Local_state.next_epoch_ledger t.config.consensus_local_state
+  let open Option.Let_syntax in
+  let%map frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let root = Transition_frontier.root frontier in
+  let root_epoch =
+    Transition_frontier.Breadcrumb.consensus_state root
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  let best_tip = Transition_frontier.best_tip frontier in
+  let best_tip_epoch =
+    Transition_frontier.Breadcrumb.consensus_state best_tip
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  if
+    Mina_numbers.Length.(
+      equal root_epoch best_tip_epoch || equal root_epoch zero)
+  then
+    (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
+    `Finalized
+      (Consensus.Data.Local_state.next_epoch_ledger
+         t.config.consensus_local_state)
+  else
+    (*No blocks in the new epoch is finalized yet, return nothing*)
+    `Notfinalized
 
 let find_delegators table pk =
   Option.value_map
