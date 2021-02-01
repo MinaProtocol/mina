@@ -329,7 +329,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
           ( match which with
           | Next ->
-              Ok (Mina_lib.next_epoch_ledger coda)
+              Option.value_map (Mina_lib.next_epoch_ledger coda)
+                ~default:
+                  (Or_error.error_string "next staking ledger not available")
+                ~f:(function
+                | `Finalized ledger ->
+                    Ok ledger
+                | `Notfinalized ->
+                    Or_error.error_string
+                      "next staking ledger is not finalized yet" )
           | Current ->
               Option.value_map
                 (Mina_lib.staking_ledger coda)
