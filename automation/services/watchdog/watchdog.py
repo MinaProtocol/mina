@@ -1,3 +1,6 @@
+# Example of running locally
+# SEED_PEERS_URL=https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt LOCAL_KUBERNETES=true KUBERNETES_NAMESPACE=watchdog-test METRICS_PORT=8000 python3 watchdog.py
+
 from prometheus_client import start_http_server, Summary
 import time
 import os

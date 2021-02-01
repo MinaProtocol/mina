@@ -3,6 +3,7 @@ import itertools
 import datetime
 import util
 import asyncio
+import random
 import os
 import sys
 import traceback
@@ -10,6 +11,7 @@ import subprocess
 import time
 import json
 import urllib.request
+import ast
 
 from google.cloud import storage
 
@@ -45,14 +47,7 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
 
 # ========================================================================
 
-def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
-  print('ctm')
-
-  # select a seed at random
-  # call telemetry on that seed in a loop with a max number of tries
-  # collect info for each metric
-
-  pass
+from telemetry_metrics import collect_telemetry_metrics
 
 # ========================================================================
 
