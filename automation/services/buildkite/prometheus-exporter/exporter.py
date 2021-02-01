@@ -1,45 +1,26 @@
 from datetime import datetime, timedelta
 import json
 import os
+import requests
 import time
 
 import asyncio
+
+from functools import wraps
 
 from python_graphql_client import GraphqlClient
 from prometheus_client import start_http_server
 from prometheus_client.core import CounterMetricFamily, GaugeMetricFamily, REGISTRY
 
-
 API_KEY = os.getenv("BUILDKITE_API_KEY")
 API_URL = os.getenv("BUILDKITE_API_URL", "https://graphql.buildkite.com/v1")
 
 ORG_SLUG = os.getenv("BUILDKITE_ORG_SLUG", "o-1-labs-2")
-PIPELINE_SLUG = os.getenv("BUILDKITE_PIPELINE_SLUG", "o-1-labs-2/coda").strip()
+PIPELINE_SLUG = os.getenv("BUILDKITE_PIPELINE_SLUG", "o-1-labs-2/mina").strip()
 BRANCH = os.getenv("BUILDKITE_BRANCH", "*")
 
-_monitored_jobs = [
-    "_prepare-monorepo",
-    "_monorepo-triage-cmds",
-    "_OCaml-check",
-    "_Rust-lint-trace-tool",
-    "_Fast-lint",
-    "_Fast-lint-optional-types",
-    "_Fast-lint-optional-binable",
-    "_TraceTool-build-trace-tool",
-    "_CompareSignatures-compare-test-signatures",
-    "_ValidationService-test",
-    "_CheckDhall-check",
-    "_Artifact-libp2p-helper",
-    "_Artifact-artifacts-build",
-    "_Artifact-docker-artifact",
-    "_UnitTest-unit-test-dev",
-    "_UnitTest-unit-test-nonconsensus_medium_curves",
-    "_ArchiveNode-build-client-sdk",
-    "_ClientSdk-install-yarn-deps,",
-    "_ClientSdk-client-sdk-build-unittests,",
-    "_ClientSdk-prepublish-client-sdk"
-]
-JOBS = os.getenv("BUILDKITE_JOBS", ','.join(_monitored_jobs))
+JOBS = os.getenv("BUILDKITE_JOBS", "")
+
 MAX_JOB_COUNT = os.getenv("BUILDKITE_MAX_JOB_COUNT", 500)
 
 MAX_AGENT_COUNT = os.getenv("BUILDKITE_MAX_AGENT_COUNT", 500)
@@ -50,7 +31,6 @@ EXPORTER_SCAN_INTERVAL = os.getenv("BUILDKITE_EXPORTER_SCAN_INTERVAL", 3600)
 
 METRICS_PORT = os.getenv("METRICS_PORT", 8000)
 
-from functools import wraps
 
 def timing(f):
     @wraps(f)
@@ -85,6 +65,22 @@ class Exporter(object):
         return asyncio.run(self.ql_client.execute_async(query=query, variables=vars))
 
     @timing
+    def list_pipeline_stepkeys(self):
+        result = []
+
+        headers = {'Authorization': "Bearer {token}".format(token=API_KEY)}
+        response = requests.get(
+            "https://api.buildkite.com/v2/organizations/{org}/pipelines/{pipeline}/builds".format(
+                org=self.org_slug,
+                pipeline=self.pipeline_slug.replace(self.org_slug + '/', "")),
+            headers=headers)
+        data = response.json()
+        for build in data:
+          result.extend([d['step_key'] if d['step_key'] else "pipeline" for d in build['jobs']])
+
+        return list(set(result)) 
+
+    @timing
     def collect(self):
         print("Collecting...")
 
@@ -92,24 +88,24 @@ class Exporter(object):
         metrics = {}
         metrics['job'] = {
             'runtime':
-                GaugeMetricFamily('job_runtime', 'Total job runtime',
+                GaugeMetricFamily('buildkite_job_runtime', 'Total job runtime',
                 labels=['branch', 'exitStatus', 'state', 'passed', 'job', 'agentName', 'agentRules']),
             'waittime':
-                GaugeMetricFamily('job_waittime', 'Total time job waited to start (from time scheduled)',
+                GaugeMetricFamily('buildkite_job_waittime', 'Total time job waited to start (from time scheduled)',
                 labels=['branch', 'exitStatus', 'state', 'passed', 'job', 'agentName', 'agentRules']),
             'status':
-                CounterMetricFamily('job_status', 'Count of in-progress job statuses over <scan-interval>',
+                CounterMetricFamily('buildkite_job_status', 'Count of in-progress job statuses over <scan-interval>',
                 labels=['branch', 'state', 'job']),
             'exit_status':
-                CounterMetricFamily('job_exit_status', 'Count of job exit statuses over <scan-interval>',
+                CounterMetricFamily('buildkite_job_exit_status', 'Count of job exit statuses over <scan-interval>',
                 labels=['branch', 'exitStatus', 'softFailed', 'state', 'passed', 'job', 'agentName', 'agentRules']),
             'artifact_size':
-                GaugeMetricFamily('job_artifact_size', 'Total size of uploaded artifact (bytes)',
+                GaugeMetricFamily('buildkite_job_artifact_size', 'Total size of uploaded artifact (bytes)',
                 labels=['branch', 'exitStatus', 'state', 'path', 'downloadURL', 'mimeType', 'job', 'agentName', 'agentRules']),
         }
         metrics['agent'] = {
             'total_count':
-                CounterMetricFamily('agent_total_count', 'Count of active Buildkite agents within <org>',
+                CounterMetricFamily('buildkite_agent_total_count', 'Count of active Buildkite agents within <org>',
                 labels=['version', 'versionHasKnownIssues','os', 'isRunning', 'metadata', 'connectionState'])
         }
 
@@ -188,7 +184,7 @@ class Exporter(object):
             "createdAtFrom": scan_from.isoformat(),
             "branch": self.branch,
             "jobLimit": MAX_JOB_COUNT,
-            "jobKey": JOBS.split(','),
+            "jobKey": JOBS.split(',') if JOBS else self.list_pipeline_stepkeys(),
             "jobArtifactLimit": MAX_ARTIFACTS_COUNT
         }
         data = self.execute_qlquery(query=query, vars=vars)
@@ -341,7 +337,9 @@ def main():
     }
     client = GraphqlClient(endpoint=API_URL, headers=headers)
 
-    REGISTRY.register(Exporter(client))
+    exporter = Exporter(client)
+    REGISTRY.register(exporter)
+
     start_http_server(METRICS_PORT)
     print("Metrics on Port {}".format(METRICS_PORT))
 
