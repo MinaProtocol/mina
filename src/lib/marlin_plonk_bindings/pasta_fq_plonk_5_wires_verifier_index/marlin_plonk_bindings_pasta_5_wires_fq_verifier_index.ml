@@ -24,7 +24,9 @@ external shifts :
 
 external dummy : unit -> t = "caml_pasta_fq_plonk_5_wires_verifier_index_dummy"
 
-external deep_copy : t -> t = "caml_pasta_fq_plonk_5_wires_verifier_index_deep_copy"
+external deep_copy :
+  t -> t
+  = "caml_pasta_fq_plonk_5_wires_verifier_index_deep_copy"
 
 let%test "deep_copy" =
   let x = dummy () in
