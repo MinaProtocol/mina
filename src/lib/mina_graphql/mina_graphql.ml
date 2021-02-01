@@ -40,13 +40,19 @@ let result_of_or_error ?error v =
       | Some error ->
           sprintf "%s (%s)" error str_error )
 
+let result_field_no_inputs ~resolve =
+  Schema.io_field ~resolve:(fun resolve_info src ->
+      Deferred.return @@ resolve resolve_info src )
+
+(* one input *)
 let result_field ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src inputs ->
       Deferred.return @@ resolve resolve_info src inputs )
 
-let result_field_no_inputs ~resolve =
-  Schema.io_field ~resolve:(fun resolve_info src ->
-      Deferred.return @@ resolve resolve_info src )
+(* two inputs *)
+let result_field2 ~resolve =
+  Schema.io_field ~resolve:(fun resolve_info src input1 input2 ->
+      Deferred.return @@ resolve resolve_info src input1 input2 )
 
 module Doc = struct
   let date ?(extra = "") s =
@@ -2162,15 +2168,24 @@ module Mutations = struct
     User_command_input.create ~signer ~fee ~fee_token ~fee_payer_pk
       ?nonce:nonce_opt ~valid_until ~memo ~body ~sign_choice ()
 
-  let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
+  let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
       ~fee_token ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind signature = signature |> Deferred.return in
-    let%bind user_command_input =
+    let%map user_command_input =
       create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_token
         ~fee_payer_pk ~valid_until ~body
         ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
+    in
+    user_command_input
+
+  let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
+      ~fee_token ~fee_payer_pk ~valid_until ~body =
+    let open Deferred.Result.Let_syntax in
+    let%bind user_command_input =
+      make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
+        ~fee_token ~fee_payer_pk ~valid_until ~body
     in
     let%map cmd = send_user_command coda user_command_input in
     { With_hash.data= cmd
@@ -2851,10 +2866,10 @@ module Queries = struct
       ; hash }
 
   let best_chain =
-    field "bestChain"
+    io_field "bestChain"
       ~doc:
         "Retrieve a list of blocks from transition frontier's root to the \
-         current best tip. Returns null if the system is bootstrapping."
+         current best tip. Returns an error if the system is bootstrapping."
       ~typ:(list @@ non_null Types.block)
       ~args:
         Arg.
@@ -2865,46 +2880,93 @@ module Queries = struct
                  blocks closest to the best tip will be returned"
               ~typ:int ]
       ~resolve:(fun {ctx= coda; _} () max_length ->
-        let open Option.Let_syntax in
-        let%map best_chain = Mina_lib.best_chain ?max_length coda in
-        List.map best_chain ~f:(block_of_breadcrumb coda) )
+        match Mina_lib.best_chain ?max_length coda with
+        | Some best_chain ->
+            let%map blocks =
+              Deferred.List.map best_chain ~f:(fun bc ->
+                  Deferred.return @@ block_of_breadcrumb coda bc )
+            in
+            Ok (Some blocks)
+        | None ->
+            return
+            @@ Error "Could not obtain best chain from transition frontier" )
 
   let block =
-    result_field "block"
+    result_field2 "block"
       ~doc:
-        "Retrieve a block with the given state hash, if contained in the \
-         transition frontier."
+        "Retrieve a block with the given state hash or height, if contained \
+         in the transition frontier."
       ~typ:(non_null Types.block)
       ~args:
         Arg.
           [ arg "stateHash" ~doc:"The state hash of the desired block"
-              ~typ:string ]
+              ~typ:string
+          ; arg "height" ~doc:"The height of the desired block" ~typ:int ]
       ~resolve:
-        (fun {ctx= coda; _} () (state_hash_base58_opt : string option) ->
+        (fun {ctx= coda; _} () (state_hash_base58_opt : string option)
+             (height_opt : int option) ->
         let open Result.Let_syntax in
-        let%bind state_hash_base58 =
-          state_hash_base58_opt
-          |> Result.of_option ~error:"Must provide a state hash"
-        in
-        let transition_frontier_pipe = Mina_lib.transition_frontier coda in
-        let%bind transition_frontier =
+        let get_transition_frontier () =
+          let transition_frontier_pipe = Mina_lib.transition_frontier coda in
           Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
           |> Result.of_option ~error:"Could not obtain transition frontier"
         in
-        let%bind state_hash =
-          State_hash.of_base58_check state_hash_base58
-          |> Result.map_error ~f:Error.to_string_hum
+        let block_from_state_hash state_hash_base58 =
+          let%bind state_hash =
+            State_hash.of_base58_check state_hash_base58
+            |> Result.map_error ~f:Error.to_string_hum
+          in
+          let%bind transition_frontier = get_transition_frontier () in
+          let%map breadcrumb =
+            Transition_frontier.find transition_frontier state_hash
+            |> Result.of_option
+                 ~error:
+                   (sprintf
+                      "Block with state hash %s not found in transition \
+                       frontier"
+                      state_hash_base58)
+          in
+          block_of_breadcrumb coda breadcrumb
         in
-        let%map breadcrumb =
-          Transition_frontier.find transition_frontier state_hash
-          |> Result.of_option
-               ~error:
-                 (sprintf
-                    "Breadcrumb for state hash %s not found in transition \
-                     frontier"
-                    state_hash_base58)
+        let block_from_height height =
+          let height_uint32 =
+            (* GraphQL int is signed 32-bit
+                 empirically, conversion does not raise even if
+                 - the number is negative
+                 - the number is not representable using 32 bits
+              *)
+            Unsigned.UInt32.of_int height
+          in
+          let%bind transition_frontier = get_transition_frontier () in
+          let breadcrumbs =
+            Transition_frontier.all_breadcrumbs transition_frontier
+          in
+          let%map desired_breadcrumb =
+            List.find breadcrumbs ~f:(fun bc ->
+                let validated_transition =
+                  Transition_frontier.Breadcrumb.validated_transition bc
+                in
+                let block_height =
+                  Mina_transition.External_transition.Validated
+                  .blockchain_length validated_transition
+                in
+                Unsigned.UInt32.equal block_height height_uint32 )
+            |> Result.of_option
+                 ~error:
+                   (sprintf
+                      "Could not find block in transition frontier with \
+                       height %d"
+                      height)
+          in
+          block_of_breadcrumb coda desired_breadcrumb
         in
-        block_of_breadcrumb coda breadcrumb )
+        match (state_hash_base58_opt, height_opt) with
+        | Some state_hash_base58, None ->
+            block_from_state_hash state_hash_base58
+        | None, Some height ->
+            block_from_height height
+        | None, None | Some _, Some _ ->
+            Error "Must provide exactly one of state hash, height" )
 
   let initial_peers =
     field "initialPeers"
@@ -2994,6 +3056,46 @@ module Queries = struct
         let%map config = Mina_networking.connection_gating_config net in
         Ok config )
 
+  let validate_payment =
+    io_field "validatePayment"
+      ~doc:"Validate the format and signature of a payment"
+      ~typ:(non_null bool)
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.send_payment)
+          ; Types.Input.Fields.signature ]
+      ~resolve:
+        (fun {ctx= mina; _} ()
+             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
+             signature ->
+        let open Deferred.Result.Let_syntax in
+        let body =
+          Signed_command_payload.Body.Payment
+            { source_pk= from
+            ; receiver_pk= to_
+            ; token_id= Option.value ~default:Token_id.default token_id
+            ; amount= Amount.of_uint64 amount }
+        in
+        let fee_token = Token_id.default in
+        let%bind signature =
+          match signature with
+          | Some signature ->
+              return signature
+          | None ->
+              Deferred.Result.fail "Signature field is missing"
+        in
+        let%bind user_command_input =
+          Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
+            ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
+        in
+        let%map user_command, _ =
+          User_command_input.to_user_command
+            ~get_current_nonce:(Mina_lib.get_current_nonce mina)
+            user_command_input
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        Signed_command.check_signature user_command )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -3019,7 +3121,8 @@ module Queries = struct
     ; pending_snark_work
     ; genesis_constants
     ; time_offset
-    ; next_available_token ]
+    ; next_available_token
+    ; validate_payment ]
 end
 
 let schema =

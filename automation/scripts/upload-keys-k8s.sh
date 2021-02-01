@@ -1,3 +1,4 @@
+#! /bin/bash
 
 TESTNET="$1"
 KEYS_PREFIX="$2"

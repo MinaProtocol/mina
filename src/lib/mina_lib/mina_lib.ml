@@ -703,34 +703,34 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
+let get_current_nonce t aid =
+  match
+    Participating_state.active
+      (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
+    |> Option.join
+  with
+  | None ->
+      Error
+        "Couldn't infer nonce for transaction from specified `sender` since \
+         `sender` is not in the ledger or sent a transaction in transaction \
+         pool."
+  | Some nonce ->
+      let ledger_nonce =
+        Participating_state.active (get_account t aid)
+        |> Option.join
+        |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
+        |> Option.value ~default:nonce
+      in
+      Ok (`Min ledger_nonce, nonce)
+
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let get_current_nonce aid =
-    match
-      Participating_state.active
-        (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
-      |> Option.join
-    with
-    | None ->
-        Error
-          "Couldn't infer nonce for transaction from specified `sender` since \
-           `sender` is not in the ledger or sent a transaction in transaction \
-           pool."
-    | Some nonce ->
-        let ledger_nonce =
-          Participating_state.active (get_account t aid)
-          |> Option.join
-          |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
-          |> Option.value ~default:nonce
-        in
-        Ok (`Min ledger_nonce, nonce)
-  in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
     ( uc_inputs
     , ( if Ivar.is_full result_ivar then
           [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill result_ivar )
-    , get_current_nonce )
+    , get_current_nonce t )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -751,7 +751,31 @@ let staking_ledger t =
     ~consensus_state ~local_state
 
 let next_epoch_ledger t =
-  Consensus.Data.Local_state.next_epoch_ledger t.config.consensus_local_state
+  let open Option.Let_syntax in
+  let%map frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let root = Transition_frontier.root frontier in
+  let root_epoch =
+    Transition_frontier.Breadcrumb.consensus_state root
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  let best_tip = Transition_frontier.best_tip frontier in
+  let best_tip_epoch =
+    Transition_frontier.Breadcrumb.consensus_state best_tip
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  if
+    Mina_numbers.Length.(
+      equal root_epoch best_tip_epoch || equal root_epoch zero)
+  then
+    (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
+    `Finalized
+      (Consensus.Data.Local_state.next_epoch_ledger
+         t.config.consensus_local_state)
+  else
+    (*No blocks in the new epoch is finalized yet, return nothing*)
+    `Notfinalized
 
 let find_delegators table pk =
   Option.value_map

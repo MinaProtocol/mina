@@ -58,7 +58,7 @@ locals {
     },
     {
       "name" = "KUBE_CONFIG_PATH"
-      "value" = "~/.kube/config"
+      "value" = "/root/.kube/config"
     },
     # AWS EnvVars
     {
@@ -207,20 +207,56 @@ locals {
         cp --update --verbose $(which helm) "$${CI_SHARED_BIN}/helm"
       EOF
 
-      "03-gcloud-cluster-setup" = <<-EOF
+      "02-install-terraform" = <<-EOF
         #!/bin/bash
 
         set -eou pipefail
 
-        declare -A k8s_cluster_mappings=(
+        apt install -y unzip
+        curl -sL https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip -o terraform.zip
+        unzip terraform.zip && mv terraform /usr/bin
+      EOF
+
+      "02-install-coda-network-tools" = <<-EOF
+        #!/bin/bash
+
+        set -eou pipefail
+
+        # Download and install NodeJS
+        curl -sL https://deb.nodesource.com/setup_12.x | bash -
+        apt-get install -y nodejs
+
+        # Build coda-network library
+        mkdir -p /tmp/mina && git clone https://github.com/MinaProtocol/mina.git /tmp/mina
+        cd /tmp/mina/automation && npm install -g && npm install -g yarn
+        yarn install && yarn build
+        chmod +x bin/coda-network && ln --symbolic --force bin/coda-network /usr/local/bin/coda-network
+      EOF
+
+      "03-setup-k8s-ctx" = <<-EOF
+        #!/bin/bash
+
+        set -eou pipefail
+
+        # k8s_ctx = <gcloud_project>_<cluster-region>_<cluster-name>
+        # k8s context mappings: <cluster-name> => <cluster-region>
+        declare -A k8s_ctx_mappings=(
           ["coda-infra-east"]="us-east1"
           ["coda-infra-east4"]="us-east4"
           ["coda-infra-central1"]="us-central1"
           ["mina-integration-west1"]="us-west1"
         )
-        for cluster in "${!k8s_cluster_mappings[@]}"; do
-            gcloud container clusters get-credentials "${cluster}" --region "${k8s_cluster_mappings[$cluster]}"
+        for cluster in "$${!k8s_ctx_mappings[@]}"; do
+            gcloud container clusters get-credentials "$${cluster}" --region "$${k8s_ctx_mappings[$cluster]}"
         done
+
+        # Copy kube config to shared Docker path
+        export CI_SHARED_CONFIG="/var/buildkite/shared/config"
+        mkdir -p "$${CI_SHARED_CONFIG}"
+        cp "$${KUBE_CONFIG_PATH:-/root/.kube/config}" "$${CI_SHARED_CONFIG}/.kube" && chmod ugo+rw "$${CI_SHARED_CONFIG}/.kube"
+
+        # set agent default Kubernetes context for deployment
+        kubectl config use-context ${var.testnet_k8s_ctx}
       EOF
     }
   }

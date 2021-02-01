@@ -34,7 +34,9 @@ module Variant = struct
     | `Signature_missing
     | `Public_key_format_not_valid
     | `No_options_provided
-    | `Exception of string ]
+    | `Exception of string
+    | `Signature_invalid
+    | `Memo_invalid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -98,6 +100,10 @@ end = struct
         "No options provided"
     | `Exception _ ->
         "Exception"
+    | `Signature_invalid ->
+        "Invalid signature"
+    | `Memo_invalid ->
+        "Invalid memo"
 
   let context = function
     | `Sql msg ->
@@ -156,6 +162,10 @@ end = struct
         None
     | `Exception s ->
         Some (sprintf "Exception when processing request: %s" s)
+    | `Signature_invalid ->
+        None
+    | `Memo_invalid ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -190,6 +200,10 @@ end = struct
         false
     | `Exception _ ->
         false
+    | `Signature_invalid ->
+        false
+    | `Memo_invalid ->
+        false
 
   (* Unlike message above, description can be updated whenever we see fit *)
   let description = function
@@ -223,6 +237,10 @@ end = struct
         "An operation you provided isn't supported for construction."
     | `Signature_missing ->
         "Your request is missing a signature."
+    | `Signature_invalid ->
+        "Your request has an invalid signature."
+    | `Memo_invalid ->
+        "Your request has an invalid memo."
     | `No_options_provided ->
         "Your request is missing options."
     | `Exception _ ->

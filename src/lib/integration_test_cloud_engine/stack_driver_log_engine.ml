@@ -466,7 +466,7 @@ module Block_produced_query = struct
             (if result.snarked_ledger_generated then 1 else 0) }
     end
 
-    (*Todo: Reorg will mess up the value of snarked_ledgers_generated*)
+    (* TODO: Reorg will mess up the value of snarked_ledgers_generated*)
     let aggregate (aggregated : Aggregated.t) (result : t) : Aggregated.t =
       if result.block_height > aggregated.last_seen_result.block_height then
         { Aggregated.last_seen_result= result
@@ -559,10 +559,6 @@ type subscriptions =
   ; blocks_produced: Subscription.t
   ; transition_frontier_diff_application: Subscription.t
   ; breadcrumb_added: Subscription.t }
-
-type constants =
-  { constraints: Genesis_constants.Constraint_constants.t
-  ; genesis: Genesis_constants.t }
 
 type t =
   { logger: Logger.t
@@ -799,173 +795,102 @@ let destroy t : Test_error.Set.t Malleable_error.t =
   in
   {Test_error.Set.soft_errors; hard_errors}
 
-(*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
 let wait_for' :
-       blocks:int
-    -> epoch_reached:int
-    -> snarked_ledgers_generated:int
-    -> timeout:[ `Slots of int
-               | `Epochs of int
-               | `Snarked_ledgers_generated of int
-               | `Milliseconds of int64 ]
-    -> t
+       t
+    -> Condition.t
     -> ( [> `Blocks_produced of int]
        * [> `Slots_passed of int]
        * [> `Snarked_ledgers_generated of int] )
        Malleable_error.t =
- fun ~blocks ~epoch_reached ~snarked_ledgers_generated ~timeout t ->
-  if
-    blocks = 0 && epoch_reached = 0
-    && snarked_ledgers_generated = 0
-    && timeout = `Milliseconds 0L
-  then
-    Malleable_error.return
-      (`Blocks_produced 0, `Slots_passed 0, `Snarked_ledgers_generated 0)
-  else
-    let now = Time.now () in
-    let timeout_safety =
-      let ( ! ) = Int64.of_int in
-      let ( * ) = Int64.( * ) in
-      let ( +! ) = Int64.( + ) in
-      let estimated_time =
-        match timeout with
-        | `Slots n ->
-            !n * !(t.constants.constraints.block_window_duration_ms)
-        | `Epochs n ->
-            !n
-            * !(t.constants.genesis.protocol.slots_per_epoch)
-            * !(t.constants.constraints.block_window_duration_ms)
-        | `Snarked_ledgers_generated n ->
-            (* Assuming at least 1/3 rd of the max throughput otherwise this could take forever depending on the scan state size*)
-            (*first snarked ledger*)
-            3L
-            * !(t.constants.constraints.block_window_duration_ms)
-            * ( !(t.constants.constraints.work_delay + 1)
-                * !(t.constants.constraints.transaction_capacity_log_2 + 1)
-              +! 1L )
-            +! (*subsequent snarked ledgers*)
-               !(n - 1)
-               * !(t.constants.constraints.block_window_duration_ms)
-               * 3L
-        | `Milliseconds n ->
-            n
-      in
-      let hard_timeout = estimated_time * 2L in
-      Time.add now (Time.Span.of_ms (Int64.to_float hard_timeout))
+ fun t cond ->
+  let finished = Ivar.create () in
+  let stop = Ivar.read finished in
+  let updates =
+    let r, w = Pipe.create () in
+    upon stop (fun () -> if not (Pipe.is_closed w) then Pipe.close w) ;
+    let timeouts = ref [] in
+    let finish () =
+      Ivar.fill_if_empty finished () ;
+      List.iter !timeouts ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
+      if not (Pipe.is_closed w) then Pipe.close w
     in
-    let query_timeout_ms =
-      match timeout with
-      | `Milliseconds x ->
-          Some (Time.add now (Time.Span.of_ms (Int64.to_float x)))
-      | _ ->
-          None
+    let add_timeout time x =
+      Option.iter (Network_time_span.to_span ~constants:t.constants time)
+        ~f:(fun span ->
+          timeouts :=
+            Clock.Event.run_after span
+              (fun () ->
+                Pipe.write_without_pushback_if_open w x ;
+                finish () )
+              ()
+            :: !timeouts )
     in
-    let timed_out (res : Block_produced_query.Result.Aggregated.t) =
-      match timeout with
-      | `Slots x ->
-          res.last_seen_result.global_slot >= x
-      | `Epochs x ->
-          res.last_seen_result.epoch >= x
-      | `Snarked_ledgers_generated x ->
-          res.snarked_ledgers_generated >= x
-      | `Milliseconds _ ->
-          Time.( > ) (Time.now ()) (Option.value_exn query_timeout_ms)
+    add_timeout cond.hard_timeout
+      (Error
+         { Malleable_error.Hard_fail.hard_error=
+             Test_error.raw_internal_error (Error.of_string "timed out")
+         ; soft_errors= [] }) ;
+    add_timeout cond.soft_timeout
+      (Ok
+         { Malleable_error.Accumulator.computation_result= []
+         ; soft_errors=
+             [Test_error.raw_internal_error (Error.of_string "soft timeout")]
+         }) ;
+    let interval =
+      Time.Span.of_ms
+        (Int.to_float t.constants.constraints.block_window_duration_ms /. 2.0)
     in
-    let conditions_passed
-        (aggregated_res : Block_produced_query.Result.Aggregated.t) =
-      [%log' info t.logger]
-        ~metadata:
-          [ ( "result"
-            , Block_produced_query.Result.Aggregated.to_yojson aggregated_res
-            )
-          ; ("blocks", `Int blocks)
-          ; ("epoch_reached", `Int epoch_reached)
-          ; ("snarked_ledgers_generated", `Int snarked_ledgers_generated) ]
-        "Checking if conditions passed for $result [expected blocks=$blocks, \
-         expected epochs reached=$epoch_reached, expected snarked ledgers \
-         generated=$snarked_ledgers_generated]" ;
-      aggregated_res.last_seen_result.block_height > blocks
-      && aggregated_res.last_seen_result.epoch >= epoch_reached
-      && aggregated_res.snarked_ledgers_generated >= snarked_ledgers_generated
-    in
-    let open Malleable_error.Let_syntax in
-    let rec go aggregated_res =
-      if Time.( > ) (Time.now ()) timeout_safety then
-        Malleable_error.of_string_hard_error
-          "wait_for took too long to complete"
-      else if timed_out aggregated_res then
-        Malleable_error.of_string_hard_error "wait_for timedout"
-      else (
+    Clock.every' ~stop interval (fun () ->
         [%log' info t.logger] "Pulling blocks produced subscription" ;
-        let%bind logs = Subscription.pull t.subscriptions.blocks_produced in
-        [%log' info t.logger]
-          ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
-          "Pulled $n logs for blocks produced: $logs" ;
-        let%bind finished, aggregated_res' =
-          Malleable_error.List.fold_left_while logs
-            ~init:(false, aggregated_res) ~f:(fun (_, acc) log ->
+        let%bind res = Subscription.pull t.subscriptions.blocks_produced in
+        let d = Pipe.write_if_open w res in
+        ( match res with
+        | Ok {computation_result= logs; _} ->
+            [%log' info t.logger]
+              ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
+              "Pulled $n logs for blocks produced: $logs"
+        | Error _ ->
+            finish () ) ;
+        d ) ;
+    r
+  in
+  let conditions_passed (acc : Block_produced_query.Result.Aggregated.t) =
+    cond.predicate
+      { block_height= acc.last_seen_result.block_height
+      ; epoch= acc.last_seen_result.epoch
+      ; global_slot= acc.last_seen_result.global_slot
+      ; snarked_ledgers_generated= acc.snarked_ledgers_generated
+      ; blocks_generated= acc.blocks_generated }
+  in
+  let rec go acc =
+    let finish (acc : Block_produced_query.Result.Aggregated.t) =
+      Ivar.fill_if_empty finished () ;
+      Malleable_error.return
+        ( `Blocks_produced acc.blocks_generated
+        , `Slots_passed acc.last_seen_result.global_slot
+        , `Snarked_ledgers_generated acc.snarked_ledgers_generated )
+    in
+    match%bind Pipe.read updates with
+    | `Eof ->
+        finish acc
+    | `Ok r ->
+        let open Malleable_error.Let_syntax in
+        let%bind logs = Deferred.return r in
+        let%bind finished, acc =
+          Malleable_error.List.fold_left_while logs ~init:(false, acc)
+            ~f:(fun (_, acc) log ->
               let open Malleable_error.Let_syntax in
               let%map result = Block_produced_query.parse log in
               let acc = Block_produced_query.Result.aggregate acc result in
               if conditions_passed acc then `Stop (true, acc)
               else `Continue (false, acc) )
         in
-        if not finished then
-          let%bind () =
-            Deferred.bind
-              (Async.after
-                 (Time.Span.of_ms
-                    ( Int.to_float
-                        t.constants.constraints.block_window_duration_ms
-                    /. 2.0 )))
-              ~f:Malleable_error.return
-          in
-          go aggregated_res'
-        else
-          Malleable_error.return
-            ( `Blocks_produced aggregated_res'.blocks_generated
-            , `Slots_passed aggregated_res'.last_seen_result.global_slot
-            , `Snarked_ledgers_generated
-                aggregated_res'.snarked_ledgers_generated ) )
-    in
-    go Block_produced_query.Result.Aggregated.empty
+        if finished then finish acc else go acc
+  in
+  go Block_produced_query.Result.Aggregated.empty
 
-let wait_for :
-       ?blocks:int
-    -> ?epoch_reached:int
-    -> ?snarked_ledgers_generated:int
-    -> ?timeout:[ `Slots of int
-                | `Epochs of int
-                | `Snarked_ledgers_generated of int
-                | `Milliseconds of int64 ]
-    -> t
-    -> ( [> `Blocks_produced of int]
-       * [> `Slots_passed of int]
-       * [> `Snarked_ledgers_generated of int] )
-       Malleable_error.t =
- fun ?(blocks = 0) ?(epoch_reached = 0) ?(snarked_ledgers_generated = 0)
-     ?(timeout = `Milliseconds 300000L) t ->
-  [%log' info t.logger]
-    ~metadata:
-      [ ("blocks", `Int blocks)
-      ; ("epoch", `Int epoch_reached)
-      ; ("snarked_ledgers_generated", `Int snarked_ledgers_generated)
-      ; ( "timeout"
-        , `String
-            ( match timeout with
-            | `Slots n ->
-                Printf.sprintf "%d slots" n
-            | `Epochs n ->
-                Printf.sprintf "%d epochs" n
-            | `Snarked_ledgers_generated n ->
-                Printf.sprintf "%d snarked ledgers emitted" n
-            | `Milliseconds n ->
-                Printf.sprintf "%Ld ms" n ) ) ]
-    "Waiting for $blocks blocks, $epoch epoch, $snarked_ledgers_generated \
-     snarked ledgers with timeout $timeout" ;
-  match%bind
-    wait_for' ~blocks ~epoch_reached ~snarked_ledgers_generated ~timeout t
-  with
+let wait_for t cond =
+  match%bind wait_for' t cond with
   | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
       [%log' fatal t.logger] "wait_for failed with error: $error"
         ~metadata:[("error", Error_json.error_to_yojson e.error)] ;

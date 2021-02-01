@@ -1,6 +1,8 @@
 testnetName: "coda-testnet"
 
 coda:
+  runtimeConfig:
+  generateGenesisProof: true
   logLevel: "Debug"
   logSnarkWorkGossip: false
   image: codaprotocol/coda-daemon:0.0.16-beta7-develop
@@ -69,6 +71,7 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
 
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30

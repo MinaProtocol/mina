@@ -526,6 +526,8 @@ module type S = sig
 
       val curr_slot : Value.t -> Slot.t
 
+      val epoch_count : Value.t -> Length.t
+
       val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 
       val global_slot_since_genesis : Value.t -> Mina_numbers.Global_slot.t
@@ -629,7 +631,7 @@ module type S = sig
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
-      -> block_producer_timing
+      -> block_producer_timing Async.Deferred.t
 
     (**
      * A hook for managing local state when the locked tip is updated.

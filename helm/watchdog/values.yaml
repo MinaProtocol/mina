@@ -1,0 +1,19 @@
+testnetName: "coda-testnet"
+name: "watchdog"
+
+coda:
+  image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
+  ports:
+    client: "8301"
+    graphql: "3085"
+    metrics: "8000"
+    p2p: "10909"
+
+image: gcr.io/o1labs-192920/watchdog:0.3.0
+
+restartEveryMins: ""
+restartNodes: ""
+makeReports: ""
+makeReportEveryMins: ""
+makeReportDiscordWebhookUrl: ""
+makeReportAccounts: ""

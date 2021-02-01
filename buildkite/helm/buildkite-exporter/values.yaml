@@ -1,7 +1,7 @@
 exporter:
   pipeline: coda
   name: "buildkite-{{ .Values.exporter.pipeline }}-exporter"
-  image: codaprotocol/buildkite-exporter:0.1.0
+  image: codaprotocol/buildkite-exporter:0.2.0
   ports:
     metricsPort: 8000
   optionalEnv:

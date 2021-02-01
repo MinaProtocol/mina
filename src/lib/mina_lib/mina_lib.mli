@@ -41,7 +41,10 @@ val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val next_epoch_ledger :
-  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     t
+  -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     | `Notfinalized ]
+     option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
@@ -74,6 +77,11 @@ val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val snark_job_state : t -> Work_selector.State.t
+
+val get_current_nonce :
+     t
+  -> Account_id.t
+  -> ([> `Min of Account.Nonce.t] * Account.Nonce.t, string) result
 
 val add_transactions :
      t

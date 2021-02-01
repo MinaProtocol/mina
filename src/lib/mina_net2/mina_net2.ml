@@ -1543,23 +1543,47 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                       !termination_hack_ref)
             then (
               match e with
-              | Error (`Exit_non_zero _) | Error (`Signal _) ->
+              | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
                   [%log fatal]
-                    !"libp2p_helper process died unexpectedly: %s"
-                    (Unix.Exit_or_signal.to_string_hum e) ;
+                    !"libp2p_helper process died unexpectedly: $exit_status"
+                    ~metadata:
+                      [ ( "exit_status"
+                        , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
                   Option.iter !termination_hack_ref ~f:(fun t ->
                       t.finished <- true ) ;
                   on_unexpected_termination ()
-              | Ok () ->
+              | Error err ->
+                  [%log fatal]
+                    !"Child processes library could not track libp2p_helper \
+                      process: $err"
+                    ~metadata:[("err", Error_json.error_to_yojson err)] ;
+                  Option.iter !termination_hack_ref ~f:(fun t ->
+                      t.finished <- true ) ;
+                  let%bind () =
+                    match !termination_hack_ref with
+                    | Some {subprocess; _} ->
+                        Deferred.ignore_m (Child_processes.kill subprocess)
+                    | None ->
+                        Deferred.unit
+                  in
+                  on_unexpected_termination ()
+              | Ok (Ok ()) ->
                   [%log error]
                     "libp2p helper process exited peacefully but it should \
                      have been killed by shutdown!" ;
                   Deferred.unit )
-            else (
+            else
+              let exit_status =
+                match e with
+                | Ok e ->
+                    `String (Unix.Exit_or_signal.to_string_hum e)
+                | Error err ->
+                    Error_json.error_to_yojson err
+              in
               [%log info]
-                !"libp2p_helper process killed successfully: %s"
-                (Unix.Exit_or_signal.to_string_hum e) ;
-              Deferred.unit ) ))
+                !"libp2p_helper process killed successfully: $exit_status"
+                ~metadata:[("exit_status", exit_status)] ;
+              Deferred.unit ))
   with
   | Error e ->
       Deferred.Or_error.fail
