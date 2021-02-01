@@ -34,6 +34,7 @@
    ;; Indices
    marlin_plonk_bindings_pasta_fp_index
    marlin_plonk_bindings_pasta_fq_index
+   marlin_plonk_bindings_pasta_5_wires_fp_index
    marlin_plonk_bindings_tweedle_fp_index
    marlin_plonk_bindings_tweedle_fq_index
    ;; Verification indices

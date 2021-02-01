@@ -41,6 +41,7 @@ module Tweedle_fq_urs = Marlin_plonk_bindings_tweedle_fq_urs
 
 module Pasta_fp_index = Marlin_plonk_bindings_pasta_fp_index
 module Pasta_fq_index = Marlin_plonk_bindings_pasta_fq_index
+module Pasta_5_wires_fp_index = Marlin_plonk_bindings_pasta_5_wires_fp_index
 module Tweedle_fp_index = Marlin_plonk_bindings_tweedle_fp_index
 module Tweedle_fq_index = Marlin_plonk_bindings_tweedle_fq_index
 
