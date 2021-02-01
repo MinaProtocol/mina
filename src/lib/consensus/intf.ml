@@ -629,7 +629,7 @@ module type S = sig
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> coinbase_receiver:Coinbase_receiver.t
       -> logger:Logger.t
-      -> block_producer_timing
+      -> block_producer_timing Async.Deferred.t
 
     (**
      * A hook for managing local state when the locked tip is updated.

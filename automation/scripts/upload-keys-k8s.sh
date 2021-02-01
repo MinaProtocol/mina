@@ -1,3 +1,4 @@
+#! /bin/bash
 
 TESTNET="$1"
 KEYS_PREFIX="$2"
@@ -6,8 +7,7 @@ if [ -z "$CLUSTER" ]; then
   CLUSTER="$(kubectl config current-context)"
 fi
 
-kubectl apply -f ~/o1/turbo-pickles/secrets/ && exit 0
-
+# kubectl apply -f ~/o1/turbo-pickles/secrets/ && exit 0
 
 # always relative to rootdir
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"

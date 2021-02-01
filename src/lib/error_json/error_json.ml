@@ -154,4 +154,8 @@ let info_to_yojson (info : Info.t) : Yojson.Safe.t =
   info_internal_repr_to_yojson (Info.Internal_repr.of_info info)
 
 let error_to_yojson (err : Error.t) : Yojson.Safe.t =
-  info_to_yojson (err :> Info.t)
+  match info_to_yojson (err :> Info.t) with
+  | `Assoc assocs ->
+      `Assoc (("commit_id", `String Mina_version.commit_id) :: assocs)
+  | json ->
+      `Assoc [("commit_id", `String Mina_version.commit_id); ("error", json)]

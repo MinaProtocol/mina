@@ -136,6 +136,11 @@ missing_subchain :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_subchain/missing_subchain.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
+archive_blocks :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
@@ -168,17 +173,6 @@ check-format:
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
-
-########################################
-## Merlin fixup for docker builds
-
-merlin-fixup:
-ifeq ($(USEDOCKER),TRUE)
-	@echo "Fixing up .merlin files for Docker build"
-	@./scripts/merlin-fixup.sh
-else
-	@echo "Not building in Docker, .merlin files unchanged"
-endif
 
 #######################################
 ## Environment setup

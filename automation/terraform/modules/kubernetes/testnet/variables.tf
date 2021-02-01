@@ -1,4 +1,17 @@
-// K8s Cluster Vars
+# Control Vars
+
+# when set to true, this module generates and uploads artifacts from `genesis_ledger.json`
+variable "generate_and_upload_artifacts" {
+  type = bool
+  default = true
+}
+
+variable "artifact_path" {
+  type = string
+  default = "/tmp"
+}
+
+# K8s Cluster Vars
 
 variable "cluster_name" {
   type = string
@@ -52,6 +65,11 @@ variable "coda_points_image" {
   default = ""
 }
 
+variable "watchdog_image" {
+  type = string
+  default = "gcr.io/o1labs-192920/watchdog:latest"
+}
+
 # this must be a string to avoid scientific notation truncation
 variable "coda_faucet_amount" {
   type    = string
@@ -77,6 +95,12 @@ variable "additional_seed_peers" {
 variable "archive_node_count" {
   type    = number
   default = 0
+}
+
+# only used if `generate_and_upload_artifacts` is set to false
+variable "runtime_config" {
+  type    = string
+  default = ""
 }
 
 # Seed Vars

@@ -34,7 +34,9 @@ module Variant = struct
     | `Signature_missing
     | `Public_key_format_not_valid
     | `No_options_provided
-    | `Exception of string ]
+    | `Exception of string
+    | `Signature_invalid
+    | `Memo_invalid ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -98,6 +100,10 @@ end = struct
         "No options provided"
     | `Exception _ ->
         "Exception"
+    | `Signature_invalid ->
+        "Invalid signature"
+    | `Memo_invalid ->
+        "Invalid memo"
 
   let context = function
     | `Sql msg ->
@@ -109,7 +115,7 @@ end = struct
     | `Network_doesn't_exist (req, conn) ->
         Some
           (sprintf
-             !"You are requesting the status for the network %s but you are \
+             !"You are requesting the status for the network %s, but you are \
                connected to the network %s\n"
              req conn)
     | `Chain_info_missing ->
@@ -121,21 +127,23 @@ end = struct
     | `Account_not_found addr ->
         Some
           (sprintf
-             !"You attempt to lookup %s but we couldn't find it in the ledger."
+             !"You attempted to lookup %s, but we couldn't find it in the \
+               ledger."
              addr)
     | `Invariant_violation ->
         None
     | `Transaction_not_found hash ->
         Some
           (sprintf
-             "You attempt to lookup %s but it is missing from the mempool. \
-              This may be due to it's inclusion in a block -- try looking for \
+             "You attempted to lookup %s, but it is missing from the mempool. \
+              This may be due to its inclusion in a block -- try looking for \
               this transaction in a recent block. It also could be due to the \
               transaction being evicted from the mempool."
              hash)
     | `Block_missing ->
-        (* TODO: Add context around the query made *)
-        None
+        Some
+          "We couldn't find the block you specified in the archive node. Ask \
+           a friend for the missing data."
     | `Malformed_public_key ->
         None
     | `Operations_not_valid reasons ->
@@ -154,6 +162,10 @@ end = struct
         None
     | `Exception s ->
         Some (sprintf "Exception when processing request: %s" s)
+    | `Signature_invalid ->
+        None
+    | `Memo_invalid ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -188,6 +200,10 @@ end = struct
         false
     | `Exception _ ->
         false
+    | `Signature_invalid ->
+        false
+    | `Memo_invalid ->
+        false
 
   (* Unlike message above, description can be updated whenever we see fit *)
   let description = function
@@ -209,7 +225,8 @@ end = struct
     | `Transaction_not_found _ ->
         "That transaction could not be found."
     | `Block_missing ->
-        "That block could not be found."
+        "We couldn't find the block you specified in the archive node. Ask a \
+         friend for the missing data."
     | `Malformed_public_key ->
         "The public key you provided was malformed."
     | `Operations_not_valid _ ->
@@ -220,6 +237,10 @@ end = struct
         "An operation you provided isn't supported for construction."
     | `Signature_missing ->
         "Your request is missing a signature."
+    | `Signature_invalid ->
+        "Your request has an invalid signature."
+    | `Memo_invalid ->
+        "Your request has an invalid memo."
     | `No_options_provided ->
         "Your request is missing options."
     | `Exception _ ->
