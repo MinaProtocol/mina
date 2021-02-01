@@ -22,7 +22,10 @@ in
               "DUNE_PROFILE=testnet_postake_medium_curves",
               -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
-              ] "dune build --verbose --profile=\\\${DUNE_PROFILE} src/app/test_executive/test_executive.exe" #
+            ] "dune build --verbose --profile=\\\${DUNE_PROFILE} src/app/test_executive/test_executive.exe"
+            
+            #
+            
             [
               Cmd.run "cp src/app/test_executive/test_executive.exe . && buildkite/scripts/buildkite-artifact-helper.sh test_executive.exe",
 
@@ -32,7 +35,7 @@ in
                     "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
                 "fi"
               ),
-              
+
               -- Execute test based on BUILD image
               Cmd.run (
                 "source ${deployEnv} && test_executive.exe cloud" ++
