@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	gonet "net"
 	"os"
 	"path"
@@ -162,22 +163,20 @@ func (ms *MessageStats) UpdateMetrics(val uint64) {
 	defer ms.Unlock()
 	if ms.max < val {
 		ms.max = val
-	} else if ms.min > val {
+	}
+
+	if ms.min > val {
 		ms.min = val
 	}
 
+	ms.total++
 	if ms.avg == 0 {
 		ms.avg = val
 	} else {
-		ms.avg = (ms.avg * (ms.total + 1)) / ms.total
+		ms.avg = (ms.avg*(ms.total-1) + val) / ms.total
 	}
 }
 
-func (ms *MessageStats) IncrTotal() {
-	ms.Lock()
-	defer ms.Unlock()
-	ms.total++
-}
 func (ms *MessageStats) GetMin() uint64 {
 	ms.RLock()
 	defer ms.RUnlock()
@@ -451,6 +450,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
-		MsgStats:          &MessageStats{},
+		MsgStats:          &MessageStats{min: math.MaxUint64},
 	}, nil
 }

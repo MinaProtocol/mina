@@ -48,19 +48,20 @@ type validationStatus struct {
 }
 
 type app struct {
-	P2p             *codanet.Helper
-	Ctx             context.Context
-	Subs            map[int]subscription
-	Topics          map[string]*pubsub.Topic
-	Validators      map[int]*validationStatus
-	ValidatorMutex  *sync.Mutex
-	Streams         map[int]net.Stream
-	StreamsMutex    sync.Mutex
-	Out             *bufio.Writer
-	OutChan         chan interface{}
-	Bootstrapper    io.Closer
-	AddedPeers      []peer.AddrInfo
-	UnsafeNoTrustIP bool
+	P2p                *codanet.Helper
+	Ctx                context.Context
+	Subs               map[int]subscription
+	Topics             map[string]*pubsub.Topic
+	Validators         map[int]*validationStatus
+	ValidatorMutex     *sync.Mutex
+	Streams            map[int]net.Stream
+	StreamsMutex       sync.Mutex
+	Out                *bufio.Writer
+	OutChan            chan interface{}
+	Bootstrapper       io.Closer
+	AddedPeers         []peer.AddrInfo
+	UnsafeNoTrustIP    bool
+	MetricsRefreshTime time.Duration
 
 	// development configuration options
 	NoMDNS bool
@@ -683,7 +684,6 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				continue
 			}
 
-			msg.IncrTotal()
 			msg.UpdateMetrics(length)
 
 			msgBytes = make([]byte, length)
@@ -1038,6 +1038,9 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		//       caused by this prometheus issues.
 		// go app.checkBandwidth(id)
 		// go app.checkLatency(id)
+		// go app.checkPeerCount(id)
+		// go app.checkMessageExchanged(id)
+		// go app.checkMessageStats(id)
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
@@ -1056,7 +1059,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 const (
 	latencyMeasurementTime = time.Second * 5
-	metricsRefreshTime     = time.Minute
 )
 
 func (app *app) updateConnectionMetrics() {
@@ -1113,14 +1115,14 @@ func (app *app) checkBandwidth(id peer.ID) {
 		rateIn.Set(stats.RateIn)
 		rateOut.Set(stats.RateOut)
 
-		time.Sleep(metricsRefreshTime)
+		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
 func (app *app) checkPeerCount(id peer.ID) {
 	peerCountGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: fmt.Sprintf("peer_count_%s", id),
-		Help:      "The peer count is used by given peer id to get the total number of peer in network.",
+		Name: fmt.Sprintf("peer_count_%s", id),
+		Help: "The total number of peers connected by the peer",
 	})
 
 	err := prometheus.Register(peerCountGauge)
@@ -1132,43 +1134,43 @@ func (app *app) checkPeerCount(id peer.ID) {
 	for {
 		peerIDs := app.P2p.Host.Network().Peers()
 		peerCountGauge.Set(float64(len(peerIDs)))
-		time.Sleep(metricsRefreshTime)
+		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
 func (app *app) checkMessageExchanged(id peer.ID) {
 	msgGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: fmt.Sprintf("message_exchanged_%s", id),
-		Help:      "The message exchanged used by the given peer to check the variety of peers",
+		Name: fmt.Sprintf("message_exchanged_%s", id),
+		Help: "The number of different peers that the peer connects with",
 	})
 
 	err := prometheus.Register(msgGauge)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't message exchanged of peers for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register message exchanged of peers for id", id, "perhaps we've already done so", err.Error())
 		return
 	}
 
 	for {
 		currentCount := app.P2p.ConnectionManager.GetInfo().ConnCount
 		msgGauge.Set(float64(currentCount))
-		time.Sleep(metricsRefreshTime)
+		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
 func (app *app) checkMessageStats(id peer.ID) {
 	msgMaxGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: fmt.Sprintf("meessage_max_stats_%s", id),
-		Help:      "The message max stats used by the given peer id to get the max size amongst network messages",
+		Name: fmt.Sprintf("message_max_stats_%s", id),
+		Help: "The max size of network message received by the peer",
 	})
 
 	msgAvgGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: fmt.Sprintf("meessage_avg_stats_%s", id),
-		Help:      "The message min stats used by the given peer id to get the min size amongst network messages",
+		Name: fmt.Sprintf("message_avg_stats_%s", id),
+		Help: "The average size of network message received by the peer",
 	})
 
 	msgMinGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: fmt.Sprintf("meessage_min_stats_%s", id),
-		Help:      "The message average stats used by the given peer id to get the average size amongst network messages",
+		Name: fmt.Sprintf("message_min_stats_%s", id),
+		Help: "The min size of network message received by the peer",
 	})
 
 	err := prometheus.Register(msgMaxGauge)
@@ -1195,7 +1197,7 @@ func (app *app) checkMessageStats(id peer.ID) {
 		msgAvgGauge.Set(float64(msgStats.GetAvg()))
 		msgMaxGauge.Set(float64(msgStats.GetMax()))
 
-		time.Sleep(metricsRefreshTime)
+		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
@@ -1216,7 +1218,7 @@ func (app *app) checkLatency(id peer.ID) {
 		latency := app.P2p.Host.Peerstore().LatencyEWMA(id)
 		latencyGauge.Set(float64(latency))
 
-		time.Sleep(metricsRefreshTime)
+		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
@@ -1395,16 +1397,17 @@ func init() {
 
 func newApp() *app {
 	return &app{
-		P2p:            nil,
-		Ctx:            context.Background(),
-		Subs:           make(map[int]subscription),
-		Topics:         make(map[string]*pubsub.Topic),
-		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]*validationStatus),
-		Streams:        make(map[int]net.Stream),
-		OutChan:        make(chan interface{}, 4096),
-		Out:            bufio.NewWriter(os.Stdout),
-		AddedPeers:     []peer.AddrInfo{},
+		P2p:                nil,
+		Ctx:                context.Background(),
+		Subs:               make(map[int]subscription),
+		Topics:             make(map[string]*pubsub.Topic),
+		ValidatorMutex:     &sync.Mutex{},
+		Validators:         make(map[int]*validationStatus),
+		Streams:            make(map[int]net.Stream),
+		OutChan:            make(chan interface{}, 4096),
+		Out:                bufio.NewWriter(os.Stdout),
+		AddedPeers:         []peer.AddrInfo{},
+		MetricsRefreshTime: time.Minute,
 	}
 }
 
