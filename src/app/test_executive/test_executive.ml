@@ -1,3 +1,5 @@
+(* Trigger Mina artifact builds *)
+
 open Core
 open Async
 open Cmdliner
