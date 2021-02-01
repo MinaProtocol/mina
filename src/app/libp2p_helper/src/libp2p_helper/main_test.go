@@ -879,7 +879,7 @@ func TestGetPeerMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// appD will try to connect to appA, appA will send peer msg containing B and C and disconnect
-	appD := newTestApp(t, nil)
+	appD := newTestApp(t, appAInfos)
 	err = appD.P2p.Host.Connect(appD.Ctx, appAInfos[0])
 	require.NoError(t, err)
 

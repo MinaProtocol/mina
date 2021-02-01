@@ -185,7 +185,7 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	logger.Debugf("wrote peers to stream %s", stream.Protocol())
 
 	// small delay to allow for remote peer to read from stream
-	time.Sleep(time.Millisecond * 300)
+	time.Sleep(time.Millisecond * 400)
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
@@ -212,6 +212,7 @@ type Helper struct {
 	GatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
+	Seeds []peer.AddrInfo
 }
 
 type customValidator struct {
@@ -372,7 +373,7 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 	ret := make([]peer.AddrInfo, num)
 	rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
 	idx := 0
-	
+
 	for i := 0; i < num; i++ {
 	  for {
 	    if idx >= len(peers) {
@@ -393,6 +394,21 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
+	fromSeed := false
+
+	for _, seed := range h.Seeds {
+		if s.Conn().RemotePeer() == seed.ID {
+			fromSeed = true
+			break
+		}
+	}
+
+	if !fromSeed {
+		logger.Debugf("ignoring peer-exchange stream from non-seed peer=%s", s.Conn().RemotePeer())
+		_ = s.Close()
+		return
+	}
+
 	for {
 		dec := json.NewDecoder(s)
 		peers := []peer.AddrInfo{}
@@ -527,6 +543,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
+		Seeds: 		seeds,
 	}
 
 	if !minaPeerExchange {
