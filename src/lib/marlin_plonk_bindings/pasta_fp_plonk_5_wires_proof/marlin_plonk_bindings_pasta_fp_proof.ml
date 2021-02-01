@@ -10,7 +10,11 @@ type t =
 external create :
      Marlin_plonk_bindings_pasta_5_wires_fp_index.t
   -> primary_input:Marlin_plonk_bindings_pasta_fp_vector.t
-  -> auxiliary_input:(Marlin_plonk_bindings_pasta_fp.t array *Marlin_plonk_bindings_pasta_fp.t array *Marlin_plonk_bindings_pasta_fp.t array *Marlin_plonk_bindings_pasta_fp.t array *Marlin_plonk_bindings_pasta_fp.t array)
+  -> auxiliary_input:Marlin_plonk_bindings_pasta_fp.t array
+                     * Marlin_plonk_bindings_pasta_fp.t array
+                     * Marlin_plonk_bindings_pasta_fp.t array
+                     * Marlin_plonk_bindings_pasta_fp.t array
+                     * Marlin_plonk_bindings_pasta_fp.t array
   -> prev_challenges:Marlin_plonk_bindings_pasta_fp.t array
   -> prev_sgs:Marlin_plonk_bindings_pasta_vesta.Affine.t array
   -> t
