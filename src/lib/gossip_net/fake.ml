@@ -17,7 +17,7 @@ module type S = sig
     network -> Peer.t -> Rpc_intf.rpc_handler list -> t Deferred.t
 end
 
-module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
+module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Intf
   open Rpc_intf
@@ -26,11 +26,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     type rpc_hook =
       { hook:
           'q 'r.    Peer.Id.t -> ('q, 'r) rpc -> 'q
-          -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
+          -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t }
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t * (bool -> unit)
+          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -66,22 +66,26 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       node.interface <- Some interface
 
     let get_interface peer =
-      Option.value_exn peer.interface
-        ~error:
-          (Error.of_string "cannot call rpc on peer which was never registered")
+      match peer.interface with
+      | Some x ->
+          Ok x
+      | None ->
+          Or_error.error_string
+            "cannot call rpc on peer which was never registered"
 
     let broadcast t ~sender msg =
       Hashtbl.iter t.nodes ~f:(fun nodes ->
           List.iter nodes ~f:(fun node ->
               if not (Peer.equal node.peer sender) then
-                let intf = get_interface node in
-                let msg =
-                  Envelope.(
-                    Incoming.wrap ~data:msg
-                      ~sender:(Sender.Remote (sender.host, sender.peer_id)))
-                in
-                Strict_pipe.Writer.write intf.broadcast_message_writer
-                  (msg, Fn.const ()) ) )
+                Or_error.iter (get_interface node) ~f:(fun intf ->
+                    let msg =
+                      Envelope.(
+                        Incoming.wrap ~data:msg ~sender:(Sender.Remote sender))
+                    in
+                    Strict_pipe.Writer.write intf.broadcast_message_writer
+                      ( msg
+                      , Mina_net2.Validation_callback.create_without_expiration
+                          () ) ) ) )
 
     let call_rpc : type q r.
            t
@@ -90,7 +94,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         -> responder_id:Peer.Id.t
         -> (q, r) rpc
         -> q
-        -> r Coda_base.Rpc_intf.rpc_response Deferred.t =
+        -> r Mina_base.Rpc_intf.rpc_response Deferred.t =
      fun t peer_table ~sender_id ~responder_id rpc query ->
       let responder =
         Option.value_exn
@@ -98,8 +102,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           ~error:
             (Error.createf "failed to find peer %s in peer_table" responder_id)
       in
-      let intf = get_interface (lookup_node t responder) in
-      intf.rpc_hook.hook sender_id rpc query
+      match get_interface (lookup_node t responder) with
+      | Ok intf ->
+          intf.rpc_hook.hook sender_id rpc query
+      | Error e ->
+          Deferred.return (Mina_base.Rpc_intf.Failed_to_connect e)
   end
 
   module Instance = struct
@@ -109,11 +116,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; rpc_handlers: rpc_handler list
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers: Peer.t list
+      ; connection_gating: Mina_net2.connection_gating ref
       ; received_message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t * (bool -> unit)
+          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -125,7 +133,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
              Peer.Id.t
           -> (q, r) rpc
           -> q
-          -> r Coda_base.Rpc_intf.rpc_response Deferred.t =
+          -> r Mina_base.Rpc_intf.rpc_response Deferred.t =
        fun peer rpc query ->
         let (module Impl) = implementation_of_rpc rpc in
         let latest_version =
@@ -146,7 +154,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             failwith "fake gossip net error: rpc not implemented"
         | Some deferred ->
             let%map response = deferred in
-            Coda_base.Rpc_intf.Connected
+            Mina_base.Rpc_intf.Connected
               (Envelope.Incoming.wrap_peer ~data:(Ok response) ~sender)
       in
       Network.{hook}
@@ -168,6 +176,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         ; rpc_handlers
         ; peer_table
         ; initial_peers
+        ; connection_gating=
+            ref Mina_net2.{banned_peers= []; trusted_peers= []; isolate= false}
         ; received_message_reader
         ; received_message_writer
         ; ban_notification_reader
@@ -181,11 +191,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
+    let add_peer _ (_p : Peer.t) = Deferred.return (Ok ())
+
     let initial_peers t =
       Hashtbl.data t.peer_table
       |> List.map
            ~f:
-             (Fn.compose Coda_net2.Multiaddr.of_string Peer.to_multiaddr_string)
+             (Fn.compose Mina_net2.Multiaddr.of_string Peer.to_multiaddr_string)
 
     let random_peers t n =
       let%map peers = peers t in
@@ -208,9 +220,31 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let ban_notification_reader {ban_notification_reader; _} =
       ban_notification_reader
 
-    let query_peer t peer rpc query =
+    let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
         ~responder_id:peer rpc query
+
+    let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
+      let%map rs =
+        Deferred.List.map ?how qs
+          ~f:(query_peer ?timeout ?heartbeat_timeout t peer rpc)
+      in
+      with_return (fun {return} ->
+          let data =
+            List.map rs ~f:(function
+              | Connected x ->
+                  x.data
+              | Failed_to_connect e ->
+                  return (Mina_base.Rpc_intf.Failed_to_connect e) )
+            |> Or_error.all
+          in
+          let sender =
+            Option.value_exn
+              (Hashtbl.find t.peer_table peer)
+              ~error:
+                (Error.createf "failed to find peer %s in peer_table" peer)
+          in
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender) )
 
     let query_random_peers _ = failwith "TODO stub"
 
@@ -218,11 +252,19 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let ip_for_peer t peer_id =
       Deferred.return (Hashtbl.find t.peer_table peer_id)
+
+    let connection_gating t = Deferred.return !(t.connection_gating)
+
+    let set_connection_gating t config =
+      t.connection_gating := config ;
+      Deferred.return config
   end
 
   type network = Network.t
 
   include Instance
+
+  let restart_helper (_ : t) = ()
 
   let create_network = Network.create
 

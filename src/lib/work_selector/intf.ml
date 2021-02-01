@@ -50,8 +50,8 @@ module type Inputs_intf = sig
 
     val all_work_pairs :
          t
-      -> get_state:(   Coda_base.State_hash.t
-                    -> Coda_state.Protocol_state.value Or_error.t)
+      -> get_state:(   Mina_base.State_hash.t
+                    -> Mina_state.Protocol_state.value Or_error.t)
       -> ( Transaction.t
          , Transaction_witness.t
          , Ledger_proof.t )
@@ -71,7 +71,7 @@ module type Inputs_intf = sig
     val best_tip_staged_ledger : t -> Staged_ledger.t
 
     val get_protocol_state :
-      t -> Coda_base.State_hash.t -> Coda_state.Protocol_state.value Or_error.t
+      t -> Mina_base.State_hash.t -> Mina_state.Protocol_state.value Or_error.t
   end
 end
 

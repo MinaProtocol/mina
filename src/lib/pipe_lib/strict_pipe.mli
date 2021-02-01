@@ -8,19 +8,27 @@ type crash = Overflow_behavior_crash
 
 type drop_head = Overflow_behavior_drop_head
 
-type _ overflow_behavior =
-  | Crash : crash overflow_behavior
-  | Drop_head : drop_head overflow_behavior
+type call = Overflow_behavior_call
+
+type (_, _, _) overflow_behavior =
+  | Crash : ('a, crash, unit) overflow_behavior
+  | Drop_head : ('a, drop_head, unit) overflow_behavior
+  | Call : ('a -> 'r) -> ('a, call, 'r option) overflow_behavior
 
 type synchronous = Type_synchronous
 
 type _ buffered = Type_buffered
 
-type (_, _) type_ =
-  | Synchronous : (synchronous, unit Deferred.t) type_
+(** A [('a, 'behavior, 'write_result) type_] is a representation of strict pipe types.
+ *  ['a] is the type of data written over the pipe, ['behavior] is a type parameter for classifying
+ *  which overflow behavior the pipe exhibits, and ['write_result] determines the return type of
+ *  writing to the pipe.
+ *)
+type (_, _, _) type_ =
+  | Synchronous : ('a, synchronous, unit Deferred.t) type_
   | Buffered :
-      [`Capacity of int] * [`Overflow of 'b overflow_behavior]
-      -> ('b buffered, unit) type_
+      [`Capacity of int] * [`Overflow of ('a, 'b, 'r) overflow_behavior]
+      -> ('a, 'b buffered, 'r) type_
 
 module Reader : sig
   type 't t
@@ -29,6 +37,8 @@ module Reader : sig
 
   (** Read a single value from the pipe or fail if the pipe is closed *)
   val read : 't t -> [`Eof | `Ok of 't] Deferred.t
+
+  val read' : 't t -> [`Eof | `Ok of 't Base.Queue.t] Deferred.t
 
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
@@ -63,6 +73,8 @@ module Reader : sig
   (** This is a specialization of a fold for the common case of accumulating
    * unit. See [fold reader ~init ~f] *)
   val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
+
+  val iter' : 'a t -> f:('a Base.Queue.t -> unit Deferred.t) -> unit Deferred.t
 
   (** See [fold_without_pushback reader ~init ~f] *)
   val iter_without_pushback :
@@ -117,7 +129,8 @@ end
 
 val create :
      ?name:string
-  -> ('type_, 'write_return) type_
+  -> ?warn_on_drop:bool
+  -> ('t, 'type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 
 val transfer :

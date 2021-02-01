@@ -388,7 +388,7 @@ struct
     | Ok () ->
         ()
     | Error e ->
-        failwithf "Send failed %s" (Error.to_string_hum e) ()
+        Error.tag e ~tag:"Send failed" |> Error.raise
 
   let send_multi t ~recipients msg =
     Deferred.List.all

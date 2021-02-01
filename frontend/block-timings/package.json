@@ -1,0 +1,21 @@
+{
+  "name": "rescript-project-template",
+  "version": "0.0.1",
+  "scripts": {
+    "build": "bsb -make-world",
+    "clean": "bsb -clean-world",
+    "start": "bsb -make-world -w",
+    "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei')"
+  },
+  "keywords": ["rescript"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "bs-platform": "*",
+    "bs-let": "^0.1.16"
+  },
+  "dependencies": {
+    "@google-cloud/logging": "^8.0.8",
+    "reason-promise": "^1.1.2"
+  }
+}

@@ -4,8 +4,8 @@
  * being handled by various threads in the transition frontier controller. *)
 
 open Core_kernel
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Network_peer
 
 module Name = struct
@@ -30,11 +30,11 @@ module Registry = struct
   type element = State_hash.t
 
   let element_added _ =
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.inc_one Transition_frontier_controller.transitions_being_processed)
 
   let element_removed _ _ =
-    Coda_metrics.(
+    Mina_metrics.(
       Gauge.dec_one Transition_frontier_controller.transitions_being_processed)
 end
 

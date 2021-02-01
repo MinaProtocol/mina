@@ -30,7 +30,7 @@ struct
   type ('k, 'v) t =
     { to_string: 'k -> string
     ; read: 'k -> path:string -> 'v M.t
-    ; write: 'v -> string -> unit M.t }
+    ; write: 'k -> 'v -> string -> unit M.t }
 end
 
 module type S = sig
@@ -45,15 +45,15 @@ module type S = sig
     type ('k, 'v) t = ('k, 'v) Disk_storable(M).t =
       { to_string: 'k -> string
       ; read: 'k -> path:string -> 'v M.t
-      ; write: 'v -> string -> unit M.t }
+      ; write: 'k -> 'v -> string -> unit M.t }
 
     val of_binable :
       ('k -> string) -> (module Binable.S with type t = 'v) -> ('k, 'v) t
 
     val simple :
          ('k -> string)
-      -> ('k -> path:string -> 'v)
-      -> ('v -> string -> unit)
+      -> ('k -> path:string -> 'v M.t)
+      -> ('k -> 'v -> string -> unit M.t)
       -> ('k, 'v) t
   end
 
@@ -85,7 +85,7 @@ module Sync : S with module M := Or_error = struct
           Or_error.errorf "directory %s does not exist or cannot be read"
             prefix
       | `Yes ->
-          write v (path key)
+          write key v (path key)
     in
     {read; write}
 
@@ -96,7 +96,7 @@ module Sync : S with module M := Or_error = struct
       let uri_string = bucket_prefix ^/ label in
       let file_path = install_path ^/ label in
       let open Or_error.Let_syntax in
-      [%log debug] "Downloading key to key cache"
+      [%log trace] "Downloading key to key cache"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind () =
@@ -109,14 +109,13 @@ module Sync : S with module M := Or_error = struct
               Error.createf "died after receiving %s (signal number %d)"
                 (Signal.to_string s) (Signal.to_system_int s) )
         |> Result.map_error ~f:(fun err ->
-               [%log debug] "Could not download key to key cache"
+               [%log trace] "Could not download key to key cache"
                  ~metadata:
                    [ ("url", `String uri_string)
-                   ; ("local_file_path", `String file_path)
-                   ; ("err", `String (Error.to_string_hum err)) ] ;
+                   ; ("local_file_path", `String file_path) ] ;
                err )
       in
-      [%log debug] "Downloaded key to key cache"
+      [%log trace] "Downloaded key to key cache"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       read k ~path:file_path
@@ -133,7 +132,7 @@ module Sync : S with module M := Or_error = struct
         Or_error.try_with (fun () ->
             Binable.of_string m (In_channel.read_all path) )
       in
-      let write t path =
+      let write _k t path =
         Or_error.try_with (fun () ->
             Out_channel.write_all path ~data:(Binable.to_string m t) )
       in
@@ -141,8 +140,8 @@ module Sync : S with module M := Or_error = struct
 
     let simple to_string read write =
       { to_string
-      ; read= (fun k ~path -> Or_error.return (read k ~path))
-      ; write= (fun v s -> Or_error.return (write v s)) }
+      ; read= (fun k ~path -> read k ~path)
+      ; write= (fun k v s -> write k v s) }
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =
@@ -200,7 +199,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
             (Or_error.errorf "directory %s does not exist or cannot be read"
                prefix)
       | `Yes ->
-          write v (path key)
+          write key v (path key)
     in
     {read; write}
 
@@ -211,22 +210,22 @@ module Async : S with module M := Async.Deferred.Or_error = struct
       let file_path = install_path ^/ label in
       let open Deferred.Or_error.Let_syntax in
       let logger = Logger.create () in
-      [%log debug] "Downloading key to key cache"
+      [%log trace] "Downloading key to key cache"
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind result =
         Process.run ~prog:"curl"
-          ~args:["--fail"; "-o"; file_path; uri_string]
+          ~args:
+            ["--fail"; "--silent"; "--show-error"; "-o"; file_path; uri_string]
           ()
         |> Deferred.Result.map_error ~f:(fun err ->
                [%log debug] "Could not download key to key cache"
                  ~metadata:
                    [ ("url", `String uri_string)
-                   ; ("local_file_path", `String file_path)
-                   ; ("err", `String (Error.to_string_hum err)) ] ;
+                   ; ("local_file_path", `String file_path) ] ;
                err )
       in
-      [%log debug] "Downloaded key to key cache"
+      [%log trace] "Downloaded key to key cache"
         ~metadata:
           [ ("url", `String uri_string)
           ; ("local_file_path", `String file_path)
@@ -241,7 +240,7 @@ module Async : S with module M := Async.Deferred.Or_error = struct
 
     let of_binable (type t) to_string (module B : Binable.S with type t = t) =
       let read _ ~path = Reader.load_bin_prot path B.bin_reader_t in
-      let write t path =
+      let write _ t path =
         Deferred.map
           (Writer.save_bin_prot path B.bin_writer_t t)
           ~f:Or_error.return
@@ -250,8 +249,8 @@ module Async : S with module M := Async.Deferred.Or_error = struct
 
     let simple to_string read write =
       { to_string
-      ; read= (fun k ~path -> Deferred.Or_error.return (read k ~path))
-      ; write= (fun v s -> Deferred.Or_error.return (write v s)) }
+      ; read= (fun k ~path -> read k ~path)
+      ; write= (fun v s -> write v s) }
   end
 
   let read spec {Disk_storable.to_string; read= r; write= w} k =

@@ -29,7 +29,7 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
     | Some dir ->
         dir
         ^/ Network_peer.Peer.Id.to_string
-             (Coda_net2.Keypair.to_peer_id libp2p_keypair)
+             (Mina_net2.Keypair.to_peer_id libp2p_keypair)
     | None ->
         Filename.temp_dir_name
         ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -101,10 +101,6 @@ let process_user_command_exn (conn, _, _) cmd =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.process_user_command ~arg:cmd
 
-let prove_receipt_exn (conn, _, _) proving_receipt resulting_receipt =
-  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
-    ~arg:(proving_receipt, resulting_receipt)
-
 let sync_status_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.sync_status
@@ -134,10 +130,6 @@ let new_block_exn (conn, _, _) key =
   in
   Linear_pipe.wrap_reader r
 
-let get_all_transitions (conn, _, _) key =
-  Coda_worker.Connection.run_exn conn
-    ~f:Coda_worker.functions.get_all_transitions ~arg:key
-
 let root_diff_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_diff
@@ -158,10 +150,6 @@ let start_exn (conn, _, _) =
 let new_user_command_exn (conn, _, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_user_command
     ~arg:pk
-
-let get_all_user_commands_exn (conn, _, _) pk =
-  Coda_worker.Connection.run_exn conn
-    ~f:Coda_worker.functions.get_all_user_commands ~arg:pk
 
 let dump_tf (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()

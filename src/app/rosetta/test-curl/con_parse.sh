@@ -1,0 +1,5 @@
+#!/bin/bash
+
+. lib.sh
+
+req '/construction/parse' '{"network_identifier":{"blockchain":"coda","network":"debug"},"signed":false,"transaction":"{\"randomOracleInput\":\"00000003682279690F47EEC41D5BC8D4DA9FF9C5956B3863651CF8AF7458B14042B153D8682279690F47EEC41D5BC8D4DA9FF9C5956B3863651CF8AF7458B14042B153D85E6737A0AC0A147918437FC8C21EA57CECFB613E711CA2E4FD328401657C291C000002570029ACEE000000008000000000000000800000007FFFFFFFC00000000000000000000000000000000000000000000000000000000000000000000E000000000000000001E82D3400000000\",\"payment\":{\"to\":\"B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv\",\"from\":\"B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV\",\"fee\":\"2000000000\",\"token\":\"1\",\"nonce\":\"0\",\"memo\":null,\"amount\":\"3000000000\",\"valid_until\":null},\"stakeDelegation\":null,\"createToken\":null,\"createTokenAccount\":null,\"mintTokens\":null}"}'

@@ -42,6 +42,8 @@ val iter : 'e t -> f:('e -> unit) -> unit
 
 val to_seq : 'e t -> 'e Sequence.t
 
+val to_list : 'e t -> 'e list
+
 val sexp_of_t : ('e -> Sexp.t) -> 'e t -> Sexp.t
 
 val equal : ('e -> 'e -> bool) -> 'e t -> 'e t -> bool
@@ -58,3 +60,5 @@ val snoc : 'e t -> 'e -> 'e t
     be a sequence containing all elements with index < i, the second will
     contain all elements with index >= i *)
 val split_at : 'e t -> int -> 'e t * 'e t
+
+val find : 'e t -> f:('e -> sexp_bool) -> 'e sexp_option

@@ -1,4 +1,5 @@
 (executable
-  (name decoder)
-  (libraries coda_base)
-  (preprocess (pps ppx_version)))
+ (name decoder)
+ (libraries mina_base)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))

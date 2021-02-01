@@ -18,20 +18,20 @@ def run_comparison(base_commit, compare_script):
     os.mkdir('base')
     os.chdir('base')
     # it would be faster to do a clone of the local repo, but there's "smudge error" (?)
-    subprocess.run(['git', 'clone', 'https://github.com/CodaProtocol/coda.git'])
-    os.chdir('coda')
+    subprocess.run(['git', 'clone', 'https://github.com/MinaProtocol/mina.git'])
+    os.chdir('mina')
     subprocess.run(['git', 'checkout', base_commit])
     os.chdir(cwd)
     # changed files in the PR
     diffs_raw = subprocess.check_output(
-        ['git', 'diff', '--name-only', base_commit])
+        ['git', 'diff', '--name-only', 'origin/' + base_commit])
     diffs_decoded = diffs_raw.decode('UTF-8')
     diffs = diffs_decoded.split('\n')
     for diff in diffs:
         fn = os.path.basename(diff)
         if not fn.endswith('.ml'):
             continue
-        orig = 'base/coda/' + diff
+        orig = 'base/mina/' + diff
         # don't compare if file added or deleted
         if not (os.path.exists(orig) and os.path.exists(diff)):
             continue

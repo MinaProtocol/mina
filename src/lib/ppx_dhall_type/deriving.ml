@@ -42,17 +42,31 @@ let rec dhall_type_of_core_type core_type =
       [%expr Ppx_dhall_type.Dhall_type.Double]
   | Ptyp_constr (lident, []) when is_string_lident lident ->
       [%expr Ppx_dhall_type.Dhall_type.Text]
-  | Ptyp_constr ({txt= Lident id; _}, []) ->
-      evar (id ^ "_dhall_type")
-  | Ptyp_constr ({txt= Ldot (prefix, nm); _}, []) ->
-      let mod_path = Longident.name prefix in
-      if String.equal nm "t" then evar (mod_path ^ ".dhall_type")
-      else evar (mod_path ^ "." ^ nm ^ "_dhall_type")
   | Ptyp_constr (lident, [ty]) when is_option_lident lident ->
       [%expr
         Ppx_dhall_type.Dhall_type.Optional [%e dhall_type_of_core_type ty]]
   | Ptyp_constr (lident, [ty]) when is_list_lident lident ->
       [%expr Ppx_dhall_type.Dhall_type.List [%e dhall_type_of_core_type ty]]
+  | Ptyp_constr ({txt= Lident id; _}, []) ->
+      evar (id ^ "_dhall_type")
+  | Ptyp_constr ({txt= Lident id; _}, params) ->
+      let dhall_type_fun = evar (id ^ "_dhall_type") in
+      let args = List.map params ~f:dhall_type_of_core_type in
+      eapply dhall_type_fun args
+  | Ptyp_constr ({txt= Ldot (prefix, nm); _}, []) ->
+      let mod_path = Longident.name prefix in
+      if String.equal nm "t" then evar (mod_path ^ ".dhall_type")
+      else evar (mod_path ^ "." ^ nm ^ "_dhall_type")
+  | Ptyp_constr ({txt= Ldot (prefix, nm); _}, params) ->
+      let mod_path = Longident.name prefix in
+      let dhall_type_fun =
+        if String.equal nm "t" then evar (mod_path ^ ".dhall_type")
+        else evar (mod_path ^ "." ^ nm ^ "_dhall_type")
+      in
+      let args = List.map params ~f:dhall_type_of_core_type in
+      eapply dhall_type_fun args
+  | Ptyp_var a ->
+      evar a
   | _ ->
       Location.raise_errorf ~loc:core_type.ptyp_loc "Unsupported type"
 
@@ -121,7 +135,21 @@ let generate_dhall_type type_decl =
     | nm ->
         pvar (nm ^ "_dhall_type")
   in
-  [%stri let [%p ty_name] = [%e dhall_type]]
+  match type_decl.ptype_params with
+  | [] ->
+      [%stri let [%p ty_name] = [%e dhall_type]]
+  | params ->
+      let args =
+        List.map params ~f:(fun (core_type, _variance) ->
+            match core_type.ptyp_desc with
+            | Ptyp_var a ->
+                pvar a
+            | _ ->
+                Location.raise_errorf ~loc:type_decl.ptype_loc
+                  "Type parameter not a type variable" )
+      in
+      let abs = eabstract args dhall_type in
+      [%stri let [%p ty_name] = [%e abs]]
 
 let generate_dhall_types ~loc:_ ~path:_ (_rec_flag, type_decls) =
   List.map type_decls ~f:generate_dhall_type

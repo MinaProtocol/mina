@@ -5,9 +5,9 @@ open Core_kernel
 open Async
 open Unsigned
 open Signature_lib
-open Coda_base
-open Coda_state
-open Coda_transition
+open Mina_base
+open Mina_state
+open Mina_transition
 open Snark_params
 open Blockchain_snark
 open Consensus
@@ -132,7 +132,7 @@ module Vrf_distribution = struct
    *  to simulate any regular properties of how a real chain would be built. *)
   let pick_chain_unrealistically dist =
     let constants = Constants.compiled in
-    let default_window_size = UInt32.to_int constants.delta in
+    let default_window_size = UInt32.to_int constants.delta + 1 in
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
       let window_expired =
@@ -311,7 +311,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   in
   Or_error.iter_error res ~f:(fun e ->
       [%log error]
-        ~metadata:[("error", `String (Error.to_string_hum e))]
+        ~metadata:[("error", Error_json.error_to_yojson e)]
         "Prover threw an error while extending block: $error" ) ;
   res
 
@@ -345,7 +345,7 @@ let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
   in
   Or_error.iter_error res ~f:(fun e ->
       [%log error]
-        ~metadata:[("error", `String (Error.to_string_hum e))]
+        ~metadata:[("error", Error_json.error_to_yojson e)]
         "Prover threw an error while extending block: $error" ) ;
   res
 
@@ -491,7 +491,8 @@ let main () =
       ~transport:
         (Transport.File_system.dumb_logrotate ~directory:"fuzz_logs"
            ~log_filename:"log"
-           ~max_size:(500 * 1024 * 1024))) ;
+           ~max_size:(500 * 1024 * 1024)
+           ~num_rotate:1)) ;
   don't_wait_for
     (let%bind genesis_transition, genesis_staged_ledger =
        create_genesis_data ()

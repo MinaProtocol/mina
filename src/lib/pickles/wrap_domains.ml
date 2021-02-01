@@ -42,7 +42,7 @@ module Make (A : T0) (A_value : T0) = struct
       (let x =
          let (T (typ, conv)) = Impls.Wrap.input () in
          Domain.Pow_2_roots_of_unity
-           (Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ]))
+           (Int.ceil_log2 (Impls.Wrap.Data_spec.size [typ]))
        in
        {Common.wrap_domains with x})
 
@@ -64,10 +64,9 @@ module Make (A : T0) (A_value : T0) = struct
                  ~len:
                    (Common.index_commitment_length
                       ~max_degree:Common.Max_degree.step
-                      Fix_domains.rough_domains.k)
+                      Fix_domains.rough_domains.h)
              in
-             let t : _ Abc.t = {a= g; b= g; c= g} in
-             {Matrix_evals.row= t; col= t; value= t; rc= t} ))
+             Verification_key.dummy_commitments g ))
     in
     let prev_domains = prev ~self ~choices in
     Timer.clock __LOC__ ;

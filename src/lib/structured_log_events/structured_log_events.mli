@@ -60,3 +60,9 @@ val parse_exn : id -> (string * Yojson.Safe.t) list -> t
     [(event_name, event_id, event_field_names)].
 *)
 val dump_registered_events : unit -> (string * id * string list) list
+
+(** [check_interpolation_exn ~msg_loc msg labels]
+    raises an exception if `msg` can't be parsed for log interpolation,
+    or if the interpolation points don't appear in `labels`
+*)
+val check_interpolations_exn : msg_loc:string -> string -> string list -> unit

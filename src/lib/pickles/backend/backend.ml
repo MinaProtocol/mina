@@ -1,9 +1,9 @@
 module Tick = struct
-  include Zexe_backend.Tweedle.Dum_based
-  module Inner_curve = Zexe_backend.Tweedle.Dee
+  include Zexe_backend.Pasta.Vesta_based_plonk
+  module Inner_curve = Zexe_backend.Pasta.Pallas
 end
 
 module Tock = struct
-  include Zexe_backend.Tweedle.Dee_based
-  module Inner_curve = Zexe_backend.Tweedle.Dum
+  include Zexe_backend.Pasta.Pallas_based_plonk
+  module Inner_curve = Zexe_backend.Pasta.Vesta
 end

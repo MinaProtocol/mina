@@ -1,8 +1,8 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 open Pickles_types
 
 include struct
@@ -89,13 +89,14 @@ let%snarkydef step ~(logger : Logger.t)
     in
     (t, body)
   in
-  let%bind ( `Success updated_consensus_state
-           , `Supercharge_coinbase supercharge_coinbase
-           , consensus_state ) =
+  let%bind `Success updated_consensus_state, consensus_state =
     with_label __LOC__
       (Consensus_state_hooks.next_state_checked ~constraint_constants
          ~prev_state:previous_state ~prev_state_hash:previous_state_hash
          transition txn_snark.supply_increase)
+  in
+  let supercharge_coinbase =
+    Consensus.Data.Consensus_state.supercharge_coinbase_var consensus_state
   in
   let prev_pending_coinbase_root =
     previous_state |> Protocol_state.blockchain_state
@@ -107,18 +108,32 @@ let%snarkydef step ~(logger : Logger.t)
     Protocol_state.genesis_state_hash_checked ~state_hash:previous_state_hash
       previous_state
   in
-  let%bind new_state =
+  let%bind new_state, is_base_case =
     let t =
       Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
         ~blockchain_state:(Snark_transition.blockchain_state transition)
         ~consensus_state
         ~constants:(Protocol_state.constants previous_state)
     in
+    let%bind is_base_case =
+      Protocol_state.consensus_state t
+      |> Consensus.Data.Consensus_state.is_genesis_state_var
+    in
+    let%bind previous_state_hash =
+      match constraint_constants.fork with
+      | Some {previous_state_hash= fork_prev; _} ->
+          State_hash.if_ is_base_case
+            ~then_:(State_hash.var_of_t fork_prev)
+            ~else_:t.previous_state_hash
+      | None ->
+          Checked.return t.previous_state_hash
+    in
+    let t = {t with previous_state_hash} in
     let%map () =
       let%bind h, _ = Protocol_state.hash_checked t in
       with_label __LOC__ (State_hash.assert_equal h new_state_hash)
     in
-    t
+    (t, is_base_case)
   in
   let%bind txn_snark_should_verify, success =
     let%bind ledger_hash_didn't_change =
@@ -130,6 +145,9 @@ let%snarkydef step ~(logger : Logger.t)
       Currency.Amount.(equal_var txn_snark.supply_increase (var_of_t zero))
     in
     let%bind new_pending_coinbase_hash, deleted_stack, no_coinbases_popped =
+      let coinbase_receiver =
+        Consensus.Data.Consensus_state.coinbase_receiver_var consensus_state
+      in
       let%bind root_after_delete, deleted_stack =
         Pending_coinbase.Checked.pop_coinbases ~constraint_constants
           prev_pending_coinbase_root
@@ -146,7 +164,7 @@ let%snarkydef step ~(logger : Logger.t)
           (Pending_coinbase.Checked.add_coinbase ~constraint_constants
              root_after_delete
              (Snark_transition.pending_coinbase_update transition)
-             ~supercharge_coinbase previous_state_body_hash)
+             ~coinbase_receiver ~supercharge_coinbase previous_state_body_hash)
       in
       (new_root, deleted_stack, no_coinbases_popped)
     in
@@ -242,10 +260,6 @@ let%snarkydef step ~(logger : Logger.t)
     | Full ->
         txn_snark_should_verify
   in
-  let%bind is_base_case =
-    Protocol_state.consensus_state new_state
-    |> Consensus.Data.Consensus_state.is_genesis_state_var
-  in
   let prev_should_verify =
     match proof_level with
     | Check | None ->
@@ -276,7 +290,8 @@ let check w ?handler ~proof_level ~constraint_constants txn_snark
 
 let rule ~proof_level ~constraint_constants transaction_snark self :
     _ Pickles.Inductive_rule.t =
-  { prevs= [self; transaction_snark]
+  { identifier= "step"
+  ; prevs= [self; transaction_snark]
   ; main=
       (fun [x1; x2] x ->
         let b1, b2 =
@@ -341,19 +356,20 @@ module type S = sig
        , N2.n * (N2.n * unit)
        , N1.n * (N2.n * unit)
        , Protocol_state.Value.t
-       , Proof.t )
+       , Proof.t Async.Deferred.t )
        Pickles.Prover.t
 end
 
-let verify state proof ~key =
-  Pickles.verify (module Nat.N2) (module Statement) key [(state, proof)]
+let verify ts ~key = Pickles.verify (module Nat.N2) (module Statement) key ts
 
 module Make (T : sig
   val tag : Transaction_snark.tag
-end) : S = struct
-  let proof_level = Genesis_constants.Proof_level.compiled
 
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled
+  val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
+end) : S = struct
+  open T
 
   let tag, cache_handle, p, Pickles.Provers.[step] =
     Pickles.compile ~cache:Cache_dir.cache
@@ -363,6 +379,9 @@ end) : S = struct
       ~branches:(module Nat.N1)
       ~max_branching:(module Nat.N2)
       ~name:"blockchain-snark"
+      ~constraint_constants:
+        (Genesis_constants.Constraint_constants.to_snark_keys_header
+           constraint_constants)
       ~choices:(fun ~self ->
         [rule ~proof_level ~constraint_constants T.tag self] )
 
@@ -371,20 +390,18 @@ end) : S = struct
   module Proof = (val p)
 end
 
-let constraint_system_digests () =
+let constraint_system_digests ~proof_level ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
     , digest
         (let main x =
            let open Tick in
-           let%bind x1 = exists Coda_base.State_hash.typ in
+           let%bind x1 = exists Mina_base.State_hash.typ in
            let%bind x2 = exists Transaction_snark.Statement.With_sok.typ in
            let%map _ =
-             step ~proof_level:Genesis_constants.Proof_level.compiled
-               ~constraint_constants:
-                 Genesis_constants.Constraint_constants.compiled
-               ~logger:(Logger.create ()) [x1; x2] x
+             step ~proof_level ~constraint_constants ~logger:(Logger.create ())
+               [x1; x2] x
            in
            ()
          in
-         Tick.constraint_system ~exposing:[Coda_base.State_hash.typ] main) ) ]
+         Tick.constraint_system ~exposing:[Mina_base.State_hash.typ] main) ) ]
