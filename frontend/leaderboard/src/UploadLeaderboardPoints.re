@@ -160,7 +160,7 @@ let uploadChallengePoints = (spreadsheetId, metricsMap) => {
       updateChallengeSheet(
         client,
         spreadsheetId,
-        Sheets.getSheet(Sheets.CurrentReleaseLeaderboard).name ++ "!A4:N",
+        Sheets.getSheet(Sheets.CurrentReleaseLeaderboard).name ++ "!A4:V",
         userMap,
         metricsMap,
       );
