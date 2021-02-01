@@ -1,12 +1,13 @@
 locals {
   east1_region = "us-east1"
   east1_k8s_context = "gke_o1labs-192920_us-east1_coda-infra-east"
+  bk_east1_k8s_context = "gke_o1labs-192920_us-east1_buildkite-infra-east1"
 
   east_prometheus_helm_values = {
     server = {
       global = {
         external_labels = {
-          origin_prometheus = "east-prometheus"
+          origin_prometheus = "east1-prometheus"
         }
       }
       persistentVolume = {
@@ -22,7 +23,7 @@ locals {
           write_relabel_configs = [
             {
               source_labels: ["__name__"]
-              regex: "(container.*|Coda.*)"
+              regex: "(buildkite.*|container.*|Coda.*|watchdog.*)"
               action: "keep"
             }
           ]
@@ -221,15 +222,37 @@ resource "kubernetes_storage_class" "east1_standard" {
 ## Monitoring 
 
 provider helm {
-  alias = "helm_east"
+  alias = "helm_east1"
   kubernetes {
     config_context = local.east1_k8s_context
   }
 }
 
-resource "helm_release" "east_prometheus" {
-  provider  = helm.helm_east
+provider helm {
+  alias = "bk_helm_east1"
+  kubernetes {
+    config_context = local.bk_east1_k8s_context
+  }
+}
+
+resource "helm_release" "east1_prometheus" {
+  provider  = helm.helm_east1
+
   name      = "east-prometheus"
+  chart     = "stable/prometheus"
+  namespace = "default"
+  values = [
+    yamlencode(local.east_prometheus_helm_values)
+  ]
+  wait       = true
+  depends_on = [google_container_cluster.coda_cluster_east]
+  force_update  = true
+}
+
+resource "helm_release" "bk_east1_prometheus" {
+  provider  = helm.bk_helm_east1
+
+  name      = "bk-east-prometheus"
   chart     = "stable/prometheus"
   namespace = "default"
   values = [

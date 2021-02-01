@@ -2,12 +2,11 @@ apiVersion: v2
 name: buildkite-exporter
 description: A Helm chart for O(1) Lab's Buildkite graphql exporter
 type: application
-version: 0.1.2
-appVersion: 0.1.0
+version: 0.1.3
+appVersion: 0.2.0
 annotations:
   artifacthub.io/changes: |
-    - enable Artifacthub repository hosting *changes* annotations
-    - add CHANGELOG.md for chart version => changelog tracking
+    - update default exporter image version (0.1.0 => 0.2.0)
 icon: https://pbs.twimg.com/profile_images/968998928241733632/Rhxmu_9O_400x400.jpg
 keywords:
 - buildkite
