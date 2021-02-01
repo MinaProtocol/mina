@@ -309,7 +309,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig))
+	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig), app.AddedPeers)
 	if err != nil {
 		return nil, badRPC(err)
 	}
@@ -882,6 +882,8 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
+	app.P2p.GatingState.TrustedPeers.Add(info.ID)
+
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
 	}
@@ -897,17 +899,42 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 type beginAdvertisingMsg struct {
 }
 
+type peerDisoverySource int
+
+const (
+	PEER_DISCOVERY_SOURCE_MDNS peerDisoverySource = iota
+	PEER_DISCOVERY_SOURCE_ROUTING
+)
+
+func (source peerDisoverySource) String() string {
+	switch source {
+	case PEER_DISCOVERY_SOURCE_MDNS:
+		return "PEER_DISCOVERY_SOURCE_MDNS"
+	case PEER_DISCOVERY_SOURCE_ROUTING:
+		return "PEER_DISCOVERY_SOURCE_ROUTING"
+	default:
+		return fmt.Sprintf("%d", int(source))
+	}
+}
+
+type peerDiscovery struct {
+	info   peer.AddrInfo
+	source peerDisoverySource
+}
+
 type mdnsListener struct {
-	FoundPeer chan peer.AddrInfo
+	FoundPeer chan peerDiscovery
 	app       *app
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
-	l.app.P2p.GatingState.AllowedPeers.Add(info.ID)
-	l.FoundPeer <- info
+	l.FoundPeer <- peerDiscovery{
+		info:   info,
+		source: PEER_DISCOVERY_SOURCE_MDNS,
+	}
 }
 
-func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
+func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
 	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
 	if err != nil {
 		return err
@@ -936,7 +963,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	foundPeerCh := make(chan peer.AddrInfo)
+	foundPeerCh := make(chan peerDiscovery)
 
 	validPeer := func(who peer.ID) bool {
 		return who.Validate() == nil && who != app.P2p.Me
@@ -944,23 +971,31 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 	// report discovery peers local and remote
 	go func() {
-		for info := range foundPeerCh {
-			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", info.ID)
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+		for discovery := range foundPeerCh {
+			if validPeer(discovery.info.ID) {
+				app.P2p.Logger.Debugf("discovered peer %v via %v; processing", discovery.info.ID, discovery.source)
+				app.P2p.Host.Peerstore().AddAddrs(discovery.info.ID, discovery.info.Addrs, peerstore.ConnectedAddrTTL)
+
+				if discovery.source == PEER_DISCOVERY_SOURCE_MDNS {
+					for _, addr := range discovery.info.Addrs {
+						app.P2p.GatingState.MarkPrivateAddrAsKnown(addr)
+					}
+				}
 
 				// now connect to the peer we discovered
-				err := app.P2p.Host.Connect(app.Ctx, info)
+				err := app.P2p.Host.Connect(app.Ctx, discovery.info)
 				if err != nil {
-					app.P2p.Logger.Error("failed to connect to peer after discovering it: ", info, err.Error())
+					app.P2p.Logger.Error("failed to connect to peer after discovering it: ", discovery.info, err.Error())
 					continue
 				}
+			} else {
+				app.P2p.Logger.Debugf("discovered peer %v via %v; not processing as it is not a valid peer", discovery.info.ID, discovery.source)
 			}
 		}
 	}()
 
 	if !app.NoMDNS {
-		app.P2p.Logger.Debugf("beginning mDNS discovery")
+		app.P2p.Logger.Infof("beginning mDNS discovery")
 		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
@@ -969,7 +1004,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	if !app.NoDHT {
-		app.P2p.Logger.Debugf("beginning DHT discovery")
+		app.P2p.Logger.Infof("beginning DHT discovery")
 		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
 		if routingDiscovery == nil {
 			return nil, errors.New("failed to create routing discovery")
@@ -998,7 +1033,10 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			}
 
 			for peer := range peerCh {
-				foundPeerCh <- peer
+				foundPeerCh <- peerDiscovery{
+					info:   peer,
+					source: PEER_DISCOVERY_SOURCE_ROUTING,
+				}
 			}
 		}()
 	}
@@ -1183,31 +1221,35 @@ type setGatingConfigMsg struct {
 	Isolate        bool     `json:"isolate"`
 }
 
-func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
-	newFilter := ma.NewFilters()
+func gatingConfigFromJson(gc *setGatingConfigMsg, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
 	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
 
-	logger.Info("setting gating config from: %#v", gc)
+	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
+	if err != nil {
+		return nil, err
+	}
 
+	// TODO: perhaps the isolate option should just be passed down to the gating state instead
+	bannedAddrFilters := ma.NewFilters()
 	if gc.Isolate {
-		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
-		if err != nil {
-			return nil, err
-		}
-		newFilter.AddFilter(*ipnet, ma.ActionDeny)
+		bannedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 	}
 	for _, ip := range gc.BannedIPs {
-		err := filterIPString(newFilter, ip, ma.ActionDeny)
+		err := filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	trustedAddrFilters := ma.NewFilters()
+	trustedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 	for _, ip := range gc.TrustedIPs {
-		err := filterIPString(newFilter, ip, ma.ActionAccept)
+		err := filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	bannedPeers := peer.NewSet()
 	for _, peerID := range gc.BannedPeerIDs {
 		id, err := peer.Decode(peerID)
@@ -1217,6 +1259,7 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		}
 		bannedPeers.Add(id)
 	}
+
 	trustedPeers := peer.NewSet()
 	for _, peerID := range gc.TrustedPeerIDs {
 		id, err := peer.Decode(peerID)
@@ -1226,8 +1269,11 @@ func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, err
 		}
 		trustedPeers.Add(id)
 	}
+	for _, peer := range addedPeers {
+		trustedPeers.Add(peer.ID)
+	}
 
-	return codanet.NewCodaGatingState(newFilter, bannedPeers, trustedPeers), nil
+	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
@@ -1235,7 +1281,7 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 
-	newState, err := gatingConfigFromJson(gc)
+	newState, err := gatingConfigFromJson(gc, app.AddedPeers)
 
 	if err != nil {
 		return nil, badRPC(err)
@@ -1306,6 +1352,8 @@ func newApp() *app {
 }
 
 func main() {
+	codanet.Init()
+
 	logging.SetupLogging(logging.Config{
 		Format: logging.JSONOutput,
 		Stderr: true,
