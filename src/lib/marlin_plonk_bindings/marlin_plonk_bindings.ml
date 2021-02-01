@@ -49,6 +49,8 @@ module Tweedle_fq_index = Marlin_plonk_bindings_tweedle_fq_index
 
 module Pasta_fp_verifier_index = Marlin_plonk_bindings_pasta_fp_verifier_index
 module Pasta_fq_verifier_index = Marlin_plonk_bindings_pasta_fq_verifier_index
+module Pasta_5_wires_fp_verifier_index =
+  Marlin_plonk_bindings_pasta_5_wires_fp_verifier_index
 module Tweedle_fp_verifier_index =
   Marlin_plonk_bindings_tweedle_fp_verifier_index
 module Tweedle_fq_verifier_index =
