@@ -21,8 +21,8 @@ in
             OpamInit.andThenRunInDocker [
               "DUNE_PROFILE=testnet_postake_medium_curves",
               -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
-              "PREPROCESSOR=./scripts/zexe-standardize.sh"
-            ] "dune build --verbose --profile=\\\${DUNE_PROFILE} src/app/test_executive/test_executive.exe"
+              "PREPROCESSOR=./scripts/zexe-standardize.sh",
+            ] "./buildkite/scripts/build-test-executive.sh"
             
             #
             
