@@ -184,6 +184,38 @@ module Plonk_proof = struct
     ; prev_challenges: ('field array * 'poly_comm) array }
 end
 
+module Plonk_5_wires_proof = struct
+  module Evaluations = struct
+    type 'field t =
+      { w:
+          'field array
+          * 'field array
+          * 'field array
+          * 'field array
+          * 'field array
+      ; z: 'field array
+      ; t: 'field array
+      ; f: 'field array
+      ; s: 'field array * 'field array * 'field array * 'field array }
+  end
+
+  module Opening_proof = Plonk_proof.Opening_proof
+
+  module Messages = struct
+    type 'poly_comm t =
+      { w_comm: 'poly_comm * 'poly_comm * 'poly_comm * 'poly_comm * 'poly_comm
+      ; z_comm: 'poly_comm
+      ; t_comm: 'poly_comm }
+  end
+
+  type ('field, 'g, 'poly_comm) t =
+    { messages: 'poly_comm Messages.t
+    ; proof: ('field, 'g) Opening_proof.t
+    ; evals: 'field Evaluations.t * 'field Evaluations.t
+    ; public: 'field array
+    ; prev_challenges: ('field array * 'poly_comm) array }
+end
+
 module Oracles = struct
   module Random_oracles = struct
     type 'field t =

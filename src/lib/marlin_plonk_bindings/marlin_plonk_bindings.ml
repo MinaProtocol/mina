@@ -59,6 +59,7 @@ module Tweedle_fq_verifier_index =
 (* Proofs *)
 module Pasta_fp_proof = Marlin_plonk_bindings_pasta_fp_proof
 module Pasta_fq_proof = Marlin_plonk_bindings_pasta_fq_proof
+module Pasta_5_wires_fp_proof = Marlin_plonk_bindings_pasta_5_wires_fp_proof
 module Tweedle_fp_proof = Marlin_plonk_bindings_tweedle_fp_proof
 module Tweedle_fq_proof = Marlin_plonk_bindings_tweedle_fq_proof
 

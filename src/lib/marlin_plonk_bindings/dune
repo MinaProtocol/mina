@@ -46,6 +46,7 @@
    ;; Proofs
    marlin_plonk_bindings_pasta_fp_proof
    marlin_plonk_bindings_pasta_fq_proof
+   marlin_plonk_bindings_pasta_5_wires_fp_proof
    marlin_plonk_bindings_tweedle_fp_proof
    marlin_plonk_bindings_tweedle_fq_proof
    ;; Oracles
