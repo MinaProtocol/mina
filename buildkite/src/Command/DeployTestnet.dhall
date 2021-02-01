@@ -5,7 +5,6 @@ let Size = ./Size.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 
-let defaultArtifactStep = { name = "MinaArtifact", key = "mina-docker-image" }
 
 let deployEnv = "DOCKER_DEPLOY_ENV" in
 
