@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	gonet "net"
-	"os"
 	"path"
 	"time"
 
@@ -35,18 +33,30 @@ import (
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr/net"
 	"golang.org/x/crypto/blake2b"
 
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
 	mplex "github.com/libp2p/go-mplex"
 )
 
+func parseCIDR(cidr string) gonet.IPNet {
+	_, ipnet, err := gonet.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return *ipnet
+}
+
+type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
+
 var (
 	logger   = logging.Logger("codanet.Helper")
 	gsLogger = logging.Logger("codanet.CodaGatingState")
 	NoDHT bool // option for testing to completely disable the DHT
+	WithPrivate bool // option for testing to allow private IPs
 
-	privateIPs = []string{
+	privateCIDRs = []string{
 		"10.0.0.0/8",
 		"172.16.0.0/12",
 		"192.168.0.0/16",
@@ -56,16 +66,23 @@ var (
 	}
 
 	pxProtocolID = protocol.ID("/mina/peer-exchange")
+
+	privateIpFilter *ma.Filters = nil
 )
 
-type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
-
-func parseCIDR(cidr string) gonet.IPNet {
-	_, ipnet, err := gonet.ParseCIDR(cidr)
-	if err != nil {
-		panic(err)
+func initPrivateIpFilter() {
+	privateIpFilter = ma.NewFilters()
+	if WithPrivate {
+		return 
 	}
-	return *ipnet
+	
+	for _, cidr := range privateCIDRs {
+		privateIpFilter.AddFilter(parseCIDR(cidr), ma.ActionDeny)
+	}
+}
+
+func isPrivateAddr(addr ma.Multiaddr) bool {
+	return privateIpFilter.AddrBlocked(addr)
 }
 
 type CodaConnectionManager struct {
@@ -215,54 +232,100 @@ type Helper struct {
 	Seeds []peer.AddrInfo
 }
 
-type customValidator struct {
-	Base record.Validator
-}
-
 // this type implements the ConnectionGating interface
 // https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
 // the comments of the functions below are taken from those docs.
 type CodaGatingState struct {
-	logger              logging.EventLogger
-	InternalAddrFilters *ma.Filters
-	AddrFilters         *ma.Filters
-	DeniedPeers         *peer.Set
-	AllowedPeers        *peer.Set
+	logger                  logging.EventLogger
+	KnownPrivateAddrFilters *ma.Filters
+	BannedAddrFilters       *ma.Filters
+	TrustedAddrFilters      *ma.Filters
+	BannedPeers             *peer.Set
+	TrustedPeers            *peer.Set
 }
 
 // NewCodaGatingState returns a new CodaGatingState
-func NewCodaGatingState(addrFilters *ma.Filters, denied *peer.Set, allowed *peer.Set) *CodaGatingState {
-	if addrFilters == nil {
-		addrFilters = ma.NewFilters()
+func NewCodaGatingState(bannedAddrFilters *ma.Filters, trustedAddrFilters *ma.Filters, bannedPeers *peer.Set, trustedPeers *peer.Set) *CodaGatingState {
+	logger := logging.Logger("codanet.CodaGatingState")
+
+	if bannedAddrFilters == nil {
+		bannedAddrFilters = ma.NewFilters()
 	}
 
-	if denied == nil {
-		denied = peer.NewSet()
+	if trustedAddrFilters == nil {
+		trustedAddrFilters = ma.NewFilters()
 	}
 
-	if allowed == nil {
-		allowed = peer.NewSet()
+	if bannedPeers == nil {
+		bannedPeers = peer.NewSet()
 	}
 
-	internalAddrFilters := ma.NewFilters()
-	for _, addr := range privateIPs {
-		internalAddrFilters.AddFilter(parseCIDR(addr), ma.ActionDeny)
+	if trustedPeers == nil {
+		trustedPeers = peer.NewSet()
 	}
 
-	logger.Info("computed gating state addr filters: %#v", addrFilters)	
+	// we initialize the known private addr filters to reject all ip addresses initially
+	knownPrivateAddrFilters := ma.NewFilters()
+	knownPrivateAddrFilters.AddFilter(parseCIDR("0.0.0.0/0"), ma.ActionDeny)
 
 	return &CodaGatingState{
-		logger:              gsLogger,
-		AddrFilters:         addrFilters,
-		InternalAddrFilters: internalAddrFilters,
-		DeniedPeers:         denied,
-		AllowedPeers:        allowed,
+		logger:                  logger,
+		BannedAddrFilters:       bannedAddrFilters,
+		TrustedAddrFilters:      trustedAddrFilters,
+		KnownPrivateAddrFilters: knownPrivateAddrFilters,
+		BannedPeers:             bannedPeers,
+		TrustedPeers:            trustedPeers,
 	}
 }
 
-func (gs *CodaGatingState) blockedInternalAddr(addr ma.Multiaddr) bool {
-	_, exists := os.LookupEnv("CONNECT_PRIVATE_IPS")
-	return !exists && gs.InternalAddrFilters.AddrBlocked(addr)
+func (gs *CodaGatingState) MarkPrivateAddrAsKnown(addr ma.Multiaddr) {
+	if isPrivateAddr(addr) && gs.KnownPrivateAddrFilters.AddrBlocked(addr) {
+		gs.logger.Infof("marking private addr %v as known", addr)
+
+		ip, err := manet.ToIP(addr)
+		if err != nil {
+			panic(err)
+		}
+
+		bits := len(ip) * 8
+		ipNet := gonet.IPNet{
+			IP:   ip,
+			Mask: gonet.CIDRMask(bits, bits),
+		}
+		gs.KnownPrivateAddrFilters.AddFilter(ipNet, ma.ActionAccept)
+	}
+}
+
+func (gs *CodaGatingState) isPeerTrusted(p peer.ID) bool {
+	return gs.TrustedPeers.Contains(p)
+}
+
+func (gs *CodaGatingState) isPeerBanned(p peer.ID) bool {
+	return gs.BannedPeers.Contains(p)
+}
+
+// checks if a peer id is allowed to dial/accept
+func (gs *CodaGatingState) isAllowedPeer(p peer.ID) bool {
+	return gs.isPeerTrusted(p) || !gs.isPeerBanned(p)
+}
+
+func (gs *CodaGatingState) isAddrTrusted(addr ma.Multiaddr) bool {
+	return !gs.TrustedAddrFilters.AddrBlocked(addr)
+}
+
+func (gs *CodaGatingState) isAddrBanned(addr ma.Multiaddr) bool {
+	return gs.BannedAddrFilters.AddrBlocked(addr)
+}
+
+// checks if an address is allowed to dial/accept
+func (gs *CodaGatingState) isAllowedAddr(addr ma.Multiaddr) bool {
+	publicOrKnownPrivate := !isPrivateAddr(addr) || !gs.KnownPrivateAddrFilters.AddrBlocked(addr)
+	return gs.isAddrTrusted(addr) || (!gs.isAddrBanned(addr) && publicOrKnownPrivate)
+}
+
+// checks if a peer is allowed to dial/accept; if the peer is in the trustlist, the address checks are overriden
+func (gs *CodaGatingState) isAllowedPeerWithAddr(p peer.ID, addr ma.Multiaddr) bool {
+	return gs.isPeerTrusted(p) || (gs.isAllowedPeer(p) && gs.isAllowedAddr(addr))
 }
 
 func (gs *CodaGatingState) logGate() {
@@ -273,10 +336,10 @@ func (gs *CodaGatingState) logGate() {
 //
 // This is called by the network.Network implementation when dialling a peer.
 func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
-	allow = !gs.DeniedPeers.Contains(p) || gs.AllowedPeers.Contains(p)
+	allow = gs.isAllowedPeer(p)
 
 	if !allow {
-		gs.logger.Infof("disallowing peer dial from: %v", p)
+		gs.logger.Infof("disallowing peer dial to: %v (peer)", p)
 		gs.logGate()
 	}
 
@@ -289,14 +352,10 @@ func (gs *CodaGatingState) InterceptPeerDial(p peer.ID) (allow bool) {
 // This is called by the network.Network implementation after it has
 // resolved the peer's addrs, and prior to dialling each.
 func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (allow bool) {
-	if gs.AddrFilters.AddrBlocked(addr) {
-		return false
-	}
-
-	allow = gs.AllowedPeers.Contains(id) || (!gs.DeniedPeers.Contains(id) && !gs.AddrFilters.AddrBlocked(addr) && !gs.blockedInternalAddr(addr))
+	allow = gs.isAllowedPeerWithAddr(id, addr)
 
 	if !allow {
-		gs.logger.Infof("disallowing peer dial from: %v", id)
+		gs.logger.Infof("disallowing peer dial to: %v + %v (peer + address)", id, addr)
 		gs.logGate()
 	}
 
@@ -309,12 +368,17 @@ func (gs *CodaGatingState) InterceptAddrDial(id peer.ID, addr ma.Multiaddr) (all
 // Bluetooth), straight after it has accepted a connection from its socket.
 func (gs *CodaGatingState) InterceptAccept(addrs network.ConnMultiaddrs) (allow bool) {
 	remoteAddr := addrs.RemoteMultiaddr()
-
-	allow = !gs.AddrFilters.AddrBlocked(remoteAddr)
+	allow = gs.isAddrTrusted(remoteAddr) || !gs.isAddrBanned(remoteAddr)
 
 	if !allow {
 		gs.logger.Infof("refusing to accept inbound connection from addr: %v", remoteAddr)
 		gs.logGate()
+	}
+
+	// If we are receiving a connection, and the remote address is private,
+	// then we infer that we should be able to connect to that private address.
+	if allow {
+		gs.MarkPrivateAddrAsKnown(remoteAddr)
 	}
 
 	return
@@ -331,7 +395,7 @@ func (gs *CodaGatingState) InterceptSecured(_ network.Direction, id peer.ID, add
 	// connections in coda are symmetric: if i am allowed to connect to
 	// you, you are allowed to connect to me.
 	remoteAddr := addrs.RemoteMultiaddr()
-	allow = gs.AllowedPeers.Contains(id) || !gs.DeniedPeers.Contains(id)
+	allow = gs.isAllowedPeerWithAddr(id, remoteAddr)
 
 	if !allow {
 		gs.logger.Infof("refusing to accept inbound connection from authenticated addr: %v", remoteAddr)
@@ -352,16 +416,6 @@ func (gs *CodaGatingState) InterceptUpgraded(network.Conn) (allow bool, reason c
 	allow = true
 	reason = control.DisconnectReason(0)
 	return
-}
-
-func (cv customValidator) Validate(key string, value []byte) error {
-	log.Printf("DHT Validating: %s = %s", key, value)
-	return cv.Base.Validate(key, value)
-}
-
-func (cv customValidator) Select(key string, values [][]byte) (int, error) {
-	log.Printf("DHT Selecting Among: %s = %s", key, bytes.Join(values, []byte("; ")))
-	return cv.Base.Select(key, values)
 }
 
 func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
@@ -391,6 +445,20 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 
 	logger.Debugf("node=%s sending random peers", h.Host.ID(), ret)
 	return ret
+}
+
+type customValidator struct {
+	Base record.Validator
+}
+
+func (cv customValidator) Validate(key string, value []byte) error {
+	logger.Debugf("DHT Validating: %s = %s", key, value)
+	return cv.Base.Validate(key, value)
+}
+
+func (cv customValidator) Select(key string, values [][]byte) (int, error) {
+	logger.Debugf("DHT Selecting Among: %s = %s", key, bytes.Join(values, []byte("; ")))
+	return cv.Base.Select(key, values)
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
@@ -436,14 +504,14 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	}
 }
 
-// TODO: just put this into main.go?
-
 // MakeHelper does all the initialization to run one host
 func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
 	}
+
+	initPrivateIpFilter()
 
 	dso := dsb.DefaultOptions
 
@@ -490,20 +558,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 				as = append(as, externalAddr)
 			}
 
-			fs := ma.NewFilters()
-			for _, addr := range privateIPs {
-				fs.AddFilter(parseCIDR(addr), ma.ActionDeny)
-			}
-
-			bs := []ma.Multiaddr{}
-			for _, a := range as {
-				if fs.AddrBlocked(a) {
-					continue
-				}
-				bs = append(bs, a)
-			}
-
-			return bs
+			return as
 		}),
 		p2p.NATPortMap(),
 		p2p.Routing(

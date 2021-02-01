@@ -6,6 +6,11 @@ variable "generate_and_upload_artifacts" {
   default = true
 }
 
+variable "artifact_path" {
+  type = string
+  default = "/tmp"
+}
+
 # K8s Cluster Vars
 
 variable "cluster_name" {

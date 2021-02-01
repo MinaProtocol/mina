@@ -36,7 +36,7 @@ var port = 7000
 func TestMain(m *testing.M) {
 	_ = logging.SetLogLevel("codanet.Helper", "debug")
 	_ = logging.SetLogLevel("codanet.CodaGatingState", "debug")
-	_ = os.Setenv("CONNECT_PRIVATE_IPS", "true")
+	codanet.WithPrivate = true
 
 	os.Exit(m.Run())
 }
@@ -65,14 +65,14 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *
 		newTestKey(t),
 		string(testProtocol),
 		seeds,
-		codanet.NewCodaGatingState(nil, nil, nil),
+		codanet.NewCodaGatingState(nil, nil, nil, nil),
 		maxConns,
 		true,
 	)
 	require.NoError(t, err)
 	port++
 
-	helper.GatingState.AddrFilters = ma.NewFilters()
+	helper.GatingState.TrustedAddrFilters = ma.NewFilters()
 	helper.Host.SetStreamHandler(testProtocol, testStreamHandler)
 
 	t.Cleanup(func() {
@@ -494,7 +494,7 @@ func TestOpenStreamMsg(t *testing.T) {
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -528,7 +528,7 @@ func TestCloseStreamMsg(t *testing.T) {
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -573,7 +573,7 @@ func TestResetStreamMsg(t *testing.T) {
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -618,7 +618,7 @@ func TestSendStreamMsg(t *testing.T) {
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -674,7 +674,7 @@ func TestAddStreamHandlerMsg(t *testing.T) {
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -779,7 +779,7 @@ func TestFindPeerMsg(t *testing.T) {
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
@@ -809,7 +809,7 @@ func TestListPeersMsg(t *testing.T) {
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "127.0.0.1",
+		Host:       "192.168.0.100",
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
