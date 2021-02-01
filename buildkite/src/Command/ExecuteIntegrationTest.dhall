@@ -16,20 +16,21 @@ in
     Command.build
       Command.Config::{
         commands =
-            -- Build test executive binary and cache
-            -- TODO: cache using `cacheThrough` method (see: https://github.com/MinaProtocol/mina/blob/develop/buildkite/src/Jobs/Lint/ValidationService.dhall#L25)
+            -- Build test executive binary
             OpamInit.andThenRunInDocker [
               "DUNE_PROFILE=testnet_postake_medium_curves",
               -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
-              "PREPROCESSOR=./scripts/zexe-standardize.sh",
+              "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-test-executive.sh"
             
             #
             
             [
+              -- Cache test-executive binary
+              -- TODO: cache using `cacheThrough` method
               Cmd.run "cp src/app/test_executive/test_executive.exe . && buildkite/scripts/buildkite-artifact-helper.sh test_executive.exe",
 
-              -- download deploy env to identify test dependencies
+              -- Download deploy env to identify test dependencies
               Cmd.run (
                 "if [ ! -f ${deployEnv} ]; then " ++
                     "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
