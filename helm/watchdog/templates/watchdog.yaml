@@ -28,8 +28,8 @@ spec:
             memory: 512m
             cpu: 1.0
         image: {{ .Values.image }}
-        command: ["bash"]
-        args: ["-c", "/code/main.sh"]
+        command: ["python3"]
+        args: ["/code/watchdog.py"]
         env:
           - name: "RESTART_EVERY_MINS"
             value: {{ .Values.restartEveryMins | quote }}
@@ -43,7 +43,10 @@ spec:
             value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
           - name: "MAKE_REPORT_ACCOUNTS"
             value: {{ .Values.makeReportAccounts | quote }}
+          - name: "METRICS_PORT"
+            value: {{ $.Values.coda.ports.metrics | quote }}
         ports: 
         - name: metrics-port
-          containerPort: 8000
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.metrics }}
         imagePullPolicy: Always
