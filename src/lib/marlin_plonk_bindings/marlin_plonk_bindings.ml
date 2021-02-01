@@ -42,6 +42,7 @@ module Tweedle_fq_urs = Marlin_plonk_bindings_tweedle_fq_urs
 module Pasta_fp_index = Marlin_plonk_bindings_pasta_fp_index
 module Pasta_fq_index = Marlin_plonk_bindings_pasta_fq_index
 module Pasta_5_wires_fp_index = Marlin_plonk_bindings_pasta_5_wires_fp_index
+module Pasta_5_wires_fq_index = Marlin_plonk_bindings_pasta_5_wires_fq_index
 module Tweedle_fp_index = Marlin_plonk_bindings_tweedle_fp_index
 module Tweedle_fq_index = Marlin_plonk_bindings_tweedle_fq_index
 
@@ -51,6 +52,8 @@ module Pasta_fp_verifier_index = Marlin_plonk_bindings_pasta_fp_verifier_index
 module Pasta_fq_verifier_index = Marlin_plonk_bindings_pasta_fq_verifier_index
 module Pasta_5_wires_fp_verifier_index =
   Marlin_plonk_bindings_pasta_5_wires_fp_verifier_index
+module Pasta_5_wires_fq_verifier_index =
+  Marlin_plonk_bindings_pasta_5_wires_fq_verifier_index
 module Tweedle_fp_verifier_index =
   Marlin_plonk_bindings_tweedle_fp_verifier_index
 module Tweedle_fq_verifier_index =
@@ -60,6 +63,7 @@ module Tweedle_fq_verifier_index =
 module Pasta_fp_proof = Marlin_plonk_bindings_pasta_fp_proof
 module Pasta_fq_proof = Marlin_plonk_bindings_pasta_fq_proof
 module Pasta_5_wires_fp_proof = Marlin_plonk_bindings_pasta_5_wires_fp_proof
+module Pasta_5_wires_fq_proof = Marlin_plonk_bindings_pasta_5_wires_fq_proof
 module Tweedle_fp_proof = Marlin_plonk_bindings_tweedle_fp_proof
 module Tweedle_fq_proof = Marlin_plonk_bindings_tweedle_fq_proof
 
