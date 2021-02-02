@@ -271,7 +271,7 @@ let main inputs =
           in
           network_state_writer_ref := Some network_state_writer ;
           let (`Don't_call_in_tests dsl) =
-            Dsl.create ~network ~event_router ~network_state_reader
+            Dsl.create ~logger ~network ~event_router ~network_state_reader
           in
           (network, dsl)
         in
@@ -284,7 +284,11 @@ let main inputs =
   let exit_reason, test_result =
     match monitor_test_result with
     | Ok malleable_error ->
-        ("test completed", Deferred.return malleable_error)
+        let exit_reason =
+          if Malleable_error.is_ok malleable_error then "test completed"
+          else "errors occurred"
+        in
+        (exit_reason, Deferred.return malleable_error)
     | Error exn ->
         [%log error] "%s" (Exn.to_string_mach exn) ;
         ("exception thrown", Malleable_error.of_error_hard (Error.of_exn exn))

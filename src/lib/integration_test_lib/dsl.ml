@@ -39,16 +39,17 @@ module Make (Engine : Intf.Engine.S) () :
 
   (* TODO: monadify as Malleable_error w/ global value threading *)
   type t =
-    { network: Engine.Network.t
+    { logger: Logger.t
+    ; network: Engine.Network.t
     ; event_router: Event_router.t
     ; network_state_reader: Network_state.t Broadcast_pipe.Reader.t }
 
-  let create ~network ~event_router ~network_state_reader =
-    let t = {network; event_router; network_state_reader} in
+  let create ~logger ~network ~event_router ~network_state_reader =
+    let t = {logger; network; event_router; network_state_reader} in
     `Don't_call_in_tests t
 
-  let hard_wait_for_network_state_predicate ~hard_timeout ~network_state_reader
-      ~init ~check =
+  let hard_wait_for_network_state_predicate ~logger ~hard_timeout
+      ~network_state_reader ~init ~check =
     let open Wait_condition in
     let handle_predicate_result = function
       | Predicate_passed ->
@@ -59,6 +60,7 @@ module Make (Engine : Intf.Engine.S) () :
           `Continue new_predicate_state
     in
     let handle_network_state predicate_state network_state =
+      [%log debug] "Handling network state predicate" ;
       check predicate_state network_state |> handle_predicate_result
     in
     match
@@ -72,11 +74,12 @@ module Make (Engine : Intf.Engine.S) () :
           ~timeout_duration:hard_timeout ~timeout_result:`Hard_timeout
           ~init:init_predicate_state ~f:handle_network_state
 
-  let hard_wait_for_event_predicate ~hard_timeout ~event_router ~event_type
-      ~init ~f =
+  let hard_wait_for_event_predicate ~logger ~hard_timeout ~event_router
+      ~event_type ~init ~f =
     let open Wait_condition in
     let state = ref init in
     let handle_event node data =
+      [%log debug] "Handling event predicate" ;
       Deferred.return
         ( match f !state node data with
         | Predicate_passed ->
@@ -95,39 +98,57 @@ module Make (Engine : Intf.Engine.S) () :
     let open Wait_condition in
     let constants = Engine.Network.constants t.network in
     let soft_timeout =
-      Option.value_exn
-        (Network_time_span.to_span condition.soft_timeout ~constants)
+      Network_time_span.to_span condition.soft_timeout ~constants
     in
     let hard_timeout =
-      Option.value_exn
-        (Network_time_span.to_span condition.hard_timeout ~constants)
+      Network_time_span.to_span condition.hard_timeout ~constants
     in
     let start_time = Time.now () in
+    [%log' info t.logger]
+      "Waiting for %s (soft_timeout: $soft_timeout, hard_timeout: \
+       $hard_timeout)"
+      condition.description
+      ~metadata:
+        [ ( "soft_timeout"
+          , `String
+              (Network_time_span.to_string ~constants condition.soft_timeout)
+          )
+        ; ( "hard_timeout"
+          , `String
+              (Network_time_span.to_string ~constants condition.hard_timeout)
+          ) ] ;
     let%bind result =
       match condition.predicate with
       | Network_state_predicate (init, check) ->
-          hard_wait_for_network_state_predicate
+          hard_wait_for_network_state_predicate ~logger:t.logger
             ~network_state_reader:t.network_state_reader ~hard_timeout ~init
             ~check
       | Event_predicate (event_type, init, f) ->
-          hard_wait_for_event_predicate ~event_router:t.event_router
-            ~hard_timeout ~event_type ~init ~f
+          hard_wait_for_event_predicate ~logger:t.logger
+            ~event_router:t.event_router ~hard_timeout ~event_type ~init ~f
     in
     match result with
     | `Hard_timeout ->
-        Malleable_error.of_string_hard_error "wait_for hit a hard timeout"
+        Malleable_error.of_string_hard_error_format
+          "hit a hard timeout waiting for %s" condition.description
     | `Failure error ->
         Malleable_error.of_error_hard
-          (Error.of_list [Error.of_string "wait_for hit an error"; error])
+          (Error.of_list
+             [ Error.createf "wait_for hit an error waiting for %s"
+                 condition.description
+             ; error ])
     | `Success ->
         let soft_timeout_was_met =
           Time.(add start_time soft_timeout >= now ())
         in
-        if soft_timeout_was_met then Malleable_error.return ()
+        if soft_timeout_was_met then (
+          [%log' info t.logger] "Finished waiting for %s" condition.description ;
+          Malleable_error.return () )
         else
-          Error.of_string
-            "wait_for hit a soft timeout (condition succeeded, but beyond \
-             expectation)"
+          Error.createf
+            "wait_for hit a soft timeout waiting for %s (condition succeeded, \
+             but beyond expectation)"
+            condition.description
           |> Malleable_error.soft_error ()
 
   (**************************************************************************************************)

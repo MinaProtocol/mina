@@ -70,6 +70,8 @@ type 'a t =
   | Block_produced : Block_produced.t t
   | Breadcrumb_added : Breadcrumb_added.t t
 
+val to_string : 'a t -> string
+
 type existential = Event_type : 'a t -> existential
 [@@deriving sexp, to_yojson]
 

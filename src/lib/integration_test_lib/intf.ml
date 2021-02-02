@@ -226,7 +226,8 @@ module Dsl = struct
 
     (* TODO: move this functionality to a more suitable location *)
     val create :
-         network:Engine.Network.t
+         logger:Logger.t
+      -> network:Engine.Network.t
       -> event_router:Event_router.t
       -> network_state_reader:Network_state.t Broadcast_pipe.Reader.t
       -> [`Don't_call_in_tests of t]

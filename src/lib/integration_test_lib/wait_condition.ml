@@ -1,5 +1,7 @@
 open Core_kernel
 open Mina_base
+open Currency
+open Signature_lib
 
 module Make
     (Engine : Intf.Engine.S)
@@ -27,7 +29,8 @@ struct
         -> predicate
 
   type t =
-    { predicate: predicate
+    { description: string
+    ; predicate: predicate
     ; soft_timeout: Network_time_span.t
     ; hard_timeout: Network_time_span.t }
 
@@ -45,21 +48,23 @@ struct
       then Predicate_passed
       else Predicate_continuation ()
     in
-    let soft_timeout_in_mins = 2.0 in
-    { predicate= Network_state_predicate (check (), check)
-    ; soft_timeout= Literal (Time.Span.of_min soft_timeout_in_mins)
-    ; hard_timeout= Literal (Time.Span.of_min (soft_timeout_in_mins *. 2.0)) }
+    { description= Printf.sprintf "\"%s\" to initialize" (Node.id node)
+    ; predicate= Network_state_predicate (check (), check)
+    ; soft_timeout= Literal (Time.Span.of_min 5.0)
+    ; hard_timeout= Literal (Time.Span.of_min 7.5) }
 
   (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =
     let init state = Predicate_continuation state.blocks_generated in
     let check init_blocks_generated state =
+      Printf.printf !"%d\n%!" (state.blocks_generated - init_blocks_generated) ;
       if state.blocks_generated - init_blocks_generated >= n then
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
     let soft_timeout_in_slots = 8 * n in
-    { predicate= Network_state_predicate (init, check)
+    { description= Printf.sprintf "%d blocks to be produced" n
+    ; predicate= Network_state_predicate (init, check)
     ; soft_timeout= Slots soft_timeout_in_slots
     ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
 
@@ -77,7 +82,13 @@ struct
       else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 * 3 in
-    { predicate= Network_state_predicate (check (), check)
+    let formatted_nodes =
+      nodes
+      |> List.map ~f:(fun node -> "\"" ^ Node.id node ^ "\"")
+      |> String.concat ~sep:", "
+    in
+    { description= Printf.sprintf "%s to synchronize" formatted_nodes
+    ; predicate= Network_state_predicate (check (), check)
     ; soft_timeout= Slots soft_timeout_in_slots
     ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
 
@@ -127,7 +138,12 @@ struct
           Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 in
-    { predicate= Event_predicate (Event_type.Breadcrumb_added, (), check)
+    { description=
+        Printf.sprintf "payment from %s to %s of amount %s"
+          (Public_key.Compressed.to_string sender)
+          (Public_key.Compressed.to_string receiver)
+          (Amount.to_string amount)
+    ; predicate= Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout= Slots soft_timeout_in_slots
     ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
 end

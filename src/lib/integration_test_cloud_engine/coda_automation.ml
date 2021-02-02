@@ -3,6 +3,7 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
+open Cmd_util
 open Integration_test_lib
 open Unix
 
@@ -315,9 +316,9 @@ module Network_manager = struct
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
-  let run_cmd t prog args = Cmd_util.run_cmd t.testnet_dir prog args
+  let run_cmd t prog args = run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn t prog args = Cmd_util.run_cmd_exn t.testnet_dir prog args
+  let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
     let testnet_dir =
@@ -329,17 +330,20 @@ module Network_manager = struct
       if%bind File_system.dir_exists testnet_dir then (
         [%log warn]
           "Old network deployment found; attempting to refresh and cleanup" ;
-        let%bind () =
+        let%bind _ =
           Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
         in
-        let%bind () =
+        let%bind _ =
           let open Process.Output in
           let%bind state_output =
             Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
           in
           if not (String.is_empty state_output.stdout) then
-            Cmd_util.run_cmd_exn testnet_dir "terraform"
-              ["destroy"; "-auto-approve"]
+            let%map _ =
+              Cmd_util.run_cmd_exn testnet_dir "terraform"
+                ["destroy"; "-auto-approve"]
+            in
+            ()
           else return ()
         in
         File_system.remove_dir testnet_dir )
@@ -409,26 +413,29 @@ module Network_manager = struct
       ; keypairs= List.unzip network_config.keypairs |> snd }
     in
     [%log info] "Initializing terraform" ;
-    let%bind () = run_cmd_exn t "terraform" ["init"] in
-    let%map () = run_cmd_exn t "terraform" ["validate"] in
+    let%bind _ = run_cmd_exn t "terraform" ["init"] in
+    let%map _ = run_cmd_exn t "terraform" ["validate"] in
     t
 
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
     [%log' info t.logger] "Deploying network" ;
-    let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
+    let%bind _ = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     [%log' info t.logger] "Uploading network secrets" ;
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          run_cmd_exn t "kubectl"
-            [ "create"
-            ; "secret"
-            ; "generic"
-            ; secret
-            ; "--cluster=" ^ t.cluster
-            ; "--namespace=" ^ t.namespace
-            ; "--from-file=key=" ^ secret
-            ; "--from-file=pub=" ^ secret ^ ".pub" ] )
+          let%map _ =
+            run_cmd_exn t "kubectl"
+              [ "create"
+              ; "secret"
+              ; "generic"
+              ; secret
+              ; "--cluster=" ^ t.cluster
+              ; "--namespace=" ^ t.namespace
+              ; "--from-file=key=" ^ secret
+              ; "--from-file=pub=" ^ secret ^ ".pub" ]
+          in
+          () )
     in
     t.deployed <- true ;
     let result =
@@ -453,7 +460,7 @@ module Network_manager = struct
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    let%bind () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
+    let%bind _ = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
     t.deployed <- false ;
     Deferred.unit
 

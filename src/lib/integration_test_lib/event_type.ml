@@ -216,6 +216,8 @@ let existential_to_string = function
   | Event_type Breadcrumb_added ->
       "Breadcrumb_added"
 
+let to_string e = existential_to_string (Event_type e)
+
 let existential_of_string_exn = function
   | "Log_error" ->
       Event_type Log_error
@@ -277,7 +279,7 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
 let event_to_yojson event =
   let (Event (t, d)) = event in
   let (module Type) = event_type_module t in
-  Type.to_yojson d
+  `Assoc [(to_string t, Type.to_yojson d)]
 
 let to_structured_event_id event_type =
   let (Event_type t) = event_type in

@@ -54,6 +54,12 @@ end)
 
 include T
 
+let is_ok = function
+  | Ok {Accumulator.computation_result= _; soft_errors= []} ->
+      true
+  | _ ->
+      false
+
 let ok_unit = return ()
 
 let ok_exn (res : 'a t) : 'a Deferred.t =

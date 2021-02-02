@@ -1,5 +1,6 @@
 open Async
 open Core
+open Cmd_util
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 module Node = Kubernetes_network.Node
@@ -83,7 +84,7 @@ module Subscription = struct
     in
     let%bind authorization =
       let%map token =
-        Process.run ~prog ~args:["auth"; "print-access-token"] ()
+        run_cmd_or_error "." prog ["auth"; "print-access-token"]
       in
       let token = String.strip token in
       String.concat ["Authorization: Bearer "; token]
@@ -104,25 +105,25 @@ module Subscription = struct
       |> Yojson.Safe.to_string
     in
     let%bind response =
-      Process.run ~prog:"curl"
-        ~args:
-          [ "--request"
-          ; "POST"
-          ; url
-          ; header
-          ; authorization
-          ; header
-          ; req_type
-          ; header
-          ; content_type
-          ; "--data"
-          ; data
-          ; "--compressed" ]
-        ()
+      run_cmd_or_error "." "curl"
+        [ "--request"
+        ; "--silent"
+        ; "--show-error"
+        ; "POST"
+        ; url
+        ; header
+        ; authorization
+        ; header
+        ; req_type
+        ; header
+        ; content_type
+        ; "--data"
+        ; data
+        ; "--compressed" ]
     in
+    [%log spam] "Create sink response: $response"
+      ~metadata:[("response", `String response)] ;
     let%bind response_json = Deferred.return (yojson_from_string response) in
-    [%log debug] "Create sink response: $response"
-      ~metadata:[("response", response_json)] ;
     match
       Yojson.Safe.Util.(to_option Fn.id (member "error" response_json))
     with
@@ -147,20 +148,18 @@ module Subscription = struct
             gcloud_key_file_env
     in
     let create_topic name =
-      Process.run ~prog ~args:["pubsub"; "topics"; "create"; name] ()
+      run_cmd_or_error "." prog ["pubsub"; "topics"; "create"; name]
     in
     let create_subscription name topic =
-      Process.run ~prog
-        ~args:
-          [ "pubsub"
-          ; "subscriptions"
-          ; "create"
-          ; name
-          ; "--topic"
-          ; topic
-          ; "--topic-project"
-          ; project_id ]
-        ()
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "subscriptions"
+        ; "create"
+        ; name
+        ; "--topic"
+        ; topic
+        ; "--topic-project"
+        ; project_id ]
     in
     let topic = name ^ "_topic" in
     let sink = name ^ "_sink" in
@@ -175,20 +174,16 @@ module Subscription = struct
   let delete t =
     let open Deferred.Or_error.Let_syntax in
     let delete_subscription =
-      Process.run ~prog
-        ~args:
-          ["pubsub"; "subscriptions"; "delete"; t.name; "--project"; project_id]
-        ()
+      run_cmd_or_error "." prog
+        ["pubsub"; "subscriptions"; "delete"; t.name; "--project"; project_id]
     in
     let delete_sink =
-      Process.run ~prog
-        ~args:["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
-        ()
+      run_cmd_or_error "." prog
+        ["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
     in
     let delete_topic =
-      Process.run ~prog
-        ~args:["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
-        ()
+      run_cmd_or_error "." prog
+        ["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
     in
     let%map _ =
       Deferred.Or_error.combine_errors
@@ -196,26 +191,26 @@ module Subscription = struct
     in
     ()
 
-  let pull t =
+  let pull ~logger t =
     let open Deferred.Or_error.Let_syntax in
     let subscription_id =
       String.concat ~sep:"/" ["projects"; project_id; "subscriptions"; t.name]
     in
     (* The limit for messages we pull on each interval is currently not configurable. For now, it's set to 5 (which will hopefully be a sane for a while). *)
     let%bind result =
-      Process.run ~prog
-        ~args:
-          [ "pubsub"
-          ; "subscriptions"
-          ; "pull"
-          ; subscription_id
-          ; "--auto-ack"
-          ; "--limit"
-          ; string_of_int 5
-          ; "--format"
-          ; "table(DATA)" ]
-        ()
+      run_cmd_or_error "." prog
+        [ "pubsub"
+        ; "subscriptions"
+        ; "pull"
+        ; subscription_id
+        ; "--auto-ack"
+        ; "--limit"
+        ; string_of_int 5
+        ; "--format"
+        ; "table(DATA)" ]
     in
+    [%log spam] "Pull result from stackdriver: $result"
+      ~metadata:[("result", `String result)] ;
     match String.split_lines result with
     | [] | ["DATA"] ->
         return []
@@ -255,12 +250,12 @@ let parse_event_from_log_entry ~network log_entry =
 let rec pull_subscription_in_background ~logger ~network ~event_writer
     ~subscription =
   if not (Pipe.is_closed event_writer) then (
-    [%log debug] "Pulling StackDriver subscription" ;
+    [%log spam] "Pulling StackDriver subscription" ;
     let%bind log_entries =
-      Deferred.map (Subscription.pull subscription) ~f:Or_error.ok_exn
+      Deferred.map (Subscription.pull ~logger subscription) ~f:Or_error.ok_exn
     in
     if List.length log_entries > 0 then
-      [%log debug] "Parsing events from $n logs"
+      [%log spam] "Parsing events from $n logs"
         ~metadata:[("n", `Int (List.length log_entries))]
     else [%log debug] "No logs were pulled" ;
     let%bind () =

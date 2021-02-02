@@ -11,6 +11,8 @@ module Make
    and module Event_router := Event_router = struct
   module Node = Engine.Network.Node
 
+  let map_to_yojson m ~f = `Assoc String.Map.(m |> map ~f |> to_alist)
+
   (* TODO: Just replace the first 3 fields here with Protocol_state *)
   type t =
     { block_height: int
@@ -19,7 +21,10 @@ module Make
     ; snarked_ledgers_generated: int
     ; blocks_generated: int
     ; node_initialization: bool String.Map.t
-    ; best_tips_by_node: State_hash.t String.Map.t }
+          [@to_yojson map_to_yojson ~f:(fun b -> `Bool b)]
+    ; best_tips_by_node: State_hash.t String.Map.t
+          [@to_yojson map_to_yojson ~f:State_hash.to_yojson] }
+  [@@deriving to_yojson]
 
   let empty =
     { block_height= 0
@@ -34,12 +39,16 @@ module Make
     let r, w = Broadcast_pipe.create empty in
     let update ~f =
       (* should be safe to ignore the write here, so long as `f` is synchronous *)
-      ignore (Broadcast_pipe.Writer.write w (f (Broadcast_pipe.Reader.peek r))) ;
+      let state = f (Broadcast_pipe.Reader.peek r) in
+      [%log debug] "updated network state to: $state"
+        ~metadata:[("state", to_yojson state)] ;
+      ignore (Broadcast_pipe.Writer.write w state) ;
       Deferred.return `Continue
     in
     ignore
       (Event_router.on event_router Event_type.Block_produced
          ~f:(fun node block_produced ->
+           [%log debug] "Updating network state with block produced event" ;
            update ~f:(fun state ->
                [%log debug] "handling block production from $node"
                  ~metadata:[("node", `String (Node.id node))] ;
@@ -60,6 +69,9 @@ module Make
       (Event_router.on event_router
          Event_type.Transition_frontier_diff_application
          ~f:(fun node diff_application ->
+           [%log debug]
+             "Updating network state with transition frontier diff \
+              application event" ;
            update ~f:(fun state ->
                [%log debug] "handling frontier diff application of $node"
                  ~metadata:[("node", `String (Node.id node))] ;
@@ -74,7 +86,8 @@ module Make
       (Event_router.on event_router Event_type.Node_initialization
          ~f:(fun node () ->
            update ~f:(fun state ->
-               [%log debug] "handling initialization of $node"
+               [%log debug]
+                 "Updating network state with initialization event of $node"
                  ~metadata:[("node", `String (Node.id node))] ;
                let node_initialization' =
                  String.Map.set state.node_initialization ~key:(Node.id node)

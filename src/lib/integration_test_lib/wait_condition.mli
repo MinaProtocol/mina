@@ -23,7 +23,8 @@ module Make
         -> predicate
 
   type t =
-    { predicate: predicate
+    { description: string
+    ; predicate: predicate
     ; soft_timeout: Network_time_span.t
     ; hard_timeout: Network_time_span.t }
 
