@@ -51,9 +51,9 @@ func parseCIDR(cidr string) gonet.IPNet {
 type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
 var (
-	logger   = logging.Logger("codanet.Helper")
-	gsLogger = logging.Logger("codanet.CodaGatingState")
-	NoDHT bool // option for testing to completely disable the DHT
+	logger      = logging.Logger("codanet.Helper")
+	gsLogger    = logging.Logger("codanet.CodaGatingState")
+	NoDHT       bool // option for testing to completely disable the DHT
 	WithPrivate bool // option for testing to allow private IPs
 
 	privateCIDRs = []string{
@@ -86,22 +86,22 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx context.Context
-	host host.Host
-	p2pManager   *p2pconnmgr.BasicConnMgr
+	ctx              context.Context
+	host             host.Host
+	p2pManager       *p2pconnmgr.BasicConnMgr
 	minaPeerExchange bool
-	getRandomPeers getRandomPeersFunc
-	OnConnect    func(network.Network, network.Conn)
-	OnDisconnect func(network.Network, network.Conn)
+	getRandomPeers   getRandomPeersFunc
+	OnConnect        func(network.Network, network.Conn)
+	OnDisconnect     func(network.Network, network.Conn)
 }
 
 func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
-		OnConnect:    noop,
-		OnDisconnect: noop,
+		p2pManager:       p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
+		OnConnect:        noop,
+		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
 	}
 }
@@ -165,7 +165,7 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		return
 	}
 
-  cm.TrimOpenConns(context.Background())
+	cm.TrimOpenConns(context.Background())
 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
@@ -195,10 +195,10 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	n, err := stream.Write(bz)
 	if err != nil {
 		logger.Error("failed to write to stream", err)
-		return		
+		return
 	} else if n != len(bz) {
 		logger.Error("failed to write all data to stream")
-		return		
+		return
 	}
 
 	logger.Debugf("wrote peers to stream %s", stream.Protocol())
@@ -231,7 +231,7 @@ type Helper struct {
 	GatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
-	Seeds []peer.AddrInfo
+	Seeds             []peer.AddrInfo
 }
 
 // this type implements the ConnectionGating interface
@@ -423,7 +423,7 @@ func (gs *CodaGatingState) InterceptUpgraded(network.Conn) (allow bool, reason c
 func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 	peers := h.Host.Peerstore().Peers()
 	if len(peers)-2 < num {
-		num = len(peers)-2 // -2 because excluding ourself and the peer we are sending this to
+		num = len(peers) - 2 // -2 because excluding ourself and the peer we are sending this to
 	}
 
 	ret := make([]peer.AddrInfo, num)
@@ -431,18 +431,18 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 	idx := 0
 
 	for i := 0; i < num; i++ {
-	  for {
-	    if idx >= len(peers) {
-	       return ret
-	    } else if peers[idx] != h.Host.ID() && peers[idx] != from {
-	      break
-	    } else {
-	      idx += 1
-	    }
-	  }
+		for {
+			if idx >= len(peers) {
+				return ret
+			} else if peers[idx] != h.Host.ID() && peers[idx] != from {
+				break
+			} else {
+				idx += 1
+			}
+		}
 
-	  ret[i] = h.Host.Peerstore().PeerInfo(peers[idx])
-	  idx += 1
+		ret[i] = h.Host.Peerstore().PeerInfo(peers[idx])
+		idx += 1
 	}
 
 	logger.Debugf("node=%s sending random peers", h.Host.ID(), ret)
@@ -486,7 +486,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 		if err != nil && err == io.EOF {
 			continue
 		} else if err != nil && err.Error() == "stream reset" {
-      _ = s.Close()
+			_ = s.Close()
 			return
 		} else if err != nil {
 			logger.Errorf("failed to decode list of peers err=%s", err)
@@ -601,7 +601,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
-		Seeds: 		seeds,
+		Seeds:             seeds,
 	}
 
 	if !minaPeerExchange {

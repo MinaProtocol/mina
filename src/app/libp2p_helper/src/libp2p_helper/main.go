@@ -896,10 +896,10 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 }
 
 func connectToPeer(app *app, info *peer.AddrInfo) error {
-  connInfo := app.P2p.ConnectionManager.GetInfo()
-  if connInfo.ConnCount >= connInfo.HighWater {
-    return errors.New("conn count >= max connections")
-  }
+	connInfo := app.P2p.ConnectionManager.GetInfo()
+	if connInfo.ConnCount >= connInfo.HighWater {
+		return errors.New("conn count >= max connections")
+	}
 	return app.P2p.Host.Connect(app.Ctx, *info)
 }
 
@@ -920,7 +920,7 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 		app.Bootstrapper.Close()
 	}
 
-  app.P2p.Logger.Error("addPeer Trying to connect to: ", info)
+	app.P2p.Logger.Error("addPeer Trying to connect to: ", info)
 	err = connectToPeer(app, info)
 	if err != nil {
 		return nil, badp2p(err)
@@ -1016,14 +1016,14 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 				}
 
 				// now connect to the peer we discovered
-        connInfo := app.P2p.ConnectionManager.GetInfo()
-        if connInfo.ConnCount < connInfo.LowWater {
-          err := app.P2p.Host.Connect(app.Ctx, discovery.info)
-          if err != nil {
-            app.P2p.Logger.Error("failed to connect to peer after discovering it: ", discovery.info, err.Error())
-            continue
-          }
-        }
+				connInfo := app.P2p.ConnectionManager.GetInfo()
+				if connInfo.ConnCount < connInfo.LowWater {
+					err := app.P2p.Host.Connect(app.Ctx, discovery.info)
+					if err != nil {
+						app.P2p.Logger.Error("failed to connect to peer after discovering it: ", discovery.info, err.Error())
+						continue
+					}
+				}
 			} else {
 				app.P2p.Logger.Debugf("discovered peer %v via %v; not processing as it is not a valid peer", discovery.info.ID, discovery.source)
 			}
