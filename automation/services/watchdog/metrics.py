@@ -18,6 +18,7 @@ from google.cloud import storage
 # ========================================================================
 
 def collect_cluster_crashes(v1, namespace, cluster_crashes):
+  print('collecting cluster crashes / restarts')
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
   containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items ]))
@@ -52,6 +53,7 @@ from telemetry_metrics import collect_telemetry_metrics
 # ========================================================================
 
 def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
+  print('checking google storage bucket')
 
   bucket = 'mina_network_block_data'
   now = time.time()
@@ -68,6 +70,7 @@ def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
 # ========================================================================
 
 def check_seed_list_up(v1, namespace, seeds_reachable):
+  print('checking seed list up')
 
   seed_peers_list_url = os.environ.get('SEED_PEERS_URL')
 

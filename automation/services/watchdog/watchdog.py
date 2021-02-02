@@ -15,6 +15,8 @@ import metrics
 # =================================================
 
 def main():
+  print('starting watchdog')
+
   port = int(os.environ['METRICS_PORT'])
   start_http_server(port)
 

@@ -16,6 +16,7 @@ import ast
 # ========================================================================
 
 def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
+  print('collecting telemetry metrics')
 
   pods = v1.list_namespaced_pod(namespace, watch=False)
   pod_names = [ p['metadata']['name'] for p in pods.to_dict()['items'] ]
