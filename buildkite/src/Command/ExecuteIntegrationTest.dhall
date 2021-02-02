@@ -28,7 +28,7 @@ in
             [
               -- Cache test-executive binary
               -- TODO: cache using `cacheThrough` method
-              Cmd.run "cp src/app/test_executive/test_executive.exe . && buildkite/scripts/buildkite-artifact-helper.sh test_executive.exe",
+              Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh test_executive.exe",
 
               -- Download deploy env to identify test dependencies
               Cmd.run (
