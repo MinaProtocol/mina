@@ -59,6 +59,7 @@ module Network_config = struct
     ; keypairs: (string * Keypair.t) list
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; genesis_constants: Genesis_constants.t
+    ; terraform_version: string
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -68,8 +69,17 @@ module Network_config = struct
     in
     assoc
 
+  let get_terraform_version () =
+    let%map output =
+      Process.run ~prog:"terraform" ~args:["-version"; "-json"] ()
+    in
+    output |> Or_error.ok_exn |> Yojson.Safe.from_string
+    |> Yojson.Safe.Util.member "terraform_version"
+    |> Yojson.Safe.Util.to_string
+
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
       ~(test_config : Test_config.t) ~(images : Container_images.t) =
+    let%map terraform_version = get_terraform_version () in
     let { Test_config.k
         ; delta
         ; slots_per_epoch
@@ -219,6 +229,7 @@ module Network_config = struct
     ; keypairs= block_producer_keypairs
     ; constraint_constants
     ; genesis_constants
+    ; terraform_version
     ; terraform=
         { generate_and_upload_artifacts= false
         ; cluster_name
@@ -255,7 +266,7 @@ module Network_config = struct
   let to_terraform network_config =
     let open Terraform in
     [ Block.Terraform
-        { Block.Terraform.required_version= "~> 0.12.0"
+        { Block.Terraform.required_version= network_config.terraform_version
         ; backend=
             Backend.S3
               { Backend.S3.key=
