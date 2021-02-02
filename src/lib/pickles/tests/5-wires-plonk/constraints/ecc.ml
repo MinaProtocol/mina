@@ -117,9 +117,14 @@ struct
           in
           let state =
             Array.mapi state ~f:(fun i s ->
-                {s with xt; yt; b= scalar.(Int.(n - i - 1))} )
+                let xp, yp =
+                  if i > 0 then
+                    let s = state.(Int.(i - 1)) in
+                    (s.xs, s.ys)
+                  else (xp, yp)
+                in
+                {s with xt; yt; b= scalar.(Int.(n - i - 1)); xp; yp} )
           in
-          state.(0) <- {(state.(0)) with xp; yp} ;
           Intf.assert_
             [{basic= Plonk_constraint.T (EC_scale {state}); annotation= None}] ;
           let finish = state.(Int.(n - 2)) in
@@ -193,7 +198,16 @@ struct
                 done ;
                 Array.of_list !state)
       in
-      state.(0) <- {(state.(0)) with xp; yp} ;
+      let state =
+        Array.mapi state ~f:(fun i s ->
+            let open Int in
+            if i > 0 then
+              { s with
+                n1= state.(i - 1).n2
+              ; xp= state.(i - 1).xs
+              ; yp= state.(i - 1).ys }
+            else {s with xp; yp} )
+      in
       Intf.assert_
         [{basic= Plonk_constraint.T (EC_scale_pack {state}); annotation= None}] ;
       let finish = state.(Int.(n - 2)) in
@@ -263,6 +277,12 @@ struct
     in
     let state =
       Array.mapi state ~f:(fun i s ->
+          let xp, yp =
+            if i > 0 then
+              let s = state.(Int.(i - 1)) in
+              (s.xs, s.ys)
+            else (xp, yp)
+          in
           { s with
             xt
           ; yt
@@ -271,9 +291,10 @@ struct
               Int.(
                 if (2 * (n - i - 1)) + 1 < Array.length scalar then
                   scalar.((2 * (n - i - 1)) + 1)
-                else Field.zero) } )
+                else Field.zero)
+          ; xp
+          ; yp } )
     in
-    state.(0) <- {(state.(0)) with xp; yp} ;
     Intf.assert_
       [{basic= Plonk_constraint.T (EC_endoscale {state}); annotation= None}] ;
     let finish = state.(Int.(n - 1)) in

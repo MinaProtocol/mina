@@ -70,7 +70,7 @@ let%test_module "backend test" =
       let statement = Impl.Field.Constant.of_int 13579
 
       let check () =
-        let input = exists (Impl.Field.typ) ~compute:(fun () -> statement) in
+        let input = exists Impl.Field.typ ~compute:(fun () -> statement) in
         computation input ()
 
       let () = Impl.check check () |> Or_error.ok_exn

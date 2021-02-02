@@ -56,7 +56,13 @@ struct
               state)
     in
     Intf.assert_ [{basic= Plonk_constraint.T (Pack {state}); annotation= None}] ;
-    Array.init len ~f:(fun i -> state.((i / 4) + 1).(i % 4))
+    let ret = ref [] in
+    for i = 0 to len - 1 do
+      let elm = state.((i / 4) + 1).(i % 4) in
+      if elm <> Field.zero || List.length !ret > 0 then
+        ret := List.append !ret [elm]
+    done ;
+    Array.of_list !ret
 
   let pack (bits : Field.t array) : Field.t =
     let padlen = 4 - (Array.length bits % 4) in
