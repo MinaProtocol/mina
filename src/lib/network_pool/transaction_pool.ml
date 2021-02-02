@@ -901,22 +901,21 @@ struct
               Trust_system.record_envelope_sender t.config.trust_system
                 t.logger sender
             in
-            let rec go txs' pool (accepted, rejected) =
+            let rec go txs' (accepted, rejected) =
               let open Interruptible.Deferred_let_syntax in
               match txs' with
               | [] ->
-                  t.pool <- pool ;
                   Interruptible.Or_error.return
                   @@ (List.rev accepted, List.rev rejected)
               | tx :: txs'' -> (
                   let tx = User_command.Signed_command tx in
                   (*                   let tx = User_command.forget_check tx' in *)
                   let tx' = Transaction_hash.User_command.create tx in
-                  if Indexed_pool.member pool tx' then
+                  if Indexed_pool.member t.pool tx' then
                     let%bind _ =
                       trust_record (Trust_system.Actions.Sent_old_gossip, None)
                     in
-                    go txs'' pool
+                    go txs''
                       ( accepted
                       , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
                       )
@@ -935,13 +934,14 @@ struct
                                 ( "account does not exist for command: $cmd"
                                 , [("cmd", User_command.to_yojson tx)] ) )
                         in
-                        go txs'' pool
+                        go txs''
                           ( accepted
                           , ( tx
                             , Diff_versioned.Diff_error
                               .Sender_account_does_not_exist )
                             :: rejected )
                     | Some sender_account ->
+                        let pool = t.pool in
                         if has_sufficient_fee pool tx ~pool_max_size then (
                           let add_res =
                             Indexed_pool.add_from_gossip_exn pool
@@ -1021,6 +1021,13 @@ struct
                           in
                           match add_res with
                           | Ok (verified, pool', dropped) ->
+                              if is_sender_local then
+                                Hashtbl.add_exn t.locally_generated_uncommitted
+                                  ~key:verified ~data:(Time.now ()) ;
+                              let pool'', dropped_for_size =
+                                drop_until_below_max_size pool' ~pool_max_size
+                              in
+                              t.pool <- pool'' ;
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useful_gossip
@@ -1028,12 +1035,6 @@ struct
                                       ( "$cmd"
                                       , [("cmd", User_command.to_yojson tx)] )
                                   )
-                              in
-                              if is_sender_local then
-                                Hashtbl.add_exn t.locally_generated_uncommitted
-                                  ~key:verified ~data:(Time.now ()) ;
-                              let pool'', dropped_for_size =
-                                drop_until_below_max_size pool' ~pool_max_size
                               in
                               let seq_cmd_to_yojson seq =
                                 `List
@@ -1082,7 +1083,7 @@ struct
                                                .User_command_with_valid_signature
                                                .to_yojson
                                              locally_generated_dropped) ) ] ;
-                              go txs'' pool'' (tx :: accepted, rejected)
+                              go txs'' (tx :: accepted, rejected)
                           | Error
                               (Insufficient_replace_fee
                                 (`Replace_fee rfee, fee)) ->
@@ -1102,7 +1103,7 @@ struct
                                   [ ("cmd", User_command.to_yojson tx)
                                   ; ("rfee", Currency.Fee.to_yojson rfee)
                                   ; ("fee", Currency.Fee.to_yojson fee) ] ;
-                              go txs'' pool
+                              go txs''
                                 ( accepted
                                 , ( tx
                                   , Diff_versioned.Diff_error
@@ -1122,7 +1123,7 @@ struct
                                 ~metadata:
                                   [ ("cmd", User_command.to_yojson tx)
                                   ; ("token", Token_id.to_yojson fee_token) ] ;
-                              go txs'' pool
+                              go txs''
                                 ( accepted
                                 , ( tx
                                   , Diff_versioned.Diff_error
@@ -1137,7 +1138,7 @@ struct
                                          invalid signature or was malformed"
                                       , [] ) )
                               in
-                              go txs'' pool
+                              go txs''
                                 ( accepted
                                 , ( tx
                                   , Diff_versioned.Diff_error.Invalid_signature
@@ -1164,8 +1165,7 @@ struct
                                         ; ("error_extra", `Assoc error_extra)
                                         ] ) )
                               in
-                              go txs'' pool
-                                (accepted, (tx, diff_err) :: rejected) )
+                              go txs'' (accepted, (tx, diff_err) :: rejected) )
                         else
                           let%bind _ =
                             trust_record
@@ -1176,7 +1176,7 @@ struct
                                        insufficient fee."
                                   , [("cmd", User_command.to_yojson tx)] ) )
                           in
-                          go txs'' pool
+                          go txs''
                             ( accepted
                             , (tx, Diff_versioned.Diff_error.Insufficient_fee)
                               :: rejected ) )
@@ -1191,7 +1191,7 @@ struct
                     |> Error.tag ~tag:"Transaction_pool.apply" )
               in
               let%bind () = Interruptible.lift Deferred.unit signal in
-              go txs t.pool ([], [])
+              go txs ([], [])
             with
             | Ok res ->
                 res
