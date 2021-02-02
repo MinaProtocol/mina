@@ -1,25 +1,26 @@
 (executable
-  (package signer)
-  (name signer)
-  (public_name signer)
-  (modes native)
-  (libraries
-    async
-    async_ssl
-    core_kernel
-    logger
-    rosetta_models
-    lib
-    ppx_deriving_yojson.runtime
-    yojson
-    )
-  (preprocess (pps
-    graphql_ppx
-    ppx_coda
-    ppx_deriving.show
-    ppx_deriving_yojson
-    ppx_jane
-    ppx_version
-    ppx_deriving.eq
-    ))
-  )
+ (package signer)
+ (name signer)
+ (public_name signer)
+ (modes native)
+ (libraries
+   async
+   async_ssl
+   core_kernel
+   logger
+   rosetta_models
+   lib
+   ppx_deriving_yojson.runtime
+   yojson
+ )
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps
+               graphql_ppx
+               ppx_coda
+               ppx_deriving.show
+               ppx_deriving_yojson
+               ppx_jane
+               ppx_version
+               ppx_deriving.eq
+ ))
+)

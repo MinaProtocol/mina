@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_base
+open Mina_base
 open Frontier_base
 
 (* WARNING: don't use this code until @nholland has landed a PR that
@@ -51,19 +51,17 @@ module T = struct
           in
           let ledger_hash = Ledger.merkle_root ledger in
           add_entry t ~ledger_hash ~ledger
-      | E (New_node (Lite _), _) ->
-          failwith "ledger_table extension: unexpected new lite node"
       | E (Root_transitioned transition, _) -> (
         match transition.garbage with
         | Full nodes ->
-            let open Coda_state in
+            let open Mina_state in
             List.iter nodes ~f:(fun node ->
                 let With_hash.{data= external_transition; _}, _ =
                   node.transition
                 in
                 let blockchain_state =
                   Protocol_state.blockchain_state
-                  @@ Coda_transition.External_transition.protocol_state
+                  @@ Mina_transition.External_transition.protocol_state
                        external_transition
                 in
                 let staged_ledger =
@@ -72,10 +70,7 @@ module T = struct
                 let ledger_hash =
                   Staged_ledger_hash.ledger_hash staged_ledger
                 in
-                remove_entry t ~ledger_hash )
-        | Lite _ ->
-            failwith
-              "ledger_table extension: unexpected garbage with lite nodes" )
+                remove_entry t ~ledger_hash ) )
       | E (Best_tip_changed _, _) ->
           () ) ;
     None

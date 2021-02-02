@@ -727,7 +727,13 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
       finalize (fun () -> f t) (fun () -> destroy t)
   end
 
-  let checkpoint_create db dir log_size_for_flush =
+  (* log_size_for_flush: if the totoal log file size is equal or
+     larger than this value, then a flush is triggered for all the
+     column families. The default value is 0, which means flush is
+     always triggered. If you move away from the default, the checkpoint
+     may not contain up-to-date data if WAL writing is not always
+     enabled.*)
+  let checkpoint_create db ?log_size_for_flush:(l = 0) ~dir =
     let checkpoint_create_raw =
       foreign "rocksdb_checkpoint_create"
         ( CheckpointObject.t @-> string @-> Views.int_to_uint64_t
@@ -735,7 +741,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
     in
     CheckpointObject.with_t db (fun checkpoint_object ->
         with_err_pointer
-          (checkpoint_create_raw checkpoint_object dir log_size_for_flush) )
+          (checkpoint_create_raw checkpoint_object dir l) )
 
   let property_value db name =
     (* Ugly hack. Is there a better way to retrieve string from C? *)

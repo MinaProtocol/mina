@@ -22,6 +22,19 @@ module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
 
   let to_bits = Field.choose_preimage_var ~length:Field.size_in_bits
 
+  module Unsafe = struct
+    let to_bits_unboolean x =
+      with_label __LOC__ (fun () ->
+          let length = Field.size_in_bits in
+          let res =
+            exists
+              (Typ.list Boolean.typ_unchecked ~length)
+              ~compute:As_prover.(fun () -> Field.Constant.unpack (read_var x))
+          in
+          Field.Assert.equal x (Field.project res) ;
+          res )
+  end
+
   let () = assert (Field.size_in_bits < 64 * Nat.to_int Limbs.n)
 
   module Constant = struct

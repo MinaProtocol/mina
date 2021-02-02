@@ -1,8 +1,10 @@
+(* Only show stdout for failed inline tests. *)
+open Inline_test_quiet_logs
 open Async_kernel
 open Core_kernel
 open Signature_lib
-open Coda_base
-open Coda_transition
+open Mina_base
+open Mina_transition
 open Frontier_base
 open Deferred.Let_syntax
 
@@ -41,16 +43,25 @@ let%test_module "Full_frontier tests" =
     let add_breadcrumb frontier breadcrumb =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
       ignore
-        (Full_frontier.apply_diffs frontier diffs
-           ~ignore_consensus_local_state:false)
+        (Full_frontier.apply_diffs frontier diffs ~has_long_catchup_job:false
+           ~enable_epoch_ledger_sync:`Disabled)
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
     let create_frontier () =
-      let base_hash = Frontier_hash.empty in
+      let open Core in
+      let epoch_ledger_location =
+        Filename.temp_dir_name ^/ "epoch_ledger"
+        ^ (Uuid_unix.create () |> Uuid.to_string)
+      in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
           ~genesis_ledger:Genesis_ledger.t
+          ~genesis_epoch_data:precomputed_values.genesis_epoch_data
+          ~epoch_ledger_location
+          ~ledger_depth:constraint_constants.ledger_depth
+          ~genesis_state_hash:
+            (With_hash.hash precomputed_values.protocol_state_with_hash)
       in
       let root_ledger =
         Or_error.ok_exn
@@ -67,7 +78,7 @@ let%test_module "Full_frontier tests" =
       in
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
-        ~base_hash ~consensus_local_state ~max_length ~precomputed_values
+        ~consensus_local_state ~max_length ~precomputed_values
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->

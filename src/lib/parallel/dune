@@ -5,4 +5,5 @@
  (libraries core async rpc_parallel)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.eq))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Template code to run programs that rely Rpc_parallel.Expert"))

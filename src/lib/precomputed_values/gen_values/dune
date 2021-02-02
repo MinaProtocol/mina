@@ -6,15 +6,16 @@
    core
    ;; libraries
    blockchain_snark
-   coda_base
+   mina_base
    genesis_proof
    global_signer_private_key
    ppxlib
    ppx_util
    snark_keys
    snark_params
-   snarky.backendless )
+   snarky.backendless)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_version ppx_optcomp ppx_let ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx))
  (modes native))

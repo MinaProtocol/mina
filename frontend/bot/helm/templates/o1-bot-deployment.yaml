@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Values.bot.name }}
+  labels:
+    app: {{ $.Values.bot.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $.Values.bot.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $.Values.bot.name }}
+        testnet: {{ $.Values.bot.testnet }}
+        role: {{ $.Values.bot.role }}
+    spec:
+      containers:
+      - name: bot
+        imagePullPolicy: Always
+        resources:
+{{- if .Values.bot.resources }}
+{{ toYaml .Values.bot.resources | nindent 10 }}
+{{- end }}
+        image: {{ $.Values.bot.image }}
+        command: {{ $.Values.bot.command }}
+        args: {{ $.Values.bot.args }}
+        env:
+{{- if .Values.bot.optionalEnv }}
+{{ toYaml .Values.bot.optionalEnv | nindent 10 }}
+{{- end }}
+        ports:
+{{- if .Values.bot.ports }}
+{{ toYaml .Values.bot.ports | nindent 10 }}
+{{- end }}
+        volumeMounts:
+{{- if .Values.bot.volumeMounts }}
+{{ toYaml .Values.bot.volumeMounts | nindent 10 }}
+{{- end }}
+      volumes:
+{{- if .Values.bot.volumes }}
+{{ toYaml .Values.bot.volumes | nindent 8 }}
+{{- end }}

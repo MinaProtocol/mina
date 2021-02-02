@@ -1,4 +1,4 @@
-open Coda_base
+open Mina_base
 open Signature_lib
 
 module Query_first_seen =

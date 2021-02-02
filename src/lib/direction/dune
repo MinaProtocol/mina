@@ -5,4 +5,5 @@
  (libraries core)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving.eq))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Representation of direction in a binary tree"))

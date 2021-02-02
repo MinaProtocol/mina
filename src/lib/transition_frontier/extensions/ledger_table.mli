@@ -1,6 +1,6 @@
 (** A ledger table maps ledger hashes to ledgers *)
 
-open Coda_base
+open Mina_base
 
 type t
 

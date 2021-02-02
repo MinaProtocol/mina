@@ -5,17 +5,18 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-  cache_dir
-  hash_prefixes
-  group_map
-  snarky.backendless
-  pickles
-  bignum_bigint
-  bowe_gabizon_hash
-  random_oracle
-  tuple_lib)
+   cache_dir
+   hash_prefixes
+   group_map
+   snarky.backendless
+   pickles
+   bignum_bigint
+   bowe_gabizon_hash
+   random_oracle
+   tuple_lib)
  (preprocess
-  (pps ppx_version ppx_jane h_list.ppx bisect_ppx -- -conditional))
+  (pps ppx_version ppx_jane h_list.ppx))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Cryptographic parameters"))
 
 (rule

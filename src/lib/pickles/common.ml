@@ -11,13 +11,23 @@ module Max_degree = struct
   let wrap = 1 lsl Nat.to_int Backend.Tock.Rounds.n
 end
 
+let tick_shifts, tock_shifts =
+  let mk g =
+    let f =
+      Memo.general ~cache_size_bound:20 ~hashable:Int.hashable
+        (fun log2_size -> g ~log2_size)
+    in
+    fun ~log2_size -> f log2_size
+  in
+  ( mk Backend.Tick.Verification_key.shifts
+  , mk Backend.Tock.Verification_key.shifts )
+
 let wrap_domains =
-  { Domains.h= Pow_2_roots_of_unity 18
-  ; k= Pow_2_roots_of_unity 19
+  { Domains.h= Pow_2_roots_of_unity 17
   ; x=
       Pow_2_roots_of_unity
         (let (T (typ, _)) = Impls.Wrap.input () in
-         Int.ceil_log2 (1 + Impls.Wrap.Data_spec.size [typ])) }
+         Int.ceil_log2 (Impls.Wrap.Data_spec.size [typ])) }
 
 let hash_pairing_me_only ~app_state
     (t : _ Types.Pairing_based.Proof_state.Me_only.t) =
@@ -28,11 +38,11 @@ let hash_pairing_me_only ~app_state
        ~comm:
          (fun (x :
                 Tock.Curve.Affine.t
-                Dlog_marlin_types.Poly_comm.Without_degree_bound.t) ->
-         List.concat_map (Array.to_list x) ~f:g )
+                Dlog_plonk_types.Poly_comm.Without_degree_bound.t) ->
+         Array.concat_map x ~f:(Fn.compose Array.of_list g) )
        ~app_state)
 
-let hash_dlog_me_only (type n) (max_branching : n Nat.t)
+let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
@@ -42,11 +52,9 @@ let hash_dlog_me_only (type n) (max_branching : n Nat.t)
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [x; y]))
 
 let dlog_pcs_batch (type n_branching total)
-    ((without_degree_bound, pi) :
-      total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t) ~h_minus_1
-    ~k_minus_1 =
-  Pcs_batch.create ~without_degree_bound
-    ~with_degree_bound:[h_minus_1; h_minus_1; k_minus_1]
+    ((without_degree_bound, _pi) :
+      total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
+  Pcs_batch.create ~without_degree_bound ~with_degree_bound:[max_quot_size]
 
 module Pairing_pcs_batch = struct
   let beta_1 : (int, _, _) Pcs_batch.t =
@@ -100,86 +108,13 @@ let group_map m ~a ~b =
   let params = Group_map.Params.create m {a; b} in
   stage (fun x -> Group_map.to_group m ~params x)
 
-(* The group of units F^× decomposes as
+module Shifts = struct
+  let tock : Tock.Field.t Shifted_value.Shift.t =
+    Shifted_value.Shift.create (module Tock.Field)
 
-   F^× = < g > ⊕ H
-
-   where g ([two_adic_root_of_unity] below) has order 2^two_adicity.
-*)
-let det_sqrt (type f) ((module Impl) : f Snarky_backendless.Snark.m)
-    ~(two_adic_root_of_unity : f) ~two_adicity
-    ~(det_sqrt_witness :
-       f -> f Zexe_backend_common.Field.Det_sqrt_witness.t option) =
-  let open Impl in
-  (* This maps n (as a bitstring) to g^n *)
-  let inj =
-    (* "double and add" *)
-    let rec go acc bits =
-      match bits with
-      | [] ->
-          acc
-      | b :: bits ->
-          let acc = Field.square acc in
-          let acc =
-            Field.if_ b
-              ~then_:(Field.scale acc two_adic_root_of_unity)
-              ~else_:acc
-          in
-          go acc bits
-    in
-    fun bits -> go Field.one (List.rev bits)
-  in
-  (* This projects onto the H subgroup by the map
-     x -> x^|< g >|
-  *)
-  let project_h =
-    (* Compute x^(2^i) *)
-    let rec pow2_pow x i =
-      if i = 0 then x (* x^(2^0) = x^1 = x *)
-      else
-        (* (x^2)^(2^(i - 1)) = x^(2 * 2^(i - 1)) = x^(2^i) *)
-        pow2_pow (Field.square x) (i - 1)
-    in
-    fun x -> pow2_pow x two_adicity
-  in
-  stage (fun t ->
-      let n = two_adicity - 1 in
-      (* t has two square roots, y and -y.
-
-         Consider how they appear in < g > ⊕ H.
-
-         Note that -1 = g^(2^(two_adicity - 1)) since g^(2^(two_adicity - 1)) != 1 and g^(2^(two_adicity - 1))^2 = 1.
-
-         Say y = g^k h.
-
-         Then
-         -y
-         = g^(2^(two_adicity - 1)) g^n h
-         = g^(2^n + k) h
-
-         What we can conclude from this is one of the square roots of t has the top bit = 1, and the other = 0,
-         and their bit representations, and h representations are otherwise the same.
-
-         So, the h components and lower bits are unique, and the top bit may be 1 or 0.
-
-         As a deterministic square root, we choose the one with top bit = 0.
-      *)
-      let c, d =
-        exists
-          Typ.(field * list ~length:n Boolean.typ)
-          ~compute:
-            As_prover.(
-              fun () ->
-                let r = Option.value_exn (det_sqrt_witness (read_var t)) in
-                let bits =
-                  List.init n ~f:(fun i ->
-                      Unsigned.UInt64.(
-                        equal one (logand (shift_right r.d i) one)) )
-                in
-                (r.c, bits))
-      in
-      let res = Field.mul (project_h c) (inj d) in
-      assert_square res t ; res )
+  let tick : Tick.Field.t Shifted_value.Shift.t =
+    Shifted_value.Shift.create (module Tick.Field)
+end
 
 module Ipa = struct
   open Backend
@@ -187,85 +122,66 @@ module Ipa = struct
   (* TODO: Make all this completely generic over backend *)
 
   let compute_challenge (type f) ~endo_to_field
-      (module Field : Zexe_backend.Field.S with type t = f) ~is_square c =
-    let x = endo_to_field c in
-    let nonresidue = Field.of_int 5 in
-    (* TODO: Don't actually need to transmit the "is_square" bit on the wire *)
-    [%test_eq: bool] is_square (Field.is_square x) ;
-    Field.det_sqrt (if is_square then x else Field.(nonresidue * x))
+      (module Field : Zexe_backend.Field.S with type t = f) c =
+    endo_to_field c
 
   let compute_challenges ~endo_to_field field chals =
-    Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
-        compute_challenge field ~is_square ~endo_to_field prechallenge )
+    Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge} ->
+        compute_challenge field ~endo_to_field prechallenge )
 
   module Wrap = struct
     let field =
       (module Tock.Field : Zexe_backend.Field.S with type t = Tock.Field.t)
 
-    let endo_to_field = Endo.Dee.to_field
+    let endo_to_field = Endo.Step_inner_curve.to_field
 
     let compute_challenge c = compute_challenge field ~endo_to_field c
 
     let compute_challenges cs = compute_challenges field ~endo_to_field cs
 
     let compute_sg chals =
-      let open Snarky_bn382.Tweedle.Dee.Field_poly_comm in
       let comm =
-        Snarky_bn382.Tweedle.Dee.Field_urs.b_poly_commitment
+        Marlin_plonk_bindings_pasta_fq_urs.b_poly_commitment
           (Backend.Tock.Keypair.load_urs ())
-          (Backend.Tock.Field.Vector.of_array
-             (Vector.to_array (compute_challenges chals)))
+          (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      Backend.Tock.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tock.Curve.Affine.of_backend
+      comm.unshifted.(0) |> Or_infinity.finite_exn
   end
 
   module Step = struct
     let field =
       (module Tick.Field : Zexe_backend.Field.S with type t = Tick.Field.t)
 
-    let endo_to_field = Endo.Dum.to_field
+    let endo_to_field = Endo.Wrap_inner_curve.to_field
 
     let compute_challenge c = compute_challenge field ~endo_to_field c
 
     let compute_challenges cs = compute_challenges field ~endo_to_field cs
 
     let compute_sg chals =
-      let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
       let comm =
-        Snarky_bn382.Tweedle.Dum.Field_urs.b_poly_commitment
+        Marlin_plonk_bindings_pasta_fp_urs.b_poly_commitment
           (Backend.Tick.Keypair.load_urs ())
-          (Backend.Tick.Field.Vector.of_array
-             (Vector.to_array (compute_challenges chals)))
+          (Pickles_types.Vector.to_array (compute_challenges chals))
       in
-      Backend.Tick.Curve.Affine.Backend.Vector.get (unshifted comm) 0
-      |> Backend.Tick.Curve.Affine.of_backend
+      comm.unshifted.(0) |> Or_infinity.finite_exn
 
     let accumulator_check comm_chals =
-      let open Snarky_bn382.Tweedle.Dum.Field_poly_comm in
       let chals =
-        let open Backend.Tick.Field.Vector in
-        let v = create () in
-        List.iter comm_chals ~f:(fun (_, chals) ->
-            Vector.iter chals ~f:(emplace_back v) ) ;
-        v
+        Array.concat
+        @@ List.map comm_chals ~f:(fun (_, chals) -> Vector.to_array chals)
       in
       let comms =
-        let open Backend.Tick.Curve.Affine in
-        let open Backend.Vector in
-        let v = create () in
-        List.iter comm_chals ~f:(fun (comm, _) ->
-            emplace_back v (to_backend comm) ) ;
-        v
+        Array.of_list_map comm_chals ~f:(fun (comm, _) ->
+            Or_infinity.Finite comm )
       in
-      Snarky_bn382.Tweedle.Dum.Field_urs.batch_accumulator_check
+      Marlin_plonk_bindings.Pasta_fp_urs.batch_accumulator_check
         (Backend.Tick.Keypair.load_urs ())
         comms chals
   end
 end
 
 let tock_unpadded_public_input_of_statement prev_statement =
-  let open Zexe_backend in
   let input =
     let (T (typ, _conv)) = Impls.Wrap.input () in
     Impls.Wrap.generate_public_input [typ] prev_statement
@@ -275,24 +191,30 @@ let tock_unpadded_public_input_of_statement prev_statement =
     ~f:(Backend.Tock.Field.Vector.get input)
 
 let tock_public_input_of_statement s =
-  let open Zexe_backend in
-  Backend.Tock.Field.one :: tock_unpadded_public_input_of_statement s
+  tock_unpadded_public_input_of_statement s
 
 let tick_public_input_of_statement ~max_branching
     (prev_statement : _ Types.Pairing_based.Statement.t) =
-  let open Zexe_backend in
   let input =
-    let (T (input, conv)) =
+    let (T (input, _conv)) =
       Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input [input] prev_statement
   in
-  Backend.Tick.Field.one
-  :: List.init
-       (Backend.Tick.Field.Vector.length input)
-       ~f:(Backend.Tick.Field.Vector.get input)
+  List.init
+    (Backend.Tick.Field.Vector.length input)
+    ~f:(Backend.Tick.Field.Vector.get input)
 
 let index_commitment_length k ~max_degree =
-  Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
+  let actual =
+    Int.round_up ~to_multiple_of:max_degree (Domain.size k) / max_degree
+  in
+  [%test_eq: int] actual 1 ;
+  1
 
 let max_log2_degree = Pickles_base.Side_loaded_verification_key.max_log2_degree
+
+let max_quot_size ~of_int ~mul:( * ) ~sub:( - ) domain_size =
+  of_int 5 * (domain_size - of_int 1)
+
+let max_quot_size_int = max_quot_size ~of_int:Fn.id ~mul:( * ) ~sub:( - )

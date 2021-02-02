@@ -16,7 +16,6 @@ val ( >= ) : t -> t -> bool
 
 module Checked : sig
   open Snark_params.Tick
-  open Snarky_integer
 
   type t
 
@@ -26,7 +25,7 @@ module Checked : sig
 
   val constant : Unsigned.UInt32.t -> t
 
-  val add : t -> Coda_numbers.Length.Checked.t -> t
+  val add : t -> Mina_numbers.Length.Checked.t -> t
 
   val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
