@@ -11,5 +11,6 @@ export GO=/usr/lib/go/bin/go
 
 dune build --verbose --profile=${DUNE_PROFILE} src/app/test_executive/test_executive.exe
 
-# copy built binary to current location
+# copy built binary to current location and adjust permissions
 cp _build/default/src/app/test_executive/test_executive.exe .
+chmod +rwx test_executive.exe

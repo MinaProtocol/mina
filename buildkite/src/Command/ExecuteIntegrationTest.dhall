@@ -39,7 +39,7 @@ in
 
               -- Execute test based on BUILD image
               Cmd.run (
-                "source ${deployEnv} && test_executive.exe cloud" ++
+                "source ${deployEnv} && ./test_executive.exe cloud" ++
                 " --coda-image gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
                 " --coda-automation-location ./automation" ++
                 " ${testName}"
