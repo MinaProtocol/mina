@@ -14,7 +14,7 @@ data "local_file" "genesis_ledger" {
 }
 
 locals {
-  use_local_charts = false
+  use_local_charts = true
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
@@ -163,6 +163,7 @@ locals {
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts = var.make_report_accounts
     seedPeersURL = var.seedPeersURL
+    uploadBlocksToGCloud = var.upload_blocks_to_gcloud
   }
   
 }

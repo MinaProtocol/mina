@@ -32,14 +32,19 @@ def main():
   recent_google_bucket_blocks = Gauge('Coda_watchdog_recent_google_bucket_blocks', 'Description of gauge') 
   seeds_reachable = Gauge('Coda_watchdog_seeds_reachable', 'Description of gauge')
 
+  if 
+
   # ========================================================================
 
   fns = [
     ( lambda: metrics.collect_cluster_crashes(v1, namespace, cluster_crashes), 30*60 ),
     ( lambda: metrics.collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors), 60*60 ),
-    ( lambda: metrics.check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks), 30*60 ),
     ( lambda: metrics.check_seed_list_up(v1, namespace, seeds_reachable), 60*60 ),
   ]
+
+  if os.environ.get('CHECK_GCLOUD_STORAGE_BUCKET') is not None:
+    os.system('gcloud auth activate-service-account --key-file="/gcloud/keyfile.json"')
+    fns += [ ( lambda: metrics.check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks), 30*60 ) ]
 
   for fn, time_between in fns:
     asyncio.ensure_future(util.run_periodically(fn, time_between, error_counter))

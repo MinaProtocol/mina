@@ -29,7 +29,7 @@ spec:
             cpu: 1.0
         image: {{ .Values.image }}
         command: ["python3"]
-        args: ["/code/watchdog.py"]
+        args: ["-u", "/code/watchdog.py"]
         env:
           - name: "RESTART_EVERY_MINS"
             value: {{ .Values.restartEveryMins | quote }}
@@ -46,9 +46,29 @@ spec:
           - name: "METRICS_PORT"
             value: {{ $.Values.coda.ports.metrics | quote }}
           - name: "SEED_PEERS_URL"
-            value: {{ $.Values.coda.seedPeersURL | quote }}
+            value: {{ $.Values.seedPeersURL | quote }}
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          - name: "CHECK_GCLOUD_STORAGE_BUCKET"
+            value: "true"
+          {{- end }}
+
         ports: 
         - name: metrics-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.metrics }}
         imagePullPolicy: Always
+        volumeMounts:
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+      volumes:
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
