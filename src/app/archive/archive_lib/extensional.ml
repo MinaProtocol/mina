@@ -34,7 +34,7 @@ module User_command = struct
     ; hash: Transaction_hash.Stable.Latest.t
           [@to_yojson Transaction_hash.to_yojson]
           [@of_yojson Transaction_hash.of_yojson]
-    ; status: string
+    ; status: string option
     ; failure_reason: Transaction_status.Failure.Stable.Latest.t option
     ; fee_payer_account_creation_fee_paid:
         Currency.Amount.Stable.Latest.t option
