@@ -82,7 +82,7 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
-    let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
+    let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
     let user_sanitized =
       Str.global_replace (Str.regexp "\\W|_") "" user_from_env
     in

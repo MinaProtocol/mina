@@ -47,7 +47,7 @@ in
             ],
         label = "Execute integration test: ${testName}",
         key = "integration-test-${testName}",
-        target = Size.Large,
+        target = Size.XLarge,
         depends_on = dependsOn
       }
 }

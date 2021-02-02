@@ -14,7 +14,6 @@ in Pipeline.build Pipeline.Config::{
     JobSpec::{
     dirtyWhen = [
         S.strictlyStart (S.contains "src"),
-        S.strictlyStart (S.contains "src/app/test-executive"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
     ],
     path = "Test",
