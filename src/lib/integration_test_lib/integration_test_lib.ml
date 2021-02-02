@@ -152,7 +152,7 @@ module type Engine_intf = sig
       -> cli_inputs:Cli_inputs.t
       -> test_config:Test_config.t
       -> images:Container_images.t
-      -> t
+      -> t Deferred.t
   end
 
   (* TODO: return Deferred.Or_error.t on each of the lifecycle actions? *)

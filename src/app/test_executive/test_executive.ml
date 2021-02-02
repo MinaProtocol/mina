@@ -170,7 +170,7 @@ let main inputs =
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
   in
-  let network_config =
+  let%bind network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
       ~test_config:T.config ~images
   in
