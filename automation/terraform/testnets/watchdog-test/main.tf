@@ -160,4 +160,6 @@ module "testnet_east" {
   make_report_accounts = local.make_report_accounts
 
   seedPeersURL = "https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt"
+
+  artifact_path = "./"
 }
