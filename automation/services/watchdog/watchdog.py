@@ -41,7 +41,6 @@ def main():
   ]
 
   if os.environ.get('CHECK_GCLOUD_STORAGE_BUCKET') is not None:
-    os.system('gcloud auth activate-service-account --key-file="/gcloud/keyfile.json"')
     fns += [ ( lambda: metrics.check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks), 30*60 ) ]
 
   for fn, time_between in fns:
