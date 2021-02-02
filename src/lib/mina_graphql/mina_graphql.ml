@@ -2459,7 +2459,7 @@ module Mutations = struct
       ~args:
         Arg.
           [arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)]
-      ~doc:"Connect to the given peers"
+      ~doc:"Connect to the given peers as seeds"
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
       ~resolve:(fun {ctx= coda; _} () peers ->
         let open Deferred.Result.Let_syntax in
@@ -2473,7 +2473,7 @@ module Mutations = struct
         let%bind.Async maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Mina_networking.add_peer net peer with
+              match%map.Async Mina_networking.add_peer net peer ~seed:true with
               | Ok () ->
                   None
               | Error err ->
