@@ -63,6 +63,38 @@ module Hash_state = struct
   let empty = H.feed_string H.empty "plonk_constraint_system_v3"
 end
 
+(* HACK: The rust side shouldn't be using an integer for this.
+   As written, we have no correctness guarantees from either compiler.
+*)
+let col_to_index = function
+  | Plonk_5_wires_gate.Col.L ->
+      0
+  | Plonk_5_wires_gate.Col.R ->
+      1
+  | Plonk_5_wires_gate.Col.O ->
+      2
+  | Plonk_5_wires_gate.Col.Q ->
+      3
+  | Plonk_5_wires_gate.Col.P ->
+      4
+
+(* HACK: The rust side shouldn't be using an integer for this.
+   As written, we have no correctness guarantees from either compiler.
+*)
+let index_to_col = function
+  | 0 ->
+      Plonk_5_wires_gate.Col.L
+  | 1 ->
+      Plonk_5_wires_gate.Col.R
+  | 2 ->
+      Plonk_5_wires_gate.Col.O
+  | 3 ->
+      Plonk_5_wires_gate.Col.Q
+  | 4 ->
+      Plonk_5_wires_gate.Col.P
+  | _ ->
+      assert false
+
 module Plonk_constraint = struct
   open Core_kernel
 
@@ -393,38 +425,6 @@ struct
 
   let wire sys key row col = wire' sys key (Row.After_public_input row) col
 
-  (* HACK: The rust side shouldn't be using an integer for this.
-     As written, we have no correctness guarantees from either compiler.
-  *)
-  let col_to_int = function
-    | Plonk_5_wires_gate.Col.L ->
-        0
-    | Plonk_5_wires_gate.Col.R ->
-        1
-    | Plonk_5_wires_gate.Col.O ->
-        2
-    | Plonk_5_wires_gate.Col.Q ->
-        3
-    | Plonk_5_wires_gate.Col.P ->
-        4
-
-  (* HACK: The rust side shouldn't be using an integer for this.
-     As written, we have no correctness guarantees from either compiler.
-  *)
-  let index_to_col = function
-    | 0 ->
-        Plonk_5_wires_gate.Col.L
-    | 1 ->
-        Plonk_5_wires_gate.Col.R
-    | 2 ->
-        Plonk_5_wires_gate.Col.O
-    | 3 ->
-        Plonk_5_wires_gate.Col.Q
-    | 4 ->
-        Plonk_5_wires_gate.Col.P
-    | _ ->
-        assert false
-
   let finalize_and_get_gates sys =
     match sys.gates with
     | `Finalized ->
@@ -504,11 +504,11 @@ struct
               { kind
               ; row
               ; wires=
-                  { l= {row= lrow; col= col_to_int lcol}
-                  ; r= {row= rrow; col= col_to_int rcol}
-                  ; o= {row= orow; col= col_to_int ocol}
-                  ; q= {row= qrow; col= col_to_int qcol}
-                  ; p= {row= prow; col= col_to_int pcol} }
+                  { l= {row= lrow; col= col_to_index lcol}
+                  ; r= {row= rrow; col= col_to_index rcol}
+                  ; o= {row= orow; col= col_to_index ocol}
+                  ; q= {row= qrow; col= col_to_index qcol}
+                  ; p= {row= prow; col= col_to_index pcol} }
               ; c= coeffs } ) ;
         g
 

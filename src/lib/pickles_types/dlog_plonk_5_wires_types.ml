@@ -144,7 +144,17 @@ module Messages = struct
       ~value_of_hlist:of_hlist
 end
 
-module Proof = Dlog_plonk_types.Proof
+module Proof = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('g, 'g_opt, 'fq, 'fqv) t =
+        { messages: ('g, 'g_opt) Messages.Stable.V1.t
+        ; openings: ('g, 'fq, 'fqv) Openings.Stable.V1.t }
+      [@@deriving sexp, compare, yojson, hash, eq]
+    end
+  end]
+end
 
 module Shifts = struct
   [%%versioned
