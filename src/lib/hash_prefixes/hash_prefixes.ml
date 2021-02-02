@@ -44,7 +44,9 @@ let base_snark = create "CodaBaseSnark"
 
 let transition_system_snark = create "CodaTransitionSnark"
 
-let signature = create "CodaSignature"
+let signature_testnet = create "CodaSignature"
+
+let signature_mainnet = create "MinaSignatureMainnet"
 
 let receipt_chain_user_command = create "CodaReceiptUC"
 

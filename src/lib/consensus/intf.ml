@@ -526,6 +526,8 @@ module type S = sig
 
       val curr_slot : Value.t -> Slot.t
 
+      val epoch_count : Value.t -> Length.t
+
       val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 
       val global_slot_since_genesis : Value.t -> Mina_numbers.Global_slot.t

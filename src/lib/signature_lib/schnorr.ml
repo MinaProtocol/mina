@@ -414,12 +414,26 @@ module Message = struct
 
   type t = (Field.t, bool) Random_oracle.Input.t [@@deriving sexp]
 
+  [%%if
+  mainnet]
+
+  let network_id = Char.of_int_exn 1
+
+  [%%else]
+
+  let network_id = Char.of_int_exn 0
+
+  [%%endif]
+
   let derive t ~private_key ~public_key =
     let input =
       let x, y = Tick.Inner_curve.to_affine_exn public_key in
       Random_oracle.Input.append t
         { field_elements= [|x; y|]
-        ; bitstrings= [|Tock.Field.unpack private_key|] }
+        ; bitstrings=
+            [| Tock.Field.unpack private_key
+             ; Fold_lib.Fold.(
+                 to_list (string_bits (String.of_char network_id))) |] }
     in
     Random_oracle.Input.to_bits ~unpack:Field.unpack input
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
