@@ -709,6 +709,15 @@ module Balance = struct
          |sql})
       (public_key_id, balance_to_int64 balance)
 
+  let load (module Conn : CONNECTION) ~(id : int) =
+    Conn.find
+      (Caqti_request.find Caqti_type.int
+         Caqti_type.(tup2 int int64)
+         {sql| SELECT public_key_id, balance FROM balances
+               WHERE id = $1
+         |sql})
+      id
+
   let add (module Conn : CONNECTION) ~(public_key_id : int)
       ~(balance : Currency.Balance.t) =
     Conn.find
@@ -1363,10 +1372,34 @@ module Block = struct
       in
       List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
     in
+    let balance_id_of_pk_and_balance pk balance =
+      let%bind public_key_id =
+        Public_key.add_if_doesn't_exist (module Conn) pk
+      in
+      Balance.add_if_doesn't_exist (module Conn) ~public_key_id ~balance
+    in
+    let balance_id_of_pk_and_balance_opt pk balance_opt =
+      Option.value_map balance_opt ~default:(Deferred.Result.return None)
+        ~f:(fun balance ->
+          let%map id = balance_id_of_pk_and_balance pk balance in
+          Some id )
+    in
     (* add user commands to join table *)
     let%bind () =
       deferred_result_list_fold user_cmds_with_ids ~init:()
         ~f:(fun () (user_command, user_command_id) ->
+          let%bind source_balance_id =
+            balance_id_of_pk_and_balance_opt user_command.source
+              user_command.source_balance
+          in
+          let%bind fee_payer_balance_id =
+            balance_id_of_pk_and_balance user_command.fee_payer
+              user_command.fee_payer_balance
+          in
+          let%bind receiver_balance_id =
+            balance_id_of_pk_and_balance_opt user_command.receiver
+              user_command.receiver_balance
+          in
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~user_command_id ~sequence_no:user_command.sequence_no
@@ -1376,15 +1409,12 @@ module Block = struct
               user_command.fee_payer_account_creation_fee_paid
             ~receiver_account_creation_fee_paid:
               user_command.receiver_account_creation_fee_paid
-            ~created_token:
-              user_command.created_token
-              (* TODO(psteckler): Once these ID fields are added to Extensional.User_command thread the values through here *)
-            ~fee_payer_balance_id:0 ~source_balance_id:None
-            ~receiver_balance_id:None )
+            ~created_token:user_command.created_token ~fee_payer_balance_id
+            ~source_balance_id ~receiver_balance_id )
     in
     (* add internal commands *)
-    let%bind internal_cmd_ids_and_seq_nos =
-      let%map internal_cmd_ids_rev =
+    let%bind internal_cmds_ids_and_seq_nos =
+      let%map internal_cmds_and_ids_rev =
         deferred_result_list_fold block.internal_cmds ~init:[]
           ~f:(fun acc internal_cmd ->
             let%map cmd_id =
@@ -1392,23 +1422,25 @@ module Block = struct
                 (module Conn)
                 internal_cmd
             in
-            cmd_id :: acc )
+            (internal_cmd, cmd_id) :: acc )
       in
       let sequence_nos =
         List.map block.internal_cmds ~f:(fun internal_cmd ->
             (internal_cmd.sequence_no, internal_cmd.secondary_sequence_no) )
       in
-      List.zip_exn (List.rev internal_cmd_ids_rev) sequence_nos
+      List.zip_exn (List.rev internal_cmds_and_ids_rev) sequence_nos
     in
     (* add internal commands to join table *)
     let%bind () =
-      deferred_result_list_fold internal_cmd_ids_and_seq_nos ~init:()
+      deferred_result_list_fold internal_cmds_ids_and_seq_nos ~init:()
         ~f:(fun ()
-           (internal_command_id, (sequence_no, secondary_sequence_no))
+           ( (internal_command, internal_command_id)
+           , (sequence_no, secondary_sequence_no) )
            ->
-          (* TODO(psteckler): Add receiver_balance column to Extensional.Internal_command
-           *   then replace dummy value with real balance here *)
-          let receiver_balance_id = 0 in
+          let%bind receiver_balance_id =
+            balance_id_of_pk_and_balance internal_command.receiver
+              internal_command.receiver_balance
+          in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
