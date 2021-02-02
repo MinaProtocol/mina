@@ -17,9 +17,12 @@ locals {
   buildkite_config_envs = [
     # Buildkite EnvVars
     {
-      # inject Google Cloud application credentials into agent runtime for enabling buildkite artifact uploads
       "name" = "BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON"
       "value" = var.enable_gcs_access ? base64decode(google_service_account_key.buildkite_svc_key[0].private_key) : var.google_app_credentials
+    },
+    {
+      "name" = "GCLOUD_API_KEY"
+      "value" = data.aws_secretsmanager_secret_version.testnet_logengine_apikey.secret_string
     },
     {
       "name" = "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"
@@ -224,7 +227,7 @@ locals {
 
         # Download and install NodeJS
         curl -sL https://deb.nodesource.com/setup_12.x | bash -
-        apt-get install -y nodejs
+        apt-get install -y nodejs libjemalloc-dev
 
         # Build coda-network library
         mkdir -p /tmp/mina && git clone https://github.com/MinaProtocol/mina.git /tmp/mina

@@ -89,3 +89,11 @@ data "aws_secretsmanager_secret" "buildkite_api_token_metadata" {
 data "aws_secretsmanager_secret_version" "buildkite_api_token" {
   secret_id = "${data.aws_secretsmanager_secret.buildkite_api_token_metadata.id}"
 }
+
+data "aws_secretsmanager_secret" "testnet_logengine_apikey_metadata" {
+  name = "testnet/gcp/api-key/log-engine"
+}
+
+data "aws_secretsmanager_secret_version" "testnet_logengine_apikey" {
+  secret_id = "${data.aws_secretsmanager_secret.testnet_logengine_apikey_metadata.id}"
+}
