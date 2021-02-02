@@ -9,6 +9,8 @@ module Node = struct
   type t =
     {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
+  let id {pod_id; _} = pod_id
+
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
   let node_to_string (n : t) : String.t =
@@ -350,8 +352,7 @@ end
 
 type t =
   { namespace: string
-  ; constraint_constants: Genesis_constants.Constraint_constants.t
-  ; genesis_constants: Genesis_constants.t
+  ; constants: Test_config.constants
   ; block_producers: Node.t list
   ; snark_coordinators: Node.t list
   ; archive_nodes: Node.t list
@@ -359,9 +360,11 @@ type t =
   ; keypairs: Signature_lib.Keypair.t list
   ; nodes_by_app_id: Node.t String.Map.t }
 
-let constraint_constants {constraint_constants; _} = constraint_constants
+let constants {constants; _} = constants
 
-let genesis_constants {genesis_constants; _} = genesis_constants
+let constraint_constants {constants; _} = constants.constraints
+
+let genesis_constants {constants; _} = constants.genesis
 
 let block_producers {block_producers; _} = block_producers
 

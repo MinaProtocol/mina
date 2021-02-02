@@ -2,13 +2,17 @@ open Core
 open Integration_test_lib
 open Currency
 
-module Make (Engine : Engine_intf) = struct
+module Make (Inputs : Intf.Test.Inputs_intf) = struct
+  open Inputs
   open Engine
+  open Dsl
 
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
-  type log_engine = Log_engine.t
+  type node = Network.Node.t
+
+  type dsl = Dsl.t
 
   let config =
     let open Test_config in
@@ -41,17 +45,15 @@ module Make (Engine : Engine_intf) = struct
     | [] ->
         str
 
-  let run network log_engine =
+  let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     [%log info] "mina_peers_test: started" ;
-    let wait_for_init_partial node =
-      Log_engine.wait_for_init node log_engine
-    in
     let peer_list = Network.block_producers network in
     let%bind () =
-      Malleable_error.List.iter peer_list ~f:wait_for_init_partial
+      Malleable_error.List.iter peer_list ~f:(fun node ->
+          wait_for t (Wait_condition.node_to_initialize node) )
     in
     [%log info] "mina_peers_test: done waiting for initialization" ;
     (* [%log info] "peers_list"

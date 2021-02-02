@@ -1,9 +1,8 @@
 open Async
 open Core
-open Pipe_lib
-open Mina_base
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
+module Node = Kubernetes_network.Node
 
 (** This implements Log_engine_intf for stack driver logs for integration tests
     Assumptions:
@@ -168,6 +167,9 @@ module Subscription = struct
     let%bind _ = create_topic topic in
     let%bind _ = create_sink ~topic ~filter ~key ~logger sink in
     let%map _ = create_subscription name topic in
+    [%log debug]
+      "Succesfully created subscription \"$name\" to topic \"$topic\""
+      ~metadata:[("name", `String name); ("topic", `String topic)] ;
     {name; topic; sink}
 
   let delete t =
@@ -223,751 +225,89 @@ module Subscription = struct
         Deferred.Or_error.errorf "Invalid subscription pull result: %s" result
 end
 
-(* TODO: think about buffering & temporal caching vs. network state subscriptions *)
-module Event_router = struct
-  module Event_handler_id = Unique_id.Int ()
-
-  type ('a, 'b) handler_func =
-    Kubernetes_network.Node.t -> 'a -> [`Stop of 'b | `Continue] Deferred.t
-
-  type event_handler =
-    | Event_handler :
-        Event_handler_id.t
-        * 'b Ivar.t
-        * 'a Event_type.t
-        * ('a, 'b) handler_func
-        -> event_handler
-
-  (* event subscriptions surface information from the handler (as type witnesses), but do not existentially hide the result parameter *)
-  type _ event_subscription =
-    | Event_subscription :
-        Event_handler_id.t * 'b Ivar.t * 'a Event_type.t
-        -> 'b event_subscription
-
-  type handler_map = event_handler list Event_type.Map.t
-
-  (* TODO: asynchronously unregistered event handlers *)
-  type t =
-    { logger: Logger.t
-    ; subscription: Subscription.t
-    ; handlers: handler_map ref
-    ; cancel_ivar: unit Ivar.t
-    ; background_job: unit Deferred.t }
-
-  let unregister_event_handlers_by_id handlers event_type ids =
-    handlers :=
-      Event_type.Map.update !handlers event_type ~f:(fun registered_handlers ->
-          registered_handlers |> Option.value ~default:[]
-          |> List.filter ~f:(fun (Event_handler (registered_id, _, _, _)) ->
-                 List.mem ids registered_id ~equal:Event_handler_id.equal ) )
-
-  let dispatch_event handlers node event =
-    let open Event_type in
-    let open Deferred.Let_syntax in
-    let event_handlers =
-      Map.find !handlers (type_of_event event) |> Option.value ~default:[]
-    in
-    (* This loop cannot directly mutate or recompute the handlers. Doing so will introduce a race condition. *)
-    let%map ids_to_remove =
-      Deferred.List.filter_map ~how:`Parallel event_handlers ~f:(fun handler ->
-          (* assuming the dispatch for `f` is already parallel, and not the execution of the deferred it returns *)
-          let (Event (event_type, event_data)) = event in
-          let (Event_handler
-                ( handler_id
-                , handler_finished_ivar
-                , handler_type
-                , handler_callback )) =
-            handler
-          in
-          match%map
-            dispatch_exn event_type event_data handler_type
-              (handler_callback node)
-          with
-          | `Continue ->
-              None
-          | `Stop result ->
-              Ivar.fill handler_finished_ivar result ;
-              Some handler_id )
-    in
-    unregister_event_handlers_by_id handlers
-      (Event_type.type_of_event event)
-      ids_to_remove
-
-  let rec pull_subscription_in_background ~logger ~network ~subscription
-      ~handlers =
-    let open Interruptible in
-    let open Interruptible.Let_syntax in
-    let module Or_error = Core.Or_error in
-    [%log debug] "Pulling StackDriver subscription" ;
-    (* TODO: improved error reporting *)
-    let%bind log_entries =
-      uninterruptible
-        (Deferred.map ~f:Or_error.ok_exn (Subscription.pull subscription))
-    in
-    [%log debug] "Parsing events from logs" ;
-    let%bind events_with_nodes =
-      return
-        (Or_error.ok_exn
-           (or_error_list_map log_entries ~f:(fun log_entry ->
-                let open Or_error.Let_syntax in
-                let open Json_parsing in
-                let%bind app_id =
-                  find string log_entry ["labels"; "k8s-pod/app"]
-                in
-                let%bind node =
-                  Kubernetes_network.lookup_node_by_app_id network app_id
-                  |> Option.value_map ~f:Or_error.return
-                       ~default:
-                         (Or_error.errorf
-                            "failed to find node by pod app id \"%s\"" app_id)
-                in
-                let%bind log =
-                  find
-                    (parser_from_of_yojson Logger.Message.of_yojson)
-                    log_entry ["jsonPayload"]
-                in
-                let%map event = Event_type.parse_event log in
-                (event, node) )))
-    in
-    [%log debug] "Processing subscription events"
-      ~metadata:
-        [ ( "events"
-          , `List
-              (List.map events_with_nodes ~f:(fun (event, _) ->
-                   Event_type.event_to_yojson event )) ) ] ;
-    let%bind () =
-      uninterruptible
-        (Deferred.List.iter events_with_nodes ~f:(fun (event, node) ->
-             dispatch_event handlers node event ))
-    in
-    let%bind () = uninterruptible (after (Time.Span.of_ms 10000.0)) in
-    (* this extra bind point allows the interruptible monad to interrupt after the timeout *)
-    let%bind () = return () in
-    pull_subscription_in_background ~logger ~network ~subscription ~handlers
-
-  let start_background_job ~logger ~network ~subscription ~handlers
-      ~cancel_ivar =
-    let job =
-      let open Interruptible.Let_syntax in
-      let%bind () = Interruptible.lift Deferred.unit (Ivar.read cancel_ivar) in
-      pull_subscription_in_background ~logger ~network ~subscription ~handlers
-    in
-    let finished_ivar = Ivar.create () in
-    Interruptible.don't_wait_for
-      (Interruptible.finally job ~f:(fun () -> Ivar.fill finished_ivar ())) ;
-    Ivar.read finished_ivar
-
-  let create ~logger ~network ~subscription =
-    let cancel_ivar = Ivar.create () in
-    let handlers = ref Event_type.Map.empty in
-    let background_job =
-      start_background_job ~logger ~network ~subscription ~handlers
-        ~cancel_ivar
-    in
-    {logger; subscription; handlers; cancel_ivar; background_job}
-
-  let stop t =
-    Ivar.fill_if_empty t.cancel_ivar () ;
-    t.background_job
-
-  let on t event_type ~f =
-    let event_type_ex = Event_type.Event_type event_type in
-    let handler_id = Event_handler_id.create () in
-    let finished_ivar = Ivar.create () in
-    let handler = Event_handler (handler_id, finished_ivar, event_type, f) in
-    t.handlers :=
-      Event_type.Map.add_multi !(t.handlers) ~key:event_type_ex ~data:handler ;
-    Event_subscription (handler_id, finished_ivar, event_type)
-
-  (* TODO: On cancellation, should we notify active subscriptions? Would involve changing await type to option or result. *)
-  let cancel t event_subscription cancellation =
-    let (Event_subscription (id, ivar, event_type)) = event_subscription in
-    unregister_event_handlers_by_id t.handlers
-      (Event_type.Event_type event_type) [id] ;
-    Ivar.fill ivar cancellation
-
-  let await event_subscription =
-    let (Event_subscription (_, ivar, _)) = event_subscription in
-    Ivar.read ivar
-
-  let await_with_timeout t event_subscription ~timeout_duration
-      ~timeout_cancellation =
-    let open Deferred.Let_syntax in
-    match%map
-      Timeout.await () ~timeout_duration (await event_subscription)
-    with
-    | `Ok x ->
-        x
-    | `Timeout ->
-        cancel t event_subscription timeout_cancellation ;
-        timeout_cancellation
-end
-
-type log_error = Kubernetes_network.Node.t * Event_type.Log_error.t
-
-type errors =
-  { warn: log_error DynArray.t
-  ; error: log_error DynArray.t
-  ; faulty_peer: log_error DynArray.t
-  ; fatal: log_error DynArray.t }
-
-let empty_errors () =
-  { warn= DynArray.create ()
-  ; error= DynArray.create ()
-  ; faulty_peer= DynArray.create ()
-  ; fatal= DynArray.create () }
-
 type t =
   { logger: Logger.t
-  ; constants: Test_config.constants
   ; subscription: Subscription.t
-  ; event_router: Event_router.t
-  ; error_accumulator: errors
-  ; initialization_table: unit Ivar.t String.Map.t
-  ; best_tip_map_reader: State_hash.t String.Map.t Broadcast_pipe.Reader.t
-  ; best_tip_map_writer: State_hash.t String.Map.t Broadcast_pipe.Writer.t }
+  ; event_writer: (Node.t * Event_type.event) Pipe.Writer.t
+  ; event_reader: (Node.t * Event_type.event) Pipe.Reader.t
+  ; background_job: unit Deferred.t }
 
-let watch_log_errors ~logger ~event_router ~on_fatal_error =
-  let error_accumulator = empty_errors () in
-  ignore
-    (Event_router.on event_router Event_type.Log_error ~f:(fun node message ->
-         let open Logger.Message in
-         let acc =
-           match message.level with
-           | Warn ->
-               error_accumulator.warn
-           | Error ->
-               error_accumulator.error
-           | Faulty_peer ->
-               error_accumulator.faulty_peer
-           | Fatal ->
-               error_accumulator.fatal
-           | _ ->
-               failwith "unexpected log level encountered"
-         in
-         DynArray.add acc (node, message) ;
-         if message.level = Fatal then (
-           [%log fatal] "Error occured $error"
-             ~metadata:[("error", Logger.Message.to_yojson message)] ;
-           on_fatal_error message ) ;
-         Deferred.return `Continue )) ;
-  error_accumulator
+let event_reader {event_reader; _} = event_reader
 
-let watch_node_initializations ~logger ~event_router ~network =
-  (* TODO: redo initialization table (support multiple fills, staging/unstaging expectations) *)
-  let initialization_table =
-    let open Kubernetes_network.Node in
-    Kubernetes_network.all_nodes network
-    |> List.map ~f:(fun (node : Kubernetes_network.Node.t) ->
-           (node.pod_id, Ivar.create ()) )
-    |> String.Map.of_alist_exn
+let parse_event_from_log_entry ~network log_entry =
+  let open Or_error.Let_syntax in
+  let open Json_parsing in
+  let%bind app_id = find string log_entry ["labels"; "k8s-pod/app"] in
+  let%bind node =
+    Kubernetes_network.lookup_node_by_app_id network app_id
+    |> Option.value_map ~f:Or_error.return
+         ~default:
+           (Or_error.errorf "failed to find node by pod app id \"%s\"" app_id)
   in
-  ignore
-    (Event_router.on event_router Event_type.Node_initialization
-       ~f:(fun node () ->
-         let ivar =
-           match String.Map.find initialization_table node.pod_id with
-           | None ->
-               failwithf "Node not found in initialization table: %s"
-                 node.pod_id ()
-           | Some ivar ->
-               ivar
-         in
-         if Ivar.is_empty ivar then (
-           Ivar.fill ivar () ;
-           return `Continue )
-         else (
-           [%log warn]
-             "Received initialization for node that has already initialized" ;
-           return `Continue ) )) ;
-  initialization_table
-
-let watch_best_tips ~event_router =
-  let best_tip_map_reader, best_tip_map_writer =
-    Broadcast_pipe.create String.Map.empty
+  let%bind log =
+    find
+      (parser_from_of_yojson Logger.Message.of_yojson)
+      log_entry ["jsonPayload"]
   in
-  ignore
-    (Event_router.on event_router
-       Event_type.Transition_frontier_diff_application
-       ~f:(fun node diff_application ->
-         Option.value_map diff_application.best_tip_changed
-           ~default:(return `Continue)
-           ~f:(fun new_best_tip ->
-             let best_tip_map =
-               Broadcast_pipe.Reader.peek best_tip_map_reader
-             in
-             let best_tip_map' =
-               String.Map.set best_tip_map ~key:node.pod_id ~data:new_best_tip
-             in
-             let%map () =
-               Broadcast_pipe.Writer.write best_tip_map_writer best_tip_map'
-             in
-             `Continue ) )) ;
-  (best_tip_map_reader, best_tip_map_writer)
+  let%map event = Event_type.parse_event log in
+  (node, event)
 
-let create ~logger ~(network : Kubernetes_network.t) ~on_fatal_error =
-  Deferred.bind ~f:Malleable_error.of_or_error_hard
-    (let open Deferred.Or_error.Let_syntax in
-    let log_filter =
-      let coda_container_filter = "resource.labels.container_name=\"coda\"" in
-      let filters =
-        [network.testnet_log_filter; coda_container_filter]
-        @ all_event_types_log_filter
-      in
-      String.concat filters ~sep:"\n"
+let rec pull_subscription_in_background ~logger ~network ~event_writer
+    ~subscription =
+  if not (Pipe.is_closed event_writer) then (
+    [%log debug] "Pulling StackDriver subscription" ;
+    let%bind log_entries =
+      Deferred.map (Subscription.pull subscription) ~f:Or_error.ok_exn
     in
-    let%map subscription =
-      Subscription.create ~logger ~name:"integration_test_events"
-        ~filter:log_filter
+    if List.length log_entries > 0 then
+      [%log debug] "Parsing events from $n logs"
+        ~metadata:[("n", `Int (List.length log_entries))]
+    else [%log debug] "No logs were pulled" ;
+    let%bind () =
+      Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
+          log_entry
+          |> parse_event_from_log_entry ~network
+          |> Or_error.ok_exn
+          |> Pipe.write_without_pushback_if_open event_writer ;
+          Deferred.unit )
     in
-    [%log info] "Event subscription created" ;
-    let event_router = Event_router.create ~logger ~network ~subscription in
-    let error_accumulator =
-      watch_log_errors ~logger ~event_router ~on_fatal_error
-    in
-    let initialization_table =
-      watch_node_initializations ~logger ~event_router ~network
-    in
-    let best_tip_map_reader, best_tip_map_writer =
-      watch_best_tips ~event_router
-    in
-    { logger
-    ; constants=
-        { constraints= network.constraint_constants
-        ; genesis= network.genesis_constants }
-    ; subscription
-    ; event_router
-    ; error_accumulator
-    ; initialization_table
-    ; best_tip_map_writer
-    ; best_tip_map_reader })
+    let%bind () = after (Time.Span.of_ms 10000.0) in
+    pull_subscription_in_background ~logger ~network ~event_writer
+      ~subscription )
+  else Deferred.unit
 
-let destroy t : Test_error.Set.t Malleable_error.t =
-  let open Malleable_error.Let_syntax in
-  let { constants= _
-      ; logger
-      ; subscription
-      ; event_router
-      ; initialization_table= _
-      ; best_tip_map_reader= _
-      ; best_tip_map_writer
-      ; error_accumulator } =
+let create ~logger ~(network : Kubernetes_network.t) =
+  let open Deferred.Or_error.Let_syntax in
+  let log_filter =
+    let coda_container_filter = "resource.labels.container_name=\"coda\"" in
+    let filters =
+      [network.testnet_log_filter; coda_container_filter]
+      @ all_event_types_log_filter
+    in
+    String.concat filters ~sep:"\n"
+  in
+  let%map subscription =
+    Subscription.create ~logger ~name:"integration_test_events"
+      ~filter:log_filter
+  in
+  [%log info] "Event subscription created" ;
+  let event_reader, event_writer = Pipe.create () in
+  let background_job =
+    pull_subscription_in_background ~logger ~network ~event_writer
+      ~subscription
+  in
+  {logger; subscription; event_reader; event_writer; background_job}
+
+let destroy t : unit Deferred.Or_error.t =
+  let open Deferred.Or_error.Let_syntax in
+  let {logger; subscription; event_reader= _; event_writer; background_job} =
     t
   in
-  let%map () =
-    Deferred.bind
-      ~f:(Malleable_error.of_or_error_soft ())
-      (let open Deferred.Or_error.Let_syntax in
-      let%bind () =
-        Deferred.map (Event_router.stop event_router) ~f:Or_error.return
-      in
-      Broadcast_pipe.Writer.close best_tip_map_writer ;
-      Subscription.delete subscription)
-  in
+  Pipe.close event_writer ;
+  let%bind () = Deferred.map background_job ~f:Or_error.return in
+  let%map () = Subscription.delete subscription in
   [%log debug] "subscription deleted" ;
-  let lift error_array =
-    DynArray.to_list error_array
-    |> List.map ~f:(fun (node, message) ->
-           let open Kubernetes_network.Node in
-           Test_error.Remote_error
-             {node_id= node.pod_id; error_message= message} )
-  in
-  let soft_errors =
-    lift error_accumulator.warn @ lift error_accumulator.faulty_peer
-  in
-  let hard_errors =
-    lift error_accumulator.error @ lift error_accumulator.fatal
-  in
-  {Test_error.Set.soft_errors; hard_errors}
-
-(**************************************************************************************************)
-
-(*TODO: Node status. Should that be a part of a node query instead? or we need a new log that has status info and some node identifier*)
-let wait_for' :
-       blocks:int
-    -> epoch_reached:int
-    -> snarked_ledgers_generated:int
-    -> timeout:[ `Slots of int
-               | `Epochs of int
-               | `Snarked_ledgers_generated of int
-               | `Milliseconds of int64 ]
-    -> t
-    -> ( [> `Blocks_produced of int]
-       * [> `Slots_passed of int]
-       * [> `Snarked_ledgers_generated of int] )
-       Malleable_error.t =
- fun ~blocks ~epoch_reached ~snarked_ledgers_generated ~timeout t ->
-  if
-    blocks = 0 && epoch_reached = 0
-    && snarked_ledgers_generated = 0
-    && timeout = `Milliseconds 0L
-  then
-    Malleable_error.return
-      (`Blocks_produced 0, `Slots_passed 0, `Snarked_ledgers_generated 0)
-  else
-    let now = Time.now () in
-    let hard_timeout =
-      let ( ! ) = Int64.of_int in
-      let ( * ) = Int64.( * ) in
-      let ( +! ) = Int64.( + ) in
-      let estimated_time =
-        match timeout with
-        | `Slots n ->
-            !n * !(t.constants.constraints.block_window_duration_ms)
-        | `Epochs n ->
-            !n
-            * !(t.constants.genesis.protocol.slots_per_epoch)
-            * !(t.constants.constraints.block_window_duration_ms)
-        | `Snarked_ledgers_generated n ->
-            (* Assuming at least 1/3 rd of the max throughput otherwise this could take forever depending on the scan state size*)
-            (*first snarked ledger*)
-            3L
-            * !(t.constants.constraints.block_window_duration_ms)
-            * ( !(t.constants.constraints.work_delay + 1)
-                * !(t.constants.constraints.transaction_capacity_log_2 + 1)
-              +! 1L )
-            +! (*subsequent snarked ledgers*)
-               !(n - 1)
-               * !(t.constants.constraints.block_window_duration_ms)
-               * 3L
-        | `Milliseconds n ->
-            n
-      in
-      Time.Span.of_ms (Int64.to_float (estimated_time * 2L))
-    in
-    let query_timeout_ms =
-      match timeout with
-      | `Milliseconds x ->
-          Some (Time.add now (Time.Span.of_ms (Int64.to_float x)))
-      | _ ->
-          None
-    in
-    let timed_out (res : Event_type.Block_produced.aggregated) =
-      match timeout with
-      | `Slots x ->
-          res.last_seen_result.global_slot >= x
-      | `Epochs x ->
-          res.last_seen_result.epoch >= x
-      | `Snarked_ledgers_generated x ->
-          res.snarked_ledgers_generated >= x
-      | `Milliseconds _ ->
-          Time.( > ) (Time.now ()) (Option.value_exn query_timeout_ms)
-    in
-    let conditions_met (aggregated : Event_type.Block_produced.aggregated) =
-      [%log' info t.logger]
-        ~metadata:
-          [ ( "result"
-            , Event_type.Block_produced.aggregated_to_yojson aggregated )
-          ; ("blocks", `Int blocks)
-          ; ("epoch_reached", `Int epoch_reached)
-          ; ("snarked_ledgers_generated", `Int snarked_ledgers_generated) ]
-        "Checking if conditions passed for $result [expected blocks=$blocks, \
-         expected epochs reached=$epoch_reached, expected snarked ledgers \
-         generated=$snarked_ledgers_generated]" ;
-      aggregated.last_seen_result.block_height > blocks
-      && aggregated.last_seen_result.epoch >= epoch_reached
-      && aggregated.snarked_ledgers_generated >= snarked_ledgers_generated
-    in
-    (* TODO: Event_router.on_fold to thread state through handlers without refs *)
-    let aggregated_ref = ref Event_type.Block_produced.empty_aggregated in
-    let handle_block_produced _node block_produced =
-      let aggregated =
-        Event_type.Block_produced.aggregate !aggregated_ref block_produced
-      in
-      aggregated_ref := aggregated ;
-      if timed_out aggregated then Deferred.return (`Stop `State_timeout)
-      else if conditions_met aggregated then
-        Deferred.return (`Stop (`Conditions_met aggregated))
-      else Deferred.return `Continue
-    in
-    let%bind result =
-      Event_router.on t.event_router Event_type.Block_produced
-        ~f:handle_block_produced
-      |> Event_router.await_with_timeout t.event_router
-           ~timeout_duration:hard_timeout ~timeout_cancellation:`Hard_timeout
-    in
-    match result with
-    | `Hard_timeout ->
-        Malleable_error.of_string_hard_error "wait_for hit a hard timeout"
-    | `State_timeout ->
-        Malleable_error.of_string_hard_error "wait_for hit a state timeout"
-    | `Conditions_met aggregated ->
-        let open Event_type.Block_produced in
-        Malleable_error.return
-          ( `Blocks_produced aggregated.blocks_generated
-          , `Slots_passed aggregated.last_seen_result.global_slot
-          , `Snarked_ledgers_generated aggregated.snarked_ledgers_generated )
-
-let wait_for :
-       ?blocks:int
-    -> ?epoch_reached:int
-    -> ?snarked_ledgers_generated:int
-    -> ?timeout:[ `Slots of int
-                | `Epochs of int
-                | `Snarked_ledgers_generated of int
-                | `Milliseconds of int64 ]
-    -> t
-    -> ( [> `Blocks_produced of int]
-       * [> `Slots_passed of int]
-       * [> `Snarked_ledgers_generated of int] )
-       Malleable_error.t =
- fun ?(blocks = 0) ?(epoch_reached = 0) ?(snarked_ledgers_generated = 0)
-     ?(timeout = `Milliseconds 300000L) t ->
-  [%log' info t.logger]
-    ~metadata:
-      [ ("blocks", `Int blocks)
-      ; ("epoch", `Int epoch_reached)
-      ; ("snarked_ledgers_generated", `Int snarked_ledgers_generated)
-      ; ( "timeout"
-        , `String
-            ( match timeout with
-            | `Slots n ->
-                Printf.sprintf "%d slots" n
-            | `Epochs n ->
-                Printf.sprintf "%d epochs" n
-            | `Snarked_ledgers_generated n ->
-                Printf.sprintf "%d snarked ledgers emitted" n
-            | `Milliseconds n ->
-                Printf.sprintf "%Ld ms" n ) ) ]
-    "Waiting for $blocks blocks, $epoch epoch, $snarked_ledgers_generated \
-     snarked ledgers with timeout $timeout" ;
-  match%bind
-    wait_for' ~blocks ~epoch_reached ~snarked_ledgers_generated ~timeout t
-  with
-  | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
-      [%log' fatal t.logger] "wait_for failed with error: $error"
-        ~metadata:[("error", Error_json.error_to_yojson e.error)] ;
-      Deferred.return
-        (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
-  | res ->
-      Deferred.return res
-
-(**************************************************************************************************)
-
-let wait_for' :
-       t
-    -> Condition.t
-    -> ( [> `Blocks_produced of int]
-       * [> `Slots_passed of int]
-       * [> `Snarked_ledgers_generated of int] )
-       Malleable_error.t =
- fun t cond ->
-  let finished = Ivar.create () in
-  let stop = Ivar.read finished in
-  let updates =
-    let r, w = Pipe.create () in
-    upon stop (fun () -> if not (Pipe.is_closed w) then Pipe.close w) ;
-    let timeouts = ref [] in
-    let finish () =
-      Ivar.fill_if_empty finished () ;
-      List.iter !timeouts ~f:(fun e -> Clock.Event.abort_if_possible e ()) ;
-      if not (Pipe.is_closed w) then Pipe.close w
-    in
-    let add_timeout time x =
-      Option.iter (Condition.Network_time_span.to_span ~constants:t.constants time)
-        ~f:(fun span ->
-          timeouts :=
-            Clock.Event.run_after span
-              (fun () ->
-                Pipe.write_without_pushback_if_open w x ;
-                finish () )
-              ()
-            :: !timeouts )
-    in
-    add_timeout cond.hard_timeout
-      (Error
-         { Malleable_error.Hard_fail.hard_error=
-             Test_error.raw_internal_error (Error.of_string "timed out")
-         ; soft_errors= [] }) ;
-    add_timeout cond.soft_timeout
-      (Ok
-         { Malleable_error.Accumulator.computation_result= []
-         ; soft_errors=
-             [Test_error.raw_internal_error (Error.of_string "soft timeout")]
-         }) ;
-    let interval =
-      Time.Span.of_ms
-        (Int.to_float t.constants.constraints.block_window_duration_ms /. 2.0)
-    in
-    Clock.every' ~stop interval (fun () ->
-        [%log' info t.logger] "Pulling blocks produced subscription" ;
-        let%bind res = Subscription.pull t.subscriptions.blocks_produced in
-        let d = Pipe.write_if_open w res in
-        ( match res with
-        | Ok {computation_result= logs; _} ->
-            [%log' info t.logger]
-              ~metadata:[("n", `Int (List.length logs)); ("logs", `List logs)]
-              "Pulled $n logs for blocks produced: $logs"
-        | Error _ ->
-            finish () ) ;
-        d ) ;
-    r
-  in
-  let conditions_passed (acc : Block_produced_query.Result.Aggregated.t) =
-    cond.predicate
-      { block_height= acc.last_seen_result.block_height
-      ; epoch= acc.last_seen_result.epoch
-      ; global_slot= acc.last_seen_result.global_slot
-      ; snarked_ledgers_generated= acc.snarked_ledgers_generated
-      ; blocks_generated= acc.blocks_generated }
-  in
-  let rec go acc =
-    let finish (acc : Block_produced_query.Result.Aggregated.t) =
-      Ivar.fill_if_empty finished () ;
-      Malleable_error.return
-        ( `Blocks_produced acc.blocks_generated
-        , `Slots_passed acc.last_seen_result.global_slot
-        , `Snarked_ledgers_generated acc.snarked_ledgers_generated )
-    in
-    match%bind Pipe.read updates with
-    | `Eof ->
-        finish acc
-    | `Ok r ->
-        let open Malleable_error.Let_syntax in
-        let%bind logs = Deferred.return r in
-        let%bind finished, acc =
-          Malleable_error.List.fold_left_while logs ~init:(false, acc)
-            ~f:(fun (_, acc) log ->
-              let open Malleable_error.Let_syntax in
-              let%map result = Block_produced_query.parse log in
-              let acc = Block_produced_query.Result.aggregate acc result in
-              if conditions_passed acc then `Stop (true, acc)
-              else `Continue (false, acc) )
-        in
-        if finished then finish acc else go acc
-  in
-  go Block_produced_query.Result.Aggregated.empty
-
-let wait_for t cond =
-  match%bind wait_for' t cond with
-  | Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se} ->
-      [%log' fatal t.logger] "wait_for failed with error: $error"
-        ~metadata:[("error", Error_json.error_to_yojson e.error)] ;
-      Deferred.return
-        (Error {Malleable_error.Hard_fail.hard_error= e; soft_errors= se})
-  | res ->
-      Deferred.return res
-
-let command_matches_payment cmd ~sender ~receiver ~amount =
-  let open User_command in
-  match cmd with
-  | Signed_command signed_cmd -> (
-      let open Signature_lib in
-      let body =
-        Signed_command.payload signed_cmd |> Signed_command_payload.body
-      in
-      match body with
-      | Payment {source_pk; receiver_pk; amount= paid_amt; token_id= _}
-        when Public_key.Compressed.equal source_pk sender
-             && Public_key.Compressed.equal receiver_pk receiver
-             && Currency.Amount.equal paid_amt amount ->
-          true
-      | _ ->
-          false )
-  | Snapp_command _ ->
-      false
-
-let wait_for_payment ?(timeout_duration = Time.Span.of_ms 900.0) t ~logger
-    ~sender ~receiver ~amount () : unit Malleable_error.t =
-  let open Signature_lib in
-  let open Event_type.Breadcrumb_added in
-  let handle_breadcrumb_added _node breadcrumb_added =
-    let payment_opt =
-      List.find breadcrumb_added.user_commands ~f:(fun cmd_with_status ->
-          cmd_with_status.With_status.data |> User_command.forget_check
-          |> command_matches_payment ~sender ~receiver ~amount )
-    in
-    match payment_opt with
-    | Some cmd_with_status ->
-        let actual_status = cmd_with_status.With_status.status in
-        let was_applied =
-          match actual_status with
-          | Transaction_status.Applied _ ->
-              true
-          | _ ->
-              false
-        in
-        if was_applied then Deferred.return (`Stop `Payment_found)
-        else Deferred.return (`Stop (`Payment_not_applied actual_status))
-    | None ->
-        Deferred.return `Continue
-  in
-  let%bind result =
-    Event_router.await_with_timeout t.event_router ~timeout_duration
-      ~timeout_cancellation:`Timeout
-      (Event_router.on t.event_router Event_type.Breadcrumb_added
-         ~f:handle_breadcrumb_added)
-  in
-  match result with
-  | `Timeout ->
-      Malleable_error.of_string_hard_error "timed out waiting for payment"
-  | `Payment_not_applied actual_status ->
-      [%log info]
-        "wait_for_payment: found matching payment, but status is not 'Applied'"
-        ~metadata:
-          [ ("sender", `String (Public_key.Compressed.to_string sender))
-          ; ("receiver", `String (Public_key.Compressed.to_string receiver))
-          ; ("amount", `String (Currency.Amount.to_string amount))
-          ; ( "actual_user_command_status"
-            , Transaction_status.to_yojson actual_status ) ] ;
-      Malleable_error.of_string_hard_error_format
-        "Unexpected status in matching payment: %s"
-        (Transaction_status.to_yojson actual_status |> Yojson.Safe.to_string)
-  | `Payment_found ->
-      [%log info] "wait_for_payment: found matching payment"
-        ~metadata:
-          [ ("sender", `String (Public_key.Compressed.to_string sender))
-          ; ("receiver", `String (Public_key.Compressed.to_string receiver))
-          ; ("amount", `String (Currency.Amount.to_string amount)) ] ;
-      Malleable_error.return ()
-
-let await_timeout ~waiting_for ~timeout_duration ~logger deferred =
-  match%bind Timeout.await ~timeout_duration () deferred with
-  | `Timeout ->
-      Malleable_error.of_string_hard_error_format
-        "timeout while waiting for %s" waiting_for
-  | `Ok x ->
-      [%log info] "%s completed" waiting_for ;
-      Malleable_error.return x
-
-let wait_for_init (node : Kubernetes_network.Node.t) t =
-  let open Malleable_error.Let_syntax in
-  [%log' info t.logger]
-    ~metadata:[("node", `String node.pod_id)]
-    "Waiting for $node to initialize" ;
-  let%bind init =
-    Malleable_error.of_option_hard
-      (String.Map.find t.initialization_table node.pod_id)
-      "failed to find node in initialization table"
-  in
-  if Ivar.is_full init then return ()
-  else
-    (* TODO: make configurable (or ideally) compute dynamically from network configuration *)
-    await_timeout ~waiting_for:"initialization"
-      ~timeout_duration:(Time.Span.of_ms (15.0 *. 60.0 *. 1000.0))
-      (Ivar.read init) ~logger:t.logger
-
-(* TODO: rewrite with event router *)
-let wait_for_sync (nodes : Kubernetes_network.Node.t list) ~timeout t =
-  [%log' info t.logger]
-    ~metadata:[("nodes", `List (List.map ~f:(fun n -> `String n.pod_id) nodes))]
-    "Waiting for $nodes to synchronize" ;
-  let pod_ids = List.map nodes ~f:(fun node -> node.pod_id) in
-  let all_equal ls =
-    Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-        [h] = List.find_all_dups ~compare:State_hash.compare ls )
-  in
-  let all_nodes_synced best_tip_map =
-    if List.for_all pod_ids ~f:(String.Map.mem best_tip_map) then
-      (* [lookup_exn] should never throw an exception here *)
-      all_equal (List.map pod_ids ~f:(String.Map.find_exn best_tip_map))
-    else false
-  in
-  [%log' info t.logger] "waiting for %f seconds" (Time.Span.to_sec timeout) ;
-  await_timeout
-    (Broadcast_pipe.Reader.iter_until t.best_tip_map_reader
-       ~f:(Fn.compose Deferred.return all_nodes_synced))
-    ~waiting_for:"synchronization" ~timeout_duration:timeout ~logger:t.logger
+  ()
 
 (*TODO: unit tests without conencting to gcloud. The following test connects to joyous-occasion*)
 (*let%test_module "Log tests" =

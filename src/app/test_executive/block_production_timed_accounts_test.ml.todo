@@ -1,13 +1,16 @@
 open Integration_test_lib
 open Core_kernel
 
-module Make (Engine : Engine_intf) = struct
+module Make (Engine : Intf.Engine.S) (Dsl : Intf.Dsl.S with module Engine := Engine)  = struct
   open Engine
+  open Dsl
 
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
-  type log_engine = Log_engine.t
+  type node = Network.Node.t
+
+  type dsl = Dsl.t
 
   let block_producer_balance = "1000"
 
@@ -53,22 +56,19 @@ module Make (Engine : Engine_intf) = struct
 
   let expected_error_event_reprs = []
 
-  let run network log_engine =
+  let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let block_producer = List.nth_exn (Network.block_producers network) 0 in
-    let%bind () = Log_engine.wait_for_init block_producer log_engine in
+    let%bind () = wait_for t (Wait_condition.node_to_initialize block_producer) in
     let%bind ( `Blocks_produced blocks_produced
              , `Slots_passed slots
              , `Snarked_ledgers_generated _snarked_ledger_generated ) =
-      Log_engine.wait_for log_engine
-        { hard_timeout= None
-        ; soft_timeout= None
-        ; predicate=
-            (fun s ->
-              s.blocks_generated >= 8
-              || s.snarked_ledgers_generated >= 1
-              || s.global_slot >= 30 ) }
+      Log_engine.wait_for t Wait_condition.(
+        any
+          [ blocks_to_be_produced 8
+          ; snarked_ledgers_generated 1
+          ; global_slot_reached 30 ])
     in
     let logger = Logger.create () in
     [%log info] "blocks produced %d slots passed %d" blocks_produced slots ;

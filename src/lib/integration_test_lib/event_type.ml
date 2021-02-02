@@ -118,6 +118,7 @@ module Block_produced = struct
     ; snarked_ledger_generated: bool }
   [@@deriving to_yojson]
 
+  (*
   let empty =
     {block_height= 0; epoch= 0; global_slot= 0; snarked_ledger_generated= false}
 
@@ -145,6 +146,7 @@ module Block_produced = struct
             aggregated.snarked_ledgers_generated + 1
           else aggregated.snarked_ledgers_generated ) }
     else aggregated
+  *)
 
   (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
   let parse message =

@@ -1,13 +1,17 @@
 open Integration_test_lib
 open Core_kernel
 
-module Make (Engine : Engine_intf) = struct
+module Make (Inputs : Intf.Test.Inputs_intf) = struct
+  open Inputs
   open Engine
+  open Dsl
 
   (* TODO: find a way to avoid this type alias (first class module signatures restrictions make this tricky) *)
   type network = Network.t
 
-  type log_engine = Log_engine.t
+  type node = Network.Node.t
+
+  type dsl = Dsl.t
 
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
@@ -47,17 +51,21 @@ module Make (Engine : Engine_intf) = struct
     let {public_key; _} = List.nth_exn keypairs n in
     public_key |> Public_key.compress
 
-  let run network log_engine =
+  let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let block_producer1 = List.nth_exn (Network.block_producers network) 0 in
     let block_producer2 = List.nth_exn (Network.block_producers network) 1 in
     [%log info] "Waiting for block producer 1 (of 2) to initialize" ;
-    let%bind () = Log_engine.wait_for_init block_producer1 log_engine in
+    let%bind () =
+      wait_for t (Wait_condition.node_to_initialize block_producer1)
+    in
     [%log info] "Block producer 1 (of 2) initialized" ;
     [%log info] "Waiting for block producer 2 (of 2) to initialize" ;
-    let%bind () = Log_engine.wait_for_init block_producer2 log_engine in
+    let%bind () =
+      wait_for t (Wait_condition.node_to_initialize block_producer2)
+    in
     [%log info] "Block producer 2 (of 2) initialized" ;
     let sender = pk_of_keypair (Network.keypairs network) 1 in
     let receiver = pk_of_keypair (Network.keypairs network) 0 in
@@ -82,8 +90,9 @@ module Make (Engine : Engine_intf) = struct
     in
     [%log info] "Waiting for payment to appear in breadcrumb" ;
     let%bind () =
-      Log_engine.wait_for_payment log_engine ~logger ~sender ~receiver ~amount
-        ()
+      wait_for t
+        (Wait_condition.payment_to_be_included_in_frontier ~sender ~receiver
+           ~amount)
     in
     [%log info] "Got breadcrumb with desired payment" ;
     [%log info]

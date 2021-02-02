@@ -43,6 +43,7 @@ module Block_produced : sig
 
   include Event_type_intf with type t := t
 
+  (*
   type aggregated =
     {last_seen_result: t; blocks_generated: int; snarked_ledgers_generated: int}
   [@@deriving to_yojson]
@@ -52,6 +53,7 @@ module Block_produced : sig
   val init_aggregated : t -> aggregated
 
   val aggregate : aggregated -> t -> aggregated
+  *)
 end
 
 module Breadcrumb_added : sig

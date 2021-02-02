@@ -59,8 +59,7 @@ module Network_config = struct
     ; project_id: string
     ; cluster_id: string
     ; keypairs: (string * Keypair.t) list
-    ; constraint_constants: Genesis_constants.Constraint_constants.t
-    ; genesis_constants: Genesis_constants.t
+    ; constants: Test_config.constants
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -201,6 +200,9 @@ module Network_config = struct
         (Genesis_ledger_helper.make_genesis_constants ~logger
            ~default:Genesis_constants.compiled runtime_config)
     in
+    let constants : Test_config.constants =
+      {constraints= constraint_constants; genesis= genesis_constants}
+    in
     (* BLOCK PRODUCER CONFIG *)
     let base_port = 10001 in
     let block_producer_config index (secret_name, _) =
@@ -220,8 +222,7 @@ module Network_config = struct
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
-    ; constraint_constants
-    ; genesis_constants
+    ; constants
     ; terraform=
         { generate_and_upload_artifacts= false
         ; cluster_name
@@ -307,8 +308,7 @@ module Network_manager = struct
     ; keypair_secrets: string list
     ; testnet_dir: string
     ; testnet_log_filter: string
-    ; constraint_constants: Genesis_constants.Constraint_constants.t
-    ; genesis_constants: Genesis_constants.t
+    ; constants: Test_config.constants
     ; block_producer_nodes: Kubernetes_network.Node.t list
     ; snark_coordinator_nodes: Kubernetes_network.Node.t list
     ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
@@ -400,8 +400,7 @@ module Network_manager = struct
       ; namespace= network_config.terraform.testnet_name
       ; testnet_dir
       ; testnet_log_filter
-      ; constraint_constants= network_config.constraint_constants
-      ; genesis_constants= network_config.genesis_constants
+      ; constants= network_config.constants
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
       ; block_producer_nodes
       ; snark_coordinator_nodes
@@ -434,8 +433,7 @@ module Network_manager = struct
     t.deployed <- true ;
     let result =
       { Kubernetes_network.namespace= t.namespace
-      ; constraint_constants= t.constraint_constants
-      ; genesis_constants= t.genesis_constants
+      ; constants= t.constants
       ; block_producers= t.block_producer_nodes
       ; snark_coordinators= t.snark_coordinator_nodes
       ; archive_nodes= []
