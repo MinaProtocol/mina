@@ -14,7 +14,7 @@ data "local_file" "genesis_ledger" {
 }
 
 locals {
-  use_local_charts = true
+  use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
