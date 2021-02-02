@@ -2,6 +2,8 @@ drop table blocks_internal_commands;
 
 drop table blocks_user_commands;
 
+drop table balances;
+
 drop index idx_blocks_height;
 
 drop index idx_blocks_creator_id;
