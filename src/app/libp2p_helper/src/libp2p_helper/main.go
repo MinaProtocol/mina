@@ -880,6 +880,7 @@ func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
 
 type addPeerMsg struct {
 	Multiaddr string `json:"multiaddr"`
+	Seed      bool   `json:"seed"`
 }
 
 func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
@@ -893,14 +894,6 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 	}
 
 	return info, nil
-}
-
-func connectToPeer(app *app, info *peer.AddrInfo) error {
-	connInfo := app.P2p.ConnectionManager.GetInfo()
-	if connInfo.ConnCount >= connInfo.HighWater {
-		return errors.New("conn count >= max connections")
-	}
-	return app.P2p.Host.Connect(app.Ctx, *info)
 }
 
 func (ap *addPeerMsg) run(app *app) (interface{}, error) {
@@ -921,7 +914,12 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.Logger.Error("addPeer Trying to connect to: ", info)
-	err = connectToPeer(app, info)
+
+	if ap.Seed {
+		app.P2p.Seeds = append(app.P2p.Seeds, *info)
+	}
+
+	err = app.P2p.Host.Connect(app.Ctx, *info)
 	if err != nil {
 		return nil, badp2p(err)
 	}

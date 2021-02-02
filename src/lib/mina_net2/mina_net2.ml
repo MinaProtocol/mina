@@ -489,7 +489,7 @@ module Helper = struct
     end
 
     module Add_peer = struct
-      type input = {multiaddr: string} [@@deriving yojson]
+      type input = {multiaddr: string; seed: bool} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -1478,10 +1478,12 @@ let open_stream net ~protocol peer =
   | Error e ->
       Error e
 
-let add_peer net maddr =
+let add_peer net maddr ~seed =
   match%map
     Helper.(
-      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+      do_rpc net
+        (module Rpcs.Add_peer)
+        {multiaddr= Multiaddr.to_string maddr; seed})
   with
   | Ok "addPeer success" ->
       Ok ()

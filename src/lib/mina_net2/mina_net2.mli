@@ -367,7 +367,7 @@ val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
 (** Connect to a peer, ensuring it enters our peerbook and DHT.
 
     This can fail if the connection fails. *)
-val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
+val add_peer : net -> Multiaddr.t -> seed:bool -> unit Deferred.Or_error.t
 
 (** Join the DHT and announce our existence.
 
