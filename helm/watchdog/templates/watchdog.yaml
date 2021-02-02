@@ -47,6 +47,8 @@ spec:
             value: {{ $.Values.coda.ports.metrics | quote }}
           - name: "SEED_PEERS_URL"
             value: {{ $.Values.seedPeersURL | quote }}
+          - name: "GOOGLE_APPLICATION_CREDENTIALS"
+            value: "/gcloud/keyfile.json"
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           - name: "CHECK_GCLOUD_STORAGE_BUCKET"
             value: "true"
