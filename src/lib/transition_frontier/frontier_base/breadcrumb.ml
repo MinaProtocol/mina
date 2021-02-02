@@ -144,7 +144,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                       | Pre_diff _
                       | Non_zero_fee_excess _
                       | Insufficient_work _
-                      | Mismatched_statuses _ ->
+                      | Mismatched_statuses _
+                      | Invalid_public_key _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith

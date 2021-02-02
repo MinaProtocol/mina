@@ -85,16 +85,25 @@ CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 
+CREATE TABLE balances
+( id            serial PRIMARY KEY
+, public_key_id int    NOT NULL REFERENCES public_keys(id)
+, balance       bigint NOT NULL
+);
+
 CREATE TABLE blocks_user_commands
 ( block_id        int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , user_command_id int NOT NULL REFERENCES user_commands(id) ON DELETE CASCADE
 , sequence_no     int NOT NULL
-, status          user_command_status
+, status          user_command_status NOT NULL
 , failure_reason  text
 , fee_payer_account_creation_fee_paid bigint
 , receiver_account_creation_fee_paid bigint
-, created_token   bigint
-, PRIMARY KEY (block_id, user_command_id)
+, created_token     bigint
+, fee_payer_balance int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
+, source_balance    int          REFERENCES balances(id) ON DELETE CASCADE
+, receiver_balance  int          REFERENCES balances(id) ON DELETE CASCADE
+, PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
 
 CREATE TABLE blocks_internal_commands
@@ -102,5 +111,6 @@ CREATE TABLE blocks_internal_commands
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
 , sequence_no           int NOT NULL
 , secondary_sequence_no int NOT NULL
+, receiver_balance      int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );

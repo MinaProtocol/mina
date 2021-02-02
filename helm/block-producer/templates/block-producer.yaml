@@ -227,7 +227,7 @@ spec:
         - name: external-port
           protocol: TCP 
           containerPort: {{ $.Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.external }}
+          hostPort: {{ $.Values.coda.ports.p2p }}
 {{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:

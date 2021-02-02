@@ -331,6 +331,29 @@ module User_command = struct
            |sql})
         id
 
+    type balance_public_key_ids =
+      {fee_payer_id: int; source_id: int; receiver_id: int}
+
+    let add_balance_public_keys_if_don't_exist (module Conn : CONNECTION)
+        (t : Signed_command.t) =
+      let open Deferred.Result.Let_syntax in
+      let%bind fee_payer_id =
+        Public_key.add_if_doesn't_exist
+          (module Conn)
+          (Signed_command.fee_payer_pk t)
+      in
+      let%bind source_id =
+        Public_key.add_if_doesn't_exist
+          (module Conn)
+          (Signed_command.source_pk t)
+      in
+      let%map receiver_id =
+        Public_key.add_if_doesn't_exist
+          (module Conn)
+          (Signed_command.receiver_pk t)
+      in
+      {fee_payer_id; source_id; receiver_id}
+
     let add_if_doesn't_exist ?(via = `Ident) (module Conn : CONNECTION)
         (t : Signed_command.t) =
       let open Deferred.Result.Let_syntax in
@@ -341,20 +364,8 @@ module User_command = struct
       | Some user_command_id ->
           return user_command_id
       | None ->
-          let%bind fee_payer_id =
-            Public_key.add_if_doesn't_exist
-              (module Conn)
-              (Signed_command.fee_payer_pk t)
-          in
-          let%bind source_id =
-            Public_key.add_if_doesn't_exist
-              (module Conn)
-              (Signed_command.source_pk t)
-          in
-          let%bind receiver_id =
-            Public_key.add_if_doesn't_exist
-              (module Conn)
-              (Signed_command.receiver_pk t)
+          let%bind {fee_payer_id; source_id; receiver_id} =
+            add_balance_public_keys_if_don't_exist (module Conn) t
           in
           let valid_until =
             let open Mina_numbers in
@@ -672,17 +683,63 @@ module Coinbase = struct
           ; hash= transaction_hash |> Transaction_hash.to_base58_check }
 end
 
+module Balance = struct
+  type t = {id: int; public_key_id: int; balance: int64} [@@deriving hlist]
+
+  let typ =
+    let open Caqti_type_spec in
+    let spec = Caqti_type.[int; int; int64] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
+  let balance_to_int64 (balance : Currency.Balance.t) : int64 =
+    balance |> Currency.Balance.to_amount |> Currency.Amount.to_uint64
+    |> Unsigned.UInt64.to_int64
+
+  let find (module Conn : CONNECTION) ~(public_key_id : int)
+      ~(balance : Currency.Balance.t) =
+    Conn.find_opt
+      (Caqti_request.find_opt
+         Caqti_type.(tup2 int int64)
+         Caqti_type.int
+         {sql| SELECT id FROM balances
+               WHERE public_key_id = $1
+               AND balance = $2
+         |sql})
+      (public_key_id, balance_to_int64 balance)
+
+  let add (module Conn : CONNECTION) ~(public_key_id : int)
+      ~(balance : Currency.Balance.t) =
+    Conn.find
+      (Caqti_request.find
+         Caqti_type.(tup2 int int64)
+         Caqti_type.int
+         {sql| INSERT INTO balances (public_key_id, balance) VALUES (?, ?) RETURNING id |sql})
+      (public_key_id, balance_to_int64 balance)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION) ~(public_key_id : int)
+      ~(balance : Currency.Balance.t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind find (module Conn) ~public_key_id ~balance with
+    | Some balance_id ->
+        return balance_id
+    | None ->
+        add (module Conn) ~public_key_id ~balance
+end
+
 module Block_and_internal_command = struct
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
-      ~sequence_no ~secondary_sequence_no =
+      ~sequence_no ~secondary_sequence_no ~receiver_balance_id =
     Conn.exec
       (Caqti_request.exec
-         Caqti_type.(tup4 int int int int)
+         Caqti_type.(tup2 (tup4 int int int int) int)
          {sql| INSERT INTO blocks_internal_commands
-                (block_id, internal_command_id, sequence_no, secondary_sequence_no)
-                VALUES (?, ?, ?, ?)
+                (block_id, internal_command_id, sequence_no, secondary_sequence_no, receiver_balance)
+                VALUES (?, ?, ?, ?, ?)
          |sql})
-      (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+      ( (block_id, internal_command_id, sequence_no, secondary_sequence_no)
+      , receiver_balance_id )
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
@@ -699,7 +756,8 @@ module Block_and_internal_command = struct
       (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~internal_command_id ~sequence_no ~secondary_sequence_no =
+      ~internal_command_id ~sequence_no ~secondary_sequence_no
+      ~receiver_balance_id =
     let open Deferred.Result.Let_syntax in
     match%bind
       find
@@ -712,12 +770,7 @@ module Block_and_internal_command = struct
         add
           (module Conn)
           ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-
-  let add_with_balance conn ~block_id ~internal_command_id ~sequence_no
-      ~secondary_sequence_no ~balance =
-    (* TODO(omerzach): Store balance. *)
-    let () = ignore balance in
-    add conn ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
+          ~receiver_balance_id
 end
 
 module Block_and_signed_command = struct
@@ -725,11 +778,14 @@ module Block_and_signed_command = struct
     { block_id: int
     ; user_command_id: int
     ; sequence_no: int
-    ; status: string option
+    ; status: string
     ; failure_reason: string option
     ; fee_payer_account_creation_fee_paid: int64 option
     ; receiver_account_creation_fee_paid: int64 option
-    ; created_token: int64 option }
+    ; created_token: int64 option
+    ; fee_payer_balance_id: int
+    ; source_balance_id: int option
+    ; receiver_balance_id: int option }
   [@@deriving hlist]
 
   let typ =
@@ -739,75 +795,41 @@ module Block_and_signed_command = struct
         [ int
         ; int
         ; int
-        ; option string
+        ; string
         ; option string
         ; option int64
         ; option int64
-        ; option int64 ]
+        ; option int64
+        ; int
+        ; option int
+        ; option int ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
-  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no =
-    Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(tup3 int int int)
-         {sql| INSERT INTO blocks_user_commands
-                 (block_id, user_command_id, sequence_no)
-               VALUES (?, ?, ?)
-         |sql})
-      (block_id, user_command_id, sequence_no)
-
-  let add_with_status (module Conn : CONNECTION) ~block_id ~user_command_id
-      ~sequence_no ~(status : Transaction_status.t) =
+  let add (module Conn : CONNECTION) ~block_id ~user_command_id ~sequence_no
+      ~status ~failure_reason ~fee_payer_account_creation_fee_paid
+      ~receiver_account_creation_fee_paid ~created_token ~fee_payer_balance_id
+      ~source_balance_id ~receiver_balance_id =
+    let failure_reason =
+      Option.map ~f:Transaction_status.Failure.to_string failure_reason
+    in
     let amount_to_int64 x =
       Unsigned.UInt64.to_int64 (Currency.Amount.to_uint64 x)
     in
-    let balance_to_int64 x = amount_to_int64 (Currency.Balance.to_amount x) in
-    let balances_to_int64s
-        { Transaction_status.Balance_data.fee_payer_balance
-        ; source_balance
-        ; receiver_balance } =
-      ( Option.map ~f:balance_to_int64 fee_payer_balance
-      , Option.map ~f:balance_to_int64 source_balance
-      , Option.map ~f:balance_to_int64 receiver_balance )
+    let fee_payer_account_creation_fee_paid =
+      Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
     in
-    let ( status_str
-        , failure_reason
-        , fee_payer_account_creation_fee_paid
-        , receiver_account_creation_fee_paid
-        , created_token
-        , (fee_payer_balance, source_balance, receiver_balance) ) =
-      match status with
-      | Applied
-          ( { fee_payer_account_creation_fee_paid
-            ; receiver_account_creation_fee_paid
-            ; created_token }
-          , balances ) ->
-          ( "applied"
-          , None
-          , Option.map ~f:amount_to_int64 fee_payer_account_creation_fee_paid
-          , Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
-          , Option.map created_token ~f:(fun tid ->
-                Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) )
-          , balances_to_int64s balances )
-      | Failed (failure, balances) ->
-          ( "failed"
-          , Some (Transaction_status.Failure.to_string failure)
-          , None
-          , None
-          , None
-          , balances_to_int64s balances )
+    let receiver_account_creation_fee_paid =
+      Option.map ~f:amount_to_int64 receiver_account_creation_fee_paid
     in
-    (* TODO: Record these with the transaction *)
-    ignore (fee_payer_balance, source_balance, receiver_balance) ;
+    let created_token =
+      Option.map created_token ~f:(fun tid ->
+          Unsigned.UInt64.to_int64 (Token_id.to_uint64 tid) )
+    in
     Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(
-           tup3 (tup3 int int int)
-             (tup3 (option string) (option string) (option int64))
-             (tup2 (option int64) (option int64)))
+      (Caqti_request.exec typ
          {sql| INSERT INTO blocks_user_commands
                  (block_id,
                  user_command_id,
@@ -816,15 +838,89 @@ module Block_and_signed_command = struct
                  failure_reason,
                  fee_payer_account_creation_fee_paid,
                  receiver_account_creation_fee_paid,
-                 created_token)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 created_token,
+                 fee_payer_balance,
+                 source_balance,
+                 receiver_balance)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          |sql})
-      ( (block_id, user_command_id, sequence_no)
-      , (Some status_str, failure_reason, fee_payer_account_creation_fee_paid)
-      , (receiver_account_creation_fee_paid, created_token) )
+      { block_id
+      ; user_command_id
+      ; sequence_no
+      ; status
+      ; failure_reason
+      ; fee_payer_account_creation_fee_paid
+      ; receiver_account_creation_fee_paid
+      ; created_token
+      ; fee_payer_balance_id
+      ; source_balance_id
+      ; receiver_balance_id }
+
+  let add_with_status (module Conn : CONNECTION) ~block_id ~user_command_id
+      ~sequence_no ~(status : Transaction_status.t) ~fee_payer_id ~source_id
+      ~receiver_id =
+    let open Deferred.Result.Let_syntax in
+    let ( status_str
+        , failure_reason
+        , fee_payer_account_creation_fee_paid
+        , receiver_account_creation_fee_paid
+        , created_token
+        , { Transaction_status.Balance_data.fee_payer_balance
+          ; source_balance
+          ; receiver_balance } ) =
+      match status with
+      | Applied
+          ( { fee_payer_account_creation_fee_paid
+            ; receiver_account_creation_fee_paid
+            ; created_token }
+          , balances ) ->
+          ( "applied"
+          , None
+          , fee_payer_account_creation_fee_paid
+          , receiver_account_creation_fee_paid
+          , created_token
+          , balances )
+      | Failed (failure, balances) ->
+          ("failed", Some failure, None, None, None, balances)
+    in
+    let add_optional_balance id balance =
+      match balance with
+      | None ->
+          Deferred.Result.return None
+      | Some balance ->
+          let%map balance_id =
+            Balance.add_if_doesn't_exist
+              (module Conn)
+              ~public_key_id:id ~balance
+          in
+          Some balance_id
+    in
+    (* Any transaction included in a block will have had its fee paid, so we can
+     * assume the fee payer balance will be Some here *)
+    let fee_payer_balance = Option.value_exn fee_payer_balance in
+    let%bind fee_payer_balance_id =
+      Balance.add_if_doesn't_exist
+        (module Conn)
+        ~public_key_id:fee_payer_id ~balance:fee_payer_balance
+    in
+    let%bind source_balance_id =
+      add_optional_balance source_id source_balance
+    in
+    let%bind receiver_balance_id =
+      add_optional_balance receiver_id receiver_balance
+    in
+    add
+      (module Conn)
+      ~block_id ~user_command_id ~sequence_no ~status:status_str
+      ~failure_reason ~fee_payer_account_creation_fee_paid
+      ~receiver_account_creation_fee_paid ~created_token ~fee_payer_balance_id
+      ~source_balance_id ~receiver_balance_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) ~block_id
-      ~user_command_id ~sequence_no =
+      ~user_command_id ~sequence_no ~(status : string) ~failure_reason
+      ~fee_payer_account_creation_fee_paid ~receiver_account_creation_fee_paid
+      ~created_token ~fee_payer_balance_id ~source_balance_id
+      ~receiver_balance_id =
     let open Deferred.Result.Let_syntax in
     match%bind
       Conn.find_opt
@@ -841,7 +937,12 @@ module Block_and_signed_command = struct
     | Some _ ->
         return ()
     | None ->
-        add (module Conn) ~block_id ~user_command_id ~sequence_no
+        add
+          (module Conn)
+          ~block_id ~user_command_id ~sequence_no ~status ~failure_reason
+          ~fee_payer_account_creation_fee_paid
+          ~receiver_account_creation_fee_paid ~created_token
+          ~fee_payer_balance_id ~source_balance_id ~receiver_balance_id
 
   let load (module Conn : CONNECTION) ~block_id ~user_command_id =
     Conn.find
@@ -853,7 +954,10 @@ module Block_and_signed_command = struct
                status,failure_reason,
                fee_payer_account_creation_fee_paid,
                receiver_account_creation_fee_paid,
-               created_token
+               created_token,
+               fee_payer_balance,
+               source_balance,
+               receiver_balance,
                FROM blocks_user_commands
                WHERE block_id = $1
                AND user_command_id = $2
@@ -1030,11 +1134,18 @@ module Block = struct
                     (module Conn)
                     user_command.data
                 in
+                let%bind {fee_payer_id; source_id; receiver_id} =
+                  User_command.Signed_command
+                  .add_balance_public_keys_if_don't_exist
+                    (module Conn)
+                    (User_command.as_signed_command user_command.data)
+                in
                 let%map () =
                   Block_and_signed_command.add_with_status
                     (module Conn)
                     ~block_id ~user_command_id:id ~sequence_no
-                    ~status:user_command.status
+                    ~status:user_command.status ~fee_payer_id ~source_id
+                    ~receiver_id
                   >>| ignore
                 in
                 sequence_no + 1
@@ -1047,7 +1158,7 @@ module Block = struct
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
-                let%bind fee_transfer_ids =
+                let%bind fee_transfer_infos =
                   deferred_result_list_fold fee_transfers ~init:[]
                     ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
                       let%map id =
@@ -1055,10 +1166,11 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Normal
                       in
-                      (id, secondary_sequence_no) :: acc )
+                      (id, secondary_sequence_no, fee_transfer.receiver_pk)
+                      :: acc )
                 in
-                let fee_transfer_ids =
-                  match fee_transfer_ids with
+                let fee_transfer_infos =
+                  match fee_transfer_infos with
                   | [id] ->
                       [(id, balances.receiver1_balance)]
                   | [id1; id2] ->
@@ -1070,14 +1182,26 @@ module Block = struct
                          transfer transaction"
                 in
                 let%map () =
-                  deferred_result_list_fold fee_transfer_ids ~init:()
+                  deferred_result_list_fold fee_transfer_infos ~init:()
                     ~f:(fun ()
-                       ((fee_transfer_id, secondary_sequence_no), balance)
+                       ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
+                       , balance )
                        ->
-                      Block_and_internal_command.add_with_balance
+                      let%bind receiver_id =
+                        Public_key.add_if_doesn't_exist
+                          (module Conn)
+                          receiver_pk
+                      in
+                      let%bind receiver_balance_id =
+                        Balance.add_if_doesn't_exist
+                          (module Conn)
+                          ~public_key_id:receiver_id ~balance
+                      in
+                      Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:fee_transfer_id
-                        ~sequence_no ~secondary_sequence_no ~balance
+                        ~sequence_no ~secondary_sequence_no
+                        ~receiver_balance_id
                       >>| ignore )
                 in
                 sequence_no + 1
@@ -1100,24 +1224,44 @@ module Block = struct
                           (module Conn)
                           fee_transfer `Via_coinbase
                       in
-                      Block_and_internal_command.add_with_balance
+                      let%bind fee_transfer_receiver_id =
+                        Public_key.add_if_doesn't_exist
+                          (module Conn)
+                          receiver_pk
+                      in
+                      let%bind receiver_balance_id =
+                        Balance.add_if_doesn't_exist
+                          (module Conn)
+                          ~public_key_id:fee_transfer_receiver_id
+                          ~balance:
+                            (Option.value_exn
+                               balances.fee_transfer_receiver_balance)
+                      in
+                      Block_and_internal_command.add
                         (module Conn)
                         ~block_id ~internal_command_id:id ~sequence_no
-                        ~secondary_sequence_no:0
-                        ~balance:
-                          (Option.value_exn
-                             balances.fee_transfer_receiver_balance)
+                        ~secondary_sequence_no:0 ~receiver_balance_id
                       >>| ignore
                 in
                 let%bind id =
                   Coinbase.add_if_doesn't_exist (module Conn) coinbase
                 in
+                let%bind coinbase_receiver_id =
+                  Public_key.add_if_doesn't_exist
+                    (module Conn)
+                    coinbase.receiver
+                in
+                let%bind receiver_balance_id =
+                  Balance.add_if_doesn't_exist
+                    (module Conn)
+                    ~public_key_id:coinbase_receiver_id
+                    ~balance:balances.coinbase_receiver_balance
+                in
                 let%map () =
-                  Block_and_internal_command.add_with_balance
+                  Block_and_internal_command.add
                     (module Conn)
                     ~block_id ~internal_command_id:id ~sequence_no
-                    ~secondary_sequence_no:0
-                    ~balance:balances.coinbase_receiver_balance
+                    ~secondary_sequence_no:0 ~receiver_balance_id
                   >>| ignore
                 in
                 sequence_no + 1 )
@@ -1206,7 +1350,7 @@ module Block = struct
             ; timestamp= block.timestamp |> Block_time.to_int64 }
     in
     (* add user commands *)
-    let%bind user_cmd_ids_and_seq_nos =
+    let%bind user_cmds_with_ids =
       let%map user_cmd_ids_rev =
         deferred_result_list_fold block.user_cmds ~init:[]
           ~f:(fun acc user_cmd ->
@@ -1217,19 +1361,26 @@ module Block = struct
             in
             cmd_id :: acc )
       in
-      let sequence_nos =
-        List.map block.user_cmds ~f:(fun user_cmd -> user_cmd.sequence_no)
-      in
-      List.zip_exn (List.rev user_cmd_ids_rev) sequence_nos
+      List.zip_exn block.user_cmds (List.rev user_cmd_ids_rev)
     in
     (* add user commands to join table *)
     let%bind () =
-      deferred_result_list_fold user_cmd_ids_and_seq_nos ~init:()
-        ~f:(fun () (user_command_id, sequence_no) ->
-          (* TODO: Have this use Block_and_signed_command.add_with_status instead *)
+      deferred_result_list_fold user_cmds_with_ids ~init:()
+        ~f:(fun () (user_command, user_command_id) ->
           Block_and_signed_command.add_if_doesn't_exist
             (module Conn)
-            ~block_id ~user_command_id ~sequence_no )
+            ~block_id ~user_command_id ~sequence_no:user_command.sequence_no
+            ~status:user_command.status
+            ~failure_reason:user_command.failure_reason
+            ~fee_payer_account_creation_fee_paid:
+              user_command.fee_payer_account_creation_fee_paid
+            ~receiver_account_creation_fee_paid:
+              user_command.receiver_account_creation_fee_paid
+            ~created_token:
+              user_command.created_token
+              (* TODO(psteckler): Once these ID fields are added to Extensional.User_command thread the values through here *)
+            ~fee_payer_balance_id:0 ~source_balance_id:None
+            ~receiver_balance_id:None )
     in
     (* add internal commands *)
     let%bind internal_cmd_ids_and_seq_nos =
@@ -1255,10 +1406,13 @@ module Block = struct
         ~f:(fun ()
            (internal_command_id, (sequence_no, secondary_sequence_no))
            ->
+          (* TODO(psteckler): Add receiver_balance column to Extensional.Internal_command
+           *   then replace dummy value with real balance here *)
+          let receiver_balance_id = 0 in
           Block_and_internal_command.add_if_doesn't_exist
             (module Conn)
             ~block_id ~internal_command_id ~sequence_no ~secondary_sequence_no
-      )
+            ~receiver_balance_id )
     in
     return block_id
 
@@ -1353,34 +1507,59 @@ module Block = struct
     else return ()
 end
 
-let add_block_aux ~add_block ~hash ~delete_older_than
+let retry ~f ~logger ~error_str retries =
+  let rec go retry_count =
+    match%bind f () with
+    | Error e ->
+        if retry_count <= 0 then return (Error e)
+        else (
+          [%log warn] "Error in %s : $error. Retrying..." error_str
+            ~metadata:[("error", `String (Caqti_error.show e))] ;
+          let wait_for = Random.float_range 20. 2000. in
+          let%bind () = after (Time.Span.of_ms wait_for) in
+          go (retry_count - 1) )
+    | Ok res ->
+        return (Ok res)
+  in
+  go retries
+
+let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
     (module Conn : CONNECTION) block =
-  let%bind res =
-    let open Deferred.Result.Let_syntax in
-    let%bind () = Conn.start () in
-    let%bind block_id = add_block (module Conn : CONNECTION) block in
-    (* if an existing block has a parent hash that's for the block just added,
+  let add () =
+    let%bind res =
+      let open Deferred.Result.Let_syntax in
+      let%bind () = Conn.start () in
+      let%bind block_id = add_block (module Conn : CONNECTION) block in
+      (* if an existing block has a parent hash that's for the block just added,
        set its parent id
-    *)
-    let%bind () =
-      Block.set_parent_id_if_null
-        (module Conn)
-        ~parent_hash:(hash block) ~parent_id:block_id
+      *)
+      let%bind () =
+        Block.set_parent_id_if_null
+          (module Conn)
+          ~parent_hash:(hash block) ~parent_id:block_id
+      in
+      match delete_older_than with
+      | Some num_blocks ->
+          Block.delete_if_older_than ~num_blocks (module Conn)
+      | None ->
+          return ()
     in
-    match delete_older_than with
-    | Some num_blocks ->
-        Block.delete_if_older_than ~num_blocks (module Conn)
-    | None ->
-        return ()
-  in
-  let%map () =
     match res with
-    | Error _ ->
-        Conn.rollback () >>| ignore
+    | Error e as err ->
+        (*Error in the current transaction*)
+        [%log warn]
+          "Error when adding block data to the database, rolling it back: \
+           $error"
+          ~metadata:[("error", `String (Caqti_error.show e))] ;
+        let%map _ = Conn.rollback () in
+        err
     | Ok _ ->
-        Conn.commit () >>| ignore
+        [%log info] "Committing block data for $state_hash"
+          ~metadata:
+            [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
+        Conn.commit ()
   in
-  res
+  retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
 let add_block_aux_precomputed ~constraint_constants =
   add_block_aux ~add_block:(Block.add_from_precomputed ~constraint_constants)
@@ -1399,7 +1578,9 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash block = With_hash.hash block in
         match%map
-          add_block_aux ~delete_older_than ~hash ~add_block (module Conn) block
+          add_block_aux ~logger ~delete_older_than ~hash ~add_block
+            (module Conn)
+            block
         with
         | Error e ->
             [%log warn]
@@ -1421,7 +1602,7 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
   match runtime_config_opt with
   | None ->
       Deferred.unit
-  | Some runtime_config ->
+  | Some runtime_config -> (
       let accounts =
         match Option.map runtime_config.ledger ~f:(fun l -> l.base) with
         | Some (Accounts accounts) ->
@@ -1441,21 +1622,41 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
         | _ ->
             failwith "No accounts found in runtime config file"
       in
-      let%bind () =
-        Deferred.List.iter accounts ~f:(fun (_, acc) ->
-            match%map Timing_info.add_if_doesn't_exist (module Conn) acc with
-            | Error e ->
-                [%log error]
-                  ~metadata:
-                    [ ("account", Account.to_yojson acc)
-                    ; ("error", `String (Caqti_error.show e)) ]
-                  "Failed to add genesis account: $account, see $error" ;
-                Conn.rollback () |> ignore ;
-                failwith "Failed to add genesis account"
-            | Ok _ ->
-                () )
+      let add_accounts () =
+        let open Deferred.Result.Let_syntax in
+        let%bind () = Conn.start () in
+        let rec go accounts =
+          let open Deferred.Let_syntax in
+          match accounts with
+          | [] ->
+              Deferred.Result.return ()
+          | (_, account) :: accounts' -> (
+              match%bind
+                Timing_info.add_if_doesn't_exist (module Conn) account
+              with
+              | Error e as err ->
+                  [%log error]
+                    ~metadata:
+                      [ ("account", Account.to_yojson account)
+                      ; ("error", `String (Caqti_error.show e)) ]
+                    "Failed to add genesis account: $account, see $error" ;
+                  let%map _ = Conn.rollback () in
+                  err
+              | Ok _ ->
+                  go accounts' )
+        in
+        let%bind () = go accounts in
+        Conn.commit ()
       in
-      Conn.commit () >>| ignore
+      match%map
+        retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
+      with
+      | Error e ->
+          [%log warn] "genesis accounts could not be added"
+            ~metadata:[("error", `String (Caqti_error.show e))] ;
+          failwith "Failed to add genesis accounts"
+      | Ok () ->
+          () )
 
 let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
     ~delete_older_than ~runtime_config_opt =
@@ -1494,8 +1695,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
-            add_block_aux_precomputed ~constraint_constants ~delete_older_than
-              conn precomputed_block
+            add_block_aux_precomputed ~logger ~constraint_constants
+              ~delete_older_than conn precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -1511,7 +1712,8 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~delete_older_than conn extensional_block
+            add_block_aux_extensional ~logger ~delete_older_than conn
+              extensional_block
           with
           | Error e ->
               [%log warn]

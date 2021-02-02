@@ -4,7 +4,8 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core async_unix sodium ppx_deriving_yojson.runtime yojson
-            mina_base secrets work_selector graphql_lib rosetta_coding)
+            mina_base secrets work_selector graphql_lib rosetta_coding
+            rosetta_lib)
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))

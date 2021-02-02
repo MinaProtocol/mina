@@ -20,25 +20,18 @@ provider "google" {
   zone    = "us-east4-b"
 }
 
-variable "testnet_name" {
-  type = string
-
-  description = "Name identifier of testnet to provision"
-  default     = "ci-net"
-}
-
 variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.6-compatible"
+  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.11-develop"
 }
 
 variable "coda_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.2.6-compatible"
+  default     = "gcr.io/o1labs-192920/coda-archive:0.2.11-develop"
 }
 
 variable "whale_count" {
@@ -61,12 +54,24 @@ variable "snark_worker_count" {
   default = 1
 }
 
+variable "ci_cluster_region" {
+  type    = string
+  default = "us-west1"
+}
+
+variable "ci_k8s_ctx" {
+  type    = string
+  default = "gke_o1labs-192920_us-west1_mina-integration-west1"
+}
+
+variable "ci_artifact_path" {
+  type    = string
+  default = "/tmp"
+}
+
 locals {
-  seed_region = "us-east4"
-  seed_zone = "us-east4-b"
-  seed_discovery_keypairs = [
-  "CAESQBEHe2zCcQDHcSaeIydGggamzmTapdCS8SP0hb5FWvYhe9XEygmlUGV4zNu2P8zAIba4X84Gm4usQFLamjRywA8=,CAESIHvVxMoJpVBleMzbtj/MwCG2uF/OBpuLrEBS2po0csAP,12D3KooWJ9mNdbUXUpUNeMnejRumKzmQF15YeWwAPAhTAWB6dhiv",
-  "CAESQO+8qvMqTaQEX9uh4NnNoyOy4Xwv3U80jAsWweQ1J37AVgx7kgs4pPVSBzlP7NDANP1qvSvEPOTh2atbMMUO8EQ=,CAESIFYMe5ILOKT1Ugc5T+zQwDT9ar0rxDzk4dmrWzDFDvBE,12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5" ]
+  seed_region = "us-west1"
+  seed_zone = "us-west1-b"
 }
 
 
@@ -74,10 +79,11 @@ module "ci_testnet" {
   providers = { google = google.google-us-east4 }
   source    = "../../modules/kubernetes/testnet"
 
+  # TODO: remove obsolete cluster_name var + cluster region
   cluster_name          = "mina-integration-west1"
-  cluster_region        = "us-west1"
-  k8s_context           = "gke_o1labs-192920_us-west1_mina-integration-west1"
-  testnet_name          = var.testnet_name
+  cluster_region        = var.ci_cluster_region
+  k8s_context           = var.ci_k8s_ctx
+  testnet_name          = "${terraform.workspace}-ci-net"
 
   coda_image            = var.coda_image
   coda_archive_image    = var.coda_archive_image
@@ -146,4 +152,6 @@ module "ci_testnet" {
   agent_min_tx = "0.0015"
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
+
+  artifact_path = var.ci_artifact_path
 }
