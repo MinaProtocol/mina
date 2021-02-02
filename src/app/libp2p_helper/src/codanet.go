@@ -73,9 +73,9 @@ var (
 func initPrivateIpFilter() {
 	privateIpFilter = ma.NewFilters()
 	if WithPrivate {
-		return 
+		return
 	}
-	
+
 	for _, cidr := range privateCIDRs {
 		privateIpFilter.AddFilter(parseCIDR(cidr), ma.ActionDeny)
 	}
@@ -99,7 +99,7 @@ func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaCo
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(30*time.Second)),
+		p2pManager:   p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
 		OnConnect:    noop,
 		OnDisconnect: noop,
 		minaPeerExchange: minaPeerExchange,
@@ -164,6 +164,8 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	if len(net.Peers()) <= info.HighWater {
 		return
 	}
+
+  cm.TrimOpenConns(context.Background())
 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
@@ -484,6 +486,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 		if err != nil && err == io.EOF {
 			continue
 		} else if err != nil && err.Error() == "stream reset" {
+      _ = s.Close()
 			return
 		} else if err != nil {
 			logger.Errorf("failed to decode list of peers err=%s", err)
