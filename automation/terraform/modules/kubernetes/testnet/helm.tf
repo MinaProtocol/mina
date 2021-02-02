@@ -15,7 +15,7 @@ data "local_file" "genesis_ledger" {
 
 data "local_file" "libp2p_peers" {
   for_each = toset([ for config in var.block_producer_configs : config.name ])
-  filename = "../../../keys/libp2p/${var.testnet_name}/${each.key}"
+  filename = "${path.module}/../../../../keys/libp2p/${var.testnet_name}/${each.key}"
   depends_on = [
     null_resource.block_producer_key_generation
   ]
