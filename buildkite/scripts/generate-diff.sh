@@ -6,6 +6,12 @@ TAG=$(git tag --points-at HEAD)
 
 [[ -n $TAG ]] && git ls-files && exit
 
+case $BUILDKITE_BRANCH in
+  compatible|develop|develop-next)
+    git ls-files && exit
+    ;;
+esac
+
 # Finds the commit hash of HEAD of $BASE branch
 BASECOMMIT=$(git log origin/$BASE -1 --pretty=format:%H)
 # Finds the commit hash of HEAD of the current branch
