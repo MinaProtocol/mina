@@ -443,18 +443,33 @@ struct
                     ~data:(One_or_two.map proofs ~f:fst, message)
                     ~sender
                 in
-                match%bind Batcher.Snark_pool.verify t.batcher proof_env with
-                | Ok true ->
-                    return true
-                | Ok false ->
-                    (* if this proof is in the set of invalid proofs*)
-                    let e = Error.of_string "Invalid proof" in
-                    let%map () = log e in
-                    false
-                | Error e ->
-                    (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                    let%map () = log ~punish:false e in
-                    false )
+                match Signature_lib.Public_key.decompress prover with
+                | None ->
+                    (* We may need to decompress the key when paying the fee
+                 transfer, so check that we can do it now.
+              *)
+                    [%log' error t.logger]
+                      "Proof had an invalid key: $public_key"
+                      ~metadata:
+                        [ ( "public_key"
+                          , Signature_lib.Public_key.Compressed.to_yojson
+                              prover ) ] ;
+                    Deferred.return false
+                | Some _ -> (
+                    match%bind
+                      Batcher.Snark_pool.verify t.batcher proof_env
+                    with
+                    | Ok true ->
+                        return true
+                    | Ok false ->
+                        (* if this proof is in the set of invalid proofs*)
+                        let e = Error.of_string "Invalid proof" in
+                        let%map () = log e in
+                        false
+                    | Error e ->
+                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                        let%map () = log ~punish:false e in
+                        false ) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->

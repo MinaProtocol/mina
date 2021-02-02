@@ -107,6 +107,16 @@ let receiver_pks t =
 
 let receivers t = One_or_two.to_list (One_or_two.map ~f:Single.receiver t)
 
+(* This must match [Transaction_union].
+   TODO: enforce this.
+*)
+let fee_payer_pk ft =
+  match ft with
+  | `One ft ->
+      Single.receiver_pk ft
+  | `Two (_, ft) ->
+      Single.receiver_pk ft
+
 let fee_token = Single.fee_token
 
 let fee_tokens = One_or_two.map ~f:Single.fee_token

@@ -27,6 +27,8 @@ val receiver_pk : t -> Public_key.Compressed.t
 
 val receiver : t -> Account_id.t
 
+val fee_payer_pk : t -> Public_key.Compressed.t
+
 val amount : t -> Currency.Amount.t
 
 val fee_transfer : t -> Fee_transfer.t option
