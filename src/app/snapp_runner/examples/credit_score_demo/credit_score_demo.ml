@@ -7,9 +7,27 @@ type _ Snarky_backendless.Request.t +=
 
 let target_score = 700
 
+let dummy_constraints () =
+  let module Impl = Pickles.Impls.Step in
+  let module Inner_curve = Pickles.Step_main_inputs.Inner_curve in
+  let open Impl in
+  make_checked (fun () ->
+      let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+      let g =
+        exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.Params.one)
+      in
+      let _ =
+        Pickles.Step_main_inputs.Ops.scale_fast g (`Plus_two_to_len [|b; b|])
+      in
+      let _ =
+        Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
+      in
+      () )
+
 let main () =
   let open Pickles.Impls.Step.Internal_Basic in
   let open Checked.Let_syntax in
+  let%bind () = dummy_constraints () in
   let%bind score = exists Field.typ ~request:As_prover.(return Get_score) in
   (* 10 bits because maximum score is 850. *)
   let%bind () =
@@ -68,6 +86,7 @@ include Snapp_runner_functor.Make_with_commands (struct
 
   let rule =
     { Inductive_rule.prevs= []
+    ; identifier= "demo-base"
     ; main=
         (fun [] i ->
           Pickles.Impls.Step.run_checked (main i) ;

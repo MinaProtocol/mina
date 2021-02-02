@@ -71,7 +71,7 @@ module Intf = struct
            , unit
            , unit
            , Input.Public_input.Value.t
-           , Side_loaded.Proof.t )
+           , Side_loaded.Proof.t Deferred.t )
            Prover.t
   end
 
@@ -94,10 +94,57 @@ module Make (X : Intf.Input) : Intf.S with module Input = X = struct
   module Input = X
 
   let compile ?cache ?disk_keys () =
+    let dummy_constraints x =
+      let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
+      let xx = (x, x) in
+      let assert_all xs =
+        Pickles.Impls.Step.assert_all
+          (List.map xs ~f:(fun x ->
+               [{Snarky_backendless.Constraint.basic= T x; annotation= None}]
+           ))
+      in
+      assert_all
+        [ EC_add {p1= xx; p2= xx; p3= xx}
+        ; EC_scale
+            { state=
+                Array.init 3 ~f:(fun _ ->
+                    { Zexe_backend_common.Scale_round.xt= x
+                    ; b= x
+                    ; yt= x
+                    ; xp= x
+                    ; l1= x
+                    ; yp= x
+                    ; xs= x
+                    ; ys= x } ) }
+        ; EC_endoscale
+            { state=
+                Array.init 3 ~f:(fun _ ->
+                    { Zexe_backend_common.Endoscale_round.b2i1= x
+                    ; xt= x
+                    ; b2i= x
+                    ; xq= x
+                    ; yt= x
+                    ; xp= x
+                    ; l1= x
+                    ; yp= x
+                    ; xs= x
+                    ; ys= x } ) } ]
+    in
     let tag, cache_handle, proof, Provers.[prover; _dummy] =
       Pickles.compile ?cache ?disk_keys
         (module X.Public_input.Var)
         (module X.Public_input.Value)
+        ~constraint_constants:
+          { sub_windows_per_window= 0
+          ; ledger_depth= 0
+          ; work_delay= 0
+          ; block_window_duration_ms= 0
+          ; transaction_capacity= Log_2 0
+          ; pending_coinbase_depth= 0
+          ; coinbase_amount= Unsigned.UInt64.of_int 0
+          ; supercharged_coinbase_factor= 0
+          ; account_creation_fee= Unsigned.UInt64.of_int 0
+          ; fork= None }
         ~typ:X.Public_input.typ
         ~branches:(module Pickles_types.Nat.N2)
         ~max_branching:(module Side_loaded.Verification_key.Max_width)
@@ -106,10 +153,15 @@ module Make (X : Intf.Input) : Intf.S with module Input = X = struct
           [ X.rule
           ; { prevs= [self; self]
             ; main_value= (fun [_; _] _ -> [true; true])
+            ; identifier= "demo"
             ; main=
                 (fun [_; _] _ ->
                   let open Pickles.Impls.Step in
-                  Boolean.Assert.is_true Boolean.false_ ;
+                  let x =
+                    exists Field.typ ~compute:(fun _ -> failwith "dummy rule")
+                  in
+                  dummy_constraints x ;
+                  Boolean.Assert.is_true (Boolean.not (Field.equal x x)) ;
                   [Boolean.true_; Boolean.true_] ) } ] )
     in
     (tag, cache_handle, proof, prover)
@@ -165,7 +217,7 @@ module Make_commands (X : Intf.S) : Intf.Commands = struct
   let prove =
     let open Command in
     let open Command.Let_syntax in
-    basic ~summary:"Generate and print a proof of the circuit"
+    async ~summary:"Generate and print a proof of the circuit"
       (let%map mode = mode_flag
        and cache = cache_flag
        and request_data = X.Input.Request_data.args
@@ -194,7 +246,8 @@ module Make_commands (X : Intf.S) : Intf.Commands = struct
        in
        fun () ->
          let _, _, _, prove = X.compile ?cache () in
-         let proof =
+         let open Async in
+         let%map proof =
            prove
              ~handler:(X.Input.Request_data.handler request_data)
              [] public_input
