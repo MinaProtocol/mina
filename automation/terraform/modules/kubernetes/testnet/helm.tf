@@ -7,7 +7,7 @@ provider helm {
 
 data "local_file" "genesis_ledger" {
   # genesis_ledger.json is not required when generate_and_upload_artifacts is set to false
-  filename = var.generate_and_upload_artifacts ? "genesis_ledger.json" : "/dev/null"
+  filename = var.generate_and_upload_artifacts ? "${var.artifact_path}/genesis_ledger.json" : "/dev/null"
   depends_on = [
     null_resource.block_producer_key_generation
   ]
