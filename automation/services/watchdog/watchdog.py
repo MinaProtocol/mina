@@ -32,8 +32,6 @@ def main():
   recent_google_bucket_blocks = Gauge('Coda_watchdog_recent_google_bucket_blocks', 'Description of gauge') 
   seeds_reachable = Gauge('Coda_watchdog_seeds_reachable', 'Description of gauge')
 
-  if 
-
   # ========================================================================
 
   fns = [
