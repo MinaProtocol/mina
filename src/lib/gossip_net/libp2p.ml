@@ -33,6 +33,7 @@ module Config = struct
     ; flooding: bool
     ; direct_peers: Mina_net2.Multiaddr.t list
     ; peer_exchange: bool
+    ; mina_peer_exchange: bool
     ; max_connections: int
     ; validation_queue_size: int
     ; mutable keypair: Mina_net2.Keypair.t option }
@@ -215,7 +216,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 ~network_id:config.chain_id
                 ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~seed_peers:initial_peers ~direct_peers:config.direct_peers
-                ~peer_exchange:config.peer_exchange ~flooding:config.flooding
+                ~peer_exchange:config.peer_exchange
+                ~mina_peer_exchange:config.mina_peer_exchange
+                ~flooding:config.flooding
                 ~max_connections:config.max_connections
                 ~validation_queue_size:config.validation_queue_size
                 ~initial_gating_config:

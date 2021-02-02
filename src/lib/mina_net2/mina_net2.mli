@@ -248,6 +248,7 @@ val configure :
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
   -> peer_exchange:bool
+  -> mina_peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> max_connections:int
