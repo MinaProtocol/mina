@@ -74,6 +74,8 @@ struct
     assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)
 end
 
+(* Disabled. We don't need to run this in CI. *)
+(*
 let%test_module "backend test" =
   ( module struct
     let () =
@@ -92,3 +94,4 @@ let%test_module "backend test" =
 
     include ComputationExample (Impl) (Params)
   end )
+*)
