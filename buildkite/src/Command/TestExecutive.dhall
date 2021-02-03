@@ -28,7 +28,7 @@ in
             
             [
               -- Cache test-executive binary
-              Cmd.run "artifact-cache-helper.sh test_executive.exe --miss-cmd \"ls test-executive.exe\""
+              Cmd.run "artifact-cache-helper.sh test_executive.exe --upload"
             ],
         label = "Build test-executive | dune profile: ${duneProfile}",
         key = "build-test-executive",

@@ -142,8 +142,15 @@ locals {
           DOWNLOAD_CMD="buildkite-agent artifact download --build $${BUILDKITE_BUILD_ID} --include-retried-jobs"
 
           while [[ "$#" -gt 0 ]]; do case $1 in
+            --upload) UPLOAD_PATH="true"; shift;;
             --miss-cmd) MISS_CMD="$${2}"; shift;;
           esac; shift; done
+
+          # upload artifact if explicitly set and exit
+          if [[ $UPLOAD_PATH ]]; then
+            buildkite-agent artifact upload "$${FILE}"
+            exit
+          fi
 
           set +e
           if [[ -f "$${FILE}" ]] || $${DOWNLOAD_CMD} "$${FILE}" .; then
