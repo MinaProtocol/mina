@@ -185,6 +185,13 @@ type signed_payment_js = {
   "signature": signature,
 };
 
+type signed_stake_delegation_js = {
+  .
+  "stakeDelegation": stake_delegation_js,
+  "sender": publicKey,
+  "signature": signature,
+};
+
 [@bs.send]
 external signPayment: (codaSDK, privateKey, payment_js) => signed_js =
   "signPayment";
@@ -341,6 +348,52 @@ let verifyPaymentSignature = (signedPayment: signed(payment)) => {
           "source": payload.from,
           "receiver": payload.to_,
           "amount": amount,
+        },
+      },
+    },
+  )
+  ->bool_of_int;
+};
+
+[@bs.send]
+external verifyStakeDelegationSignature:
+  (codaSDK, signed_stake_delegation_js) => int =
+  "verifyStakeDelegationSignature";
+
+/**
+  * Verifies a signed stake delegation
+  *
+  * @param signedStakeDelegation - A signed stake delegation
+  * @returns True if the `signed(stakeDelegation)` is a verifiable stake delegation
+  */
+[@genType]
+let verifyStakeDelegationSignature =
+    (signedStakeDelegation: signed(stakeDelegation)) => {
+  let payload = signedStakeDelegation.payload;
+  // Stringify all numeric inputs since they may be passed as
+  // number/bigint in TS/JS
+  let memo = value(~default="", payload.memo);
+  let fee = Js.String.make(payload.fee);
+  let nonce = Js.String.make(payload.nonce);
+  let validUntil =
+    Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
+
+  verifyStakeDelegationSignature(
+    codaSDK,
+    {
+      "sender": signedStakeDelegation.publicKey,
+      "signature": signedStakeDelegation.signature,
+      "stakeDelegation": {
+        "common": {
+          "fee": fee,
+          "feePayer": payload.from,
+          "nonce": nonce,
+          "validUntil": validUntil,
+          "memo": memo,
+        },
+        "delegationPayload": {
+          "newDelegate": payload.to_,
+          "delegator": payload.from,
         },
       },
     },

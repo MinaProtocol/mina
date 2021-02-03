@@ -6,6 +6,7 @@ let publicKey = CodaSDK.derivePublicKey(key.privateKey);
 let signed = CodaSDK.signMessage("hello", key);
 CodaSDK.verifyMessage(signed);
 
+deepStrictEqual(publicKey, key.publicKey, "Public keys do not match");
 
 let payment1 = CodaSDK.unsafeSignAny(
     {to: key.publicKey, from: key.publicKey, amount: "1", fee: "1", nonce: "0"},
@@ -36,4 +37,8 @@ let sd2 = CodaSDK.signStakeDelegation(
 
 deepStrictEqual(sd1, sd2, "Stake delegation signatures don't match (string vs numeric inputs)");
 
-deepStrictEqual(publicKey, key.publicKey, "Public keys do not match");
+CodaSDK.verifyStakeDelegationSignature(sd1);
+deepStrictEqual(CodaSDK.verifyStakeDelegationSignature(sd1), true, "Signed delegation could not be verified");
+
+let invalidSd = {...sd1, publicKey: CodaSDK.genKeys().publicKey};
+deepStrictEqual(CodaSDK.verifyStakeDelegationSignature(invalidSd), false, "Invalid signed delegation was verified");

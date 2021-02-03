@@ -92,3 +92,10 @@ export declare const signStakeDelegation: (stakeDelegation: stakeDelegation, key
   * @returns True if the `signed(payment)` is a verifiable payment
    */
 export declare const verifyPaymentSignature: (signedPayment: signed<payment>) => boolean;
+/**
+  * Verifies a signed stake delegation
+  *
+  * @param signedStakeDelegation - A signed stake delegation
+  * @returns True if the `signed(stakeDelegation)` is a verifiable stake delegation
+   */
+export declare const verifyStakeDelegationSignature: (signedStakeDelegation: signed<stakeDelegation>) => boolean;
