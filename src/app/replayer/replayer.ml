@@ -405,9 +405,12 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
   match undo_or_error with
   | Ok _undo ->
       (* in Transaction_log.process_transfer_fee, when the fee transfer has two components,
-       as here, the balance depends only on the first transfer if the receiver is the same
-       in both components
-    *)
+         as here, the balance depends only on the first transfer if the receiver is the same
+         in both components
+
+         because of the way fee transfers are synthesized, the receivers here are expected never
+         to be the same
+      *)
       let cmd =
         if Int.equal cmd1.receiver_id cmd2.receiver_id then cmd1 else cmd2
       in
