@@ -15,7 +15,7 @@ let getBlocksChallenge = pk => {
 
 let getTransactionsSentChallenge = pk => {
   {j|
-    SELECT COUNT(*)
+    SELECT MAX(nonce)
     FROM user_commands
     INNER JOIN public_keys AS p ON source_id=p.id
     WHERE status = 'applied'
