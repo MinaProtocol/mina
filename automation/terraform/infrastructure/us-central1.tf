@@ -166,11 +166,11 @@ resource "google_container_node_pool" "central1_compute_nodes" {
   node_count = 1
   autoscaling {
     min_node_count = 1
-    max_node_count = 1
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
-    machine_type = "c2-standard-60"
+    machine_type = "c2-standard-16"
     disk_size_gb = 500
 
     metadata = {

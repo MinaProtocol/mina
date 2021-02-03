@@ -71,7 +71,7 @@ locals {
           ephemeral-storage = "100Gi"
         }
       }
-      replicaCount = 5
+      replicaCount = 15
     }
   }
 }

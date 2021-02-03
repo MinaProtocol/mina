@@ -166,7 +166,7 @@ resource "google_container_node_pool" "east4_compute_nodes" {
   node_count = 5
   autoscaling {
     min_node_count = 2
-    max_node_count = 5
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
