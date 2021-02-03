@@ -35,7 +35,7 @@ module R1CS_constraint_system =
     (struct
       let params =
         Sponge.Params.(
-          map pasta_q5 ~f:(fun x ->
+          map pasta_p5 ~f:(fun x ->
               Field.of_bigint (Bigint256.of_decimal_string x) ))
     end)
 
