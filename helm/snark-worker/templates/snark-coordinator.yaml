@@ -46,6 +46,9 @@ spec:
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
+          {{- if .Values.coda.enableArchive }}
+          "-archive-address", "{{ .Values.coda.archiveAddress }}",
+          {{- end }}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}

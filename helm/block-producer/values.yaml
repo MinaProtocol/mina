@@ -45,6 +45,8 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    enableArchive: true
+    archiveAddress: archive-1-postgressql
   - name: "test-2"
     externalPort: 2
     runWithUserAgent: true
@@ -53,6 +55,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    enableArchive: false
   - name: "test-3"
     externalPort: 3
     runWithUserAgent: false
@@ -61,6 +64,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    enableArchive: false
   - name: "test-4"
     externalPort: 4
     runWithUserAgent: true
@@ -69,6 +73,7 @@ blockProducerConfigs:
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    enableArchive: false
 
 healthcheck:
   enabled: true

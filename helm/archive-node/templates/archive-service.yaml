@@ -1,8 +1,10 @@
+{{ range $config := $.Values.archive.archiveConfigs }}
+{{- if $config.runPostgresDb }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "archive-node.fullname" . }}
+  name: {{ $config.name }}
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -10,8 +12,10 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ template "archive-node.fullname" . }}
+    app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ .Values.coda.ports.p2p }}
+    port: {{ $.Values.coda.ports.p2p }}
     targetPort: external-port
+{{- end }}
+{{- end }}

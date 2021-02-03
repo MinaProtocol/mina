@@ -1,27 +1,31 @@
+{{ range $config := $.Values.archive.archiveConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "archive-node.fullname" . }}
+  name: {{ $config.name }}
   labels:
-    app: {{ template "archive-node.fullname" . }}
+    app: {{ $config.name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ template "archive-node.fullname" . }}
+      app: {{ $config.name }}
   template:
     metadata:
       labels:
-        app: {{ template "archive-node.fullname" . }}
-        testnet: {{ .Values.testnetName }}
+        app: {{ $config.name }}
+        testnet: {{ $.Values.testnetName }}
         role: archive-node
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
+      {{- if $config.runLocalDaemon }}
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
+      {{- end }}
     spec:
       containers:
+{{- if $config.runLocalDaemon }}
       - name: coda
         resources:
           limits:
@@ -30,21 +34,21 @@ spec:
             cpu: 4.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
-          "-log-level", {{ .Values.coda.logLevel }},
+          "-log-level", {{ $.Values.coda.logLevel }},
           "-log-json",
-          {{- if .Values.coda.logSnarkWorkGossip }}
+          {{- if $.Values.coda.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}
-          {{- range .Values.coda.seedPeers }}
+          {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
-          {{- if .Values.coda.enableFlooding }}
+          {{- if $.Values.coda.enableFlooding }}
           "-enable-flooding true"
           {{- end -}}
-          {{- if .Values.coda.peerExchange }}
+          {{- if $.Values.coda.peerExchange }}
           "-peer-exchange true"
           {{- end -}}
-          {{- range .Values.coda.directPeers }}
+          {{- range $.Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
           {{- end -}}
           "-config-directory", "/root/.coda-config",
@@ -54,22 +58,22 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
-          {{- if .Values.coda.runtimeConfig }}
+          {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end -}}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coda.ports.graphql | quote }}
+          value: {{ $.Values.coda.ports.graphql | quote }}
         - name: DAEMON_ARCHIVE_PORT
-          value: {{ .Values.archive.ports.server | quote }}
+          value: {{ $config.serverPort | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.client | quote }}
+          value: {{ $.Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coda.ports.metrics | quote }}
+          value: {{ $.Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ $.Values.coda.ports.p2p | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
@@ -77,41 +81,42 @@ spec:
         ports:
         - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.client }}
+          containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.graphql }}
+          containerPort: {{ $.Values.coda.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.metrics }}
+          containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.p2p }}
-{{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
+          containerPort: {{ $.Values.coda.ports.p2p }}
+          hostPort: {{ $.Values.coda.ports.p2p }}
+{{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 
         - name: config-dir
           mountPath: /root/.coda-config
-        {{- if .Values.coda.runtimeConfig }}
+        {{- if $.Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+      {{- end }}
       # Archive Process
       - name: archive
-        image: {{ .Values.archive.image }}
+        image: {{ $.Values.archive.image }}
         args: [ 
           "coda-archive",
           "run",
-          "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
-          {{- if .Values.coda.runtimeConfig }}
+          "-postgres-uri", "{{ $config.postgresUri }}",
+          {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
-          "-server-port", "{{ .Values.archive.ports.server }}"
+          "-server-port", "{{ $config.serverPort }}"
         ]
         env:
         imagePullPolicy: Always
-        {{- if .Values.coda.runtimeConfig }}
+        {{- if $.Values.coda.runtimeConfig }}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"
@@ -119,17 +124,15 @@ spec:
         ports:
         - name: archive-port
           protocol: TCP
-          containerPort: {{ .Values.archive.ports.server }}
-        - name: postgres-port
-          protocol: TCP
-          containerPort: {{ .Values.archive.ports.postgres }}
-{{- include "healthcheck.archive.allChecks" . | indent 8 }}
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
+          containerPort: {{ $config.serverPort }}
+{{- include "healthcheck.archive.allChecks" $config | indent 8 }}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
       volumes:
       - name: config-dir
         emptyDir: {}
-      {{- if .Values.coda.runtimeConfig }}
+      {{- if $.Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: "{{ template "archive-node.fullname" . }}-daemon-config"
+          name: "{{ $config.name }}-daemon-config"
       {{- end }}
+{{ end }}

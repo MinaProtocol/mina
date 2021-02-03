@@ -21,13 +21,33 @@ archive:
   listenPort: "3086"
   nodeName: "dev"
   remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-  postgresHost: '{{ .Release.Name }}-postgresql'
+  postgresHost: '{{ $.Release.Name }}-postgresql'
   postgresPort: "5432"
   postgresDB: "archive"
   postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
   ports:
     server: 3086
     postgres: "5432"
+  # for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
+  archiveConfigs:
+  - name: "archive-1"
+    serverPort: 3086
+    externalPort: 1
+    runLocalDaemon: true
+    runPostgresDb: true
+    postgres:
+      postgresHost: '{{ $.Release.Name }}-postgresql'
+      postgresPort: "5432"
+      postgresqlUsername: "postgres"
+      postgresqlPassword: "foobar"
+      postgresDB: "archive"
+      remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+    healthcheck:
+      enabled: true
+      failureThreshold: 60
+      periodSeconds: 5
+      initialDelaySeconds: 30
 
 postgresql:
   postgresqlPassword: "foobar"

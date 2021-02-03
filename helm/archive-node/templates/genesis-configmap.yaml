@@ -1,12 +1,14 @@
-{{- if .Values.coda.runtimeConfig }}
+{{ range $config := $.Values.archiveConfigs}}
+{{- if $.Values.coda.runtimeConfig }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: "{{ template "archive-node.fullname" . }}-daemon-config"
+  name: "{{ $config.name }}-daemon-config"
   labels:
-    app: {{ template "archive-node.fullname" . }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+    app: {{ $config.name }}
+    heritage: {{ $.Release.Service }}
+    release: {{ $.Release.Name }}
 data:
-  daemon.json: {{ .Values.coda.runtimeConfig | quote }}
+  daemon.json: {{ $.Values.coda.runtimeConfig | quote }}
+{{- end }}
 {{- end }}

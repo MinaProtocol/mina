@@ -28,17 +28,21 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced --db-host {{ template "archive-node.fullname" . }}-postgresql"
+      {{- if .runLocalDaemon }}
+      "source /healthcheck/utilities.sh && isDaemonSynced && isArchiveSynced --db-host {{ .name }}-postgresql"
+      {{- else }}
+      "source /healthcheck/utilities.sh && isArchiveSynced --db-host {{ .name }}-postgresql"
+      {{- end }}
     ]
-{{- include "healthcheck.common.settings" .Values | indent 2 }}
+{{- include "healthcheck.common.settings" . | indent 2 }}
 {{- end }}
 
 {{/*
 ALL archive-node healthchecks  - TODO: readd startupProbes once GKE clusters have been updated to 1.16
 */}}
 {{- define "healthcheck.archive.allChecks" }}
-{{- if .Values.healthcheck.enabled }}
-{{- include "healthcheck.archive.livenessCheck" .Values }}
+{{- if .healthcheck.enabled }}
+{{- include "healthcheck.archive.livenessCheck" . }}
 {{- include "healthcheck.archive.readinessCheck" . }}
 {{- end }}
 {{- end }}
