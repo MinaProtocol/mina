@@ -1,7 +1,7 @@
 terraform {
   required_version = "~> 0.12.0"
   backend "s3" {
-    key     = "terraform-febdevelop.tfstate"
+    key     = "terraform-encore.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
