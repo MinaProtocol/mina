@@ -12,13 +12,14 @@ let deployEnv = "DOCKER_DEPLOY_ENV"
 
 in
 
-{ step = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
+{
+  build = \(duneProfile : Text) ->
     Command.build
       Command.Config::{
         commands =
             -- Build test executive binary
             OpamInit.andThenRunInDocker [
-              "DUNE_PROFILE=testnet_postake_medium_curves",
+              "DUNE_PROFILE=${duneProfile}",
               -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-test-executive.sh"
@@ -27,15 +28,21 @@ in
             
             [
               -- Cache test-executive binary
-              -- TODO: cache using `cacheThrough` method
-              Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh test_executive.exe",
+              Cmd.run "artifact-cache-helper.sh test_executive.exe --miss-cmd \"ls test-executive.exe\""
+            ],
+        label = "Build test-executive | dune profile: ${duneProfile}",
+        key = "build-test-executive",
+        target = Size.XLarge
+      },
 
-              -- Download deploy env to identify test dependencies
-              Cmd.run (
-                "if [ ! -f ${deployEnv} ]; then " ++
-                    "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
-                "fi"
-              ),
+  execute = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
+    Command.build
+      Command.Config::{
+        commands =
+            [
+              -- Download test dependencies
+              Cmd.run "artifact-cache-helper.sh test_executive.exe",
+              Cmd.run "artifact-cache-helper.sh ${deployEnv}",
 
               -- Execute test based on BUILD image
               Cmd.run (
@@ -47,7 +54,7 @@ in
             ],
         label = "Execute integration test: ${testName}",
         key = "integration-test-${testName}",
-        target = Size.XLarge,
+        target = Size.Medium,
         depends_on = dependsOn
       }
 }
