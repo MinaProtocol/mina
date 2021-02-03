@@ -167,3 +167,33 @@ module Construction = struct
     Lift.res ~logger res ~of_yojson:Construction_submit_response.of_yojson
     |> Lift.successfully
 end
+
+module Account_balance = struct
+  open Deferred.Result.Let_syntax
+
+  let request_balance ~account_identifier ~block_identifier ~rosetta_uri
+      ~network_response ~logger =
+    let request : Account_balance_request.t =
+      { network_identifier= net_id network_response
+      ; account_identifier
+      ; block_identifier
+      ; currencies= [] }
+    in
+    let%map res =
+      post ~rosetta_uri ~logger
+        ~body:(request |> Account_balance_request.to_yojson)
+        ~path:"account/balance"
+    in
+    Lift.res ~logger res ~of_yojson:Account_balance_response.of_yojson
+
+  let current_balance ~account_identifier ~rosetta_uri ~network_response
+      ~logger =
+    request_balance ~account_identifier ~block_identifier:None ~rosetta_uri
+      ~network_response ~logger
+
+  let balance_at_index ~account_identifier ~(index : int64) ~rosetta_uri
+      ~network_response ~logger =
+    request_balance ~account_identifier
+      ~block_identifier:(Some {index= Some index; hash= None})
+      ~rosetta_uri ~network_response ~logger
+end
