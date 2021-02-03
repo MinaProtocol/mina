@@ -39,7 +39,7 @@ let getSnarkFeeChallenge = pk => {
       FROM internal_commands as ic
       INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
       INNER JOIN blocks as b ON b.id = bic.block_id
-      INNER JOIN public_keys as p ON p.id=b.creator_id
+      INNER JOIN public_keys as p ON p.id=ic.receiver_id
       WHERE type = 'coinbase'
       AND value = '$(pk)'
     )
