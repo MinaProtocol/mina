@@ -116,17 +116,25 @@ end
 module Block = struct
   open Deferred.Result.Let_syntax
 
-  let newest_block ~rosetta_uri ~network_response ~logger =
+  let request_block ~block_identifier ~rosetta_uri ~network_response ~logger =
     let%map res =
       post ~rosetta_uri ~logger
         ~body:
           Block_request.(
-            create (net_id network_response)
-              (Partial_block_identifier.create ())
-            |> to_yojson)
+            create (net_id network_response) block_identifier |> to_yojson)
         ~path:"block/"
     in
     Lift.res ~logger res ~of_yojson:Block_response.of_yojson
+
+  let newest_block ~rosetta_uri ~network_response ~logger =
+    request_block
+      ~block_identifier:(Partial_block_identifier.create ())
+      ~rosetta_uri ~network_response ~logger
+
+  let block_at_index ~index ~rosetta_uri ~network_response ~logger =
+    request_block
+      ~block_identifier:{index= Some index; hash= None}
+      ~rosetta_uri ~network_response ~logger
 end
 
 module Construction = struct
