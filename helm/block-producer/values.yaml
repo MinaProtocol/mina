@@ -38,7 +38,6 @@ bots:
 # for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
 blockProducerConfigs:
   - name: "test-1"
-    externalPort: 1
     runWithUserAgent: false
     runWithBots: false
     privateKeySecret: "yolo"
@@ -47,8 +46,8 @@ blockProducerConfigs:
     enablePeerExchange: false
     enableArchive: true
     archiveAddress: archive-1-postgressql
+    libp2pSecret: "libp2pYolo"
   - name: "test-2"
-    externalPort: 2
     runWithUserAgent: true
     runWithBots: false
     privateKeySecret: "yolo"
@@ -56,8 +55,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     enableArchive: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-3"
-    externalPort: 3
     runWithUserAgent: false
     runWithBots: true
     privateKeySecret: "yolo"
@@ -65,8 +64,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     enableArchive: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-4"
-    externalPort: 4
     runWithUserAgent: true
     runWithBots: true
     privateKeySecret: "yolo"
@@ -74,6 +73,7 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     enableArchive: false
+    libp2pSecret: "libp2pYolo"
 
 healthcheck:
   enabled: true
