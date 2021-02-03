@@ -46,6 +46,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     | [] ->
         str
 
+  open Graph_algorithms
+
+  module X = struct
+    include String
+
+    type display = string [@@deriving yojson]
+
+    let display = Fn.id
+
+    let name = Fn.id
+  end
+
+  module G = Visualization.Make_ocamlgraph (X)
+
+  let graph_of_adjacency_list adj =
+    List.fold adj ~init:G.empty ~f:(fun acc (x, xs) ->
+        let acc = G.add_vertex acc x in
+        List.fold xs ~init:acc ~f:(fun acc y ->
+            let acc = G.add_vertex acc y in
+            G.add_edge acc x y ) )
+
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -57,9 +78,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           wait_for t (Wait_condition.node_to_initialize node) )
     in
     [%log info] "mina_peers_test: done waiting for initialization" ;
-    (* [%log info] "peers_list"
-      ~metadata:
-      [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ; *)
+    [%log info] "peers_list"
+      ~metadata:[("peers", `List (List.map peer_list ~f:(fun n -> `String (Node.id n) )))] ;
     let get_peer_id_partial = Node.get_peer_id ~logger in
     (* each element in query_results represents the data of a single node relevant to this test. ( peer_id of node * [list of peer_ids of node's peers] ) *)
     let%bind (query_results : (string * string list) list) =
@@ -68,6 +88,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info]
       "mina_peers_test: successfully made graphql query.  query_results: %s"
       (to_string_query_results query_results "") ;
+    let () =
+      Out_channel.with_file "/tmp/network-graph.dot" ~f:(fun c ->
+          G.output_graph c (graph_of_adjacency_list query_results) )
+    in
     let expected_peers, _ = List.unzip query_results in
     let test_compare_func (node_peer_id, visible_peers_of_node) =
       let expected_peers_of_node : string list =
@@ -87,6 +111,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "mina_peers_test: making assertions" ;
     let result = return (List.iter query_results ~f:test_compare_func) in
+    ( (* Check that the network cannot be disconnected by removing 0 or 1 nodes. *)
+    match Nat.take (connectivity (module String) query_results) 2 with
+    | `Failed_after n ->
+        failwithf "The network could be disconnected by removing %d node(s)" n
+          ()
+    | `Ok ->
+        () ) ;
     [%log info]
       "mina_peers_test: assertions passed, peers test successfully ran!!!" ;
     result
