@@ -36,6 +36,27 @@ let keep_trying ~step ~retry_count ~initial_delay ~each_delay ~failure_reason =
   let%bind () = wait initial_delay in
   go retry_count
 
+let get_last_block_index ~rosetta_uri ~network_response ~logger =
+  let open Core.Time in
+  let open Deferred.Result.Let_syntax in
+  keep_trying
+    ~step:(fun () ->
+      let%map block_r =
+        Peek.Block.newest_block ~rosetta_uri ~network_response ~logger
+      in
+      match
+        Result.map block_r ~f:(fun block ->
+            (Option.value_exn block.Block_response.block).block_identifier
+              .index )
+      with
+      | Error _ ->
+          `Failed
+      | Ok index ->
+          `Succeeded index )
+    ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
+    ~each_delay:(Span.of_ms 250.0)
+    ~failure_reason:"Took too long for the last block to be fetched"
+
 let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response ~txn_hash ~operation_expectations =
   let open Core.Time in
@@ -87,23 +108,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
   in
   [%log info] "Verified mempool operations" ;
   let%bind last_block_index =
-    keep_trying
-      ~step:(fun () ->
-        let%map block_r =
-          Peek.Block.newest_block ~rosetta_uri ~network_response ~logger
-        in
-        match
-          Result.map block_r ~f:(fun block ->
-              (Option.value_exn block.Block_response.block).block_identifier
-                .index )
-        with
-        | Error _ ->
-            `Failed
-        | Ok index ->
-            `Succeeded index )
-      ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
-      ~each_delay:(Span.of_ms 250.0)
-      ~failure_reason:"Took too long for the last block to be fetched"
+    get_last_block_index ~rosetta_uri ~network_response ~logger
   in
   [%log debug]
     ~metadata:[("index", `Intlit (Int64.to_string last_block_index))]
