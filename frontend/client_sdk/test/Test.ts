@@ -18,6 +18,13 @@ let payment2 = CodaSDK.signPayment(
 
 deepStrictEqual(payment1, payment2, "Payment signatures don't match (string vs numeric inputs)");
 
+
+deepStrictEqual(CodaSDK.verifyPaymentSignature(payment1), true, "Unsafe signed payment could not be verified.");
+deepStrictEqual(CodaSDK.verifyPaymentSignature(payment2), true, "Signed payment could not be verified.");
+
+let invalidPayment = {...payment2, publicKey: CodaSDK.genKeys().publicKey};
+deepStrictEqual(CodaSDK.verifyPaymentSignature(invalidPayment), false, "Invalid signed payment was verified");
+
 let sd1 = CodaSDK.signStakeDelegation(
     {to: key.publicKey, from: key.publicKey, fee: "1", nonce: "0"},
     key);

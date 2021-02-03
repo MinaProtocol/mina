@@ -131,6 +131,13 @@ let value = (~default: 'a, option: option('a)): 'a => {
   (go())(. default, option);
 };
 
+let bool_of_int = i =>
+  if (i === 0) {
+    false;
+  } else {
+    true;
+  };
+
 type common_payload_js = {
   .
   "fee": string,
@@ -167,6 +174,13 @@ type signed_js = {
   .
   "stakeDelegation": Js.Undefined.t(stake_delegation_js),
   "payment": Js.Undefined.t(payment_js),
+  "sender": publicKey,
+  "signature": signature,
+};
+
+type signed_payment_js = {
+  .
+  "payment": payment_js,
   "sender": publicKey,
   "signature": signature,
 };
@@ -282,8 +296,54 @@ let signStakeDelegation =
             "delegationPayload": {
               "newDelegate": stakeDelegation.to_,
               "delegator": stakeDelegation.from,
-            }
+            },
           },
         )##signature,
     };
   };
+
+[@bs.send]
+external verifyPaymentSignature: (codaSDK, signed_payment_js) => int =
+  "verifyPaymentSignature";
+
+/**
+  * Verifies a signed payment.
+  *
+  * @param signedPayment - A signed payment transaction
+  * @returns True if the `signed(payment)` is a verifiable payment
+  */
+[@genType]
+let verifyPaymentSignature = (signedPayment: signed(payment)) => {
+  let payload = signedPayment.payload;
+  // Stringify all numeric inputs since they may be passed as
+  // number/bigint in TS/JS
+  let memo = value(~default="", payload.memo);
+  let fee = Js.String.make(payload.fee);
+  let amount = Js.String.make(payload.amount);
+  let nonce = Js.String.make(payload.nonce);
+  let validUntil =
+    Js.String.make(value(~default=defaultValidUntil, payload.validUntil));
+
+  verifyPaymentSignature(
+    codaSDK,
+    {
+      "sender": signedPayment.publicKey,
+      "signature": signedPayment.signature,
+      "payment": {
+        "common": {
+          "fee": fee,
+          "feePayer": payload.from,
+          "nonce": nonce,
+          "validUntil": validUntil,
+          "memo": memo,
+        },
+        "paymentPayload": {
+          "source": payload.from,
+          "receiver": payload.to_,
+          "amount": amount,
+        },
+      },
+    },
+  )
+  ->bool_of_int;
+};
