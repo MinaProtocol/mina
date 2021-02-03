@@ -47,7 +47,7 @@ spec:
           {{- range .Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
           {{- end -}}
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
@@ -92,7 +92,7 @@ spec:
         imagePullPolicy: Always
         volumeMounts: 
         - name: config-dir
-          mountPath: /root/.coda-config
+          mountPath: /root/.mina-config
         {{- if .Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"

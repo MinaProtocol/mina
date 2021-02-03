@@ -34,7 +34,7 @@ spec:
           "-log-level", "Trace",
           "-log-json",
           "-log-snark-work-gossip", "true",
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",

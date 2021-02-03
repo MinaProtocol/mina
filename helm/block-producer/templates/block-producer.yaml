@@ -51,12 +51,12 @@ spec:
         command:
         - bash
         - -c
-        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || coda accounts import -config-directory /root/.coda-config -privkey-path /root/wallet-keys/$key; done
+        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || coda accounts import -config-directory /root/.mina-config -privkey-path /root/wallet-keys/$key; done
         volumeMounts:
         - name: wallet-keys
           mountPath: /root/wallet-keys
         - name: config-dir
-          mountPath: /root/.coda-config
+          mountPath: /root/.mina-config
         env: 
           - name: CODA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
@@ -192,7 +192,7 @@ spec:
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
@@ -254,7 +254,7 @@ spec:
         - name: wallet-keys
           mountPath: /root/wallet-keys
         - name: config-dir
-          mountPath: /root/.coda-config
+          mountPath: /root/.mina-config
         {{- if $config.libp2pSecret }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys

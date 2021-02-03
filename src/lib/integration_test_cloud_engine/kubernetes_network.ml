@@ -36,7 +36,7 @@ module Node = struct
     let%bind () =
       if fresh_state then
         Deferred.bind ~f:Malleable_error.return
-          (run_in_container node "rm -rf .coda-config")
+          (run_in_container node "rm -rf .mina-config")
       else Malleable_error.return ()
     in
     Deferred.bind ~f:Malleable_error.return

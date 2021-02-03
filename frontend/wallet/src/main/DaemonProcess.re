@@ -34,7 +34,7 @@ let codaCommand = (~port, ~extraArgs) => {
           "-genesis-ledger-dir",
           keysPath,
           "-config-directory",
-          ProjectRoot.userData ^/ "coda-config",
+          ProjectRoot.userData ^/ "mina-config",
         |],
         extraArgs,
       ),

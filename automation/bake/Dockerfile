@@ -19,24 +19,24 @@ RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/auto
 RUN head ${CONFIG_FILE}
 
 # Create the defautl config dir and an empty config
-RUN mkdir -p /root/.coda-config && echo "{}" > /root/.coda-config/daemon.json
+RUN mkdir -p /root/.mina-config && echo "{}" > /root/.mina-config/daemon.json
 
 RUN coda daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
-  mv ~/.coda-config/genesis/genesis_* /var/lib/coda/
+  mv ~/.mina-config/genesis/genesis_* /var/lib/coda/
 
 RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt
 
 #RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 
 RUN echo '#!/bin/bash -x\n\
-mkdir -p .coda-config\n\
-touch .coda-config/coda-prover.log\n\
-touch .coda-config/coda-verifier.log\n\
-touch .coda-config/mina-best-tip.log\n\
+mkdir -p .mina-config\n\
+touch .mina-config/coda-prover.log\n\
+touch .mina-config/coda-verifier.log\n\
+touch .mina-config/mina-best-tip.log\n\
 command=$1 \n\
 shift \n\
 while true; do\n\
-  rm -f /root/.coda-config/.mina-lock\n\
+  rm -f /root/.mina-config/.mina-lock\n\
   coda "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >coda.log &\n\
   coda_pid=$!\n\
   tail -q -f coda.log &\n\

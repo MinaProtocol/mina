@@ -12,7 +12,7 @@ end)
 let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   let log_location_detail =
     if Cli_lib.Flag.Uri.is_localhost uri.value then
-      " (in `~/.coda-config/coda.log`)"
+      " (in `~/.mina-config/coda.log`)"
     else ""
   in
   match%bind f query_obj uri.value with

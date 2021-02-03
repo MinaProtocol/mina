@@ -83,7 +83,7 @@ def run_docker(daemon_image, gossip_port, working_directory, peers):
 daemon \
   -external-port {gossip_port} \
   -generate-genesis-proof true \
-  -config-dir /root/.coda-config \
+  -config-dir /root/.mina-config \
   -config-file /tmp/daemon.json \
   -peer {peers[0]} \
   -peer {peers[2]} \

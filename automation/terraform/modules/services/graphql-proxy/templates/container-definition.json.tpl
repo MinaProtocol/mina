@@ -31,7 +31,7 @@
     "memory": 6500,
     "mountPoints" : [
       {
-          "containerPath" : "/coda-config",
+          "containerPath" : "/mina-config",
           "sourceVolume" : "archive-node-storage"
       }
     ],

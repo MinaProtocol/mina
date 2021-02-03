@@ -31,7 +31,7 @@ echo "== Verify snarks work"
 echo "========="
 ./mina.exe transaction-snark-profiler
 
-rm -rf ~/.coda-config
+rm -rf ~/.mina-config
 
 echo "========="
 echo "== Verify full test"

@@ -74,7 +74,7 @@ fi
 echo "$ROLE_COMMAND"
 
 # Make Config Directory
-mkdir ~/coda-config
+mkdir ~/mina-config
 
 # Run Coda Daemon
 
@@ -82,14 +82,14 @@ mkdir ~/coda-config
 set -x
 for file in "${key_files[@]}"
 do
-  coda advanced unsafe-import -config-dir ~/coda-config -privkey-path $file
+  coda advanced unsafe-import -config-dir ~/mina-config -privkey-path $file
 done
 
 
 
 if [ -z "$NODAEMON" ] || [ "$NODAEMON" -eq 0 ]; then
 
-  coda daemon -config-directory ~/coda-config $ROLE_COMMAND -client-port $DAEMON_CLIENT_PORT -rest-port $DAEMON_REST_PORT -external-port $DAEMON_EXTERNAL_PORT  -discovery-port $DAEMON_DISCOVERY_PORT -metrics-port $DAEMON_METRICS_PORT \
+  coda daemon -config-directory ~/mina-config $ROLE_COMMAND -client-port $DAEMON_CLIENT_PORT -rest-port $DAEMON_REST_PORT -external-port $DAEMON_EXTERNAL_PORT  -discovery-port $DAEMON_DISCOVERY_PORT -metrics-port $DAEMON_METRICS_PORT \
     -peer /dns4/peer1-$CODA_TESTNET.o1test.net/tcp/8303/p2p/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
     -peer /dns4/peer2-$CODA_TESTNET.o1test.net/tcp/8303/p2p/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
     -peer /dns4/peer3-$CODA_TESTNET.o1test.net/tcp/8303/p2p/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7
