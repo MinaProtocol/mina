@@ -103,12 +103,16 @@ let dispatch_cleanup ~logger ~init_cleanup_func ~network_cleanup_func
       Option.value_map !net_manager_ref ~default:Deferred.unit
         ~f:network_cleanup_func
     in
+    let%bind test_error_set =
+      Malleable_error.lift_error_set_unit test_result
+    in
     Option.value_map !network_state_writer_ref ~default:()
       ~f:Broadcast_pipe.Writer.close ;
     let all_errors =
       let open Test_error.Set in
       combine
         [ lift_accumulated_errors_func ()
+        ; test_error_set
         ; of_hard_or_error log_engine_cleanup_result ]
     in
     let expected_error_event_ids =
@@ -147,19 +151,23 @@ let dispatch_cleanup ~logger ~init_cleanup_func ~network_cleanup_func
     in
     report_test_errors unexpected_errors missing_expected_error_reprs
   in
-  let%bind test_error_str = Malleable_error.hard_error_to_string test_result in
+  let%bind hard_error_string =
+    Malleable_error.hard_error_to_string test_result
+  in
   match !cleanup_deferred_ref with
   | Some deferred ->
       [%log error]
         "additional call to cleanup testnet while already cleaning up \
-         ($reason, $error)"
+         (reason: $reason, hard error: $error)"
         ~metadata:
-          [("reason", `String exit_reason); ("error", `String test_error_str)] ;
+          [ ("reason", `String exit_reason)
+          ; ("error", `String hard_error_string) ] ;
       deferred
   | None ->
-      [%log info] "cleaning up testnet (reason: $reason, error: $error)"
+      [%log info] "cleaning up testnet (reason: $reason, hard error: $error)"
         ~metadata:
-          [("reason", `String exit_reason); ("error", `String test_error_str)] ;
+          [ ("reason", `String exit_reason)
+          ; ("error", `String hard_error_string) ] ;
       let deferred = cleanup () in
       cleanup_deferred_ref := Some deferred ;
       deferred
@@ -210,8 +218,8 @@ let main inputs =
       print_string "Pausing cleanup. Enter [y/Y] to continue: " ;
       let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
       let c = Option.value_exn In_channel.(input_char stdin) in
-      if c = 'y' || c = 'Y' then Deferred.unit
-      else ( print_newline () ; prompt_continue () )
+      print_newline () ;
+      if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue ()
     in
     let init_cleanup_func () =
       if inputs.debug then prompt_continue () else Deferred.unit

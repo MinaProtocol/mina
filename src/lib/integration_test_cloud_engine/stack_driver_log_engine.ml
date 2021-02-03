@@ -106,9 +106,9 @@ module Subscription = struct
     in
     let%bind response =
       run_cmd_or_error "." "curl"
-        [ "--request"
-        ; "--silent"
+        [ "--silent"
         ; "--show-error"
+        ; "--request"
         ; "POST"
         ; url
         ; header
@@ -257,7 +257,7 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
     if List.length log_entries > 0 then
       [%log spam] "Parsing events from $n logs"
         ~metadata:[("n", `Int (List.length log_entries))]
-    else [%log debug] "No logs were pulled" ;
+    else [%log spam] "No logs were pulled" ;
     let%bind () =
       Deferred.List.iter ~how:`Sequential log_entries ~f:(fun log_entry ->
           log_entry

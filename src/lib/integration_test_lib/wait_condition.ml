@@ -62,7 +62,7 @@ struct
         Predicate_passed
       else Predicate_continuation init_blocks_generated
     in
-    let soft_timeout_in_slots = 8 * n in
+    let soft_timeout_in_slots = 2 * n in
     { description= Printf.sprintf "%d blocks to be produced" n
     ; predicate= Network_state_predicate (init, check)
     ; soft_timeout= Slots soft_timeout_in_slots

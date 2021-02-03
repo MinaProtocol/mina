@@ -63,6 +63,7 @@ module Make (Engine : Intf.Engine.S) () :
       [%log debug] "Handling network state predicate" ;
       check predicate_state network_state |> handle_predicate_result
     in
+    [%log debug] "Initializing network state predicate" ;
     match
       Broadcast_pipe.Reader.peek network_state_reader
       |> init |> handle_predicate_result

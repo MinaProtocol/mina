@@ -167,6 +167,14 @@ let lift_error_set (type a) (m : a t) :
   | Error {Hard_fail.hard_error; soft_errors} ->
       Error (internal_error_set [hard_error] soft_errors)
 
+let lift_error_set_unit (m : unit t) : Test_error.Set.t Deferred.t =
+  let open Deferred.Let_syntax in
+  match%map lift_error_set m with
+  | Ok ((), errors) ->
+      errors
+  | Error errors ->
+      errors
+
 module List = struct
   let rec iter ls ~f =
     let open T.Let_syntax in
