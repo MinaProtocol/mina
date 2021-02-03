@@ -20,6 +20,11 @@ in Pipeline.build Pipeline.Config::{
     name = "TestnetIntegrationTests"
   },
   steps = [
-    ExecuteIntegrationTest.step "block-production" dependsOn
+    ExecuteIntegrationTest.step "block-production" dependsOn,
+    ExecuteIntegrationTest.step "bootstrap" dependsOn,
+    ExecuteIntegrationTest.step "bp-timed-accts" dependsOn,
+    ExecuteIntegrationTest.step "peers" dependsOn,
+    ExecuteIntegrationTest.step "pmt-timed-accts" dependsOn,
+    ExecuteIntegrationTest.step "send-payment" dependsOn
   ]
 }
