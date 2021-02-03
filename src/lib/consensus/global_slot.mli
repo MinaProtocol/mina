@@ -1,8 +1,6 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
-open Coda_base
-open Unsigned
 
 module Poly : sig
   [%%versioned:
@@ -18,8 +16,8 @@ end
 module Stable : sig
   module V1 : sig
     type t =
-      ( Coda_numbers.Global_slot.Stable.V1.t
-      , Coda_numbers.Length.Stable.V1.t )
+      ( Mina_numbers.Global_slot.Stable.V1.t
+      , Mina_numbers.Length.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving compare, eq, sexp, hash, yojson]
   end
@@ -27,13 +25,17 @@ end]
 
 val to_input : t -> (_, bool) Random_oracle.Input.t
 
-val of_slot_number : constants:Constants.t -> Coda_numbers.Global_slot.t -> t
+val of_slot_number : constants:Constants.t -> Mina_numbers.Global_slot.t -> t
 
 val gen : constants:Constants.t -> t Quickcheck.Generator.t
 
 val ( + ) : t -> int -> t
 
+val ( - ) : t -> t -> Mina_numbers.Global_slot.t option
+
 val ( < ) : t -> t -> bool
+
+val max : t -> t -> t
 
 val succ : t -> t
 
@@ -70,12 +72,12 @@ module Checked : sig
   open Snark_params.Tick
 
   type t =
-    (Coda_numbers.Global_slot.Checked.t, Coda_numbers.Length.Checked.t) Poly.t
+    (Mina_numbers.Global_slot.Checked.t, Mina_numbers.Length.Checked.t) Poly.t
 
   val ( < ) : t -> t -> (Boolean.var, _) Checked.t
 
   val of_slot_number :
-    constants:Constants.var -> Coda_numbers.Global_slot.Checked.t -> t
+    constants:Constants.var -> Mina_numbers.Global_slot.Checked.t -> t
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
@@ -86,6 +88,9 @@ module Checked : sig
        Checked.t
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
+
+  (** [sub ~m x y] computes [x - y] and ensures that [0 <= x - y] *)
+  val sub : t -> t -> (Mina_numbers.Global_slot.Checked.t, _) Checked.t
 end
 
 val typ : (Checked.t, t) Typ.t
@@ -97,5 +102,5 @@ val slot_number : ('a, _) Poly.t -> 'a
 val slots_per_epoch : (_, 'b) Poly.t -> 'b
 
 module For_tests : sig
-  val of_global_slot : t -> Coda_numbers.Global_slot.t -> t
+  val of_global_slot : t -> Mina_numbers.Global_slot.t -> t
 end

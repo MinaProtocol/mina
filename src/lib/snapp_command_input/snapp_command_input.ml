@@ -1,8 +1,8 @@
 open Core_kernel
-open Async
-open Coda_numbers
+open Async_kernel
+open Mina_numbers
+open Mina_base
 open Signature_lib
-open Coda_base
 
 module Sign_choice = struct
   [%%versioned
@@ -68,9 +68,9 @@ module Other_fee_payer = struct
         { payload:
             ( Public_key.Compressed.Stable.V1.t
             , Token_id.Stable.V1.t
-            , Coda_numbers.Account_nonce.Stable.V1.t option
+            , Account_nonce.Stable.V1.t option
             , Currency.Fee.Stable.V1.t )
-            Coda_base.Other_fee_payer.Payload.Poly.Stable.V1.t
+            Other_fee_payer.Payload.Poly.Stable.V1.t
         ; sign_choice: Sign_choice.Stable.V1.t }
       [@@deriving sexp, to_yojson]
 
@@ -123,7 +123,10 @@ let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
       let updated_map = update_map ~data:next_nonce in
       Ok (next_nonce, updated_map)
   | None ->
-      let%map txn_pool_or_account_nonce = get_current_nonce account_id in
+      (* TODO: Allow user provided nonce and use min nonce *)
+      let%map `Min _min_nonce, txn_pool_or_account_nonce =
+        get_current_nonce account_id
+      in
       let updated_map = update_map ~data:txn_pool_or_account_nonce in
       (txn_pool_or_account_nonce, updated_map)
 
@@ -178,7 +181,7 @@ let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
         in
         let%map signature = sign ~signer:pk sign_choice in
         ( ( Some {payload= {pk; token_id; nonce; fee}; signature}
-            : Coda_base.Other_fee_payer.t option )
+            : Mina_base.Other_fee_payer.t option )
         , nonce_map )
     | None ->
         return (None, nonce_map)

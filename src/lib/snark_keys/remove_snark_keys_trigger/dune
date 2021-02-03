@@ -2,7 +2,8 @@
  (name remove_snark_keys_trigger)
  ; Remove keys when snarky gets recompiled
  (libraries snarky.backendless)
- (preprocess (pps ppx_version bisect_ppx -- --conditional)))
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
 
 (rule
  (targets remove_keys_trigger.ml)

@@ -47,16 +47,16 @@ module Core = {
 
     let getSheet = sheet => {
       switch (sheet) {
-      | Main => {name: "main", range: "main!A5:I"}
+      | Main => {name: "main", range: "main!A5:AQ"}
       | AllTimeLeaderboard => {
           name: "All-Time Leaderboard",
           range: "All-Time Leaderboard!C4:H",
         }
       | CurrentPhaseLeaderboard => {
-          name: "Phase 3 Leaderboard",
-          range: "Phase 3 Leaderboard!B4:E",
+          name: "Phase 5 Testworld Leaderboard",
+          range: "Phase 5 Testworld Leaderboard!B4:E",
         }
-      | CurrentReleaseLeaderboard => {name: "3.3", range: "3.3!A4:C"}
+      | CurrentReleaseLeaderboard => {name: "5.1", range: "5.1!A4:C"}
       | MemberProfileData => {
           name: "Member_Profile_Data",
           range: "Member_Profile_Data!A2:Z",

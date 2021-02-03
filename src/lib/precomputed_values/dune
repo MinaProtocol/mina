@@ -3,7 +3,7 @@
  (flags -warn-error -22)
  (public_name precomputed_values)
  (libraries
-   coda_base
+   mina_base
    crypto_params
    dummy_values
    genesis_proof
@@ -11,7 +11,8 @@
    snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess
-  (pps ppx_version ppx_jane ppxlib.metaquot bisect_ppx -- --conditional)))
+  (pps ppx_version ppx_jane ppxlib.metaquot))
+ (instrumentation (backend bisect_ppx)))
 
 (rule
  (targets precomputed_values.ml)

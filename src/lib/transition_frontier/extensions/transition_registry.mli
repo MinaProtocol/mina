@@ -1,5 +1,5 @@
 open Async_kernel
-open Coda_base
+open Mina_base
 
 include Intf.Extension_intf with type view = unit
 

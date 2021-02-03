@@ -63,11 +63,11 @@ clean:
 	$(info Removing previous build artifacts)
 	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
+	@rm -rf src/app/libp2p_helper/result
 
 # TEMP HACK (for circle-ci)
 libp2p_helper:
-	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
-
+	make -C src/app/libp2p_helper
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
@@ -121,6 +121,21 @@ dhall_types :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
 	$(info Build complete)
 
+replayer :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+missing_blocks_auditor :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+missing_subchain :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_subchain/missing_subchain.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
@@ -153,17 +168,6 @@ check-format:
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
-
-########################################
-## Merlin fixup for docker builds
-
-merlin-fixup:
-ifeq ($(USEDOCKER),TRUE)
-	@echo "Fixing up .merlin files for Docker build"
-	@./scripts/merlin-fixup.sh
-else
-	@echo "Not building in Docker, .merlin files unchanged"
-endif
 
 #######################################
 ## Environment setup
@@ -231,14 +235,12 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp _build/coda*.deb /tmp/artifacts/.
-	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+	@cp _build/mina*.deb /tmp/artifacts/.
 
 deb_optimized:
 	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
 	@mkdir -p /tmp/artifacts
-	@cp _build/coda*.deb /tmp/artifacts/.
-	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+	@cp _build/mina*.deb /tmp/artifacts/.
 
 build_pv_keys:
 	$(info Building keys)
@@ -258,8 +260,8 @@ publish_debs:
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp _build/default/src/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp _build/default/src/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
@@ -297,7 +299,7 @@ benchmarks:
 # Coverage testing and output
 
 test-coverage: SHELL := /bin/bash
-test-coverage:
+test-coverage: libp2p_helper
 	scripts/create_coverage_profiles.sh
 
 # we don't depend on test-coverage, which forces a run of all unit tests

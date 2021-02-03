@@ -1,6 +1,6 @@
 open Core
-open Coda_base
-open Coda_state
+open Mina_base
+open Mina_state
 
 module Merkle_list_verifier = Merkle_list_verifier.Make (struct
   type proof_elem = State_body_hash.t
@@ -14,4 +14,5 @@ end)
 
 let verify ~target_hash ~transition_chain_proof:(init_state_hash, merkle_list)
     =
+  (* TODO: Should we check the length here too? *)
   Merkle_list_verifier.verify ~init:init_state_hash merkle_list target_hash

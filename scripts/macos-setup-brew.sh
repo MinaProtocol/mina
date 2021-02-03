@@ -10,5 +10,5 @@ brew uninstall python@2 || true
 
 brew bundle install --file=scripts/Brewfile
 
-echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> /Users/distiller/.bash_profile
-echo 'export PATH="$(brew --prefix openssl)/bin:$PATH"' >> /Users/distiller/.bash_profile
+echo 'export PKG_CONFIG_PATH=$(brew --prefix openssl)/lib/pkgconfig' >> $HOME/.bash_profile
+echo 'export PATH="$(brew --prefix openssl)/bin:$PATH"' >> $HOME/.bash_profile

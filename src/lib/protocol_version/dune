@@ -5,4 +5,5 @@
  (libraries core_kernel)
  (preprocess
   (pps ppx_version ppx_bin_prot ppx_sexp_conv ppx_deriving.eq))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Protocol version representation"))

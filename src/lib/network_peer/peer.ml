@@ -128,6 +128,8 @@ module Display = struct
   module Fields = Stable.Latest.Fields
 end
 
+let ip {host; _} = host
+
 let to_display {host; libp2p_port; peer_id} =
   Display.
     { host= Unix.Inet_addr.to_string host

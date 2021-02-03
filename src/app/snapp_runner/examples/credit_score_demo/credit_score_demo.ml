@@ -7,9 +7,27 @@ type _ Snarky_backendless.Request.t +=
 
 let target_score = 700
 
-let main (_ : Coda_base.Snapp_statement.Checked.t) =
+let dummy_constraints () =
+  let module Impl = Pickles.Impls.Step in
+  let module Inner_curve = Pickles.Step_main_inputs.Inner_curve in
+  let open Impl in
+  make_checked (fun () ->
+      let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
+      let g =
+        exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.Params.one)
+      in
+      let _ =
+        Pickles.Step_main_inputs.Ops.scale_fast g (`Plus_two_to_len [|b; b|])
+      in
+      let _ =
+        Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
+      in
+      () )
+
+let main (_ : Mina_base.Snapp_statement.Checked.t) =
   let open Pickles.Impls.Step.Internal_Basic in
   let open Checked.Let_syntax in
+  let%bind () = dummy_constraints () in
   let%bind score = exists Field.typ ~request:As_prover.(return Get_score) in
   (* 10 bits because maximum score is 850. *)
   let%bind () =
@@ -28,7 +46,7 @@ let main (_ : Coda_base.Snapp_statement.Checked.t) =
 include Snapp_runner_functor.Make_with_commands (struct
   module Public_input = struct
     module Value = struct
-      include Coda_base.Snapp_statement
+      include Mina_base.Snapp_statement
 
       let if_not_given = `Raise
 
@@ -66,7 +84,7 @@ include Snapp_runner_functor.Make_with_commands (struct
                (Unsigned.UInt64.of_string "100000")
                (Arg_type.map ~f:Unsigned.UInt64.of_string Command.Param.string))
         in
-        let open Coda_base in
+        let open Mina_base in
         let open Option.Let_syntax in
         let%map snapp_pk = snapp_pk
         and receiver_pk = receiver_pk
@@ -102,9 +120,9 @@ include Snapp_runner_functor.Make_with_commands (struct
           : Snapp_statement.t )
     end
 
-    module Var = Coda_base.Snapp_statement.Checked
+    module Var = Mina_base.Snapp_statement.Checked
 
-    let typ = Coda_base.Snapp_statement.typ
+    let typ = Mina_base.Snapp_statement.typ
   end
 
   module Request_data = struct
@@ -131,6 +149,7 @@ include Snapp_runner_functor.Make_with_commands (struct
 
   let rule =
     { Inductive_rule.prevs= []
+    ; identifier= "demo-base"
     ; main=
         (fun [] i ->
           Pickles.Impls.Step.run_checked (main i) ;

@@ -1,4 +1,5 @@
 ## Summary
+
 [summary]: #summary
 
 This RFC explains how to a create a hard fork in response to a severe
@@ -7,6 +8,7 @@ in earlier RFCs that describe handling of the blockchain
 and scan state for hard forks.
 
 ## Motivation
+
 [motivation]: #motivation
 
 The Coda network may get to a state where the blockchain can no longer
@@ -16,30 +18,30 @@ continue, a hard fork of the blockchain can be created, using an
 updated version of the Coda software.
 
 ## Detailed design
+
 [detailed-design]: #detailed-design
 
 When it becomes evident that the network is failing, the Coda
 developers will perform the following tasks:
 
- - on some node, run a CLI command to persist enough state to re-start the
-    network; to choose a node, we may wish to query a set of nodes to find
-	the best state, and use a representative node
+- on some node, run a CLI command to persist enough state to re-start the
+  network; to choose a node, we may wish to query a set of nodes to find
+  the best state, and use a representative node
 
- - run a tool to transform the persisted state into data needed for the
-    Coda binary
+- run a tool to transform the persisted state into data needed for the
+  Coda binary
 
- - create a new Coda binary with a new protocol version
+- create a new Coda binary with a new protocol version
 
- - notify node operators of the change, in a manner to be determined,
-    and provide access to the new binary
+- notify node operators of the change, in a manner to be determined,
+  and provide access to the new binary
 
 To remedy the problems that led to a failure, the Coda software will
 likely change in some significant way when the network is
 restarted. Using a new protocol version, with a new major/minor or minor
 version, will require node operators to upgrade their software.
 
-CLI command to save state
--------------------------
+## CLI command to save state
 
 The Coda developers will choose a node with a root to represent the
 starting point of the hard fork. The choice of node is beyond the scope of
@@ -54,98 +56,100 @@ client commands.
 Let `frontier` be the current transition frontier. When the CLI command
 is run, the daemon saves the following data:
 
- - its root
+- its root
 
-   this is an instance of `Protocol_state.value`, retrievable via
+  this is an instance of `Protocol_state.value`, retrievable via
 
-	 ```ocaml
-      let full = Transition_frontier.full_frontier frontier in
-      let root = full.root in
-	  root |> find_protocol_state
-     ```
-
- - the SNARK proof for that root
-
-   this is an instance of `Proof.t`, retrievable via
-
-   ```ocaml
-      let full = Transition_frontier.full_frontier frontier in
-      let transition_with_hash,_ = Full_frontier.(root_data full).transition in
-	  let transition = With_hash.data transition_with_hash in
-	  transition.protocol_state_proof
-   ```
-
- - the SNARKed ledger corresponding to the root
-
-   this is an instance of `Coda_base.Ledger.Any_ledger.witness`, retrievable
-    via
-
-   ```ocaml
+  ```ocaml
     let full = Transition_frontier.full_frontier frontier in
-    full.root_ledger
-   ```
-   Note: There appears to be a mechanism in `Persistent_root` for saving the
-   root ledger, but it appears only to store a ledger hash, and not the ledger itself.
+    let root = full.root in
+   root |> find_protocol_state
+  ```
 
- - two epoch ledgers
+- the SNARK proof for that root
 
-   there is pending PR #4115 which allows saving epoch ledgers to RocksDB databases
+  this is an instance of `Proof.t`, retrievable via
 
-   which two epoch ledgers needed depends on whether the root is in the epoch current
-     at the time of the network pause, or in the previous one:
-
-	 - if the root is in the current epoch, the two ledgers needed are
-	    `staking_epoch_snapshot` and `next_epoch_snapshot`, as in the PR
-     - if the root is in the previous epoch, the two ledger needed are
-        `staking_epoch_snapshot` and `previous_epoch_snapshot` (not implemented
-	    in the PR)
-
- - the protocol states for the scan state at the root
-
-   this is a list of `Protocol_state.value`, retrievable via
-   ```ocaml
+  ```ocaml
      let full = Transition_frontier.full_frontier frontier in
-     let state_map = full.protocol_states_for_root_scan_state in
-     State_hash.Map.data state_map
-   ```
+     let transition_with_hash,_ = Full_frontier.(root_data full).transition in
+    let transition = With_hash.data transition_with_hash in
+    transition.protocol_state_proof
+  ```
 
- - the breadcrumb at the root
+- the SNARKed ledger corresponding to the root
 
-   this is an instance of `Breadcrumb.t`, retrievable via
+  this is an instance of `Mina_base.Ledger.Any_ledger.witness`, retrievable
+  via
 
-   ```ocaml
-     let full = Transition_frontier.full_frontier frontier in
-	 let root = full.root in
-     Full_frontier.find_exn full root
-   ```
-   The breadcrumb contains a validated block and a staged ledger.
+  ```ocaml
+   let full = Transition_frontier.full_frontier frontier in
+   full.root_ledger
+  ```
 
-   From the breadcrumb, we need to save:
+  Note: There appears to be a mechanism in `Persistent_root` for saving the
+  root ledger, but it appears only to store a ledger hash, and not the ledger itself.
 
-     - the scan state and pending coinbase (both part of the contained
-	    staged ledger)
-     - the root transition
+- two epoch ledgers
 
-   The staged ledger can be reconstructed from the SNARKed ledger, the scan state,
-   and the protocol states. See `Persistent_frontier.construct_staged_ledger_at_root`.
+  there is pending PR #4115 which allows saving epoch ledgers to RocksDB databases
 
- - optionally, a chain of breadcrumbs between the root and best tip
+  which two epoch ledgers needed depends on whether the root is in the epoch current
+  at the time of the network pause, or in the previous one:
 
-   over some reachable nodes, find the common prefix of breadcrumbs
-   because the scan states contained in breadcrumbs can be large, do this
-    computation lazily:
-    - find a common prefix of breadcrumb hashes
-       - obtain the breadcrumbs corresponding to those hashes from a
-          representative node
-   N.B.: it is possible that there is no common prefix beyond the root breadcrumb
+  - if the root is in the current epoch, the two ledgers needed are
+    `staking_epoch_snapshot` and `next_epoch_snapshot`, as in the PR
+  - if the root is in the previous epoch, the two ledger needed are
+    `staking_epoch_snapshot` and `previous_epoch_snapshot` (not implemented
+    in the PR)
+
+- the protocol states for the scan state at the root
+
+  this is a list of `Protocol_state.value`, retrievable via
+
+  ```ocaml
+    let full = Transition_frontier.full_frontier frontier in
+    let state_map = full.protocol_states_for_root_scan_state in
+    State_hash.Map.data state_map
+  ```
+
+- the breadcrumb at the root
+
+  this is an instance of `Breadcrumb.t`, retrievable via
+
+  ```ocaml
+    let full = Transition_frontier.full_frontier frontier in
+   let root = full.root in
+    Full_frontier.find_exn full root
+  ```
+
+  The breadcrumb contains a validated block and a staged ledger.
+
+  From the breadcrumb, we need to save:
+
+  - the scan state and pending coinbase (both part of the contained
+    staged ledger)
+  - the root transition
+
+  The staged ledger can be reconstructed from the SNARKed ledger, the scan state,
+  and the protocol states. See `Persistent_frontier.construct_staged_ledger_at_root`.
+
+- optionally, a chain of breadcrumbs between the root and best tip
+
+  over some reachable nodes, find the common prefix of breadcrumbs
+  because the scan states contained in breadcrumbs can be large, do this
+  computation lazily:
+
+  - find a common prefix of breadcrumb hashes - obtain the breadcrumbs corresponding to those hashes from a
+    representative node
+    N.B.: it is possible that there is no common prefix beyond the root breadcrumb
 
 The in-memory values (that is, those other than the epoch ledgers) can
 be serialized as JSON or S-expressions to some particular location,
 say `recovery_data` in the Coda configuration directory. The epoch
 ledgers can be copied to that same location.
 
-Preparing the data for inclusion in a binary
---------------------------------------------
+## Preparing the data for inclusion in a binary
 
 Operators should be able to install a new package containing a binary and
 all data needed to join the resumed network.
@@ -153,11 +157,13 @@ all data needed to join the resumed network.
 The SNARKed ledger can be stored in serialized format, stored as a value
 in a generated OCaml module, which can be loaded when creating the
 full transition frontier:
+
 ```ocaml
  module Forked_ledger = struct
    let ledger = ... (* Bin_prot serialization *)
  end
 ```
+
 The ledger can be passed as the `~root_ledger` argument to `Full_frontier.create`.
 
 The epoch ledgers can be compiled into the binary, or, if epoch ledger
@@ -178,8 +184,7 @@ It might be that the SNARKed ledger and breadcrumbs are too large to
 include in the binary. In that case, we could provide serialized
 versions of them, to be loaded on daemon startup.
 
-Gossipping a hard fork block
-----------------------------
+## Gossipping a hard fork block
 
 When the hard fork occurs, a restarted daemon gossips a special block
 containing a new hard fork time, an epoch and slot. The type
@@ -213,6 +218,7 @@ they've received the special block, and time has reached the
 designated epoch and slot.
 
 ## Drawbacks
+
 [drawbacks]: #drawbacks
 
 In the best case, the network will run smoothly, making preparations
@@ -226,6 +232,7 @@ blocks are not finalized. We avoid that loss if we add these
 transactions back to the transaction pool.
 
 ## Rationale and alternatives
+
 [rationale-and-alternatives]: #rationale-and-alternatives
 
 This design is for hard forks made necessary by a network failure.
@@ -239,12 +246,14 @@ SNARK workers who may be aware of the planned fork will continue
 to produce SNARKs, without risking lost fees when the planned fork occurs.
 
 ## Prior art
+
 [prior-art]: #prior-art
 
 See RFCs 0032 and 0033 for how to handle the blockchain and scan state across
 hard forks.
 
 ## Unresolved questions
+
 [unresolved-questions]: #unresolved-questions
 
 What unsafe bits are there in the protocol state, and what do

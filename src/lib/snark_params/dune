@@ -4,11 +4,11 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries sponge group_map fold_lib o1trace digestif tuple_lib bitstring_lib
-   snarky_group_map core_kernel snarky.backendless snarky_curves
-   snark_bits pickles crypto_params)
+            snarky_group_map core_kernel snarky.backendless snarky_curves
+            snark_bits pickles crypto_params)
+ (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_version ppx_assert ppx_base ppx_bench ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
-    ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky bisect_ppx --
-    --conditional))
- (preprocessor_deps ../../config.mlh)
+       ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky))
+ (instrumentation (backend bisect_ppx))
  (synopsis "Snark parameters"))
