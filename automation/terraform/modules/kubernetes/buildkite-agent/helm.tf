@@ -148,6 +148,7 @@ locals {
 
           # upload artifact if explicitly set and exit
           if [[ $UPLOAD_PATH ]]; then
+            echo "--- uploading artifact: $${FILE}"
             buildkite-agent artifact upload "$${FILE}"
             exit
           fi
