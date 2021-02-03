@@ -3,9 +3,10 @@ let S = ../../Lib/SelectFiles.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 let Pipeline = ../../Pipeline/Dsl.dhall
 
-let ExecuteIntegrationTest = ../../Command/ExecuteIntegrationTest.dhall
+let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
+    { name = "TestnetIntegrationTests", key = "build-test-executive" },
     { name = "MinaArtifact", key = "mina-docker-image" }
 ]
 
@@ -20,11 +21,13 @@ in Pipeline.build Pipeline.Config::{
     name = "TestnetIntegrationTests"
   },
   steps = [
-    ExecuteIntegrationTest.step "block-production" dependsOn,
-    ExecuteIntegrationTest.step "bootstrap" dependsOn,
-    ExecuteIntegrationTest.step "bp-timed-accts" dependsOn,
-    ExecuteIntegrationTest.step "peers" dependsOn,
-    ExecuteIntegrationTest.step "pmt-timed-accts" dependsOn,
-    ExecuteIntegrationTest.step "send-payment" dependsOn
+    TestExecutive.build "testnet_postake_medium_curves",
+
+    TestExecutive.execute "block-production" dependsOn,
+    TestExecutive.execute "bootstrap" dependsOn,
+    TestExecutive.execute "bp-timed-accts" dependsOn,
+    TestExecutive.execute "peers" dependsOn,
+    TestExecutive.execute "pmt-timed-accts" dependsOn,
+    TestExecutive.execute "send-payment" dependsOn
   ]
 }
