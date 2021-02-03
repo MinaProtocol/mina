@@ -73,7 +73,7 @@ let _ =
 
        (** verify signature of arbitrary string signed with signString *)
        method verifyStringSignature (signature_js : signature_js)
-           (public_key_js : string_js) (str_js : string_js) =
+           (public_key_js : string_js) (str_js : string_js) : bool Js.t =
          let field = Js.to_string signature_js##.field |> Field.of_string in
          let scalar =
            Js.to_string signature_js##.scalar |> Inner_curve.Scalar.of_string
@@ -110,7 +110,8 @@ let _ =
          end
 
        (** verify signed payments *)
-       method verifyPaymentSignature (signed_payment : signed_payment) =
+       method verifyPaymentSignature (signed_payment : signed_payment)
+           : bool Js.t =
          let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
@@ -121,7 +122,7 @@ let _ =
          in
          let signature = signature_of_js_object signed_payment##.signature in
          let signed = Signed_command.Poly.{payload; signer; signature} in
-         Signed_command.check_signature signed
+         if Signed_command.check_signature signed then Js._true else Js._false
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
@@ -144,7 +145,7 @@ let _ =
 
        (** verify signed delegations *)
        method verifyStakeDelegationSignature
-             (signed_stake_delegation : signed_stake_delegation) =
+             (signed_stake_delegation : signed_stake_delegation) : bool Js.t =
          let payload : Signed_command_payload.t =
            payload_of_stake_delegation_js
              signed_stake_delegation##.stakeDelegation
@@ -158,7 +159,7 @@ let _ =
            signature_of_js_object signed_stake_delegation##.signature
          in
          let signed = Signed_command.Poly.{payload; signer; signature} in
-         Signed_command.check_signature signed
+         if Signed_command.check_signature signed then Js._true else Js._false
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)
