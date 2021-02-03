@@ -104,8 +104,6 @@ module Plonk_constraint = struct
           { l: 'f * 'v
           ; r: 'f * 'v
           ; o: 'f * 'v
-          ; q: 'f * 'v
-          ; p: 'f * 'v
           ; m: 'f
           ; c: 'f }
       | Pack of {state: 'v array array}
@@ -120,9 +118,9 @@ module Plonk_constraint = struct
     let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
       let fp (x, y) = (f x, f y) in
       match t with
-      | Basic {l; r; o; q; p; m; c} ->
+      | Basic {l; r; o; m; c} ->
           let pp (x, y) = (x, f y) in
-          Basic {l= pp l; r= pp r; o= pp o; q= pp q; p= pp p; m; c}
+          Basic {l= pp l; r= pp r; o= pp o; m; c}
       | Pack {state} ->
           Pack {state= Array.map ~f:(fun x -> Array.map ~f x) state}
       | Poseidon {state} ->
@@ -150,20 +148,16 @@ module Plonk_constraint = struct
         (eval_one : v -> f) (t : (v, f) t) =
       match t with
       (* cl * vl + cr * vr + co * vo + m * vl*vr + c = 0 *)
-      | Basic {l= cl, vl; r= cr, vr; o= co, vo; q= cq, vq; p= cp, vp; m; c} ->
+      | Basic {l= cl, vl; r= cr, vr; o= co, vo; m; c} ->
           let vl = eval_one vl in
           let vr = eval_one vr in
           let vo = eval_one vo in
-          let vq = eval_one vq in
-          let vp = eval_one vp in
           let open F in
           let res =
             List.reduce_exn ~f:add
               [ mul cl vl
               ; mul cr vr
               ; mul co vo
-              ; mul cq vq
-              ; mul cp vp
               ; mul m (mul vl vr)
               ; c ]
           in
@@ -173,11 +167,9 @@ module Plonk_constraint = struct
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
-                + %{sexp:t} * %{sexp:t}\n\
                 + %{sexp:t}\n\
                 = %{sexp:t}%!"
-              cl vl cr vr co vo cq vq cp vp m (mul vl vr) c res ;
+              cl vl cr vr co vo m (mul vl vr) c res ;
             false )
           else true
       | _ ->
@@ -293,10 +285,10 @@ struct
         cvars [a; b; c] t
     | Plonk_constraint.T constr -> (
       match constr with
-      | Basic {l; r; o; q; p; m; c} ->
+      | Basic {l; r; o; m; c} ->
           let t = H.feed_string t "basic" in
           let pr (s, x) acc = fp s acc |> cvars [x] in
-          t |> pr l |> pr r |> pr o |> pr q |> pr p |> fp m |> fp c
+          t |> pr l |> pr r |> pr o |> fp m |> fp c
       | Pack {state} ->
           let t = H.feed_string t "pack" in
           let row a = cvars (Array.to_list a) in
