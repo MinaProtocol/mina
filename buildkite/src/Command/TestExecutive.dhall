@@ -41,7 +41,7 @@ in
         commands =
             [
               -- Download test dependencies
-              Cmd.run "artifact-cache-helper.sh test_executive.exe",
+              Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
               Cmd.run "artifact-cache-helper.sh ${deployEnv}",
 
               -- Execute test based on BUILD image
