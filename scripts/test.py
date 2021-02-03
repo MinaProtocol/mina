@@ -339,7 +339,7 @@ class Executive:
 # It is responsible for dispatching builds and tests.
 class CodaProject:
     logproc_exe_path = 'src/app/logproc/logproc.exe'
-    coda_exe_path = 'src/app/cli/src/coda.exe'
+    coda_exe_path = 'src/app/cli/src/mina.exe'
 
     def __init__(self, executive, root='.'):
         self.executive = executive

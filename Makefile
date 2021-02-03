@@ -78,7 +78,7 @@ genesis_ledger:
 
 build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
@@ -150,7 +150,7 @@ update-opam:
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
-	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
+	@./scripts/macos-portable.sh _build/default/src/app/cli/src/mina.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
 	@cp -a package/keys/. _build/coda-daemon-macos/keys/
 	@cd _build/coda-daemon-macos && zip -r ../coda-daemon-macos.zip .
 	@echo Find coda-daemon-macos.zip inside _build/

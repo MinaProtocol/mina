@@ -153,7 +153,7 @@ let installCoda = (tempPath, doneCb) => {
   extractZip(tempPath, installPath, res =>
     switch (res) {
     | Belt.Result.Ok () =>
-      Bindings.Fs.chmodSync(installPath ++ "/coda.exe", 0o755);
+      Bindings.Fs.chmodSync(installPath ++ "/mina.exe", 0o755);
       Bindings.Fs.chmodSync(installPath ++ "/libp2p_helper", 0o755);
       Bindings.Fs.readdirSync(installPath ++ "/keys")
       |> Array.to_list

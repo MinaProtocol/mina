@@ -364,7 +364,7 @@ jobs:
                     cp /tmp/s3_cache_dir/genesis_ledger_*.tar.gz package/keys/. ||:
                     cp /tmp/s3_cache_dir/genesis_proof_* package/keys/. ||:
                     echo 'coda'
-                    cp _build/default/src/app/cli/src/coda.exe package/coda
+                    cp _build/default/src/app/cli/src/mina.exe package/mina
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
@@ -635,7 +635,7 @@ jobs:
                 key: {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
                 paths:
                     - "src/app/libp2p_helper/result"
-                    - "_build/default/src/app/cli/src/coda.exe"
+                    - "_build/default/src/app/cli/src/mina.exe"
                     - "_build/default/src/app/logproc/logproc.exe"
                     - "scripts"
                     - "should_run_tests"

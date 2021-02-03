@@ -31,7 +31,7 @@
   },
   "scripts": {
     "fake": "graphql-faker --port 3085 -- schema.graphql",
-    "real": "./_build/coda-daemon-macos/coda.exe daemon -rest-port 8080 &> /dev/tty",
+    "real": "./_build/coda-daemon-macos/mina.exe daemon -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "yarn copy-schema && bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",

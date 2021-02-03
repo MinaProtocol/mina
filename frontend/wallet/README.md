@@ -44,7 +44,7 @@ Run locally with hot reloading:
    up before you pulled the code. Make sure you ran `git lfs install` and then
    run `git lfs pull` to download files.
 
-### Repackaging coda.exe [Needs work]
+### Repackaging mina.exe [Needs work]
 
 1. cd to root of repo
 2. `make build`

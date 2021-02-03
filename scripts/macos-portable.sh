@@ -6,7 +6,7 @@
 set -eou pipefail
 
 if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <path-to-coda.exe> <outdir>"
+  echo "Usage: $0 <path-to-mina.exe> <outdir>"
   exit 1
 fi
 
@@ -16,7 +16,7 @@ DIST_DIR="$3"
 
 mkdir -p "$DIST_DIR"
 
-# move and sign coda.exe (if has rights)
+# move and sign mina.exe (if has rights)
 cp "$1" "$DIST_DIR/$LOCAL_CODA_EXE"
 set +u
 [ -z "$APPLE_ID" ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_CODA_EXE"
@@ -72,5 +72,5 @@ fixup() {
   done
 }
 
-# Fix coda.exe
+# Fix mina.exe
 fixup "$LOCAL_CODA_EXE"

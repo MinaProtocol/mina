@@ -133,7 +133,7 @@ daemon=$ledgerfolder/daemon.json
 # ================================================
 # Launch nodes
 
-CODA=_build/default/src/app/cli/src/coda.exe
+CODA=_build/default/src/app/cli/src/mina.exe
 LOGPROC=_build/default/src/app/logproc/logproc.exe
 
 

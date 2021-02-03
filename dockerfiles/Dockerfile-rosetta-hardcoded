@@ -252,7 +252,7 @@ RUN git pull \
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/generate_keypair/generate_keypair.exe \
-    src/app/cli/src/coda.exe \
+    src/app/cli/src/mina.exe \
     src/app/archive/archive.exe \
     src/app/rosetta/rosetta.exe \
     src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \

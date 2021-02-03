@@ -35,7 +35,7 @@ echo "--- Upload genesis data"
 
 echo "--- Build logproc + coda + rosetta"
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
-dune build --profile=${DUNE_PROFILE} src/app/logproc/logproc.exe src/app/cli/src/coda.exe src/app/rosetta/rosetta.exe 2>&1 | tee /tmp/buildocaml3.log
+dune build --profile=${DUNE_PROFILE} src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/rosetta/rosetta.exe 2>&1 | tee /tmp/buildocaml3.log
 
 echo "--- Build replayer"
 dune build --profile=${DUNE_PROFILE} src/app/replayer/replayer.exe 2>&1 | tee /tmp/buildocaml4.log

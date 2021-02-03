@@ -16,11 +16,11 @@ let%test_module "Command line tests" =
        dune won't allow running it via "dune exec", because it's outside its
        workspace, so we invoke the executable directly
 
-       the coda.exe executable must have been built before running the test
+       the mina.exe executable must have been built before running the test
        here, else it will fail
 
      *)
-    let coda_exe = "../../app/cli/src/coda.exe"
+    let coda_exe = "../../app/cli/src/mina.exe"
 
     let start_daemon config_dir genesis_ledger_dir port =
       let%bind working_dir = Sys.getcwd () in
@@ -112,6 +112,6 @@ let%test_module "Command line tests" =
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | _ ->
-          printf !"Please build coda.exe in order to run this test\n%!" ;
+          printf !"Please build mina.exe in order to run this test\n%!" ;
           false
   end )

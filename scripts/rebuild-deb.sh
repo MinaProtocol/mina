@@ -14,7 +14,7 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
-PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
@@ -106,7 +106,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/coda"
 cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
