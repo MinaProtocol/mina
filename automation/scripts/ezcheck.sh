@@ -6,7 +6,7 @@ TESTNET="$1"
 [ -n "$TESTNET" ] || (echo 'MISSING ARGUMENT' && exit 1)
 
 get_status() {
-  kubectl -n "$1" exec -c coda -i "$2" -- coda client status \
+  kubectl -n "$1" exec -c mina -i "$2" -- mina client status \
     | grep 'Block height\|Protocol state hash\|Sync status' \
     | xargs -I '{}' printf '  > %s\n' '"{}"'
 }

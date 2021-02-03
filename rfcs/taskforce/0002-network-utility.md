@@ -18,7 +18,7 @@ This document proposes a tool that unifies these processes by collecting tools a
 
 For these processes we mainly use the [testnet-keys.py](https://github.com/CodaProtocol/coda-automation/blob/master/scripts/testnet-keys.py) script in coda-automation.
 
-1. Keypair generation calls `coda advanced-generate keypair` generate new accounts
+1. Keypair generation calls `mina advanced-generate keypair` generate new accounts
 2. Genesis ledger creation happens using custom logic inside this script
 3. Distribution of configuration uses Kubernetes secrets
 4. Deployment consists of a variety of terraform configurations targeting Google Kubernetes Engine

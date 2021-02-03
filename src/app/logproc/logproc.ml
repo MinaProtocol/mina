@@ -173,11 +173,11 @@ let () =
     Term.(const main $ timezone $ interpolation_config $ filter)
   in
   let main_info =
-    let doc = "Process coda log statements from standard input" in
+    let doc = "Process mina log statements from standard input" in
     let man =
       [ `S Manpage.s_description
       ; `P
-          "Logproc processes coda logs from stdin and is capable of filtering \
+          "Logproc processes mina logs from stdin and is capable of filtering \
            and reformating logs in a user friendly fashion. A javascript-like \
            filter language is included for defining boolean predicates on log \
            statements. Logproc will also attempt to interpolate logging \

@@ -21,9 +21,9 @@ conditions where you've observed the issue.
 **Expected behavior**
 What should have happened instead of the bug?
 
-**Output of `coda -version`**: Fill this in!
+**Output of `mina -version`**: Fill this in!
 
-**Log file**: Upload `debug.log` (`coda client log-location` tells you where it is) to https://gist.github.com/ and link here.
+**Log file**: Upload `debug.log` (`mina client log-location` tells you where it is) to https://gist.github.com/ and link here.
 
 **Additional context**: Any other notes? Is this related to other issues? Did
 anyone in Discord have anything to add?

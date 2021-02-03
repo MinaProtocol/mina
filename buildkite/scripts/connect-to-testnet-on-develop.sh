@@ -29,7 +29,7 @@ TESTNET_NAME="testworld"
 
 
 # Generate genesis proof and then crash due to no peers
-coda daemon \
+mina daemon \
   -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
 || true
@@ -38,7 +38,7 @@ coda daemon \
 rm ~/.mina-config/.mina-lock ||:
 
 # Restart in the background
-coda daemon \
+mina daemon \
   -peer-list-file automation/terraform/testnets/$TESTNET_NAME/peers.txt \
   -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
   -generate-genesis-proof true \
@@ -49,7 +49,7 @@ num_status_retries=24
 for ((i=1;i<=$num_status_retries;i++)); do
   sleep 10s
   set +e
-  coda client status
+  mina client status
   status_exit_code=$?
   set -e
   if [ $status_exit_code -eq 0 ]; then
@@ -61,8 +61,8 @@ done
 
 # Check that the daemon has connected to peers and is still up after 2 mins
 sleep 2m
-coda client status
-if [ $(coda advanced get-peers | wc -l) -gt 0 ]; then
+mina client status
+if [ $(mina advanced get-peers | wc -l) -gt 0 ]; then
     echo "Found some peers"
 else
     echo "No peers found"

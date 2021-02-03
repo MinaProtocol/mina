@@ -22,7 +22,7 @@ let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
       eprintf
         "Error: Unable to connect to Coda daemon.\n\
          - The daemon might not be running. See logs%s for details.\n\
-        \  Run `coda daemon -help` to see how to start daemon.\n\
+        \  Run `mina daemon -help` to see how to start daemon.\n\
          - If you just started the daemon, wait a minute for the GraphQL \
          server to start.\n\
          - Alternatively, the daemon may not be running the GraphQL server on \

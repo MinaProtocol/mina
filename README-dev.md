@@ -187,7 +187,7 @@ you'll want to rebuild the Docker toolchain to save that time.
 To run unit tests for a single library, do `dune runtest lib/$LIBNAME`.
 
 You can use `dune exec coda` to build and run `coda`. This is especially useful
-in the form of `dune exec coda -- integration-tests $SOME_TEST`.
+in the form of `dune exec mina -- integration-tests $SOME_TEST`.
 
 You might see a build error like this:
 
@@ -250,4 +250,4 @@ To do this, pass a json file to the daemon using the flag `genesis-constants` wi
 }
 ```
 
-The daemon logs should reflect these changes. Also, `coda client status` displays some of the constants.
+The daemon logs should reflect these changes. Also, `mina client status` displays some of the constants.

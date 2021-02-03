@@ -51,7 +51,7 @@ spec:
         command:
         - bash
         - -c
-        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || coda accounts import -config-directory /root/.mina-config -privkey-path /root/wallet-keys/$key; done
+        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || mina accounts import -config-directory /root/.mina-config -privkey-path /root/wallet-keys/$key; done
         volumeMounts:
         - name: wallet-keys
           mountPath: /root/wallet-keys

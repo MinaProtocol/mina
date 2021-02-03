@@ -206,7 +206,7 @@ let setup_daemon logger =
   and libp2p_keypair =
     flag "discovery-keypair" (optional string)
       ~doc:
-        "KEYFILE Keypair (generated from `coda advanced \
+        "KEYFILE Keypair (generated from `mina advanced \
          generate-libp2p-keypair`) to use with libp2p discovery (default: \
          generate per-run temporary keypair)"
   and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
@@ -328,7 +328,7 @@ let setup_daemon logger =
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
-        Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
+        Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
           conf_dir ;
         Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
           ~redirect_stderr:`Dev_null () )
@@ -1079,7 +1079,7 @@ let replay_blocks logger =
     flag "-format" (optional string)
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
-  Command.async ~summary:"Start coda daemon with blocks replayed from a file"
+  Command.async ~summary:"Start mina daemon with blocks replayed from a file"
     (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)

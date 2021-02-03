@@ -36,7 +36,7 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
   in
   if Core.Sys.file_exists conf_dir <> `No then
     failwithf
-      "cannot configure coda process because directory already exists: %s"
+      "cannot configure mina process because directory already exists: %s"
       conf_dir () ;
   let config =
     { Coda_worker.Input.addrs_and_ports

@@ -26,9 +26,9 @@ def main():
 
 def get_status(namespace, pod):
   if 'seed' in pod:
-    return exec_shell('kubectl exec -n ' + namespace + ' -c seed -i ' + pod + ' -- coda client status')
+    return exec_shell('kubectl exec -n ' + namespace + ' -c seed -i ' + pod + ' -- mina client status')
   else:
-    return exec_shell('kubectl exec -n ' + namespace + ' -c coda -i ' + pod + ' -- coda client status')
+    return exec_shell('kubectl exec -n ' + namespace + ' -c coda -i ' + pod + ' -- mina client status')
 
 
 def exec_shell(cmd):
