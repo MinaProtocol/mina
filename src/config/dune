@@ -22,5 +22,5 @@ let () =
      \  (targets config.mlh)\n\
      \  (mode fallback)\n\
      \  (deps %{profile}.mlh " ^ config_deps
-     ^ " (env_var CODA_DUNE_PROFILE))\n
+     ^ " (env_var MINA_DUNE_PROFILE))\n
      \  (action (copy %{profile}.mlh config.mlh)))"

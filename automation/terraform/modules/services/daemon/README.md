@@ -41,7 +41,7 @@ The manual commands to release each container are the following:
 ### Coda-Daemon Container
 
 *(From the root of the `CodaProtocol/coda` repository)*
-`./scripts/release-docker.sh -s mina-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg coda_version=<CODA_VERSION> --build-arg deb_repo=<deb-repo>"`
+`./scripts/release-docker.sh -s mina-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg coda_version=<MINA_VERSION> --build-arg deb_repo=<deb-repo>"`
 
 Example:
 `./scripts/release-docker.sh -s mina-daemon -v 0.0.10-beta4 --extra-args "--build-arg coda_version=0.0.10-beta4-fff3b856 --build-arg deb_repo=release"`

@@ -74,7 +74,7 @@ case "$CIRCLE_JOB" in
         echo "Exporting Variables: "
         # Export Variables for Downstream Steps
         echo "export MINA_DEB_REPO=$CODENAME" >> /tmp/DOCKER_DEPLOY_ENV
-        echo "export CODA_WAS_PUBLISHED=true" >> /tmp/DOCKER_DEPLOY_ENV
+        echo "export MINA_WAS_PUBLISHED=true" >> /tmp/DOCKER_DEPLOY_ENV
         set +x
         ;;
     *)

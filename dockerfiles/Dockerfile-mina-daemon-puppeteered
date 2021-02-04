@@ -2,8 +2,8 @@
 # this dockerfile in a production environment. See `coda_daemon_puppeteer.py`
 # for more details.
 
-ARG CODA_VERSION
-FROM codaprotocol/coda-daemon:${CODA_VERSION}
+ARG MINA_VERSION
+FROM codaprotocol/coda-daemon:${MINA_VERSION}
 
 ARG MINA_BRANCH
 

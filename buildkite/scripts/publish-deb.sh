@@ -48,14 +48,14 @@ source "${SCRIPTPATH}/export-git-env-vars.sh"
 set -x
 # Export variables for use with downstream steps
 echo "export MINA_SERVICE=mina-daemon" >> ./DOCKER_DEPLOY_ENV
-echo "export CODA_VERSION=${DOCKER_TAG}" >> ./DOCKER_DEPLOY_ENV
+echo "export MINA_VERSION=${DOCKER_TAG}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_DEB_VERSION=${VERSION}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_PROJECT=${PROJECT}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_GIT_HASH=${GITHASH}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_GIT_BRANCH=${BUILDKITE_BRANCH}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_GIT_TAG=${GITTAG}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_DEB_REPO=${CODENAME}" >> ./DOCKER_DEPLOY_ENV
-echo "export CODA_WAS_PUBLISHED=true" >> ./DOCKER_DEPLOY_ENV
+echo "export MINA_WAS_PUBLISHED=true" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_BUILD_ROSETTA=${BUILD_ROSETTA}" >> ./DOCKER_DEPLOY_ENV
 set +x
 

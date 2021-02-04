@@ -524,9 +524,9 @@ jobs:
                     if test -f "$FILE"; then
                         source $FILE
                         echo "Publishing Docker"
-                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        echo "Should Publish Docker: $MINA_WAS_PUBLISHED"
                         set -x
-                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+                        if [[ "$MINA_WAS_PUBLISHED" = true  ]]; then
                               echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
                               {%- for docker_image in docker_image_set['images'] %}
                               scripts/release-docker.sh \

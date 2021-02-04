@@ -56,15 +56,15 @@ bot)
   DOCKER_CONTEXT="frontend/bot"
   ;;
 mina-daemon)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon"
   DOCKER_CONTEXT="dockerfiles/"
   ;;
 mina-daemon-puppeteered)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-daemon-puppeteered"
   DOCKER_CONTEXT="dockerfiles/"
   ;;
 mina-demo)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-demo"
   ;;
 mina-rosetta)
   if [[ "$BUILD_ROSETTA" != "true" ]]; then

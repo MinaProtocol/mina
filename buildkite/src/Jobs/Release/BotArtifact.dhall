@@ -39,7 +39,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-              Cmd.run "echo export CODA_VERSION=$(cat frontend/bot/package.json | jq '.version') > BOT_DEPLOY_ENV && buildkite/scripts/buildkite-artifact-helper.sh BOT_DEPLOY_ENV"
+              Cmd.run "echo export MINA_VERSION=$(cat frontend/bot/package.json | jq '.version') > BOT_DEPLOY_ENV && buildkite/scripts/buildkite-artifact-helper.sh BOT_DEPLOY_ENV"
           ],
           label = "Setup o1bot docker image deploy environment",
           key = "setup-deploy-env",
