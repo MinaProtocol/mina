@@ -10,7 +10,7 @@ set +x
 CLEAR='\033[0m'
 RED='\033[0;31m'
 # Array of valid service names
-VALID_SERVICES=('coda-archive', 'coda-daemon' 'coda-daemon-puppeteered' 'bot' 'coda-demo' 'coda-rosetta', 'leaderboard')
+VALID_SERVICES=('mina-archive', 'mina-daemon' 'mina-daemon-puppeteered' 'bot' 'mina-demo' 'mina-rosetta', 'leaderboard')
 
 function usage() {
   if [ -n "$1" ]; then
@@ -48,25 +48,25 @@ if [ -z "$EXTRA" ]; then EXTRA=""; fi;
 if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 
 case $SERVICE in
-coda-archive)
+mina-archive)
   DOCKERFILE_PATH="scripts/archive/Dockerfile"
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
   DOCKER_CONTEXT="frontend/bot"
   ;;
-coda-daemon)
+mina-daemon)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon"
   DOCKER_CONTEXT="dockerfiles/"
   ;;
-coda-daemon-puppeteered)
+mina-daemon-puppeteered)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
   DOCKER_CONTEXT="dockerfiles/"
   ;;
-coda-demo)
+mina-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   ;;
-coda-rosetta)
+mina-rosetta)
   if [[ "$BUILD_ROSETTA" != "true" ]]; then
     echo "BUILD_ROSETTA env var not set, short-circuiting to avoid slow builds."
     exit 0
@@ -90,7 +90,7 @@ else
 fi
 
 tag-and-push() {
-  docker tag "codaprotocol/$SERVICE:$VERSION" "$1"
+  docker tag "minaprotocol/$SERVICE:$VERSION" "$1"
   docker push "$1"
 }
 

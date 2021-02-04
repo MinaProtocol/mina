@@ -494,10 +494,10 @@ jobs:
     {%- if profile in medium_curve_profiles %}
     {%- for docker_image_set in [
         {
-          'images': ['coda-daemon', 'coda-daemon-puppeteered'],
+          'images': ['mina-daemon', 'mina-daemon-puppeteered'],
           'build_args': {
-            'coda-daemon': '--build-arg mina_deb_version=$MINA_DEB_VERSION --build-arg deb_repo=$MINA_DEB_REPO',
-            'coda-daemon-puppeteered': '--build-arg coda_version=$MINA_GIT_TAG-$MINA_GIT_BRANCH-$MINA_GIT_HASH'
+            'mina-daemon': '--build-arg mina_deb_version=$MINA_DEB_VERSION --build-arg deb_repo=$MINA_DEB_REPO',
+            'mina-daemon-puppeteered': '--build-arg coda_version=$MINA_GIT_TAG-$MINA_GIT_BRANCH-$MINA_GIT_HASH'
           }
         },
         {
@@ -735,7 +735,7 @@ workflows:
             {%- endfor %}
             {%- for profile in build_artifact_profiles %}
             {%- if profile in medium_curve_profiles %}
-            {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+            {%- for docker_image in ['mina-daemon', 'mina-demo'] %}
             - build-artifacts-docker--{{profile}}--{{docker_image}}:
                 requires:
                   - build-artifacts--{{profile}}
