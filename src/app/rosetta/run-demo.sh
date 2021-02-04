@@ -9,7 +9,7 @@ SNARK_PK=B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
 
-export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
+export MINA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export MINA_PRIVKEY_PASS=""
 export CODA_CONFIG_FILE=/tmp/config.json
 

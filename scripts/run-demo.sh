@@ -5,7 +5,7 @@ set -e
 genesis_time=$(date -d "$(mina advanced compile-time-constants | jq -r '.genesis_state_timestamp')" +%s)
 now_time=$(date +%s)
 
-export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
+export MINA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export MINA_PRIVKEY_PASS=""
 export CODA_CONFIG_FILE=/config.json
 

@@ -69,12 +69,12 @@ module Time = struct
       | None ->
           let offset =
             let env_offset =
-              match Core.Sys.getenv "CODA_TIME_OFFSET" with
+              match Core.Sys.getenv "MINA_TIME_OFFSET" with
               | Some tm ->
                   Int.of_string tm
               | None ->
                   [%log debug]
-                    "Environment variable CODA_TIME_OFFSET not found, using \
+                    "Environment variable MINA_TIME_OFFSET not found, using \
                      default of 0" ;
                   0
             in
