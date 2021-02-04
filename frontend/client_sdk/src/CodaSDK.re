@@ -131,13 +131,6 @@ let value = (~default: 'a, option: option('a)): 'a => {
   (go())(. default, option);
 };
 
-let bool_of_int = i =>
-  if (i === 0) {
-    false;
-  } else {
-    true;
-  };
-
 type common_payload_js = {
   .
   "fee": string,
@@ -310,7 +303,7 @@ let signStakeDelegation =
   };
 
 [@bs.send]
-external verifyPaymentSignature: (codaSDK, signed_payment_js) => int =
+external verifyPaymentSignature: (codaSDK, signed_payment_js) => bool =
   "verifyPaymentSignature";
 
 /**
@@ -352,12 +345,11 @@ let verifyPaymentSignature = (signedPayment: signed(payment)) => {
       },
     },
   )
-  ->bool_of_int;
 };
 
 [@bs.send]
 external verifyStakeDelegationSignature:
-  (codaSDK, signed_stake_delegation_js) => int =
+  (codaSDK, signed_stake_delegation_js) => bool =
   "verifyStakeDelegationSignature";
 
 /**
@@ -398,5 +390,4 @@ let verifyStakeDelegationSignature =
       },
     },
   )
-  ->bool_of_int;
 };
