@@ -233,7 +233,7 @@ let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
       pgPoolOld,
       Postgres.getTransactionsSentChallenge,
       0,
-      "count",
+      "max",
     )
     |> filterNonePromises;
 
