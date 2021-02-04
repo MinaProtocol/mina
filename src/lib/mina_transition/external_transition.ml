@@ -275,19 +275,20 @@ let block_winner =
 
 let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
 
-let to_yojson t =
-  `Assoc
-    [ ("protocol_state", Protocol_state.value_to_yojson (protocol_state t))
-    ; ("protocol_state_proof", `String "<opaque>")
-    ; ("staged_ledger_diff", `String "<opaque>")
-    ; ("delta_transition_chain_proof", `String "<opaque>")
-    ; ( "current_protocol_version"
-      , `String (Protocol_version.to_string (current_protocol_version t)) )
-    ; ( "proposed_protocol_version"
-      , `String
-          (Option.value_map
-             (proposed_protocol_version_opt t)
-             ~default:"<None>" ~f:Protocol_version.to_string) ) ]
+module Repr = struct
+  type t =
+    { protocol_state: Protocol_state.Value.t
+    ; current_protocol_version: Protocol_version.t
+    ; proposed_protocol_version: Protocol_version.t option }
+  [@@deriving yojson]
+end
+
+let to_repr t =
+  { Repr.protocol_state= protocol_state t
+  ; current_protocol_version= current_protocol_version t
+  ; proposed_protocol_version= proposed_protocol_version_opt t }
+
+let to_yojson = Fn.compose Repr.to_yojson to_repr
 
 let equal =
   Comparable.lift Consensus.Data.Consensus_state.Value.equal ~f:consensus_state

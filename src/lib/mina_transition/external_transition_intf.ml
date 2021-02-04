@@ -80,6 +80,16 @@ end
 module type S = sig
   include External_transition_base_intf
 
+  module Repr : sig
+    type t =
+      { protocol_state: Protocol_state.Value.t
+      ; current_protocol_version: Protocol_version.t
+      ; proposed_protocol_version: Protocol_version.t option }
+    [@@deriving yojson]
+  end
+
+  val to_repr : t -> Repr.t
+
   type external_transition = t
 
   module Precomputed_block : sig

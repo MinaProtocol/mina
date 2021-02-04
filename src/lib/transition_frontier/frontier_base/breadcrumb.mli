@@ -11,7 +11,17 @@ open Mina_state
 open Mina_transition
 open Network_peer
 
+module Repr : sig
+  type t =
+    { validated_transition: External_transition.Repr.t
+    ; just_emitted_a_proof: bool
+    ; transition_receipt_time: Time.t option }
+  [@@deriving yojson]
+end
+
 type t [@@deriving sexp, eq, compare, to_yojson]
+
+val to_repr : t -> Repr.t
 
 type display =
   { state_hash: string

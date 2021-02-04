@@ -5,6 +5,29 @@ open Mina_state
 open Mina_transition
 open Network_peer
 
+module Repr = struct
+  module T = struct
+    type t = Time.t
+
+    let to_yojson t =
+      `String (Time.to_string_iso8601_basic ~zone:Time.Zone.utc t)
+
+    let of_yojson j =
+      match j with
+      | `String s -> (
+        try Ok (Time.of_string_fix_proto `Utc s)
+        with e -> Error (Exn.to_string e) )
+      | _ ->
+          Error "expected string"
+  end
+
+  type t =
+    { validated_transition: External_transition.Repr.t
+    ; just_emitted_a_proof: bool
+    ; transition_receipt_time: T.t option }
+  [@@deriving yojson]
+end
+
 module T = struct
   let id = "breadcrumb"
 
@@ -14,6 +37,16 @@ module T = struct
     ; just_emitted_a_proof: bool
     ; transition_receipt_time: Time.t option }
   [@@deriving sexp, fields]
+
+  let to_repr
+      { validated_transition
+      ; staged_ledger= _
+      ; just_emitted_a_proof
+      ; transition_receipt_time } =
+    { Repr.validated_transition=
+        External_transition.to_repr (validated_transition |> fst).data
+    ; just_emitted_a_proof
+    ; transition_receipt_time }
 
   type 'a creator =
        validated_transition:External_transition.Validated.t
@@ -35,26 +68,13 @@ module T = struct
     ; just_emitted_a_proof
     ; transition_receipt_time }
 
-  let to_yojson
-      { validated_transition
-      ; staged_ledger= _
-      ; just_emitted_a_proof
-      ; transition_receipt_time } =
-    `Assoc
-      [ ( "validated_transition"
-        , External_transition.Validated.to_yojson validated_transition )
-      ; ("staged_ledger", `String "<opaque>")
-      ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
-      ; ( "transition_receipt_time"
-        , `String
-            (Option.value_map transition_receipt_time
-               ~default:"<not available>"
-               ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc)) ) ]
+  let to_yojson = Fn.compose Repr.to_yojson to_repr
 end
 
 [%%define_locally
 T.
   ( validated_transition
+  , to_repr
   , staged_ledger
   , just_emitted_a_proof
   , transition_receipt_time
