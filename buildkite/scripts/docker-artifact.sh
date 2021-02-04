@@ -6,10 +6,10 @@ source DOCKER_DEPLOY_ENV
 
 echo "--- Build/Release docker artifact for ${MINA_SERVICE}"
 scripts/release-docker.sh --service "${MINA_SERVICE}" --version "${CODA_VERSION}" --commit "${MINA_GIT_HASH}" \
- --extra-args "--build-arg mina_deb_version=${MINA_DEB_VERSION} --build-arg deb_repo=${CODA_DEB_REPO}"
+ --extra-args "--build-arg mina_deb_version=${MINA_DEB_VERSION} --build-arg deb_repo=${MINA_DEB_REPO}"
 echo "--- Build/Release docker artifact for ${MINA_SERVICE}-puppeteered"
 scripts/release-docker.sh --service "${MINA_SERVICE}-puppeteered" --version "${CODA_VERSION}" --commit "${MINA_GIT_HASH}" \
- --extra-args "--build-arg mina_deb_version=${MINA_DEB_VERSION} --build-arg CODA_VERSION=${CODA_VERSION} --build-arg MINA_BRANCH=${MINA_GIT_BRANCH} --build-arg deb_repo=${CODA_DEB_REPO}"
+ --extra-args "--build-arg mina_deb_version=${MINA_DEB_VERSION} --build-arg CODA_VERSION=${CODA_VERSION} --build-arg MINA_BRANCH=${MINA_GIT_BRANCH} --build-arg deb_repo=${MINA_DEB_REPO}"
 
 if [[ -n $CODA_BUILD_ROSETTA ]]; then
   echo "--- Build/Release coda-rosetta to docker hub"

@@ -104,7 +104,7 @@ if [ -n "${BUILDKITE+x}" ]; then
     echo "export MINA_SERVICE=mina-archive" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export CODA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export MINA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
     echo "export MINA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
 
     set +x
