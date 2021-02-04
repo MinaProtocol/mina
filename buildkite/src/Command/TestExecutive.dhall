@@ -31,7 +31,7 @@ in
               -- Cache test-executive binary
               Cmd.run "artifact-cache-helper.sh test_executive.exe --upload"
             ],
-        label = "Build test-executive | dune profile: ${duneProfile}",
+        label = "Build test-executive",
         key = "build-test-executive",
         target = Size.XLarge
       },
