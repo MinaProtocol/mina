@@ -70,7 +70,7 @@ Pipeline.build
       let puppeteeredSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn # [{ name = "MinaArtifact", key = "mina-docker-image" }],
         service="\\\${CODA_SERVICE}-puppeteered",
-        extra_args="--build-arg coda_deb_version=\\\${MINA_DEB_VERSION} --build-arg CODA_VERSION=\\\${CODA_VERSION} --build-arg CODA_BRANCH=\\\${CODA_GIT_BRANCH} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
+        extra_args="--build-arg coda_deb_version=\\\${MINA_DEB_VERSION} --build-arg CODA_VERSION=\\\${CODA_VERSION} --build-arg MINA_BRANCH=\\\${CODA_GIT_BRANCH} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
         step_key="puppeteered-docker-image"
       }
 

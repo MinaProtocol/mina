@@ -219,7 +219,7 @@ ARG DUNE_PROFILE=dev
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the coda codebase in the next stage
-ARG CODA_BRANCH=rosetta/debug-v1.1.4
+ARG MINA_BRANCH=rosetta/debug-v1.1.4
 
 # location of repo used for pins and external package commits
 ARG CODA_DIR=coda
@@ -229,7 +229,7 @@ ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 # git will clone into an empty dir, but this also helps us set the workdir in advance
 RUN cd $HOME && rm -rf $HOME/${CODA_DIR} \
   && git clone \
-  -b "${CODA_BRANCH}" \
+  -b "${MINA_BRANCH}" \
   --depth 1 \
   --shallow-submodules \
   --recurse-submodules \
