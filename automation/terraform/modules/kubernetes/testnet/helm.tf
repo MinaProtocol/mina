@@ -57,7 +57,11 @@ locals {
       runtimeConfig      = local.coda_vars.runtimeConfig
       image              = var.coda_image
       privkeyPass        = var.block_producer_key_pass
-      seedPeers          = var.additional_seed_peers
+      // TODO: Change this to a better name
+      seedPeers          = concat(
+        var.additional_seed_peers,
+        [ for name in keys(local.static_peers) : local.static_peers[name].full_peer ]
+      )
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
       ports = {
