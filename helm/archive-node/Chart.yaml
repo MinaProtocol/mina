@@ -11,6 +11,7 @@ dependencies:
   - name: postgresql
     version: "*"
     repository: "https://charts.bitnami.com/bitnami"
+    condition:  archive.enablePostgresDB
   - name: common-utilities
     version: 0.0.8
     repository: "https://coda-charts.storage.googleapis.com"

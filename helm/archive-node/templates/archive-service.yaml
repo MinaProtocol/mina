@@ -1,4 +1,4 @@
-{{- if .Values.runLocalDaemon }}
+{{- if .Values.enableLocalDaemon }}
 ---
 apiVersion: v1
 kind: Service

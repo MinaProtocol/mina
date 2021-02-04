@@ -22,6 +22,7 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       containers:
+{{- if .Values.enableLocalDaemon }}
       - name: coda
         resources:
           limits:
@@ -97,6 +98,7 @@ spec:
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+{{- end }}
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
