@@ -270,7 +270,28 @@ variable "make_report_accounts" {
   default = ""
 }
 
-# Archive-Postgres Vars
+# Archive | Postgres Vars
+
+variable "archive_configs" {
+  type = list(
+    object({
+      name = string
+      serverPort = string
+      externalPort = string
+      runLocalDaemon = string
+      runPostgresDb = string
+      postgresHost = string
+      postgresPort = string
+      postgresDB = string
+      postgresqlUsername = string
+      postgresqlPassword = string
+      remoteSchemaFile = string
+      postgresUri = string
+      healthcheck = object
+    })
+  )
+  default = []
+}
 
 variable "archive_persistence_enabled" {
   type    = bool

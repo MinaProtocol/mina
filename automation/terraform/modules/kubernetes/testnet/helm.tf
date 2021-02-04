@@ -139,6 +139,51 @@ locals {
     archive = {
       image = var.coda_archive_image
       remoteSchemaFile = var.mina_archive_schema
+      archiveConfigs = var.archive_configs ? [
+        for index, config in var.archive_configs: {
+          name                = config.name
+          serverPort          = config.serverPort
+          externalPort        = config.externalPort
+          runLocalDaemon      = config.runLocalDaemon
+          runPostgresDb       = config.runPostgresDb
+          postgresHost        = config.postgresHost
+          postgresPort        = config.postgresPort
+          postgresDB          = config.postgresPort
+          postgresqlUsername  = config.postgresqlUsername
+          postgresqlPassword  = config.postgresqlPassword
+          remoteSchemaFile    = config.remoteSchemaFile
+          postgresUri         = config.postgresUri
+
+          healthcheck = {
+            enabled               = config.healthcheck.enabled
+            failureThreshold      = config.healthcheck.failureThreshold
+            periodSeconds         = config.healthcheck.periodSeconds
+            initialDelaySeconds   = config.healthcheck.initialDelaySeconds 
+          }
+        }
+      ] : [
+        for index in range(var.archive_node_count): {
+          name                = "archive-${index}"
+          serverPort          = 3086
+          externalPort        = 11010
+          runLocalDaemon      = false
+          runPostgresDb       = false
+          postgresHost        = "archive-1"
+          postgresPort        = 5432
+          postgresDB          = "archive"
+          postgresqlUsername  = "postgres"
+          postgresqlPassword  = "foobar"
+          remoteSchemaFile    = var.mina_archive_schema
+          postgresUri         = "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+
+          healthcheck = {
+            enabled               = true
+            failureThreshold      = 60
+            periodSeconds         = 5
+            initialDelaySeconds   = 30 
+          }
+        }
+      ]
     }
     postgresql = {
       persistence = {

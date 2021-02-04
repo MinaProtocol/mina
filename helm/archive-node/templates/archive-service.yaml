@@ -1,5 +1,5 @@
 {{ range $config := $.Values.archive.archiveConfigs }}
-{{- if $config.runPostgresDb }}
+{{- if $config.runLocalDaemon }}
 ---
 apiVersion: v1
 kind: Service

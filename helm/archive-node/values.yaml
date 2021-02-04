@@ -15,13 +15,6 @@ coda:
     metrics: "10001"
     p2p: "10909"
 
-postgresql:
-  postgresqlPassword: "foobar"
-  postgresqlUsername: "postgres"
-
-nodeSelector:
-  preemptible: false
-
 archive:
   hostPort: "10909"
   image: codaprotocol/coda-archive:0.0.16-beta7-develop
@@ -42,14 +35,13 @@ archive:
     externalPort: 1
     runLocalDaemon: false
     runPostgresDb: true
-    postgres:
-      postgresHost: archive-1-postgresql
-      postgresPort: '{{ .Values.archive.postgresPort }}'
-      postgresDB: '{{ .Values.archive.postgresDB }}'
-      postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
-      postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
-      remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
-      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+    postgresHost: archive-1-postgresql
+    postgresPort: '{{ .Values.archive.postgresPort }}'
+    postgresDB: '{{ .Values.archive.postgresDB }}'
+    postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
+    postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
+    remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
+    postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
     healthcheck:
       enabled: true
       failureThreshold: 60
@@ -60,14 +52,13 @@ archive:
     externalPort: 2
     runLocalDaemon: true
     runPostgresDb: false
-    postgres:
-      postgresHost: archive-1-postgresql
-      postgresPort: '{{ .Values.archive.postgresPort }}'
-      postgresDB: '{{ .Values.archive.postgresDB }}'
-      postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
-      postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
-      remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
-      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+    postgresHost: archive-1-postgresql
+    postgresPort: '{{ .Values.archive.postgresPort }}'
+    postgresDB: '{{ .Values.archive.postgresDB }}'
+    postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
+    postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
+    remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
+    postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
     healthcheck:
       enabled: true
       failureThreshold: 60
@@ -78,19 +69,25 @@ archive:
     externalPort: 3
     runLocalDaemon: false
     runPostgresDb: false
-    postgres:
-      postgresHost: archive-1-postgresql
-      postgresPort: '{{ .Values.archive.postgresPort }}'
-      postgresDB: '{{ .Values.archive.postgresDB }}'
-      postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
-      postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
-      remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
-      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+    postgresHost: archive-1-postgresql
+    postgresPort: '{{ .Values.archive.postgresPort }}'
+    postgresDB: '{{ .Values.archive.postgresDB }}'
+    postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
+    postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
+    remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
+    postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
     healthcheck:
       enabled: true
       failureThreshold: 60
       periodSeconds: 5
       initialDelaySeconds: 30
+
+postgresql:
+  postgresqlPassword: "foobar"
+  postgresqlUsername: "postgres"
+
+nodeSelector:
+  preemptible: false
 
 healthcheck:
   enabled: true
