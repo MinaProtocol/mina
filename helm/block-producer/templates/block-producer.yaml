@@ -227,7 +227,7 @@ spec:
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- if $config.libp2pSecret }}
-        - name: CODA_LIBP2P_PASS
+        - name: MINA_LIBP2P_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- end }}
         - name: CODA_CLIENT_TRUSTLIST
