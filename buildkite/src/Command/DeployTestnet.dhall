@@ -29,7 +29,7 @@ let testnetArtifactPath = "/tmp/artifacts" in
           Cmd.run "mkdir -p ${testnetArtifactPath}",
           Cmd.run (
             "source ${deployEnv} && terraform apply -auto-approve" ++
-              " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
+              " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$MINA_GIT_HASH" ++
               " -var ci_artifact_path=${testnetArtifactPath}"
           ),
           Cmd.run (
