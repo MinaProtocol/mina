@@ -13,6 +13,14 @@ data "local_file" "genesis_ledger" {
   ]
 }
 
+data "local_file" "libp2p_peers" {
+  for_each = toset([ for config in var.block_producer_configs : config.name ])
+  filename = "${path.module}/../../../../keys/libp2p/${var.testnet_name}/${each.key}"
+  depends_on = [
+    null_resource.block_producer_key_generation
+  ]
+}
+
 locals {
   use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
@@ -21,11 +29,23 @@ locals {
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
   ]
 
+  static_peers = { for index, name in keys(data.local_file.libp2p_peers) :
+    name => {
+      full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port + index }/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}",
+      port      = var.block_producer_starting_host_port + index
+      name      = name
+    }
+  }
+
   coda_vars = {
     runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
     image              = var.coda_image
     privkeyPass        = var.block_producer_key_pass
-    seedPeers          = concat(var.additional_seed_peers, local.seed_peers)
+    seedPeers          = concat(
+      var.additional_seed_peers,
+      local.seed_peers,
+      [ for name in keys(local.static_peers) : local.static_peers[name].full_peer ]
+    )
     logLevel           = var.log_level
     logSnarkWorkGossip = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
@@ -81,7 +101,7 @@ locals {
       for index, config in var.block_producer_configs: {
         name                 = config.name
         class                = config.class
-        externalPort         = var.block_producer_starting_host_port + index
+        externalPort         = local.static_peers[config.name].port
         runWithUserAgent     = config.run_with_user_agent
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
@@ -166,6 +186,10 @@ locals {
   
 }
 
+output static_peers {
+  value = local.static_peers
+}
+
 # Cluster-Local Seed Node
 
 resource "kubernetes_role_binding" "helm_release" {
@@ -215,7 +239,7 @@ resource "helm_release" "block_producers" {
   name        = "${var.testnet_name}-block-producers"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version     = "0.4.5"
+  version     = "0.5.0"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
