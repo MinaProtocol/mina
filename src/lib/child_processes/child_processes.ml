@@ -146,7 +146,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
           | Error exn ->
               [%log warn]
                 !"Couldn't delete lock file for %s (pid $childPid) after \
-                  killing it. If another Coda daemon was already running it \
+                  killing it. If another Mina daemon was already running it \
                   may have cleaned it up for us. ($exn)"
                 name
                 ~metadata:
@@ -273,10 +273,10 @@ let start_custom :
   let%bind process =
     keep_trying
       (List.filter_opt
-         [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
+         [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
-         ; Some ("coda-" ^ name) ])
+         ; Some ("mina-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   let%bind () =
