@@ -3,10 +3,13 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
+open Cmd_util
 open Integration_test_lib
 open Unix
 
 module Network_config = struct
+  module Cli_inputs = Cli_inputs
+
   type block_producer_config =
     { name: string
     ; class_: string [@key "class"]
@@ -57,8 +60,7 @@ module Network_config = struct
     ; project_id: string
     ; cluster_id: string
     ; keypairs: (string * Keypair.t) list
-    ; constraint_constants: Genesis_constants.Constraint_constants.t
-    ; genesis_constants: Genesis_constants.t
+    ; constants: Test_config.constants
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -69,7 +71,8 @@ module Network_config = struct
     assoc
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
-      ~(test_config : Test_config.t) ~(images : Container_images.t) =
+      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
+      =
     let { Test_config.k
         ; delta
         ; slots_per_epoch
@@ -198,6 +201,9 @@ module Network_config = struct
         (Genesis_ledger_helper.make_genesis_constants ~logger
            ~default:Genesis_constants.compiled runtime_config)
     in
+    let constants : Test_config.constants =
+      {constraints= constraint_constants; genesis= genesis_constants}
+    in
     (* BLOCK PRODUCER CONFIG *)
     let base_port = 10001 in
     let block_producer_config index (secret_name, _) =
@@ -217,8 +223,7 @@ module Network_config = struct
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
-    ; constraint_constants
-    ; genesis_constants
+    ; constants
     ; terraform=
         { generate_and_upload_artifacts= false
         ; cluster_name
@@ -304,16 +309,16 @@ module Network_manager = struct
     ; keypair_secrets: string list
     ; testnet_dir: string
     ; testnet_log_filter: string
-    ; constraint_constants: Genesis_constants.Constraint_constants.t
-    ; genesis_constants: Genesis_constants.t
-    ; block_producer_pod_names: Kubernetes_network.Node.t list
-    ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
+    ; constants: Test_config.constants
+    ; block_producer_nodes: Kubernetes_network.Node.t list
+    ; snark_coordinator_nodes: Kubernetes_network.Node.t list
+    ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
-  let run_cmd t prog args = Cmd_util.run_cmd t.testnet_dir prog args
+  let run_cmd t prog args = run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn t prog args = Cmd_util.run_cmd_exn t.testnet_dir prog args
+  let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
     let testnet_dir =
@@ -325,17 +330,20 @@ module Network_manager = struct
       if%bind File_system.dir_exists testnet_dir then (
         [%log warn]
           "Old network deployment found; attempting to refresh and cleanup" ;
-        let%bind () =
+        let%bind _ =
           Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
         in
-        let%bind () =
+        let%bind _ =
           let open Process.Output in
           let%bind state_output =
             Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
           in
           if not (String.is_empty state_output.stdout) then
-            Cmd_util.run_cmd_exn testnet_dir "terraform"
-              ["destroy"; "-auto-approve"]
+            let%map _ =
+              Cmd_util.run_cmd_exn testnet_dir "terraform"
+                ["destroy"; "-auto-approve"]
+            in
+            ()
           else return ()
         in
         File_system.remove_dir testnet_dir )
@@ -377,12 +385,18 @@ module Network_manager = struct
       ; Kubernetes_network.Node.node_graphql_port= port }
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1" 3085] in
-    let block_producer_pod_names =
+    let snark_coordinator_nodes = [cons_node "snark-coordinator-1" 3085] in
+    let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
           cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
       )
+    in
+    let nodes_by_app_id =
+      let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
+      all_nodes
+      |> List.map ~f:(fun node -> (node.pod_id, node))
+      |> String.Map.of_alist_exn
     in
     let t =
       { logger
@@ -390,44 +404,47 @@ module Network_manager = struct
       ; namespace= network_config.terraform.testnet_name
       ; testnet_dir
       ; testnet_log_filter
-      ; constraint_constants= network_config.constraint_constants
-      ; genesis_constants= network_config.genesis_constants
+      ; constants= network_config.constants
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
-      ; block_producer_pod_names
-      ; snark_coordinator_pod_names
+      ; block_producer_nodes
+      ; snark_coordinator_nodes
+      ; nodes_by_app_id
       ; deployed= false
       ; keypairs= List.unzip network_config.keypairs |> snd }
     in
     [%log info] "Initializing terraform" ;
-    let%bind () = run_cmd_exn t "terraform" ["init"] in
-    let%map () = run_cmd_exn t "terraform" ["validate"] in
+    let%bind _ = run_cmd_exn t "terraform" ["init"] in
+    let%map _ = run_cmd_exn t "terraform" ["validate"] in
     t
 
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
     [%log' info t.logger] "Deploying network" ;
-    let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
+    let%bind _ = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     [%log' info t.logger] "Uploading network secrets" ;
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          run_cmd_exn t "kubectl"
-            [ "create"
-            ; "secret"
-            ; "generic"
-            ; secret
-            ; "--cluster=" ^ t.cluster
-            ; "--namespace=" ^ t.namespace
-            ; "--from-file=key=" ^ secret
-            ; "--from-file=pub=" ^ secret ^ ".pub" ] )
+          let%map _ =
+            run_cmd_exn t "kubectl"
+              [ "create"
+              ; "secret"
+              ; "generic"
+              ; secret
+              ; "--cluster=" ^ t.cluster
+              ; "--namespace=" ^ t.namespace
+              ; "--from-file=key=" ^ secret
+              ; "--from-file=pub=" ^ secret ^ ".pub" ]
+          in
+          () )
     in
     t.deployed <- true ;
     let result =
       { Kubernetes_network.namespace= t.namespace
-      ; constraint_constants= t.constraint_constants
-      ; genesis_constants= t.genesis_constants
-      ; block_producers= t.block_producer_pod_names
-      ; snark_coordinators= t.snark_coordinator_pod_names
+      ; constants= t.constants
+      ; block_producers= t.block_producer_nodes
+      ; snark_coordinators= t.snark_coordinator_nodes
       ; archive_nodes= []
+      ; nodes_by_app_id= t.nodes_by_app_id
       ; testnet_log_filter= t.testnet_log_filter
       ; keypairs= t.keypairs }
     in
@@ -443,7 +460,7 @@ module Network_manager = struct
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    let%bind () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
+    let%bind _ = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
     t.deployed <- false ;
     Deferred.unit
 
