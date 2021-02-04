@@ -56,13 +56,19 @@ variable "coda_archive_image" {
 }
 
 variable "watchdog_image" {
-  type string
+  type = string
 
   description = "Watchdog image"
   default     = "gcr.io/o1labs-192920/watchdog:0.3.7"
 }
 
+variable "archive_node_count" {
+  type = number
+  default = 3
+}
+
 locals {
+
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
   seed_discovery_keypairs = [
@@ -77,6 +83,9 @@ module "ci_testnet" {
   source    = "../../modules/kubernetes/testnet"
 
   k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
+  generate_and_upload_artifacts = false
+
+  gcloud_seeds = [ module.seed_one, module.seed_two ]
 
   cluster_name          = "coda-infra-east4"
   cluster_region        = "us-east4"
@@ -90,15 +99,20 @@ module "ci_testnet" {
 
   watchdog_image = var.watchdog_image
 
+  archive_node_count = var.archive_node_count
+
   whale_count           = var.whale_count
   fish_count            = var.fish_count
 
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"
 
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/2f36b15d48e956e5242c0abc134f1fa7711398dd/src/app/archive/create_schema.sql"
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/5cc4ace7b04345d2ac63ae730b0c4cb1d4f4103a/src/app/archive/create_schema.sql"
 
-  additional_seed_peers = []
+  additional_seed_peers = [
+    "/dns4/seed-one.${var.testnet_name}.o1test.net/tcp/10001/p2p/${split(",", local.seed_discovery_keypairs[0])[2]}",
+    "/dns4/seed-two.${var.testnet_name}.o1test.net/tcp/10001/p2p/${split(",", local.seed_discovery_keypairs[1])[2]}"
+  ]
 
   seed_port = "10001"
 
@@ -135,15 +149,15 @@ module "ci_testnet" {
         libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
         enable_gossip_flooding = false
         run_with_user_agent    = false
-        run_with_bots          = false
+        run_with_bots          = true
         enable_peer_exchange   = true
         isolated               = false
       }
     ]
   )
 
-  snark_worker_replicas = 1
-  snark_worker_fee      = "0.025"
+  snark_worker_replicas = 20
+  snark_worker_fee      = "2.5"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
   snark_worker_host_port = 10401
 
@@ -152,8 +166,7 @@ module "ci_testnet" {
   agent_min_tx = "0.0015"
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
+
+  upload_blocks_to_gcloud = true
 }
 
-output beep {
-  value = module.ci_testnet.static_peers
-}
