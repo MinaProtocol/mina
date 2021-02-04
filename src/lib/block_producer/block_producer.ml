@@ -9,7 +9,8 @@ open O1trace
 open Otp_lib
 module Time = Block_time
 
-type Structured_log_events.t += Block_produced
+type Structured_log_events.t +=
+  | Block_produced of {breadcrumb: Frontier_base.Breadcrumb.Repr.t}
   [@@deriving register_event {msg= "Successfully produced a new block"}]
 
 module Singleton_supervisor : sig
@@ -606,9 +607,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                err )
                     in
                     [%str_log info]
-                      ~metadata:
-                        [("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
-                      Block_produced ;
+                      (Block_produced
+                         {breadcrumb= Breadcrumb.to_repr breadcrumb}) ;
                     let metadata =
                       [("state_hash", State_hash.to_yojson protocol_state_hash)]
                     in
@@ -907,8 +907,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                          err ) )
           in
           [%str_log trace]
-            ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
-            Block_produced ;
+            (Block_produced {breadcrumb= Breadcrumb.to_repr breadcrumb}) ;
           let metadata =
             [("state_hash", State_hash.to_yojson protocol_state_hash)]
           in
