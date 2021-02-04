@@ -58,7 +58,7 @@ spec:
         - name: config-dir
           mountPath: /root/.mina-config
         env: 
-          - name: CODA_PRIVKEY_PASS
+          - name: MINA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
@@ -113,7 +113,7 @@ spec:
               secretKeyRef:
                 name: {{ $config.privateKeySecret }}
                 key: pub
-          - name: CODA_PRIVKEY_PASS
+          - name: MINA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
@@ -224,7 +224,7 @@ spec:
           value: {{ $.Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET 
           value: "mina_network_block_data"
-        - name: CODA_PRIVKEY_PASS
+        - name: MINA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- if $config.libp2pSecret }}
         - name: MINA_LIBP2P_PASS

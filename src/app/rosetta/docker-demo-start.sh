@@ -44,7 +44,7 @@ genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
 
 export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
-export CODA_PRIVKEY_PASS=""
+export MINA_PRIVKEY_PASS=""
 export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
 MINA_CONFIG_DIR=/root/.mina-config

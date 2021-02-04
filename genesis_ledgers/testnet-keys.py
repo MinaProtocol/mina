@@ -44,7 +44,7 @@ def generate_block_producer_keys(count, output_dir, privkey_pass):
         pubkey = client.containers.run(
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",  
-            command=["CODA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/block_producer_{}".format(privkey_pass, block_producer_number)], 
+            command=["MINA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/block_producer_{}".format(privkey_pass, block_producer_number)], 
             volumes={output_dir: {'bind': '/keys', 'mode': 'rw'}}
         )
         print(pubkey)
@@ -66,7 +66,7 @@ def generate_offline_whale_keys(count, output_dir, privkey_pass):
         pubkey = client.containers.run(
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",  
-            command=["CODA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/whale_account_{}".format(privkey_pass, i+1)], 
+            command=["MINA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/whale_account_{}".format(privkey_pass, i+1)], 
             volumes={output_dir: {'bind': '/keys', 'mode': 'rw'}}
         )
         print(pubkey)
@@ -86,7 +86,7 @@ def generate_offline_fish_keys(count, output_dir, privkey_pass):
         pubkey = client.containers.run(
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",  
-            command=["CODA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/fish_account_{}".format(privkey_pass, i+1)], 
+            command=["MINA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/fish_account_{}".format(privkey_pass, i+1)], 
             volumes={output_dir: {'bind': '/keys', 'mode': 'rw'}}
         )
         print(pubkey)

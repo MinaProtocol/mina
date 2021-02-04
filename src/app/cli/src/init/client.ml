@@ -1135,7 +1135,7 @@ let import_key =
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon.\n\
-       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
@@ -1193,7 +1193,7 @@ let export_key =
     ~summary:
       "Export a tracked account so that it can be saved or transferred \
        between machines.\n\
-      \ Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+      \ Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be exported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun _ (export_path, pk, conf_dir) ->

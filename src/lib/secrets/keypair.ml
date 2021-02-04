@@ -7,9 +7,9 @@ open Keypair_common
 module T = struct
   type t = Keypair.t
 
-  let env = "CODA_PRIVKEY_PASS"
+  let env = "MINA_PRIVKEY_PASS"
 
-  let which = "coda keypair"
+  let which = "mina keypair"
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
   let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)

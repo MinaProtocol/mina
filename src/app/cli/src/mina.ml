@@ -72,7 +72,7 @@ let setup_daemon logger =
     flag "block-producer-password"
       ~doc:
         "PASSWORD Password associated with the block-producer key. Setting \
-         this is equivalent to setting the CODA_PRIVKEY_PASS environment \
+         this is equivalent to setting the MINA_PRIVKEY_PASS environment \
          variable. Be careful when setting it in the commandline as it will \
          likely get tracked in your history. Mainly to be used from the \
          daemon.json config file"

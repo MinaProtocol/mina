@@ -16,7 +16,7 @@ jsonpath="$tmpdir/sample_keypairs.json"
 cd "$SCRIPTPATH/.."
 
 mkdir -p wallet-keys
-export CODA_PRIVKEY_PASS=""
+export MINA_PRIVKEY_PASS=""
 
 # Iterate over the keys in the JSON and wrap them in the proper format
 i=1

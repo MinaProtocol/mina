@@ -85,7 +85,7 @@ function generate_key_files {
     docker run \
       -v "${output_dir}:/keys:z" \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
+      -c "MINA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
