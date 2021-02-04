@@ -139,6 +139,10 @@ function generate_keyset_from_file {
 }
 # ================================================================================
 
+# prep dir for copied libp2psecrets
+LIBP2PPEERS="$(pwd)/keys/libp2p/${TESTNET}/"
+mkdir -p $LIBP2PPEERS
+
 if [[ -s "keys/testnet-keys/${TESTNET}_online-whale-keyfiles/online_whale_account_1.pub" ]]; then
 echo "using existing whale keys"
 else
@@ -150,6 +154,8 @@ else
 
   build_keyset_from_testnet_keys $online_output_dir "online-whales"
   build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
+
+  cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
 
 fi
 
@@ -170,12 +176,28 @@ else
 
   build_keyset_from_testnet_keys $online_output_dir "online-fish"
   build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
+
+  cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
+
 fi
 echo "Online Fish Keyset:"
 cat keys/keysets/${TESTNET}_online-fish
 echo "Offline Fish Keyset:"
 cat keys/keysets/${TESTNET}_offline-fish
 echo
+
+
+if [[ -s "keys/libp2p/${TESTNET}/whale-block-producer-1" ]]; then
+  echo "libp2p keys prepped"
+else
+  echo "Prepping libp2p peers for consumption"
+  for p2p in $LIBP2PPEERS*; do
+    f="${p2p%.*}"
+    splitP2P=(${f//_/ })
+    outputP2P="${splitP2P[1]}-block-producer-${splitP2P[3]}"
+    mv ${p2p} ${LIBP2PPEERS}${outputP2P}
+  done
+fi
 
 # ================================================================================
 
