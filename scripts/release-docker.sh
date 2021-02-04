@@ -90,7 +90,7 @@ else
 fi
 
 tag-and-push() {
-  docker tag "minaprotocol/$SERVICE:$VERSION" "$1"
+  docker tag "codaprotocol/$SERVICE:$VERSION" "$1"
   docker push "$1"
 }
 
