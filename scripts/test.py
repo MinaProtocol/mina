@@ -425,7 +425,7 @@ def run(args):
     executive = Executive(args, out_dir.artifacts)
     project = CodaProject(executive)
     out_dir.initialize(executive)
-    os.environ['CODA_INTEGRATION_TEST_DIR'] = os.path.join(
+    os.environ['MINA_INTEGRATION_TEST_DIR'] = os.path.join(
         os.getcwd(), out_dir.test_configs)
 
     print('Preparing to run the following tests:')
