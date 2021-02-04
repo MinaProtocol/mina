@@ -17,9 +17,11 @@ spec:
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
+        {{- if .Values.enableLocalDaemon }}
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
+        {{- end }}
     spec:
       containers:
 {{- if .Values.enableLocalDaemon }}
