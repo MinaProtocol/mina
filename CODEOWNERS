@@ -16,7 +16,7 @@
 
 /src/app/archive @MinaProtocol/product-eng-reviewers
 /src/app/cli/src/tests @MinaProtocol/protocol-eng-reviewers
-/src/app/cli/src/coda.ml @MinaProtocol/protocol-eng-reviewers
+/src/app/cli/src/mina.ml @MinaProtocol/protocol-eng-reviewers
 /src/app/cli/src/init @MinaProtocol/protocol-eng-reviewers
 /src/app/libp2p_helper @MinaProtocol/protocol-eng-reviewers
 /src/app/reformat/ @MinaProtocol/infra-eng-reviewers
