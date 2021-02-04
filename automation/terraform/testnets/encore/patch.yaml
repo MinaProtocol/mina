@@ -1,0 +1,6 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: coda
+          image: gcr.io/o1labs-192920/coda-daemon-baked:0.3.0-5493fe3-encore-6fe6a3e
