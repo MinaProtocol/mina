@@ -3,19 +3,11 @@ open Core_kernel
 
 type 'a adjacency_list = ('a * 'a list) list
 
-(* Naive algorithm for computing the minimum number of vertices required to disconnect
-   a graph as
-
-   connectivity G =
-    if not (connected G)
-    then 0
-    else 1 + min_{v in V(G)} connectivity (G - v)
-  *)
-
-let connectivity (type a) (module V : Comparable.S with type t = a) =
-  let module G = struct
+module Make (V : Comparable.S) = struct
+  module G = struct
     type t = V.Set.t V.Map.t
-  end in
+  end
+
   let connected_component (g : G.t) v0 =
     let rec go seen next =
       match next with
@@ -29,12 +21,12 @@ let connectivity (type a) (module V : Comparable.S with type t = a) =
             @ next )
     in
     go V.Set.empty [v0]
-  in
+
   let choose (g : G.t) : V.t option =
     with_return (fun {return} ->
         Map.iteri g ~f:(fun ~key ~data:_ -> return (Some key)) ;
         None )
-  in
+
   let connected (g : G.t) : bool =
     match choose g with
     | None ->
@@ -42,28 +34,50 @@ let connectivity (type a) (module V : Comparable.S with type t = a) =
         true
     | Some v ->
         Int.equal (Map.length g) (Set.length (connected_component g v))
-  in
+
   let remove_vertex (g : G.t) v : G.t =
     Map.remove g v |> Map.map ~f:(Fn.flip Set.remove v)
+
+  (* Naive algorithm for computing the minimum number of vertices required to disconnect
+   a graph as
+
+   connectivity G =
+    if not (connected G)
+    then 0
+    else 1 + min_{v in V(G)} connectivity (G - v)
+
+   The function returns a lazy nat, because the algorithm naturally can
+   be seen as a search over sequences of vertices of increasing length,
+   and upon finishing examining all sequences of a given length, we learn 
+   one more piece of information about the return value (i.e., whether it
+   is bigger than that length or equal to it.)
+
+   This means that the caller of this function can control how far this
+   search goes based on how much information they need. For example, if
+   they just want to know whether the graph is connected, they only need
+   to force the outermost constructor. In general, if they want to know
+   whether the connectivity is >= n, they only need to force the first
+   n + 1 constructors.
+*)
+
+  let rec connectivity (g : G.t) : Nat.t =
+    lazy
+      ( if not (connected g) then Z
+      else
+        S
+          ( lazy
+            (Nat.min
+               (List.map (Map.keys g) ~f:(fun v ->
+                    connectivity (remove_vertex g v) ))) ) )
+end
+
+let connectivity (type a) (module V : Comparable.S with type t = a)
+    (adj : V.t adjacency_list) =
+  let module M = Make (V) in
+  let g : M.G.t =
+    V.Map.of_alist_exn (List.map adj ~f:(fun (x, xs) -> (x, V.Set.of_list xs)))
   in
-  fun (adj : V.t adjacency_list) ->
-    (* The minimum number of vertices one needs to remove to
-        disconnect the graph. *)
-    let rec connectivity g : Nat.t =
-      lazy
-        ( if not (connected g) then Z
-        else
-          S
-            ( lazy
-              (Nat.min
-                 (List.map (Map.keys g) ~f:(fun v ->
-                      connectivity (remove_vertex g v) ))) ) )
-    in
-    let g : G.t =
-      V.Map.of_alist_exn
-        (List.map adj ~f:(fun (x, xs) -> (x, V.Set.of_list xs)))
-    in
-    connectivity g
+  M.connectivity g
 
 let%test_unit "tree connectivity" =
   (*
