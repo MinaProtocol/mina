@@ -7,6 +7,7 @@ let Size = ./Size.dhall
 let OpamInit = ../Command/OpamInit.dhall
 
 let Cmd = ../Lib/Cmds.dhall
+let SelectFiles = ../Lib/SelectFiles.dhall
 
 let deployEnv = "DOCKER_DEPLOY_ENV"
 
@@ -49,9 +50,12 @@ in
                 "source ${deployEnv} && ./test_executive.exe cloud" ++
                 " --coda-image gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
                 " --coda-automation-location ./automation" ++
-                " ${testName}"
+                " ${testName}" ++
+                " | tee ${testName}.test.log" ++
+                " | logproc -i inline -f '!(.level in [\"Spam\", \"Debug\"])'"
               )
             ],
+        artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "Execute integration test: ${testName}",
         key = "integration-test-${testName}",
         target = Size.Medium,
