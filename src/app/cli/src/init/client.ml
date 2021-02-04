@@ -1546,7 +1546,7 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           match Sys.getenv "CODA_CONFIG_FILE" with
+           match Sys.getenv "MINA_CONFIG_FILE" with
            | Some config_file ->
                config_file
            | None ->
