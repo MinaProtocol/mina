@@ -10,13 +10,6 @@ let or_error_list_fold ls ~init ~f =
       let%bind acc = acc_or_error in
       f acc el )
 
-let get_metadata (message : Logger.Message.t) key =
-  match String.Map.find message.metadata key with
-  | Some x ->
-      Or_error.return x
-  | None ->
-      Or_error.errorf "did not find key \"%s\" in message metadata" key
-
 module type Event_type_intf = sig
   type t [@@deriving to_yojson]
 
@@ -26,6 +19,10 @@ module type Event_type_intf = sig
 
   val parse : Logger.Message.t -> t Or_error.t
 end
+
+let parse id (m : Logger.Message.t) =
+  Or_error.try_with (fun () ->
+      Structured_log_events.parse_exn id (Map.to_alist m.metadata) )
 
 module Log_error = struct
   let name = "Log_error"
@@ -53,8 +50,9 @@ end
 module Transition_frontier_diff_application = struct
   let name = "Transition_frontier_diff_application"
 
-  let structured_event_id =
-    Some Transition_frontier.applying_diffs_structured_events_id
+  let id = Transition_frontier.applying_diffs_structured_events_id
+
+  let structured_event_id = Some id
 
   type root_transitioned = {new_root: State_hash.t; garbage: State_hash.t list}
   [@@deriving to_yojson]
@@ -78,38 +76,27 @@ module Transition_frontier_diff_application = struct
         Ok (lens.set (Some x) result)
 
   let parse message =
-    let open Json_parsing in
     let open Or_error.Let_syntax in
-    let%bind diffs = get_metadata message "diffs" >>= parse (list json) in
-    or_error_list_fold diffs ~init:empty ~f:(fun res diff ->
-        match Yojson.Safe.Util.keys diff with
-        | [name] -> (
-            let%bind value = find json diff [name] in
-            match name with
-            | "New_node" ->
-                let%bind state_hash = parse state_hash value in
-                register new_node res state_hash
-            | "Best_tip_changed" ->
-                let%bind state_hash = parse state_hash value in
-                register best_tip_changed res state_hash
-            | "Root_transitioned" ->
-                let%bind new_root = find state_hash value ["new_root"] in
-                let%bind garbage = find (list state_hash) value ["garbage"] in
-                let data = {new_root; garbage} in
-                register root_transitioned res data
-            | _ ->
-                Or_error.error_string
-                  "unexpected transition frontier diff name" )
-        | _ ->
-            Or_error.error_string "unexpected transition frontier diff format"
-    )
+    match%bind parse id message with
+    | Transition_frontier.Applying_diffs {diffs} ->
+        or_error_list_fold diffs ~init:empty ~f:(fun res diff ->
+            match diff with
+            | New_node h ->
+                register new_node res h
+            | Best_tip_changed h ->
+                register best_tip_changed res h
+            | Root_transitioned {new_root; garbage} ->
+                register root_transitioned res {new_root; garbage} )
+    | _ ->
+        Or_error.error_string "bad parse"
 end
 
 module Block_produced = struct
   let name = "Block_produced"
 
-  let structured_event_id =
-    Some Block_producer.block_produced_structured_events_id
+  let id = Block_producer.block_produced_structured_events_id
+
+  let structured_event_id = Some id
 
   type t =
     { block_height: int
@@ -148,50 +135,43 @@ module Block_produced = struct
     else aggregated
   *)
 
-  (*TODO: Once we transition to structured events, this should call Structured_log_event.parse_exn and match on the structured events that it returns.*)
   let parse message =
-    let open Json_parsing in
     let open Or_error.Let_syntax in
-    let%bind breadcrumb = get_metadata message "breadcrumb" in
-    let%bind snarked_ledger_generated =
-      find bool breadcrumb ["just_emitted_a_proof"]
-    in
-    let%bind breadcrumb_consensus_state =
-      find json breadcrumb
-        [ "validated_transition"
-        ; "data"
-        ; "protocol_state"
-        ; "body"
-        ; "consensus_state" ]
-    in
-    let%bind block_height =
-      find int breadcrumb_consensus_state ["blockchain_length"]
-    in
-    let%bind global_slot =
-      find int breadcrumb_consensus_state ["curr_global_slot"; "slot_number"]
-    in
-    let%map epoch = find int breadcrumb_consensus_state ["epoch_count"] in
-    {block_height; global_slot; epoch; snarked_ledger_generated}
+    match%bind parse id message with
+    | Block_producer.Block_produced {breadcrumb} ->
+        let cs =
+          breadcrumb.validated_transition.protocol_state
+          |> Mina_state.Protocol_state.consensus_state
+        in
+        let open Consensus.Data.Consensus_state in
+        let get f = f cs |> Unsigned.UInt32.to_int in
+        Ok
+          { block_height= get blockchain_length
+          ; global_slot= get curr_global_slot
+          ; epoch= get epoch_count
+          ; snarked_ledger_generated= breadcrumb.just_emitted_a_proof }
+    | _ ->
+        Or_error.error_string "parse failed"
 end
 
 module Breadcrumb_added = struct
   let name = "Breadcrumb_added"
 
-  let structured_event_id =
-    Some
-      Transition_frontier.added_breadcrumb_user_commands_structured_events_id
+  let id =
+    Transition_frontier.added_breadcrumb_user_commands_structured_events_id
+
+  let structured_event_id = Some id
 
   type t = {user_commands: User_command.Valid.t With_status.t list}
   [@@deriving to_yojson]
 
   let parse message =
-    let open Json_parsing in
     let open Or_error.Let_syntax in
-    let%map user_commands =
-      get_metadata message "user_commands"
-      >>= parse valid_commands_with_statuses
-    in
-    {user_commands}
+    match%bind parse id message with
+    | Transition_frontier.Added_breadcrumb_user_commands {user_commands} ->
+        Ok {user_commands}
+    | _ ->
+        Or_error.error_string "parse failed"
 end
 
 type 'a t =
