@@ -135,22 +135,41 @@ locals {
       seedPeers     = concat(var.additional_seed_peers, local.seed_peers)
       runtimeConfig = local.coda_vars.runtimeConfig
     }
-    node_configs = length(var.archive_configs) != 0 ? var.archive_configs : [
-      for index in range(var.archive_node_count): {
-        name                = "archive-${index}"
-        serverPort          = "3086"
-        externalPort        = "11010"
-        enableLocalDaemon   = false
-        enablePostgresDb    = false
-        postgresHost        = "archive-1"
-        postgresPort        = 5432
-        postgresDB          = "archive"
-        postgresqlUsername  = "postgres"
-        postgresqlPassword  = "foobar"
-        remoteSchemaFile    = var.mina_archive_schema
-        postgresUri         = "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-      }
-    ]
+    node_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
+      # By default deploy a single postgres and local daemon enabled server
+      [
+        {
+          name                = "archive-1"
+          serverPort          = "3086"
+          externalPort        = "11010"
+          enableLocalDaemon   = true
+          enablePostgresDb    = true
+          postgresHost        = "archive-1"
+          postgresPort        = 5432
+          postgresDB          = "archive"
+          postgresqlUsername  = "postgres"
+          postgresqlPassword  = "foobar"
+          remoteSchemaFile    = var.mina_archive_schema
+          postgresUri         = "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+        }
+      ],
+      # in addition to stand-alone servers up to input count
+      [
+        for index in range(1, var.archive_node_count): {
+          name                = "archive-${index}"
+          serverPort          = "3086"
+          externalPort        = "11010"
+          enableLocalDaemon   = false
+          enablePostgresDb    = false
+          postgresHost        = "archive-1"
+          postgresPort        = 5432
+          postgresDB          = "archive"
+          postgresqlUsername  = "postgres"
+          postgresqlPassword  = "foobar"
+          remoteSchemaFile    = var.mina_archive_schema
+          postgresUri         = "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+        }
+      ])
     postgres = {
       persistence = {
         enabled = var.archive_persistence_enabled
