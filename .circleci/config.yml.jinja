@@ -654,7 +654,7 @@ jobs:
                   name: Running test -- {{profile}}:{{test}}
                   command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"; fi
                   environment:
-                    CODA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
+                    MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
