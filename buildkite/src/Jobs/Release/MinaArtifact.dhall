@@ -49,7 +49,16 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
-          ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
+          ] "./buildkite/scripts/build-artifact.sh"
+
+          #
+
+          [
+            Cmd.run "artifact-cache-helper.sh DOCKER_DEPLOY_ENV --upload",
+            -- cache previously built logproc tool for job use/troubleshooting purposes
+            -- TODO: build artifact parent DIR removal from upload path into cache helper
+            Cmd.run "cd _build/default/src/app/logproc && artifact-cache-helper.sh *.exe --upload"
+          ],
           label = "Build Mina daemon debian package",
           key = "build-deb-pkg",
           target = Size.XLarge,
