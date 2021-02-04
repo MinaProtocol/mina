@@ -820,7 +820,7 @@ let wrap_key =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
-      Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+      Secrets.Password.hidden_line_or_env "Private key: " ~env:"MINA_PRIVKEY"
     in
     let pk = Private_key.of_base58_check_exn (Bytes.to_string privkey) in
     let kp = Keypair.of_private_key_exn pk in
