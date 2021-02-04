@@ -179,6 +179,7 @@ locals {
     coda = {
       image = var.coda_image
       ports =  { metrics: 8000 }
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
     restartEveryMins = var.restart_nodes_every_mins
     restartNodes = var.restart_nodes
@@ -186,6 +187,7 @@ locals {
     makeReportEveryMins = var.make_report_every_mins
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts = var.make_report_accounts
+    seedPeersURL = var.seedPeersURL
   }
   
 }
