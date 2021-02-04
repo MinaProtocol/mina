@@ -30,7 +30,7 @@ let ReleaseSpec = {
     version = "\\\${CODA_VERSION}",
     commit = "\\\${CODA_GIT_HASH}",
     build_rosetta_override = False,
-    extra_args = "--build-arg coda_deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
+    extra_args = "--build-arg coda_deb_version=\\\${MINA_DEB_VERSION} --build-arg deb_repo=\\\${CODA_DEB_REPO}",
     step_key = "mina-docker-image"
   }
 }

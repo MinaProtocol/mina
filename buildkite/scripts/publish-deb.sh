@@ -49,7 +49,7 @@ set -x
 # Export variables for use with downstream steps
 echo "export CODA_SERVICE=coda-daemon" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_VERSION=${DOCKER_TAG}" >> ./DOCKER_DEPLOY_ENV
-echo "export CODA_DEB_VERSION=${VERSION}" >> ./DOCKER_DEPLOY_ENV
+echo "export MINA_DEB_VERSION=${VERSION}" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_PROJECT=${PROJECT}" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_HASH=${GITHASH}" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_GIT_BRANCH=${BUILDKITE_BRANCH}" >> ./DOCKER_DEPLOY_ENV
