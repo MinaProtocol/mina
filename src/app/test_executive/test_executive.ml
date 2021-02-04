@@ -318,11 +318,11 @@ let test_arg =
 
 let coda_image_arg =
   let doc = "Identifier of the coda docker image to test." in
-  let env = Arg.env_var "CODA_IMAGE" ~doc in
+  let env = Arg.env_var "MINA_IMAGE" ~doc in
   Arg.(
     required
     & opt (some string) None
-    & info ["coda-image"] ~env ~docv:"CODA_IMAGE" ~doc)
+    & info ["mina-image"] ~env ~docv:"MINA_IMAGE" ~doc)
 
 let debug_arg =
   let doc =
