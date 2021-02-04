@@ -224,6 +224,12 @@ let setup_daemon logger =
         "true|false Help keep the mesh connected when closing connections \
          (default: false)"
       (optional bool)
+  and mina_peer_exchange =
+    flag "enable-mina-peer-exchange"
+      ~doc:
+        "true|false Help keep the mesh connected when closing connections \
+         (default: true)"
+      (optional_with_default true bool)
   and max_connections =
     flag "max-connections"
       ~doc:
@@ -961,6 +967,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; trust_system
           ; flooding= Option.value ~default:false enable_flooding
           ; direct_peers
+          ; mina_peer_exchange
           ; peer_exchange= Option.value ~default:false peer_exchange
           ; max_connections
           ; validation_queue_size

@@ -431,7 +431,8 @@ module Helper = struct
         ; gating_config: Set_gater_config.input
         ; seed_peers: string list
         ; max_connections: int
-        ; validation_queue_size: int }
+        ; validation_queue_size: int
+        ; mina_peer_exchange: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -488,7 +489,7 @@ module Helper = struct
     end
 
     module Add_peer = struct
-      type input = {multiaddr: string} [@@deriving yojson]
+      type input = {multiaddr: string; seed: bool} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -1325,8 +1326,8 @@ let list_peers net =
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~metrics_port ~on_peer_connected ~on_peer_disconnected ~unsafe_no_trust_ip
-    ~flooding ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
-    ~max_connections ~validation_queue_size =
+    ~flooding ~direct_peers ~peer_exchange ~mina_peer_exchange ~seed_peers
+    ~initial_gating_config ~max_connections ~validation_queue_size =
   net.Helper.peer_connected_callback
   <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
   net.Helper.peer_disconnected_callback
@@ -1346,6 +1347,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
+      ; mina_peer_exchange
       ; max_connections
       ; validation_queue_size
       ; gating_config=
@@ -1476,10 +1478,12 @@ let open_stream net ~protocol peer =
   | Error e ->
       Error e
 
-let add_peer net maddr =
+let add_peer net maddr ~seed =
   match%map
     Helper.(
-      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+      do_rpc net
+        (module Rpcs.Add_peer)
+        {multiaddr= Multiaddr.to_string maddr; seed})
   with
   | Ok "addPeer success" ->
       Ok ()
@@ -1707,8 +1711,8 @@ let%test_module "coda network tests" =
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
@@ -1725,8 +1729,8 @@ let%test_module "coda network tests" =
       [%log error] ~metadata:[("peer", `String seed_peer)] "Seed_peer: $peer" ;
       let%bind () =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
@@ -1735,8 +1739,8 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       and () =
         configure c ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_c
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150

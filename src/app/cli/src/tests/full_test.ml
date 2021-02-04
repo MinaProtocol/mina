@@ -138,6 +138,7 @@ let run_test () : unit Deferred.t =
           ; flooding= false
           ; direct_peers= []
           ; peer_exchange= true
+          ; mina_peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
