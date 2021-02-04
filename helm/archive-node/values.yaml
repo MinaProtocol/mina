@@ -15,16 +15,23 @@ coda:
     metrics: "10001"
     p2p: "10909"
 
+postgresql:
+  postgresqlPassword: "foobar"
+  postgresqlUsername: "postgres"
+
+nodeSelector:
+  preemptible: false
+
 archive:
   hostPort: "10909"
   image: codaprotocol/coda-archive:0.0.16-beta7-develop
   listenPort: "3086"
   nodeName: "dev"
   remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-  postgresHost: '{{ $.Release.Name }}-postgresql'
+  postgresHost: 'archive-1-postgresql'
   postgresPort: "5432"
   postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
   ports:
     server: 3086
     postgres: "5432"
@@ -33,31 +40,60 @@ archive:
   - name: "archive-1"
     serverPort: 3086
     externalPort: 1
-    runLocalDaemon: true
+    runLocalDaemon: false
     runPostgresDb: true
     postgres:
-      postgresHost: '{{ $.Release.Name }}-postgresql'
-      postgresPort: "5432"
-      postgresqlUsername: "postgres"
-      postgresqlPassword: "foobar"
-      postgresDB: "archive"
-      remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ tpl .Values.archive.postgresHost . }}:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+      postgresHost: archive-1-postgresql
+      postgresPort: '{{ .Values.archive.postgresPort }}'
+      postgresDB: '{{ .Values.archive.postgresDB }}'
+      postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
+      postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
+      remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
+      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+    healthcheck:
+      enabled: true
+      failureThreshold: 60
+      periodSeconds: 5
+      initialDelaySeconds: 30
+  - name: "archive-2"
+    serverPort: 3086
+    externalPort: 2
+    runLocalDaemon: true
+    runPostgresDb: false
+    postgres:
+      postgresHost: archive-1-postgresql
+      postgresPort: '{{ .Values.archive.postgresPort }}'
+      postgresDB: '{{ .Values.archive.postgresDB }}'
+      postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
+      postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
+      remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
+      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+    healthcheck:
+      enabled: true
+      failureThreshold: 60
+      periodSeconds: 5
+      initialDelaySeconds: 30
+  - name: "archive-3"
+    serverPort: 3086
+    externalPort: 3
+    runLocalDaemon: false
+    runPostgresDb: false
+    postgres:
+      postgresHost: archive-1-postgresql
+      postgresPort: '{{ .Values.archive.postgresPort }}'
+      postgresDB: '{{ .Values.archive.postgresDB }}'
+      postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
+      postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
+      remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
+      postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
     healthcheck:
       enabled: true
       failureThreshold: 60
       periodSeconds: 5
       initialDelaySeconds: 30
 
-postgresql:
-  postgresqlPassword: "foobar"
-  postgresqlUsername: "postgres"
-
 healthcheck:
   enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
-
-nodeSelector:
-  preemptible: false

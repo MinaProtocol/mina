@@ -108,7 +108,7 @@ spec:
         args: [ 
           "coda-archive",
           "run",
-          "-postgres-uri", "{{ $config.postgresUri }}",
+          "-postgres-uri", "{{ tpl $config.postgres.postgresUri $ }}",
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
