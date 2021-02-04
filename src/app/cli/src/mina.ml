@@ -813,7 +813,7 @@ let setup_daemon logger =
         >>| Or_error.ok
       in
       let client_trustlist =
-        match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
+        match Unix.getenv "MINA_CLIENT_TRUSTLIST" with
         | Some envstr ->
             let cidrs =
               String.split ~on:',' envstr
@@ -822,7 +822,7 @@ let setup_daemon logger =
                      with _ ->
                        [%log warn]
                          "Could not parse address $address in \
-                          CODA_CLIENT_TRUSTLIST"
+                          MINA_CLIENT_TRUSTLIST"
                          ~metadata:[("address", `String str)] ;
                        None )
             in
