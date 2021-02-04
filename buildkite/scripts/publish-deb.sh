@@ -47,7 +47,7 @@ source "${SCRIPTPATH}/export-git-env-vars.sh"
 
 set -x
 # Export variables for use with downstream steps
-echo "export CODA_SERVICE=coda-daemon" >> ./DOCKER_DEPLOY_ENV
+echo "export MINA_SERVICE=mina-daemon" >> ./DOCKER_DEPLOY_ENV
 echo "export CODA_VERSION=${DOCKER_TAG}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_DEB_VERSION=${VERSION}" >> ./DOCKER_DEPLOY_ENV
 echo "export MINA_PROJECT=${PROJECT}" >> ./DOCKER_DEPLOY_ENV
