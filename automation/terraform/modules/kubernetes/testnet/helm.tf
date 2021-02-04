@@ -130,62 +130,28 @@ locals {
   }
 
   archive_node_vars = {
-    testnetName = var.testnet_name
     coda = {
       image         = var.coda_image
       seedPeers     = concat(var.additional_seed_peers, local.seed_peers)
       runtimeConfig = local.coda_vars.runtimeConfig
     }
-    archive = {
-      image = var.coda_archive_image
-      remoteSchemaFile = var.mina_archive_schema
-      archiveConfigs = var.archive_configs ? [
-        for index, config in var.archive_configs: {
-          name                = config.name
-          serverPort          = config.serverPort
-          externalPort        = config.externalPort
-          runLocalDaemon      = config.runLocalDaemon
-          runPostgresDb       = config.runPostgresDb
-          postgresHost        = config.postgresHost
-          postgresPort        = config.postgresPort
-          postgresDB          = config.postgresPort
-          postgresqlUsername  = config.postgresqlUsername
-          postgresqlPassword  = config.postgresqlPassword
-          remoteSchemaFile    = config.remoteSchemaFile
-          postgresUri         = config.postgresUri
-
-          healthcheck = {
-            enabled               = config.healthcheck.enabled
-            failureThreshold      = config.healthcheck.failureThreshold
-            periodSeconds         = config.healthcheck.periodSeconds
-            initialDelaySeconds   = config.healthcheck.initialDelaySeconds 
-          }
-        }
-      ] : [
-        for index in range(var.archive_node_count): {
-          name                = "archive-${index}"
-          serverPort          = 3086
-          externalPort        = 11010
-          runLocalDaemon      = false
-          runPostgresDb       = false
-          postgresHost        = "archive-1"
-          postgresPort        = 5432
-          postgresDB          = "archive"
-          postgresqlUsername  = "postgres"
-          postgresqlPassword  = "foobar"
-          remoteSchemaFile    = var.mina_archive_schema
-          postgresUri         = "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
-
-          healthcheck = {
-            enabled               = true
-            failureThreshold      = 60
-            periodSeconds         = 5
-            initialDelaySeconds   = 30 
-          }
-        }
-      ]
-    }
-    postgresql = {
+    node_configs = length(var.archive_configs) != 0 ? var.archive_configs : [
+      for index in range(var.archive_node_count): {
+        name                = "archive-${index}"
+        serverPort          = "3086"
+        externalPort        = "11010"
+        runLocalDaemon      = false
+        runPostgresDb       = false
+        postgresHost        = "archive-1"
+        postgresPort        = 5432
+        postgresDB          = "archive"
+        postgresqlUsername  = "postgres"
+        postgresqlPassword  = "foobar"
+        remoteSchemaFile    = var.mina_archive_schema
+        postgresUri         = "postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+      }
+    ]
+    postgres = {
       persistence = {
         enabled = var.archive_persistence_enabled
         storageClass = "${var.cluster_region}-${var.archive_persistence_class}-${lower(var.archive_persistence_reclaim_policy)}"
@@ -317,15 +283,34 @@ resource "helm_release" "snark_workers" {
 resource "helm_release" "archive_node" {
   provider   = helm.testnet_deploy
 
-  count       = var.archive_node_count
+  count       = length(local.archive_node_vars.node_configs)
   
-  name        = "archive-node-${count.index + 1}"
+  name        = local.archive_node_vars.node_configs[count.index].name 
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
   version     = "0.4.6"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
-    yamlencode(local.archive_node_vars)
+    yamlencode({
+      testnetName = var.testnet_name
+      coda = local.archive_node_vars.coda
+      fullnameOverride    = local.archive_node_vars.node_configs[count.index].name 
+      archive = {
+        image             = var.coda_archive_image
+        remoteSchemaFile  = var.mina_archive_schema
+        hostPort          = local.archive_node_vars.node_configs[count.index].externalPort
+        remoteSchemaFile  = local.archive_node_vars.node_configs[count.index].remoteSchemaFile
+        postgresHost      = local.archive_node_vars.node_configs[count.index].postgresHost
+        postgresPort      = local.archive_node_vars.node_configs[count.index].postgresPort
+        postgresDB        = local.archive_node_vars.node_configs[count.index].postgresDB
+        postgresUri       = local.archive_node_vars.node_configs[count.index].postgresUri
+        ports = {
+          server          = local.archive_node_vars.node_configs[count.index].serverPort
+          postgres        = local.archive_node_vars.node_configs[count.index].postgresPort
+        }
+      }
+      postgresql = local.archive_node_vars.postgres
+    })
   ]
 
   wait = false

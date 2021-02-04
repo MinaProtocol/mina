@@ -287,7 +287,6 @@ variable "archive_configs" {
       postgresqlPassword = string
       remoteSchemaFile = string
       postgresUri = string
-      healthcheck = object
     })
   )
   default = []

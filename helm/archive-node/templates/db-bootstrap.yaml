@@ -1,9 +1,7 @@
-{{ range $config := $.Values.archiveConfigs}}
-{{- if $config.runPostgresDb }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "{{ $config.name }}-db-bootstrap"
+  name: "{{ template "archive-node.fullname" . }}-db-bootstrap"
 spec:
   template:
     spec:
@@ -11,16 +9,10 @@ spec:
       - name: create-db
         image: bitnami/postgresql
         command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ $config.postgres.postgresqlPassword }} createdb --username {{ $config.postgres.postgresqlUsername }} --host {{ $config.postgres.postgresHost }} --port {{ $config.postgres.postgresPort }} --echo {{ $config.postgres.postgresDB }}"]
+        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} createdb --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --echo {{ .Values.archive.postgresDB}}"]
       - name: import-schema
         image: bitnami/postgresql
         command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ $config.postgresql.postgresqlPassword }} psql --username {{ $config.postgresql.postgresqlUsername }} --host {{ $config.postgres.postgresHost }} --port {{ $config.postgres.postgresPort }} --dbname {{ $config.postgres.postgresDB }} -f <(curl -Ls {{ $config.postgres.remoteSchemaFile }})"]
-      - name: update-transaction-isolation-level
-        image: bitnami/postgresql
-        command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ $config.postgresql.postgresqlPassword }} psql --username {{ $config.postgresql.postgresqlUsername }} --host {{ $config.postgres.postgresHost }} --port {{ $config.postgres.postgresPort }} --dbname {{ $config.postgres.postgresDB }} -c ALTER DATABASE {{ $config.postgres.postgresDB }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE ;"]
+        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB}} -f <(curl -Ls {{ .Values.archive.remoteSchemaFile }})"]
       restartPolicy: Never
   backoffLimit: 10
-{{- end }}
-{{- end }}

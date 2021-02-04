@@ -18,69 +18,13 @@ coda:
 archive:
   hostPort: "10909"
   image: codaprotocol/coda-archive:0.0.16-beta7-develop
-  listenPort: "3086"
-  nodeName: "dev"
   remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-  postgresHost: 'archive-1-postgresql'
-  postgresPort: "5432"
+  postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
   ports:
     server: 3086
     postgres: "5432"
-  # for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
-  archiveConfigs:
-  - name: "archive-1"
-    serverPort: 3086
-    externalPort: 1
-    runLocalDaemon: false
-    runPostgresDb: true
-    postgresHost: archive-1-postgresql
-    postgresPort: '{{ .Values.archive.postgresPort }}'
-    postgresDB: '{{ .Values.archive.postgresDB }}'
-    postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
-    postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
-    remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
-    postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
-    healthcheck:
-      enabled: true
-      failureThreshold: 60
-      periodSeconds: 5
-      initialDelaySeconds: 30
-  - name: "archive-2"
-    serverPort: 3086
-    externalPort: 2
-    runLocalDaemon: true
-    runPostgresDb: false
-    postgresHost: archive-1-postgresql
-    postgresPort: '{{ .Values.archive.postgresPort }}'
-    postgresDB: '{{ .Values.archive.postgresDB }}'
-    postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
-    postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
-    remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
-    postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
-    healthcheck:
-      enabled: true
-      failureThreshold: 60
-      periodSeconds: 5
-      initialDelaySeconds: 30
-  - name: "archive-3"
-    serverPort: 3086
-    externalPort: 3
-    runLocalDaemon: false
-    runPostgresDb: false
-    postgresHost: archive-1-postgresql
-    postgresPort: '{{ .Values.archive.postgresPort }}'
-    postgresDB: '{{ .Values.archive.postgresDB }}'
-    postgresqlUsername: '{{ .Values.postgresql.postgresqlUsername }}'
-    postgresqlPassword: '{{ .Values.postgresql.postgresqlPassword }}'
-    remoteSchemaFile: '{{ .Values.archive.remoteSchemaFile }}'
-    postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.postgresPort }}/{{ .Values.archive.postgresDB }}
-    healthcheck:
-      enabled: true
-      failureThreshold: 60
-      periodSeconds: 5
-      initialDelaySeconds: 30
 
 postgresql:
   postgresqlPassword: "foobar"
