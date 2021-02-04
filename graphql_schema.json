@@ -6583,16 +6583,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "UInt64",
-          "description": "String representing a uint64 number in base 10",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "AccountTiming",
           "description": null,
