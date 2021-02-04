@@ -278,8 +278,6 @@ variable "archive_configs" {
       name = string
       serverPort = string
       externalPort = string
-      runLocalDaemon = string
-      runPostgresDb = string
       postgresHost = string
       postgresPort = string
       postgresDB = string
@@ -287,6 +285,8 @@ variable "archive_configs" {
       postgresqlPassword = string
       remoteSchemaFile = string
       postgresUri = string
+      enableLocalDaemon = bool
+      enablePostgresDb = bool
     })
   )
   default = []

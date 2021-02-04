@@ -140,8 +140,8 @@ locals {
         name                = "archive-${index}"
         serverPort          = "3086"
         externalPort        = "11010"
-        runLocalDaemon      = false
-        runPostgresDb       = false
+        enableLocalDaemon   = false
+        enablePostgresDb    = false
         postgresHost        = "archive-1"
         postgresPort        = 5432
         postgresDB          = "archive"
@@ -308,6 +308,8 @@ resource "helm_release" "archive_node" {
           server          = local.archive_node_vars.node_configs[count.index].serverPort
           postgres        = local.archive_node_vars.node_configs[count.index].postgresPort
         }
+        enableLocalDaemon = local.archive_node_vars.node_configs[count.index].enableLocalDaemon
+        enablePostgresDb  = local.archive_node_vars.node_configs[count.index].enablePostgresDb
       }
       postgresql = local.archive_node_vars.postgres
     })
