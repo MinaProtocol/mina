@@ -1,11 +1,11 @@
 FROM ubuntu:18.04
 
-# Run with `docker build --build-arg coda_deb_version=<version>`
-ARG coda_deb_version
+# Run with `docker build --build-arg mina_deb_version=<version>`
+ARG mina_deb_version
 ARG deb_repo=stable
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN echo "Building image with version $coda_deb_version"
+RUN echo "Building image with version $mina_deb_version"
 
 # Dependencies
 RUN apt-get -y update && \
@@ -32,4 +32,4 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 # archive-node package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
-  && apt-get install -y "mina-archive=$coda_deb_version"
+  && apt-get install -y "mina-archive=$mina_deb_version"
