@@ -30,7 +30,7 @@ let main () =
     Cli_lib.Arg_type.Work_selection_method.Sequence
   in
   Coda_processes.init () ;
-  let trace_dir = Unix.getenv "CODA_TRACING" in
+  let trace_dir = Unix.getenv "MINA_TRACING" in
   let max_concurrent_connections = None in
   let%bind configs =
     Coda_processes.local_configs n ~program_dir ~block_production_interval

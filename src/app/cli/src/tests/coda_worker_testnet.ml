@@ -478,7 +478,7 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
       ~block_production_keys ~acceptable_delay ~chain_id:name
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
-      ~trace_dir:(Unix.getenv "CODA_TRACING")
+      ~trace_dir:(Unix.getenv "MINA_TRACING")
       ~max_concurrent_connections ?is_archive_rocksdb ?archive_process_location
       ~runtime_config
   in

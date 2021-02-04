@@ -34,7 +34,7 @@ let main () =
     Coda_processes.local_configs n ~program_dir ~block_production_interval
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method
-      ~trace_dir:(Unix.getenv "CODA_TRACING")
+      ~trace_dir:(Unix.getenv "MINA_TRACING")
       ~max_concurrent_connections:None
       ~runtime_config:precomputed_values.runtime_config
   in

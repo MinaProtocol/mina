@@ -95,7 +95,7 @@ let run_test () : unit Deferred.t =
     ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
-        match Unix.getenv "CODA_TRACING" with
+        match Unix.getenv "MINA_TRACING" with
         | Some trace_dir ->
             let%bind () = Async.Unix.mkdir ~p:() trace_dir in
             Coda_tracing.start trace_dir
