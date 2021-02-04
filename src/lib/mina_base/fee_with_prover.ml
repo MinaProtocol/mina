@@ -29,14 +29,5 @@ end]
 include Comparable.Make (Stable.V1.T)
 
 let gen =
-  (* This isn't really a valid public key, but good enough for testing *)
-  let pk =
-    let open Snark_params.Tick in
-    let open Quickcheck.Generator.Let_syntax in
-    let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
-    and is_odd = Bool.quickcheck_generator in
-    let x = Bigint.(to_field (of_bignum_bigint x)) in
-    {Public_key.Compressed.Poly.x; is_odd}
-  in
-  Quickcheck.Generator.map2 Currency.Fee.gen pk ~f:(fun fee prover ->
-      {fee; prover} )
+  Quickcheck.Generator.map2 Currency.Fee.gen Public_key.Compressed.gen
+    ~f:(fun fee prover -> {fee; prover})

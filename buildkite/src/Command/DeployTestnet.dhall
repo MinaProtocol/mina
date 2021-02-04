@@ -6,7 +6,9 @@ let Size = ./Size.dhall
 let Cmd = ../Lib/Cmds.dhall
 
 
-let deployEnv = "DOCKER_DEPLOY_ENV" in
+let deployEnv = "DOCKER_DEPLOY_ENV"
+-- testnet artifacts include: genesis ledgers, block producer keys,...
+let testnetArtifactPath = "/tmp/artifacts" in
 
 { step = \(testnetName : Text) -> \(dependsOn : List Command.TaggedKey.Type) -> \(postDeploy : Text) ->
     Command.build
@@ -23,14 +25,17 @@ let deployEnv = "DOCKER_DEPLOY_ENV" in
                 "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
             "fi"
           ),
+          -- ensure artifact DIR exists
+          Cmd.run "mkdir -p ${testnetArtifactPath}",
           Cmd.run (
             "source ${deployEnv} && terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
-              " -var ci_artifact_path=/tmp"
+              " -var ci_artifact_path=${testnetArtifactPath}"
           ),
           Cmd.run (
-            -- upload genesis_ledger and related generated json files
-            "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID} buildkite-agent artifact upload \"/tmp/genesis_ledger.json\""
+            -- upload/cache testnet genesis_ledger
+            "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID}" ++
+              " pushd ${testnetArtifactPath} && buildkite-agent artifact upload \"genesis_ledger.json\" && popd"
           ),
           Cmd.run (
             -- always execute post-deploy operation
