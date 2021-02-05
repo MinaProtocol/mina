@@ -63,6 +63,41 @@ let _ =
          Coding.to_public_key_compressed pk_raw_str
          |> Public_key.Compressed.to_base58_check |> Js.string
 
+       (** is the public key valid and derivable from private key; can
+           the private key be used to sign a transaction?
+       *)
+       method validKeypair (keypair_js : keypair_js) =
+         let sk_base58_check = Js.to_string keypair_js##.privateKey in
+         let pk_base58_check = Js.to_string keypair_js##.publicKey in
+         let derived_pk =
+           Js.to_string @@ _self##publicKeyOfPrivateKey keypair_js##.privateKey
+         in
+         if not (String.equal pk_base58_check derived_pk) then
+           raise_js_error "Public key not derivable from private key"
+         else
+           let sk = Private_key.of_base58_check_exn sk_base58_check in
+           let pk =
+             Public_key.Compressed.of_base58_check_exn pk_base58_check
+             |> Public_key.decompress_exn
+           in
+           let dummy_payload =
+             Mina_base_nonconsensus.Signed_command_payload.dummy
+           in
+           let signature =
+             Mina_base_nonconsensus.Signed_command.sign_payload sk
+               dummy_payload
+           in
+           let message =
+             Mina_base_nonconsensus.Signed_command.to_input dummy_payload
+           in
+           let verified =
+             Schnorr.verify signature
+               (Snark_params_nonconsensus.Inner_curve.of_affine pk)
+               message
+           in
+           if verified then Js._true
+           else raise_js_error "Could not sign a transaction with private key"
+
        (** sign arbitrary string with private key *)
        method signString (sk_base58_check_js : string_js) (str_js : string_js)
            =

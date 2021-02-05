@@ -34,8 +34,8 @@ let testnetArtifactPath = "/tmp/artifacts" in
           ),
           Cmd.run (
             -- upload/cache testnet genesis_ledger
-            "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID}" ++
-              " pushd ${testnetArtifactPath} && buildkite-agent artifact upload \"genesis_ledger.json\" && popd"
+            "pushd ${testnetArtifactPath} && BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID}" ++
+              " buildkite-agent artifact upload \"genesis_ledger.json\" && popd"
           ),
           Cmd.run (
             -- always execute post-deploy operation
