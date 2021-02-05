@@ -12,7 +12,7 @@ coda:
     metrics: "10001"
     p2p: "10909"
   enableArchive: true
-  archiveAddress: archive-1-postgressql
+  archiveAddress: archive-1-postgresql:3086
 
 seed:
   active: true
