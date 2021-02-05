@@ -77,10 +77,10 @@ let derivePublicKey = (privateKey: privateKey) =>
 /**
   * Verifies if a keypair is valid by checking if the public key can be derived from
   * the private key and additionally checking if we can use the private key to
-  * sign a transaction.
+  * sign a transaction. If the keypair is invalid, an exception is thrown.
   *
   * @param keypair - A keypair
-  * @returns True if the `keypair` is a verifiable keypair
+  * @returns True if the `keypair` is a verifiable keypair, otherwise throw an exception
   */
 [@genType]
 let verifyKeypair = (keypair: keypair) => {
