@@ -14,7 +14,7 @@ end
 
 let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
 
-let snark_pk = "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf"
+let snark_pk = "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
 
 let wait span = Async.after span |> Deferred.map ~f:Result.return
 
