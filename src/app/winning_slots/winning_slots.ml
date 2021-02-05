@@ -9,6 +9,7 @@ module Evaluate = struct
       { constraint_constants:
           Genesis_constants.Constraint_constants.Stable.Latest.t
       ; starting_slot: int
+      ; epoch: int
       ; slots_per_epoch: int }
     [@@deriving bin_io_unversioned]
   end
@@ -24,13 +25,14 @@ module Evaluate = struct
     [@@deriving bin_io_unversioned]
   end
 
-  let f {Param.constraint_constants; starting_slot; slots_per_epoch}
+  let f {Param.constraint_constants; starting_slot; epoch; slots_per_epoch}
       ( {Input.total_stake; my_stake; seed; delegator; private_key; basename= _}
       as input ) =
     let slots =
-      List.range ~start:`inclusive ~stop:`exclusive starting_slot
-        slots_per_epoch
-      |> List.map ~f:Coda_numbers.Global_slot.of_int
+      List.range ~start:`inclusive ~stop:`exclusive
+        (starting_slot + (slots_per_epoch * epoch))
+        (slots_per_epoch * (epoch + 1))
+      |> List.map ~f:Mina_numbers.Global_slot.of_int
     in
     ( input
     , List.filter slots ~f:(fun global_slot ->
@@ -47,7 +49,7 @@ module Evaluate = struct
     module Input = Input
 
     module Output = struct
-      type t = Input.t * Coda_numbers.Global_slot.Stable.Latest.t list
+      type t = Input.t * Mina_numbers.Global_slot.Stable.Latest.t list
       [@@deriving bin_io_unversioned]
     end
 
@@ -59,7 +61,7 @@ module Kp = struct
   type t = Public_key.Compressed.t * Private_key.t * string [@@deriving yojson]
 end
 
-let read_keys ~password dir =
+let read_keys dir =
   let keys_cache = "decrypted-keys" in
   let%bind keypairs =
     let res = Public_key.Compressed.Table.create () in
@@ -96,8 +98,19 @@ let read_keys ~password dir =
             in
             if Hashtbl.mem keypairs pubkey then Deferred.unit
             else
+              let parts = String.split ~on:'_' privkey_path in
+              let first = List.take parts (List.length parts - 1) in
+              let number = List.drop parts (List.length parts - 1) in
+              let file =
+                String.concat ~sep:"_" (first @ ["pw"] @ number) ^ ".txt"
+              in
+              Core.printf "reading pw file %s\n" file ;
+              let%bind password = Reader.file_contents (dir ^/ file) in
+              (*let password = "naughty blue worm" in*)
+              let password = String.strip password in
               let%map keypair =
-                Secrets.Keypair.read ~privkey_path:path ~password
+                Secrets.Keypair.read ~privkey_path:path
+                  ~password:(lazy (Deferred.return (Bytes.of_string password)))
               in
               match keypair with
               | Error e ->
@@ -117,12 +130,11 @@ let read_keys ~password dir =
   keypairs
 
 module Output_record = struct
-  type t = {basename: string; slots_won: Coda_numbers.Global_slot.t list}
+  type t = {basename: string; slots_won: Mina_numbers.Global_slot.t list}
   [@@deriving yojson]
 end
 
-let main ~starting_slot ~num_workers ~out_dir ~keys_dir ~password ~config_path
-    =
+let main ~starting_slot ~epoch ~num_workers ~out_dir ~keys_dir ~config_path =
   let logger = Logger.create () in
   let%bind config =
     let%map config_jsons =
@@ -191,7 +203,7 @@ let main ~starting_slot ~num_workers ~out_dir ~keys_dir ~password ~config_path
   in
   let%bind (private_keys
              : (string * Private_key.t) Public_key.Compressed.Table.t) =
-    read_keys keys_dir ~password
+    read_keys keys_dir
   in
   let ledger =
     Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
@@ -199,6 +211,7 @@ let main ~starting_slot ~num_workers ~out_dir ~keys_dir ~password ~config_path
   let param =
     { Evaluate.Param.constraint_constants=
         precomputed_values.constraint_constants
+    ; epoch
     ; starting_slot
     ; slots_per_epoch=
         Unsigned.UInt32.to_int
@@ -208,11 +221,11 @@ let main ~starting_slot ~num_workers ~out_dir ~keys_dir ~password ~config_path
     let r = ref [] in
     let genesis = Precomputed_values.genesis_state precomputed_values in
     let epoch_data =
-      Coda_state.Protocol_state.consensus_state genesis
+      Mina_state.Protocol_state.consensus_state genesis
       |> Consensus.Data.Consensus_state.staking_epoch_data
     in
     Ledger.iteri ledger ~f:(fun i a ->
-        match Hashtbl.find private_keys a.public_key with
+        match Hashtbl.find private_keys (Option.value_exn a.delegate) with
         | None ->
             ()
         | Some (basename, private_key) ->
@@ -265,23 +278,13 @@ let () =
           ~doc:"directory of private-key/public-key pairs"
       and config_path =
         flag "config-file" (required string) ~doc:"Genesis config file"
-      and password =
-        flag "-provide-password"
-          ~doc:"will try the default password if not provided" no_arg
       and out_dir = flag "-out-dir" ~doc:"output directory" (required string)
       and starting_slot =
         flag "-starting-slot" ~doc:"slot to start checking at"
           (optional_with_default 0 int)
+      and epoch =
+        flag "-epoch" ~doc:"epoch to check for" (optional_with_default 0 int)
       in
       fun () ->
-        let open Async in
-        let%bind password =
-          if password then
-            Secrets.Password.read_hidden_line "Password: "
-              ~error_help_message:"error"
-          else Deferred.return (Bytes.of_string "naughty blue worm")
-        in
-        main ~num_workers ~keys_dir ~out_dir ~starting_slot
-          ~password:(Lazy.return (Deferred.return password))
-          ~config_path)
+        main ~num_workers ~keys_dir ~out_dir ~starting_slot ~epoch ~config_path)
   |> Rpc_parallel.start_app

@@ -42,7 +42,7 @@ module Exported : sig
   val check_vrf :
        total_stake:Currency.Amount.t
     -> my_stake:Currency.Balance.t
-    -> global_slot:Coda_numbers.Global_slot.t
+    -> global_slot:Mina_numbers.Global_slot.t
     -> seed:Mina_base.Epoch_seed.t
     -> delegator:Mina_base.Account.Index.t
     -> private_key:Signature_lib.Private_key.t
