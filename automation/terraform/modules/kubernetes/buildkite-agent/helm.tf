@@ -148,8 +148,9 @@ locals {
 
           # upload artifact if explicitly set and exit
           if [[ $UPLOAD_PATH ]]; then
-            echo "--- uploading artifact: $${FILE}"
-            buildkite-agent artifact upload "$${FILE}"
+            echo "--- Uploading artifact: $${FILE}"
+            pushd $(dirname $FILE)
+            buildkite-agent artifact upload "$(basename $FILE)"; popd
             exit
           fi
 
@@ -161,13 +162,16 @@ locals {
             set -e
             echo "*** Cache miss -- executing step ***"
             bash -c "$${MISS_CMD}"
-            buildkite-agent artifact upload "$${FILE}"
+
+            echo "--- Uploading artifact: $${FILE}"
+            pushd $(dirname $FILE)
+            buildkite-agent artifact upload "$${FILE}"; popd
           else
             echo "*** Cache miss -- failing since a miss command was NOT provided ***"
             exit 1
           fi
         else
-          echo "*** Artifact not provided ***"
+          echo "*** Artifact not provided - skipping ***"
         fi
       EOF
 
