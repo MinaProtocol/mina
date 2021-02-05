@@ -1,6 +1,6 @@
 # The the base image from which we should build this image
 ARG base_image_tag
-FROM codaprotocol/coda-daemon:$base_image_tag
+FROM codaprotocol/mina-daemon:$base_image_tag
 
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y install \

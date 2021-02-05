@@ -3,8 +3,8 @@
 # Entrypoint for the Coda daemon service container
 # Features: 
 #   - Fetches Secrets (Wallet Keys) from AWS Secrets Manager on startup 
-#       - Configured via environment variable `CODA_WALLET_KEYS`
-#       -  `CODA_WALLET_KEYS=testnet/keys/echo/0 testnet/keys/grumpus/0`
+#       - Configured via environment variable `MINA_WALLET_KEYS`
+#       -  `MINA_WALLET_KEYS=testnet/keys/echo/0 testnet/keys/grumpus/0`
 #   - Starts mina daemon with those secrets
 #   - Optionally runs a SNARK Worker
 #   - Optionally runs a Block Producer
@@ -35,8 +35,8 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
-# Load CODA_WALLET_KEYS array from environment
-keys=($CODA_WALLET_KEYS)
+# Load MINA_WALLET_KEYS array from environment
+keys=($MINA_WALLET_KEYS)
 key_files=()
 # For each Secrets Manager key
 for key in "${keys[@]}"

@@ -1,6 +1,6 @@
 ARG BAKE_VERSION
 
-FROM codaprotocol/coda-daemon:${BAKE_VERSION}
+FROM codaprotocol/mina-daemon:${BAKE_VERSION}
 
 RUN apt-get update && apt-get install -y gnupg2
 

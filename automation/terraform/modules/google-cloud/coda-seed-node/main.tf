@@ -30,7 +30,7 @@ resource "google_compute_instance" "vm" {
     }
   }
 
-  tags = ["coda-daemon"]
+  tags = ["mina-daemon"]
 
   metadata = {
     gce-container-declaration = <<EOF

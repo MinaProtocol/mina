@@ -59,7 +59,7 @@ Pipeline.build
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        service="coda-daemon"
+        service="mina-daemon"
       }
 
       in

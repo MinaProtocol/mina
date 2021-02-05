@@ -104,7 +104,7 @@ daemon \
 @cli.command()
 @click.option("--namespace", default="regeneration", help="The name of the testnet you'd like to connect to.")
 @click.option("--gossip-port", default=10000, help="The port to expose on the Coda Daemon Docker Container.")
-@click.option("--docker-image", default="codaprotocol/coda-daemon:latest", help="The Coda Daemon Docker Image to use.")
+@click.option("--docker-image", default="codaprotocol/mina-daemon:latest", help="The Coda Daemon Docker Image to use.")
 @click.option("--working-directory", default=".", help="The location to download temporary files to, namely the daemon.json")
 def run(namespace, gossip_port, docker_image, working_directory):
   if working_directory == ".":

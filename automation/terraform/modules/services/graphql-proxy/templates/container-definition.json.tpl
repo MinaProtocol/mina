@@ -44,7 +44,7 @@
       }
     },
     "environment" : [
-        { "name" : "CODA_WALLET_KEYS", "value" : "${coda_wallet_keys}" },
+        { "name" : "MINA_WALLET_KEYS", "value" : "${coda_wallet_keys}" },
         { "name" : "AWS_ACCESS_KEY_ID", "value" : "${aws_access_key}" },
         { "name" : "AWS_SECRET_ACCESS_KEY", "value" : "${aws_secret_key}" },
         { "name" : "AWS_DEFAULT_REGION", "value" : "${aws_default_region}" },

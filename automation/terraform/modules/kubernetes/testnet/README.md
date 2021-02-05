@@ -17,7 +17,7 @@
 | block\_producer\_starting\_host\_port | n/a | `number` | `10000` | no |
 | cluster\_name | n/a | `string` | n/a | yes |
 | cluster\_region | n/a | `string` | n/a | yes |
-| coda\_image | n/a | `string` | `"codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"` | no |
+| mina\_image | n/a | `string` | `"codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"` | no |
 | fish\_block\_producer\_label\_offset | n/a | `number` | `0` | no |
 | num\_fish\_block\_producers | n/a | `number` | `5` | no |
 | num\_whale\_block\_producers | n/a | `number` | `3` | no |

@@ -34,7 +34,7 @@ This is a Terraform module that will deploy a Coda Daemon container as a service
 
 ## Deployment Considerations
 
-In order to deploy a "new" version of this module, you must ensure that you have rebuilt said container. The container build is a two-step process, with the base Coda dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile). 
+In order to deploy a "new" version of this module, you must ensure that you have rebuilt said container. The container build is a two-step process, with the base Coda dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-mina-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile). 
 
 The manual commands to release each container are the following: 
 
