@@ -36,14 +36,14 @@ let validate_keypair =
               try Public_key.Compressed.of_base58_check_exn line
               with _exn ->
                 eprintf
-                  "Could not create public key in file %s from text: %s\n!"
+                  "Could not create public key in file %s from text: %s\n"
                   pubkey_path line ;
                 exit 1 )
             | None ->
-                eprintf "No public key found in file %s\n!" pubkey_path ;
+                eprintf "No public key found in file %s\n" pubkey_path ;
                 exit 1 )
       with exn ->
-        eprintf "Could not read public key file %s, error: %s\n!" pubkey_path
+        eprintf "Could not read public key file %s, error: %s\n" pubkey_path
           (Exn.to_string exn) ;
         exit 1
     in
