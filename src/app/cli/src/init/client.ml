@@ -53,12 +53,13 @@ let stop_daemon =
 let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Get balance associated with a public key"
@@ -86,7 +87,7 @@ let get_balance_graphql =
 let get_tokens_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key for which you want to find accounts"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
@@ -161,7 +162,7 @@ let get_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:
         "IP An IPv4 or IPv6 address for which you want to query the trust \
          status"
@@ -199,7 +200,7 @@ let get_trust_status_all =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let nonzero_flag =
-    flag "nonzero-only" no_arg
+    flag "--nonzero-only" ~aliases:["nonzero-only"] no_arg
       ~doc:"Only show trust statuses whose trust score is nonzero"
   in
   let json_flag = Cli_lib.Flag.json in
@@ -233,7 +234,7 @@ let reset_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:
         "IP An IPv4 or IPv6 address for which you want to reset the trust \
          status"
@@ -258,7 +259,7 @@ let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
   let with_details_flag =
-    flag "with-details" no_arg
+    flag "--with-details" ~aliases:["with-details"] no_arg
       ~doc:"Show extra details (eg. balance, nonce) in addition to public keys"
   in
   let error_ctx = "Failed to get public-keys" in
@@ -296,21 +297,23 @@ let verify_receipt =
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let proof_path_flag =
-    flag "proof-path"
+    flag "--proof-path" ~aliases:["proof-path"]
       ~doc:"PROOFFILE File to read json version of payment receipt"
       (required string)
   in
   let payment_path_flag =
-    flag "payment-path"
+    flag "--payment-path" ~aliases:["payment-path"]
       ~doc:"PAYMENTPATH File to read json version of verifying payment"
       (required string)
   in
   let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+    flag "--address" ~aliases:["address"]
+      ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
@@ -373,11 +376,13 @@ let get_nonce_cmd =
   let open Command.Param in
   (* Ignores deprecation of public_key type for backwards compatibility *)
   let[@warning "-3"] address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
+    flag "--address" ~aliases:["address"]
+      ~doc:"PUBLICKEY Public-key address you want the nonce for"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   let flags = Args.zip2 address_flag token_flag in
@@ -507,16 +512,17 @@ let send_payment_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Payment amount you want to send"
-      (required txn_amount)
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to transfer"
-      (optional token_id)
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to transfer" (optional token_id)
   in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
@@ -546,7 +552,7 @@ let delegate_stake_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver"
+    flag "--receiver" ~aliases:["receiver"]
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
@@ -574,7 +580,8 @@ let create_new_token_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to create the new token for"
       (optional public_key_compressed)
   in
   let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
@@ -602,15 +609,18 @@ let create_new_account_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to create the new account for"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to create the new account for"
       (required public_key_compressed)
   in
   let token_owner_flag =
-    flag "token-owner" ~doc:"PUBLICKEY Public key for the owner of the token"
+    flag "--token-owner" ~aliases:["token-owner"]
+      ~doc:"PUBLICKEY Public key for the owner of the token"
       (optional public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to create the account for"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to create the account for"
       (required token_id)
   in
   let args =
@@ -670,19 +680,19 @@ let mint_tokens_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver"
+    flag "--receiver" ~aliases:["receiver"]
       ~doc:
         "PUBLICKEY Public key of the account to create new tokens in \
          (defaults to the sender)"
       (optional public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to mint"
-      (required token_id)
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to mint" (required token_id)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Number of new tokens to create"
-      (required txn_amount)
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Number of new tokens to create" (required txn_amount)
   in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_flag
@@ -710,7 +720,7 @@ let mint_tokens_graphql =
 let cancel_transaction_graphql =
   let txn_id_flag =
     Command.Param.(
-      flag "id" ~doc:"ID Transaction ID to be cancelled"
+      flag "--id" ~aliases:["id"] ~doc:"ID Transaction ID to be cancelled"
         (required Cli_lib.Arg_type.user_command))
   in
   Command.async
@@ -758,7 +768,7 @@ module Export_logs = struct
 
   let tarfile_flag =
     let open Command.Param in
-    flag "tarfile"
+    flag "--tarfile" ~aliases:["tarfile"]
       ~doc:"STRING Basename of the tar archive (default: date_time)"
       (optional string)
 
@@ -859,7 +869,8 @@ let handle_dump_ledger_response ~json = function
 let dump_ledger =
   let sl_hash_flag =
     Command.Param.(
-      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+      flag "--state-hash" ~aliases:["state-hash"]
+        ~doc:"STATE-HASH State hash (default: best state hash)"
         (optional string))
   in
   let json_flag = Cli_lib.Flag.json in
@@ -1049,7 +1060,7 @@ let set_staking_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
       (required public_key_compressed)
   in
@@ -1080,7 +1091,7 @@ let set_staking_graphql =
 let set_snark_worker =
   let open Command.Param in
   let public_key_flag =
-    flag "address"
+    flag "--address" ~aliases:["address"]
       ~doc:
         "PUBLICKEY Public-key address you wish to start snark-working on; \
          null to stop doing any snark work"
@@ -1184,7 +1195,8 @@ let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   let pk_flag =
     let open Command.Param in
-    flag "public-key" ~doc:"PUBLICKEY Public key of account to be exported"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let conf_dir = Cli_lib.Flag.conf_dir in
@@ -1331,7 +1343,8 @@ let create_hd_account =
 let unlock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"PUBLICKEY Public key to be unlocked"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key to be unlocked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
@@ -1365,7 +1378,8 @@ let unlock_account =
 let lock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"PUBLICKEY Public key of account to be locked"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key of account to be locked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
@@ -1417,7 +1431,7 @@ let generate_libp2p_keypair =
 
 let trustlist_ip_flag =
   Command.Param.(
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:"CIDR An IPv4 CIDR mask for the client trustlist (eg, 10.0.0.0/8)"
       (required Cli_lib.Arg_type.cidr_mask))
 
@@ -1606,16 +1620,17 @@ let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
-    flag "daemon-peers" no_arg
+    flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
       ~doc:"Get telemetry data for peers known to the daemon"
   in
   let peer_ids_flag =
-    flag "peer-ids"
+    flag "--peer-ids" ~aliases:["peer-ids"]
       (optional (Arg_type.comma_separated string))
       ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
   in
   let show_errors_flag =
-    flag "show-errors" no_arg ~doc:"Include error responses in output"
+    flag "--show-errors" ~aliases:["show-errors"] no_arg
+      ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
   Command.async ~summary:"Get telemetry data for a set of peers"
@@ -1688,25 +1703,25 @@ let archive_blocks =
       Command.Param.anon
         Command.Anons.(sequence ("FILES" %: Command.Param.string))
     and success_file =
-      Command.Param.flag "successful-files"
+      Command.Param.flag "--successful-files" ~aliases:["successful-files"]
         ~doc:"PATH Appends the list of files that were processed successfully"
         (Command.Flag.optional Command.Param.string)
     and failure_file =
-      Command.Param.flag "failed-files"
+      Command.Param.flag "--failed-files" ~aliases:["failed-files"]
         ~doc:"PATH Appends the list of files that failed to be processed"
         (Command.Flag.optional Command.Param.string)
     and log_successes =
-      Command.Param.flag "log-successful"
+      Command.Param.flag "--log-successful" ~aliases:["log-successful"]
         ~doc:
           "true/false Whether to log messages for files that were processed \
            successfully"
         (Command.Flag.optional_with_default true Command.Param.bool)
     and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
     and precomputed_flag =
-      Command.Param.flag "precomputed" no_arg
+      Command.Param.flag "--precomputed" ~aliases:["precomputed"] no_arg
         ~doc:"Blocks are in precomputed JSON format"
     and extensional_flag =
-      Command.Param.flag "extensional" no_arg
+      Command.Param.flag "--extensional" ~aliases:["extensional"] no_arg
         ~doc:"Blocks are in extensional JSON format"
     in
     ( files
