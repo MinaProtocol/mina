@@ -315,7 +315,7 @@ locals {
         ln --symbolic --force /docker-entrypoint.d/00-artifact-cache-helper /usr/local/bin/artifact-cache-helper.sh
 
         # Install mina debian package tools
-        echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list
+        echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/o1.list
         apt-get update && apt-get install -y "mina-testnet-postake-medium-curves"
       EOF
     }
