@@ -8,22 +8,22 @@ let Cmd = ../Lib/Cmds.dhall
 
 let DeploySpec = {
   Type = {
-    deps : List Command.TaggedKey.Type,
+    testnetLabel: Text,
     deployEnvFile : Text,
-    testnet: Text,
     workspace: Text,
     artifactPath: Text,
     postDeploy: Text,
-    testnetLabel: Text
+    testnetDir: Text,
+    deps : List Command.TaggedKey.Type
   },
   default = {
-    deps = [] : List Command.TaggedKey.Type,
+    testnetLabel = "ci-net",
     deployEnvFile = "DOCKER_DEPLOY_ENV",
-    testnet = "ci-net",
     workspace = "\\\${BUILDKITE_BRANCH//[_\\/]/-}",
     artifactPath = "/tmp/artifacts",
     postDeploy = "echo 'Deployment successfull!'",
-    testnetLabel = "testnet"
+    testnetDir = "automation/terraform/testnets/ci-net",
+    deps = [] : List Command.TaggedKey.Type
   }
 }
 
@@ -34,10 +34,9 @@ in
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "cd automation/terraform/testnets/${spec.testnet} && terraform init",
+          Cmd.run "cd ${spec.testnetDir} && terraform init",
 
           -- create separate workspace based on build branch to isolate infrastructure states
-          -- also ensure branch name meets terraform workspace naming constraints (remove '/' and '_')
           Cmd.run "terraform workspace select ${spec.workspace} || terraform workspace new ${spec.workspace}",
 
           -- download deployment dependencies and ensure artifact DIR exists
