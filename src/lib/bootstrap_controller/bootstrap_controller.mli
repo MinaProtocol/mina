@@ -1,5 +1,5 @@
 open Async_kernel
-open Coda_transition
+open Mina_transition
 open Pipe_lib
 open Network_peer
 
@@ -15,10 +15,14 @@ val run :
   -> transition_reader:External_transition.Initial_validated.t
                        Envelope.Incoming.t
                        Strict_pipe.Reader.t
+  -> best_seen_transition:External_transition.Initial_validated.t
+                          Envelope.Incoming.t
+                          option
   -> persistent_root:Transition_frontier.Persistent_root.t
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:External_transition.Validated.t
   -> precomputed_values:Precomputed_values.t
+  -> catchup_mode:[`Normal | `Super]
   -> ( Transition_frontier.t
      * External_transition.Initial_validated.t Envelope.Incoming.t list )
      Deferred.t

@@ -109,6 +109,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "ExtensionalBlock",
+          "description": "Block encoded in extensional block format",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "Applied",
           "description": null,
@@ -3065,6 +3075,37 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "archiveExtensionalBlock",
+              "description": null,
+              "args": [
+                {
+                  "name": "block",
+                  "description": "Block encoded in extensional block format",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "ExtensionalBlock",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Applied",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -3983,7 +4024,7 @@
             },
             {
               "name": "amount",
-	      "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4047,7 +4088,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4368,7 +4409,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -4689,7 +4730,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5014,7 +5055,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5239,7 +5280,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount that the source is sending to receiver; 0 for commands without an associated amount",
+              "description": "Amount that the source is sending to receiver - 0 for commands that are not associated with an amount",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6451,7 +6492,7 @@
         {
           "kind": "OBJECT",
           "name": "AnnotatedBalance",
-          "description": "A total balance annotated with the amount that is currently unknown with the invariant: unknown <= total",
+          "description": "A total balance annotated with the amount that is currently unknown with the invariant unknown <= total, as well as the currently liquid and locked balances.",
           "fields": [
             {
               "name": "total",
@@ -6486,6 +6527,28 @@
               "deprecationReason": null
             },
             {
+              "name": "liquid",
+              "isDeprecated": true,
+              "args": [],
+              "deprecationReason": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64"
+              },
+              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping."
+            },
+            {
+              "name": "locked",
+              "isDeprecated": true,
+              "args": [],
+              "deprecationReason": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64"
+              },
+              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping."
+            },
+            {
               "name": "blockHeight",
               "description": "Block height at which balance was measured",
               "args": [],
@@ -6508,6 +6571,77 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "AccountTiming",
+          "description": null,
+          "fields": [
+            {
+              "name": "initial_mininum_balance",
+              "description": "The initial minimum balance for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_time",
+              "description": "The cliff time for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_amount",
+              "description": "The cliff amount for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_period",
+              "description": "The vesting period for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_increment",
+              "description": "The vesting increment for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -6570,6 +6704,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "timing",
+              "description": "The timing associated with this account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountTiming",
                   "ofType": null
                 }
               },
@@ -6780,65 +6930,6 @@
                 "kind": "SCALAR",
                 "name": "Boolean",
                 "ofType": null
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
-          "kind": "OBJECT",
-          "name": "Peer",
-          "description": null,
-          "fields": [
-            {
-              "name": "host",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "libp2pPort",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "peerId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -7543,6 +7634,65 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "Peer",
+          "description": null,
+          "fields": [
+            {
+              "name": "host",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2pPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "peerId",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "String",
           "description": null,
@@ -7709,8 +7859,8 @@
                     "kind": "NON_NULL",
                     "name": null,
                     "ofType": {
-                      "kind": "SCALAR",
-                      "name": "String",
+                      "kind": "OBJECT",
+                      "name": "Peer",
                       "ofType": null
                     }
                   }
@@ -7774,6 +7924,26 @@
                   "kind": "ENUM",
                   "name": "SyncStatus",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "catchupStatus",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "String",
+                    "ofType": null
+                  }
                 }
               },
               "isDeprecated": false,
@@ -8110,7 +8280,7 @@
             },
             {
               "name": "account",
-              "description": "Find any account via a public key",
+              "description": "Find any account via a public key and token",
               "args": [
                 {
                   "name": "token",
@@ -8250,6 +8420,33 @@
                     "ofType": null
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "block",
+              "description": "Retrieve a block with the given state hash, if contained in the transition frontier.",
+              "args": [
+                {
+                  "name": "stateHash",
+                  "description": "The state hash of the desired block",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Block",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -8551,6 +8748,47 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "validatePayment",
+              "description": "Validate the format and signature of a payment",
+              "args": [
+                {
+                  "name": "signature",
+                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "SignatureInput",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SendPaymentInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
                   "ofType": null
                 }
               },

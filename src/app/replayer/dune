@@ -8,8 +8,9 @@
    caqti
    caqti-async
    caqti-driver-postgresql
+   archive_lib
    mina_base
-   coda_state
+   mina_state
    genesis_constants
    genesis_ledger_helper
    yojson
@@ -17,4 +18,4 @@
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_let ppx_sexp_conv
-                  ppx_hash ppx_compare ppx_deriving_yojson)))
+                  ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx)))

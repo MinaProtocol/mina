@@ -22,7 +22,7 @@ module Get_coinbase_and_genesis =
       stateHash
     }
     daemonStatus {
-      peers
+      peers { peerId }
     }
     initialPeers
   }
@@ -214,7 +214,7 @@ module Sql = struct
          * backwards until it reaches a block of the given height. *)
         {|
 WITH RECURSIVE chain AS (
-  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
+  (SELECT id, state_hash, parent_id, parent_hash, creator_id, block_winner_id, snarked_ledger_hash_id, staking_epoch_data_id, next_epoch_data_id, ledger_hash, height, global_slot, global_slot_since_genesis, timestamp FROM blocks b WHERE height = (select MAX(height) from blocks)
   ORDER BY timestamp ASC
   LIMIT 1)
 
@@ -287,22 +287,52 @@ WITH RECURSIVE chain AS (
 
   module User_commands = struct
     module Extras = struct
-      let fee_payer_account_creation_fee_paid (x, _, _, _) = x
+      (* TODO: A few of these actually aren't used; should we leave in for future or remove? *)
+      type t =
+        { fee_payer: string
+        ; source: string
+        ; receiver: string
+        ; status: string option
+        ; failure_reason: string option
+        ; fee_payer_account_creation_fee_paid: int64 option
+        ; receiver_account_creation_fee_paid: int64 option
+        ; created_token: int64 option }
+      [@@deriving hlist]
 
-      let receiver_account_creation_fee_paid (_, y, _, _) = y
+      let fee_payer t = `Pk t.fee_payer
 
-      let created_token (_, _, z, _) = z
+      let source t = `Pk t.source
 
-      let fee_payer (_, _, _, (x, _, _)) = `Pk x
+      let receiver t = `Pk t.receiver
 
-      let source (_, _, _, (_, y, _)) = `Pk y
+      let status t = t.status
 
-      let receiver (_, _, _, (_, _, z)) = `Pk z
+      let failure_reason t = t.failure_reason
+
+      let fee_payer_account_creation_fee_paid t =
+        t.fee_payer_account_creation_fee_paid
+
+      let receiver_account_creation_fee_paid t =
+        t.receiver_account_creation_fee_paid
+
+      let created_token t = t.created_token
 
       let typ =
-        Caqti_type.(
-          tup4 (option int64) (option int64) (option int64)
-            (tup3 string string string))
+        let open Archive_lib.Processor.Caqti_type_spec in
+        let spec =
+          Caqti_type.
+            [ string
+            ; string
+            ; string
+            ; option string
+            ; option string
+            ; option int64
+            ; option int64
+            ; option int64 ]
+        in
+        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        Caqti_type.custom ~encode ~decode (to_rep spec)
     end
 
     let typ =
@@ -313,8 +343,13 @@ WITH RECURSIVE chain AS (
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
-        u.valid_until, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token,
-        pk1.value as fee_payer, pk2.value as source, pk3.value as receiver
+        u.valid_until, u.memo, u.hash,
+        pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
+        blocks_user_commands.status,
+        blocks_user_commands.failure_reason,
+        blocks_user_commands.fee_payer_account_creation_fee_paid,
+        blocks_user_commands.receiver_account_creation_fee_paid,
+        blocks_user_commands.created_token
         FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
@@ -420,7 +455,7 @@ WITH RECURSIVE chain AS (
           in
           { Internal_command_info.kind
           ; receiver= Internal_commands.Extras.receiver extras
-          ; fee= Unsigned.UInt64.of_int ic.fee
+          ; fee= Unsigned.UInt64.of_int64 ic.fee
           ; token= Unsigned.UInt64.of_int64 ic.token
           ; hash= ic.hash } )
     in
@@ -451,7 +486,7 @@ WITH RECURSIVE chain AS (
                      `Invariant_violation)
           in
           let%map failure_status =
-            match uc.failure_reason with
+            match User_commands.Extras.failure_reason extras with
             | None -> (
               match
                 ( User_commands.Extras.fee_payer_account_creation_fee_paid
@@ -489,11 +524,11 @@ WITH RECURSIVE chain AS (
           ; fee_payer= User_commands.Extras.fee_payer extras
           ; source= User_commands.Extras.source extras
           ; receiver= User_commands.Extras.receiver extras
-          ; fee_token= Unsigned.UInt64.of_int uc.fee_token
-          ; token= Unsigned.UInt64.of_int uc.token
+          ; fee_token= Unsigned.UInt64.of_int64 uc.fee_token
+          ; token= Unsigned.UInt64.of_int64 uc.token
           ; nonce= Unsigned.UInt32.of_int uc.nonce
-          ; amount= Option.map ~f:Unsigned.UInt64.of_int uc.amount
-          ; fee= Unsigned.UInt64.of_int uc.fee
+          ; amount= Option.map ~f:Unsigned.UInt64.of_int64 uc.amount
+          ; fee= Unsigned.UInt64.of_int64 uc.fee
           ; hash= uc.hash
           ; failure_status= Some failure_status } )
     in

@@ -80,11 +80,6 @@ of the repo.
 
 #### Customizing your dev environment for autocomplete/merlin
 
-- If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
-  build
-
-`make USEDOCKER=TRUE merlin-fixup`
-
 - If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 
 ```bash
@@ -219,7 +214,7 @@ Coda genesis constants consists of constants for the consensus algorithm, sizes 
 All the constants can be set at compile-time. A subset of the compile-time constants can be overriden when generating the genesis state using `runtime_genesis_ledger.exe`, and a subset of those can again be overridden at runtime by passing the new values to the daemon.
 
 The constants at compile-time are set for different configurations using optional compilation. This is how integration tests/builds with multiple configurations are run.
-Currently some of these constants (defined [here](src/lib/coda_compile_config/coda_compile_config.ml)) cannot be changed after building and would require creating a new build profile (\*.mlh files) for any change in the values.
+Currently some of these constants (defined [here](src/lib/mina_compile_config/mina_compile_config.ml)) cannot be changed after building and would require creating a new build profile (\*.mlh files) for any change in the values.
 
 <b> 1. Constants that can be overridden when generating the genesis state are:</b>
 

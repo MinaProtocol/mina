@@ -45,7 +45,6 @@ spec:
           "-peer-exchange true"
           {{- end -}}
           {{- range .Values.coda.directPeers }}
-
           "-direct-peers", {{ . | quote }},
           {{- end -}}
           "-config-directory", "/root/.coda-config",
@@ -57,8 +56,8 @@ spec:
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end -}}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: DAEMON_REST_PORT
@@ -73,6 +72,8 @@ spec:
           value: {{ .Values.coda.ports.p2p | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
         ports:
         - name: client-port
           protocol: TCP 
@@ -86,7 +87,7 @@ spec:
         - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.external }}
+          hostPort: {{ .Values.coda.ports.p2p }}
 {{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 
@@ -99,9 +100,22 @@ spec:
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
-        args: [ "coda-archive run -postgres-uri {{ tpl .Values.archive.postgresUri . }} -server-port {{ .Values.archive.ports.server }}" ]
+        args: [ 
+          "coda-archive",
+          "run",
+          "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
+          {{- if .Values.coda.runtimeConfig }}
+          "-config-file", "/config/daemon.json",
+          {{- end }}
+          "-server-port", "{{ .Values.archive.ports.server }}"
+        ]
         env:
         imagePullPolicy: Always
+        {{- if .Values.coda.runtimeConfig }}
+        volumeMounts:
+        - name: daemon-config
+          mountPath: "/config/"
+        {{- end }}
         ports:
         - name: archive-port
           protocol: TCP

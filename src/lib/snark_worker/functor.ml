@@ -92,15 +92,15 @@ module Make (Inputs : Intf.Inputs_intf) :
     let%map res =
       Rpc.Connection.with_client
         ~handshake_timeout:
-          (Time.Span.of_sec Coda_compile_config.rpc_handshake_timeout_sec)
+          (Time.Span.of_sec Mina_compile_config.rpc_handshake_timeout_sec)
         ~heartbeat_config:
           (Rpc.Connection.Heartbeat_config.create
              ~timeout:
                (Time_ns.Span.of_sec
-                  Coda_compile_config.rpc_heartbeat_timeout_sec)
+                  Mina_compile_config.rpc_heartbeat_timeout_sec)
              ~send_every:
                (Time_ns.Span.of_sec
-                  Coda_compile_config.rpc_heartbeat_send_every_sec))
+                  Mina_compile_config.rpc_heartbeat_send_every_sec))
         (Tcp.Where_to_connect.of_host_and_port address)
         (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
@@ -244,15 +244,16 @@ module Make (Inputs : Intf.Inputs_intf) :
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
-        flag "daemon-address"
+        flag "--daemon-address" ~aliases:["daemon-address"]
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
       and proof_level =
-        flag "proof-level"
+        flag "--proof-level" ~aliases:["proof-level"]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
       and shutdown_on_disconnect =
-        flag "shutdown-on-disconnect" (optional bool)
+        flag "--shutdown-on-disconnect" ~aliases:["shutdown-on-disconnect"]
+          (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
       in

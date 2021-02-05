@@ -21,8 +21,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.contains "helm",
-        S.strictly (S.contains "Chart.yaml"),
+        S.strictlyEnd (S.contains "Chart.yaml"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
         S.exactly "buildkite/scripts/helm-ci" "sh"
       ],

@@ -62,8 +62,9 @@ type app struct {
 	UnsafeNoTrustIP bool
 
 	// development configuration options
-	NoMDNS bool
-	NoDHT  bool
+	NoMDNS    bool
+	NoDHT     bool
+	NoUpcalls bool
 }
 
 var seqs = make(chan int)
@@ -108,6 +109,10 @@ type envelope struct {
 }
 
 func (app *app) writeMsg(msg interface{}) {
+	if app.NoUpcalls {
+		return
+	}
+
 	app.OutChan <- msg
 }
 
@@ -124,6 +129,10 @@ type wrappedError struct {
 
 func (w wrappedError) Error() string {
 	return fmt.Sprintf("%s error: %s", w.tag, w.e.Error())
+}
+
+func (w wrappedError) Unwrap() error {
+	return w.e
 }
 
 func wrapError(e error, tag string) error { return wrappedError{e: e, tag: tag} }
@@ -252,6 +261,7 @@ type configureMsg struct {
 	GatingConfig        setGatingConfigMsg `json:"gating_config"`
 	MaxConnections      int                `json:"max_connections"`
 	ValidationQueueSize int                `json:"validation_queue_size"`
+	MinaPeerExchange    bool               `json:"mina_peer_exchange"`
 }
 
 type peerConnectionUpcall struct {
@@ -309,12 +319,12 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badAddr(err)
 	}
 
-	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig))
+	gatingConfig, err := gatingConfigFromJson(&(m.GatingConfig), app.AddedPeers)
 	if err != nil {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections)
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange)
 	if err != nil {
 		return nil, badHelper(err)
 	}
@@ -398,8 +408,13 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 
 	var topic *pubsub.Topic
 	var has bool
+
 	if topic, has = app.Topics[t.Topic]; !has {
-		return nil, badRPC(err)
+		topic, err = app.P2p.Pubsub.Join(t.Topic)
+		if err != nil {
+			return nil, badp2p(err)
+		}
+		app.Topics[t.Topic] = topic
 	}
 
 	if err := topic.Publish(app.Ctx, data); err != nil {
@@ -424,6 +439,12 @@ func codaEncode(data []byte) string {
 func codaDecode(data string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(data)
 }
+
+var (
+	acceptResult = "accept"
+	rejectResult = "reject"
+	ignoreResult = "ignore"
+)
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
@@ -507,18 +528,19 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationReject
 		case res := <-ch:
 			switch res {
-			case "reject":
+			case rejectResult:
 				app.P2p.Logger.Info("why u fail to validate :(")
 				return pubsub.ValidationReject
-			case "accept":
+			case acceptResult:
 				app.P2p.Logger.Info("validated!")
 				return pubsub.ValidationAccept
-			case "ignore":
+			case ignoreResult:
 				app.P2p.Logger.Info("ignoring valid message!")
 				return pubsub.ValidationIgnore
+			default:
+				app.P2p.Logger.Info("ignoring message that falled off the end!")
+				return pubsub.ValidationIgnore
 			}
-			app.P2p.Logger.Info("ignoring message that falled off the end!")
-			return pubsub.ValidationIgnore
 		}
 	}, pubsub.WithValidatorTimeout(validationTimeout))
 
@@ -644,11 +666,6 @@ type streamReadCompleteUpcall struct {
 	StreamIdx int    `json:"stream_idx"`
 }
 
-type openStreamMsg struct {
-	Peer       string `json:"peer"`
-	ProtocolID string `json:"protocol"`
-}
-
 type incomingMsgUpcall struct {
 	Upcall    string `json:"upcall"`
 	StreamIdx int    `json:"stream_idx"`
@@ -693,6 +710,11 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 	}()
 }
 
+type openStreamMsg struct {
+	Peer       string `json:"peer"`
+	ProtocolID string `json:"protocol"`
+}
+
 type openStreamResult struct {
 	StreamIdx int          `json:"stream_idx"`
 	Peer      codaPeerInfo `json:"peer"`
@@ -702,7 +724,9 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+
 	streamIdx := <-seqs
+
 	peer, err := peer.Decode(o.Peer)
 	if err != nil {
 		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
@@ -856,6 +880,7 @@ func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
 
 type addPeerMsg struct {
 	Multiaddr string `json:"multiaddr"`
+	Seed      bool   `json:"seed"`
 }
 
 func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
@@ -882,8 +907,16 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.AddedPeers = append(app.AddedPeers, *info)
+	app.P2p.GatingState.TrustedPeers.Add(info.ID)
+
 	if app.Bootstrapper != nil {
 		app.Bootstrapper.Close()
+	}
+
+	app.P2p.Logger.Error("addPeer Trying to connect to: ", info)
+
+	if ap.Seed {
+		app.P2p.Seeds = append(app.P2p.Seeds, *info)
 	}
 
 	err = app.P2p.Host.Connect(app.Ctx, *info)
@@ -897,21 +930,51 @@ func (ap *addPeerMsg) run(app *app) (interface{}, error) {
 type beginAdvertisingMsg struct {
 }
 
+type peerDisoverySource int
+
+const (
+	PEER_DISCOVERY_SOURCE_MDNS peerDisoverySource = iota
+	PEER_DISCOVERY_SOURCE_ROUTING
+)
+
+func (source peerDisoverySource) String() string {
+	switch source {
+	case PEER_DISCOVERY_SOURCE_MDNS:
+		return "PEER_DISCOVERY_SOURCE_MDNS"
+	case PEER_DISCOVERY_SOURCE_ROUTING:
+		return "PEER_DISCOVERY_SOURCE_ROUTING"
+	default:
+		return fmt.Sprintf("%d", int(source))
+	}
+}
+
+type peerDiscovery struct {
+	info   peer.AddrInfo
+	source peerDisoverySource
+}
+
 type mdnsListener struct {
-	FoundPeer chan peer.AddrInfo
+	FoundPeer chan peerDiscovery
+	app       *app
 }
 
 func (l *mdnsListener) HandlePeerFound(info peer.AddrInfo) {
-	l.FoundPeer <- info
+	l.FoundPeer <- peerDiscovery{
+		info:   info,
+		source: PEER_DISCOVERY_SOURCE_MDNS,
+	}
 }
 
-func beginMDNS(app *app, foundPeerCh chan peer.AddrInfo) error {
+func beginMDNS(app *app, foundPeerCh chan peerDiscovery) error {
 	mdns, err := mdns.NewMdnsService(app.Ctx, app.P2p.Host, time.Minute, "_coda-discovery._udp.local")
 	if err != nil {
 		return err
 	}
 	app.P2p.Mdns = &mdns
-	l := &mdnsListener{FoundPeer: foundPeerCh}
+	l := &mdnsListener{
+		FoundPeer: foundPeerCh,
+		app:       app,
+	}
 	mdns.RegisterNotifee(l)
 
 	return nil
@@ -923,7 +986,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	for _, info := range app.AddedPeers {
-		app.P2p.Logger.Error("Trying to connect to: ", info)
+		app.P2p.Logger.Debug("Trying to connect to: ", info)
 		err := app.P2p.Host.Connect(app.Ctx, info)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to peer: ", info, err.Error())
@@ -931,7 +994,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}
 
-	foundPeerCh := make(chan peer.AddrInfo)
+	foundPeerCh := make(chan peerDiscovery)
 
 	validPeer := func(who peer.ID) bool {
 		return who.Validate() == nil && who != app.P2p.Me
@@ -939,23 +1002,34 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 	// report discovery peers local and remote
 	go func() {
-		for info := range foundPeerCh {
-			if validPeer(info.ID) {
-				app.P2p.Logger.Debugf("discovered peer", info.ID)
-				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+		for discovery := range foundPeerCh {
+			if validPeer(discovery.info.ID) {
+				app.P2p.Logger.Debugf("discovered peer %v via %v; processing", discovery.info.ID, discovery.source)
+				app.P2p.Host.Peerstore().AddAddrs(discovery.info.ID, discovery.info.Addrs, peerstore.ConnectedAddrTTL)
+
+				if discovery.source == PEER_DISCOVERY_SOURCE_MDNS {
+					for _, addr := range discovery.info.Addrs {
+						app.P2p.GatingState.MarkPrivateAddrAsKnown(addr)
+					}
+				}
 
 				// now connect to the peer we discovered
-				err := app.P2p.Host.Connect(app.Ctx, info)
-				if err != nil {
-					app.P2p.Logger.Error("failed to connect to peer after discovering it: ", info, err.Error())
-					continue
+				connInfo := app.P2p.ConnectionManager.GetInfo()
+				if connInfo.ConnCount < connInfo.LowWater {
+					err := app.P2p.Host.Connect(app.Ctx, discovery.info)
+					if err != nil {
+						app.P2p.Logger.Error("failed to connect to peer after discovering it: ", discovery.info, err.Error())
+						continue
+					}
 				}
+			} else {
+				app.P2p.Logger.Debugf("discovered peer %v via %v; not processing as it is not a valid peer", discovery.info.ID, discovery.source)
 			}
 		}
 	}()
 
 	if !app.NoMDNS {
-		app.P2p.Logger.Debugf("beginning mDNS discovery")
+		app.P2p.Logger.Infof("beginning mDNS discovery")
 		err := beginMDNS(app, foundPeerCh)
 		if err != nil {
 			app.P2p.Logger.Error("failed to connect to begin mdns: ", err.Error())
@@ -964,7 +1038,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	if !app.NoDHT {
-		app.P2p.Logger.Debugf("beginning DHT discovery")
+		app.P2p.Logger.Infof("beginning DHT discovery")
 		routingDiscovery := discovery.NewRoutingDiscovery(app.P2p.Dht)
 		if routingDiscovery == nil {
 			return nil, errors.New("failed to create routing discovery")
@@ -979,6 +1053,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 
 		time.Sleep(time.Millisecond * 100)
+		app.P2p.Logger.Debugf("beginning DHT advertising")
 
 		_, err = routingDiscovery.Advertise(app.Ctx, app.P2p.Rendezvous)
 		if err != nil {
@@ -993,12 +1068,17 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			}
 
 			for peer := range peerCh {
-				foundPeerCh <- peer
+				foundPeerCh <- peerDiscovery{
+					info:   peer,
+					source: PEER_DISCOVERY_SOURCE_ROUTING,
+				}
 			}
 		}()
 	}
 
 	app.P2p.ConnectionManager.OnConnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+
 		id := c.RemotePeer()
 
 		app.writeMsg(peerConnectionUpcall{
@@ -1013,6 +1093,8 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
+		app.updateConnectionMetrics()
+
 		id := c.RemotePeer()
 
 		app.writeMsg(peerConnectionUpcall{
@@ -1028,6 +1110,11 @@ const (
 	latencyMeasurementTime = time.Second * 5
 	metricsRefreshTime     = time.Minute
 )
+
+func (app *app) updateConnectionMetrics() {
+	info := app.P2p.ConnectionManager.GetInfo()
+	connectionCountMetric.Set(float64(info.ConnCount))
+}
 
 func (a *app) checkBandwidth(id peer.ID) {
 	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -1169,49 +1256,49 @@ type setGatingConfigMsg struct {
 	Isolate        bool     `json:"isolate"`
 }
 
-func gatingConfigFromJson(gc *setGatingConfigMsg) (*codanet.CodaGatingState, error) {
-	newFilter := ma.NewFilters()
-	logger := logging.Logger("libp2p_helper.gatingConfigFromJson")
+func gatingConfigFromJson(gc *setGatingConfigMsg, addedPeers []peer.AddrInfo) (*codanet.CodaGatingState, error) {
+	_, totalIpNet, err := gonet.ParseCIDR("0.0.0.0/0")
+	if err != nil {
+		return nil, err
+	}
 
+	// TODO: perhaps the isolate option should just be passed down to the gating state instead
+	bannedAddrFilters := ma.NewFilters()
 	if gc.Isolate {
-		_, ipnet, err := gonet.ParseCIDR("0.0.0.0/0")
-		if err != nil {
-			return nil, err
-		}
-		newFilter.AddFilter(*ipnet, ma.ActionDeny)
+		bannedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
 	}
 	for _, ip := range gc.BannedIPs {
-		err := filterIPString(newFilter, ip, ma.ActionDeny)
+		err := filterIPString(bannedAddrFilters, ip, ma.ActionDeny)
 		if err != nil {
 			return nil, err
 		}
-	}
-	for _, ip := range gc.TrustedIPs {
-		err := filterIPString(newFilter, ip, ma.ActionAccept)
-		if err != nil {
-			return nil, err
-		}
-	}
-	bannedPeers := peer.NewSet()
-	for _, peerID := range gc.BannedPeerIDs {
-		id, err := peer.Decode(peerID)
-		if err != nil {
-			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
-			continue
-		}
-		bannedPeers.Add(id)
-	}
-	trustedPeers := peer.NewSet()
-	for _, peerID := range gc.TrustedPeerIDs {
-		id, err := peer.Decode(peerID)
-		if err != nil {
-			logger.Errorf("error while parsing peer id %s: %v", peerID, err.Error())
-			continue
-		}
-		trustedPeers.Add(id)
 	}
 
-	return codanet.NewCodaGatingState(newFilter, bannedPeers, trustedPeers), nil
+	trustedAddrFilters := ma.NewFilters()
+	trustedAddrFilters.AddFilter(*totalIpNet, ma.ActionDeny)
+	for _, ip := range gc.TrustedIPs {
+		err := filterIPString(trustedAddrFilters, ip, ma.ActionAccept)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	bannedPeers := peer.NewSet()
+	for _, peerID := range gc.BannedPeerIDs {
+		id := peer.ID(peerID)
+		bannedPeers.Add(id)
+	}
+
+	trustedPeers := peer.NewSet()
+	for _, peerID := range gc.TrustedPeerIDs {
+		id := peer.ID(peerID)
+		trustedPeers.Add(id)
+	}
+	for _, peer := range addedPeers {
+		trustedPeers.Add(peer.ID)
+	}
+
+	return codanet.NewCodaGatingState(bannedAddrFilters, trustedAddrFilters, bannedPeers, trustedPeers), nil
 }
 
 func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
@@ -1219,13 +1306,12 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 
-	newState, err := gatingConfigFromJson(gc)
-
+	newState, err := gatingConfigFromJson(gc, app.AddedPeers)
 	if err != nil {
 		return nil, badRPC(err)
 	}
 
-	*app.P2p.GatingState = *newState
+	app.P2p.GatingState = newState
 
 	return "ok", nil
 }
@@ -1263,10 +1349,30 @@ type successResult struct {
 	Duration string          `json:"duration"`
 }
 
+var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "connection_count",
+	Help: "Number of active connections, according to the CodaConnectionManager.",
+})
+
 func init() {
 	// === Register metrics collectors here ===
-	// currently, we only register the default go collector (which promhttp does automatically for us)
+	prometheus.MustRegister(connectionCountMetric)
 	http.Handle("/metrics", promhttp.Handler())
+}
+
+func newApp() *app {
+	return &app{
+		P2p:            nil,
+		Ctx:            context.Background(),
+		Subs:           make(map[int]subscription),
+		Topics:         make(map[string]*pubsub.Topic),
+		ValidatorMutex: &sync.Mutex{},
+		Validators:     make(map[int]*validationStatus),
+		Streams:        make(map[int]net.Stream),
+		OutChan:        make(chan interface{}, 4096),
+		Out:            bufio.NewWriter(os.Stdout),
+		AddedPeers:     []peer.AddrInfo{},
+	}
 }
 
 func main() {
@@ -1337,20 +1443,8 @@ func main() {
 	// 4 * (2^24/3) / 2^20 = 21.33
 	bufsize := (1024 * 1024) * 1024
 	lines.Buffer(make([]byte, bufsize), bufsize)
-	out := bufio.NewWriter(os.Stdout)
 
-	app := &app{
-		P2p:            nil,
-		Ctx:            context.Background(),
-		Subs:           make(map[int]subscription),
-		Topics:         make(map[string]*pubsub.Topic),
-		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]*validationStatus),
-		Streams:        make(map[int]net.Stream),
-		OutChan:        make(chan interface{}, 4096),
-		Out:            out,
-		AddedPeers:     []peer.AddrInfo{},
-	}
+	app := newApp()
 
 	go func() {
 		for {

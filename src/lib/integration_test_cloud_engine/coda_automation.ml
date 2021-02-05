@@ -3,10 +3,13 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
+open Cmd_util
 open Integration_test_lib
 open Unix
 
 module Network_config = struct
+  module Cli_inputs = Cli_inputs
+
   type block_producer_config =
     { name: string
     ; class_: string [@key "class"]
@@ -16,11 +19,13 @@ module Network_config = struct
     ; run_with_user_agent: bool
     ; run_with_bots: bool
     ; enable_peer_exchange: bool
-    ; isolated: bool }
+    ; isolated: bool
+    ; libp2p_secret: string }
   [@@deriving to_yojson]
 
   type terraform_config =
-    { cluster_name: string
+    { generate_and_upload_artifacts: bool
+    ; cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
     ; k8s_context: string
@@ -32,7 +37,6 @@ module Network_config = struct
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; coda_faucet_amount: string
-    ; deploy_archive: bool
     ; coda_faucet_fee: string
     ; seed_zone: string
     ; seed_region: string
@@ -56,8 +60,7 @@ module Network_config = struct
     ; project_id: string
     ; cluster_id: string
     ; keypairs: (string * Keypair.t) list
-    ; constraint_constants: Genesis_constants.Constraint_constants.t
-    ; genesis_constants: Genesis_constants.t
+    ; constants: Test_config.constants
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -68,7 +71,8 @@ module Network_config = struct
     assoc
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
-      ~(test_config : Test_config.t) ~(images : Container_images.t) =
+      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
+      =
     let { Test_config.k
         ; delta
         ; slots_per_epoch
@@ -108,8 +112,11 @@ module Network_config = struct
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
-      let keypairs = Array.to_list (Lazy.force Sample_keypairs.keypairs) in
-      if List.length block_producers > List.length keypairs then
+      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
+      let keypairs =
+        List.drop (Array.to_list (Lazy.force Sample_keypairs.keypairs)) 1
+      in
+      if num_block_producers > List.length keypairs then
         failwith
           "not enough sample keypairs for specified number of block producers" ;
       let f index ({Test_config.Block_producer.balance; timing}, (pk, sk)) =
@@ -194,6 +201,9 @@ module Network_config = struct
         (Genesis_ledger_helper.make_genesis_constants ~logger
            ~default:Genesis_constants.compiled runtime_config)
     in
+    let constants : Test_config.constants =
+      {constraints= constraint_constants; genesis= genesis_constants}
+    in
     (* BLOCK PRODUCER CONFIG *)
     let base_port = 10001 in
     let block_producer_config index (secret_name, _) =
@@ -205,17 +215,18 @@ module Network_config = struct
       ; run_with_user_agent= false
       ; run_with_bots= false
       ; enable_peer_exchange= false
-      ; isolated= false }
+      ; isolated= false
+      ; libp2p_secret= "" }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
     ; project_id
     ; cluster_id
     ; keypairs= block_producer_keypairs
-    ; constraint_constants
-    ; genesis_constants
+    ; constants
     ; terraform=
-        { cluster_name
+        { generate_and_upload_artifacts= false
+        ; cluster_name
         ; cluster_region
         ; testnet_name
         ; seed_zone
@@ -224,7 +235,6 @@ module Network_config = struct
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
-        ; deploy_archive= false
         ; coda_points_image= images.points
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_key_pass= "naughty blue worm"
@@ -299,16 +309,16 @@ module Network_manager = struct
     ; keypair_secrets: string list
     ; testnet_dir: string
     ; testnet_log_filter: string
-    ; constraint_constants: Genesis_constants.Constraint_constants.t
-    ; genesis_constants: Genesis_constants.t
-    ; block_producer_pod_names: Kubernetes_network.Node.t list
-    ; snark_coordinator_pod_names: Kubernetes_network.Node.t list
+    ; constants: Test_config.constants
+    ; block_producer_nodes: Kubernetes_network.Node.t list
+    ; snark_coordinator_nodes: Kubernetes_network.Node.t list
+    ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
-  let run_cmd t prog args = Cmd_util.run_cmd t.testnet_dir prog args
+  let run_cmd t prog args = run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn t prog args = Cmd_util.run_cmd_exn t.testnet_dir prog args
+  let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
     let testnet_dir =
@@ -320,17 +330,20 @@ module Network_manager = struct
       if%bind File_system.dir_exists testnet_dir then (
         [%log warn]
           "Old network deployment found; attempting to refresh and cleanup" ;
-        let%bind () =
+        let%bind _ =
           Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
         in
-        let%bind () =
+        let%bind _ =
           let open Process.Output in
           let%bind state_output =
             Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
           in
           if not (String.is_empty state_output.stdout) then
-            Cmd_util.run_cmd_exn testnet_dir "terraform"
-              ["destroy"; "-auto-approve"]
+            let%map _ =
+              Cmd_util.run_cmd_exn testnet_dir "terraform"
+                ["destroy"; "-auto-approve"]
+            in
+            ()
           else return ()
         in
         File_system.remove_dir testnet_dir )
@@ -372,12 +385,18 @@ module Network_manager = struct
       ; Kubernetes_network.Node.node_graphql_port= port }
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
-    let snark_coordinator_pod_names = [cons_node "snark-coordinator-1" 3085] in
-    let block_producer_pod_names =
+    let snark_coordinator_nodes = [cons_node "snark-coordinator-1" 3085] in
+    let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
           cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
       )
+    in
+    let nodes_by_app_id =
+      let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
+      all_nodes
+      |> List.map ~f:(fun node -> (node.pod_id, node))
+      |> String.Map.of_alist_exn
     in
     let t =
       { logger
@@ -385,50 +404,63 @@ module Network_manager = struct
       ; namespace= network_config.terraform.testnet_name
       ; testnet_dir
       ; testnet_log_filter
-      ; constraint_constants= network_config.constraint_constants
-      ; genesis_constants= network_config.genesis_constants
+      ; constants= network_config.constants
       ; keypair_secrets= List.map network_config.keypairs ~f:fst
-      ; block_producer_pod_names
-      ; snark_coordinator_pod_names
+      ; block_producer_nodes
+      ; snark_coordinator_nodes
+      ; nodes_by_app_id
       ; deployed= false
       ; keypairs= List.unzip network_config.keypairs |> snd }
     in
     [%log info] "Initializing terraform" ;
-    let%bind () = run_cmd_exn t "terraform" ["init"] in
-    let%map () = run_cmd_exn t "terraform" ["validate"] in
+    let%bind _ = run_cmd_exn t "terraform" ["init"] in
+    let%map _ = run_cmd_exn t "terraform" ["validate"] in
     t
 
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
     [%log' info t.logger] "Deploying network" ;
-    let%bind () = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
+    let%bind _ = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     [%log' info t.logger] "Uploading network secrets" ;
     let%map () =
       Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          run_cmd_exn t "kubectl"
-            [ "create"
-            ; "secret"
-            ; "generic"
-            ; secret
-            ; "--cluster=" ^ t.cluster
-            ; "--namespace=" ^ t.namespace
-            ; "--from-file=key=" ^ secret
-            ; "--from-file=pub=" ^ secret ^ ".pub" ] )
+          let%map _ =
+            run_cmd_exn t "kubectl"
+              [ "create"
+              ; "secret"
+              ; "generic"
+              ; secret
+              ; "--cluster=" ^ t.cluster
+              ; "--namespace=" ^ t.namespace
+              ; "--from-file=key=" ^ secret
+              ; "--from-file=pub=" ^ secret ^ ".pub" ]
+          in
+          () )
     in
     t.deployed <- true ;
-    { Kubernetes_network.namespace= t.namespace
-    ; constraint_constants= t.constraint_constants
-    ; genesis_constants= t.genesis_constants
-    ; block_producers= t.block_producer_pod_names
-    ; snark_coordinators= t.snark_coordinator_pod_names
-    ; archive_nodes= []
-    ; testnet_log_filter= t.testnet_log_filter
-    ; keypairs= t.keypairs }
+    let result =
+      { Kubernetes_network.namespace= t.namespace
+      ; constants= t.constants
+      ; block_producers= t.block_producer_nodes
+      ; snark_coordinators= t.snark_coordinator_nodes
+      ; archive_nodes= []
+      ; nodes_by_app_id= t.nodes_by_app_id
+      ; testnet_log_filter= t.testnet_log_filter
+      ; keypairs= t.keypairs }
+    in
+    [%log' info t.logger] "Network deployed" ;
+    [%log' info t.logger] "snark_coordinators_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.snark_coordinators) ;
+    [%log' info t.logger] "block_producers_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.block_producers) ;
+    [%log' info t.logger] "archive_nodes_list: %s"
+      (Kubernetes_network.Node.node_list_to_string result.archive_nodes) ;
+    result
 
   let destroy t =
     [%log' info t.logger] "Destroying network" ;
     if not t.deployed then failwith "network not deployed" ;
-    let%bind () = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
+    let%bind _ = run_cmd_exn t "terraform" ["destroy"; "-auto-approve"] in
     t.deployed <- false ;
     Deferred.unit
 

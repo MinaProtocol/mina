@@ -309,7 +309,7 @@ include Transaction_logic.Make (Ledger_inner)
 type init_state =
   ( Signature_lib.Keypair.t
   * Currency.Amount.t
-  * Coda_numbers.Account_nonce.t
+  * Mina_numbers.Account_nonce.t
   * Account_timing.t )
   array
 [@@deriving sexp_of]
@@ -327,7 +327,7 @@ let gen_initial_ledger_state : init_state Quickcheck.Generator.t =
   in
   let%bind nonces =
     Quickcheck_lib.replicate_gen
-      ( Quickcheck.Generator.map ~f:Coda_numbers.Account_nonce.of_int
+      ( Quickcheck.Generator.map ~f:Mina_numbers.Account_nonce.of_int
       @@ Int.gen_incl 0 1000 )
       n_accounts
   in

@@ -63,6 +63,41 @@ let _ =
          Coding.to_public_key_compressed pk_raw_str
          |> Public_key.Compressed.to_base58_check |> Js.string
 
+       (** is the public key valid and derivable from private key; can
+           the private key be used to sign a transaction?
+       *)
+       method validKeypair (keypair_js : keypair_js) =
+         let sk_base58_check = Js.to_string keypair_js##.privateKey in
+         let pk_base58_check = Js.to_string keypair_js##.publicKey in
+         let derived_pk =
+           Js.to_string @@ _self##publicKeyOfPrivateKey keypair_js##.privateKey
+         in
+         if not (String.equal pk_base58_check derived_pk) then
+           raise_js_error "Public key not derivable from private key"
+         else
+           let sk = Private_key.of_base58_check_exn sk_base58_check in
+           let pk =
+             Public_key.Compressed.of_base58_check_exn pk_base58_check
+             |> Public_key.decompress_exn
+           in
+           let dummy_payload =
+             Mina_base_nonconsensus.Signed_command_payload.dummy
+           in
+           let signature =
+             Mina_base_nonconsensus.Signed_command.sign_payload sk
+               dummy_payload
+           in
+           let message =
+             Mina_base_nonconsensus.Signed_command.to_input dummy_payload
+           in
+           let verified =
+             Schnorr.verify signature
+               (Snark_params_nonconsensus.Inner_curve.of_affine pk)
+               message
+           in
+           if verified then Js._true
+           else raise_js_error "Could not sign a transaction with private key"
+
        (** sign arbitrary string with private key *)
        method signString (sk_base58_check_js : string_js) (str_js : string_js)
            =
@@ -73,7 +108,7 @@ let _ =
 
        (** verify signature of arbitrary string signed with signString *)
        method verifyStringSignature (signature_js : signature_js)
-           (public_key_js : string_js) (str_js : string_js) =
+           (public_key_js : string_js) (str_js : string_js) : bool Js.t =
          let field = Js.to_string signature_js##.field |> Field.of_string in
          let scalar =
            Js.to_string signature_js##.scalar |> Inner_curve.Scalar.of_string
@@ -110,7 +145,8 @@ let _ =
          end
 
        (** verify signed payments *)
-       method verifyPaymentSignature (signed_payment : signed_payment) =
+       method verifyPaymentSignature (signed_payment : signed_payment)
+           : bool Js.t =
          let payload : Signed_command_payload.t =
            payload_of_payment_js signed_payment##.payment
          in
@@ -121,7 +157,7 @@ let _ =
          in
          let signature = signature_of_js_object signed_payment##.signature in
          let signed = Signed_command.Poly.{payload; signer; signature} in
-         Signed_command.check_signature signed
+         if Signed_command.check_signature signed then Js._true else Js._false
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
@@ -144,7 +180,7 @@ let _ =
 
        (** verify signed delegations *)
        method verifyStakeDelegationSignature
-             (signed_stake_delegation : signed_stake_delegation) =
+             (signed_stake_delegation : signed_stake_delegation) : bool Js.t =
          let payload : Signed_command_payload.t =
            payload_of_stake_delegation_js
              signed_stake_delegation##.stakeDelegation
@@ -158,7 +194,7 @@ let _ =
            signature_of_js_object signed_stake_delegation##.signature
          in
          let signed = Signed_command.Poly.{payload; signer; signature} in
-         Signed_command.check_signature signed
+         if Signed_command.check_signature signed then Js._true else Js._false
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)

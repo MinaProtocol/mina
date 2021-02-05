@@ -53,12 +53,13 @@ let stop_daemon =
 let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Get balance associated with a public key"
@@ -86,7 +87,7 @@ let get_balance_graphql =
 let get_tokens_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key for which you want to find accounts"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
@@ -161,7 +162,7 @@ let get_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:
         "IP An IPv4 or IPv6 address for which you want to query the trust \
          status"
@@ -199,7 +200,7 @@ let get_trust_status_all =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let nonzero_flag =
-    flag "nonzero-only" no_arg
+    flag "--nonzero-only" ~aliases:["nonzero-only"] no_arg
       ~doc:"Only show trust statuses whose trust score is nonzero"
   in
   let json_flag = Cli_lib.Flag.json in
@@ -233,7 +234,7 @@ let reset_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:
         "IP An IPv4 or IPv6 address for which you want to reset the trust \
          status"
@@ -258,7 +259,7 @@ let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
   let with_details_flag =
-    flag "with-details" no_arg
+    flag "--with-details" ~aliases:["with-details"] no_arg
       ~doc:"Show extra details (eg. balance, nonce) in addition to public keys"
   in
   let error_ctx = "Failed to get public-keys" in
@@ -296,21 +297,23 @@ let verify_receipt =
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let proof_path_flag =
-    flag "proof-path"
+    flag "--proof-path" ~aliases:["proof-path"]
       ~doc:"PROOFFILE File to read json version of payment receipt"
       (required string)
   in
   let payment_path_flag =
-    flag "payment-path"
+    flag "--payment-path" ~aliases:["payment-path"]
       ~doc:"PAYMENTPATH File to read json version of verifying payment"
       (required string)
   in
   let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+    flag "--address" ~aliases:["address"]
+      ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
@@ -373,11 +376,13 @@ let get_nonce_cmd =
   let open Command.Param in
   (* Ignores deprecation of public_key type for backwards compatibility *)
   let[@warning "-3"] address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
+    flag "--address" ~aliases:["address"]
+      ~doc:"PUBLICKEY Public-key address you want the nonce for"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   let flags = Args.zip2 address_flag token_flag in
@@ -436,7 +441,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
+      ; valid_until: Mina_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -454,7 +459,7 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
-          ; valid_until= Some (Coda_numbers.Global_slot.random ())
+          ; valid_until= Some (Mina_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -507,16 +512,17 @@ let send_payment_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Payment amount you want to send"
-      (required txn_amount)
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to transfer"
-      (optional token_id)
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to transfer" (optional token_id)
   in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
@@ -546,7 +552,7 @@ let delegate_stake_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver"
+    flag "--receiver" ~aliases:["receiver"]
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
@@ -574,7 +580,8 @@ let create_new_token_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to create the new token for"
       (optional public_key_compressed)
   in
   let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
@@ -602,15 +609,18 @@ let create_new_account_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to create the new account for"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to create the new account for"
       (required public_key_compressed)
   in
   let token_owner_flag =
-    flag "token-owner" ~doc:"PUBLICKEY Public key for the owner of the token"
+    flag "--token-owner" ~aliases:["token-owner"]
+      ~doc:"PUBLICKEY Public key for the owner of the token"
       (optional public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to create the account for"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to create the account for"
       (required token_id)
   in
   let args =
@@ -631,8 +641,8 @@ let create_new_account_graphql =
                Deferred.return token_owner
            | None when Token_id.(equal default) token ->
                (* NOTE: Doesn't matter who we say the owner is for the default
-                  token, arbitrarily choose the receiver.
-               *)
+                        token, arbitrarily choose the receiver.
+                  *)
                Deferred.return receiver
            | None -> (
                let%map token_owner =
@@ -670,19 +680,19 @@ let mint_tokens_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver"
+    flag "--receiver" ~aliases:["receiver"]
       ~doc:
         "PUBLICKEY Public key of the account to create new tokens in \
          (defaults to the sender)"
       (optional public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to mint"
-      (required token_id)
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to mint" (required token_id)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Number of new tokens to create"
-      (required txn_amount)
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Number of new tokens to create" (required txn_amount)
   in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_flag
@@ -710,7 +720,7 @@ let mint_tokens_graphql =
 let cancel_transaction_graphql =
   let txn_id_flag =
     Command.Param.(
-      flag "id" ~doc:"ID Transaction ID to be cancelled"
+      flag "--id" ~aliases:["id"] ~doc:"ID Transaction ID to be cancelled"
         (required Cli_lib.Arg_type.user_command))
   in
   Command.async
@@ -722,31 +732,7 @@ let cancel_transaction_graphql =
          let receiver_pk = Signed_command.receiver_pk user_command in
          let cancel_sender_pk = Signed_command.fee_payer_pk user_command in
          let open Deferred.Let_syntax in
-         let%bind nonce_response =
-           let open Graphql_lib.Encoders in
-           Graphql_client.query_exn
-             (Graphql_queries.Get_inferred_nonce.make
-                ~public_key:(public_key cancel_sender_pk)
-                ())
-             graphql_endpoint
-         in
-         let maybe_inferred_nonce =
-           let open Option.Let_syntax in
-           let%bind account = nonce_response#account in
-           let%map nonce = account#inferredNonce in
-           int_of_string nonce
-         in
-         let cancelled_nonce =
-           Coda_numbers.Account_nonce.to_int
-             (Signed_command.nonce user_command)
-         in
-         let inferred_nonce =
-           Option.value maybe_inferred_nonce ~default:cancelled_nonce
-         in
          let cancel_fee =
-           let diff =
-             Unsigned.UInt64.of_int (inferred_nonce - cancelled_nonce)
-           in
            let fee =
              Currency.Fee.to_uint64 (Signed_command.fee user_command)
            in
@@ -755,7 +741,7 @@ let cancel_transaction_graphql =
            in
            let open Unsigned.UInt64.Infix in
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
-           Currency.Fee.of_uint64 (fee + (replace_fee * diff))
+           Currency.Fee.of_uint64 (fee + replace_fee)
          in
          printf "Fee to cancel transaction is %s coda.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
@@ -767,7 +753,7 @@ let cancel_transaction_graphql =
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
-                  (Coda_numbers.Account_nonce.to_uint32
+                  (Mina_numbers.Account_nonce.to_uint32
                      (Signed_command.nonce user_command)))
              ()
          in
@@ -782,7 +768,7 @@ module Export_logs = struct
 
   let tarfile_flag =
     let open Command.Param in
-    flag "tarfile"
+    flag "--tarfile" ~aliases:["tarfile"]
       ~doc:"STRING Basename of the tar archive (default: date_time)"
       (optional string)
 
@@ -883,7 +869,8 @@ let handle_dump_ledger_response ~json = function
 let dump_ledger =
   let sl_hash_flag =
     Command.Param.(
-      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+      flag "--state-hash" ~aliases:["state-hash"]
+        ~doc:"STATE-HASH State hash (default: best state hash)"
         (optional string))
   in
   let json_flag = Cli_lib.Flag.json in
@@ -1073,7 +1060,7 @@ let set_staking_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
       (required public_key_compressed)
   in
@@ -1104,7 +1091,7 @@ let set_staking_graphql =
 let set_snark_worker =
   let open Command.Param in
   let public_key_flag =
-    flag "address"
+    flag "--address" ~aliases:["address"]
       ~doc:
         "PUBLICKEY Public-key address you wish to start snark-working on; \
          null to stop doing any snark work"
@@ -1208,7 +1195,8 @@ let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   let pk_flag =
     let open Command.Param in
-    flag "public-key" ~doc:"PUBLICKEY Public key of account to be exported"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let conf_dir = Cli_lib.Flag.conf_dir in
@@ -1349,13 +1337,14 @@ let create_hd_account =
              (response#createHDAccount)#public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
-           (Coda_numbers.Hd_index.to_string hd_index)
+           (Mina_numbers.Hd_index.to_string hd_index)
            pk_string ))
 
 let unlock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"PUBLICKEY Public key to be unlocked"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key to be unlocked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
@@ -1389,7 +1378,8 @@ let unlock_account =
 let lock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"PUBLICKEY Public key of account to be locked"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key of account to be locked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
@@ -1422,18 +1412,18 @@ let generate_libp2p_keypair =
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
-            Coda_net2.create ~logger ~conf_dir:tmpd
+            Mina_net2.create ~logger ~conf_dir:tmpd
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
           with
           | Ok net ->
-              let%bind me = Coda_net2.Keypair.random net in
-              let%bind () = Coda_net2.shutdown net in
+              let%bind me = Mina_net2.Keypair.random net in
+              let%bind () = Mina_net2.shutdown net in
               let%map () =
                 Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
                   me
               in
-              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+              printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
                 ~metadata:[("error", Error_json.error_to_yojson e)] ;
@@ -1441,7 +1431,7 @@ let generate_libp2p_keypair =
 
 let trustlist_ip_flag =
   Command.Param.(
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:"CIDR An IPv4 CIDR mask for the client trustlist (eg, 10.0.0.0/8)"
       (required Cli_lib.Arg_type.cidr_mask))
 
@@ -1527,8 +1517,8 @@ let add_peers_graphql =
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
                match
-                 Coda_net2.Multiaddr.of_string peer
-                 |> Coda_net2.Multiaddr.to_peer
+                 Mina_net2.Multiaddr.of_string peer
+                 |> Mina_net2.Multiaddr.to_peer
                  |> Option.map ~f:Network_peer.Peer.to_display
                with
                | Some peer ->
@@ -1630,16 +1620,17 @@ let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
-    flag "daemon-peers" no_arg
+    flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
       ~doc:"Get telemetry data for peers known to the daemon"
   in
   let peer_ids_flag =
-    flag "peer-ids"
+    flag "--peer-ids" ~aliases:["peer-ids"]
       (optional (Arg_type.comma_separated string))
       ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
   in
   let show_errors_flag =
-    flag "show-errors" no_arg ~doc:"Include error responses in output"
+    flag "--show-errors" ~aliases:["show-errors"] no_arg
+      ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
   Command.async ~summary:"Get telemetry data for a set of peers"
@@ -1705,48 +1696,122 @@ let object_lifetime_statistics =
              printf "Failed to get object lifetime statistics: %s\n%!"
                (Error.to_string_hum err) ))
 
-let archive_precomputed_blocks =
-  let archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive in
-  let files =
-    Command.Param.anon
-      Command.Anons.(sequence ("FILES" %: Command.Param.string))
+let archive_blocks =
+  let params =
+    let open Command.Let_syntax in
+    let%map_open files =
+      Command.Param.anon
+        Command.Anons.(sequence ("FILES" %: Command.Param.string))
+    and success_file =
+      Command.Param.flag "--successful-files" ~aliases:["successful-files"]
+        ~doc:"PATH Appends the list of files that were processed successfully"
+        (Command.Flag.optional Command.Param.string)
+    and failure_file =
+      Command.Param.flag "--failed-files" ~aliases:["failed-files"]
+        ~doc:"PATH Appends the list of files that failed to be processed"
+        (Command.Flag.optional Command.Param.string)
+    and log_successes =
+      Command.Param.flag "--log-successful" ~aliases:["log-successful"]
+        ~doc:
+          "true/false Whether to log messages for files that were processed \
+           successfully"
+        (Command.Flag.optional_with_default true Command.Param.bool)
+    and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
+    and precomputed_flag =
+      Command.Param.flag "--precomputed" ~aliases:["precomputed"] no_arg
+        ~doc:"Blocks are in precomputed JSON format"
+    and extensional_flag =
+      Command.Param.flag "--extensional" ~aliases:["extensional"] no_arg
+        ~doc:"Blocks are in extensional JSON format"
+    in
+    ( files
+    , success_file
+    , failure_file
+    , log_successes
+    , archive_process_location
+    , precomputed_flag
+    , extensional_flag )
   in
   Command.async
     ~summary:
-      "Archive a precomputed block from a file.\n\n\
+      "Archive a block from a file.\n\n\
        If an archive address is given, this process will communicate with the \
        archive node directly; otherwise it will communicate through the \
        daemon over the rest-server"
-    (Cli_lib.Background_daemon.graphql_init
-       (Command.Param.both archive_process_location files)
-       ~f:(fun graphql_endpoint (archive_process_location, files) ->
-         let send_block block =
+    (Cli_lib.Background_daemon.graphql_init params
+       ~f:(fun graphql_endpoint
+          ( files
+          , success_file
+          , failure_file
+          , log_successes
+          , archive_process_location
+          , precomputed_flag
+          , extensional_flag )
+          ->
+         if Bool.equal precomputed_flag extensional_flag then
+           failwith
+             "Must provide exactly one of -precomputed and -extensional flags" ;
+         let make_send_block ~graphql_make ~archive_dispatch ~block_to_yojson
+             block =
            match archive_process_location with
            | Some archive_process_location ->
                (* Connect directly to the archive node. *)
-               Mina_lib.Archive_client.dispatch_precomputed_block
-                 archive_process_location block
+               archive_dispatch archive_process_location block
            | None ->
                (* Send the requests over GraphQL. *)
-               let block =
-                 Coda_transition.External_transition.Precomputed_block
-                 .to_yojson block
-                 |> Yojson.Safe.to_basic
-               in
-               let%map _res =
+               let block = block_to_yojson block |> Yojson.Safe.to_basic in
+               let%map.Deferred.Or_error.Let_syntax _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
                  *)
-                 Graphql_client.query_exn
-                   (Graphql_queries.Archive_precomputed_block.make ~block ())
-                   graphql_endpoint
+                 Graphql_client.query (graphql_make ~block ()) graphql_endpoint
+                 |> Deferred.Result.map_error ~f:(function
+                      | `Failed_request e ->
+                          Error.create "Unable to connect to Coda daemon" ()
+                            (fun () ->
+                              Sexp.List
+                                [ List
+                                    [ Atom "uri"
+                                    ; Atom
+                                        (Uri.to_string graphql_endpoint.value)
+                                    ]
+                                ; List
+                                    [ Atom "uri_flag"
+                                    ; Atom graphql_endpoint.name ]
+                                ; List [Atom "error_message"; Atom e] ] )
+                      | `Graphql_error e ->
+                          Error.createf "GraphQL error: %s" e )
                in
-               Ok ()
+               ()
+         in
+         let output_file_line path =
+           match path with
+           | Some path ->
+               let file = Out_channel.create ~append:true path in
+               fun line -> Out_channel.output_lines file [line]
+           | None ->
+               fun _line -> ()
+         in
+         let add_to_success_file = output_file_line success_file in
+         let add_to_failure_file = output_file_line failure_file in
+         let send_precomputed_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_precomputed_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_precomputed_block
+             ~block_to_yojson:
+               Mina_transition.External_transition.Precomputed_block.to_yojson
+         in
+         let send_extensional_block =
+           make_send_block
+             ~graphql_make:Graphql_queries.Archive_extensional_block.make
+             ~archive_dispatch:
+               Mina_lib.Archive_client.dispatch_extensional_block
+             ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson
          in
          Deferred.List.iter files ~f:(fun path ->
              match%map
-               let open Deferred.Or_error.Let_syntax in
-               let%bind precomputed_block_json =
+               let%bind.Deferred.Or_error.Let_syntax block_json =
                  Or_error.try_with (fun () ->
                      In_channel.with_file path ~f:(fun in_channel ->
                          Yojson.Safe.from_channel in_channel ) )
@@ -1755,24 +1820,44 @@ let archive_precomputed_blocks =
                           String.sexp_of_t )
                  |> Deferred.return
                in
-               let%bind precomputed_block =
-                 Coda_transition.External_transition.Precomputed_block
-                 .of_yojson precomputed_block_json
-                 |> Result.map_error ~f:(fun err ->
-                        Error.tag_arg (Error.of_string err)
-                          "Could not parse JSON as a precomputed block from \
-                           file"
-                          path String.sexp_of_t )
-                 |> Deferred.return
-               in
-               send_block precomputed_block
+               let open Deferred.Or_error.Let_syntax in
+               if precomputed_flag then
+                 let%bind precomputed_block =
+                   Mina_transition.External_transition.Precomputed_block
+                   .of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as a precomputed block from \
+                             file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_precomputed_block precomputed_block
+               else if extensional_flag then
+                 let%bind extensional_block =
+                   Archive_lib.Extensional.Block.of_yojson block_json
+                   |> Result.map_error ~f:(fun err ->
+                          Error.tag_arg (Error.of_string err)
+                            "Could not parse JSON as an extensional block \
+                             from file"
+                            path String.sexp_of_t )
+                   |> Deferred.return
+                 in
+                 send_extensional_block extensional_block
+               else
+                 (* should be unreachable *)
+                 failwith
+                   "Expected exactly one of precomputed, extensional flags"
              with
              | Ok () ->
-                 Format.printf "Sent block to archive node from %s@." path
+                 if log_successes then
+                   Format.printf "Sent block to archive node from %s@." path ;
+                 add_to_success_file path
              | Error err ->
                  Format.eprintf
                    "Failed to send block to archive node from %s. Error:@.%s@."
-                   path (Error.to_string_hum err) ) ))
+                   path (Error.to_string_hum err) ;
+                 add_to_failure_file path ) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1881,9 +1966,11 @@ let advanced =
     ; ("visualization", Visualization.command_group)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
+    ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
+    ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-precomputed-blocks", archive_precomputed_blocks) ]
+    ; ("archive-blocks", archive_blocks) ]

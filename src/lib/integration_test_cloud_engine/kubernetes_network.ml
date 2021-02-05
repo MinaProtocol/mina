@@ -9,7 +9,18 @@ module Node = struct
   type t =
     {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
+  let id {pod_id; _} = pod_id
+
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
+
+  let node_to_string (n : t) : String.t =
+    Format.sprintf
+      "{cluster: %s; namespace: %s; pod_id: %s; node_graphql_port: %d}"
+      n.cluster n.namespace n.pod_id n.node_graphql_port
+
+  let node_list_to_string (nl : t list) : String.t =
+    Format.sprintf "[ %s ]"
+      (String.concat ~sep:",  " (List.map nl ~f:node_to_string))
 
   let run_in_container node cmd =
     let base_args = base_kube_args node in
@@ -20,7 +31,8 @@ module Node = struct
         base_kube_cmd base_kube_cmd node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
-    Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
+    let%map _ = Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
+    ()
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
@@ -75,14 +87,15 @@ module Node = struct
           Malleable_error.of_error_hard e.error
 
     (* default GraphQL port is 3085, may need to be explicit if multiple daemons are running *)
-    let set_port_forwarding ~logger t port =
+    let set_port_forwarding ~logger t =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
+      let port = t.node_graphql_port in
       let portmap = string_of_int port ^ ":3085" in
       let args =
         List.append (base_kube_args t) ["port-forward"; name; portmap]
       in
-      [%log info] "Port forwarding using \"kubectl %s\"\n"
+      [%log debug] "Port forwarding using \"kubectl %s\"\n"
         String.(concat args ~sep:" ") ;
       let%bind proc =
         Deferred.bind ~f:Malleable_error.of_or_error_hard
@@ -92,7 +105,7 @@ module Node = struct
         ~description:
           (sprintf "Kubectl port forwarder on pod %s, port %d" t.pod_id port)
         (fun () ->
-          [%log info]
+          [%log debug]
             "Port forwarding being killed, no longer occupying port %d " port ;
           ignore Signal.(send kill (`Pid (Process.pid proc))) ) ;
       Deferred.bind ~f:Malleable_error.of_or_error_hard
@@ -155,16 +168,15 @@ module Node = struct
               peerId
             }
           }
-          peers
+          peers {  peerId }
+
         }
       }
     |}]
   end
 
-  let set_port_forwarding_exn ~logger t graphql_port =
-    match%map.Deferred.Let_syntax
-      Graphql.set_port_forwarding ~logger t graphql_port
-    with
+  let set_port_forwarding_exn ~logger t =
+    match%map.Deferred.Let_syntax Graphql.set_port_forwarding ~logger t with
     | Ok _ ->
         (* not reachable, port forwarder does not terminate *)
         ()
@@ -174,11 +186,13 @@ module Node = struct
         failwith "Could not run k8s port forwarding"
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
-  let exec_graphql_reqest ?(num_tries = 10) ?(retry_delay_sec = 30.0)
+  let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
       ?(initial_delay_sec = 30.0) ~logger ~graphql_port
       ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
-    [%log info] "Will now attempt to make GraphQL request: %s" query_name ;
+    [%log info]
+      "exec_graphql_request, Will now attempt to make GraphQL request: %s"
+      query_name ;
     let err_str str = sprintf "%s: %s" query_name str in
     let rec retry n =
       if n <= 0 then (
@@ -192,13 +206,15 @@ module Node = struct
         with
         | Ok result ->
             let err_str = err_str "succeeded" in
-            [%log info] "%s" err_str ;
+            [%log info] "exec_graphql_request %s" err_str ;
             return result
         | Error (`Failed_request err_string) ->
             let err_str =
               err_str
-                (sprintf "Failed GraphQL request: %s, %d tries left" err_string
-                   (n - 1))
+                (sprintf
+                   "exec_graphql_request, Failed GraphQL request: %s, %d \
+                    tries left"
+                   err_string (n - 1))
             in
             [%log warn] "%s" err_str ;
             let%bind () =
@@ -207,14 +223,19 @@ module Node = struct
             in
             retry (n - 1)
         | Error (`Graphql_error err_string) ->
-            let err_str = err_str (sprintf "GraphQL error: %s" err_string) in
+            let err_str =
+              err_str
+                (sprintf "exec_graphql_request, GraphQL error: %s" err_string)
+            in
             [%log error] "%s" err_str ;
             if retry_on_graphql_error then (
               let%bind () =
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              [%log info] "After GraphQL error, %d tries left" (n - 1) ;
+              [%log debug]
+                "exec_graphql_request, After GraphQL error, %d tries left"
+                (n - 1) ;
               retry (n - 1) )
             else Malleable_error.of_string_hard_error err_string
     in
@@ -230,13 +251,13 @@ module Node = struct
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     (* let graphql_port = 3085 in *)
-    Deferred.don't_wait_for
-      (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
-      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
         ~retry_on_graphql_error:true ~query_name:"query_peer_id" query_obj
     in
+    [%log info] "get_peer_id, finished exec_graphql_request" ;
     let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
     let%bind self_id =
       match self_id_obj with
@@ -245,8 +266,12 @@ module Node = struct
       | Some peer ->
           Malleable_error.return peer#peerId
     in
-    let peers_ids = (query_result_obj#daemonStatus)#peers in
-    return (self_id, Array.to_list peers_ids)
+    let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
+    let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
+    [%log info]
+      "get_peer_id, result of graphql querry (self_id,[peers]) (%s,%s)" self_id
+      (String.concat ~sep:" " peer_ids) ;
+    return (self_id, peer_ids)
 
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in
@@ -256,8 +281,7 @@ module Node = struct
         ; ("pod_id", `String t.pod_id)
         ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     (* let graphql_port = 3085 in *)
-    Deferred.don't_wait_for
-      (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
     let get_balance () =
@@ -268,7 +292,7 @@ module Node = struct
           ()
       in
       let%bind balance_obj =
-        exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+        exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
           ~retry_on_graphql_error:true ~query_name:"get_balance_graphql"
           get_balance_obj
       in
@@ -289,6 +313,7 @@ module Node = struct
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
     let open Malleable_error.Let_syntax in
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
     (* let graphql_port = 3085 in *)
@@ -300,7 +325,7 @@ module Node = struct
           ~public_key:(Graphql_lib.Encoders.public_key sender)
           ()
       in
-      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
         ~query_name:"unlock_sender_account_graphql" unlock_account_obj
     in
     let%bind _ = unlock_sender_account_graphql () in
@@ -314,7 +339,7 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_reqest ~logger ~graphql_port:t.node_graphql_port
+      exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
         ~retry_on_graphql_error ~query_name:"send_payment_graphql"
         send_payment_obj
     in
@@ -328,13 +353,29 @@ end
 
 type t =
   { namespace: string
-  ; constraint_constants: Genesis_constants.Constraint_constants.t
-  ; genesis_constants: Genesis_constants.t
+  ; constants: Test_config.constants
   ; block_producers: Node.t list
   ; snark_coordinators: Node.t list
   ; archive_nodes: Node.t list
   ; testnet_log_filter: string
-  ; keypairs: Signature_lib.Keypair.t list }
+  ; keypairs: Signature_lib.Keypair.t list
+  ; nodes_by_app_id: Node.t String.Map.t }
+
+let constants {constants; _} = constants
+
+let constraint_constants {constants; _} = constants.constraints
+
+let genesis_constants {constants; _} = constants.genesis
+
+let block_producers {block_producers; _} = block_producers
+
+let snark_coordinators {snark_coordinators; _} = snark_coordinators
+
+let archive_nodes {archive_nodes; _} = archive_nodes
+
+let keypairs {keypairs; _} = keypairs
 
 let all_nodes {block_producers; snark_coordinators; archive_nodes; _} =
   block_producers @ snark_coordinators @ archive_nodes
+
+let lookup_node_by_app_id t = Map.find t.nodes_by_app_id

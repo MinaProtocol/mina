@@ -1,32 +1,50 @@
 open Core
 open Async
 open Cmdliner
+open Pipe_lib
 open Integration_test_lib
 
-type test = string * (module Test_functor_intf)
+type test = string * (module Intf.Test.Functor_intf)
 
-type engine = string * (module Engine_intf)
+type engine = string * (module Intf.Engine.S)
 
-type engine_with_cli_inputs =
-  | Engine_with_cli_inputs :
-      (module Engine_intf with type Cli_inputs.t = 'cli_inputs) * 'cli_inputs
-      -> engine_with_cli_inputs
+module Make_test_inputs (Engine : Intf.Engine.S) () :
+  Intf.Test.Inputs_intf
+  with type Engine.Network_config.Cli_inputs.t =
+              Engine.Network_config.Cli_inputs.t = struct
+  module Engine = Engine
 
-type inputs = {engine: engine_with_cli_inputs; test: test; coda_image: string}
+  module Dsl = Dsl.Make (Engine) ()
+end
+
+type test_inputs_with_cli_inputs =
+  | Test_inputs_with_cli_inputs :
+      (module Intf.Test.Inputs_intf
+         with type Engine.Network_config.Cli_inputs.t = 'cli_inputs)
+      * 'cli_inputs
+      -> test_inputs_with_cli_inputs
+
+type inputs =
+  { test_inputs: test_inputs_with_cli_inputs
+  ; test: test
+  ; coda_image: string
+  ; debug: bool }
 
 let engines : engine list =
-  [("cloud", (module Integration_test_cloud_engine : Engine_intf))]
+  [("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))]
 
 let tests : test list =
   [ ( "block-production"
-    , (module Block_production_test.Make : Test_functor_intf) )
-  ; ("bootstrap", (module Bootstrap_test.Make : Test_functor_intf))
-  ; ("send-payment", (module Send_payment_test.Make : Test_functor_intf))
+    , (module Block_production_test.Make : Intf.Test.Functor_intf) )
+  ; ("bootstrap", (module Bootstrap_test.Make : Intf.Test.Functor_intf))
+  ; ("send-payment", (module Send_payment_test.Make : Intf.Test.Functor_intf))
   ; ( "pmt-timed-accts"
-    , (module Payments_timed_accounts.Make : Test_functor_intf) )
+    , (module Payments_timed_accounts_test.Make : Intf.Test.Functor_intf) )
+    (*
   ; ( "bp-timed-accts"
-    , (module Block_production_test_timed_accounts.Make : Test_functor_intf) )
-  ; ("peers", (module Mina_peers_test.Make : Test_functor_intf)) ]
+    , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
+  *)
+  ; ("peers", (module Peers_test.Make : Intf.Test.Functor_intf)) ]
 
 let report_test_errors error_set
     (missing_event_reprs : Structured_log_events.repr list) =
@@ -67,39 +85,38 @@ let report_test_errors error_set
     Out_channel.(flush stderr) ) ;
   if num_errors > 0 || num_missing_events > 0 then exit 1 else Deferred.unit
 
-let dispatch_cleanup ~logger ~network_cleanup_func ~log_engine_cleanup_func
-    ~net_manager_ref ~log_engine_ref ~cleanup_deferred_ref
-    (module T : Test_intf) reason (test_result : unit Malleable_error.t) :
-    unit Deferred.t =
+(* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
+
+let dispatch_cleanup ~logger ~init_cleanup_func ~network_cleanup_func
+    ~log_engine_cleanup_func ~lift_accumulated_errors_func ~net_manager_ref
+    ~log_engine_ref ~network_state_writer_ref ~cleanup_deferred_ref
+    ~expected_error_event_reprs ~exit_reason ~test_result : unit Deferred.t =
   let cleanup () : unit Deferred.t =
-    let log_engine_cleanup_result =
+    let open Structured_log_events in
+    let%bind () = init_cleanup_func () in
+    let%bind log_engine_cleanup_result =
       Option.value_map !log_engine_ref
-        ~default:(Malleable_error.return Test_error.Set.empty)
+        ~default:(Deferred.Or_error.return ())
         ~f:log_engine_cleanup_func
     in
     let%bind () =
       Option.value_map !net_manager_ref ~default:Deferred.unit
         ~f:network_cleanup_func
     in
-    let%bind log_engine_error_set =
-      match%map Malleable_error.lift_error_set log_engine_cleanup_result with
-      | Ok (remote_error_set, internal_error_set) ->
-          Test_error.Set.combine [remote_error_set; internal_error_set]
-      | Error internal_error_set ->
-          internal_error_set
-    in
     let%bind test_error_set =
-      match%map Malleable_error.lift_error_set test_result with
-      | Ok ((), error_set) ->
-          error_set
-      | Error error_set ->
-          error_set
+      Malleable_error.lift_error_set_unit test_result
     in
+    Option.value_map !network_state_writer_ref ~default:()
+      ~f:Broadcast_pipe.Writer.close ;
     let all_errors =
-      Test_error.Set.combine [test_error_set; log_engine_error_set]
+      let open Test_error.Set in
+      combine
+        [ lift_accumulated_errors_func ()
+        ; test_error_set
+        ; of_hard_or_error log_engine_cleanup_result ]
     in
     let expected_error_event_ids =
-      List.map T.expected_error_event_reprs ~f:(fun repr -> repr.id)
+      List.map expected_error_event_reprs ~f:(fun repr -> repr.id)
     in
     let is_expected_error (err : Test_error.t) =
       match err with
@@ -127,43 +144,61 @@ let dispatch_cleanup ~logger ~network_cleanup_func ~log_engine_cleanup_func
       |> List.filter_opt
     in
     let missing_expected_error_reprs =
-      List.filter T.expected_error_event_reprs ~f:(fun repr ->
+      List.filter expected_error_event_reprs ~f:(fun repr ->
           not
             (List.mem received_expected_error_ids repr.id
                ~equal:Structured_log_events.equal_id) )
     in
     report_test_errors unexpected_errors missing_expected_error_reprs
   in
-  let%bind test_error_str = Malleable_error.hard_error_to_string test_result in
+  let%bind hard_error_string =
+    Malleable_error.hard_error_to_string test_result
+  in
   match !cleanup_deferred_ref with
   | Some deferred ->
       [%log error]
         "additional call to cleanup testnet while already cleaning up \
-         ($reason, $error)"
+         (reason: $reason, hard error: $error)"
         ~metadata:
-          [("reason", `String reason); ("error", `String test_error_str)] ;
+          [ ("reason", `String exit_reason)
+          ; ("error", `String hard_error_string) ] ;
       deferred
   | None ->
-      [%log info] "cleaning up testnet ($reason, $error)"
+      [%log info] "cleaning up testnet (reason: $reason, hard error: $error)"
         ~metadata:
-          [("reason", `String reason); ("error", `String test_error_str)] ;
+          [ ("reason", `String exit_reason)
+          ; ("error", `String hard_error_string) ] ;
       let deferred = cleanup () in
       cleanup_deferred_ref := Some deferred ;
       deferred
 
 let main inputs =
   (* TODO: abstract over which engine is in use, allow engine to be set form CLI *)
-  let (Engine_with_cli_inputs ((module Engine), cli_inputs)) = inputs.engine in
+  let (Test_inputs_with_cli_inputs ((module Test_inputs), cli_inputs)) =
+    inputs.test_inputs
+  in
+  let open Test_inputs in
   let test_name, (module Test) = inputs.test in
   let (module T) =
-    (module Test (Engine)
-    : Test_intf
+    (module Test (Test_inputs)
+    : Intf.Test.S
+      with type network = Engine.Network.t
+       and type node = Engine.Network.Node.t
+       and type dsl = Dsl.t )
+  in
+  (*
+    (module Test (Test_inputs)
+    : Intf.Test.S
       with type network = Engine.Network.t
        and type log_engine = Engine.Log_engine.t )
-  in
+    *)
+  (* TODO:
+   *   let (module Exec) = (module Execute.Make (Engine)) in
+   *   Exec.execute ~logger ~engine_cli_inputs ~images (module Test (Engine))
+   *)
   let logger = Logger.create () in
   let images =
-    { Container_images.coda= inputs.coda_image
+    { Test_config.Container_images.coda= inputs.coda_image
     ; user_agent= "codaprotocol/coda-user-agent:0.1.5"
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
@@ -175,13 +210,30 @@ let main inputs =
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
   let log_engine_ref : Engine.Log_engine.t option ref = ref None in
+  let error_accumulator_ref = ref None in
+  let network_state_writer_ref = ref None in
   let cleanup_deferred_ref = ref None in
   let f_dispatch_cleanup =
-    dispatch_cleanup ~logger
+    let rec prompt_continue () =
+      print_string "Pausing cleanup. Enter [y/Y] to continue: " ;
+      let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
+      let c = Option.value_exn In_channel.(input_char stdin) in
+      print_newline () ;
+      if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue ()
+    in
+    let init_cleanup_func () =
+      if inputs.debug then prompt_continue () else Deferred.unit
+    in
+    let lift_accumulated_errors_func () =
+      Option.value_map !error_accumulator_ref ~default:Test_error.Set.empty
+        ~f:Dsl.lift_accumulated_errors
+    in
+    dispatch_cleanup ~logger ~init_cleanup_func
       ~network_cleanup_func:Engine.Network_manager.cleanup
-      ~log_engine_cleanup_func:Engine.Log_engine.destroy ~net_manager_ref
-      ~log_engine_ref ~cleanup_deferred_ref
-      (module T : Test_intf)
+      ~log_engine_cleanup_func:Engine.Log_engine.destroy
+      ~lift_accumulated_errors_func ~net_manager_ref ~log_engine_ref
+      ~network_state_writer_ref ~cleanup_deferred_ref
+      ~expected_error_event_reprs:T.expected_error_event_reprs
   in
   (* run test while gracefully recovering handling exceptions and interrupts *)
   Signal.handle Signal.terminating ~f:(fun signal ->
@@ -191,42 +243,65 @@ let main inputs =
         @@ Printf.sprintf "received signal %s" (Signal.to_string signal)
       in
       don't_wait_for
-        (f_dispatch_cleanup "signal received"
-           (Malleable_error.of_error_hard error)) ) ;
+        (f_dispatch_cleanup ~exit_reason:"signal received"
+           ~test_result:(Malleable_error.of_error_hard error)) ) ;
   let%bind monitor_test_result =
-    Monitor.try_with ~extract_exn:true (fun () ->
+    let on_fatal_error message =
+      don't_wait_for
+        (f_dispatch_cleanup
+           ~exit_reason:
+             (sprintf
+                !"log engine fatal error: %s"
+                (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
+           ~test_result:(Malleable_error.return ()))
+    in
+    Monitor.try_with ~extract_exn:false (fun () ->
+        let init_result =
+          let open Deferred.Or_error.Let_syntax in
+          let lift = Deferred.map ~f:Or_error.return in
+          let%bind net_manager =
+            lift @@ Engine.Network_manager.create ~logger network_config
+          in
+          net_manager_ref := Some net_manager ;
+          let%bind network =
+            lift @@ Engine.Network_manager.deploy net_manager
+          in
+          let%map log_engine = Engine.Log_engine.create ~logger ~network in
+          log_engine_ref := Some log_engine ;
+          let event_router =
+            Dsl.Event_router.create ~logger
+              ~event_reader:(Engine.Log_engine.event_reader log_engine)
+          in
+          error_accumulator_ref :=
+            Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;
+          let network_state_reader, network_state_writer =
+            Dsl.Network_state.listen ~logger event_router
+          in
+          network_state_writer_ref := Some network_state_writer ;
+          let (`Don't_call_in_tests dsl) =
+            Dsl.create ~logger ~network ~event_router ~network_state_reader
+          in
+          (network, dsl)
+        in
         let open Malleable_error.Let_syntax in
-        let%bind net_manager =
-          Deferred.bind ~f:Malleable_error.return
-            (Engine.Network_manager.create ~logger network_config)
+        let%bind network, dsl =
+          Deferred.bind init_result ~f:Malleable_error.of_or_error_hard
         in
-        net_manager_ref := Some net_manager ;
-        let%bind network =
-          Deferred.bind ~f:Malleable_error.return
-            (Engine.Network_manager.deploy net_manager)
-        in
-        [%log info] "Network deployed" ;
-        let%bind log_engine =
-          Engine.Log_engine.create ~logger ~network
-            ~on_fatal_error:(fun message ->
-              don't_wait_for
-                (f_dispatch_cleanup
-                   (sprintf
-                      !"log engine fatal error: %s"
-                      (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
-                   (Malleable_error.return ())) )
-        in
-        log_engine_ref := Some log_engine ;
-        T.run network log_engine )
+        T.run network dsl )
   in
-  let test_result =
+  let exit_reason, test_result =
     match monitor_test_result with
     | Ok malleable_error ->
-        Deferred.return malleable_error
+        let exit_reason =
+          if Malleable_error.is_ok malleable_error then "test completed"
+          else "errors occurred"
+        in
+        (exit_reason, Deferred.return malleable_error)
     | Error exn ->
-        Malleable_error.of_error_hard (Error.of_exn exn)
+        [%log error] "%s" (Exn.to_string_mach exn) ;
+        ("exception thrown", Malleable_error.of_error_hard (Error.of_exn exn))
   in
-  let%bind () = f_dispatch_cleanup "test completed" test_result in
+  let%bind () = f_dispatch_cleanup ~exit_reason ~test_result in
   exit 0
 
 let start inputs =
@@ -249,6 +324,13 @@ let coda_image_arg =
     & opt (some string) None
     & info ["coda-image"] ~env ~docv:"CODA_IMAGE" ~doc)
 
+let debug_arg =
+  let doc =
+    "Enable debug mode. On failure, the test executive will pause for user \
+     input before destroying the network it deployed."
+  in
+  Arg.(value & flag & info ["debug"; "d"] ~doc)
+
 let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
@@ -256,17 +338,20 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     let doc = "Run coda integration test(s) on remote cloud provider." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
-  let engine_with_cli_inputs_arg =
+  let test_inputs_with_cli_inputs_arg =
     let wrap_cli_inputs cli_inputs =
-      Engine_with_cli_inputs ((module Engine), cli_inputs)
+      Test_inputs_with_cli_inputs
+        ((module Make_test_inputs (Engine) ()), cli_inputs)
     in
-    Term.(const wrap_cli_inputs $ Engine.Cli_inputs.term)
+    Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs engine test coda_image = {engine; test; coda_image} in
+    let cons_inputs test_inputs test coda_image debug =
+      {test_inputs; test; coda_image; debug}
+    in
     Term.(
-      const cons_inputs $ engine_with_cli_inputs_arg $ test_arg
-      $ coda_image_arg)
+      const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
+      $ coda_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

@@ -30,7 +30,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
+          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -84,7 +84,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                     in
                     Strict_pipe.Writer.write intf.broadcast_message_writer
                       ( msg
-                      , Coda_net2.Validation_callback.create_without_expiration
+                      , Mina_net2.Validation_callback.create_without_expiration
                           () ) ) ) )
 
     let call_rpc : type q r.
@@ -116,12 +116,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       ; rpc_handlers: rpc_handler list
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers: Peer.t list
-      ; connection_gating: Coda_net2.connection_gating ref
+      ; connection_gating: Mina_net2.connection_gating ref
       ; received_message_reader:
-          (Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t)
+          (Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t)
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t * Coda_net2.Validation_callback.t
+          ( Message.msg Envelope.Incoming.t * Mina_net2.Validation_callback.t
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -177,7 +177,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         ; peer_table
         ; initial_peers
         ; connection_gating=
-            ref Coda_net2.{banned_peers= []; trusted_peers= []; isolate= false}
+            ref Mina_net2.{banned_peers= []; trusted_peers= []; isolate= false}
         ; received_message_reader
         ; received_message_writer
         ; ban_notification_reader
@@ -191,13 +191,13 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
-    let add_peer _ (_p : Peer.t) = Deferred.return (Ok ())
+    let add_peer _ (_p : Peer.t) ~seed:_ = Deferred.return (Ok ())
 
     let initial_peers t =
       Hashtbl.data t.peer_table
       |> List.map
            ~f:
-             (Fn.compose Coda_net2.Multiaddr.of_string Peer.to_multiaddr_string)
+             (Fn.compose Mina_net2.Multiaddr.of_string Peer.to_multiaddr_string)
 
     let random_peers t n =
       let%map peers = peers t in
@@ -220,9 +220,31 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     let ban_notification_reader {ban_notification_reader; _} =
       ban_notification_reader
 
-    let query_peer ?timeout:_ t peer rpc query =
+    let query_peer ?heartbeat_timeout:_ ?timeout:_ t peer rpc query =
       Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
         ~responder_id:peer rpc query
+
+    let query_peer' ?how ?heartbeat_timeout ?timeout t peer rpc qs =
+      let%map rs =
+        Deferred.List.map ?how qs
+          ~f:(query_peer ?timeout ?heartbeat_timeout t peer rpc)
+      in
+      with_return (fun {return} ->
+          let data =
+            List.map rs ~f:(function
+              | Connected x ->
+                  x.data
+              | Failed_to_connect e ->
+                  return (Mina_base.Rpc_intf.Failed_to_connect e) )
+            |> Or_error.all
+          in
+          let sender =
+            Option.value_exn
+              (Hashtbl.find t.peer_table peer)
+              ~error:
+                (Error.createf "failed to find peer %s in peer_table" peer)
+          in
+          Connected (Envelope.Incoming.wrap_peer ~data ~sender) )
 
     let query_random_peers _ = failwith "TODO stub"
 
@@ -241,6 +263,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   type network = Network.t
 
   include Instance
+
+  let restart_helper (_ : t) = ()
 
   let create_network = Network.create
 

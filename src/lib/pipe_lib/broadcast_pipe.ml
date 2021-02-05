@@ -32,6 +32,8 @@ let create a =
            Deferred.List.iter ~how:`Parallel inner_pipes ~f:(fun p ->
                Deferred.ignore @@ Pipe.downstream_flushed p )
          in
+         if Ivar.is_full !downstream_flushed_v then
+           [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
          Ivar.fill !downstream_flushed_v () ;
          Deferred.unit )) ;
   (t, t)
@@ -95,10 +97,9 @@ module Reader = struct
       | `Eof ->
           return ()
       | `Ok v ->
-          if%bind f v then return ()
-          else (
-            Pipe.Consumer.values_sent_downstream consumer ;
-            loop ~consumer reader )
+          let%bind b = f v in
+          Pipe.Consumer.values_sent_downstream consumer ;
+          if b then return () else loop ~consumer reader
     in
     prepare_pipe t ~default_value:() ~f:(fun reader ->
         let consumer = add_trivial_consumer reader in
@@ -121,6 +122,11 @@ module Writer = struct
         Int.Table.iter t.pipes ~f:(fun w -> Pipe.close w) ;
         Int.Table.clear t.pipes )
 end
+
+let map t ~f =
+  let r, w = create (f (Reader.peek t)) in
+  don't_wait_for (Reader.iter t ~f:(fun x -> Writer.write w (f x))) ;
+  r
 
 (*
  * 1. Cached value is keeping peek working

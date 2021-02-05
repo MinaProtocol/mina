@@ -82,18 +82,22 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
 let command =
   let open Command.Let_syntax in
   let%map_open archive_uri =
-    flag "archive-uri"
+    flag "--archive-uri" ~aliases:["archive-uri"]
       ~doc:"Postgres connection string URI corresponding to archive node"
       Cli.required_uri
   and graphql_uri =
-    flag "graphql-uri" ~doc:"URI of Coda GraphQL endpoint to connect to"
-      Cli.required_uri
+    flag "--graphql-uri" ~aliases:["graphql-uri"]
+      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
   and log_json =
-    flag "log-json" ~doc:"Print log output as JSON (default: plain text)"
-      no_arg
+    flag "--log-json" ~aliases:["log-json"]
+      ~doc:"Print log output as JSON (default: plain text)" no_arg
   and log_level =
-    flag "log-level" ~doc:"Set log level (default: Info)" Cli.log_level
-  and port = flag "port" ~doc:"Port to expose Rosetta server" (required int) in
+    flag "--log-level" ~aliases:["log-level"]
+      ~doc:"Set log level (default: Info)" Cli.log_level
+  and port =
+    flag "--port" ~aliases:["port"] ~doc:"Port to expose Rosetta server"
+      (required int)
+  in
   let open Deferred.Let_syntax in
   fun () ->
     let logger = Logger.create () in

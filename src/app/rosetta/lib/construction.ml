@@ -22,11 +22,18 @@ module Get_nonce =
         nonce
       }
       daemonStatus {
-        peers
+        peers { peerId }
       }
       initialPeers
      }
 |}]
+
+module Validate_payment =
+[%graphql
+{|
+  query validate($from: PublicKey!, $to_: PublicKey!, $token: UInt64, $amount: UInt64, $fee: UInt64, $validUntil: UInt64, $memo: String, $nonce: UInt32!, $signature: String!) {
+    validatePayment(signature: {rawSignature: $signature}, input: {from: $from, to:$to_, token:$token, amount:$amount, fee:$fee, validUntil: $validUntil, memo: $memo, nonce:$nonce}) }
+  |}]
 
 module Send_payment =
 [%graphql
@@ -476,19 +483,38 @@ end
 module Parse = struct
   module Env = struct
     module T (M : Monad_fail.S) = struct
-      type t = {lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t}
+      type 'gql t =
+        { send_validation_request:
+               payment:Transaction.Unsigned.Rendered.Payment.t
+            -> signature:string
+            -> unit
+            -> ('gql, Errors.t) M.t
+        ; lift: 'a 'e. ('a, 'e) Result.t -> ('a, 'e) M.t }
     end
 
     module Real = T (Deferred.Result)
     module Mock = T (Result)
 
-    let real : Real.t = {lift= Deferred.return}
-
-    let mock : Mock.t = {lift= Fn.id}
+    let real : graphql_uri:Uri.t -> 'gql_payment Real.t =
+      let uint64 x = `String (Unsigned.UInt64.to_string x) in
+      let uint32 x = `String (Unsigned.UInt32.to_string x) in
+      fun ~graphql_uri ->
+        { send_validation_request=
+            (fun ~payment ~signature () ->
+              Graphql.query
+                (Validate_payment.make ~from:(`String payment.from)
+                   ~to_:(`String payment.to_) ~token:(uint64 payment.token)
+                   ~amount:(uint64 payment.amount) ~fee:(uint64 payment.fee)
+                   ?validUntil:(Option.map ~f:uint32 payment.valid_until)
+                   ?memo:payment.memo ~nonce:(uint32 payment.nonce) ~signature
+                   ())
+                graphql_uri )
+        ; lift= Deferred.return }
   end
 
   module Impl (M : Monad_fail.S) = struct
-    let handle ~(env : Env.T(M).t) (req : Construction_parse_request.t) =
+    let handle ~(env : 'graphql_txn Env.T(M).t)
+        (req : Construction_parse_request.t) =
       let open M.Let_syntax in
       let%bind json =
         try M.return (Yojson.Safe.from_string req.transaction)
@@ -497,12 +523,28 @@ module Parse = struct
       let%map operations, account_identifier_signers =
         match req.signed with
         | true ->
-            let%map signed_transaction =
+            let%bind signed_rendered_transaction =
               Transaction.Signed.Rendered.of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)) )
-              |> Result.bind ~f:Transaction.Signed.of_rendered
               |> env.lift
+            in
+            let%bind signed_transaction =
+              Transaction.Signed.of_rendered signed_rendered_transaction
+              |> env.lift
+            in
+            let%map () =
+              match signed_rendered_transaction.payment with
+              | Some payment ->
+                  (* Only perform validation on payments. *)
+                  let%bind res =
+                    env.send_validation_request ~payment
+                      ~signature:signed_transaction.signature ()
+                  in
+                  if res#validatePayment then M.return ()
+                  else M.fail (Errors.create `Signature_invalid)
+              | None ->
+                  M.return ()
             in
             ( User_command_info.to_operations ~failure_status:None
                 signed_transaction.command
@@ -846,7 +888,8 @@ let router ~graphql_uri ~logger (route : string list) body =
         |> Errors.Lift.wrap
       in
       let%map res =
-        Parse.Real.handle ~env:Parse.Env.real req |> Errors.Lift.wrap
+        Parse.Real.handle ~env:(Parse.Env.real ~graphql_uri) req
+        |> Errors.Lift.wrap
       in
       Construction_parse_response.to_yojson res
   | ["hash"] ->

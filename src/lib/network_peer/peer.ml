@@ -73,7 +73,7 @@ end]
 
 type t = Stable.Latest.t =
   {host: Unix.Inet_addr.Blocking_sexp.t; libp2p_port: int; peer_id: string}
-[@@deriving compare, sexp, bin_io_unversioned]
+[@@deriving compare, sexp]
 
 [%%define_locally
 Stable.Latest.(of_yojson, to_yojson)]

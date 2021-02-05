@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Pipe_lib
 open Signature_lib
 module Archive_client = Archive_client
@@ -41,7 +41,10 @@ val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val next_epoch_ledger :
-  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     t
+  -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     | `Notfinalized ]
+     option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
@@ -75,6 +78,11 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val snark_job_state : t -> Work_selector.State.t
 
+val get_current_nonce :
+     t
+  -> Account_id.t
+  -> ([> `Min of Account.Nonce.t] * Account.Nonce.t, string) result
+
 val add_transactions :
      t
   -> User_command_input.t list
@@ -103,7 +111,7 @@ val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Coda_net2.Multiaddr.t list
+val initial_peers : t -> Mina_net2.Multiaddr.t list
 
 val client_port : t -> int
 

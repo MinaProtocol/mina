@@ -14,15 +14,15 @@ open Tick
 [%%else]
 
 module Currency = Currency_nonconsensus.Currency
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
-module Coda_compile_config =
-  Coda_compile_config_nonconsensus.Coda_compile_config
+module Mina_compile_config =
+  Mina_compile_config_nonconsensus.Mina_compile_config
 
 [%%endif]
 
 open Currency
-open Coda_numbers
+open Mina_numbers
 open Fold_lib
 open Import
 
@@ -164,19 +164,30 @@ module Binable_arg = struct
   end]
 end
 
+let check = Fn.id
+
 [%%if
-feature_snapps]
-
-include Binable_arg
-
-[%%else]
+not feature_snapps]
 
 let check (t : Binable_arg.t) =
+  let t = check t in
   match t.snapp with
   | None ->
       t
   | Some _ ->
       failwith "Snapp accounts not supported"
+
+[%%endif]
+
+[%%if
+not feature_tokens]
+
+let check (t : Binable_arg.t) =
+  let t = check t in
+  if Token_id.equal Token_id.default t.token_id then t
+  else failwith "Token accounts not supported"
+
+[%%endif]
 
 [%%versioned_binable
 module Stable = struct
@@ -199,8 +210,6 @@ module Stable = struct
     let public_key (t : t) : key = t.public_key
   end
 end]
-
-[%%endif]
 
 [%%define_locally
 Stable.Latest.(public_key)]
@@ -569,6 +578,8 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
     ~vesting_increment ~initial_minimum_balance =
   let open Unsigned in
   if Global_slot.(global_slot < cliff_time) then initial_minimum_balance
+    (* If vesting period is zero then everything vests immediately at the cliff *)
+  else if Global_slot.(equal vesting_period zero) then Balance.zero
   else
     match Balance.(initial_minimum_balance - cliff_amount) with
     | None ->
@@ -589,6 +600,22 @@ let min_balance_at_slot ~global_slot ~cliff_time ~cliff_amount ~vesting_period
             Balance.zero
         | Some amt ->
             amt )
+
+let incremental_balance_between_slots ~start_slot ~end_slot ~cliff_time
+    ~cliff_amount ~vesting_period ~vesting_increment ~initial_minimum_balance :
+    Unsigned.UInt64.t =
+  let open Unsigned in
+  let min_balance_at_start_slot =
+    min_balance_at_slot ~global_slot:start_slot ~cliff_time ~cliff_amount
+      ~vesting_period ~vesting_increment ~initial_minimum_balance
+    |> Balance.to_amount |> Amount.to_uint64
+  in
+  let min_balance_at_end_slot =
+    min_balance_at_slot ~global_slot:end_slot ~cliff_time ~cliff_amount
+      ~vesting_period ~vesting_increment ~initial_minimum_balance
+    |> Balance.to_amount |> Amount.to_uint64
+  in
+  UInt64.Infix.(min_balance_at_start_slot - min_balance_at_end_slot)
 
 let has_locked_tokens ~global_slot (account : t) =
   match account.timing with

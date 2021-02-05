@@ -12,10 +12,10 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 open Mina_base
-open Coda_state
+open Mina_state
 open Cache_lib
 open O1trace
-open Coda_transition
+open Mina_transition
 open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
@@ -26,6 +26,7 @@ let catchup_timeout_duration (precomputed_values : Precomputed_values.t) =
     ( (precomputed_values.genesis_constants.protocol.delta + 1)
       * precomputed_values.constraint_constants.block_window_duration_ms
     |> Int64.of_int )
+  |> Block_time.Span.min (Block_time.Span.of_ms (Int64.of_int 5000))
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
     =
@@ -181,9 +182,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           Transition_frontier.Breadcrumb.build ~logger ~precomputed_values
             ~verifier ~trust_system ~transition_receipt_time
             ~sender:(Some sender) ~parent:parent_breadcrumb
-            ~transition:
-              mostly_validated_transition (* TODO: Can we skip here? *)
-            ~skip_staged_ledger_verification:false () )
+            ~transition:mostly_validated_transition
+            (* TODO: Can we skip here? *) () )
         ~transform_result:(function
           | Error (`Invalid_staged_ledger_hash error)
           | Error (`Invalid_staged_ledger_diff error) ->
@@ -192,20 +192,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   (metadata @ [("error", Error_json.error_to_yojson error)])
                 "Error while building breadcrumb in the transition handler \
                  processor: $error" ;
-              let (_
-                    : External_transition.Initial_validated.t
-                      Envelope.Incoming.t) =
-                Cached.invalidate_with_failure
-                  cached_initially_validated_transition
-              in
               Deferred.return (Error ())
           | Error (`Fatal_error exn) ->
-              let (_
-                    : External_transition.Initial_validated.t
-                      Envelope.Incoming.t) =
-                Cached.invalidate_with_failure
-                  cached_initially_validated_transition
-              in
               raise exn
           | Ok breadcrumb ->
               Deferred.return (Ok breadcrumb) )
@@ -315,6 +303,8 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
+                     if Ivar.is_full decrement_signal then
+                       [%log error] "Ivar.fill bug is here!" ;
                      Ivar.fill decrement_signal ()
                  | `Catchup_scheduler ->
                      () )

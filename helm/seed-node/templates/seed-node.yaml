@@ -23,18 +23,6 @@ spec:
         prometheus.io/path: '/metrics'
     spec:
       containers:
-      - name: coda-network-services
-        resources:
-          requests:
-            memory: 512m
-            cpu: 0.1
-        image: gcr.io/o1labs-192920/coda-network-services:latest
-        command: ["bash"]
-        args: ["-c", "/code/main.sh"]
-        ports: 
-        - name: metrics-port
-          containerPort: 8000
-        imagePullPolicy: Always
       - name: seed
         resources:
           limits:
@@ -56,11 +44,11 @@ spec:
           "-discovery-keypair", "{{ .Values.seed.discoveryKeypair }}",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end }}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
@@ -73,6 +61,8 @@ spec:
           value: {{ .Values.coda.ports.metrics | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
+        - name: CONNECT_PRIVATE_IPS
+          value: "true"
         - name: DAEMON_EXTERNAL_PORT
           value: {{ .Values.coda.ports.p2p | quote }}
         ports:
