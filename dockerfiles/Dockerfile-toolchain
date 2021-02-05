@@ -4,10 +4,10 @@ FROM ocaml/opam2:debian-9-ocaml-4.08
 ARG OCAML_VERSION=4.07.1
 
 # location of repo used for pins and external package commits
-ARG CODA_DIR=/coda
+ARG MINA_DIR=/mina
 
 # location of external packages
-ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
+ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
 # don't keep sources, to force reinstall of pinned packages from Coda sources
 # and to keep Docker image reasonable size

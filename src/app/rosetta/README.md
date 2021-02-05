@@ -21,7 +21,7 @@ Checkout the "rosetta-stable" branch of the mina repository and then run the fol
 `cat dockerfiles/Dockerfile-rosetta | docker build -t mina-rosetta:stable --build-arg "MINA_BRANCH=rosetta-stable" -`
 
 This creates an image (mina-rosetta:stable) based on the most up-to-date changes that support rosetta. This image
-can be used as a drop-in replacement for `gcr.io/o1labs-192920/coda-rosetta:debug-v1.1` in any of the below commands for testing.
+can be used as a drop-in replacement for `gcr.io/o1labs-192920/mina-rosetta:debug-v1.1` in any of the below commands for testing.
 
 ## How to Run
 
@@ -85,15 +85,15 @@ The Construction API is _not_ validated using `rosetta-cli` as this would requir
 
 ### Reproduce agent and rosetta-cli validation
 
-`gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
+`gcr.io/o1labs-192920/mina-rosetta:debug-v1.1.4` and `rosetta-cli @ v0.5.12`
 using this [`rosetta.conf`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/rosetta.conf) and the [`bootstrap_balances.json`](https://github.com/MinaProtocol/mina/blob/2b43c8cccfb9eb480122d207c5a3e6e58c4bbba3/src/app/rosetta/bootstrap_balances.json) next to it.
 
 **Create one of each transaction type and exit**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta-test --entrypoint ./docker-test-start.sh -d gcr.io/o1labs-192920/mina-rosetta:debug-v1.1.4
 
-$ docker logs --follow coda-rosetta-test
+$ docker logs --follow mina-rosetta-test
 
 # Wait for a message that looks like:
 #
@@ -107,9 +107,9 @@ $ rosetta-cli --configuration-file rosetta.conf check:data
 **Run a fast sandbox network forever**
 
 ```
-$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name coda-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/coda-rosetta:debug-v1.1.4
+$ docker run --publish 3087:3087 --publish 3086:3086 --publish 3085:3085 --name mina-rosetta --entrypoint ./docker-demo-start.sh -d gcr.io/o1labs-192920/mina-rosetta:debug-v1.1.4
 
-$ docker logs --follow coda-rosetta
+$ docker logs --follow mina-rosetta
 
 # Wait for a message that looks like:
 #

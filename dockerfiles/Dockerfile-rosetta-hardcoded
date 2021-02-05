@@ -265,7 +265,7 @@ RUN eval $(opam config env) \
   && mv _build/default/src/app $HOME/app \
   && rm -rf _build
 
-# TODO: consider making a coda-rosetta package with the minimum coda binaries/configs for rosetta.
+# TODO: consider making a mina-rosetta package with the minimum coda binaries/configs for rosetta.
 # Right now make deb is overkill
 #RUN eval $(opam config env) && make deb
 

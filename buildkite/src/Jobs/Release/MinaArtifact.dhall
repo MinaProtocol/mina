@@ -82,7 +82,7 @@ Pipeline.build
       let rosettaSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         deploy_env_file="export-git-env-vars.sh",
-        service="coda-rosetta",
+        service="mina-rosetta",
         version="\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
@@ -97,7 +97,7 @@ Pipeline.build
       let rosettaDuneSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         deploy_env_file="export-git-env-vars.sh",
-        service="coda-rosetta",
+        service="mina-rosetta",
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
