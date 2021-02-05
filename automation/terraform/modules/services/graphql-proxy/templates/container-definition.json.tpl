@@ -56,7 +56,7 @@
         { "name" : "DAEMON_CLIENT_PORT", "value" : "${coda_client_port}" },
         { "name" : "MINA_PRIVKEY_PASS", "value" : "${mina_privkey_pass}" },
         { "name" : "CODA_TESTNET", "value" : "${coda_testnet}" },
-        { "name" : "CODA_ARCHIVE_NODE", "value" : "${coda_archive_node}" }
+        { "name" : "MINA_ARCHIVE_NODE", "value" : "${coda_archive_node}" }
     ]
   }
 ]

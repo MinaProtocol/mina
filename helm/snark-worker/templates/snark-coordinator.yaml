@@ -40,7 +40,7 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-run-snark-coordinator", "$(MINA_SNARK_KEY)",
-          "-snark-worker-fee", "$(CODA_SNARK_FEE)",
+          "-snark-worker-fee", "$(MINA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
           {{- if $.Values.coda.runtimeConfig }}
@@ -66,7 +66,7 @@ spec:
           value: "true"
         - name: MINA_SNARK_KEY
           value: {{ .Values.coordinator.publicKey | quote }}
-        - name: CODA_SNARK_FEE
+        - name: MINA_SNARK_FEE
           value: {{ .Values.coordinator.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
           value: {{ .Values.coda.ports.p2p | quote }}

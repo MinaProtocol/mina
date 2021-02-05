@@ -67,7 +67,7 @@ if [ -n "$MINA_PROPOSE_KEY" ];then
   ROLE_COMMAND+="-propose-public-key $MINA_PROPOSE_KEY ";
 fi
 
-if [ -n "$CODA_ARCHIVE_NODE" ];then
+if [ -n "$MINA_ARCHIVE_NODE" ];then
   ROLE_COMMAND+="-archive"
 fi
 
