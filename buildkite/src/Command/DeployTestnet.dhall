@@ -22,7 +22,7 @@ let DeploySpec = {
     testnet = "ci-net",
     workspace = "\\\${BUILDKITE_BRANCH//[_\\/]/-}",
     artifactPath = "/tmp/artifacts",
-    postDeploy = "echo 'Deployment successfull!",
+    postDeploy = "echo 'Deployment successfull!'",
     testnetLabel = "testnet"
   }
 }
@@ -58,7 +58,7 @@ in
           Cmd.run "${spec.postDeploy}"
         ],
         label = "Deploy testnet: ${spec.testnetLabel}",
-        key = "deploy-${spec.testnetLabel}-net",
+        key = "deploy-${spec.testnetLabel}",
         target = Size.Large,
         depends_on = spec.deps
       },
