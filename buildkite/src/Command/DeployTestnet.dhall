@@ -6,45 +6,61 @@ let Size = ./Size.dhall
 let Cmd = ../Lib/Cmds.dhall
 
 
-let deployEnv = "DOCKER_DEPLOY_ENV"
--- testnet artifacts include: genesis ledgers, block producer keys,...
-let testnetArtifactPath = "/tmp/artifacts" in
+let DeploySpec = {
+  Type = {
+    deps : List Command.TaggedKey.Type,
+    deployEnvFile : Text,
+    testnet: Text,
+    workspace: Text,
+    artifactPath: Text,
+    postDeploy: Text,
+    testnetLabel: Text
+  },
+  default = {
+    deps = [] : List Command.TaggedKey.Type,
+    deployEnvFile = "DOCKER_DEPLOY_ENV",
+    testnet = "ci-net",
+    workspace = "\\\${BUILDKITE_BRANCH//[_\\/]/-}",
+    artifactPath = "/tmp/artifacts",
+    postDeploy = "echo 'Deployment successfull!",
+    testnetLabel = "testnet"
+  }
+}
 
-{ step = \(testnetName : Text) -> \(dependsOn : List Command.TaggedKey.Type) -> \(postDeploy : Text) ->
+in
+
+{ 
+  step = \(spec : DeploySpec.Type) ->
     Command.build
       Command.Config::{
         commands = [
+          Cmd.run "cd automation/terraform/testnets/${spec.testnet} && terraform init",
+
+          -- create separate workspace based on build branch to isolate infrastructure states
+          -- also ensure branch name meets terraform workspace naming constraints (remove '/' and '_')
+          Cmd.run "terraform workspace select ${spec.workspace} || terraform workspace new ${spec.workspace}",
+
+          -- download deployment dependencies and ensure artifact DIR exists
+          Cmd.run "artifact-cache-helper.sh ${spec.deployEnvFile}",
+          Cmd.run "mkdir -p ${spec.artifactPath}",
+
+          -- launch testnet based on deploy ENV
           Cmd.run (
-            "cd automation/terraform/testnets/${testnetName} && terraform init" ++
-            -- create separate workspace based on build branch to isolate infrastructure states
-            -- also ensure branch name meets terraform workspace naming constraints (remove '/' and '_')
-            " && (terraform workspace select \\\${BUILDKITE_BRANCH//[_\\/]/-} || terraform workspace new \\\${BUILDKITE_BRANCH//[_\\/]/-})"
-          ),
-          Cmd.run (
-            "if [ ! -f ${deployEnv} ]; then " ++
-                "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs ${deployEnv} .; " ++
-            "fi"
-          ),
-          -- ensure artifact DIR exists
-          Cmd.run "mkdir -p ${testnetArtifactPath}",
-          Cmd.run (
-            "source ${deployEnv} && terraform apply -auto-approve" ++
+            "source ${spec.deployEnvFile} && terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
-              " -var ci_artifact_path=${testnetArtifactPath}"
+              " -var ci_artifact_path=${spec.artifactPath}"
           ),
-          Cmd.run (
-            -- upload/cache testnet genesis_ledger
-            "pushd ${testnetArtifactPath} && BUILDKITE_ARTIFACT_UPLOAD_DESTINATION=gs://buildkite_k8s/coda/shared/\\\${BUILDKITE_JOB_ID}" ++
-              " buildkite-agent artifact upload \"genesis_ledger.json\" && popd"
-          ),
-          Cmd.run (
-            -- always execute post-deploy operation
-            "${postDeploy}"
-          )
+
+          -- upload/cache testnet genesis_ledger
+          Cmd.run "artifact-cache-helper.sh ${spec.artifactPath}/genesis_ledger.json --upload",
+
+          -- always execute post-deploy operation
+          Cmd.run "${spec.postDeploy}"
         ],
-        label = "Deploy testnet: ${testnetName}",
-        key = "deploy-testnet-${testnetName}",
+        label = "Deploy testnet: ${spec.testnetLabel}",
+        key = "deploy-${spec.testnetLabel}-net",
         target = Size.Large,
-        depends_on = dependsOn
-      }
+        depends_on = spec.deps
+      },
+  DeploySpec = DeploySpec
 }
