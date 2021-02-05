@@ -14,7 +14,8 @@ let command_run =
        flag "--config-file" ~aliases:["-config-file"] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
      and delete_older_than =
-       flag "-delete-older-than" ~aliases:["-delete-older-than"] (optional int)
+       flag "--delete-older-than" ~aliases:["-delete-older-than"]
+         (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
