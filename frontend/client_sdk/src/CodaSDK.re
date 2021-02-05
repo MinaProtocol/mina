@@ -73,6 +73,20 @@ external publicKeyOfPrivateKey: (codaSDK, privateKey) => publicKey =
 let derivePublicKey = (privateKey: privateKey) =>
   publicKeyOfPrivateKey(codaSDK, privateKey);
 
+[@bs.send] external validKeypair: (codaSDK, keypair) => bool = "validKeypair";
+/**
+  * Verifies if a keypair is valid by checking if the public key can be derived from
+  * the private key and additionally checking if we can use the private key to
+  * sign a transaction.
+  *
+  * @param keypair - A keypair
+  * @returns True if the `keypair` is a verifiable keypair
+  */
+[@genType]
+let verifyKeypair = (keypair: keypair) => {
+  validKeypair(codaSDK, keypair);
+};
+
 [@bs.send]
 external signString: (codaSDK, privateKey, string) => signature = "signString";
 /**
@@ -344,7 +358,7 @@ let verifyPaymentSignature = (signedPayment: signed(payment)) => {
         },
       },
     },
-  )
+  );
 };
 
 [@bs.send]
@@ -353,7 +367,7 @@ external verifyStakeDelegationSignature:
   "verifyStakeDelegationSignature";
 
 /**
-  * Verifies a signed stake delegation
+  * Verifies a signed stake delegation.
   *
   * @param signedStakeDelegation - A signed stake delegation
   * @returns True if the `signed(stakeDelegation)` is a verifiable stake delegation
@@ -389,5 +403,5 @@ let verifyStakeDelegationSignature =
         },
       },
     },
-  )
+  );
 };
