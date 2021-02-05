@@ -34,7 +34,7 @@ variable "testnet_name" {
   default     = "ci-net"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
@@ -83,7 +83,7 @@ module "ci_testnet" {
   cluster_region        = "us-east1"
   testnet_name          = var.testnet_name
 
-  coda_image            = var.coda_image
+  mina_image            = var.mina_image
   coda_archive_image    = var.coda_archive_image
   coda_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
   coda_bots_image       = "minaprotocol/mina-bots:latest"

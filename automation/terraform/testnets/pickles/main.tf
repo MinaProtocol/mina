@@ -23,7 +23,7 @@ provider "google" {
 
 locals {
   testnet_name = "pickles"
-  coda_image = "codaprotocol/coda-daemon:0.0.16-beta7-debug-adding-ledger-catchup-logs-049e329"
+  mina_image = "codaprotocol/coda-daemon:0.0.16-beta7-debug-adding-ledger-catchup-logs-049e329"
   seed_region = "us-east1"
   seed_zone = "us-east1-b"
   seed_discovery_keypairs = [
@@ -39,7 +39,7 @@ module "testnet_east" {
   cluster_region        = "us-east1"
   testnet_name          = local.testnet_name
 
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"
 
   coda_faucet_amount    = "100000000000"

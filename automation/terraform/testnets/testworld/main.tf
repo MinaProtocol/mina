@@ -36,7 +36,7 @@ provider "google" {
 
 locals {
   testnet_name = "testworld"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.1.1-add-testworld-ledger-bbda99d-testworld-4af8f09"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.1.1-add-testworld-ledger-bbda99d-testworld-4af8f09"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.1.1-temporary-qa-staging-ci-wait-cf2b767"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
@@ -60,7 +60,7 @@ module "testnet_central" {
   cluster_region        = "us-central1"
   testnet_name          = local.testnet_name
 
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_archive_image    = local.coda_archive_image
   coda_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"

@@ -36,7 +36,7 @@ provider "google" {
 
 locals {
   testnet_name = "sushi"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon:0.0.17-beta10-max-fifty-neighbors-321dc27"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon:0.0.17-beta10-max-fifty-neighbors-321dc27"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.0.17-beta10-max-fifty-neighbors-321dc27"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
@@ -58,7 +58,7 @@ module "testnet_central" {
   cluster_region        = "us-central1"
   testnet_name          = local.testnet_name
 
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_archive_image    = local.coda_archive_image
   coda_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"

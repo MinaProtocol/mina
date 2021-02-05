@@ -39,7 +39,7 @@ locals {
 
   coda_vars = {
     runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
-    image              = var.coda_image
+    image              = var.mina_image
     privkeyPass        = var.block_producer_key_pass
     seedPeers          = concat(
       var.additional_seed_peers,
@@ -55,7 +55,7 @@ locals {
     testnetName = var.testnet_name
     coda        = {
       runtimeConfig      = local.coda_vars.runtimeConfig
-      image              = var.coda_image
+      image              = var.mina_image
       privkeyPass        = var.block_producer_key_pass
       // TODO: Change this to a better name
       seedPeers          = concat(
@@ -136,7 +136,7 @@ locals {
   archive_node_vars = {
     testnetName = var.testnet_name
     coda = {
-      image         = var.coda_image
+      image         = var.mina_image
       seedPeers     = concat(var.additional_seed_peers, local.seed_peers)
       runtimeConfig = local.coda_vars.runtimeConfig
     }
@@ -177,7 +177,7 @@ locals {
     testnetName = var.testnet_name
     image = var.watchdog_image
     coda = {
-      image = var.coda_image
+      image = var.mina_image
       ports =  { metrics: 8000 }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }

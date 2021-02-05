@@ -14,7 +14,7 @@ data "google_project" "project" {
 #module "seed_one" {
 #  providers = { google = google.google-us-east1 }
 #  source             = "../../modules/google-cloud/coda-seed-node"
-#  coda_image         = local.coda_image
+#  mina_image         = local.mina_image
 #  project_id         = "o1labs-192920"
 #  subnetwork_project = "o1labs-192920"
 #  subnetwork         = module.seed_network.subnet_link
@@ -30,7 +30,7 @@ data "google_project" "project" {
 #module "seed_two" {
 #  providers = { google = google.google-us-east1 }
 #  source             = "../../modules/google-cloud/coda-seed-node"
-#  coda_image         = local.coda_image
+#  mina_image         = local.mina_image
 #  project_id         = "o1labs-192920"
 #  subnetwork_project = "o1labs-192920"
 #  subnetwork         = module.seed_network.subnet_link

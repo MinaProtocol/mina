@@ -14,7 +14,7 @@ module "testnet_east" {
   cluster_name          = "coda-infra-east"
   cluster_region        = "us-east1"
   testnet_name          = local.testnet_name
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_agent_image      = local.coda_agent_image
   coda_bots_image       = local.coda_bots_image
   coda_points_image     = local.coda_points_image

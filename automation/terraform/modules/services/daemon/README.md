@@ -14,7 +14,7 @@ This is a Terraform module that will deploy a Coda Daemon container as a service
 
 `container_version`: The version of the container to be used when deploying the Daemon Service
 
-`coda_wallet_keys`: A space-delimited list of AWS Secrets Manager secret IDs
+`mina_wallet_keys`: A space-delimited list of AWS Secrets Manager secret IDs
 
 `aws_access_key`: An Access Key granting read-only access to Testnet Secrets
 
@@ -30,7 +30,7 @@ This is a Terraform module that will deploy a Coda Daemon container as a service
 
 `daemon_metrics_port` (Default: 10000): The port that the daemon will expose prometheus metrics on
 
-`coda_privkey_pass`: The password for the installed keys
+`mina_privkey_pass`: The password for the installed keys
 
 ## Deployment Considerations
 

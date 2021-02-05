@@ -112,7 +112,7 @@ If you don't know if you _should_ do this, you probably shouldn't!
 1) make a new `terraform/testnets/<testnet>`
 2) `./scripts/generate-keys-and-ledger.sh --testnet=<testnet> --wc=10 --fc=10`
 3) run `./scripts/bake.sh --testnet=<testnet> --docker-tag=<tag, ex. 0.0.17-beta6-develop> --automation-commit=$(git log -1 --pretty=format:%H) --cloud=true`
-4) copy the image tag from the output of bake.sh to `coda_image` in `terraform/testnets/<testnet>/main.tf`
+4) copy the image tag from the output of bake.sh to `mina_image` in `terraform/testnets/<testnet>/main.tf`
 5) set the archive image tag to the corresponding tag name - for example, if the image is `0.0.17-beta10-880882e`, use  `gcr.io/o1labs-192920/coda-archive:0.0.17-beta10-880882e`
 6) run `terraform apply`
 7) after its done applying, run `./scripts/upload-keys-k8s.sh <testnet>`
@@ -379,7 +379,7 @@ module "network" {
 
 module "seed_one" {
   source             = "../../modules/google-cloud/coda-seed-node"
-  coda_image         = local.coda_image
+  mina_image         = local.mina_image
   project_id         = data.google_project.project.project_id
   subnetwork_project = data.google_project.project.project_id
   subnetwork         = module.network.subnet_link
@@ -394,7 +394,7 @@ module "seed_one" {
 
 module "seed_two" {
   source             = "../../modules/google-cloud/coda-seed-node"
-  coda_image         = local.coda_image
+  mina_image         = local.mina_image
   project_id         = data.google_project.project.project_id
   subnetwork_project = data.google_project.project.project_id
   subnetwork         = module.network.subnet_link

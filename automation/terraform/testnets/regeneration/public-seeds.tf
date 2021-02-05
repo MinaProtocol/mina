@@ -12,7 +12,7 @@
 
 # module "seed_one" {
 #   source             = "../../modules/google-cloud/coda-seed-node"
-#   coda_image         = var.coda_image
+#   mina_image         = var.mina_image
 #   project_id         = data.google_project.project.project_id
 #   subnetwork_project = data.google_project.project.project_id
 #   subnetwork         = module.seed_network.subnet_link
@@ -27,7 +27,7 @@
 
 # module "seed_two" {
 #   source             = "../../modules/google-cloud/coda-seed-node"
-#   coda_image         = var.coda_image
+#   mina_image         = var.mina_image
 #   project_id         = data.google_project.project.project_id
 #   subnetwork_project = data.google_project.project.project_id
 #   subnetwork         = module.seed_network.subnet_link

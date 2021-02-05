@@ -36,7 +36,7 @@ provider "google" {
 
 locals {
   testnet_name = "pre-release"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.0.16-beta7-4.1-turbo-pickles-f2bcaf1-pre-release-90d72f8"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.0.16-beta7-4.1-turbo-pickles-f2bcaf1-pre-release-90d72f8"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.0.16-beta7-develop-7f59ad7"
   seed_region = "us-east1"
   seed_zone = "us-east1-b"
@@ -62,7 +62,7 @@ module "testnet_east" {
 
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fdab9b58b8e556a39736ce7c8bd8e2ef6fcf4d60/src/app/archive/create_schema.sql"
 
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_archive_image    = local.coda_archive_image
   coda_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"

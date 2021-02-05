@@ -29,7 +29,7 @@ module Network_config = struct
     ; cluster_region: string
     ; testnet_name: string
     ; k8s_context: string
-    ; coda_image: string
+    ; mina_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
     ; coda_points_image: string
@@ -232,7 +232,7 @@ module Network_config = struct
         ; seed_zone
         ; seed_region
         ; k8s_context
-        ; coda_image= images.coda
+        ; mina_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
         ; coda_points_image= images.points

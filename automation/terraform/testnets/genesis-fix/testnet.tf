@@ -15,7 +15,7 @@ provider "aws" {
 
 locals {
   netname    = "genesis-test"
-  coda_image = "codaprotocol/coda-daemon:0.0.11-beta5-release-0.0.11-beta5-redux-9116312"
+  mina_image = "codaprotocol/coda-daemon:0.0.11-beta5-release-0.0.11-beta5-redux-9116312"
 }
 
 provider "google" {
@@ -37,7 +37,7 @@ module "network" {
 
 module "seed_one" {
   source             = "../../modules/google-cloud/coda-seed-node"
-  coda_image         = local.coda_image
+  mina_image         = local.mina_image
   project_id         = data.google_project.project.project_id
   subnetwork_project = data.google_project.project.project_id
   subnetwork         = module.network.subnet_link
@@ -52,7 +52,7 @@ module "seed_one" {
 
 module "seed_two" {
   source             = "../../modules/google-cloud/coda-seed-node"
-  coda_image         = local.coda_image
+  mina_image         = local.mina_image
   project_id         = data.google_project.project.project_id
   subnetwork_project = data.google_project.project.project_id
   subnetwork         = module.network.subnet_link

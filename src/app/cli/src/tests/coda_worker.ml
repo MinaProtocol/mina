@@ -117,7 +117,7 @@ module T = struct
         Rpc_parallel.Function.t }
 
   type coda_functions =
-    { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
+    { mina_peers: unit -> Network_peer.Peer.t list Deferred.t
     ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
     ; coda_get_nonce:
@@ -163,7 +163,7 @@ module T = struct
            with type worker_state := Worker_state.t
             and type connection_state := Connection_state.t) =
   struct
-    let peers_impl ~worker_state ~conn_state:() () = worker_state.coda_peers ()
+    let peers_impl ~worker_state ~conn_state:() () = worker_state.mina_peers ()
 
     let verified_transitions_impl ~worker_state ~conn_state:() () =
       worker_state.coda_verified_transitions ()
@@ -496,7 +496,7 @@ module T = struct
               ()
           in
           [%log info] "Worker finish setting up coda" ;
-          let coda_peers () = Mina_lib.peers coda in
+          let mina_peers () = Mina_lib.peers coda in
           let coda_start () = Mina_lib.start coda in
           let coda_get_balance account_id =
             return
@@ -646,7 +646,7 @@ module T = struct
             Fn.compose Deferred.return
             @@ Mina_commands.For_tests.Subscriptions.new_user_commands coda
           in
-          { coda_peers= with_monitor coda_peers
+          { mina_peers= with_monitor mina_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
           ; coda_initialization_finish_signal=

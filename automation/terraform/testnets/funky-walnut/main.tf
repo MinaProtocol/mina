@@ -15,7 +15,7 @@ provider "aws" {
 
 locals {
   testnet_name = "funky-walnut"
-  coda_image   = var.coda_image
+  mina_image   = var.mina_image
   coda_agent_image = var.coda_agent_image
   coda_bots_image = var.coda_bots_image
   coda_points_image = var.coda_points_image
@@ -23,7 +23,7 @@ locals {
   coda_faucet_fee = var.coda_faucet_fee
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
   default = "codaprotocol/coda-daemon:0.0.12-beta-feature-bump-genesis-timestamp-0e1c811"
 }

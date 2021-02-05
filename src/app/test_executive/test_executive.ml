@@ -27,7 +27,7 @@ type test_inputs_with_cli_inputs =
 type inputs =
   { test_inputs: test_inputs_with_cli_inputs
   ; test: test
-  ; coda_image: string
+  ; mina_image: string
   ; debug: bool }
 
 let engines : engine list =
@@ -198,7 +198,7 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let images =
-    { Test_config.Container_images.coda= inputs.coda_image
+    { Test_config.Container_images.coda= inputs.mina_image
     ; user_agent= "codaprotocol/coda-user-agent:0.1.5"
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
@@ -316,7 +316,7 @@ let test_arg =
   let doc = "The name of the test to execute." in
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
 
-let coda_image_arg =
+let mina_image_arg =
   let doc = "Identifier of the coda docker image to test." in
   let env = Arg.env_var "MINA_IMAGE" ~doc in
   Arg.(
@@ -346,12 +346,12 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test coda_image debug =
-      {test_inputs; test; coda_image; debug}
+    let cons_inputs test_inputs test mina_image debug =
+      {test_inputs; test; mina_image; debug}
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ coda_image_arg $ debug_arg)
+      $ mina_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

@@ -22,7 +22,7 @@ provider "google" {
 
 locals {
   testnet_name = "fruit-punch"
-  coda_image = "codaprotocol/coda-daemon:0.0.16-beta7-develop-454ed24"
+  mina_image = "codaprotocol/coda-daemon:0.0.16-beta7-develop-454ed24"
   coda_archive_image = "codaprotocol/coda-archive:0.0.16-beta7-develop-454ed24"
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   seed_region = "us-east1"
@@ -59,7 +59,7 @@ module "testnet_east" {
   cluster_region        = "us-east1"
   testnet_name          = local.testnet_name
 
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_archive_image    = local.coda_archive_image
   mina_archive_schema   = local.mina_archive_schema
   coda_agent_image      = "codaprotocol/coda-user-agent:0.1.6"

@@ -18,24 +18,24 @@ data "template_file" "container_definition" {
     faucet_container_version = var.faucet_container_version
     discord_api_key   = var.discord_api_key
     coda_graphql_host = var.coda_graphql_host
-    coda_graphql_port = var.coda_rest_port
+    coda_graphql_port = var.mina_rest_port
     faucet_public_key = var.faucet_public_key
     faucet_password   = var.faucet_password
     echo_public_key   = var.echo_public_key
     echo_password     = var.echo_password
     fee_amount        = var.fee_amount
     # Daemon Vars
-   coda_container_version = var.coda_container_version
-    coda_wallet_keys   = var.coda_wallet_keys
+   mina_container_version = var.mina_container_version
+    mina_wallet_keys   = var.mina_wallet_keys
     aws_access_key     = var.aws_access_key
     aws_secret_key     = var.aws_secret_key
     aws_default_region = var.aws_default_region
-    coda_peer          = var.coda_peer
-    coda_rest_port     = var.coda_rest_port
-    coda_external_port = var.coda_external_port
-    coda_discovery_port = var.coda_discovery_port
-    coda_metrics_port  = var.coda_metrics_port
-    coda_privkey_pass  = var.coda_privkey_pass
+    mina_peer          = var.mina_peer
+    mina_rest_port     = var.mina_rest_port
+    mina_external_port = var.mina_external_port
+    mina_discovery_port = var.mina_discovery_port
+    mina_metrics_port  = var.mina_metrics_port
+    mina_privkey_pass  = var.mina_privkey_pass
     coda_testnet = var.testnet
     coda_client_port = var.coda_client_port
   }

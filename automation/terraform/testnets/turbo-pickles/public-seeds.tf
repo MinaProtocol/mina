@@ -13,7 +13,7 @@
 
  module "seed_one" {
    source             = "../../modules/google-cloud/coda-seed-node"
-   coda_image         = "gcr.io/o1labs-192920/coda-daemon-baked:0.0.17-beta11-hard-fork-changes-2855721-turbo-pickles-8f523d0"
+   mina_image         = "gcr.io/o1labs-192920/coda-daemon-baked:0.0.17-beta11-hard-fork-changes-2855721-turbo-pickles-8f523d0"
    project_id         = "o1labs-192920"
    runtime_config     = ""
    subnetwork_project = "o1labs-192920"
@@ -28,7 +28,7 @@
 
  module "seed_two" {
    source             = "../../modules/google-cloud/coda-seed-node"
-   coda_image         = "gcr.io/o1labs-192920/coda-daemon-baked:0.0.17-beta11-hard-fork-changes-2855721-turbo-pickles-8f523d0"
+   mina_image         = "gcr.io/o1labs-192920/coda-daemon-baked:0.0.17-beta11-hard-fork-changes-2855721-turbo-pickles-8f523d0"
    runtime_config     = ""
    project_id         = "o1labs-192920"
    subnetwork_project = "o1labs-192920"

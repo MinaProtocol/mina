@@ -36,7 +36,7 @@ provider "google" {
 
 locals {
   testnet_name = "test-nhreports"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon:0.0.16-beta7-pre-release-blocktime-increase-db1ee8b"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon:0.0.16-beta7-pre-release-blocktime-increase-db1ee8b"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.0.16-beta7-develop-95a2025"
   seed_region = "us-east1"
   seed_zone = "us-east1-b"
@@ -68,7 +68,7 @@ module "testnet_east" {
   cluster_region        = "us-east1"
   testnet_name          = local.testnet_name
 
-  coda_image            = local.coda_image
+  mina_image            = local.mina_image
   coda_archive_image    = local.coda_archive_image
   coda_agent_image      = "codaprotocol/coda-user-agent:0.1.5"
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"

@@ -14,19 +14,19 @@ data "template_file" "container_definition" {
   vars = {
       log_group = local.service_name
       region = "us-west-2"
-      coda_container_version=var.coda_container_version
-      coda_wallet_keys = var.coda_wallet_keys
+      mina_container_version=var.mina_container_version
+      mina_wallet_keys = var.mina_wallet_keys
       aws_access_key = var.aws_access_key
       aws_secret_key = var.aws_secret_key
       aws_default_region = var.aws_default_region
-      daemon_peer = var.coda_peer
-      daemon_rest_port = var.coda_rest_port
-      daemon_external_port = var.coda_external_port
-      daemon_discovery_port = var.coda_discovery_port
-      daemon_metrics_port = var.coda_metrics_port
-      coda_privkey_pass = var.coda_privkey_pass
-      coda_snark_key = var.coda_snark_key
-      coda_propose_key = var.coda_propose_key
+      daemon_peer = var.mina_peer
+      daemon_rest_port = var.mina_rest_port
+      daemon_external_port = var.mina_external_port
+      daemon_discovery_port = var.mina_discovery_port
+      daemon_metrics_port = var.mina_metrics_port
+      mina_privkey_pass = var.mina_privkey_pass
+      mina_snark_key = var.mina_snark_key
+      mina_propose_key = var.mina_propose_key
   }
 }
 

@@ -1,9 +1,9 @@
-data "aws_secretsmanager_secret" "testnet_coda_privkey_pass" {
-  name = "testnet/keys/coda_privkey_pass"
+data "aws_secretsmanager_secret" "testnet_mina_privkey_pass" {
+  name = "testnet/keys/mina_privkey_pass"
 }
 
-data "aws_secretsmanager_secret_version" "current_testnet_coda_privkey_pass" {
-  secret_id = "${data.aws_secretsmanager_secret.testnet_coda_privkey_pass.id}"
+data "aws_secretsmanager_secret_version" "current_testnet_mina_privkey_pass" {
+  secret_id = "${data.aws_secretsmanager_secret.testnet_mina_privkey_pass.id}"
 }
 
 data "aws_secretsmanager_secret" "discord_api_key" {
