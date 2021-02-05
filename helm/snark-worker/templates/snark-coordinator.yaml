@@ -39,7 +39,7 @@ spec:
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
-          "-run-snark-coordinator", "$(CODA_SNARK_KEY)",
+          "-run-snark-coordinator", "$(MINA_SNARK_KEY)",
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
@@ -64,7 +64,7 @@ spec:
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
-        - name: CODA_SNARK_KEY
+        - name: MINA_SNARK_KEY
           value: {{ .Values.coordinator.publicKey | quote }}
         - name: CODA_SNARK_FEE
           value: {{ .Values.coordinator.snarkFee | quote }}

@@ -27,7 +27,7 @@ function usage() {
 }
 
 while [[ "$#" -gt 0 ]]; do case $1 in
-  --run-snark-worker) CODA_SNARK_KEY="$2"; shift;;
+  --run-snark-worker) MINA_SNARK_KEY="$2"; shift;;
   -v|--run-block-producer) MINA_PROPOSE_KEY="$2"; shift;;
   -c|--command) COMMAND="$2"; shift;;
   --dont-fetch-secrets) NOFETCH=1; shift;;
@@ -59,8 +59,8 @@ done
 
 # Build ROLE_COMMAND
 ROLE_COMMAND=""
-if [ -n "$CODA_SNARK_KEY" ];then
-   ROLE_COMMAND+="-run-snark-worker $CODA_SNARK_KEY -snark-worker-fee 50";
+if [ -n "$MINA_SNARK_KEY" ];then
+   ROLE_COMMAND+="-run-snark-worker $MINA_SNARK_KEY -snark-worker-fee 50";
 fi
 
 if [ -n "$MINA_PROPOSE_KEY" ];then
