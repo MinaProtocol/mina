@@ -6,6 +6,7 @@ coda:
   logLevel: "Debug"
   logSnarkWorkGossip: false
   image: codaprotocol/coda-daemon:0.0.16-beta7-develop
+  persistentStorage: false
   privkeyPass: "naughty blue worm"
   seedPeers:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
