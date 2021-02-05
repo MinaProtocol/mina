@@ -1,6 +1,8 @@
 testnetName: "coda-testnet"
 
 coda:
+  runtimeConfig:
+  generateGenesisProof: true
   logLevel: "Debug"
   logSnarkWorkGossip: false
   image: codaprotocol/coda-daemon:0.0.16-beta7-develop
@@ -36,39 +38,40 @@ bots:
 # for purposes of testing this chart, we provide defaults that exercise all sidecar permutations
 blockProducerConfigs:
   - name: "test-1"
-    externalPort: 1
     runWithUserAgent: false
     runWithBots: false
     privateKeySecret: "yolo"
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-2"
-    externalPort: 2
     runWithUserAgent: true
     runWithBots: false
     privateKeySecret: "yolo"
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-3"
-    externalPort: 3
     runWithUserAgent: false
     runWithBots: true
     privateKeySecret: "yolo"
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
   - name: "test-4"
-    externalPort: 4
     runWithUserAgent: true
     runWithBots: true
     privateKeySecret: "yolo"
     isolated: false
     enableGossipFlooding: false
     enablePeerExchange: false
+    libp2pSecret: "libp2pYolo"
 
 healthcheck:
+  enabled: true
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30

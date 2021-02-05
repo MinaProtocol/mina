@@ -9,7 +9,14 @@ module Global_slot = Mina_numbers_nonconsensus.Global_slot
 module Memo = Signed_command_memo
 module Signature_lib = Signature_lib_nonconsensus
 
+let raise_js_error s = Js.raise_js_error (new%js Js.error_constr (Js.string s))
+
 type string_js = Js.js_string Js.t
+
+type keypair_js =
+  < privateKey: string_js Js.readonly_prop
+  ; publicKey: string_js Js.readonly_prop >
+  Js.t
 
 type payload_common_js =
   < fee: string_js Js.prop

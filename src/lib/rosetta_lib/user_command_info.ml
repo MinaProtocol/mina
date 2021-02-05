@@ -144,16 +144,26 @@ module Partial = struct
   module Reason = Errors.Partial_reason
 
   let to_user_command_payload :
-         t
+         ?memo:string
+      -> ?valid_until:Unsigned_extended.UInt32.t
+      -> t
       -> nonce:Unsigned_extended.UInt32.t
       -> (Signed_command.Payload.t, Errors.t) Result.t =
-   fun t ~nonce ->
+   fun ?memo ?valid_until t ~nonce ->
     let open Result.Let_syntax in
     let%bind fee_payer_pk =
       pk_to_public_key ~context:"Fee payer" t.fee_payer
     in
     let%bind source_pk = pk_to_public_key ~context:"Source" t.source in
     let%bind receiver_pk = pk_to_public_key ~context:"Receiver" t.receiver in
+    let%bind memo =
+      match memo with
+      | Some memo -> (
+        try Ok (Signed_command_memo.create_from_string_exn memo)
+        with _ -> Error (Errors.create `Memo_invalid) )
+      | None ->
+          Ok Signed_command_memo.empty
+    in
     let%map body =
       match t.kind with
       | `Payment ->
@@ -211,8 +221,7 @@ module Partial = struct
     Signed_command.Payload.create
       ~fee:(Fee_currency.of_uint64 t.fee)
       ~fee_token:(Token_id.of_uint64 t.fee_token)
-      ~fee_payer_pk ~nonce ~body ~memo:Signed_command_memo.empty
-      ~valid_until:None
+      ~fee_payer_pk ~nonce ~body ~memo ~valid_until
 end
 
 let forget (t : t) : Partial.t =

@@ -51,8 +51,8 @@ variable "fish_count" {
 
 locals {
   testnet_name = "watchdog-test"
-  coda_image = "minaprotocol/mina-daemon-baked:0.2.4-16ebdd6-testworld-16ebdd6"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.2.4-16ebdd6"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.2.11-compatible-a5fa443-watchdog-test-feb43ca"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.2.11-compatible-a5fa443"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
   seed_discovery_keypairs = [
@@ -87,7 +87,7 @@ module "testnet_east" {
   coda_bots_image       = "codaprotocol/coda-bots:0.0.13-beta-1"
   coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
 
-  watchdog_image = "gcr.io/o1labs-192920/watchdog:0.1.0"
+  watchdog_image = "gcr.io/o1labs-192920/watchdog:0.3.7"
 
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"
@@ -148,7 +148,7 @@ module "testnet_east" {
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
 
-  upload_blocks_to_gcloud = false
+  upload_blocks_to_gcloud = true
 
   restart_nodes = false
   restart_nodes_every_mins = "60"
@@ -159,4 +159,7 @@ module "testnet_east" {
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts = local.make_report_accounts
 
+  seedPeersURL = "https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt"
+
+  artifact_path = "./"
 }

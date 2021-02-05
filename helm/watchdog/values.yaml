@@ -6,10 +6,11 @@ coda:
   ports:
     client: "8301"
     graphql: "3085"
-    metrics: "10001"
+    metrics: "8000"
     p2p: "10909"
+  uploadBlocksToGCloud: false
 
-image: gcr.io/o1labs-192920/watchdog:latest
+image: gcr.io/o1labs-192920/watchdog:0.3.7
 
 restartEveryMins: ""
 restartNodes: ""
@@ -17,3 +18,4 @@ makeReports: ""
 makeReportEveryMins: ""
 makeReportDiscordWebhookUrl: ""
 makeReportAccounts: ""
+seedPeersURL: ""

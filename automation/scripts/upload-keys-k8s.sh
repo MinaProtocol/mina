@@ -1,3 +1,4 @@
+#! /bin/bash
 
 TESTNET="$1"
 KEYS_PREFIX="$2"
@@ -33,6 +34,14 @@ fi
 function upload_keys_by_folder {
   for pubkey in $1/*.pub; do
     privkey="${pubkey%.*}" # strip pub extension
+    justfilename=$(basename -- "$privkey")
+    secretname=$(echo $justfilename | tr _ -)-key
+
+    kubectl create secret generic $secretname --cluster=$CLUSTER --namespace=$TESTNET --from-file=key=${privkey} --from-file=pub=${pubkey}
+  done
+
+  for pubkey in $1/*.peerid; do
+    privkey="${pubkey%.*}" # strip peerid extension
     justfilename=$(basename -- "$privkey")
     secretname=$(echo $justfilename | tr _ -)-key
 

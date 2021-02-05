@@ -106,6 +106,17 @@ let fill_in_user_command pool block_state_hash =
     let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
     Public_key.Compressed.of_base58_check_exn pk_str
   in
+  let balance_of_id id ~item =
+    let%map _pk_id, balance =
+      query_db ~f:(fun db -> Processor.Balance.load db ~id) ~item
+    in
+    balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
+  in
+  let balance_of_id_opt id_opt ~item =
+    Option.value_map id_opt ~default:(Deferred.return None) ~f:(fun id ->
+        let%map balance = balance_of_id id ~item in
+        Some balance )
+  in
   let open Deferred.Let_syntax in
   let%bind block_id =
     query_db ~item:"blocks" ~f:(fun db ->
@@ -163,15 +174,27 @@ let fill_in_user_command pool block_state_hash =
                 failwithf "Not a transaction status failure: %s, error: %s" s
                   err () )
       in
+      let%bind source_balance =
+        balance_of_id_opt block_user_cmd.source_balance_id
+          ~item:"source balance"
+      in
       let fee_payer_account_creation_fee_paid =
         Option.map block_user_cmd.fee_payer_account_creation_fee_paid
           ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
       in
+      let%bind fee_payer_balance =
+        balance_of_id block_user_cmd.fee_payer_balance_id
+          ~item:"fee payer balance"
+      in
       let receiver_account_creation_fee_paid =
         Option.map block_user_cmd.receiver_account_creation_fee_paid
           ~f:(fun amt ->
             Unsigned.UInt64.of_int64 amt |> Currency.Amount.of_uint64 )
+      in
+      let%bind receiver_balance =
+        balance_of_id_opt block_user_cmd.receiver_balance_id
+          ~item:"receiver balance"
       in
       let created_token =
         Option.map block_user_cmd.created_token ~f:(fun tok ->
@@ -193,8 +216,11 @@ let fill_in_user_command pool block_state_hash =
         ; hash
         ; status
         ; failure_reason
+        ; source_balance
         ; fee_payer_account_creation_fee_paid
+        ; fee_payer_balance
         ; receiver_account_creation_fee_paid
+        ; receiver_balance
         ; created_token } )
 
 let fill_in_internal_command pool block_state_hash =
@@ -211,15 +237,25 @@ let fill_in_internal_command pool block_state_hash =
   let%bind internal_cmd_info =
     query_db
       ~item:
-        "internal command id, global_slot, sequence no, secondary sequence no"
-      ~f:(fun db -> Sql.Blocks_and_internal_commands.run db ~block_id)
+        "internal command id, global_slot, sequence no, secondary sequence \
+         no, receiver_balance" ~f:(fun db ->
+        Sql.Blocks_and_internal_commands.run db ~block_id )
   in
   Deferred.List.map internal_cmd_info
-    ~f:(fun (internal_cmd_id, global_slot, sequence_no, secondary_sequence_no)
+    ~f:(fun { internal_command_id
+            ; global_slot
+            ; sequence_no
+            ; secondary_sequence_no
+            ; receiver_balance }
        ->
+      let receiver_balance =
+        receiver_balance |> Unsigned.UInt64.of_int64
+        |> Currency.Balance.of_uint64
+      in
+      (* pieces from the internal_commands table *)
       let%bind internal_cmd =
         query_db ~item:"blocks internal commands" ~f:(fun db ->
-            Processor.Internal_command.load db ~id:internal_cmd_id )
+            Processor.Internal_command.load db ~id:internal_command_id )
       in
       let typ = internal_cmd.typ in
       let%bind receiver = pk_of_id ~item:"receiver" internal_cmd.receiver_id in
@@ -235,6 +271,7 @@ let fill_in_internal_command pool block_state_hash =
         ; secondary_sequence_no
         ; typ
         ; receiver
+        ; receiver_balance
         ; fee
         ; token
         ; hash }

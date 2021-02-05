@@ -2458,10 +2458,11 @@ module Mutations = struct
     io_field "addPeers"
       ~args:
         Arg.
-          [arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)]
-      ~doc:"Connect to the given peers"
+          [ arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)
+          ; arg "seed" ~typ:(non_null bool) ]
+      ~doc:"Connect to the given peers as seeds"
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
-      ~resolve:(fun {ctx= coda; _} () peers ->
+      ~resolve:(fun {ctx= coda; _} () peers seed ->
         let open Deferred.Result.Let_syntax in
         let%bind peers =
           Result.combine_errors peers
@@ -2473,7 +2474,7 @@ module Mutations = struct
         let%bind.Async maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Mina_networking.add_peer net peer with
+              match%map.Async Mina_networking.add_peer net peer ~seed with
               | Ok () ->
                   None
               | Error err ->
@@ -2866,10 +2867,10 @@ module Queries = struct
       ; hash }
 
   let best_chain =
-    field "bestChain"
+    io_field "bestChain"
       ~doc:
         "Retrieve a list of blocks from transition frontier's root to the \
-         current best tip. Returns null if the system is bootstrapping."
+         current best tip. Returns an error if the system is bootstrapping."
       ~typ:(list @@ non_null Types.block)
       ~args:
         Arg.
@@ -2880,9 +2881,16 @@ module Queries = struct
                  blocks closest to the best tip will be returned"
               ~typ:int ]
       ~resolve:(fun {ctx= coda; _} () max_length ->
-        let open Option.Let_syntax in
-        let%map best_chain = Mina_lib.best_chain ?max_length coda in
-        List.map best_chain ~f:(block_of_breadcrumb coda) )
+        match Mina_lib.best_chain ?max_length coda with
+        | Some best_chain ->
+            let%map blocks =
+              Deferred.List.map best_chain ~f:(fun bc ->
+                  Deferred.return @@ block_of_breadcrumb coda bc )
+            in
+            Ok (Some blocks)
+        | None ->
+            return
+            @@ Error "Could not obtain best chain from transition frontier" )
 
   let block =
     result_field2 "block"

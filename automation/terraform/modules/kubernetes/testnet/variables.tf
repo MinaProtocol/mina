@@ -6,6 +6,11 @@ variable "generate_and_upload_artifacts" {
   default = true
 }
 
+variable "artifact_path" {
+  type = string
+  default = "/tmp"
+}
+
 # K8s Cluster Vars
 
 variable "cluster_name" {
@@ -295,4 +300,9 @@ variable "archive_persistence_size" {
 variable "upload_blocks_to_gcloud" {
   type    = bool
   default = false
+}
+
+variable "seedPeersURL" {
+  type = string
+  default = ""
 }
