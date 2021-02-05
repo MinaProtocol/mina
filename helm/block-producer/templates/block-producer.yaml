@@ -169,7 +169,7 @@ spec:
           limits:
           requests:
             memory: 8.0Gi
-            cpu: 8.0
+            cpu: 7.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
           "-log-level", {{ $.Values.coda.logLevel }},
