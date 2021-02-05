@@ -204,6 +204,7 @@ spec:
           {{- end }}
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
+          "-super-catchup",
           {{- end -}}
           "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
         ]
