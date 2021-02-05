@@ -24,7 +24,7 @@
         { "name" : "DAEMON_METRICS_PORT", "value" : "${daemon_metrics_port}" },
         { "name" : "MINA_PRIVKEY_PASS", "value" : "${coda_privkey_pass}" },
         { "name" : "CODA_SNARK_KEY", "value" : "${coda_snark_key}" },
-        { "name" : "CODA_PROPOSE_KEY", "value" : "${coda_propose_key}" }
+        { "name" : "MINA_PROPOSE_KEY", "value" : "${coda_propose_key}" }
     ]
   }
 ]

@@ -28,7 +28,7 @@ function usage() {
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   --run-snark-worker) CODA_SNARK_KEY="$2"; shift;;
-  -v|--run-block-producer) CODA_PROPOSE_KEY="$2"; shift;;
+  -v|--run-block-producer) MINA_PROPOSE_KEY="$2"; shift;;
   -c|--command) COMMAND="$2"; shift;;
   --dont-fetch-secrets) NOFETCH=1; shift;;
   --no-daemon) NODAEMON=1; shift;;
@@ -63,8 +63,8 @@ if [ -n "$CODA_SNARK_KEY" ];then
    ROLE_COMMAND+="-run-snark-worker $CODA_SNARK_KEY -snark-worker-fee 50";
 fi
 
-if [ -n "$CODA_PROPOSE_KEY" ];then
-  ROLE_COMMAND+="-propose-public-key $CODA_PROPOSE_KEY ";
+if [ -n "$MINA_PROPOSE_KEY" ];then
+  ROLE_COMMAND+="-propose-public-key $MINA_PROPOSE_KEY ";
 fi
 
 if [ -n "$CODA_ARCHIVE_NODE" ];then
