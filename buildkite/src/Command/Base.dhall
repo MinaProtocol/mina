@@ -20,6 +20,8 @@ let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let B/Skip = B.definitions/commandStep/properties/skip/Type
 
+let B/If = B.definitions/commandStep/properties/if/Type
+
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
@@ -99,6 +101,7 @@ let Config =
       , retries : List Retry.Type
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
+      , if : Optional B/If
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -110,6 +113,7 @@ let Config =
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
+    , if = None B/If
     }
   }
 
@@ -183,6 +187,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
           },
     soft_fail = c.soft_fail,
     skip = c.skip,
+    if = c.if,
     plugins =
       let dockerPart =
         Optional/toList
