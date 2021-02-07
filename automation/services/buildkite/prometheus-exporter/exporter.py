@@ -340,7 +340,7 @@ def main():
     exporter = Exporter(client)
     REGISTRY.register(exporter)
 
-    start_http_server(METRICS_PORT)
+    start_http_server(int(METRICS_PORT))
     print("Metrics on Port {}".format(METRICS_PORT))
 
     while True:
