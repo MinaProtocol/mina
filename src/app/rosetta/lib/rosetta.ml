@@ -2,17 +2,33 @@ open Core_kernel
 open Async
 open Rosetta_lib
 
-let router ~graphql_uri ~db ~logger route body =
+let router ~graphql_uri ~pool ~logger route body =
+  let with_db f =
+    Caqti_async.Pool.use (fun db -> f ~db) pool
+    |> Deferred.Result.map_error ~f:(function
+         | `App e ->
+             `App e
+         | `Page_not_found ->
+             `Page_not_found
+         | `Exception exn ->
+             `Exception exn
+         | `Connect_failed _e ->
+             `App (Errors.create (`Sql "Connect failed"))
+         | `Connect_rejected _e ->
+             `App (Errors.create (`Sql "Connect rejected"))
+         | `Post_connect _e ->
+             `App (Errors.create (`Sql "Post connect error")) )
+  in
   try
     match route with
     | "network" :: tl ->
-        Network.router tl body ~db ~graphql_uri ~logger
+        with_db (Network.router tl body ~graphql_uri ~logger)
     | "account" :: tl ->
-        Account.router tl body ~db ~graphql_uri ~logger
+        with_db (Account.router tl body ~graphql_uri ~logger)
     | "mempool" :: tl ->
-        Mempool.router tl body ~db ~graphql_uri ~logger
+        with_db (Mempool.router tl body ~graphql_uri ~logger)
     | "block" :: tl ->
-        Block.router tl body ~db ~graphql_uri ~logger
+        with_db (Block.router tl body ~graphql_uri ~logger)
     | "construction" :: tl ->
         Construction.router tl body ~graphql_uri ~logger
     | _ ->
@@ -24,27 +40,11 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
-    let with_db f =
-      Caqti_async.Pool.use (fun db -> f ~db) pool
-      |> Deferred.Result.map_error ~f:(function
-           | `App e ->
-               `App e
-           | `Page_not_found ->
-               `Page_not_found
-           | `Exception exn ->
-               `Exception exn
-           | `Connect_failed _e ->
-               `App (Errors.create (`Sql "Connect failed"))
-           | `Connect_rejected _e ->
-               `App (Errors.create (`Sql "Connect rejected"))
-           | `Post_connect _e ->
-               `App (Errors.create (`Sql "Post connect error")) )
-    in
     match Yojson.Safe.from_string body with
     | body ->
-        with_db (router route body ~graphql_uri ~logger)
+        router route body ~pool ~graphql_uri ~logger
     | exception Yojson.Json_error "Blank input data" ->
-        with_db (router route `Null ~graphql_uri ~logger)
+        router route `Null ~pool ~graphql_uri ~logger
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed"
           (`Json_parse (Some err))
