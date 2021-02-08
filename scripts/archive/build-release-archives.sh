@@ -39,7 +39,7 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
-cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 
 # echo contents of deb
@@ -115,11 +115,11 @@ else
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
     docker build \
-      -t codaprotocol/coda-archive:$DOCKER_TAG \
+      -t codaprotocol/mina-archive:$DOCKER_TAG \
       -f $SCRIPTPATH/Dockerfile \
       --build-arg mina_deb_version=$VERSION \
       --build-arg deb_repo=$CODENAME \
       docker_build
 
-    docker push codaprotocol/coda-archive:$DOCKER_TAG
+    docker push codaprotocol/mina-archive:$DOCKER_TAG
 fi
