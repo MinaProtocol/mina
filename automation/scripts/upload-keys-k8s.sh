@@ -1,4 +1,5 @@
-#! /bin/bash
+#!/bin/bash
+set -e
 
 TESTNET="$1"
 KEYS_PREFIX="$2"
