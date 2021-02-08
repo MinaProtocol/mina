@@ -9,7 +9,7 @@ WHALE_COUNT=1
 FISH_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.1.1-feature-pasta-up-to-date-235a404"
+CODA_DAEMON_IMAGE="codaprotocol/mina-daemon:0.3.0-coda-to-mina-cc9a606"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
