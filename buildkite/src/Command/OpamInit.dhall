@@ -1,6 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 let Cmd = ../Lib/Cmds.dhall
-let Mina = ../Command/Coda.dhall
+let Mina = ../Command/Mina.dhall
 let S = ../Lib/SelectFiles.dhall
 
 let r = Cmd.run
@@ -29,7 +29,7 @@ let commands : List Text -> List Cmd.Type = \(environment : List Text) ->
 let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
-    [ Coda.fixPermissionsCommand ] # (commands environment) # [
+    [ Mina.fixPermissionsCommand ] # (commands environment) # [
       Cmd.runInDocker
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).codaToolchain, extraEnv = environment })
         (unpackageScript ++ " && " ++ innerScript)
