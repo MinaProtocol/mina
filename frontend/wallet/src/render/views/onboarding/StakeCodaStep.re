@@ -3,7 +3,7 @@
 [@react.component]
 let make = (~prevStep, ~closeOnboarding) => {
   <OnboardingTemplate
-    heading="Stake Coda to Earn Rewards"
+    heading="Stake Mina to Earn Rewards"
     description={
       <p>
         {React.string(
@@ -30,7 +30,7 @@ let make = (~prevStep, ~closeOnboarding) => {
           // <Spacer width=1.5 />
           <Button
             width=15.
-            label="Take me to Coda Wallet"
+            label="Take me to Mina Wallet"
             style=Button.HyperlinkBlue3
             onClick={_ => closeOnboarding()}
           />

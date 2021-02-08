@@ -22,7 +22,7 @@ available to send increases between those two times.
 ## Detailed design
 
 Accounts may have no timing restrictions, have a time lock, or a
-vesting schedule. In Coda, the type `Account.t` is a record type with
+vesting schedule. In Mina, the type `Account.t` is a record type with
 several fields.  An additional field `timing` could contain an element
 of a sum type with three alternatives: `Untimed` and `Timed`.
 

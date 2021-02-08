@@ -1,4 +1,4 @@
-(** An interface to limited libp2p functionality for Coda to use.
+(** An interface to limited libp2p functionality for Mina to use.
 
     A subprocess is spawned to run the go-libp2p code. This module communicates
     with that subprocess over an ad-hoc RPC protocol.

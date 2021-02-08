@@ -1,6 +1,6 @@
-## Coda Faucet Module
+## Mina Faucet Module
 
-This is a Terraform module that will deploy a service containing two tasks, a Coda Daemon task and a GraphQL Proxy container.
+This is a Terraform module that will deploy a service containing two tasks, a Mina Daemon task and a GraphQL Proxy container.
 
 ## Variables
 
@@ -16,9 +16,9 @@ This is a Terraform module that will deploy a service containing two tasks, a Co
 
 `proxy_container_version`: The version of the container to be used when deploying the Daemon Service
 
-`coda_graphql_host` (Default: "localhost"): The hostname of the Coda GraphQL Endpoint
+`coda_graphql_host` (Default: "localhost"): The hostname of the Mina GraphQL Endpoint
 
-`coda_graphql_port` (Default: "3085"): The port the Coda GraphQL Endpoint is listening on
+`coda_graphql_port` (Default: "3085"): The port the Mina GraphQL Endpoint is listening on
 
 ### Daemon Variables
 
@@ -44,9 +44,9 @@ This is a Terraform module that will deploy a service containing two tasks, a Co
 
 ## Deployment Considerations
 
-In order to deploy a "new" version of this module, you must ensure that you have rebuilt the Coda Daemon image and *(optionally)* the Proxy image if it has changed.
+In order to deploy a "new" version of this module, you must ensure that you have rebuilt the Mina Daemon image and *(optionally)* the Proxy image if it has changed.
 
-The Coda Daemon image build is a two-step process, with the base Coda dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile).
+The Mina Daemon image build is a two-step process, with the base Mina dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile).
 
 The manual commands to release each container are the following:
 

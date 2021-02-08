@@ -2,7 +2,7 @@
 
 It is possible to run the Mina daeemon inside a Docker container. This allows for resource and dependency isolation, and homogenization of infrastructure. 
 
-The Coda Protocol builds one main Docker Image `codaprotocol/coda-daemon` which contains the Coda Daemon and its dependencies. Image Tags follow the release cadence for the Coda Protocol and the goal is to keep them up to date with [Github Releases](https://github.com/CodaProtocol/coda/releases). 
+The Mina Protocol builds one main Docker Image `codaprotocol/coda-daemon` which contains the Mina Daemon and its dependencies. Image Tags follow the release cadence for the Mina Protocol and the goal is to keep them up to date with [Github Releases](https://github.com/CodaProtocol/coda/releases). 
 
 ### Quick Start 
 
@@ -15,20 +15,20 @@ docker run --publish 8302:8302 --publish 8303:8303 codaprotocol/coda-daemon:<ver
 For more details on the `docker run` command, see the [Docker Docs](https://docs.docker.com/engine/reference/run/).
 
 Now, lets break down that command a little bit: 
-- `--publish 8302:8302 --publish 8303:8303` By default, the Coda Daemon exposes two ports (8302 TCP, 8303 UDP) used for Network communication
+- `--publish 8302:8302 --publish 8303:8303` By default, the Mina Daemon exposes two ports (8302 TCP, 8303 UDP) used for Network communication
 - `daemon` specifies that we should run a mina daemon
 - `-peer` specifies an initial seed to query during the peer discovery process, more than one peer may be specified
 - `-external-port` specifies a non-default
 
-For more details on the Coda Daemon CLI and other flags it supports, you may execute the `help` command: 
+For more details on the Mina Daemon CLI and other flags it supports, you may execute the `help` command: 
 
 ```
 docker run codaprotocol/coda-daemon:<version> daemon -help
 ```
 
-### Running Coda with a Container Orchestrator
+### Running Mina with a Container Orchestrator
 
-Currently, the implementation of the Kademlia DHT in use by the Coda Daemon is a tad tempermental, and requires consistent ports to be set on both the host and container.
+Currently, the implementation of the Kademlia DHT in use by the Mina Daemon is a tad tempermental, and requires consistent ports to be set on both the host and container.
 
 There is a bug issue [here](https://github.com/CodaProtocol/coda/issues/2947) that details the problem. In the meantime, it is easiest to avoid any sort of bridge networking and run the Daemon container on the host network, especially if you'd like to use non-default ports. 
 

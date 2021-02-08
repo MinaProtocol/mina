@@ -11,4 +11,4 @@
  (preprocess
   (pps ppx_coda ppx_version ppx_jane ppx_register_event))
  (instrumentation (backend bisect_ppx))
- (synopsis "Coda block producer"))
+ (synopsis "Mina block producer"))

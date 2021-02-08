@@ -8,4 +8,4 @@
   (pps ppx_coda ppx_version ppx_jane ppx_deriving.std))
  (instrumentation (backend bisect_ppx))
  (synopsis
-   "Transforming Coda data such that it can be easy for the Web Client to process"))
+   "Transforming Mina data such that it can be easy for the Web Client to process"))

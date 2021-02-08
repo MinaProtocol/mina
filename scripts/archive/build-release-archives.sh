@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script makes a .deb archive for the Coda Archive process
+# This script makes a .deb archive for the Mina Archive process
 # and releases it to the AWS .deb repository packages.o1test.net
 
 set -euo pipefail

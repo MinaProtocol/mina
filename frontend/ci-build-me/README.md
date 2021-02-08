@@ -4,7 +4,7 @@ For JS code, only `src/index.js` was modified.
 
 # CI Build Me
 
-This proxy listens on a webhook via a Google Cloud Function and conditionally starts the Coda buildkite pipeline.
+This proxy listens on a webhook via a Google Cloud Function and conditionally starts the Mina buildkite pipeline.
 
 We currently dispatch a build the moment the `ci-build-me` label is added and any time commits are pushed to a pull-request that has this label attached to it.
 

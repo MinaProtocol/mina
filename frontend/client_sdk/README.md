@@ -1,4 +1,4 @@
-# Coda Client Javascript SDK
+# Mina Client Javascript SDK
 
 This is a NodeJS client SDK that allows you to sign transactions and strings using Coda's keypairs.
 The project contains Typescript and ReasonML typings but can be used from plain NodeJS as well. 

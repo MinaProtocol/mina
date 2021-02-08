@@ -7,7 +7,7 @@ let make = (~customSetup, ~expressSetup) => {
     description={
       <p>
         {React.string(
-           "Your node will allow you to connect to the Coda Network and make transactions.",
+           "Your node will allow you to connect to the Mina Network and make transactions.",
          )}
       </p>
     }

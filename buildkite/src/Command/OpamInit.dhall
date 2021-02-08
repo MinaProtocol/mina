@@ -1,6 +1,6 @@
 let Prelude = ../External/Prelude.dhall
 let Cmd = ../Lib/Cmds.dhall
-let Coda = ../Command/Coda.dhall
+let Mina = ../Command/Coda.dhall
 let S = ../Lib/SelectFiles.dhall
 
 let r = Cmd.run

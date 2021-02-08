@@ -23,13 +23,13 @@ variable "proxy_container_version" {
 }
 
 variable "coda_graphql_host" {
-  description = "The hostname of the Coda GraphQL Endpoint"
+  description = "The hostname of the Mina GraphQL Endpoint"
   type        = string
   default     = "localhost"
 }
 
 variable "coda_graphql_port" {
-  description = "The port the Coda GraphQL Endpoint is listening on"
+  description = "The port the Mina GraphQL Endpoint is listening on"
   type        = string
   default     = "3085"
 }
@@ -43,7 +43,7 @@ variable "proxy_external_port" {
 # DAEMON VARIABLES
 
 variable "mina_container_version" {
-  description = "The version of the container to be used when deploying the Coda Daemon"
+  description = "The version of the container to be used when deploying the Mina Daemon"
   type        = string
 }
 

@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Coda can't do something? Maybe it should!
+about: Mina can't do something? Maybe it should!
 ---
 
 **Have you already searched the issue tracker to see if this feature has already

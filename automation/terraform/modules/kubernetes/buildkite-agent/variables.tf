@@ -114,7 +114,7 @@ variable "helm_repo" {
 variable "coda_helm_repo" {
   type = string
 
-  description = "Repository URL where to locate Coda developed Helm charts."
+  description = "Repository URL where to locate Mina developed Helm charts."
   default     = "gs://coda-charts"
 }
 

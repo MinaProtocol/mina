@@ -1,11 +1,11 @@
 ## Summary
 
 We propose a mechanism to allow updating the versions of remote procedure
-calls (RPCs) between Coda protocol nodes.
+calls (RPCs) between Mina protocol nodes.
 
 ## Motivation
 
-Coda uses a remote procedure call (RPC) mechanism for nodes to query
+Mina uses a remote procedure call (RPC) mechanism for nodes to query
 other nodes, and to broadcast messages to the gossip network. As the
 codebase evolves, the structure of those RPC messages may evolve, and
 new kinds of messages may be added. Nodes running different versions
@@ -139,7 +139,7 @@ software.
 
 ## Prior art
 
-The Jane Street version RPC library is already in the Coda codebase.
+The Jane Street version RPC library is already in the Mina codebase.
 
 ## Unresolved questions
 

@@ -1,6 +1,6 @@
 {
   "name": "@o1labs/client-sdk",
-  "description": "Node API for signing transactions for Coda Protocol",
+  "description": "Node API for signing transactions for Mina Protocol",
   "version": "0.1.2",
   "scripts": {
     "build": "bsb -make-world && tsc src/SDKWrapper.ts -d",

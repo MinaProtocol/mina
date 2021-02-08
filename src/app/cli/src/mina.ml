@@ -1187,7 +1187,7 @@ let rec ensure_testnet_id_still_good logger =
           eprintf
             "The version for the testnet has changed, and this client \
              (version %s) is no longer compatible. Please download the latest \
-             Coda software!\n\
+             Mina software!\n\
              Valid versions:\n\
              %s\n"
             ( local_id |> Option.map ~f:str

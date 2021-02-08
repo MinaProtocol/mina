@@ -901,7 +901,7 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      Command.async ~summary:"Replay transactions from Coda archive"
+      Command.async ~summary:"Replay transactions from Mina archive"
         (let%map input_file =
            Param.flag "--input-file"
              ~doc:"file File containing the genesis ledger"

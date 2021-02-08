@@ -238,7 +238,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Coda network services vars
+# Mina network services vars
 
 variable "restart_nodes" {
   type    = bool

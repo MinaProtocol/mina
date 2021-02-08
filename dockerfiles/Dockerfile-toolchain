@@ -9,7 +9,7 @@ ARG MINA_DIR=/mina
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
 
-# don't keep sources, to force reinstall of pinned packages from Coda sources
+# don't keep sources, to force reinstall of pinned packages from Mina sources
 # and to keep Docker image reasonable size
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false

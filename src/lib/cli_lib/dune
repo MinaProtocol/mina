@@ -9,4 +9,4 @@
  (preprocess
   (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.make))
  (instrumentation (backend bisect_ppx))
- (synopsis "Library to communicate with Coda as cli as the front-end"))
+ (synopsis "Library to communicate with Mina as cli as the front-end"))

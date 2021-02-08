@@ -1,4 +1,4 @@
-(** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
+(** An agent that pokes at Mina and peeks at Rosetta to see if things look alright *)
 
 open Core_kernel
 open Async
@@ -622,7 +622,7 @@ let command =
       ~doc:"URI of Rosetta endpoint to connect to" Cli.required_uri
   and graphql_uri =
     flag "--graphql-uri" ~aliases:["graphql-uri"]
-      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
+      ~doc:"URI of Mina GraphQL endpoint to connect to" Cli.required_uri
   and log_json =
     flag "--log-json" ~aliases:["log-json"]
       ~doc:"Print log output as JSON (default: plain text)" no_arg
@@ -649,5 +649,5 @@ let command =
 
 let () =
   Command.run
-    (Command.async ~summary:"Run agent to poke at Coda and peek at Rosetta"
+    (Command.async ~summary:"Run agent to poke at Mina and peek at Rosetta"
        command)

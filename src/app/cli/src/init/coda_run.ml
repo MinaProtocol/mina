@@ -68,13 +68,13 @@ let get_current_protocol_version ~compile_time_current_protocol_version
       else (
         [%log fatal]
           "Current protocol version $protocol_version from the command line \
-           disagrees with $config_protocol_version from the Coda config"
+           disagrees with $config_protocol_version from the Mina config"
           ~metadata:
             [ ("protocol_version", `String protocol_version)
             ; ("config_protocol_version", `String config_protocol_version) ] ;
         failwith
           "Current protocol version from command line disagrees with protocol \
-           version in Coda config; please delete your Coda config if you wish \
+           version in Mina config; please delete your Mina config if you wish \
            to use a new protocol version" )
     with Sys_error _ -> (
       (* use value provided on command line, write to config dir *)
@@ -129,7 +129,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
           validate_cli_protocol_version protocol_version ;
           write_protocol_version protocol_version ;
           [%log info]
-            "Overwriting Coda config proposed protocol version \
+            "Overwriting Mina config proposed protocol version \
              $config_proposed_protocol_version with proposed protocol version \
              $protocol_version from the command line"
             ~metadata:
@@ -161,7 +161,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   match !coda_ref with
   | None ->
       [%log warn]
-        "Shutdown before Coda instance was created, not saving a visualization"
+        "Shutdown before Mina instance was created, not saving a visualization"
   | Some t -> (
     (*Transition frontier visualization*)
     match Mina_lib.visualize_frontier ~filename:frontier_file t with
@@ -191,7 +191,7 @@ let summary exn_json =
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
-      (Deferred.return (`String "Shutdown before Coda instance was created"))
+      (Deferred.return (`String "Shutdown before Mina instance was created"))
     ~f:(fun t ->
       Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
@@ -206,7 +206,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
   let report_file = temp_config ^ ".tar.gz" in
-  (*Coda status*)
+  (*Mina status*)
   let status_file = temp_config ^/ "coda_status.json" in
   let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
@@ -549,7 +549,7 @@ let coda_crash_message ~log_issue ~action ~error =
   let followup =
     if log_issue then
       sprintf
-        !{err| The Coda Protocol developers would like to know why!
+        !{err| The Mina Protocol developers would like to know why!
 
     Please:
       Open an issue:
@@ -675,7 +675,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
             [("coda_run", `String "Program was killed by signal")]
         in
         [%log info]
-          !"Coda process was interrupted by $signal"
+          !"Mina process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
         (* causes async shutdown and at_exit handlers to run *)
         Async.shutdown 130 ))

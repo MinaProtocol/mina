@@ -12,7 +12,7 @@ import yaml
 from pathlib import Path
 
 # This script is designed to fetch relevant parameters from a running testnet
-# and run a Coda helm chart against that testnet.
+# and run a Mina helm chart against that testnet.
 # Example Invocation:
 # python3 scripts/testnet-validation/helm_deploy.py run --working-directory ~/Desktop/config --coda-docker-image codaprotocol/coda-daemon:0.0.12-beta-rosetta-dockerfile-aec5631
 

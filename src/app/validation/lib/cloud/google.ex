@@ -1,5 +1,5 @@
 # TODO: fully separate this from the rest of the project
-# currently, it depends on Coda directly for configuration, and log providers depend on this directly
+# currently, it depends on Mina directly for configuration, and log providers depend on this directly
 
 defmodule Cloud.Google do
   @moduledoc "Google Cloud interface."

@@ -100,7 +100,7 @@ let make = (~prevStep, ~nextStep) => {
     description={
       <p>
         {React.string(
-           "Coda is being installed and configured on your system. This should take 1-2 min depending on your internet speed.",
+           "Mina is being installed and configured on your system. This should take 1-2 min depending on your internet speed.",
          )}
       </p>
     }

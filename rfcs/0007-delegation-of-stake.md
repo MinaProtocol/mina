@@ -15,7 +15,7 @@ Some goals for such a design are the following:
 # Detailed design
 [detailed-design]: #detailed-design
 
-In general, let's model the "delegation state" of Coda at any given time as a function
+In general, let's model the "delegation state" of Mina at any given time as a function
 `delegate : Public_key -> Public_key`. There are a few different semantics we could hope to give
 delegation.
 

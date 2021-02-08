@@ -6,4 +6,4 @@
  (preprocess
   (pps ppx_jane ppx_version ppx_deriving_yojson ppx_enumerate))
  (instrumentation (backend bisect_ppx))
- (synopsis "Different kinds of status for Coda "))
+ (synopsis "Different kinds of status for Mina "))

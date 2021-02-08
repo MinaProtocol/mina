@@ -11,7 +11,7 @@ Spacetime-enabled compiler switches within OPAM. For example, there's the switch
 with it in your enviroment, install the switch:
 
 ```
-  opam switch create 4.07.1+spacetime # or the current OCaml version for building Coda 
+  opam switch create 4.07.1+spacetime # or the current OCaml version for building Mina 
   eval $(opam env)
 ```
 Building some OPAM packages with Spacetime requires a large amount of stack space, so you
@@ -23,7 +23,7 @@ Then follow the instructions for "Building outside docker" given in README-dev.m
 
 ## Running for Spacetime
 
-Once the Coda executable has been built for Spacetime, you can run it as you would otherwise.
+Once the Mina executable has been built for Spacetime, you can run it as you would otherwise.
 To obtain Spacetime profiling data, set the environment variable `OCAML_SPACETIME_INTERVAL`
 to the sampling interval, in milliseconds. In practice, we've found that 10 seconds works well:
 

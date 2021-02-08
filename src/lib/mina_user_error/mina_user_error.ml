@@ -20,7 +20,7 @@ let () =
             (Printf.sprintf {err|
 FATAL ERROR
 
-  ☠  Coda %s.
+  ☠  Mina %s.
 
   %s
 %!|err}

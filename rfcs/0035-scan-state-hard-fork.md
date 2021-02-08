@@ -6,7 +6,7 @@ We describe how to handle the transaction SNARK scan state across hard forks.
 ## Motivation
 [motivation]: #motivation
 
-For the launch of the Coda main net, we wish to have a hard fork plan
+For the launch of the Mina main net, we wish to have a hard fork plan
 and implementation in place, in case there's a network failure. One of
 the parts of such a plan is how to update the transaction SNARK scan
 state.

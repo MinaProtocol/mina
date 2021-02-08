@@ -39,7 +39,7 @@ Parameter | Description | Default
 `coda.logLevel` | log level to set for Mina daeemon | `TRACE` 
 `coda.logSnarkWorkGossip` | whether the Mina daeemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Mina daeemon configuration to use at runtime | `undefined`
-`coda.privKeyPass` | public-private key-pair associated with Coda test account/wallet | `see [default] values.yaml`
+`coda.privKeyPass` | public-private key-pair associated with Mina test account/wallet | `see [default] values.yaml`
 
 ## archive-node launch examples
 

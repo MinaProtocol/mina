@@ -5,9 +5,9 @@
 
 # Repository Purpose
 
-This repository is designed to show an opinionated example on how to operate a network of Coda Daemons. It implements the entire node lifecycle using a modern Infrastructure as Code toolset. Community contributions are warmly encouraged, please see the [contribution guidelines](#to-do) for more details. The code is designed to be as modular as possible, allowing the end-user to "pick and choose" the parts they would like to incorporate into their own infrastructure stack.
+This repository is designed to show an opinionated example on how to operate a network of Mina Daemons. It implements the entire node lifecycle using a modern Infrastructure as Code toolset. Community contributions are warmly encouraged, please see the [contribution guidelines](#to-do) for more details. The code is designed to be as modular as possible, allowing the end-user to "pick and choose" the parts they would like to incorporate into their own infrastructure stack.
 
-If you have any issues setting up your testnet or have any other questions about this repository, join the public [Discord Server](https://discord.gg/ShKhA7J) and get help from the Coda community.
+If you have any issues setting up your testnet or have any other questions about this repository, join the public [Discord Server](https://discord.gg/ShKhA7J) and get help from the Mina community.
 
 # Code Structure
 
@@ -24,16 +24,16 @@ automation
     └── testnets
 ```
 
-**Helm:** Contains Helm Charts for various components of a Coda Testnet
+**Helm:** Contains Helm Charts for various components of a Mina Testnet
 
 - _block-producer:_ One or more block producers consisting of unique `deployments`
 - _snark-worker:_ Deploys a "SNARK Coordinator" consisting of one or more worker process containers
 
-**Terraform:** Contains resource modules and live code to deploy a Coda Testnet.
+**Terraform:** Contains resource modules and live code to deploy a Mina Testnet.
 
 - Note: Currently most modules are written against Google Kubernetes Engine, multi-cloud support is on the roadmap.
 - _infrastructure:_ The root module for infrastructure like K8s Clusters and Prometheus.
-- _kubernetes/testnet:_ A Terraform module that encapsulates a Coda Testnet, including Seed Nodes, Block Producers and SNARK Workers.
+- _kubernetes/testnet:_ A Terraform module that encapsulates a Mina Testnet, including Seed Nodes, Block Producers and SNARK Workers.
 - _google-cloud/coda-seed-node:_ A Terraform module that deploys a set of public Seed Nodes on Google Compute Engine in the configured region.
   _Scripts:_ Testnet utilities for key generation & storage, redelegation, etc.
 
@@ -65,7 +65,7 @@ In order to simulate a differentiation between O(1) Stake (Whales) and end-user 
 
 ### Bots
 
-Bots are often used to automate transactions being sent around the network. Often, these require special consideration in the genesis ledger, so it's worth keeping them in mind when setting up a new network. For example, the O(1) Discord Faucet is a simple sidecar bot that runs against a Coda Daemon's GraphQL Port and responds to requests for funds in the Coda Protocol Discord server.
+Bots are often used to automate transactions being sent around the network. Often, these require special consideration in the genesis ledger, so it's worth keeping them in mind when setting up a new network. For example, the O(1) Discord Faucet is a simple sidecar bot that runs against a Mina Daemon's GraphQL Port and responds to requests for funds in the Mina Protocol Discord server.
 
 ### Services
 
@@ -91,7 +91,7 @@ Public Testnets are functionally similar to QA Testnets but have the addition of
 
 Deploying a testnet is a relatively straightforward process once you have ironed out the configuration. At a high level, there are several pieces of configuration it's important to keep in mind or else your deployment might fail:
 
-- Coda Keypairs
+- Mina Keypairs
 - Genesis Ledger
 - Runtime Constants
 

@@ -217,7 +217,7 @@ module Transaction = struct
                  ~context:
                    (sprintf
                       "Received a public key of an unexpected shape %s when \
-                       accessing the Coda GraphQL API."
+                       accessing the Mina GraphQL API."
                       (Yojson.Basic.pretty_to_string x))
                  `Invariant_violation)
       in
@@ -239,7 +239,7 @@ module Transaction = struct
                  ~context:
                    (sprintf
                       "Received a user command of an unexpected kind %s when \
-                       accessing the Coda GrpahQL API."
+                       accessing the Mina GrpahQL API."
                       (Yojson.Basic.pretty_to_string kind))
                  `Invariant_violation)
       in

@@ -1,6 +1,6 @@
 # Coda
 
-Coda is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
+Mina is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 - [Developer homepage](https://codaprotocol.com/code.html)
 - [Roadmap](https://codaprotocol.com/docs/developers)
@@ -8,14 +8,14 @@ Coda is a new cryptocurrency protocol with a lightweight, constant-sized blockch
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
 about our development process and how to contribute. If you just want to build
-Coda, this is the right file!
+Mina, this is the right file!
 
 ## Building Coda
 
-Building Coda can be slightly involved. There are many C library dependencies that need
+Building Mina can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
-Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/CodaProtocol/coda/issues/962).
+Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/CodaProtocol/coda/issues/962).
 
 The short version:
 
@@ -140,7 +140,7 @@ NOTE: all of the `test-*` targets (including `test-all`) won't run in the contai
 
 ## Building outside docker
 
-Coda has a variety of opam and system dependencies.
+Mina has a variety of opam and system dependencies.
 
 You can see [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) for how we
 install them all in the container. To get all the opam dependencies
@@ -152,19 +152,19 @@ with `dune`, so you need to add them manually, by running `scripts/pin-external-
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
-automatically installed when building Coda via a `dune` rule in the library
+automatically installed when building Mina via a `dune` rule in the library
 ocaml-rocksdb.
 
 ## Steps for adding a new dependency
 
 Rarely, you may edit one of our forked opam-pinned packages, or add a new system
 dependency (like libsodium). Some of the pinned packages are git submodules,
-others inhabit the git Coda repository.
+others inhabit the git Mina repository.
 
-If an existing pinned package is updated, either in the Coda repository or in the
+If an existing pinned package is updated, either in the Mina repository or in the
 the submodule's repository, it will be automatically re-pinned in CI.
 
-If you add a new package in the Coda repository or as a submodule, you must do all of the following:
+If you add a new package in the Mina repository or as a submodule, you must do all of the following:
 
 1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required; there are
    comments that distinguish the treatment of submodules from other packages
@@ -210,7 +210,7 @@ Container Stages:
 
 ## Overriding Genesis Constants
 
-Coda genesis constants consists of constants for the consensus algorithm, sizes for various data structures like transaction pool, scan state, ledger etc.
+Mina genesis constants consists of constants for the consensus algorithm, sizes for various data structures like transaction pool, scan state, ledger etc.
 All the constants can be set at compile-time. A subset of the compile-time constants can be overriden when generating the genesis state using `runtime_genesis_ledger.exe`, and a subset of those can again be overridden at runtime by passing the new values to the daemon.
 
 The constants at compile-time are set for different configurations using optional compilation. This is how integration tests/builds with multiple configurations are run.

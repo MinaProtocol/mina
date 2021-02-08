@@ -335,7 +335,7 @@ class Executive:
 ################
 
 
-# A CodaProject is a thin wrapper around interacting the Coda source code.
+# A CodaProject is a thin wrapper around interacting the Mina source code.
 # It is responsible for dispatching builds and tests.
 class CodaProject:
     logproc_exe_path = 'src/app/logproc/logproc.exe'
@@ -565,7 +565,7 @@ actions = {
 def main():
 
     root_parser = argparse.ArgumentParser(
-        description='Coda integration test runner/configurator.')
+        description='Mina integration test runner/configurator.')
     subparsers = root_parser.add_subparsers(help='subcommands')
 
     run_parser = subparsers.add_parser('run',

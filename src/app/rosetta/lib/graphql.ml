@@ -40,7 +40,7 @@ let query query_obj uri =
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )
     |> Deferred.Result.map_error ~f:(fun e ->
-           Errors.create ~context:"Internal POST to Coda Daemon failed"
+           Errors.create ~context:"Internal POST to Mina Daemon failed"
              (`Graphql_coda_query (Error.to_string_hum e)) )
   in
   let%bind body_str =
@@ -55,7 +55,7 @@ let query query_obj uri =
     | code ->
         Deferred.return
           (Error
-             (Errors.create ~context:"Response from Coda Daemon is not a 200"
+             (Errors.create ~context:"Response from Mina Daemon is not a 200"
                 (`Graphql_coda_query
                   (Printf.sprintf "Status code %d -- %s" code body_str))))
   in
@@ -63,17 +63,17 @@ let query query_obj uri =
   ( match (member "errors" body_json, member "data" body_json) with
   | `Null, `Null ->
       Error
-        (Errors.create ~context:"Empty response from Coda Daemon"
+        (Errors.create ~context:"Empty response from Mina Daemon"
            (`Graphql_coda_query "Empty response"))
   | error, `Null ->
       Error
-        (Errors.create ~context:"Explicit error response from Coda Daemon"
+        (Errors.create ~context:"Explicit error response from Mina Daemon"
            (`Graphql_coda_query (graphql_error_to_string error)))
   | _, raw_json ->
       Result.try_with (fun () -> query_obj#parse raw_json)
       |> Result.map_error ~f:(fun e ->
              Errors.create
-               ~context:"JSON parse error in response from Coda Daemon"
+               ~context:"JSON parse error in response from Mina Daemon"
                (`Graphql_coda_query
                  (Printf.sprintf "Error parsing graphql response: %s"
                     (Exn.to_string e))) ) )

@@ -492,7 +492,7 @@ describe("ApplicationReducer", () => {
     });
 
     testAsync(
-      "Start a stopped Coda few times with the same args",
+      "Start a stopped Mina few times with the same args",
       ~timeout=300,
       cb => {
         let args = ["test1", "a", "b"];

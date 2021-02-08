@@ -28,19 +28,19 @@ variable "discord_api_key" {
 }
 
 variable "coda_graphql_host" {
-  description = "The hostname of the Coda GraphQL Endpoint"
+  description = "The hostname of the Mina GraphQL Endpoint"
   type        = string
   default     = "localhost"
 }
 
 variable "coda_graphql_port" {
-  description = "The port the Coda GraphQL Endpoint is listening on"
+  description = "The port the Mina GraphQL Endpoint is listening on"
   type        = string
   default     = "3085"
 }
 
 variable "faucet_public_key" {
-  description = "The Public Key to be used by the Faucet Service, must be installed as a wallet on the Coda Daemon"
+  description = "The Public Key to be used by the Faucet Service, must be installed as a wallet on the Mina Daemon"
   type        = string
 }
 
@@ -50,7 +50,7 @@ variable "faucet_password" {
 }
 
 variable "echo_public_key" {
-  description = "The Public Key to be used by the Echo Service, must be installed as a wallet on the Coda Daemon"
+  description = "The Public Key to be used by the Echo Service, must be installed as a wallet on the Mina Daemon"
   type        = string
 }
 

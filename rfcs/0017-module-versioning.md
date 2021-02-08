@@ -5,7 +5,7 @@ representations.
 
 ## Motivation
 
-Within the Coda codebase, modules contain (ideally) one main type. As
+Within the Mina codebase, modules contain (ideally) one main type. As
 the software evolves, that type can change.  When compiling, the OCaml
 type discipline enforces consistent use of such types. Sometimes we'd
 like to export representations of those types, perhaps by persisting
@@ -15,7 +15,7 @@ may be written in languages other than OCaml.
 ## Detailed design
 
 There are three main serialized representations of data used in the
-Coda codebase: `bin_io`, `sexp`, and `yojson`. The readers and writers
+Mina codebase: `bin_io`, `sexp`, and `yojson`. The readers and writers
 of those representations are typically created using the `derive`
 annotation on types.
 
@@ -171,7 +171,7 @@ containing versioned modules.
 An exception can be carved out for using `sexp` serialization of data
 from modules without `Stable` and versioning. That kind of
 serialization is useful for logging and other printing from within
-Coda, and is less likely to be used with other software.
+Mina, and is less likely to be used with other software.
 
 ### Coordination with RPC versioning
 
@@ -184,7 +184,7 @@ RPC version should be updated at the same time.
 ### Embracing this discipline; static enforcement
 
 As of this writing, there are over 600 type definitions with `deriving
-bin_io` in the Coda codebase, even more with `sexp`. Only about 60
+bin_io` in the Mina codebase, even more with `sexp`. Only about 60
 type definitions are versioned using the `Stable.Vn` naming discipline
 (and without the explicit version information suggested here). To
 embrace this discipline fully will take some effort.

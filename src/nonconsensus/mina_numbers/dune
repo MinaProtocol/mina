@@ -10,4 +10,4 @@
   (pps ppx_version ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_deriving.eq ppx_deriving_yojson
        ppx_let ppx_inline_test))
  (instrumentation (backend bisect_ppx))
- (synopsis "Snark-friendly numbers used in Coda consensus"))
+ (synopsis "Snark-friendly numbers used in Mina consensus"))

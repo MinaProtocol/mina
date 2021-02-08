@@ -1,8 +1,8 @@
-# Coda Wallet
+# Mina Wallet
 
-Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
+Mina is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
-The Coda Wallet desktop app allows you to manage your accounts, send and receive transactions, and stake your Coda for coinbase rewards.
+The Mina Wallet desktop app allows you to manage your accounts, send and receive transactions, and stake your Mina for coinbase rewards.
 
 We have a [Discord server](https://bit.ly/CodaDiscord)! Please come by if you
 need help or have questions. You might also be interested in the [OCaml
@@ -10,7 +10,7 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
 ## Development 
 
-The Coda Wallet is written in Reason (https://reasonml.github.io/), and built with Electron (https://electronjs.org/).
+The Mina Wallet is written in Reason (https://reasonml.github.io/), and built with Electron (https://electronjs.org/).
 
 ### Setup
 

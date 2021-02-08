@@ -38,7 +38,7 @@ SENT_TRANSACTION_THIS_BLOCK = False
 
 # PROMETHEUS METRICS
 TRANSACTION_COUNT = prometheus_client.Counter("faucet_transactions_sent", "Number of Transactions sent since the process started")
-TOTAL_CODA_SENT = prometheus_client.Counter("faucet_coda_sent", "Amount of Coda sent since the process started")
+TOTAL_CODA_SENT = prometheus_client.Counter("faucet_coda_sent", "Amount of Mina sent since the process started")
 PROCESS_METRICS = prometheus_client.ProcessCollector(namespace='faucet')
 PLEASE_WAIT_ERRORS = prometheus_client.Counter("faucet_please_wait_errors", "Number of 'Please Wait' Errors that have been issued")
 BLOCK_NOTIFICATIONS_RECIEVED = prometheus_client.Counter("faucet_block_notifications_recieved", "Number of Block Notifications recieved")
@@ -64,7 +64,7 @@ async def on_ready():
 @backoff.on_exception(backoff.expo,  websockets.exceptions.ConnectionClosed)
 async def on_connect():
     # Call new block subscription
-    logger.debug("Reconnecting to Coda Daemon...")
+    logger.debug("Reconnecting to Mina Daemon...")
     await faucet.new_block_subscribe(new_block_callback)
 
 @client.event

@@ -2,13 +2,13 @@
 
 ---
 
-Integrate an internationalization library into the Coda wallet for multi-language support.
+Integrate an internationalization library into the Mina wallet for multi-language support.
 
 ## Motivation
 
 ---
 
-The Coda wallet currently has only English text, making it more difficult for non-English speaking developers and users to easily contribute and use.
+The Mina wallet currently has only English text, making it more difficult for non-English speaking developers and users to easily contribute and use.
 
 The wallet should support multiple languages to reach a wide-ranging audience.
 
@@ -39,7 +39,7 @@ The best option to load the localization text would be to package the JSON files
 ]
 ```
 
-Discussion: Am I converting _all_ texts in this grant? It's within capacity. Just not sure if the Coda team is comfortable with having an app-wide change immediately due to some potential internal conflicts.
+Discussion: Am I converting _all_ texts in this grant? It's within capacity. Just not sure if the Mina team is comfortable with having an app-wide change immediately due to some potential internal conflicts.
 
 2.  Wrap the app with the react-intl provider.
 

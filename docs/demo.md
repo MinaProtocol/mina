@@ -1,4 +1,4 @@
-# Local Coda Demo
+# Local Mina Demo
 
 If all you need is a running daemon and some blocks, the
 `codaprotocol/coda-demo` container has everything you need! It uses the same

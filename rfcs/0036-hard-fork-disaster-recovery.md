@@ -3,7 +3,7 @@
 [summary]: #summary
 
 This RFC explains how to a create a hard fork in response to a severe
-failure in the Coda network. It draws on the strategies described
+failure in the Mina network. It draws on the strategies described
 in earlier RFCs that describe handling of the blockchain
 and scan state for hard forks.
 
@@ -11,11 +11,11 @@ and scan state for hard forks.
 
 [motivation]: #motivation
 
-The Coda network may get to a state where the blockchain can no longer
+The Mina network may get to a state where the blockchain can no longer
 make progress. Symptoms might include many blockchain forks, or
 blocks not being added at all, or repeated crashes of nodes. To
 continue, a hard fork of the blockchain can be created, using an
-updated version of the Coda software.
+updated version of the Mina software.
 
 ## Detailed design
 
@@ -29,21 +29,21 @@ developers will perform the following tasks:
   the best state, and use a representative node
 
 - run a tool to transform the persisted state into data needed for the
-  Coda binary
+  Mina binary
 
-- create a new Coda binary with a new protocol version
+- create a new Mina binary with a new protocol version
 
 - notify node operators of the change, in a manner to be determined,
   and provide access to the new binary
 
-To remedy the problems that led to a failure, the Coda software will
+To remedy the problems that led to a failure, the Mina software will
 likely change in some significant way when the network is
 restarted. Using a new protocol version, with a new major/minor or minor
 version, will require node operators to upgrade their software.
 
 ## CLI command to save state
 
-The Coda developers will choose a node with a root to represent the
+The Mina developers will choose a node with a root to represent the
 starting point of the hard fork. The choice of node is beyond the scope of
 this RFC.
 
@@ -146,7 +146,7 @@ is run, the daemon saves the following data:
 
 The in-memory values (that is, those other than the epoch ledgers) can
 be serialized as JSON or S-expressions to some particular location,
-say `recovery_data` in the Coda configuration directory. The epoch
+say `recovery_data` in the Mina configuration directory. The epoch
 ledgers can be copied to that same location.
 
 ## Preparing the data for inclusion in a binary
@@ -169,7 +169,7 @@ The ledger can be passed as the `~root_ledger` argument to `Full_frontier.create
 The epoch ledgers can be compiled into the binary, or, if epoch ledger
 persistence is available, included as files from the install package.
 In the latter case, the operator may need to copy the installed epoch
-ledgers to the Coda config directory.
+ledgers to the Mina config directory.
 
 If the fork is safe, then like the SNARKed ledger, we can compile
 the saved root breadcrumb into the binary. The breadcrumb data would be

@@ -3,7 +3,7 @@
 We propose a regime for ban scoring to supplement the ban mechanism
 proposed in RFC 0001-banlisting. We take Bitcoin's scoring mechanism
 as a starting point, since the Bitcoin network is subject to many of the
-same transgressions as the Coda network.
+same transgressions as the Mina network.
 
 ## Motivation
 
@@ -67,11 +67,11 @@ work fails, increments DoS by 50. A previous-block-not-found rejection
 increments DoS by 10. In several cases, transactions are rejected, but
 the DoS is not incremented, such as the "mempool-full" condition.
 
-### Coda at the moment
+### Mina at the moment
 
 Bitcoin is a mature codebase, so there are many places where ban scoring has been
 used. Nonetheless, Bitcoin uses a relatively coarse ban scoring system; only
-a few ban score increment values are used. In Coda, we could reify scores into a
+a few ban score increment values are used. In Mina, we could reify scores into a
 datatype:
 
 ```ocaml
@@ -87,7 +87,7 @@ A slightly finer gradation could be used, if desired. The banlisting system
 could translate these constructors into numerical scores. Let's call these
 constructors SEV, MOD, and TRV.
 
-In a number of places, the Coda codebase has comments indicating that
+In a number of places, the Mina codebase has comments indicating that
 a peer should be punished, either via a `TODO` or call to `Logger.faulty_peer`.
 Let's classify those places where punishment has been flagged, and annotate
 them with suggested constructors:
@@ -145,7 +145,7 @@ history leading to a ban score.
 
 ## Prior art
 
-There is existing code in Coda to maintain a set of peers banned by IP address in
+There is existing code in Mina to maintain a set of peers banned by IP address in
 `banlist_lib`. It will be superseded when this RFC and RFC 0010 are implemented.
 
 See the discussion above of how Bitcoin computes ban scores.

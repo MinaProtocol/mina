@@ -63,5 +63,5 @@ function in the implementation, in the SNARK? If not, what aspects of
 the memo should be enforced? Arguably, the structure of the memo bytes
 don't affect the protocol.
 
-It's unknown how eventual Coda users will make use of this facility
+It's unknown how eventual Mina users will make use of this facility
 beyond what the wallet implementation provides.

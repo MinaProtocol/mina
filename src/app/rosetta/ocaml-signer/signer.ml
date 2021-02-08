@@ -1,4 +1,4 @@
-(** An agent that pokes at Coda and peeks at Rosetta to see if things look alright *)
+(** An agent that pokes at Mina and peeks at Rosetta to see if things look alright *)
 
 open Core_kernel
 open Async

@@ -42,7 +42,7 @@ variable "cos_image_name" {
   default     = "cos-stable-77-12371-89-0"
 }
 
-## Coda Vars
+## Mina Vars
 
 variable "discovery_keypair" {
   description = "The LibP2P Keypair to use when launching the seed node."

@@ -25,7 +25,7 @@ done
 
 echo Testnet is ${TESTNET}
 echo Initial Docker Image is codaprotocol/mina-daemon:${DOCKER_TAG}
-echo Coda Automation Pathspec is ${AUTOMATION_PATHSPEC}
+echo Mina Automation Pathspec is ${AUTOMATION_PATHSPEC}
 echo Config File Path is ${CONFIG_FILE}
 
 first7=$(echo ${AUTOMATION_PATHSPEC} | cut -c1-7)

@@ -486,7 +486,7 @@ let make = (~publicKey) => {
             ~default="",
             AddressBook.lookup(addressBook, publicKey),
           )}
-          placeholder="My Coda Account"
+          placeholder="My Mina Account"
           onChange={value =>
             updateAddressBook(ab =>
               AddressBook.set(ab, ~key=publicKey, ~name=value)

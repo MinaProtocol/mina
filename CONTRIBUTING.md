@@ -1,7 +1,7 @@
 # Contributing to Coda
 
-Thank you for your interest in contributing to Coda 😁. This file outlines
-various parts of our process. Coda is still very young, so things might be a
+Thank you for your interest in contributing to Mina 😁. This file outlines
+various parts of our process. Mina is still very young, so things might be a
 little bumpy while we figure out how to smoothly run the project!
 
 If you haven't seen it yet, the [developer README](README-dev.md) has the
@@ -44,7 +44,7 @@ labels.
 ## Pull Requests
 
 All pull requests go through CircleCI, which makes sure the code doesn't need to
-be reformatted, builds Coda in its various configurations, and runs all the
+be reformatted, builds Mina in its various configurations, and runs all the
 tests.
 
 All pull requests must get _code reviewed_. Anyone can do a code review! Check
@@ -63,7 +63,7 @@ Once a PR has been reviewed and approved, and all CI tests have passed, tag the 
 
 ## Documentation
 
-There are three main pieces of Coda documentation:
+There are three main pieces of Mina documentation:
 
 1. The [`docs`](docs/) directory, which has prose documentation of various sorts. This
    doesn't exist yet, but it should by the time this repo is made public!

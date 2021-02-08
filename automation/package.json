@@ -1,7 +1,7 @@
 {
   "name": "@o1labs/testnet-sdk",
   "version": "0.1.0-alpha",
-  "description": "Utility for spinning up Coda testnets.",
+  "description": "Utility for spinning up Mina testnets.",
   "bin": {
     "coda-network": "bin/coda-network"
   },

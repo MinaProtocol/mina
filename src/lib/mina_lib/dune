@@ -11,4 +11,4 @@
             sync_status daemon_rpcs archive_lib exit_handlers)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
- (synopsis "Coda gut layer"))
+ (synopsis "Mina gut layer"))

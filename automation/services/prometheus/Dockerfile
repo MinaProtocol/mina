@@ -1,4 +1,4 @@
-# This is an opinionated prometheus setup to monitor a Coda Service Environment
+# This is an opinionated prometheus setup to monitor a Mina Service Environment
 FROM ubuntu:18.04
 
 # Dependencies

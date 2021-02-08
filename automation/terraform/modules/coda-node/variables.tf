@@ -1,5 +1,5 @@
 variable "instance_type" {
-  description = "Type of instance to launch Coda on"
+  description = "Type of instance to launch Mina on"
   type        = string
   default     = "c5.large"
 }
@@ -17,19 +17,19 @@ variable "netname" {
 }
 
 variable "coda_repo" {
-  description = "repo of the Coda Deb to Install"
+  description = "repo of the Mina Deb to Install"
   type = string
   default = "stable"
 }
 
 variable "coda_version" {
-  description = "Version of the Coda Deb to Install"
+  description = "Version of the Mina Deb to Install"
   type = string
   default = "0.0.1-release-beta-0d13213e"
 }
 
 variable "coda_variant" {
-  description = "The variant (build profile) of the Coda Deb to install"
+  description = "The variant (build profile) of the Mina Deb to install"
   type  = string
   default = "testnet-postake-medium-curves"
 }
@@ -89,7 +89,7 @@ variable "rolename" {
 }
 
 variable "server_count" {
-  description = "Number of Coda nodes to launch"
+  description = "Number of Mina nodes to launch"
   type        = number
   default     = 1
 }

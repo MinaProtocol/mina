@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Create a portable Coda build by rewriting the dynamic library loading to look
+# Create a portable Mina build by rewriting the dynamic library loading to look
 # in the current working directory.
 
 set -eou pipefail

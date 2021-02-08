@@ -77,7 +77,7 @@ Before the derivation step, we need to generate a keypair. We'll use the private
 
 [derivation]: #derivation
 
-Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the offcial [Coda CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
+Derivation demands that the public key expected as input be a hex-encoded byte-array value. So we'll [add functionality](#marshalkeys) to the [client-sdk](#marshalkeys), the [generate-keypair binary](#marshalkeys), and the offcial [Mina CLI](#marshalkeys) to marshall the `Fq.t * Fq.t` pair (the native representation of an uncompressed public key).
 
 The [derivation endpoint](#derivation-endpoint) would be responsible for reading in the uncompressed public key bytes which [requires adjusting the Rosetta spec](#addcurves), compressing the public key, and base58-encoding it inline with how we currently represent public keys in serialized form.
 
@@ -413,7 +413,7 @@ The submit endpoint takes a signed transaction and broadcasts it over the networ
 
 [via Testing](#testing)
 
-The existing Rosetta test-agent tests our Data API implementation by running a demo instance of Coda and mutating its state with GraphQL mutations and then querying with the Data API to see if the data that comes out is equivalent to what we put in.
+The existing Rosetta test-agent tests our Data API implementation by running a demo instance of Mina and mutating its state with GraphQL mutations and then querying with the Data API to see if the data that comes out is equivalent to what we put in.
 
 We can extend the test-agent to also send construction API requests. We should at least add behavior to send a payment and delegation constructed using this API. We can shell out to a subprocess to handle the "off-api" pieces of keypair generation and signing.
 

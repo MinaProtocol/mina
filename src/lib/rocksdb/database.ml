@@ -1,4 +1,4 @@
-(* rocksdb.ml -- expose RocksDB operations for Coda *)
+(* rocksdb.ml -- expose RocksDB operations for Mina *)
 
 open Core
 

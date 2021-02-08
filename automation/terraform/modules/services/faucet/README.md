@@ -1,6 +1,6 @@
-## Coda Faucet Module
+## Mina Faucet Module
 
-This is a Terraform module that will deploy a service containing two tasks, a Coda Daemon task and a Coda Faucet container.
+This is a Terraform module that will deploy a service containing two tasks, a Mina Daemon task and a Mina Faucet container.
 
 ## Variables 
 
@@ -18,15 +18,15 @@ This is a Terraform module that will deploy a service containing two tasks, a Co
 
 `discord_api_key`: A Discord Bot API Key
 
-`coda_graphql_host` (Default: "localhost"): The hostname of the Coda GraphQL Endpoint
+`coda_graphql_host` (Default: "localhost"): The hostname of the Mina GraphQL Endpoint
 
-`coda_graphql_port` (Default: "3085"): The port the Coda GraphQL Endpoint is listening on
+`coda_graphql_port` (Default: "3085"): The port the Mina GraphQL Endpoint is listening on
 
-`faucet_public_key`: The Public Key to be used by the Faucet Service, must be installed as a wallet on the Coda Daemon
+`faucet_public_key`: The Public Key to be used by the Faucet Service, must be installed as a wallet on the Mina Daemon
 
 `faucet_password`: The password for the private key in use by the Faucet Service
 
-`echo_public_key`: The Public Key to be used by the Echo Service, must be installed as a wallet on the Coda Daemon
+`echo_public_key`: The Public Key to be used by the Echo Service, must be installed as a wallet on the Mina Daemon
 
 `echo_password`: The password for the private key in use by the Echo Service
 
@@ -56,9 +56,9 @@ This is a Terraform module that will deploy a service containing two tasks, a Co
 
 ## Deployment Considerations
 
-In order to deploy a "new" version of this module, you must ensure that you have rebuilt the Coda Daemon image and *(optionally)* the Faucet image if it has changed.
+In order to deploy a "new" version of this module, you must ensure that you have rebuilt the Mina Daemon image and *(optionally)* the Faucet image if it has changed.
 
-The Coda Daemon image build is a two-step process, with the base Coda dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile). 
+The Mina Daemon image build is a two-step process, with the base Mina dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile). 
 
 The manual commands to release each container are the following: 
 

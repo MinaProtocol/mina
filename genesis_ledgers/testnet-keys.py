@@ -26,7 +26,7 @@ def cli(debug):
     pass
 
 ### 
-# Commands for generating Coda Keypairs 
+# Commands for generating Mina Keypairs 
 ###
 @cli.command()
 @click.option('--count', default=5, help='Number of Block Producer keys to generate.')
@@ -245,7 +245,7 @@ def create_genesis_ledger(
                 "balance": int((.7 * ledger_total_currency) / num_fish_accounts - 1000),
                 "delegate": ledger_public_keys["stakers"][index]["public_key"]
             })
-            # each staker key holds 1000 Coda to play with
+            # each staker key holds 1000 Mina to play with
             ledger.append({
                 "pk": ledger_public_keys["stakers"][index]["public_key"],
                 "sk": None,
@@ -261,7 +261,7 @@ def create_genesis_ledger(
                 "delegate": ledger_public_keys["stakers"][index]["public_key"],
                 "nickname": ledger_public_keys["stakers"][index]["discord_username"]
             })
-            # each staker key holds 1000 Coda to play with
+            # each staker key holds 1000 Mina to play with
             annotated_ledger.append({
                 "pk": ledger_public_keys["stakers"][index]["public_key"],
                 "sk": None,

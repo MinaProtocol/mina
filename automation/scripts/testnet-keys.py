@@ -65,7 +65,7 @@ def k8s():
 
 
 ###
-# Commands for generating Coda Keypairs
+# Commands for generating Mina Keypairs
 ###
 
 

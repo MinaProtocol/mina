@@ -76,7 +76,7 @@ echo "$ROLE_COMMAND"
 # Make Config Directory
 mkdir ~/mina-config
 
-# Run Coda Daemon
+# Run Mina Daemon
 
 # Import Wallets
 set -x

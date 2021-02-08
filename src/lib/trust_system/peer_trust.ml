@@ -89,7 +89,7 @@ module Make0 (Inputs : Input_intf) = struct
   type t =
     { db: Db.t option
           (* This is an option to allow using a fake trust system in tests. This is
-       ugly, but the alternative is functoring half of Coda over the trust
+       ugly, but the alternative is functoring half of Mina over the trust
        system. *)
     ; bans_reader: (Peer_id.t * Time.t) Strict_pipe.Reader.t
     ; bans_writer:

@@ -1,4 +1,4 @@
-(** Different functor instantiations of Incremental in the Coda repository
+(** Different functor instantiations of Incremental in the Mina repository
     along with some functions to interface with pipes. Each module
     instantiation of Incremental should represent a connected component of
     dependencies. We have this modue to prevent adding dependencies to

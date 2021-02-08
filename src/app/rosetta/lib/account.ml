@@ -128,7 +128,7 @@ module Balance = struct
               (Errors.create
                  ~context:
                    "Failed accessing state hash from GraphQL communication \
-                    with the Coda Daemon."
+                    with the Mina Daemon."
                  `Chain_info_missing)
         | Some state_hash ->
             M.return state_hash

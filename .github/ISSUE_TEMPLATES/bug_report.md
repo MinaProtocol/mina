@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Coda is behaving strangely? Report it so we can fix it!
+about: Mina is behaving strangely? Report it so we can fix it!
 ---
 
 **Have you already searched the issue tracker to see if this bug has already

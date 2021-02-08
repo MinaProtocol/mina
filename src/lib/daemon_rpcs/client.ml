@@ -1,7 +1,7 @@
 open Core
 open Async
 
-(** Methods for the client to interact with Coda protocol *)
+(** Methods for the client to interact with Mina protocol *)
 
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)

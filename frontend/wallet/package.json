@@ -74,7 +74,7 @@
       "bundle/**/*",
       "public/**/*"
     ],
-    "productName": "Coda Wallet",
+    "productName": "Mina Wallet",
     "compression": "store",
     "dmg": {
       "contents": [
