@@ -3003,6 +3003,16 @@
               "description": "Connect to the given peers",
               "args": [
                 {
+                  "name": "seed",
+                  "description": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "peers",
                   "description": null,
                   "type": {
