@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 
-KEYDIR="/tmp/coda_cache_dir/"
+KEYDIR="/tmp/mina_cache_dir/"
 
 # Only publish if we have AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then

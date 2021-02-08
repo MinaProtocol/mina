@@ -507,18 +507,18 @@ jobs:
                     mkdir -p package/keys
                     echo 'keys and genesis'
                     cp /tmp/s3_cache_dir/* package/keys/. ||:
-                    cp $TMPDIR/coda_cache_dir/genesis_ledger_*.tar.gz package/keys/. ||:
-                    cp $TMPDIR/coda_cache_dir/genesis_proof_* package/keys/. ||:
+                    cp $TMPDIR/mina_cache_dir/genesis_ledger_*.tar.gz package/keys/. ||:
+                    cp $TMPDIR/mina_cache_dir/genesis_proof_* package/keys/. ||:
                     cp /tmp/s3_cache_dir/genesis_ledger_*.tar.gz package/keys/. ||:
                     cp /tmp/s3_cache_dir/genesis_proof_* package/keys/. ||:
-                    echo 'coda'
+                    echo 'mina'
                     cp _build/default/src/app/cli/src/mina.exe package/mina
                     echo 'libp2p_helper'
-                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
-                    chmod +w package/coda-libp2p_helper
-                    echo 'coda-logproc'
-                    cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
-                    chmod +wx package/coda-logproc
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/mina-libp2p_helper
+                    chmod +w package/mina-libp2p_helper
+                    echo 'mina-logproc'
+                    cp _build/default/src/app/logproc/logproc.exe package/mina-logproc
+                    chmod +wx package/mina-logproc
             - run:
                 name: Build homebrew coda package
                 command: |
@@ -548,7 +548,7 @@ jobs:
                 command: |
                     make macos-portable
                     # Remove copies of keys to make some space
-                    rm -r /tmp/s3_cache_dir/ $TMPDIR/coda_cache_dir ||:
+                    rm -r /tmp/s3_cache_dir/ $TMPDIR/mina_cache_dir ||:
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud

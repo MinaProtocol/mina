@@ -106,30 +106,30 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
 cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
-p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+p2p_path="${BUILDDIR}/usr/local/bin/mina-libp2p_helper"
 cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
 chmod +w $p2p_path
 # Only for nix builds
-# patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+# patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/mina-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
-cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
 cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
 
 # Build Config
-mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
+mkdir -p "${BUILDDIR}/etc/mina/build_config"
+cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/mina/build_config/BUILD.mlh"
+rsync -Huav ../src/config/* "${BUILDDIR}/etc/mina/build_config/."
 
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # For now, deleting keys in /tmp/ so that the complicated logic below for moving them short-circuits and both packages are built without keys
-rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
+rm -rf /tmp/s3_cache_dir /tmp/mina_cache_dir
 
 # Keys
 # Identify actual keys used in build
@@ -137,7 +137,7 @@ rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
 # because building deb is the last step and therefore keys, genesis ledger, and
 # proof are not required in /tmp
 echo "Checking PV keys"
-mkdir -p "${BUILDDIR}/var/lib/coda"
+mkdir -p "${BUILDDIR}/var/lib/mina"
 compile_keys=("step" "vk-step" "wrap" "vk-wrap" "tweedledee" "tweedledum")
 for key in ${compile_keys[*]}
 do
@@ -147,23 +147,23 @@ do
     for f in  /tmp/s3_cache_dir/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in s3 key set"
-            mv /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/mina/."
             break
         fi
     done
 
-    for f in  /var/lib/coda/${key}*; do
+    for f in  /var/lib/mina/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in stable key set"
-            mv /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /var/lib/mina/${key}* "${BUILDDIR}/var/lib/mina/."
             break
         fi
     done
 
-    for f in  /tmp/coda_cache_dir/${key}*; do
+    for f in  /tmp/mina_cache_dir/${key}*; do
         if [ -e "$f" ]; then
             echo " [WARN] found key in compile-time set"
-            mv /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            mv /tmp/mina_cache_dir/${key}* "${BUILDDIR}/var/lib/mina/."
             break
         fi
     done
@@ -171,21 +171,21 @@ done
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
 # Genesis Ledger/proof/epoch ledger Copy
-for f in /tmp/coda_cache_dir/genesis*; do
+for f in /tmp/mina_cache_dir/genesis*; do
     if [ -e "$f" ]; then
-        mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+        mv /tmp/mina_cache_dir/genesis* "${BUILDDIR}/var/lib/mina/."
     fi
 done
 
 # Copy genesis Ledger/proof/epoch ledger if they were downloaded from s3
 for f in /tmp/s3_cache_dir/genesis*; do
     if [ -e "$f" ]; then
-        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/mina/."
     fi
 done
 
 #copy config.json
-cp ../genesis_ledgers/testworld.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp ../genesis_ledgers/testworld.json "${BUILDDIR}/var/lib/mina/config_${GITHASH_CONFIG}.json"
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -193,7 +193,7 @@ cp ../genesis_ledgers/testworld.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_
 mkdir -p "${BUILDDIR}/etc/bash_completion.d"
 cwd=$(pwd)
 export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
-env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > "${BUILDDIR}/etc/bash_completion.d/coda"
+env COMMAND_OUTPUT_INSTALLATION_BASH=1 mina  > "${BUILDDIR}/etc/bash_completion.d/mina"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -226,8 +226,8 @@ Description: Mina Client and Daemon
 EOF
 
 # remove proving keys
-rm -f "${BUILDDIR}"/var/lib/coda/step*
-rm -f "${BUILDDIR}"/var/lib/coda/wrap*
+rm -f "${BUILDDIR}"/var/lib/mina/step*
+rm -f "${BUILDDIR}"/var/lib/mina/wrap*
 
 # build another deb
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb

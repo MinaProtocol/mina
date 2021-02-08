@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let autogen_path = Filename.temp_dir_name ^/ "coda_cache_dir"
+let autogen_path = Filename.temp_dir_name ^/ "mina_cache_dir"
 
 let s3_install_path = "/tmp/s3_cache_dir"
 

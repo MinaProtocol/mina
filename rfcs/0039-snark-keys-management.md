@@ -145,7 +145,7 @@ fields to the runtime configuration `config.json` file for
 For example,
 ```json
 { ...
-, "snark_key_directories": ["~/.coda_cache_dir/snark_keys"]
+, "snark_key_directories": ["~/.mina_cache_dir/snark_keys"]
 , "snark_keys":
     [ { "kind":
         { "type": "step_proving_key"

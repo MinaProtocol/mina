@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GENESIS_DIR="/tmp/coda_cache_dir/"
+GENESIS_DIR="/tmp/mina_cache_dir/"
 
 # Need AWS creds to upload
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then

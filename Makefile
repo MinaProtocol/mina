@@ -69,7 +69,7 @@ clean:
 libp2p_helper:
 	make -C src/app/libp2p_helper
 
-GENESIS_DIR := $(TMPDIR)/coda_cache_dir
+GENESIS_DIR := $(TMPDIR)/mina_cache_dir
 
 genesis_ledger:
 	$(info Building runtime_genesis_ledger)
