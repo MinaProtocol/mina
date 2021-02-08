@@ -9,6 +9,8 @@ fi
 
 yarn_args="${1}"
 
+echo "//registry.yarnpkg.com/:_authToken=${NPM_TOKEN}" >>~/.npmrc
+
 echo "--- Client SDK execute: ${yarn_args}"
 eval `opam config env` && \
   pushd frontend/client_sdk && \
