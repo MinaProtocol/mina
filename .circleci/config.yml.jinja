@@ -271,7 +271,7 @@ jobs:
         macos:
             xcode: "10.2.1"
         resource_class: large
-        working_directory: /Users/distiller/coda
+        working_directory: /Users/distiller/mina
         environment:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
@@ -363,7 +363,7 @@ jobs:
                     cp $TMPDIR/mina_cache_dir/genesis_proof_* package/keys/. ||:
                     cp /tmp/s3_cache_dir/genesis_ledger_*.tar.gz package/keys/. ||:
                     cp /tmp/s3_cache_dir/genesis_proof_* package/keys/. ||:
-                    echo 'coda'
+                    echo 'mina'
                     cp _build/default/src/app/cli/src/mina.exe package/mina
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/mina-libp2p_helper
@@ -372,19 +372,19 @@ jobs:
                     cp _build/default/src/app/logproc/logproc.exe package/mina-logproc
                     chmod +wx package/mina-logproc
             - run:
-                name: Build homebrew coda package
+                name: Build homebrew mina package
                 command: |
-                    tar czvf homebrew-coda.tar.gz package
-                    openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
-                    cp homebrew-coda.tar.gz* package/.
+                    tar czvf homebrew-mina.tar.gz package
+                    openssl dgst -sha256 homebrew-mina.tar.gz > homebrew-mina.tar.gz.sha256
+                    cp homebrew-mina.tar.gz* package/.
             - run:
                 name: Build homebrew generate-keypair-phase3 package
                 command: |
-                    mkdir -p coda-generate-keypair-phase3/package
-                    cp _build/default/src/app/generate_keypair/generate_keypair.exe coda-generate-keypair-phase3/package/coda-generate-keypair-phase3
-                    pushd coda-generate-keypair-phase3
-                    tar czvf homebrew-coda-generate-keypair-phase3.tar.gz package
-                    openssl dgst -sha256 homebrew-coda-generate-keypair-phase3.tar.gz > homebrew-coda-generate-keypair-phase3.tar.gz.sha256
+                    mkdir -p mina-generate-keypair-phase3/package
+                    cp _build/default/src/app/generate_keypair/generate_keypair.exe mina-generate-keypair-phase3/package/mina-generate-keypair-phase3
+                    pushd mina-generate-keypair-phase3
+                    tar czvf homebrew-mina-generate-keypair-phase3.tar.gz package
+                    openssl dgst -sha256 homebrew-mina-generate-keypair-phase3.tar.gz > homebrew-mina-generate-keypair-phase3.tar.gz.sha256
                     cp homebrew-* ../package/.
                     popd
             - run:
@@ -401,7 +401,7 @@ jobs:
                     make macos-portable
                     # Remove copies of keys to make some space
                     rm -r /tmp/s3_cache_dir/ $TMPDIR/mina_cache_dir ||:
-                    cp _build/coda-daemon-macos.zip package/.
+                    cp _build/mina-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
@@ -497,13 +497,13 @@ jobs:
           'images': ['mina-daemon', 'mina-daemon-puppeteered'],
           'build_args': {
             'mina-daemon': '--build-arg mina_deb_version=$MINA_DEB_VERSION --build-arg deb_repo=$MINA_DEB_REPO',
-            'mina-daemon-puppeteered': '--build-arg coda_version=$MINA_GIT_TAG-$MINA_GIT_BRANCH-$MINA_GIT_HASH'
+            'mina-daemon-puppeteered': '--build-arg mina_version=$MINA_GIT_TAG-$MINA_GIT_BRANCH-$MINA_GIT_HASH'
           }
         },
         {
-          'images': ['coda-demo'],
+          'images': ['mina-demo'],
           'build_args': {
-            'coda-demo': '--build-arg mina_deb_version=$MINA_DEB_VERSION --build-arg deb_repo=$MINA_DEB_REPO'
+            'mina-demo': '--build-arg mina_deb_version=$MINA_DEB_VERSION --build-arg deb_repo=$MINA_DEB_REPO'
           }
         }
     ] %}
