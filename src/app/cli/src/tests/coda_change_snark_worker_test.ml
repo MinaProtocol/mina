@@ -28,13 +28,13 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test ~name logger n block_production_keys
+    Mina_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
-      Coda_worker_testnet.Api.validated_transitions_keyswaptest testnet
+      Mina_worker_testnet.Api.validated_transitions_keyswaptest testnet
         snark_worker_and_block_producer_id
     in
     Pipe.fork ~pushback_uses:`Fast_consumer_only (Option.value_exn pipe).pipe
@@ -79,7 +79,7 @@ let main () =
       [("new snark worker", Public_key.Compressed.to_yojson new_snark_worker)] ;
   let%bind () =
     let%map opt =
-      Coda_worker_testnet.Api.replace_snark_worker_key testnet
+      Mina_worker_testnet.Api.replace_snark_worker_key testnet
         snark_worker_and_block_producer_id (Some new_snark_worker)
     in
     Option.value_exn opt
@@ -89,13 +89,13 @@ let main () =
   (* Testing that nothing should break if the snark worker is set to None *)
   let%bind () =
     let%map opt =
-      Coda_worker_testnet.Api.replace_snark_worker_key testnet
+      Mina_worker_testnet.Api.replace_snark_worker_key testnet
         snark_worker_and_block_producer_id None
     in
     Option.value_exn opt
   in
   let%bind () = after (Time.Span.of_sec 30.) in
-  Coda_worker_testnet.Api.teardown testnet ~logger
+  Mina_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

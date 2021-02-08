@@ -21,14 +21,14 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test ~name logger n block_production_keys
+    Mina_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
   (let%bind sync_status_pipe_opt =
-     Coda_worker_testnet.Api.sync_status testnet bootstrapping_node
+     Mina_worker_testnet.Api.sync_status testnet bootstrapping_node
    in
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
@@ -39,13 +39,13 @@ let main () =
        Deferred.unit ))
   |> don't_wait_for ;
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
+    Mina_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:bootstrapping_node
   in
   (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip
     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
-  Coda_worker_testnet.Api.teardown testnet ~logger
+  Mina_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test that triggers bootstrap once"

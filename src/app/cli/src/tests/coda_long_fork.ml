@@ -17,7 +17,7 @@ let main n waiting_time () =
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
-    Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
+    Mina_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
@@ -30,11 +30,11 @@ let main n waiting_time () =
     * Unsigned.UInt32.to_int consensus_constants.slots_per_epoch
   in
   let%bind () =
-    Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:1
+    Mina_worker_testnet.Restarts.restart_node testnet ~logger ~node:1
       ~duration:(Time.Span.of_ms (2 * epoch_duration |> Float.of_int))
   in
   let%bind () = after (Time.Span.of_sec (waiting_time |> Float.of_int)) in
-  Coda_worker_testnet.Api.teardown testnet ~logger
+  Mina_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   let open Command.Let_syntax in

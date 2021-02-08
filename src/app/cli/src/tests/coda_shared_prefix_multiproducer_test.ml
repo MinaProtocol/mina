@@ -17,17 +17,17 @@ let main n enable_payments () =
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
-    Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
+    Mina_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind () =
     if enable_payments then
-      Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
+      Mina_worker_testnet.Payments.send_several_payments testnet ~node:0
         ~keypairs ~n:3
     else after (Time.Span.of_min 3.)
   in
-  Coda_worker_testnet.Api.teardown testnet ~logger
+  Mina_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   let open Command.Let_syntax in

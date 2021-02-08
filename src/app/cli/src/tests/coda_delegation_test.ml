@@ -24,7 +24,7 @@ let main () =
     |> fun (_, acct) -> Some (Account.public_key acct)
   in
   let%bind testnet =
-    Coda_worker_testnet.test ~name logger num_block_producers Option.some
+    Mina_worker_testnet.test ~name logger num_block_producers Option.some
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
@@ -121,7 +121,7 @@ let main () =
      (and none from delegatee)"
     ~metadata:[("delegator_production_count", `Int !delegator_production_count)] ;
   let%bind () =
-    Coda_worker_testnet.Delegation.delegate_stake testnet ~node:0
+    Mina_worker_testnet.Delegation.delegate_stake testnet ~node:0
       ~delegator:delegator_keypair.private_key ~delegatee:delegatee_pubkey
   in
   [%log info] "Ran delegation command" ;
@@ -130,7 +130,7 @@ let main () =
   [%log info] "Saw $delegatee_production_count blocks produced by delegatee"
     ~metadata:[("delegatee_production_count", `Int !delegatee_production_count)] ;
   heartbeat_flag := false ;
-  Coda_worker_testnet.Api.teardown testnet ~logger
+  Mina_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

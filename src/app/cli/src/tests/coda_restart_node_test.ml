@@ -18,16 +18,16 @@ let main () =
     if i = 0 then Some largest_account_pk else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test ~name logger n block_production_keys
+    Mina_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~precomputed_values
   in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1
+    Mina_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1
   in
   let%bind () = after (Time.Span.of_min 2.) in
   heartbeat_flag := false ;
-  Coda_worker_testnet.Api.teardown testnet ~logger
+  Mina_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test of stopping, waiting, then starting a node"
