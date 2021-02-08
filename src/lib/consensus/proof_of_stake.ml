@@ -1435,7 +1435,11 @@ module Data = struct
         List.fold new_sub_window_densities ~init:Length.zero ~f:Length.add
       in
       let min_window_density =
-        if same_sub_window then prev_min_window_density
+        if
+          same_sub_window
+          || Global_slot.slot_number next_global_slot
+             < constants.grace_period_end
+        then prev_min_window_density
         else Length.min new_window_length prev_min_window_density
       in
       let sub_window_densities =
@@ -1518,8 +1522,14 @@ module Data = struct
             ~f:Length.Checked.add
         in
         let%bind min_window_density =
+          let%bind in_grace_period =
+            Global_slot.Checked.( < ) next_global_slot
+              (Global_slot.Checked.of_slot_number ~constants
+                 (Mina_numbers.Global_slot.Checked.Unsafe.of_integer
+                    (Length.Checked.to_integer constants.grace_period_end)))
+          in
           if_
-            (Checked.return same_sub_window)
+            Boolean.(same_sub_window || in_grace_period)
             ~then_:(Checked.return prev_min_window_density)
             ~else_:
               (Length.Checked.min new_window_length prev_min_window_density)
@@ -1577,7 +1587,11 @@ module Data = struct
             Array.fold new_sub_window_densities ~init:Length.zero ~f:Length.add
           in
           let min_window_density =
-            if sub_window_diff = 0 then prev_min_window_density
+            if
+              sub_window_diff = 0
+              || Global_slot.slot_number next_global_slot
+                 < constants.grace_period_end
+            then prev_min_window_density
             else Length.min new_window_length prev_min_window_density
           in
           new_sub_window_densities.(n - 1)
