@@ -165,7 +165,7 @@ let export_logs_to_tar ?basename ~conf_dir =
           None
     else Deferred.return None
   in
-  let base_files = "coda.version" :: log_files in
+  let base_files = "mina.version" :: log_files in
   let files =
     Option.value_map hw_file_opt ~default:base_files ~f:(fun hw_file ->
         hw_file :: base_files )

@@ -331,7 +331,7 @@ class Executive:
 
 
 ################
-# CODA PROJECT #
+# MINA PROJECT #
 ################
 
 

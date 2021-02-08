@@ -28,7 +28,7 @@ let () =
   (* TODO: Load relevant interfaces into the environment as
      [toplevel_startup_hook].
   *)
-  (* TODO: Place [coda] in the toplevel environment once the interfaces -- and
+  (* TODO: Place [mina] in the toplevel environment once the interfaces -- and
      thus its type -- has been loaded.
   *)
   for i = 1 to Array.length Sys.argv - 1 do

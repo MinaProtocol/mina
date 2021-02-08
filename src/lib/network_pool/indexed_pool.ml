@@ -742,7 +742,7 @@ let rec add_from_gossip_exn :
   let fee_payer = User_command.fee_payer unchecked in
   let nonce = User_command.nonce_exn unchecked in
   (* Result errors indicate problems with the command, while assert failures
-     indicate bugs in Coda. *)
+     indicate bugs in Mina. *)
   let%bind () = check_expiry t unchecked in
   let%bind consumed = currency_consumed' ~constraint_constants unchecked in
   let%bind () =

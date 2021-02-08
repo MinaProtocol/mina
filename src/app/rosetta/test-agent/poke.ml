@@ -96,7 +96,7 @@ module SendTransaction = struct
     let amount_str = Unsigned.UInt64.to_string amount in
     let operations =
       sprintf
-        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"payment_source_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":2},"related_operations":[{"index":1}],"type":"payment_receiver_inc","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"%s","currency":{"symbol":"CODA","decimals":9}}}] |}
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"MINA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"payment_source_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"MINA","decimals":9}}},{"operation_identifier":{"index":2},"related_operations":[{"index":1}],"type":"payment_receiver_inc","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"%s","currency":{"symbol":"MINA","decimals":9}}}] |}
         from
         (Unsigned.UInt64.to_string fee)
         from amount_str to_ amount_str
@@ -132,7 +132,7 @@ module SendTransaction = struct
     assert (String.equal from pk) ;
     let operations =
       sprintf
-        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"delegate_change","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":null, "metadata": { "delegate_change_target": "%s"} }] |}
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"MINA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"delegate_change","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":null, "metadata": { "delegate_change_target": "%s"} }] |}
         from
         (Unsigned.UInt64.to_string fee)
         from to_
@@ -169,7 +169,7 @@ module SendTransaction = struct
     assert (String.equal sender pk) ;
     let operations =
       sprintf
-        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"create_token","status":"Pending"}] |}
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"MINA","decimals":9}}},{"operation_identifier":{"index":1},"related_operations":[],"type":"create_token","status":"Pending"}] |}
         sender
         (Unsigned.UInt64.to_string fee)
     in
@@ -209,7 +209,7 @@ module SendTransaction = struct
     assert (String.equal sender pk) ;
     let operations =
       sprintf
-        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"CODA","decimals":9}}} |}
+        {| [{"operation_identifier":{"index":0},"related_operations":[],"type":"fee_payer_dec","status":"Pending","account":{"address":"%s","metadata":{"token_id":"1"}},"amount":{"value":"-%s","currency":{"symbol":"MINA","decimals":9}}} |}
         sender
         (Unsigned.UInt64.to_string fee)
     in

@@ -62,8 +62,8 @@ let%test_module "Command line tests" =
 
     let create_config_directories () =
       (* create empty config dir to avoid any issues with the default config dir *)
-      let conf = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
-      let genesis = Filename.temp_dir ~in_dir:"/tmp" "coda_genesis_state" "" in
+      let conf = Filename.temp_dir ~in_dir:"/tmp" "mina_spun_test" "" in
+      let genesis = Filename.temp_dir ~in_dir:"/tmp" "mina_genesis_state" "" in
       (conf, genesis)
 
     let remove_config_directory config_dir genesis_dir =

@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 
-let name = "coda-txns-and-restart-non-producers"
+let name = "mina-txns-and-restart-non-producers"
 
 let main () =
   let wait_time = Time.Span.of_min 2. in

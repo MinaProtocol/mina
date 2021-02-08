@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-block-production-test"
+let name = "mina-block-production-test"
 
 let runtime_config = Runtime_config.Test_configs.split_snarkless
 

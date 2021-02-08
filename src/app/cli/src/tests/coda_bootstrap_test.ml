@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-bootstrap-test"
+let name = "mina-bootstrap-test"
 
 let runtime_config = Runtime_config.Test_configs.bootstrap
 

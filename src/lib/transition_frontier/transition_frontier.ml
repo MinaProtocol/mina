@@ -537,7 +537,7 @@ module For_tests = struct
                 ~proof_level:precomputed_values.proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
-    let root_dir = "/tmp/coda_unit_test" in
+    let root_dir = "/tmp/mina_unit_test" in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let uuid = Uuid_unix.create () in
         let temp_dir = root_dir ^/ Uuid.to_string uuid in

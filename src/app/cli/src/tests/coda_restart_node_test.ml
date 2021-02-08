@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-restart-node-test"
+let name = "mina-restart-node-test"
 
 include Heartbeat.Make ()
 

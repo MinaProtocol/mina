@@ -115,7 +115,7 @@ Just send me a message in the #faucet channel with the following contents:
 
 `$request <public-key>`
 
-Once a mod approves, `100 CODA` will be sent to the requested address!
+Once a mod approves, `100 MINA` will be sent to the requested address!
         '''
 
         await message.channel.send("```{}```".format(help_string))

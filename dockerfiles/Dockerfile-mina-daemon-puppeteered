@@ -3,7 +3,7 @@
 # for more details.
 
 ARG MINA_VERSION
-FROM codaprotocol/coda-daemon:${MINA_VERSION}
+FROM codaprotocol/mina-daemon:${MINA_VERSION}
 
 ARG MINA_BRANCH
 

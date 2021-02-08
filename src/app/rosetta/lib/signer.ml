@@ -1,4 +1,4 @@
-(* A to-spec signer library that uses internal coda libs *)
+(* A to-spec signer library that uses internal mina libs *)
 
 open Core_kernel
 open Signature_lib

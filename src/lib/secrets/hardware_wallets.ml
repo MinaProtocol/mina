@@ -137,7 +137,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
              hardware wallet. Possible reason could be you are using a \
              different hardware wallet or you reinitialized your hardware \
              wallet using a different seed. If you want to use your new \
-             ledger, please first create an account by 'coda account \
+             ledger, please first create an account by 'mina account \
              create-hd' command"
 
 let write_exn ~hd_index ~index_path : unit Deferred.t =

@@ -433,7 +433,7 @@ let setup_daemon logger =
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
-      let version_filename = conf_dir ^/ "coda.version" in
+      let version_filename = conf_dir ^/ "mina.version" in
       let make_version () =
         let%map () =
           (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
@@ -474,7 +474,7 @@ let setup_daemon logger =
     in
     Memory_stats.log_memory_stats logger ~process:"daemon" ;
     Parallel.init_master () ;
-    let monitor = Async.Monitor.create ~name:"coda" () in
+    let monitor = Async.Monitor.create ~name:"mina" () in
     let module Coda_initialization = struct
       type ('a, 'b, 'c) t =
         {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
@@ -1482,6 +1482,6 @@ let () =
        print_version_help coda_exe version
    | _ ->
        Command.run
-         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger))) ;
   Core.exit 0

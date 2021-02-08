@@ -38,7 +38,7 @@ let negated (t : Amount.t) =
 
 let coda total =
   { Amount.value= Unsigned.UInt64.to_string total
-  ; currency= {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
+  ; currency= {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
   ; metadata= None }
 
 let token token_id total =
@@ -47,7 +47,7 @@ let token token_id total =
   else
     { Amount.value= Unsigned.UInt64.to_string total
     ; currency=
-        { Currency.symbol= "CODA+"
+        { Currency.symbol= "MINA+"
         ; decimals= 9l
         ; metadata= Some (Token_id.encode token_id) }
     ; metadata= None }

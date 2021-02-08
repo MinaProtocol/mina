@@ -150,7 +150,7 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
 let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
     Logger.extend top_logger
-      [("coda_run", `String "Logging state before program ends")]
+      [("mina_run", `String "Logging state before program ends")]
   in
   let frontier_file = conf_dir ^/ "frontier.dot" in
   let mask_file = conf_dir ^/ "registered_masks.dot" in
@@ -173,7 +173,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           (Visualization_message.bootstrap "transition frontier") )
 
 let remove_prev_crash_reports ~conf_dir =
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
+  Core.Sys.command (sprintf "rm -rf %s/mina_crash_report*" conf_dir)
 
 let summary exn_json =
   let uname = Core.Unix.uname () in
@@ -185,8 +185,8 @@ let summary exn_json =
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Mina_version.branch)
-    ; ("Coda_commit", `String Mina_version.commit_id) ]
+    ; ("Mina_branch", `String Mina_version.branch)
+    ; ("Mina_commit", `String Mina_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
@@ -201,18 +201,18 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   [%log' trace top_logger] "make_report: enter" ;
   let _ = remove_prev_crash_reports ~conf_dir in
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
-  let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
+  let temp_config = conf_dir ^/ "mina_crash_report_" ^ crash_time in
   let () = Core.Unix.mkdir temp_config in
   (*Transition frontier and ledger visualization*)
   log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
   let report_file = temp_config ^ ".tar.gz" in
   (*Mina status*)
-  let status_file = temp_config ^/ "coda_status.json" in
+  let status_file = temp_config ^/ "mina_status.json" in
   let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: acquired and wrote status" ;
-  (*coda logs*)
+  (* mina logs*)
   let coda_log = conf_dir ^/ "mina.log" in
   let () =
     match Core.Sys.file_exists coda_log with
@@ -281,7 +281,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let logger =
     Logger.extend
       (Mina_lib.top_level_logger coda)
-      [("coda_run", `String "Setting up server logs")]
+      [("mina_run", `String "Setting up server logs")]
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
@@ -553,7 +553,7 @@ let coda_crash_message ~log_issue ~action ~error =
 
     Please:
       Open an issue:
-        <https://github.com/CodaProtocol/coda/issues/new>
+        <https://github.com/MinaProtocol/mina/issues/new>
 
       Briefly describe what you were doing and %s
 
@@ -590,7 +590,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
     ~metadata:[("exn", exn_json)] ;
   let%bind status = coda_status !coda_ref in
   (* TEMP MAKE REPORT TRACE *)
-  [%log' trace top_logger] "handle_crash: acquired coda status" ;
+  [%log' trace top_logger] "handle_crash: acquired mina status" ;
   let%map action_string =
     match%map
       Block_time.Timeout.await
@@ -634,7 +634,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~action:
                      "You might be trying to connect to a different network \
                       version, or need to troubleshoot your configuration. \
-                      See https://codaprotocol.com/docs/troubleshooting/ for \
+                      See https://minaprotocol.com/docs/troubleshooting/ for \
                       details."
                    ~log_issue:false
                in
@@ -672,7 +672,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
         log_shutdown ~conf_dir ~top_logger coda_ref ;
         let logger =
           Logger.extend top_logger
-            [("coda_run", `String "Program was killed by signal")]
+            [("mina_run", `String "Program was killed by signal")]
         in
         [%log info]
           !"Mina process was interrupted by $signal"

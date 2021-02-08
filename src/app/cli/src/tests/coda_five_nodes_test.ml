@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 
-let name = "coda-five-nodes-test"
+let name = "mina-five-nodes-test"
 
 let main () =
   let logger = Logger.create () in

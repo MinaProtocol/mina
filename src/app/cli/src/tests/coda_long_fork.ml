@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-long-fork"
+let name = "mina-long-fork"
 
 let main n waiting_time () =
   let precomputed_values =

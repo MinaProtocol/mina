@@ -596,19 +596,19 @@ module Types = struct
              unknown with the invariant unknown <= total, as well as the \
              currently liquid and locked balances." ~fields:(fun _ ->
             [ field "total" ~typ:(non_null uint64)
-                ~doc:"The amount of coda owned by the account"
+                ~doc:"The amount of mina owned by the account"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.total)
             ; field "unknown" ~typ:(non_null uint64)
                 ~doc:
-                  "The amount of coda owned by the account whose origin is \
+                  "The amount of mina owned by the account whose origin is \
                    currently unknown"
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
             ; field "liquid" ~typ:uint64
                 ~doc:
-                  "The amount of coda owned by the account which is currently \
+                  "The amount of mina owned by the account which is currently \
                    available. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -619,7 +619,7 @@ module Types = struct
                         (Balance.to_uint64 min_balance) ) )
             ; field "locked" ~typ:uint64
                 ~doc:
-                  "The amount of coda owned by the account which is currently \
+                  "The amount of mina owned by the account which is currently \
                    locked. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -2781,7 +2781,7 @@ module Queries = struct
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
               ~typ:(non_null Types.Input.public_key_arg)
           ; arg' "token"
-              ~doc:"Token of account being retrieved (defaults to CODA)"
+              ~doc:"Token of account being retrieved (defaults to MINA)"
               ~typ:Types.Input.token_id_arg ~default:Token_id.default ]
       ~resolve:(fun {ctx= coda; _} () pk token ->
         Some

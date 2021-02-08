@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-shared-prefix-test"
+let name = "mina-shared-prefix-test"
 
 let runtime_config = Runtime_config.Test_configs.split_snarkless
 

@@ -591,7 +591,7 @@ let of_operations (ops : Operation.t list) :
       let%bind {amount; _} = find_kind `Mint_tokens ops in
       (* check for Amount_not_some already done for amount_b *)
       let Amount.{currency= {symbol; _}; _} = Option.value_exn amount in
-      if String.equal symbol "CODA+" then return (Unsigned.UInt64.of_int 2)
+      if String.equal symbol "MINA+" then return (Unsigned.UInt64.of_int 2)
       else V.fail Incorrect_token_id
     in
     { Partial.kind= `Mint_tokens

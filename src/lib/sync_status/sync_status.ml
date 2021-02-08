@@ -1,6 +1,6 @@
 open Core_kernel
 
-(** Sync_status represent states interacting with peers in the coda protocol.
+(** Sync_status represent states interacting with peers in the mina protocol.
     When the protocol is starting, the node should be in the CONNECT state
     trying to connect to a peer. Once it connects to a peer, the node should be
     in the LISTENING state waiting for peers to send a message to them. When

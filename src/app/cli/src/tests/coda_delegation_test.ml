@@ -3,7 +3,7 @@ open Async
 open Mina_base
 open Signature_lib
 
-let name = "coda-delegation-test"
+let name = "mina-delegation-test"
 
 include Heartbeat.Make ()
 

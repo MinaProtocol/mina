@@ -493,5 +493,5 @@ let run_test () : unit Deferred.t =
 
 let command =
   let open Async in
-  Command.async ~summary:"Full coda end-to-end test"
+  Command.async ~summary:"Full mina end-to-end test"
     (Command.Param.return run_test)

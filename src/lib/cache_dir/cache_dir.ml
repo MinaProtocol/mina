@@ -17,9 +17,9 @@ let brew_install_path =
     (r, Core.Unix.close_process_in p)
   with
   | brew :: _, Ok () ->
-      brew ^ "/var/coda"
+      brew ^ "/var/mina"
   | _ ->
-      "/usr/local/var/coda"
+      "/usr/local/var/mina"
 
 let cache =
   let dir d w = Key_cache.Spec.On_disk {directory= d; should_write= w} in

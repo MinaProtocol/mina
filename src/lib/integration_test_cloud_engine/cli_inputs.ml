@@ -5,7 +5,7 @@ type t = {coda_automation_location: string}
 let term =
   let coda_automation_location =
     let doc =
-      "Location of the coda automation repository to use when deploying the \
+      "Location of the mina automation repository to use when deploying the \
        network."
     in
     let env = Arg.env_var "MINA_AUTOMATION_LOCATION" ~doc in

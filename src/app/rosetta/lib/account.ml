@@ -183,7 +183,7 @@ module Balance = struct
                ; balances=
                    [ { Amount.value= "66000"
                      ; currency=
-                         {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
+                         {Currency.symbol= "MINA"; decimals= 9l; metadata= None}
                      ; metadata= None } ]
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )

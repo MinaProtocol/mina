@@ -208,7 +208,7 @@ let%test_module "wallets" =
 
     let%test_unit "get from scratch" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
+          File_system.with_temp_dir "/tmp/mina-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
               let%map pk = generate_new wallets ~password in
               let keys = Set.of_list (pks wallets) in
@@ -218,7 +218,7 @@ let%test_module "wallets" =
     let%test_unit "get from existing file system not-scratch" =
       Backtrace.elide := false ;
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
+          File_system.with_temp_dir "/tmp/mina-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
               let%bind pk1 = generate_new wallets ~password in
               let%bind pk2 = generate_new wallets ~password in
@@ -231,7 +231,7 @@ let%test_module "wallets" =
 
     let%test_unit "create wallet then delete it" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
+          File_system.with_temp_dir "/tmp/mina-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
               let%bind pk = generate_new wallets ~password in
               let keys = Set.of_list (pks wallets) in
@@ -246,7 +246,7 @@ let%test_module "wallets" =
 
     let%test_unit "Unable to find wallet" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
+          File_system.with_temp_dir "/tmp/mina-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
               let keypair = Keypair.create () in
               let%map result =

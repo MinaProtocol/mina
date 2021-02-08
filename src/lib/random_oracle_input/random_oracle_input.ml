@@ -43,7 +43,7 @@ let to_bits ~unpack {field_elements; bitstrings} =
   List.concat @@ Array.to_list @@ Array.append field_bits bitstrings
 
 module Coding = struct
-  (** See https://github.com/CodaProtocol/coda/blob/develop/rfcs/0038-rosetta-construction-api.md for details on schema *)
+  (** See https://github.com/MinaProtocol/mina/blob/develop/rfcs/0038-rosetta-construction-api.md for details on schema *)
 
   (** Serialize a random oracle input with 32byte fields into bytes according to the RFC0038 specification *)
   let serialize ~string_of_field ~to_bool ~of_bool t =

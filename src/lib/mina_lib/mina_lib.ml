@@ -400,7 +400,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                     `Synced ) ) )
   in
   let observer = observe incremental_status in
-  (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
+  (* monitor mina status and shutdown node if offline for too long (unless we are a seed node) *)
   ( if not is_seed then
     let offline_shutdown_timeout_duration = Time.Span.of_min 15.0 in
     let shutdown_timeout = ref None in
@@ -436,7 +436,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           handle_status_change value
       | Invalidated ->
           () ) ) ;
-  (* recompute coda status on an interval *)
+  (* recompute mina status on an interval *)
   stabilize () ;
   every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
   observer
@@ -640,7 +640,7 @@ let dump_tf t =
   peek_frontier t.components.transition_frontier
   |> Or_error.map ~f:Transition_frontier.visualize_to_string
 
-(** The [best_path coda] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
+(** The [best_path] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
 let best_path t =
   let open Option.Let_syntax in
   let%map tf = Broadcast_pipe.Reader.peek t.components.transition_frontier in
@@ -921,7 +921,7 @@ let create ?wallets (config : Config.t) =
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
-      trace "coda" (fun () ->
+      trace "mina" (fun () ->
           let%bind prover =
             Monitor.try_with
               ~rest:

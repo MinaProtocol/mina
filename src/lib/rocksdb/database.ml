@@ -92,7 +92,7 @@ let%test_unit "to_alist (of_alist l) = l" =
       | `Duplicate_key _ ->
           Async.Deferred.unit
       | `Ok _ ->
-          File_system.with_temp_dir "/tmp/coda-test" ~f:(fun db_dir ->
+          File_system.with_temp_dir "/tmp/mina-test" ~f:(fun db_dir ->
               let sorted =
                 List.sort kvs ~compare:[%compare: string * string]
                 |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))

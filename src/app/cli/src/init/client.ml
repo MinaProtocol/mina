@@ -476,7 +476,7 @@ let batch_send_payments =
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
     let%bind keypair =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"mina keypair"
         privkey_path
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
@@ -743,7 +743,7 @@ let cancel_transaction_graphql =
            (* fee amount "inspired by" network_pool/indexed_pool.ml *)
            Currency.Fee.of_uint64 (fee + replace_fee)
          in
-         printf "Fee to cancel transaction is %s coda.\n"
+         printf "Fee to cancel transaction is %s mina.\n"
            (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
            let open Graphql_lib.Encoders in
@@ -844,7 +844,7 @@ let dump_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
         privkey_path
     in
     printf "Public key: %s\nPrivate key: %s\n"
@@ -1082,7 +1082,7 @@ let set_staking_graphql =
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
          print_message
-           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+           "❌ Failed to start staking with keys (try `mina accounts unlock` \
             first)"
            (result#setStaking)#lockedPublicKeys ;
          print_message "Started staking with"
@@ -1159,7 +1159,7 @@ let import_key =
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+           Secrets.Keypair.Terminal_stdin.read_exn ~which:"mina keypair"
              privkey_path
          in
          let pk = Public_key.compress public_key in
@@ -1285,7 +1285,7 @@ let list_accounts =
          | [||] ->
              printf
                "😢 You have no tracked accounts!\n\
-                You can make a new one using `coda accounts create`\n"
+                You can make a new one using `mina accounts create`\n"
          | accounts ->
              Array.iteri accounts ~f:(fun i w ->
                  printf
@@ -1410,7 +1410,7 @@ let generate_libp2p_keypair =
       (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
       let logger = Logger.null () in
       (* Using the helper only for keypair generation requires no state. *)
-      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
+      File_system.with_temp_dir "mina-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd
               ~on_unexpected_termination:(fun () ->
@@ -1907,7 +1907,7 @@ module Visualization = struct
   end
 
   let command_group =
-    Command.group ~summary:"Visualize data structures special to Coda"
+    Command.group ~summary:"Visualize data structures special to Mina"
       [ (Frontier.name, Frontier.command)
       ; (Registered_masks.name, Registered_masks.command) ]
 end

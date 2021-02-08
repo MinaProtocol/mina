@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-peers-test"
+let name = "mina-peers-test"
 
 let runtime_config = Runtime_config.Test_configs.split_snarkless
 

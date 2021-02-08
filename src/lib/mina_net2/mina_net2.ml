@@ -1669,7 +1669,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
       |> don't_wait_for ;
       Deferred.Or_error.return t
 
-let%test_module "coda network tests" =
+let%test_module "mina network tests" =
   ( module struct
     let logger = Logger.create ()
 

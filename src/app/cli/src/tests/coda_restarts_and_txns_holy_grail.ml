@@ -2,7 +2,7 @@ open Core
 open Async
 open Mina_base
 
-let name = "coda-restarts-and-txns-holy-grail"
+let name = "mina-restarts-and-txns-holy-grail"
 
 let main n () =
   let wait_time = Time.Span.of_min 2. in

@@ -9,7 +9,7 @@ let init () = Parallel.init_master ()
 type ports = {communication_port: int; discovery_port: int; libp2p_port: int}
 
 let net_configs n =
-  File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
+  File_system.with_temp_dir "mina-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
         Mina_net2.create ~logger:(Logger.create ()) ~conf_dir:tmpd
           ~on_unexpected_termination:(fun () ->

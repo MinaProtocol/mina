@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 open Signature_lib
 
-(* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
+(* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/MinaProtocol/mina/issues/852 *)
 
 module Snark_worker_config = struct
   type t =

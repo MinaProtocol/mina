@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-shared-prefix-multiproducer-test"
+let name = "mina-shared-prefix-multiproducer-test"
 
 let main n enable_payments () =
   let logger = Logger.create () in

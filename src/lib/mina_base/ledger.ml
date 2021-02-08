@@ -29,7 +29,7 @@ module Ledger_inner = struct
     Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
-    let key_value_db_dir = "coda_key_value_db"
+    let key_value_db_dir = "mina_key_value_db"
   end
 
   module Hash = struct

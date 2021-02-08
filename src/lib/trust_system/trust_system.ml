@@ -1,4 +1,4 @@
-(** The trust system, instantiated with Coda-specific stuff. *)
+(** The trust system, instantiated with Mina-specific stuff. *)
 open Core
 
 open Async

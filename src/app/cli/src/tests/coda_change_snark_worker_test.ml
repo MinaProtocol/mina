@@ -3,7 +3,7 @@ open Mina_transition
 open Signature_lib
 open Async
 
-let name = "coda-change-snark-worker-test"
+let name = "mina-change-snark-worker-test"
 
 let runtime_config = Runtime_config.Test_configs.split_snarkless
 

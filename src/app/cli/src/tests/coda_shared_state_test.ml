@@ -3,7 +3,7 @@ open Async
 
 include Heartbeat.Make ()
 
-let name = "coda-shared-state-test"
+let name = "mina-shared-state-test"
 
 let runtime_config = Runtime_config.Test_configs.transactions
 

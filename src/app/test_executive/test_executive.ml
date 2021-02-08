@@ -317,7 +317,7 @@ let test_arg =
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
 
 let mina_image_arg =
-  let doc = "Identifier of the coda docker image to test." in
+  let doc = "Identifier of the mina docker image to test." in
   let env = Arg.env_var "MINA_IMAGE" ~doc in
   Arg.(
     required
@@ -335,7 +335,7 @@ let help_term = Term.(ret @@ const (`Help (`Plain, None)))
 
 let engine_cmd ((engine_name, (module Engine)) : engine) =
   let info =
-    let doc = "Run coda integration test(s) on remote cloud provider." in
+    let doc = "Run mina integration test(s) on remote cloud provider." in
     Term.info engine_name ~doc ~exits:Term.default_exits
   in
   let test_inputs_with_cli_inputs_arg =
@@ -362,7 +362,7 @@ let help_cmd =
   (help_term, info)
 
 let default_cmd =
-  let doc = "Run coda integration test(s)." in
+  let doc = "Run mina integration test(s)." in
   let info = Term.info "test_executive" ~doc ~exits:Term.default_error_exits in
   (help_term, info)
 

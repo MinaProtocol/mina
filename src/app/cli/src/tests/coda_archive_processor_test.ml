@@ -1,7 +1,7 @@
 open Core
 open Async
 
-let name = "coda-archive-processor-test"
+let name = "mina-archive-processor-test"
 
 let main () =
   let archive_address = Host_and_port.of_string "localhost:3086" in
