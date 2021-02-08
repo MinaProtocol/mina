@@ -1,6 +1,6 @@
 ## Prometheus Monitoring Service
 
-This is an opinionated setup of a Prometheus Monitoring Service. It is designed to monitor a Coda daemon and optional Echo and Faucet services. 
+This is an opinionated setup of a Prometheus Monitoring Service. It is designed to monitor a Mina daeemon and optional Echo and Faucet services. 
 
 ## Environment Variables 
 

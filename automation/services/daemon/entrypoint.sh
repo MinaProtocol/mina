@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Entrypoint for the Coda daemon service container
+# Entrypoint for the Mina daeemon service container
 # Features: 
 #   - Fetches Secrets (Wallet Keys) from AWS Secrets Manager on startup 
 #       - Configured via environment variable `MINA_WALLET_KEYS`

@@ -17,19 +17,19 @@ module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
 type Structured_log_events.t += Connecting
-  [@@deriving register_event {msg= "Coda daemon is connecting"}]
+  [@@deriving register_event {msg= "Mina daeemon is connecting"}]
 
 type Structured_log_events.t += Listening
-  [@@deriving register_event {msg= "Coda daemon is listening"}]
+  [@@deriving register_event {msg= "Mina daeemon is listening"}]
 
 type Structured_log_events.t += Bootstrapping
-  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
+  [@@deriving register_event {msg= "Mina daeemon is bootstrapping"}]
 
 type Structured_log_events.t += Ledger_catchup
-  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
+  [@@deriving register_event {msg= "Mina daeemon is doing ledger catchup"}]
 
 type Structured_log_events.t += Synced
-  [@@deriving register_event {msg= "Coda daemon is synced"}]
+  [@@deriving register_event {msg= "Mina daeemon is synced"}]
 
 type Structured_log_events.t +=
   | Rebroadcast_transition of {state_hash: State_hash.t}

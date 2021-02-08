@@ -1,6 +1,6 @@
 ## Docker Instructions
 
-It is possible to run the Coda daemon inside a Docker container. This allows for resource and dependency isolation, and homogenization of infrastructure. 
+It is possible to run the Mina daeemon inside a Docker container. This allows for resource and dependency isolation, and homogenization of infrastructure. 
 
 The Coda Protocol builds one main Docker Image `codaprotocol/coda-daemon` which contains the Coda Daemon and its dependencies. Image Tags follow the release cadence for the Coda Protocol and the goal is to keep them up to date with [Github Releases](https://github.com/CodaProtocol/coda/releases). 
 

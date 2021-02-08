@@ -81,7 +81,7 @@ let%test_module "Command line tests" =
           ( if !test_failed then
             let contents =
               Core.In_channel.(
-                with_file (config_dir ^/ "coda.log") ~f:input_all)
+                with_file (config_dir ^/ "mina.log") ~f:input_all)
             in
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"

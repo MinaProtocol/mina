@@ -1,6 +1,6 @@
 # Why?
 
-This is an ingest pipeline for Coda daemon logs. Elasticsearch expects a timestamp to be in the @timestamp field, and by default FileBeat saves the index-time of the logs in that field. FileBeat needs to be configured to use this ingest pipeline when forwarding logs to Elasticsearch. 
+This is an ingest pipeline for Mina daeemon logs. Elasticsearch expects a timestamp to be in the @timestamp field, and by default FileBeat saves the index-time of the logs in that field. FileBeat needs to be configured to use this ingest pipeline when forwarding logs to Elasticsearch. 
 
 # How? 
 

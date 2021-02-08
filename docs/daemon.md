@@ -1,4 +1,4 @@
-# Care and feeding of your Coda daemon
+# Care and feeding of your Mina daeemon
 
 Right now the default config directory is hardcoded to `~/.mina-config`.
 This will be fixed eventually. In the meantime, you can pass `-config-directory`

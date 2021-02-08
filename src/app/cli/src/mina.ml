@@ -359,7 +359,7 @@ let setup_daemon logger =
       ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"coda.log" ~max_size:logrotate_max_size
+           ~log_filename:"mina.log" ~max_size:logrotate_max_size
            ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
@@ -382,7 +382,7 @@ let setup_daemon logger =
       ; ("marlin_commit", `String Mina_version.marlin_commit_id) ]
     in
     [%log info]
-      "Coda daemon is booting up; built with commit $commit on branch $branch"
+      "Mina daeemon is booting up; built with commit $commit on branch $branch"
       ~metadata:version_metadata ;
     let%bind () = Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
     if not @@ String.equal daemon_expiry "never" then (
@@ -1076,7 +1076,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
     return coda
 
 let daemon logger =
-  Command.async ~summary:"Coda daemon"
+  Command.async ~summary:"Mina daeemon"
     (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
@@ -1238,7 +1238,7 @@ let internal_commands logger =
              Parallel.init_master () ;
              match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
              | `Ok sexp ->
-                 let%bind conf_dir = Unix.mkdtemp "/tmp/coda-prover" in
+                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~logger
@@ -1265,7 +1265,7 @@ let internal_commands logger =
           let open Async in
           let logger = Logger.create () in
           Parallel.init_master () ;
-          let%bind conf_dir = Unix.mkdtemp "/tmp/coda-verifier" in
+          let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
             match mode with
             | "transaction" ->

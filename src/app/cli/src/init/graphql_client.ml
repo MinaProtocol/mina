@@ -12,7 +12,7 @@ end)
 let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   let log_location_detail =
     if Cli_lib.Flag.Uri.is_localhost uri.value then
-      " (in `~/.mina-config/coda.log`)"
+      " (in `~/.mina-config/mina.log`)"
     else ""
   in
   match%bind f query_obj uri.value with
@@ -20,7 +20,7 @@ let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
       Deferred.return r
   | Error (`Failed_request e) ->
       eprintf
-        "Error: Unable to connect to Coda daemon.\n\
+        "Error: Unable to connect to Mina daemon.\n\
          - The daemon might not be running. See logs%s for details.\n\
         \  Run `mina daemon -help` to see how to start daemon.\n\
          - If you just started the daemon, wait a minute for the GraphQL \

@@ -35,10 +35,10 @@ Parameter | Description | Default
 `archive.optionalEnv` | optional environment variable configuration settings | `[]`
 `postgres.postgresqlUsername` | Postgress database access username (if set) | `postgres`
 `postgres.postgresPassword` | Postgres database access password (if set) | `foobar`
-`coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898`
-`coda.logLevel` | log level to set for Coda daemon | `TRACE` 
-`coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
-`coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
+`coda.image` | container image to use for operating the archive node's Mina daeemon | `codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898`
+`coda.logLevel` | log level to set for Mina daeemon | `TRACE` 
+`coda.logSnarkWorkGossip` | whether the Mina daeemon should log SNARK work gossip | `false`
+`coda.runtimeConfig` | Mina daeemon configuration to use at runtime | `undefined`
 `coda.privKeyPass` | public-private key-pair associated with Coda test account/wallet | `see [default] values.yaml`
 
 ## archive-node launch examples

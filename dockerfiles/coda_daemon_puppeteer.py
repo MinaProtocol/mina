@@ -35,9 +35,9 @@ def handle_stop_request(signum, frame):
 
 def start_daemon():
   global coda_process
-  with open('coda.log', 'a') as f:
+  with open('mina.log', 'a') as f:
     coda_process = subprocess.Popen(
-        ['coda'] + daemon_args,
+        ['mina'] + daemon_args,
         stdout=f,
         stderr=subprocess.STDOUT
     )
@@ -90,14 +90,14 @@ if __name__ == '__main__':
   signal.signal(signal.SIGUSR2, handle_start_request)
 
   Path('.mina-config').mkdir(exist_ok=True)
-  Path('coda.log').touch()
-  Path('.mina-config/coda-prover.log').touch()
-  Path('.mina-config/coda-verifier.log').touch()
+  Path('mina.log').touch()
+  Path('.mina-config/mina-prover.log').touch()
+  Path('.mina-config/mina-verifier.log').touch()
   Path('.mina-config/mina-best-tip.log').touch()
 
   # currently does not handle tail process dying
   tail_process = subprocess.Popen(
-      ['tail', '-q', '-f', 'coda.log', '-f', '.mina-config/coda-prover.log', '-f', '.mina-config/coda-verifier.log', '-f' , '.mina-config/mina-best-tip.log']
+      ['tail', '-q', '-f', 'mina.log', '-f', '.mina-config/mina-prover.log', '-f', '.mina-config/mina-verifier.log', '-f' , '.mina-config/mina-best-tip.log']
   )
 
   start_daemon()

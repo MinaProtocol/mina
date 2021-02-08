@@ -1776,7 +1776,7 @@ let archive_blocks =
                  Graphql_client.query (graphql_make ~block ()) graphql_endpoint
                  |> Deferred.Result.map_error ~f:(function
                       | `Failed_request e ->
-                          Error.create "Unable to connect to Coda daemon" ()
+                          Error.create "Unable to connect to Mina daeemon" ()
                             (fun () ->
                               Sexp.List
                                 [ List

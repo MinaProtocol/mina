@@ -390,6 +390,6 @@ module Status = struct
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =
-    let title = "Coda daemon status\n-----------------------------------\n" in
+    let title = "Mina daeemon status\n-----------------------------------\n" in
     digest_entries ~title (entries t)
 end

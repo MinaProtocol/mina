@@ -1,4 +1,4 @@
-(** Poking the underlying Coda daemon in order to manipulate the sate of
+(** Poking the underlying Mina daeemon in order to manipulate the sate of
  * the network *)
 
 open Core_kernel

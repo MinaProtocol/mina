@@ -31,7 +31,7 @@ to the sampling interval, in milliseconds. In practice, we've found that 10 seco
   export OCAML_SPACETIME_INTERVAL=10000
 ```
 
-With that setting running a Coda daemon for an hour generates perhaps 500 Mb of profile data.
+With that setting running a Mina daeemon for an hour generates perhaps 500 Mb of profile data.
 When done profiling, terminate the daemon with Ctrl-C, to make sure the profile data is fully
 written.
 
