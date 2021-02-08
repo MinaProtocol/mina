@@ -1504,6 +1504,14 @@ let get_peers_graphql =
 
 let add_peers_graphql =
   let open Command in
+  let seed =
+    Param.(
+      flag "--seed" ~aliases:["-seed"]
+        ~doc:
+          "true/false Whether to add these peers as 'seed' peers, which may \
+           perform peer exchange. Default: true"
+        (optional bool))
+  in
   let peers =
     Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
   in
@@ -1511,8 +1519,8 @@ let add_peers_graphql =
     ~summary:
       "Add peers to the daemon\n\n\
        Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
-    (Cli_lib.Background_daemon.graphql_init peers
-       ~f:(fun graphql_endpoint input_peers ->
+    (Cli_lib.Background_daemon.graphql_init (Param.both peers seed)
+       ~f:(fun graphql_endpoint (input_peers, seed) ->
          let open Deferred.Let_syntax in
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
@@ -1536,9 +1544,10 @@ let add_peers_graphql =
                      peer ;
                    Core.exit 1 )
          in
+         let seed = Option.value ~default:true seed in
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Add_peers.make ~peers ())
+             (Graphql_queries.Add_peers.make ~peers ~seed ())
              graphql_endpoint
          in
          printf "Requested to add peers:\n" ;
