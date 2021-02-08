@@ -86,7 +86,7 @@ let command =
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:["archive-uri"]
       ~doc:"Postgres connection string URI corresponding to archive node"
-      Cli.required_uri
+      Cli.optional_uri
   and graphql_uri =
     flag "--graphql-uri" ~aliases:["graphql-uri"]
       ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
@@ -106,14 +106,23 @@ let command =
     Cli.logger_setup log_json log_level ;
     let pool =
       lazy
-        ( match Caqti_async.connect_pool ~max_size:128 archive_uri with
+        (let open Deferred.Result.Let_syntax in
+        let%bind archive_uri =
+          match archive_uri with
+          | None ->
+              Deferred.Result.fail
+                (`App (Errors.create (`Sql "No archive URI set")))
+          | Some archive_uri ->
+              Deferred.Result.return archive_uri
+        in
+        match Caqti_async.connect_pool ~max_size:128 archive_uri with
         | Error e ->
             [%log error]
               ~metadata:[("error", `String (Caqti_error.show e))]
               "Failed to create a caqti pool to postgres. Error: $error" ;
             Deferred.Result.fail (`App (Errors.create (`Sql "Connect failed")))
         | Ok pool ->
-            Deferred.Result.return pool )
+            Deferred.Result.return pool)
     in
     let%bind server =
       Cohttp_async.Server.create_expert ~max_connections:128
