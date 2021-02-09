@@ -464,15 +464,17 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
+	defer func() {
+		_ = s.Close()
+	}()
+
 	stat := s.Conn().Stat()
 	if stat.Direction != network.DirOutbound {
-	 	_ = s.Close()
 	 	return
 	}
 
 	connInfo := h.ConnectionManager.GetInfo()
 	if connInfo.ConnCount >= connInfo.LowWater {
-		_ = s.Close()
 		return
 	}
 
@@ -480,7 +482,6 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	_, err := s.Read(buf)
 	if err != nil && err != io.EOF {
 		logger.Errorf("failed to decode list of peers err=%s", err)
-		_ = s.Close()
 		return
 	}
 
@@ -490,7 +491,6 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	err = dec.Decode(&peers)
 	if err != nil {
 		logger.Errorf("failed to decode list of peers err=%s", err)
-		_ = s.Close()
 		return
 	}
 
@@ -509,8 +509,6 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 			}
 		}(p)
 	}
-
-	_ = s.Close()
 }
 
 // MakeHelper does all the initialization to run one host
