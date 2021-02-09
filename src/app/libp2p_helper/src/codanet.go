@@ -434,7 +434,7 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 		for {
 			if idx >= len(peers) {
 				return ret
-			} else if peers[idx] != h.Host.ID() && peers[idx] != from {
+			} else if peers[idx] != h.Host.ID() && peers[idx] != from && len(h.Host.Peerstore().PeerInfo(peers[idx]).Addrs) != 0 {
 				break
 			} else {
 				idx += 1
