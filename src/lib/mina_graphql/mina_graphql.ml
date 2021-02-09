@@ -212,6 +212,9 @@ module Types = struct
       ~doc:"Consensus time and the corresponding global slot since genesis"
       ~fields:(fun _ ->
         [ field "consensusTime" ~typ:(non_null consensus_time)
+            ~doc:
+              "Time in terms of slot number in an epoch, start and end time \
+               of the slot since UTC epoch"
             ~args:Arg.[]
             ~resolve:(fun _ (time, _) -> time)
         ; field "globalSlotSinceGenesis"
