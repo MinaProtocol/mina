@@ -47,7 +47,7 @@ Pipeline.build
             "DUNE_PROFILE=testnet_postake_medium_curves",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
-            -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
+            -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
           label = "Build Mina daemon debian package",

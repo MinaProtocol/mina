@@ -36,7 +36,7 @@ let make = (~tryAgain) => {
             label="Create Issue"
             style=Button.OffWhite
             onClick={_ =>
-              openExternal("https://github.com/CodaProtocol/coda/issues/new")
+              openExternal("https://github.com/MinaProtocol/mina/issues/new")
             }
           />
         </div>

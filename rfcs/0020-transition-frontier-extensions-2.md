@@ -11,7 +11,7 @@ Transition Frontier Extensions, as they are right now in the code, are fairly me
 ## Prior art
 [prior-art]: #prior-art
 
-See [#1585](https://github.com/CodaProtocol/coda/pull/1585) for early discussions about Transition Frontier Extensions (then referred to as the Transition Frontier Listener).
+See [#1585](https://github.com/MinaProtocol/mina/pull/1585) for early discussions about Transition Frontier Extensions (then referred to as the Transition Frontier Listener).
 
 ## Detailed design
 [detailed-design]: #detailed-design

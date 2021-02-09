@@ -24,7 +24,7 @@ except KeyError:
     USE_GITHUB = False
 
 # The repository to add this issue to
-REPO_OWNER = 'CodaProtocol'
+REPO_OWNER = 'MinaProtocol'
 REPO_NAME = 'coda'
 
 

@@ -120,7 +120,7 @@ To update brew package,
 
 1. Download the homebrew binary package from gcloud at the location specified in the `Copy artifacts to cloud` task in the `build-macOS` CI job. For example `gs://network-debug/382998/build/homebrew-coda.tar.gz`
 2. Upload it to our public s3 bucket at `https://s3-us-west-2.amazonaws.com/packages.o1test.net`
-3. In `coda.rb` in `CodaProtocol/homebrew-coda`,
+3. In `coda.rb` in `MinaProtocol/homebrew-coda`,
         1. update the url with the location of the new tarball
         2. update the hash. The file containing the hash is uploaded to gcloud as well, for example `gs://network-debug/382998/build/homebrew-coda.tar.gz.sha256`
         3. increment the revision number

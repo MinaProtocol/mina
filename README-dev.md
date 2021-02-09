@@ -15,13 +15,13 @@ Mina, this is the right file!
 Building Mina can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
-Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/CodaProtocol/coda/issues/962).
+Currently, Mina builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/MinaProtocol/mina/issues/962).
 
 The short version:
 
 1.  Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
 2.  Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
-    - To push branches to repos in the CodaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
+    - To push branches to repos in the MinaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
 3.  Pull in our submodules: `git submodule update --init`
     - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
       you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
@@ -205,8 +205,8 @@ Here, the offending path is `src/lib/mina_base/mina_base.objs`.
 Container Stages:
 
 - Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
-- Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
-- Stage 2: [minabuilderer](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make minabuilderer`, used with `make build`, ~2GB compressed)
+- Stage 1: [coda toolchain](https://github.com/MinaProtocol/mina/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
+- Stage 2: [minabuilderer](https://github.com/MinaProtocol/mina/blob/master/dockerfiles/Dockerfile) (built with `make minabuilderer`, used with `make build`, ~2GB compressed)
 
 ## Overriding Genesis Constants
 

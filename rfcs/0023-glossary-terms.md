@@ -141,7 +141,7 @@ See [design section](#detailed-design) for rationale and alternatives.
 ## Prior art
 [prior-art]: #prior-art
 
-- Previous RFC regarding nomenclature in code: https://github.com/CodaProtocol/coda/blob/develop/rfcs/0018-postake-naming-conventions.md
+- Previous RFC regarding nomenclature in code: https://github.com/MinaProtocol/mina/blob/develop/rfcs/0018-postake-naming-conventions.md
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions

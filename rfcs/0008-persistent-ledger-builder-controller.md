@@ -21,7 +21,7 @@ These representation choices involve trade-offs that should be considered. The M
 
 There's an existing Sync functor that takes a database module, to perform catchup operations. The masks just described work also with a database, so a MakeMask functor that takes a database module would be a way to make this setup work. The database module that's passed in is not copyable, but both the Sync and Diff functors will offer a copy function to copy their local data, leaving the underlying database unaffected.
 
-Later, a cache can be introduced onto the Merkle ledger database, allowing us to perform fewer database queries for commonly looked up information. The details of caching, however, is not addressed as part of this particular RFC. See [Use Merkle mask as a proxy](https://github.com/CodaProtocol/coda/issues/1073), which requests such a feature.
+Later, a cache can be introduced onto the Merkle ledger database, allowing us to perform fewer database queries for commonly looked up information. The details of caching, however, is not addressed as part of this particular RFC. See [Use Merkle mask as a proxy](https://github.com/MinaProtocol/mina/issues/1073), which requests such a feature.
 
 The module type for the mask could be:
 

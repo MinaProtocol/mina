@@ -22,7 +22,7 @@ First set up dependencies
 
 Download and build the app:
 
-1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
+1. Clone the repo via SSH: `git clone git@github.com:MinaProtocol/mina.git`
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
 4. `yarn` to install dependencies

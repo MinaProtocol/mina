@@ -34,13 +34,13 @@ This is a Terraform module that will deploy a Mina Daemon container as a service
 
 ## Deployment Considerations
 
-In order to deploy a "new" version of this module, you must ensure that you have rebuilt said container. The container build is a two-step process, with the base Mina dockerfile being [here](https://github.com/CodaProtocol/coda/blob/develop/dockerfiles/Dockerfile-mina-daemon) and the more deployment-specific Dockerfile [here](https://github.com/CodaProtocol/coda-automation/blob/master/services/daemon/Dockerfile). 
+In order to deploy a "new" version of this module, you must ensure that you have rebuilt said container. The container build is a two-step process, with the base Mina dockerfile being [here](https://github.com/MinaProtocol/mina/blob/develop/dockerfiles/Dockerfile-mina-daemon) and the more deployment-specific Dockerfile [here](https://github.com/MinaProtocol/mina-automation/blob/master/services/daemon/Dockerfile). 
 
 The manual commands to release each container are the following: 
 
 ### Coda-Daemon Container
 
-*(From the root of the `CodaProtocol/coda` repository)*
+*(From the root of the `MinaProtocol/mina` repository)*
 `./scripts/release-docker.sh -s mina-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg coda_version=<MINA_VERSION> --build-arg deb_repo=<deb-repo>"`
 
 Example:
@@ -50,7 +50,7 @@ The `--extra-args` argument is for passing additional parameters directly to the
 
 ### daemon Container
 
-*(From the root of the `CodaProtocol/coda-automation` repository)*
+*(From the root of the `MinaProtocol/mina-automation` repository)*
 `./scripts/release-docker.sh -s daemon -v <major>.<minor>.<patch> --extra-args "--build-arg base_image_tag=<docker tag created in first step> "`
 
 Example:

@@ -266,7 +266,7 @@ There are several public Grafana dashboards available here:
 1. git tag 0.0.16-beta4 (with -m or it won't work) (increment the 4 every time)
 2. push the tag
 3. Push the master
-4. curl -X POST --header "Content-Type: application/json" -H "Circle-Token: 62bcf7b6c8ef60bdee3ecb3618d530e5f77eb78e" -d '{ "branch": "master", "parameters": { "run-ci": true } }' 'https://circleci.com/api/v2/project/github/CodaProtocol/coda/pipeline'
+4. curl -X POST --header "Content-Type: application/json" -H "Circle-Token: 62bcf7b6c8ef60bdee3ecb3618d530e5f77eb78e" -d '{ "branch": "master", "parameters": { "run-ci": true } }' 'https://circleci.com/api/v2/project/github/MinaProtocol/mina/pipeline'
    (this starts the build)
 5. In coda automation, unzip the 3.3-keys.tar.gz into coda-automation
 6. Download secrets for gogoel cloud storage -- scripts/o1-google-cloud-storage-api-key.json

@@ -2,7 +2,7 @@
 
 ## Goal
 
-To specify the interfaces between different components and the interactions involved in executing an integration test. More concretely, proposing a spec for a Test Executive (pretty close to the one defined [here](https://github.com/CodaProtocol/coda/pull/4715). The role of a test executive is to bring together various components involved in executing an integration test and coordinating the interactions among them.
+To specify the interfaces between different components and the interactions involved in executing an integration test. More concretely, proposing a spec for a Test Executive (pretty close to the one defined [here](https://github.com/MinaProtocol/mina/pull/4715). The role of a test executive is to bring together various components involved in executing an integration test and coordinating the interactions among them.
 These components are:
     1. Testnet infrastructure: Given a network configuration, deploys a testnet for a specific infrastructure.
     2. Test: Defining the integration test itself
@@ -15,7 +15,7 @@ The goal is to have a system where each of these components can be independently
 
 ### Existing
 
-Integrations tests are currently run on a simulated network using local processes. The test controls and inspects the nodes by communicating over RPC. The tests are tightly coupled to the simulated network and cannot be ported to run on cloud-based or container-based environments. More information on the motivation is described in this [rfc](https://github.com/CodaProtocol/coda/pull/4715) (TODO: Copy it to make it easier to read?)
+Integrations tests are currently run on a simulated network using local processes. The test controls and inspects the nodes by communicating over RPC. The tests are tightly coupled to the simulated network and cannot be ported to run on cloud-based or container-based environments. More information on the motivation is described in this [rfc](https://github.com/MinaProtocol/mina/pull/4715) (TODO: Copy it to make it easier to read?)
 
 ### Improvements
 
@@ -160,7 +160,7 @@ Option 2 requires implementing stateful sets (which is to be implemented for tes
 
 ##### Log engine
 
-Similar to the network manager, a log engine is also a wrapper around the logging infrastructure we'd use. The log engine will provide functions that would filter the logs from all the nodes in the network. Log engine queries correspond to the required primitives for the test DSL, for example, the `wait_for` primitive defined [here](https://github.com/CodaProtocol/coda/blob/rfc/integration-tests/docs/test_dsl_spec.md) would return when block production logs with the given filters are seen.
+Similar to the network manager, a log engine is also a wrapper around the logging infrastructure we'd use. The log engine will provide functions that would filter the logs from all the nodes in the network. Log engine queries correspond to the required primitives for the test DSL, for example, the `wait_for` primitive defined [here](https://github.com/MinaProtocol/mina/blob/rfc/integration-tests/docs/test_dsl_spec.md) would return when block production logs with the given filters are seen.
 
 Currently we use Stackdriver as our logging infrastructure for testnets and qa-nets. Using stackdriver, one can set up a pub/sub system to subscribe to a topic ([for more information](https://cloud.google.com/pubsub/docs/quickstart-py-mac)). Log filters can be added to a subscription and so only log messages that match the filter will be published to the topic. Each query defined in the log engine would correspond to a specific topic.
 

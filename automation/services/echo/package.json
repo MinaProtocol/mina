@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Simple service that sends inverse transactions for each one it recieves.",
   "main": "index.js",
-  "repository": "https://github.com/CodaProtocol/echo-service",
+  "repository": "https://github.com/MinaProtocol/echo-service",
   "author": "Carey Janecka <carey@o1labs.org>",
   "license": "MIT",
   "scripts": {
