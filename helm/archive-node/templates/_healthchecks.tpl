@@ -28,7 +28,9 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isArchiveSynced --db-host {{ tpl .Values.archive.postgresHost . }}"
+      "source /healthcheck/utilities.sh && isArchiveSynced \
+        --db-host {{ tpl .Values.archive.postgresHost . }} \
+        --graphql-host {{ ternary "localhost" "seed-node" .Values.archive.enableLocalDaemon }}"
     ]
 {{- include "healthcheck.common.settings" .Values | indent 2 }}
 {{- end }}

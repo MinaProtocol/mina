@@ -18,7 +18,7 @@ spec:
       - name: update-transaction-isolation-level
         image: bitnami/postgresql
         command: ["bash", "-c"]
-        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ .Values.archive.postgresHost }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB }} -c 'ALTER DATABASE {{ .Values.archive.postgresDB }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;'"]
+        args: ["PGPASSWORD={{ .Values.postgresql.postgresqlPassword }} psql --username {{ .Values.postgresql.postgresqlUsername }} --host {{ tpl .Values.archive.postgresHost . }} --port {{ .Values.archive.ports.postgres }} --dbname {{ .Values.archive.postgresDB }} -c 'ALTER DATABASE {{ .Values.archive.postgresDB }} SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE;'"]
       restartPolicy: Never
   backoffLimit: 10
 {{- end }}

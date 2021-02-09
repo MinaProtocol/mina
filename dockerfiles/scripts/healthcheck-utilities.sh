@@ -118,22 +118,24 @@ function isArchiveSynced() {
     ## "Usage: $0 [--db-host <host>] [--db-port <port>] [--db-user <user>] [--db-password <pass>]"
 
     while [[ "$#" -gt 0 ]]; do case $1 in
-        --db-host) host="$2"; shift;;
-        --db-port) port="$2"; shift;;
-        --db-user) user="$2"; shift;;
-        --db-password) password="$2"; shift;;
-        --daemon-address) daemon_addr="$2"; shift;;
+        --db-host) db_host="$2"; shift;;
+        --db-port) db_port="$2"; shift;;
+        --db-user) db_user="$2"; shift;;
+        --db-password) db_password="$2"; shift;;
+        --graphql-host) ql_host="$2"; shift;;
+        --graphql-port) ql_port="$2"; shift;;
         *) echo "Unknown parameter passed: $1"; exit 1;;
     esac; shift; done
 
     highestObserved=$(
-        PGPASSWORD=${password:-foobar} psql -qtAX -h ${host:-localhost} -p ${port:-5432} -d archive -U ${user:-postgres} \
+        PGPASSWORD=${db_password:-foobar} psql -qtAX -h ${db_host:-localhost} -p ${db_port:-5432} -d archive -U ${db_user:-postgres} \
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' ${daemon_addr:-'localhost:3085'}/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" \
+            -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' ${ql_host:-localhost}:${ql_port:-3085}}/graphql | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     
-    [[ $highestObserved == $highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with local daemon[${highestReceived}]" && return 1)
+    [[ $highestObserved == $highestReceived ]] && return 0 || (echo "Archive[${highestObserved}] is out of sync with ${ql_host:-local} daemon[${highestReceived}]" && return 1)
 }
