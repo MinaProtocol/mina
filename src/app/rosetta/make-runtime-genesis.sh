@@ -3,7 +3,7 @@
 set -eou pipefail
 
 PK=B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV
-SNARK_PK=B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf
+SNARK_PK=B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL
 
 mkdir -p /tmp/s3_cache_dir/
 

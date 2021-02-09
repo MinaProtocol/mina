@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
 	"math/rand"
 	gonet "net"
@@ -495,11 +496,17 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 
 		for _, peer := range peers {
 			go func() {
-				err = h.Host.Connect(h.Ctx, peer)
-				if err != nil {
-					logger.Errorf("failed to connect to peer err=%s", err)
+				connInfo := h.ConnectionManager.GetInfo()
+				if connInfo.ConnCount < connInfo.LowWater {
+					err = h.Host.Connect(h.Ctx, peer)
+					if err != nil {
+						logger.Errorf("failed to connect to peer err=%s", err)
+					} else {
+						logger.Debugf("connected to peer! %s", peer)
+					}
+				} else {
+					h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
 				}
-				logger.Debugf("connected to peer! %s", peer)
 			}()
 		}
 

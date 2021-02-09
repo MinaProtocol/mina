@@ -33,9 +33,10 @@ let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that workers share prefixes"
     (let%map_open num_block_producers =
-       flag "num-block-producers" ~doc:"NUM number of block producers to have"
-         (required int)
+       flag "--num-block-producers" ~aliases:["num-block-producers"]
+         ~doc:"NUM number of block producers to have" (required int)
      and enable_payments =
-       flag "payments" no_arg ~doc:"enable the payment check"
+       flag "--payments" ~aliases:["payments"] no_arg
+         ~doc:"enable the payment check"
      in
      main num_block_producers enable_payments)
