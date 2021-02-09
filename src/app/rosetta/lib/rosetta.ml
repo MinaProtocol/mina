@@ -4,6 +4,8 @@ open Rosetta_lib
 
 let router ~graphql_uri ~pool ~logger route body =
   let with_db f =
+    let open Deferred.Result.Let_syntax in
+    let%bind pool = Lazy.force pool in
     Caqti_async.Pool.use (fun db -> f ~db) pool
     |> Deferred.Result.map_error ~f:(function
          | `App e ->
@@ -102,27 +104,31 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    match Caqti_async.connect_pool ~max_size:128 archive_uri with
-    | Error e ->
-        [%log error]
-          ~metadata:[("error", `String (Caqti_error.show e))]
-          "Failed to create a caqti pool to postgres. Error: $error" ;
-        Deferred.unit
-    | Ok pool ->
-        let%bind server =
-          Cohttp_async.Server.create_expert ~max_connections:128
-            ~on_handler_error:
-              (`Call
-                (fun _net exn ->
-                  [%log error]
-                    "Exception while handling Rosetta server request: $error"
-                    ~metadata:
-                      [ ("error", `String (Exn.to_string_mach exn))
-                      ; ("context", `String "rest_server") ] ))
-            (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
-            (server_handler ~pool ~graphql_uri ~logger)
-        in
-        [%log info]
-          ~metadata:[("port", `Int port)]
-          "Rosetta process running on http://localhost:$port" ;
-        Cohttp_async.Server.close_finished server
+    let pool =
+      lazy
+        ( match Caqti_async.connect_pool ~max_size:128 archive_uri with
+        | Error e ->
+            [%log error]
+              ~metadata:[("error", `String (Caqti_error.show e))]
+              "Failed to create a caqti pool to postgres. Error: $error" ;
+            Deferred.Result.fail (`App (Errors.create (`Sql "Connect failed")))
+        | Ok pool ->
+            Deferred.Result.return pool )
+    in
+    let%bind server =
+      Cohttp_async.Server.create_expert ~max_connections:128
+        ~on_handler_error:
+          (`Call
+            (fun _net exn ->
+              [%log error]
+                "Exception while handling Rosetta server request: $error"
+                ~metadata:
+                  [ ("error", `String (Exn.to_string_mach exn))
+                  ; ("context", `String "rest_server") ] ))
+        (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
+        (server_handler ~pool ~graphql_uri ~logger)
+    in
+    [%log info]
+      ~metadata:[("port", `Int port)]
+      "Rosetta process running on http://localhost:$port" ;
+    Cohttp_async.Server.close_finished server
