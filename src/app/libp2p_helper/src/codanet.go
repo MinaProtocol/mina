@@ -53,7 +53,6 @@ type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
 var (
 	logger      = logging.Logger("codanet.Helper")
-	gsLogger    = logging.Logger("codanet.CodaGatingState")
 	NoDHT       bool // option for testing to completely disable the DHT
 	WithPrivate bool // option for testing to allow private IPs
 
@@ -465,6 +464,12 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
+	stat := s.Conn().Stat()
+	if stat.Direction != network.DirOutbound {
+	 	_ = s.Close()
+	 	return
+	}
+
 	connInfo := h.ConnectionManager.GetInfo()
 	if connInfo.ConnCount >= connInfo.LowWater {
 		_ = s.Close()
@@ -489,22 +494,20 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 		return
 	}
 
-	for _, peerp := range peers {
-		var peer peer.AddrInfo
-		peer = peerp
-		go func() {
+	for _, p := range peers {
+		go func(p peer.AddrInfo) {
 			connInfo := h.ConnectionManager.GetInfo()
 			if connInfo.ConnCount < connInfo.LowWater {
-				err = h.Host.Connect(h.Ctx, peer)
+				err = h.Host.Connect(h.Ctx, p)
 				if err != nil {
-					logger.Errorf("failed to connect to peer %v err=%s", peer, err)
+					logger.Errorf("failed to connect to peer %v err=%s", p, err)
 				} else {
-					logger.Debugf("connected to peer! %v", peer)
+					logger.Debugf("connected to peer! %v", p)
 				}
 			} else {
-				h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
+				h.Host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.ConnectedAddrTTL)
 			}
-		}()
+		}(p)
 	}
 
 	_ = s.Close()
