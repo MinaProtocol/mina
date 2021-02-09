@@ -1,6 +1,6 @@
 /dns4/seed-one.encore.o1test.net/tcp/10001/p2p/12D3KooWJ9mNdbUXUpUNeMnejRumKzmQF15YeWwAPAhTAWB6dhiv/
 /dns4/seed-two.encore.o1test.net/tcp/10001/p2p/12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5/
-/ip4/35.186.171.57/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
+/ip4/35.245.137.202/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr
 /ip4/34.86.170.225/tcp/10512/p2p/12D3KooWFmLVNdE9A4UmRgDnER6YxQJGCWeXJdWw6sjocd5Lyfpn
 /ip4/34.86.189.237/tcp/10517/p2p/12D3KooWPc8xqjGRpbAkL5TyQCXjuBjF6TDNFSw5n42t1fjPgdAw
 /ip4/34.86.233.91/tcp/10508/p2p/12D3KooWFuJM1d6K18WJ929Vc7mWsN4swfzskC5xFZnpnNDFGMDh
