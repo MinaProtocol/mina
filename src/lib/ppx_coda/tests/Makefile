@@ -1,4 +1,4 @@
-# Makefile for ppx_mina tests
+# Makefile for ppx_coda tests
 
 # useful for negative tests, so we know the failure is the failure
 # we expect

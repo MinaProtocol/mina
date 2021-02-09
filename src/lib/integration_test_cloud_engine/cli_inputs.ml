@@ -12,7 +12,7 @@ let term =
     Arg.(
       value & opt string "./automation"
       & info
-          ["coda-automation-location"]
+          ["mina-automation-location"]
           ~env ~docv:"MINA_AUTOMATION_LOCATION" ~doc)
   in
   let cons_inputs coda_automation_location = {coda_automation_location} in

@@ -8,4 +8,4 @@
    ppx_deriving_yojson.runtime filtered_external_transition
    mina_base mina_state mina_transition mina_commands user_command_input mina_lib)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving_yojson)))

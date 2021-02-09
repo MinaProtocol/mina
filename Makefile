@@ -281,7 +281,7 @@ render-circleci:
 	./scripts/test.py render .circleci/config.yml.jinja .mergify.yml.jinja
 
 test-ppx:
-	$(MAKE) -C src/lib/ppx_mina/tests
+	$(MAKE) -C src/lib/ppx_coda/tests
 
 web:
 	./scripts/web.sh

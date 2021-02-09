@@ -4,4 +4,4 @@
  (libraries async core rpc_parallel mina_base mina_state mina_transition blockchain_snark memory_stats precomputed_values child_processes)
  (preprocessor_deps "../../config.mlh")
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane)))

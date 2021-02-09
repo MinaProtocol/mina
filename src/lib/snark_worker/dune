@@ -9,7 +9,7 @@
  (preprocess
   (pps
     ppx_bin_prot
-    ppx_mina
+    ppx_coda
     ppx_custom_printf
     ppx_deriving_yojson
     ppx_inline_test

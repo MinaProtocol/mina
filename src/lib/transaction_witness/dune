@@ -4,4 +4,4 @@
  (inline_tests)
  (libraries core_kernel mina_base mina_state)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_mina)))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_version ppx_coda)))

@@ -5,7 +5,7 @@
  (inline_tests)
  (libraries core async error_json pipe_lib logger web_request)
  (preprocess
-  (pps ppx_mina ppx_version ppx_jane ppx_deriving.std))
+  (pps ppx_coda ppx_version ppx_jane ppx_deriving.std))
  (instrumentation (backend bisect_ppx))
  (synopsis
    "Transforming Mina data such that it can be easy for the Web Client to process"))

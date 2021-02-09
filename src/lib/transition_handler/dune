@@ -4,4 +4,4 @@
  (inline_tests)
  (libraries mina_metrics perf_histograms core_kernel transition_frontier consensus mina_intf rose_tree pipe_lib otp_lib mina_base cache_lib)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane)))

@@ -4,4 +4,4 @@
  (public_name pipe_lib)
  (libraries core_kernel async o1trace logger)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_mina ppx_version ppx_jane ppx_deriving.make)))
+ (preprocess (pps ppx_coda ppx_version ppx_jane ppx_deriving.make)))
