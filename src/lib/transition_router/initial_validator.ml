@@ -210,12 +210,20 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         if Ivar.is_full initialization_finish_signal then
+         if Ivar.is_full initialization_finish_signal then (
            let ( `Transition transition_env
                , `Time_received time_received
                , `Valid_cb valid_cb ) =
              network_transition
            in
+           let blockchain_length =
+             Envelope.Incoming.data transition_env
+             |> External_transition.consensus_state
+             |> Consensus.Data.Consensus_state.blockchain_length
+             |> Mina_numbers.Length.to_int
+           in
+           Mina_metrics.Transition_frontier
+           .update_max_unvalidated_blocklength_observed blockchain_length ;
            if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
              let transition_with_hash =
                Envelope.Incoming.data transition_env
@@ -228,13 +236,6 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                ~rejected_blocks_logger ~time_received duplicate_checker logger
                transition_with_hash ;
              let sender = Envelope.Incoming.sender transition_env in
-             let blockchain_length =
-               External_transition.consensus_state transition_with_hash.data
-               |> Consensus.Data.Consensus_state.blockchain_length
-               |> Mina_numbers.Length.to_int
-             in
-             Mina_metrics.Transition_frontier
-             .update_max_unvalidated_blocklength_observed blockchain_length ;
              let computation =
                let open Interruptible.Let_syntax in
                let defer f x =
@@ -279,5 +280,5 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                         ~delta:genesis_constants.protocol.delta error
              in
              Interruptible.force computation >>| ignore )
-           else Deferred.unit
+           else Deferred.unit )
          else Deferred.unit ))
