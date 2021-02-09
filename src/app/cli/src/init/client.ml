@@ -875,7 +875,10 @@ let dump_ledger =
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip2 sl_hash_flag plaintext_flag in
-  Command.async ~summary:"Print the ledger with given Merkle root"
+  Command.async
+    ~summary:
+      "Print the staged ledger from the block with the given state hash \
+       (default: staged ledger at the best tip)"
     (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, plaintext) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
          let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
