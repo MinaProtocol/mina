@@ -62,7 +62,7 @@ of the repo.
 
 - Create local builder image
 
-`make codabuilder`
+`make minabuilderer`
 
 - Start developer container
 
@@ -206,7 +206,7 @@ Container Stages:
 
 - Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
 - Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
-- Stage 2: [codabuilder](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make codabuilder`, used with `make build`, ~2GB compressed)
+- Stage 2: [minabuilderer](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make minabuilderer`, used with `make build`, ~2GB compressed)
 
 ## Overriding Genesis Constants
 

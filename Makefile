@@ -6,7 +6,7 @@ GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = codabuilder-$(MYUID)
+DOCKERNAME = minabuilder-$(MYUID)
 
 # Unique signature of libp2p code tree
 LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
@@ -57,7 +57,7 @@ git_hooks: $(wildcard scripts/git_hooks/*)
 ########################################
 ## Code
 
-all: clean codabuilder containerstart build
+all: clean minabuilder containerstart build
 
 clean:
 	$(info Removing previous build artifacts)
@@ -141,7 +141,7 @@ archive_blocks :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-dev: codabuilder containerstart build
+dev: minabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
 update-opam:
@@ -220,11 +220,11 @@ update-rust-deps:
 	./scripts/update-rust-toolchain-references.sh $(GITLONGHASH)
 	make render-circleci
 
-# Local 'codabuilder' docker image (based off docker-toolchain)
-codabuilder: git_hooks
-	docker build --file dockerfiles/Dockerfile --tag codabuilder .
+# Local 'minabuilder' docker image (based off docker-toolchain)
+minabuilder: git_hooks
+	docker build --file dockerfiles/Dockerfile --tag minabuilder .
 
-# Restarts codabuilder
+# Restarts minabuilder
 containerstart: git_hooks
 	@./scripts/container.sh restart
 
@@ -268,12 +268,6 @@ genesiskeys:
 	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
 	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
 
-codaslim:
-	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp _build/coda.deb .
-	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
-	@rm coda.deb
-
 ##############################################
 ## Genesis ledger in OCaml from running daemon
 
@@ -287,7 +281,7 @@ render-circleci:
 	./scripts/test.py render .circleci/config.yml.jinja .mergify.yml.jinja
 
 test-ppx:
-	$(MAKE) -C src/lib/ppx_coda/tests
+	$(MAKE) -C src/lib/ppx_mina/tests
 
 web:
 	./scripts/web.sh
@@ -355,4 +349,4 @@ ml-docs:
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper
+.PHONY: all build check-format clean client_sdk client_sdk_test_sigs containerstart deb dev minabuilder reformat test update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper
