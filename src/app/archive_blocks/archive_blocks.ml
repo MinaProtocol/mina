@@ -86,28 +86,28 @@ let () =
       (let open Let_syntax in
       async ~summary:"Write blocks to an archive database"
         (let%map archive_uri =
-           Param.flag "archive-uri"
+           Param.flag "--archive-uri" ~aliases:["archive-uri"]
              ~doc:
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER:$USER@localhost:5432/archiver)"
              Param.(required string)
          and precomputed =
-           Param.(flag "precomputed" no_arg)
+           Param.(flag "--precomputed" ~aliases:["precomputed"] no_arg)
              ~doc:"Blocks are in precomputed format"
          and extensional =
-           Param.(flag "extensional" no_arg)
+           Param.(flag "--extensional" ~aliases:["extensional"] no_arg)
              ~doc:"Blocks are in extensional format"
          and success_file =
-           Param.flag "successful-files"
+           Param.flag "--successful-files" ~aliases:["successful-files"]
              ~doc:
                "PATH Appends the list of files that were processed successfully"
              (Flag.optional Param.string)
          and failure_file =
-           Param.flag "failed-files"
+           Param.flag "--failed-files" ~aliases:["failed-files"]
              ~doc:"PATH Appends the list of files that failed to be processed"
              (Flag.optional Param.string)
          and log_successes =
-           Param.flag "log-successful"
+           Param.flag "--log-successful" ~aliases:["log-successful"]
              ~doc:
                "true/false Whether to log messages for files that were \
                 processed successfully"

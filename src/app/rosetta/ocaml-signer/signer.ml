@@ -9,11 +9,12 @@ open Lib
 let sign_command =
   let open Command.Let_syntax in
   let%map_open unsigned_transaction =
-    flag "unsigned-transaction"
+    flag "--unsigned-transaction" ~aliases:["unsigned-transaction"]
       ~doc:"Unsigned transaction string returned from Rosetta"
       (required string)
   and private_key =
-    flag "private-key" ~doc:"Private key hex bytes" (required string)
+    flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
+      (required string)
   in
   let open Deferred.Let_syntax in
   fun () ->
@@ -30,10 +31,11 @@ let sign_command =
 let verify_command =
   let open Command.Let_syntax in
   let%map_open signed_transaction =
-    flag "signed-transaction"
+    flag "--signed-transaction" ~aliases:["signed-transaction"]
       ~doc:"Signed transaction string returned from Rosetta" (required string)
   and public_key =
-    flag "public-key" ~doc:"Public key hex bytes" (required string)
+    flag "--public-key" ~aliases:["public-key"] ~doc:"Public key hex bytes"
+      (required string)
   in
   let open Deferred.Let_syntax in
   fun () ->
@@ -53,7 +55,8 @@ let verify_command =
 let derive_command =
   let open Command.Let_syntax in
   let%map_open private_key =
-    flag "private-key" ~doc:"Private key hex bytes" (required string)
+    flag "--private-key" ~aliases:["private-key"] ~doc:"Private key hex bytes"
+      (required string)
   in
   let open Deferred.Let_syntax in
   fun () ->
