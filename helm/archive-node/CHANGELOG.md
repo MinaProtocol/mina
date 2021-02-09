@@ -7,3 +7,7 @@
 ------
 - add capability to enable/disable daemon genesis proof generation
 
+0.5.0:
+------
+- enable toggle of local daemon and associated postgresDB deployments
+

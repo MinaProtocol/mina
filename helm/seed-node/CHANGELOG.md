@@ -7,3 +7,7 @@
 ------
 - add capability to enable/disable daemon genesis proof generation
 
+0.4.7:
+------
+- add toggle for archiving daemon activity
+
