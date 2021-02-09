@@ -16,7 +16,7 @@ This document proposes a tool that unifies these processes by collecting tools a
 
 ## Existing System
 
-For these processes we mainly use the [testnet-keys.py](https://github.com/MinaProtocol/mina-automation/blob/master/scripts/testnet-keys.py) script in coda-automation.
+For these processes we mainly use the [testnet-keys.py](https://github.com/MinaProtocol/coda-automation/blob/master/scripts/testnet-keys.py) script in coda-automation.
 
 1. Keypair generation calls `mina advanced-generate keypair` generate new accounts
 2. Genesis ledger creation happens using custom logic inside this script
@@ -85,7 +85,7 @@ coda-network keyset download <KEYSET_NAME>
 
 ### Runtime Ledger Generation
 
-The code for generating the Runtime Genesis Ledger should be ported over from the [existing code](https://github.com/MinaProtocol/mina-automation/blob/master/scripts/testnet-keys.py#L203) but with the added flexibility of being able to inject any variety of keysets into the ledger with corresponding initial amounts.
+The code for generating the Runtime Genesis Ledger should be ported over from the [existing code](https://github.com/MinaProtocol/coda-automation/blob/master/scripts/testnet-keys.py#L203) but with the added flexibility of being able to inject any variety of keysets into the ledger with corresponding initial amounts.
 
 ```
 coda-network genesis create

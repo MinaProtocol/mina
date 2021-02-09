@@ -1,4 +1,4 @@
--e git+https://github.com/MinaProtocol/mina-python-client.git#egg=CodaClient
+-e git+https://github.com/MinaProtocol/coda-python-client.git#egg=CodaClient
 schedule
 kubernetes
 prometheus_client

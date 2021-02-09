@@ -46,7 +46,7 @@ This is a Terraform module that will deploy a service containing two tasks, a Mi
 
 In order to deploy a "new" version of this module, you must ensure that you have rebuilt the Mina Daemon image and *(optionally)* the Proxy image if it has changed.
 
-The Mina Daemon image build is a two-step process, with the base Mina dockerfile being [here](https://github.com/MinaProtocol/mina/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/MinaProtocol/mina-automation/blob/master/services/daemon/Dockerfile).
+The Mina Daemon image build is a two-step process, with the base Mina dockerfile being [here](https://github.com/MinaProtocol/mina/blob/develop/dockerfiles/Dockerfile-coda-daemon) and the more deployment-specific Dockerfile [here](https://github.com/MinaProtocol/coda-automation/blob/master/services/daemon/Dockerfile).
 
 The manual commands to release each container are the following:
 
@@ -58,7 +58,7 @@ The manual commands to release each container are the following:
 
 ### daemon Container
 
-*(From the root of the `MinaProtocol/mina-automation` repository)*
+*(From the root of the `MinaProtocol/coda-automation` repository)*
 
 `./scripts/release-docker.sh -s daemon -v <major>.<minor>.<patch> --extra-args "--build-arg base_image_tag=<docker tag created in first step>"`
 

@@ -25,7 +25,7 @@ except KeyError:
 
 # The repository to add this issue to
 REPO_OWNER = 'MinaProtocol'
-REPO_NAME = 'coda'
+REPO_NAME = 'mina'
 
 
 """ Mask out actual line numbers and collumns, generate a signature based on stripped data """
