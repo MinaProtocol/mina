@@ -124,8 +124,8 @@ jobs:
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
-                  name: Running test -- test_archive_processor:coda-archive-processor-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
+                  name: Running test -- test_archive_processor:mina-archive-processor-test
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:mina-archive-processor-test"'
 
     build-archive:
         resource_class: xlarge
@@ -655,7 +655,7 @@ jobs:
                     - "_build/default/src/app/logproc/logproc.exe"
                     - "scripts"
                     - "should_run_tests"
-    test--dev--coda-bootstrap-test:
+    test--dev--mina-bootstrap-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -665,15 +665,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-bootstrap-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-bootstrap-test"; fi
+                  name: Running test -- dev:mina-bootstrap-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-bootstrap-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-shared-state-test:
+    test--dev--mina-shared-state-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -683,15 +683,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-shared-state-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-state-test"; fi
+                  name: Running test -- dev:mina-shared-state-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-shared-state-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-peers-test:
+    test--dev--mina-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -701,15 +701,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-peers-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-peers-test"; fi
+                  name: Running test -- dev:mina-peers-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-peers-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-transitive-peers-test:
+    test--dev--mina-transitive-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -719,15 +719,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-transitive-peers-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-transitive-peers-test"; fi
+                  name: Running test -- dev:mina-transitive-peers-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-transitive-peers-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-block-production-test:
+    test--dev--mina-block-production-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -737,15 +737,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-block-production-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-block-production-test"; fi
+                  name: Running test -- dev:mina-block-production-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-block-production-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-shared-prefix-test_-who-produces_0:
+    test--dev--mina-shared-prefix-test_-who-produces_0:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -755,15 +755,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-shared-prefix-test -who-produces 0
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 0"; fi
+                  name: Running test -- dev:mina-shared-prefix-test -who-produces 0
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-shared-prefix-test -who-produces 0"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-shared-prefix-test_-who-produces_1:
+    test--dev--mina-shared-prefix-test_-who-produces_1:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -773,15 +773,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-shared-prefix-test -who-produces 1
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-shared-prefix-test -who-produces 1"; fi
+                  name: Running test -- dev:mina-shared-prefix-test -who-produces 1
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-shared-prefix-test -who-produces 1"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-change-snark-worker-test:
+    test--dev--mina-change-snark-worker-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -791,15 +791,15 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-change-snark-worker-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-change-snark-worker-test"; fi
+                  name: Running test -- dev:mina-change-snark-worker-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-change-snark-worker-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
                   no_output_timeout: 20m
             - store_artifacts:
                   path: test_output/artifacts
-    test--dev--coda-delegation-test:
+    test--dev--mina-delegation-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
@@ -809,8 +809,8 @@ jobs:
                 keys:
                     -  dev-build-binaries-v1-{{ .Revision }}
             - run:
-                  name: Running test -- dev:coda-delegation-test
-                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:coda-delegation-test"; fi
+                  name: Running test -- dev:mina-delegation-test
+                  command: if [ -f should_run_tests ]; then source ~/.profile && ./scripts/test.py run --no-build --non-interactive --collect-artifacts --yes "dev:mina-delegation-test"; fi
                   environment:
                     MINA_LIBP2P_HELPER_PATH: /home/opam/project/src/app/libp2p_helper/result/bin/libp2p_helper
                     GO: /usr/lib/go/bin/go
@@ -852,8 +852,8 @@ jobs:
                 name: Build libp2p_helper
                 command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
-                  name: Running test -- test_postake_catchup:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_catchup:coda-restart-node-test"'
+                  name: Running test -- test_postake_catchup:mina-restart-node-test
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_catchup:mina-restart-node-test"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_five_even_txns:
@@ -891,8 +891,8 @@ jobs:
                 name: Build libp2p_helper
                 command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
-                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
+                  name: Running test -- test_postake_five_even_txns:mina-shared-prefix-multiproducer-test -num-block-producers 5 -payments
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_five_even_txns:mina-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_snarkless:
@@ -972,8 +972,8 @@ jobs:
                 name: Build libp2p_helper
                 command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
-                  name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
+                  name: Running test -- test_postake_split:mina-shared-prefix-multiproducer-test -num-block-producers 2
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split:mina-shared-prefix-multiproducer-test -num-block-producers 2"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_three_producers:
@@ -1011,8 +1011,8 @@ jobs:
                 name: Build libp2p_helper
                 command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
-                  name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:coda-txns-and-restart-non-producers"'
+                  name: Running test -- test_postake_three_producers:mina-txns-and-restart-non-producers
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:mina-txns-and-restart-non-producers"'
             - store_artifacts:
                   path: test_output/artifacts
     test--test_postake_full_epoch:
@@ -1175,8 +1175,8 @@ jobs:
                 name: Build libp2p_helper
                 command: GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
-                  name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
+                  name: Running test -- test_postake_split_medium_curves:mina-shared-prefix-multiproducer-test -num-block-producers 2
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_medium_curves:mina-shared-prefix-multiproducer-test -num-block-producers 2"'
             - store_artifacts:
                   path: test_output/artifacts
 
@@ -1211,31 +1211,31 @@ workflows:
             - test--test_postake_split
             - test--test_postake_three_producers
             - build-binaries--dev
-            - test--dev--coda-bootstrap-test:
+            - test--dev--mina-bootstrap-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-shared-state-test:
+            - test--dev--mina-shared-state-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-peers-test:
+            - test--dev--mina-peers-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-transitive-peers-test:
+            - test--dev--mina-transitive-peers-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-block-production-test:
+            - test--dev--mina-block-production-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-shared-prefix-test_-who-produces_0:
+            - test--dev--mina-shared-prefix-test_-who-produces_0:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-shared-prefix-test_-who-produces_1:
+            - test--dev--mina-shared-prefix-test_-who-produces_1:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-change-snark-worker-test:
+            - test--dev--mina-change-snark-worker-test:
                 requires:
                   - build-binaries--dev
-            - test--dev--coda-delegation-test:
+            - test--dev--mina-delegation-test:
                 requires:
                   - build-binaries--dev
 
