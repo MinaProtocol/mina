@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/libp2p/go-libp2p-pubsub"
@@ -864,7 +865,7 @@ func TestGetPeerMessage(t *testing.T) {
 		codanet.NoDHT = false
 	}()
 
-	// only allow peer count of 1 for node A
+	// only allow peer count of 2 for node A
 	maxCount := 2
 	appA := newTestAppWithMaxConns(t, nil, maxCount)
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -911,4 +912,34 @@ func TestGetPeerMessage(t *testing.T) {
 
 	time.Sleep(time.Second)
 	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
+}
+
+func TestGetTelemetry(t *testing.T) {
+	codanet.NoDHT = true
+	defer func() {
+		codanet.NoDHT = false
+	}()
+
+	// only allow peer count of 1 for node A
+	maxCount := 1
+	appA := newTestAppWithMaxConns(t, nil, maxCount)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+	appA.P2p.TelemetryData = "testdata"
+
+	appB := newTestApp(t, nil)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	appC := newTestApp(t, nil)
+	appC.P2p.Host.Peerstore().AddAddrs(appA.P2p.Host.ID(), appAInfos[0].Addrs, peerstore.ConnectedAddrTTL)
+
+	// ensure we can receive data before being disconnected
+	msg := &getPeerTelemetryDataMsg{
+		PeerID: string(appA.P2p.Host.ID()),
+	}
+
+	ret, err := msg.run(appC)
+	require.NoError(t, err)
+	require.Equal(t, ret, appA.P2p.TelemetryData)
 }

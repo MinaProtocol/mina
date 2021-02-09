@@ -67,6 +67,7 @@ var (
 	}
 
 	pxProtocolID = protocol.ID("/mina/peer-exchange")
+	TelemetryProtocolID = protocol.ID("/mina/telemetry")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -171,7 +172,11 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
 	defer func() {
-		_ = c.Close()
+		go func() {
+			// small delay to allow for remote peer to read from stream
+			time.Sleep(time.Millisecond * 400)
+			_ = c.Close()	
+		}()
 	}()
 
 	// select random subset of our peers to send over, then disconnect
@@ -203,9 +208,6 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	}
 
 	logger.Debugf("wrote peers to stream %s", stream.Protocol())
-
-	// small delay to allow for remote peer to read from stream
-	time.Sleep(time.Millisecond * 400)
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
@@ -233,6 +235,7 @@ type Helper struct {
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	Seeds             []peer.AddrInfo
+	TelemetryData     string
 }
 
 // this type implements the ConnectionGating interface
@@ -514,6 +517,28 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	}
 }
 
+func (h *Helper) handleTelemetryStreams(s network.Stream) {
+	defer func() {
+		_ = s.Close()
+	}()
+	bz, err := json.Marshal(h.TelemetryData)
+	if err != nil {
+		logger.Error("failed to marshal peers", err)
+		return
+	}
+
+	n, err := s.Write(bz)
+	if err != nil {
+		logger.Error("failed to write to stream", err)
+		return
+	} else if n != len(bz) {
+		logger.Error("failed to write all data to stream")
+		return
+	}
+
+	logger.Debugf("wrote telemetry data to stream %s", s.Protocol())
+}
+
 // MakeHelper does all the initialization to run one host
 func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
@@ -619,5 +644,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	connManager.ctx = ctx
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
+	h.Host.SetStreamHandler(TelemetryProtocolID, h.handleTelemetryStreams)
 	return h, nil
 }
