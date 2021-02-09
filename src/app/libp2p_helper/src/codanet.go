@@ -188,16 +188,16 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	stream, err := cm.host.NewStream(cm.ctx, c.RemotePeer(), pxProtocolID)
 	if err != nil {
-		logger.Error("failed to open stream", err)
+		logger.Debug("failed to open stream", err)
 		return
 	}
 
 	n, err := stream.Write(bz)
 	if err != nil {
-		logger.Error("failed to write to stream", err)
+		logger.Debug("failed to write to stream", err)
 		return
 	} else if n != len(bz) {
-		logger.Error("failed to write all data to stream")
+		logger.Debug("failed to write all data to stream")
 		return
 	}
 
@@ -470,7 +470,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 
 	stat := s.Conn().Stat()
 	if stat.Direction != network.DirOutbound {
-	 	return
+		return
 	}
 
 	connInfo := h.ConnectionManager.GetInfo()
@@ -481,7 +481,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	buf := make([]byte, 8192)
 	_, err := s.Read(buf)
 	if err != nil && err != io.EOF {
-		logger.Errorf("failed to decode list of peers err=%s", err)
+		logger.Debugf("failed to decode list of peers err=%s", err)
 		return
 	}
 
@@ -490,7 +490,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	dec := json.NewDecoder(r)
 	err = dec.Decode(&peers)
 	if err != nil {
-		logger.Errorf("failed to decode list of peers err=%s", err)
+		logger.Debugf("failed to decode list of peers err=%s", err)
 		return
 	}
 
@@ -500,7 +500,7 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 			if connInfo.ConnCount < connInfo.LowWater {
 				err = h.Host.Connect(h.Ctx, p)
 				if err != nil {
-					logger.Errorf("failed to connect to peer %v err=%s", p, err)
+					logger.Debugf("failed to connect to peer %v err=%s", p, err)
 				} else {
 					logger.Debugf("connected to peer! %v", p)
 				}
