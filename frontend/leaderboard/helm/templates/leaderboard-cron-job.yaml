@@ -20,6 +20,8 @@ spec:
               env:
                 - name: PGCONN
                   value: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.postgresql.postgresHost }}:{{ .Values.postgresql.postgresPort }}/{{ .Values.postgresql.postgresDB }}
+                - name: SPREADSHEET_ID
+                  value: {{ .Values.googleSheets.spreadsheetId }}
               volumeMounts:
                 - name: {{ .Values.volume.name }}
                   mountPath: {{ .Values.volume.mountPath }}
