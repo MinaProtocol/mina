@@ -228,6 +228,13 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                ~rejected_blocks_logger ~time_received duplicate_checker logger
                transition_with_hash ;
              let sender = Envelope.Incoming.sender transition_env in
+             let blockchain_length =
+               External_transition.consensus_state transition_with_hash.data
+               |> Consensus.Data.Consensus_state.blockchain_length
+               |> Mina_numbers.Length.to_int
+             in
+             Mina_metrics.Transition_frontier
+             .update_max_unvalidated_blocklength_observed blockchain_length ;
              let computation =
                let open Interruptible.Let_syntax in
                let defer f x =
@@ -259,12 +266,6 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                      valid_cb ;
                    Envelope.Incoming.wrap ~data:verified_transition ~sender
                    |> Writer.write valid_transition_writer ;
-                   let blockchain_length =
-                     External_transition.Initial_validated.consensus_state
-                       verified_transition
-                     |> Consensus.Data.Consensus_state.blockchain_length
-                     |> Mina_numbers.Length.to_int
-                   in
                    Mina_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;
                    return ()

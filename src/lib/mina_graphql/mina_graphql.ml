@@ -336,7 +336,8 @@ module Types = struct
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
-               ~highest_block_length_received:nn_int )
+               ~highest_block_length_received:nn_int
+               ~highest_unvalidated_block_length_received:nn_int )
   end
 
   let fee_transfer =

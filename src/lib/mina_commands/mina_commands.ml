@@ -355,6 +355,8 @@ let get_status ~flag t =
   ; highest_block_length_received=
       (*if this function is not called until after catchup max_block_height will be 1 and most_recent_valid_transition pipe might have the genesis block as the latest transition in which case return the best tip length*)
       max (Option.value ~default:1 blockchain_length) !max_block_height
+  ; highest_unvalidated_block_length_received=
+      !Mina_metrics.Transition_frontier.max_unvalidated_blocklength_observed
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
