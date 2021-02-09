@@ -20,7 +20,7 @@ let codaCommand = (~port, ~extraArgs) => {
   let path = Js.Dict.get(env, "PATH") |> Option.with_default(~default="");
   let installPath = getPath("userData") ++ del ++ "coda";
   // NOTE: This is a workaround for keys that's very specific to unix based systems
-  let keysPath = "/usr/local/var/coda/keys";
+  let keysPath = "/usr/local/var/mina/keys";
   Js.Dict.set(env, "PATH", path ++ del ++ installPath);
   Js.Dict.set(env, "MINA_LIBP2P_HELPER_PATH", installPath ++ del ++ "libp2p-helper");
   {

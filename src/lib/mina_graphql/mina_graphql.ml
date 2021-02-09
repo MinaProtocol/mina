@@ -810,7 +810,7 @@ module Types = struct
                  ~resolve:(fun _ {account; _} -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
-                 ~doc:"The amount of coda owned by the account"
+                 ~doc:"The amount of mina owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} -> account.Account.Poly.balance)
              ; field "nonce" ~typ:string

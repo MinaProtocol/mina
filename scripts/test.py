@@ -29,24 +29,24 @@ simple_tests = [
 ]
 
 compile_config_agnostic_tests = [
-    'coda-bootstrap-test',
-    'coda-shared-state-test',
-    'coda-peers-test',
-    'coda-transitive-peers-test',
-    'coda-block-production-test',
-    'coda-shared-prefix-test -who-produces 0',
-    'coda-shared-prefix-test -who-produces 1',
-    'coda-change-snark-worker-test',
-    'coda-delegation-test',
+    'mina-bootstrap-test',
+    'mina-shared-state-test',
+    'mina-peers-test',
+    'mina-transitive-peers-test',
+    'mina-block-production-test',
+    'mina-shared-prefix-test -who-produces 0',
+    'mina-shared-prefix-test -who-produces 1',
+    'mina-change-snark-worker-test',
+    'mina-delegation-test',
 ]
 
 compile_config_agnostic_profiles = ['dev']
 
 required_config_agnostic_tests = {
     'dev': [
-        'coda-bootstrap-test',
-        'coda-shared-state-test',
-        'coda-delegation-test',
+        'mina-bootstrap-test',
+        'mina-shared-state-test',
+        'mina-delegation-test',
     ]
 }
 
@@ -55,13 +55,13 @@ small_curves_tests = {
     'test_postake_snarkless':
     simple_tests,
     'test_postake_split':
-    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
+    ['mina-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     [],  # TODO imeckler: Change back to "simple_tests" when PLONK lands
-    'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
+    'test_postake_catchup': ['mina-restart-node-test'],
+    'test_postake_three_producers': ['mina-txns-and-restart-non-producers'],
     'test_postake_five_even_txns':
-    ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
+    ['mina-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
 
 medium_curves_and_other_tests = {
@@ -70,12 +70,12 @@ medium_curves_and_other_tests = {
     'test_postake_snarkless_medium_curves':
     simple_tests,
     'test_postake_split_medium_curves':
-    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
+    ['mina-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake_full_epoch': ['full-test'],
 }
 
 archive_processor_test = {
-    'test_archive_processor': ['coda-archive-processor-test'],
+    'test_archive_processor': ['mina-archive-processor-test'],
 }
 
 medium_curve_profiles_full = [

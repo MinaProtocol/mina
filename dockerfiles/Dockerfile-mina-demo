@@ -34,9 +34,9 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/ap
   && mkdir -p ~/.mina-config/wallets/store \
   && echo 'B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g' >  ~/.mina-config/wallets/store/B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g.pub \
   && cp /root/keys/demo-block-producer ~/.mina-config/wallets/store/B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g \
-  && rm /var/lib/coda/genesis* \
+  && rm /var/lib/mina/genesis* \
   && echo '{"ledger":{"accounts":[{"pk":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","balance":"66000","sk":null,"delegate":null}]}}' > /config.json \
-  && coda-create-genesis --genesis-dir /var/lib/coda --config-file /config.json
+  && coda-create-genesis --genesis-dir /var/lib/mina --config-file /config.json
 
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/run-demo.sh"]

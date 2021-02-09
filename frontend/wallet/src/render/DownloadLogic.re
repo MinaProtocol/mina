@@ -141,8 +141,8 @@ let extractZip = (src, dest, doneCb) => {
 };
 
 let installCoda = (tempPath, doneCb) => {
-  let installPath = getPath("userData") ++ "/coda";
-  let keysPath = "/usr/local/var/coda/keys/";
+  let installPath = getPath("userData") ++ "/mina";
+  let keysPath = "/usr/local/var/mina/keys/";
   let rec moveKeys = files =>
     switch (files) {
     | [] => ()
@@ -166,7 +166,7 @@ let installCoda = (tempPath, doneCb) => {
 };
 
 let downloadCoda = (version, chunkCb, doneCb) => {
-  let filename = "coda-daemon-" ++ version ++ ".zip";
+  let filename = "mina-daemon-" ++ version ++ ".zip";
   let tempPath = getPath("temp") ++ "/" ++ filename;
   download(tempPath, codaRepo ++ filename, "binary", 1, chunkCb, res =>
     switch (res) {
