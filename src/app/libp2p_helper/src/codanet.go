@@ -465,53 +465,49 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
-	fromSeed := false
-
-	for _, seed := range h.Seeds {
-		if s.Conn().RemotePeer() == seed.ID {
-			fromSeed = true
-			break
-		}
-	}
-
-	if !fromSeed {
-		logger.Debugf("ignoring peer-exchange stream from non-seed peer=%s", s.Conn().RemotePeer())
+	connInfo := h.ConnectionManager.GetInfo()
+	if connInfo.ConnCount >= connInfo.LowWater {
 		_ = s.Close()
 		return
 	}
 
-	for {
-		dec := json.NewDecoder(s)
-		peers := []peer.AddrInfo{}
-		err := dec.Decode(&peers)
-		if err != nil && err == io.EOF {
-			continue
-		} else if err != nil && err.Error() == "stream reset" {
-			_ = s.Close()
-			return
-		} else if err != nil {
-			logger.Errorf("failed to decode list of peers err=%s", err)
-			continue
-		}
-
-		for _, peer := range peers {
-			go func() {
-				connInfo := h.ConnectionManager.GetInfo()
-				if connInfo.ConnCount < connInfo.LowWater {
-					err = h.Host.Connect(h.Ctx, peer)
-					if err != nil {
-						logger.Errorf("failed to connect to peer err=%s", err)
-					} else {
-						logger.Debugf("connected to peer! %s", peer)
-					}
-				} else {
-					h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
-				}
-			}()
-		}
-
+	buf := make([]byte, 8192)
+	_, err := s.Read(buf)
+	if err != nil && err != io.EOF {
+		logger.Errorf("failed to decode list of peers err=%s", err)
 		_ = s.Close()
+		return
 	}
+
+	r := bytes.NewReader(buf)
+	peers := []peer.AddrInfo{}
+	dec := json.NewDecoder(r)
+	err = dec.Decode(&peers)
+	if err != nil {
+		logger.Errorf("failed to decode list of peers err=%s", err)
+		_ = s.Close()
+		return
+	}
+
+	for _, peerp := range peers {
+		var peer peer.AddrInfo
+		peer = peerp
+		go func() {
+			connInfo := h.ConnectionManager.GetInfo()
+			if connInfo.ConnCount < connInfo.LowWater {
+				err = h.Host.Connect(h.Ctx, peer)
+				if err != nil {
+					logger.Errorf("failed to connect to peer %v err=%s", peer, err)
+				} else {
+					logger.Debugf("connected to peer! %v", peer)
+				}
+			} else {
+				h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
+			}
+		}()
+	}
+
+	_ = s.Close()
 }
 
 // MakeHelper does all the initialization to run one host
