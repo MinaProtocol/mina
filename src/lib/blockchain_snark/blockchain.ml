@@ -29,12 +29,5 @@ include Allocation_functor.Make.Versioned_v1.Full (Raw_versioned__)
 [%%define_locally
 Raw_versioned__.(state, proof)]
 
-include (
-  Stable.Latest :
-    sig
-      type t [@@deriving sexp, yojson]
-    end
-    with type t := t )
-
 [%%define_locally
-Stable.Latest.(create)]
+Stable.Latest.(create, t_of_sexp, sexp_of_t, to_yojson, of_yojson)]

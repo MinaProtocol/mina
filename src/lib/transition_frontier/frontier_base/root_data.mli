@@ -34,6 +34,9 @@ module Limited : sig
     end
   end]
 
+  (* not generated automatically, for some reason *)
+  val to_yojson : t -> Yojson.Safe.t
+
   val transition : t -> External_transition.Validated.t
 
   val hash : t -> State_hash.t
