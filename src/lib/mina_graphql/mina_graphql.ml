@@ -207,11 +207,20 @@ module Types = struct
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
+  let consensus_time_with_global_slot_since_genesis =
+    obj "ConsensusTimeGlobalSlot"
+      ~doc:"Consensus time and the corresponding global slot since genesis"
+      ~fields:(fun _ ->
+        [ field "consensusTime" ~typ:(non_null consensus_time)
+            ~args:Arg.[]
+            ~resolve:(fun _ (time, _) -> time)
+        ; field "globalSlotSinceGenesis"
+            ~args:Arg.[]
+            ~typ:(non_null uint32)
+            ~resolve:(fun _ (_, slot) -> slot) ] )
+
   let block_producer_timing :
-      ( _
-      , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
-        option )
-      typ =
+      (_, Daemon_rpcs.Types.Status.Next_producer_timing.t option) typ =
     obj "BlockProducerTimings" ~fields:(fun _ ->
         let of_time ~consensus_constants =
           Consensus.Data.Consensus_time.of_time_exn
@@ -219,20 +228,52 @@ module Types = struct
         in
         [ field "times"
             ~typ:(non_null @@ list @@ non_null consensus_time)
+            ~doc:"Next block production time"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} ->
+            ~resolve:
+              (fun {ctx= coda; _}
+                   {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
               let consensus_constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              function
-              | `Check_again _time ->
+              match timing with
+              | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
-              | `Produce time ->
-                  [of_time time ~consensus_constants]
-              | `Produce_now ->
-                  [ of_time ~consensus_constants
-                    @@ Block_time.now (Mina_lib.config coda).time_controller ]
-              ) ] )
+              | Produce info ->
+                  [of_time info.time ~consensus_constants]
+              | Produce_now info ->
+                  [of_time ~consensus_constants info.time] )
+        ; field "globalSlotSinceGenesis"
+            ~typ:(non_null @@ list @@ non_null uint32)
+            ~doc:"Next block production global-slot-since-genesis "
+            ~args:Arg.[]
+            ~resolve:
+              (fun _ {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
+              match timing with
+              | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Produce info ->
+                  [info.for_slot.global_slot_since_genesis]
+              | Produce_now info ->
+                  [info.for_slot.global_slot_since_genesis] )
+        ; field "generatedFromConsensusAt"
+            ~typ:(non_null consensus_time_with_global_slot_since_genesis)
+            ~doc:
+              "Consensus time of the block that was used to determine the \
+               next block production time"
+            ~args:Arg.[]
+            ~resolve:
+              (fun {ctx= coda; _}
+                   { Daemon_rpcs.Types.Status.Next_producer_timing
+                     .generated_from_consensus_at=
+                       {slot; global_slot_since_genesis}
+                   ; _ } ->
+              let consensus_constants =
+                (Mina_lib.config coda).precomputed_values.consensus_constants
+              in
+              ( Consensus.Data.Consensus_time.of_global_slot
+                  ~constants:consensus_constants slot
+              , global_slot_since_genesis ) ) ] )
 
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
