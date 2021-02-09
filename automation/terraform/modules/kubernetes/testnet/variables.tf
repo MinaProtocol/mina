@@ -286,7 +286,7 @@ variable "archive_configs" {
       remoteSchemaFile = string
       postgresUri = string
       enableLocalDaemon = bool
-      enablePostgresDb = bool
+      enablePostgresDB = bool
     })
   )
   default = []

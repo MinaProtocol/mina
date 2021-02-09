@@ -147,8 +147,8 @@ locals {
           serverPort          = "3086"
           externalPort        = "11010"
           enableLocalDaemon   = true
-          enablePostgresDb    = true
-          postgresHost        = "archive-1"
+          enablePostgresDB    = true
+          postgresHost        = "archive-1-postgresql"
           postgresPort        = 5432
           postgresDB          = "archive"
           postgresqlUsername  = "postgres"
@@ -159,13 +159,13 @@ locals {
       ],
       # in addition to stand-alone servers up to input count
       [
-        for index in range(1, var.archive_node_count): {
+        for index in range(2, var.archive_node_count + 1): {
           name                = "archive-${index}"
           serverPort          = "3086"
           externalPort        = "11010"
           enableLocalDaemon   = false
-          enablePostgresDb    = false
-          postgresHost        = "archive-1"
+          enablePostgresDB    = false
+          postgresHost        = "archive-1-postgresql"
           postgresPort        = 5432
           postgresDB          = "archive"
           postgresqlUsername  = "postgres"
@@ -334,7 +334,7 @@ resource "helm_release" "archive_node" {
           postgres        = local.archive_node_vars.node_configs[count.index].postgresPort
         }
         enableLocalDaemon = local.archive_node_vars.node_configs[count.index].enableLocalDaemon
-        enablePostgresDb  = local.archive_node_vars.node_configs[count.index].enablePostgresDb
+        enablePostgresDB  = local.archive_node_vars.node_configs[count.index].enablePostgresDB
       }
       postgresql = local.archive_node_vars.postgres
     })

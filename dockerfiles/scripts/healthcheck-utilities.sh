@@ -122,6 +122,7 @@ function isArchiveSynced() {
         --db-port) port="$2"; shift;;
         --db-user) user="$2"; shift;;
         --db-password) password="$2"; shift;;
+        --daemon-address) daemon_addr="$2"; shift;;
         *) echo "Unknown parameter passed: $1"; exit 1;;
     esac; shift; done
 
@@ -130,7 +131,7 @@ function isArchiveSynced() {
             -w -c "SELECT height FROM blocks ORDER BY height DESC LIMIT 1"
     )
     highestReceived=$(
-        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' localhost:3085/graphql | \
+        curl --silent --show-error --header "Content-Type:application/json" -d'{ "query": "query { daemonStatus { highestBlockLengthReceived } }" }' ${daemon_addr:-'localhost:3085'}/graphql | \
             jq '.data.daemonStatus.highestBlockLengthReceived'
     )
     

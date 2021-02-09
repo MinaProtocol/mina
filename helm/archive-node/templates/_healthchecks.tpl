@@ -28,7 +28,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isArchiveSynced --db-host {{ template "archive-node.fullname" . }}-postgresql"
+      "source /healthcheck/utilities.sh && isArchiveSynced --db-host {{ tpl .Values.archive.postgresHost . }}"
     ]
 {{- include "healthcheck.common.settings" .Values | indent 2 }}
 {{- end }}
