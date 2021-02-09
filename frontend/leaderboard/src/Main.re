@@ -22,15 +22,13 @@ Node.Process.putEnvVar(
 );
 
 let spreadsheetId = getEnvOrFail("SPREADSHEET_ID");
-let pgConnectionCurr = getEnvOrFail("PGCONN1");
-let pgConnectionPrev = getEnvOrFail("PGCONN2");
+let pgConnection = getEnvOrFail("PGCONN");
 
 let main = () => {
   open Js.Promise;
-  let pool = Postgres.createPool(pgConnectionCurr);
-  let poolOld = Postgres.createPool(pgConnectionPrev);
+  let pool = Postgres.createPool(pgConnection);
 
-  Metrics.calculateMetricsAndUploadPoints(pool, poolOld, spreadsheetId)
+  Metrics.calculateMetricsAndUploadPoints(pool, spreadsheetId)
   |> then_(_ => {
        Postgres.makeQuery(pool, Postgres.getBlockHeight)
        |> then_(blockHeight => {
@@ -47,7 +45,6 @@ let main = () => {
           })
        |> then_(_ => {
             Postgres.endPool(pool);
-            Postgres.endPool(poolOld);
             resolve();
           })
        |> ignore;

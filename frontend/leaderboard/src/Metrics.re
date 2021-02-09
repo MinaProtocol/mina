@@ -162,7 +162,7 @@ let calculateMetrics =
      );
 };
 
-let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
+let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
   open Js.Promise;
   let users =
     Postgres.makeQuery(pgPool, Postgres.getUsers)
@@ -187,30 +187,10 @@ let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
     )
     |> filterNonePromises;
 
-  let blocksChallengeOld =
-    getPromisifiedChallenge(
-      users,
-      pgPoolOld,
-      Postgres.getBlocksChallenge,
-      0,
-      "count",
-    )
-    |> filterNonePromises;
-
   let snarkFeeChallenge =
     getPromisifiedChallenge(
       users,
       pgPool,
-      Postgres.getSnarkFeeChallenge,
-      0,
-      "sum",
-    )
-    |> filterNonePromises;
-
-  let snarkFeeChallengeOld =
-    getPromisifiedChallenge(
-      users,
-      pgPoolOld,
       Postgres.getSnarkFeeChallenge,
       0,
       "sum",
@@ -227,24 +207,7 @@ let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
     )
     |> filterNonePromises;
 
-  let transactionSentChallengeOld =
-    getPromisifiedChallenge(
-      users,
-      pgPoolOld,
-      Postgres.getTransactionsSentChallenge,
-      0,
-      "max",
-    )
-    |> filterNonePromises;
-
-  [|
-    blocksChallenge,
-    snarkFeeChallenge,
-    transactionSentChallenge,
-    blocksChallengeOld,
-    snarkFeeChallengeOld,
-    transactionSentChallengeOld,
-  |]
+  [|blocksChallenge, snarkFeeChallenge, transactionSentChallenge|]
   |> all
   |> then_(result => {
        result
@@ -252,20 +215,16 @@ let calculateMetricsAndUploadPoints = (pgPool, pgPoolOld, spreadsheetId) => {
        |> then_(result => {
             users
             |> then_(users => {
-                 let blocksChallenge = result[0];
-                 let snarkFeeChallenge = result[1];
-                 let transactionChallenge = result[2];
-
-                 let blocksChallengeOld = result[3];
-                 let snarkFeeChallengeOld = result[4];
-                 let transactionChallengeOld = result[5];
+                 let blocksMetrics = result[0];
+                 let snarkFeeMetrics = result[1];
+                 let transactionMetrics = result[2];
 
                  let blocksChallenge =
-                   mergeIntMap(blocksChallenge, blocksChallengeOld);
-                 let transactionChallenge =
-                   mergeIntMap(transactionChallenge, transactionChallengeOld);
+                   convertDBRowsToMap(blocksMetrics, int_of_string);
                  let snarkFeeChallenge =
-                   mergeInt64Map(snarkFeeChallenge, snarkFeeChallengeOld);
+                   convertDBRowsToMap(snarkFeeMetrics, Int64.of_string);
+                 let transactionChallenge =
+                   convertDBRowsToMap(transactionMetrics, int_of_string);
 
                  Js.log("Computing Metrics - In Progress");
 
