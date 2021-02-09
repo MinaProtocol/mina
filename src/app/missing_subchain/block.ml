@@ -170,11 +170,13 @@ let payload_of_user_cmd user_cmd =
 
 let status_of_user_cmd (user_cmd : Extensional.User_command.t) =
   let open Transaction_status in
-  (* TODO: use actual balance data instead of dummy value *)
+  let balance_data =
+    { Balance_data.fee_payer_balance= Some user_cmd.fee_payer_balance
+    ; source_balance= user_cmd.source_balance
+    ; receiver_balance= user_cmd.receiver_balance }
+  in
   match user_cmd.status with
-  | None ->
-      None
-  | Some "applied" ->
+  | "applied" ->
       Some
         (Applied
            ( { fee_payer_account_creation_fee_paid=
@@ -182,14 +184,14 @@ let status_of_user_cmd (user_cmd : Extensional.User_command.t) =
              ; receiver_account_creation_fee_paid=
                  user_cmd.receiver_account_creation_fee_paid
              ; created_token= user_cmd.created_token }
-           , Balance_data.empty ))
-  | Some "failed" -> (
+           , balance_data ))
+  | "failed" -> (
     match user_cmd.failure_reason with
     | Some reason ->
-        Some (Failed (reason, Balance_data.empty))
+        Some (Failed (reason, balance_data))
     | None ->
         failwith "Failed user command status, no reason given" )
-  | Some s ->
+  | s ->
       failwithf "Unexpected user command status \"%s\"" s ()
 
 let signed_cmd_with_status_of_user_cmd (user_cmd : Extensional.User_command.t)

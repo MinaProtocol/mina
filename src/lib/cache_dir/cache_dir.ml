@@ -56,7 +56,13 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
                ; ("local_file_path", `String file_path) ] ;
            let%map _result =
              Process.run_exn ~prog:"curl"
-               ~args:["--fail"; "-o"; file_path; uri_string]
+               ~args:
+                 [ "--fail"
+                 ; "--silent"
+                 ; "--show-error"
+                 ; "-o"
+                 ; file_path
+                 ; uri_string ]
                ()
            in
            [%log trace] "Download finished"

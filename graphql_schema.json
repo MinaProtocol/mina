@@ -3003,6 +3003,16 @@
               "description": "Connect to the given peers",
               "args": [
                 {
+                  "name": "seed",
+                  "description": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "peers",
                   "description": null,
                   "type": {
@@ -6583,6 +6593,77 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "AccountTiming",
+          "description": null,
+          "fields": [
+            {
+              "name": "initial_mininum_balance",
+              "description": "The initial minimum balance for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_time",
+              "description": "The cliff time for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_amount",
+              "description": "The cliff amount for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_period",
+              "description": "The vesting period for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_increment",
+              "description": "The vesting increment for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "TokenId",
           "description": "String representation of a token's UInt64 identifier",
@@ -6633,6 +6714,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "timing",
+              "description": "The timing associated with this account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountTiming",
                   "ofType": null
                 }
               },
