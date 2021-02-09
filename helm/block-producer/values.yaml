@@ -45,7 +45,7 @@ blockProducerConfigs:
   enableGossipFlooding: false
   enablePeerExchange: false
   enableArchive: true
-  archiveAddress: archive-1-postgresql:3086
+  archiveAddress: archive-1:3086
   libp2pSecret: "libp2pYolo"
 - name: "test-2"
   runWithUserAgent: true
@@ -64,7 +64,7 @@ blockProducerConfigs:
   enableGossipFlooding: false
   enablePeerExchange: false
   enableArchive: true
-  archiveAddress: archive-1-postgresql:3086
+  archiveAddress: archive-1:3086
   libp2pSecret: "libp2pYolo"
 - name: "test-4"
   runWithUserAgent: true

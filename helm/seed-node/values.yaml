@@ -11,8 +11,7 @@ coda:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
-  enableArchive: true
-  archiveAddress: archive-1-postgresql:3086
+  enableArchive: false
 
 seed:
   active: true
