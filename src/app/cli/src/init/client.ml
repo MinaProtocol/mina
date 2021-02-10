@@ -866,41 +866,52 @@ let handle_dump_ledger_response ~json = function
         printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts
 
-let dump_ledger =
-  let sl_hash_flag =
+let export_ledger =
+  let state_hash_flag =
     Command.Param.(
       flag "--state-hash" ~aliases:["state-hash"]
-        ~doc:"STATE-HASH State hash (default: best state hash)"
+        ~doc:
+          "STATE-HASH State hash, if printing the current staged ledger \
+           (default: state hash for the best tip)"
         (optional string))
   in
-  let plaintext_flag = Cli_lib.Flag.plaintext in
-  let flags = Args.zip2 sl_hash_flag plaintext_flag in
-  Command.async
-    ~summary:
-      "Print the staged ledger from the block with the given state hash \
-       (default: staged ledger at the best tip)"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, plaintext) ->
-         (* TODO: allow input in Base58Check format: issue #3036 *)
-         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
-         >>| handle_dump_ledger_response ~json:(not plaintext) ))
-
-let dump_staking_ledger =
-  let which =
+  let ledger_kind =
     let t =
       Command.Param.Arg_type.of_alist_exn
-        [("current", Daemon_rpcs.Get_staking_ledger.Current); ("next", Next)]
+        (List.map
+           [ "current-staged-ledger"
+           ; "staking-epoch-ledger"
+           ; "next-epoch-ledger" ] ~f:(fun s -> (s, s)))
     in
-    Command.Param.(anon ("current|next" %: t))
+    Command.Param.(
+      anon ("current-staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
   in
-  Command.async ~summary:"Print either the staking or next epoch ledger"
-    (Cli_lib.Background_daemon.rpc_init
-       (Args.zip2 which Cli_lib.Flag.plaintext)
-       ~f:(fun port (which, plaintext) ->
-         (* TODO: allow input in Base58Check format: issue #3036 *)
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
-           port
-         >>| handle_dump_ledger_response ~json:(not plaintext) ))
+  let plaintext_flag = Cli_lib.Flag.plaintext in
+  let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
+  Command.async
+    ~summary:
+      "Print the specified ledger (default: staged ledger at the best tip)"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (x, plaintext, ledger_kind) ->
+         let response =
+           match ledger_kind with
+           | "current-staged-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn x
+               in
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+                 state_hash port
+           | "staking-epoch-ledger" ->
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
+                 Daemon_rpcs.Get_staking_ledger.Current port
+           | "next-epoch-ledger" ->
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
+                 Daemon_rpcs.Get_staking_ledger.Next port
+           | s ->
+               (* unreachable *)
+               failwithf "Unknown ledger kind: %s" s ()
+         in
+         response >>| handle_dump_ledger_response ~json:(not plaintext) ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1987,5 +1998,4 @@ let advanced =
     ; ("archive-blocks", archive_blocks) ]
 
 let ledger =
-  Command.group ~summary:"Ledger commands"
-    [("dump-ledger", dump_ledger); ("dump-staking-ledger", dump_staking_ledger)]
+  Command.group ~summary:"Ledger commands" [("export", export_ledger)]
