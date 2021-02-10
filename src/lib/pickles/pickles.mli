@@ -67,7 +67,7 @@ module Proof : sig
   val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
-    type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson]
+    type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson, hash]
   end
 
   module Branching_2 : sig

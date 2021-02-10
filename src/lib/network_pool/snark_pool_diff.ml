@@ -28,7 +28,7 @@ module Make
   type t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson]
+  [@@deriving compare, sexp, to_yojson, hash]
 
   type verified = t [@@deriving compare, sexp, to_yojson]
 
@@ -40,7 +40,7 @@ module Make
     { work: Work.t
     ; fee: Currency.Fee.t
     ; prover: Signature_lib.Public_key.Compressed.t }
-  [@@deriving yojson]
+  [@@deriving yojson, hash]
 
   let to_compact = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
