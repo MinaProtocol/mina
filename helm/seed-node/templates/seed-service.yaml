@@ -4,7 +4,12 @@ kind: Service
 metadata:
   name: {{ tpl .Values.seed.fullname . }}
 spec:
+  {{- if .Values.seed.externalIp }}
+  type: LoadBalancer
+  loadBalancerIP: {{ .Values.seed.externalIp }}
+  {{- else }}
   type: ClusterIP
+  {{- end }}
   # We want all pods to have their addresses published for the sake of the
   # other testnet pods even before they're ready, since they
   # have to be able to talk to each other in order to become ready.

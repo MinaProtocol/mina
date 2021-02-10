@@ -21,6 +21,13 @@ data "local_file" "libp2p_peers" {
   ]
 }
 
+# reserve gcloud external IP address for public seed access
+resource "google_compute_address" "seed_static_ip" {
+  name         = "seed-static-ip"
+  address_type = "EXTERNAL"
+  region       = var.cluster_region
+}
+
 locals {
   use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
@@ -71,9 +78,10 @@ locals {
         p2p     = var.seed_port
       }
     }
-    seed        = {
+    seed  = {
       active = true
       discovery_keypair = var.seed_discovery_keypairs[0]
+      externalIp = google_compute_address.seed_static_ip.address
     }
   }
 
