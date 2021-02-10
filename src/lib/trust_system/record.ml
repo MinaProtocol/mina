@@ -47,6 +47,7 @@ end) : S = struct
     let elapsed_time =
       if elap >= Time.Span.zero then elap else Time.Span.zero
     in
+    (* ntpd or a user may have reset the system time, yielding a negative elapsed time.  in that case, clamp the elapsed time to zero*)
     let new_trust = (decay_rate ** Time.Span.to_sec elapsed_time) *. trust in
     { trust= new_trust
     ; trust_last_updated= now
