@@ -106,7 +106,8 @@ type t =
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t
-  ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
+  ; mutable next_producer_timing:
+      Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
   ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref
@@ -871,18 +872,58 @@ let perform_compaction t =
       perform interval_configured
 
 let start t =
-  let set_next_producer_timing timing =
-    let block_production_status =
-      match timing with
-      | `Check_again _ ->
-          `Free
-      | `Produce_now _ ->
-          `Producing
-      | `Produce (time, _, _) ->
-          `Producing_in_ms (Int64.to_float time)
+  let set_next_producer_timing timing consensus_state =
+    let block_production_status, next_producer_timing =
+      let generated_from_consensus_at :
+          Daemon_rpcs.Types.Status.Next_producer_timing.slot =
+        { slot= Consensus.Data.Consensus_state.curr_global_slot consensus_state
+        ; global_slot_since_genesis=
+            Consensus.Data.Consensus_state.global_slot_since_genesis
+              consensus_state }
+      in
+      let info time (data : Consensus.Data.Block_data.t) :
+          Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
+        let for_slot : Daemon_rpcs.Types.Status.Next_producer_timing.slot =
+          { slot= Consensus.Data.Block_data.global_slot data
+          ; global_slot_since_genesis=
+              Consensus.Data.Block_data.global_slot_since_genesis data }
+        in
+        {time; for_slot}
+      in
+      let status, timing =
+        match timing with
+        | `Check_again time ->
+            ( `Free
+            , Daemon_rpcs.Types.Status.Next_producer_timing.Check_again
+                ( time |> Block_time.Span.of_ms
+                |> Block_time.of_span_since_epoch ) )
+        | `Produce_now (block_data, _) ->
+            let info :
+                Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
+              let time =
+                Consensus.Data.Consensus_time.of_global_slot
+                  ~constants:t.config.precomputed_values.consensus_constants
+                  (Consensus.Data.Block_data.global_slot block_data)
+                |> Consensus.Data.Consensus_time.to_time
+                     ~constants:t.config.precomputed_values.consensus_constants
+              in
+              info time block_data
+            in
+            (`Producing, Produce_now info)
+        | `Produce (time, block_data, _) ->
+            ( `Producing_in_ms (Int64.to_float time)
+            , Produce
+                (info
+                   ( time |> Block_time.Span.of_ms
+                   |> Block_time.of_span_since_epoch )
+                   block_data) )
+      in
+      ( status
+      , { Daemon_rpcs.Types.Status.Next_producer_timing.timing
+        ; generated_from_consensus_at } )
     in
     t.block_production_status := block_production_status ;
-    t.next_producer_timing <- Some timing
+    t.next_producer_timing <- Some next_producer_timing
   in
   Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_producer_timing ~prover:t.processes.prover

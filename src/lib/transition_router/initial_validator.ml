@@ -210,12 +210,20 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         if Ivar.is_full initialization_finish_signal then
+         if Ivar.is_full initialization_finish_signal then (
            let ( `Transition transition_env
                , `Time_received time_received
                , `Valid_cb valid_cb ) =
              network_transition
            in
+           let blockchain_length =
+             Envelope.Incoming.data transition_env
+             |> External_transition.consensus_state
+             |> Consensus.Data.Consensus_state.blockchain_length
+             |> Mina_numbers.Length.to_int
+           in
+           Mina_metrics.Transition_frontier
+           .update_max_unvalidated_blocklength_observed blockchain_length ;
            if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
              let transition_with_hash =
                Envelope.Incoming.data transition_env
@@ -259,12 +267,6 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                      valid_cb ;
                    Envelope.Incoming.wrap ~data:verified_transition ~sender
                    |> Writer.write valid_transition_writer ;
-                   let blockchain_length =
-                     External_transition.Initial_validated.consensus_state
-                       verified_transition
-                     |> Consensus.Data.Consensus_state.blockchain_length
-                     |> Mina_numbers.Length.to_int
-                   in
                    Mina_metrics.Transition_frontier
                    .update_max_blocklength_observed blockchain_length ;
                    return ()
@@ -278,5 +280,5 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                         ~delta:genesis_constants.protocol.delta error
              in
              Interruptible.force computation >>| ignore )
-           else Deferred.unit
+           else Deferred.unit )
          else Deferred.unit ))
