@@ -3,5 +3,5 @@
  (public_name sync_handler)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_version ppx_jane))
+ (preprocess (pps ppx_mina ppx_version ppx_jane))
  (libraries async_kernel core_kernel mina_intf mina_base transition_frontier syncable_ledger merkle_address consensus best_tip_prover))

@@ -19,4 +19,4 @@
    web_request graphql_lib genesis_ledger_helper)
  (instrumentation (backend bisect_ppx))
  (preprocessor_deps ../../../../config.mlh)
- (preprocess (pps ppx_coda graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocess (pps ppx_mina graphql_ppx ppx_version ppx_jane ppx_deriving_yojson)))

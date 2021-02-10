@@ -873,14 +873,17 @@ let dump_ledger =
         ~doc:"STATE-HASH State hash (default: best state hash)"
         (optional string))
   in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 sl_hash_flag json_flag in
-  Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
+  let plaintext_flag = Cli_lib.Flag.plaintext in
+  let flags = Args.zip2 sl_hash_flag plaintext_flag in
+  Command.async
+    ~summary:
+      "Print the staged ledger from the block with the given state hash \
+       (default: staged ledger at the best tip)"
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, plaintext) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
          let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
-         >>| handle_dump_ledger_response ~json ))
+         >>| handle_dump_ledger_response ~json:(not plaintext) ))
 
 let dump_staking_ledger =
   let which =
@@ -891,12 +894,13 @@ let dump_staking_ledger =
     Command.Param.(anon ("current|next" %: t))
   in
   Command.async ~summary:"Print either the staking or next epoch ledger"
-    (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)
-       ~f:(fun port (which, json) ->
+    (Cli_lib.Background_daemon.rpc_init
+       (Args.zip2 which Cli_lib.Flag.plaintext)
+       ~f:(fun port (which, plaintext) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
            port
-         >>| handle_dump_ledger_response ~json ))
+         >>| handle_dump_ledger_response ~json:(not plaintext) ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1960,8 +1964,6 @@ let advanced =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
-    ; ("dump-ledger", dump_ledger)
-    ; ("dump-staking-ledger", dump_staking_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
@@ -1983,3 +1985,7 @@ let advanced =
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
     ; ("archive-blocks", archive_blocks) ]
+
+let ledger =
+  Command.group ~summary:"Ledger commands"
+    [("dump-ledger", dump_ledger); ("dump-staking-ledger", dump_staking_ledger)]

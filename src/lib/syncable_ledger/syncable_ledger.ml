@@ -26,6 +26,10 @@ module Query = struct
       [@@deriving sexp, yojson, hash, compare]
     end
   end]
+
+  (* not auto-generated, for some reason *)
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson)]
 end
 
 module Answer = struct
@@ -43,6 +47,10 @@ module Answer = struct
       [@@deriving sexp, yojson]
     end
   end]
+
+  (* not auto-generated, for some reason *)
+  [%%define_locally
+  Stable.Latest.(to_yojson, of_yojson)]
 end
 
 module type Inputs_intf = sig
