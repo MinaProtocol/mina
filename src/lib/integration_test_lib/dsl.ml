@@ -45,6 +45,8 @@ module Make (Engine : Intf.Engine.S) () :
     ; event_router: Event_router.t
     ; network_state_reader: Network_state.t Broadcast_pipe.Reader.t }
 
+  let network_state t = Broadcast_pipe.Reader.peek t.network_state_reader
+
   let create ~logger ~network ~event_router ~network_state_reader =
     let t = {logger; network; event_router; network_state_reader} in
     `Don't_call_in_tests t
