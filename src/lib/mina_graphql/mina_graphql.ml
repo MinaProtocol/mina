@@ -3231,3 +3231,7 @@ let schema =
   Graphql_async.Schema.(
     schema Queries.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
+
+let schema_limited =
+  Graphql_async.Schema.(
+    schema Queries.commands ~mutations:[] ~subscriptions:Subscriptions.commands)

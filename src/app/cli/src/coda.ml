@@ -122,6 +122,7 @@ let setup_daemon logger =
   and libp2p_port = Flag.Port.Daemon.external_
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
+  and graphql_port_limited = Flag.Port.Daemon.graphql_server_limited
   and archive_process_location = Flag.Host_and_port.Daemon.archive
   and metrics_server_port =
     flag "--metrics-port" ~aliases:["metrics-port"]
@@ -477,7 +478,10 @@ let setup_daemon logger =
     let monitor = Async.Monitor.create ~name:"coda" () in
     let module Coda_initialization = struct
       type ('a, 'b, 'c) t =
-        {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
+        { coda: 'a
+        ; client_trustlist: 'b
+        ; rest_server_port: 'c
+        ; graphql_port_limited: 'c option }
     end in
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
@@ -683,6 +687,12 @@ let setup_daemon logger =
       in
       let libp2p_port = get_port libp2p_port in
       let rest_server_port = get_port rest_server_port in
+      let graphql_port_limited =
+        let ({value; name} : int option Flag.Types.with_name) =
+          graphql_port_limited
+        in
+        maybe_from_config YJ.Util.to_int_option name value
+      in
       let client_port = get_port client_port in
       let snark_work_fee_flag =
         let json_to_currency_fee_option json =
@@ -1048,7 +1058,10 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
              ~upload_blocks_to_gcloud ())
       in
-      {Coda_initialization.coda; client_trustlist; rest_server_port}
+      { Coda_initialization.coda
+      ; client_trustlist
+      ; rest_server_port
+      ; graphql_port_limited }
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Mina_lib.t option ref = ref None in
@@ -1056,7 +1069,10 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
-    let%bind {Coda_initialization.coda; client_trustlist; rest_server_port} =
+    let%bind { Coda_initialization.coda
+             ; client_trustlist
+             ; rest_server_port
+             ; graphql_port_limited } =
       coda_initialization_deferred ()
     in
     coda_ref := Some coda ;
@@ -1066,7 +1082,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
          (Mina_lib.validated_transitions coda)
          ~f:ignore) ;
     Coda_run.setup_local_server ?client_trustlist ~rest_server_port
-      ~insecure_rest_server coda ;
+      ~insecure_rest_server ?graphql_port_limited coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
           Mina_metrics.server ~port ~logger >>| ignore )

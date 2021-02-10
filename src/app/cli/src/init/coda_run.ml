@@ -265,7 +265,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
-    ?(insecure_rest_server = false) coda =
+    ?graphql_port_limited ?(insecure_rest_server = false) coda =
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -481,6 +481,53 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           |> Deferred.map ~f:(fun _ ->
                  [%log info]
                    !"Created GraphQL server at: http://localhost:%i/graphql"
+                   rest_server_port ) ) ) ;
+  (*Second graphql server with limited queries exopsed*)
+  Option.iter graphql_port_limited ~f:(fun rest_server_port ->
+      trace_task "Second REST server (with limited queries)" (fun () ->
+          let graphql_callback =
+            Graphql_cohttp_async.make_callback
+              (fun _req -> coda)
+              Mina_graphql.schema_limited
+          in
+          Cohttp_async.(
+            Server.create_expert
+              ~on_handler_error:
+                (`Call
+                  (fun _net exn ->
+                    [%log error]
+                      "Exception while handling REST server request: $error"
+                      ~metadata:
+                        [ ("error", `String (Exn.to_string_mach exn))
+                        ; ("context", `String "rest_server") ] ))
+              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
+              (fun ~body _sock req ->
+                let uri = Cohttp.Request.uri req in
+                let status flag =
+                  let%bind status = Mina_commands.get_status ~flag coda in
+                  Server.respond_string
+                    ( status |> Daemon_rpcs.Types.Status.to_yojson
+                    |> Yojson.Safe.pretty_to_string )
+                in
+                let lift x = `Response x in
+                match Uri.path uri with
+                | "/graphql" ->
+                    [%log debug] "Received graphql request. Uri: $uri"
+                      ~metadata:
+                        [ ("uri", `String (Uri.to_string uri))
+                        ; ("context", `String "rest_server") ] ;
+                    graphql_callback () req body
+                | "/status" ->
+                    status `None >>| lift
+                | "/status/performance" ->
+                    status `Performance >>| lift
+                | _ ->
+                    Server.respond_string ~status:`Not_found "Route not found"
+                    >>| lift ))
+          |> Deferred.map ~f:(fun _ ->
+                 [%log info]
+                   !"Created GraphQL server with limited queries at: \
+                     http://localhost:%i/graphql"
                    rest_server_port ) ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
