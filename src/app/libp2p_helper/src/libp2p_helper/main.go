@@ -1237,15 +1237,14 @@ func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
 		_ = s.Close()
 	}()
 
-	var data string
-	dec := json.NewDecoder(s)
-	err = dec.Decode(&data)
+	data := make([]byte, 8192)
+	n, err := s.Read(data)
 	if err != nil && err != io.EOF {
 		app.P2p.Logger.Errorf("failed to decode telemetry data: err=%s", err)
 		return nil, err
 	}
 
-	return data, nil
+	return string(data[:n]), nil
 }
 
 type listPeersMsg struct {

@@ -521,17 +521,12 @@ func (h *Helper) handleTelemetryStreams(s network.Stream) {
 	defer func() {
 		_ = s.Close()
 	}()
-	bz, err := json.Marshal(h.TelemetryData)
-	if err != nil {
-		logger.Error("failed to marshal peers", err)
-		return
-	}
-
-	n, err := s.Write(bz)
+	
+	n, err := s.Write([]byte(h.TelemetryData))
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(bz) {
+	} else if n != len(h.TelemetryData) {
 		logger.Error("failed to write all data to stream")
 		return
 	}

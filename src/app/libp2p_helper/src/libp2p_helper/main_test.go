@@ -941,5 +941,5 @@ func TestGetTelemetry(t *testing.T) {
 
 	ret, err := msg.run(appC)
 	require.NoError(t, err)
-	require.Equal(t, ret, appA.P2p.TelemetryData)
+	require.Equal(t, appA.P2p.TelemetryData, ret)
 }
