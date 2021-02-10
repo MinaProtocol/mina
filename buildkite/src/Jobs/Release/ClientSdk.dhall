@@ -27,19 +27,6 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = [
-            Cmd.run "chmod -R 777 frontend/client_sdk",
-            Cmd.runInDocker
-              Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).codaToolchain}
-              "cd frontend/client_sdk && yarn install"
-          ]
-          , label = "Install Yarn dependencies"
-          , key = "install-yarn-deps"
-          , target = Size.Small
-          , docker = None Docker.Type
-        },
-      Command.build
-        Command.Config::{
           commands = OpamInit.andThenRunInDocker ([] : List Text) "./buildkite/scripts/client-sdk-tool.sh 'publish --non-interactive'"
           , label = "Publish client SDK to npm"
           , key = "publish-client-sdk"
