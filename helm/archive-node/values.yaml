@@ -23,7 +23,7 @@ archive:
   remoteSchemaFile: "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
   postgresHost:  '{{ .Release.Name }}-postgresql'
   postgresDB: "archive"
-  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@archive-1-postgresql:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
+  postgresUri: postgres://{{ .Values.postgresql.postgresqlUsername }}:{{ .Values.postgresql.postgresqlPassword }}@{{ .Values.archive.postgresHost }}:{{ .Values.archive.ports.postgres }}/{{ .Values.archive.postgresDB }}
   ports:
     server: 3086
     postgres: "5432"

@@ -28,9 +28,7 @@ readinessProbe:
     command: [
       "/bin/bash",
       "-c",
-      "source /healthcheck/utilities.sh && isArchiveSynced \
-        --db-host {{ tpl .Values.archive.postgresHost . }} \
-        --graphql-host {{ ternary "localhost" "seed-node" .Values.archive.enableLocalDaemon }}"
+      "source /healthcheck/utilities.sh && isArchiveSynced --db-host {{ tpl .Values.archive.postgresHost . }}"
     ]
 {{- include "healthcheck.common.settings" .Values | indent 2 }}
 {{- end }}
@@ -41,6 +39,8 @@ ALL archive-node healthchecks  - TODO: readd startupProbes once GKE clusters hav
 {{- define "healthcheck.archive.allChecks" }}
 {{- if .Values.healthcheck.enabled }}
 {{- include "healthcheck.archive.livenessCheck" .Values }}
+{{- if .Values.archive.enableLocalDaemon }}
 {{- include "healthcheck.archive.readinessCheck" . }}
+{{- end }}
 {{- end }}
 {{- end }}
