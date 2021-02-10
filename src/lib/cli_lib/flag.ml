@@ -3,7 +3,12 @@ open Core
 let json =
   Command.Param.(
     flag "--json" ~aliases:["json"] no_arg
-      ~doc:"Use json output (default: plaintext)")
+      ~doc:"Use JSON output (default: plaintext)")
+
+let plaintext =
+  Command.Param.(
+    flag "--plaintext" ~aliases:["plaintext"] no_arg
+      ~doc:"Use plaintext output (default: JSON)")
 
 let performance =
   Command.Param.(

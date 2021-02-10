@@ -1378,6 +1378,9 @@ module Data = struct
     let to_uint32 t = Global_slot.slot_number t
 
     let to_global_slot = slot_number
+
+    let of_global_slot ~(constants : Constants.t) slot =
+      of_slot_number ~constants slot
   end
 
   [%%if
