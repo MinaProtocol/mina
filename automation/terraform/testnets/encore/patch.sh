@@ -3,7 +3,7 @@
 # archive-node-{1..3}
 # fish-block-producer-{3..5}
 
-for node in whale-block-producer-{1..4} fish-block-producer-{1..5}; do
+for node in whale-block-producer-12 archive-node-{1..3} fish-block-producer-4; do
   kubectl patch deploy/${node} -p "$(cat patch.yaml)"
   ready=""
   while [[ -z $ready ]]; do
