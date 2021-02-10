@@ -115,13 +115,14 @@ function hasSnarkWorker() {
 # Determine whether an Archive node's highest observed block is in sync with its local Mina daemon
 #
 function isArchiveSynced() {
-    ## "Usage: $0 [--db-host <host>] [--db-port <port>] [--db-user <user>] [--db-password <pass>]"
+    ## "Usage: $0 [--db-host <host>] [--db-port <port>] [--db-user <user>] [--db-password <pass>] [--graphql-host <host>] [--graphql-port <port>]"
 
     while [[ "$#" -gt 0 ]]; do case $1 in
         --db-host) db_host="$2"; shift;;
         --db-port) db_port="$2"; shift;;
         --db-user) db_user="$2"; shift;;
         --db-password) db_password="$2"; shift;;
+
         --graphql-host) ql_host="$2"; shift;;
         --graphql-port) ql_port="$2"; shift;;
         *) echo "Unknown parameter passed: $1"; exit 1;;
