@@ -196,6 +196,9 @@ module Status = struct
 
     let highest_block_length_received = int_entry "Max observed block height"
 
+    let highest_unvalidated_block_length_received =
+      int_entry "Max observed unvalidated block height"
+
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
           Time.Span.to_string (Time.Span.of_int_sec secs) )
@@ -343,6 +346,7 @@ module Status = struct
     { num_accounts: int option
     ; blockchain_length: int option
     ; highest_block_length_received: int
+    ; highest_unvalidated_block_length_received: int
     ; uptime_secs: int
     ; ledger_merkle_root: string option
     ; state_hash: string option
@@ -381,12 +385,12 @@ module Status = struct
     end) in
     let open M in
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
-      ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
-      ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
-      ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
-      ~global_slot_since_genesis_best_tip ~consensus_time_now
-      ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status
+      ~highest_unvalidated_block_length_received ~highest_block_length_received
+      ~uptime_secs ~ledger_merkle_root ~state_hash ~chain_id ~commit_id
+      ~conf_dir ~peers ~user_commands_sent ~snark_worker ~block_production_keys
+      ~histograms ~consensus_time_best_tip ~global_slot_since_genesis_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_block_production ~snark_work_fee ~addrs_and_ports ~catchup_status
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =
