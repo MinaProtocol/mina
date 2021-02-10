@@ -112,7 +112,7 @@ end
     - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
 *)
 module Multiaddr : sig
-  type t [@@deriving compare]
+  type t [@@deriving compare, bin_io]
 
   val to_string : t -> string
 
@@ -263,6 +263,12 @@ val me : net -> Keypair.t Deferred.t
 
 (** List of all peers we know about. *)
 val peers : net -> Peer.t list Deferred.t
+
+(** Set telemetry data to be served to peers requesting telemetry data. *)
+val set_telemetry_data : net -> string -> unit Deferred.Or_error.t
+
+(** Get telemetry data from given peer. *)
+val get_peer_telemetry_data : net -> Peer.t -> string Deferred.Or_error.t
 
 (** Try to connect to a peer ID, returning a [Peer.t]. *)
 val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t

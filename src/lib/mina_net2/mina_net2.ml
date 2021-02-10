@@ -512,6 +512,22 @@ module Helper = struct
       let name = "listPeers"
     end
 
+    module Set_telemetry_data = struct
+      type input = {data: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "setTelemetryData"
+    end
+
+    module Get_peer_telemetry_data = struct
+      type input = {peer_multiaddr: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "getPeerTelemetryData"
+    end
+
     module Find_peer = struct
       type input = {peer_id: string} [@@deriving yojson]
 
@@ -1140,7 +1156,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string [@@deriving compare]
+  type t = string [@@deriving compare, bin_io_unversioned]
 
   let to_string t = t
 
@@ -1304,6 +1320,22 @@ module Pubsub = struct
 end
 
 let me (net : Helper.t) = Ivar.read net.me_keypair
+
+let set_telemetry_data net data =
+  match%map
+    Helper.do_rpc net (module Helper.Rpcs.Set_telemetry_data) {data}
+  with
+  | Ok "setTelemetryData success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: setTelemetryData got %s" v ()
+  | Error e ->
+      Error e
+
+let get_peer_telemetry_data net peer =
+  Helper.do_rpc net
+    (module Helper.Rpcs.Get_peer_telemetry_data)
+    {peer_multiaddr= Peer.to_multiaddr_string peer}
 
 let list_peers net =
   match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
