@@ -892,24 +892,32 @@ let export_ledger =
     ~summary:
       "Print the specified ledger (default: staged ledger at the best tip)"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (x, plaintext, ledger_kind) ->
+       ~f:(fun port (state_hash, plaintext, ledger_kind) ->
+         let check_for_state_hash () =
+           if Option.is_some state_hash then (
+             Format.eprintf "A state hash should not be given for %s@."
+               ledger_kind ;
+             Core_kernel.exit 1 )
+         in
          let response =
            match ledger_kind with
            | "current-staged-ledger" ->
                let state_hash =
-                 Option.map ~f:State_hash.of_base58_check_exn x
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
                in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
                  state_hash port
            | "staking-epoch-ledger" ->
+               check_for_state_hash () ;
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
                  Daemon_rpcs.Get_staking_ledger.Current port
            | "next-epoch-ledger" ->
+               check_for_state_hash () ;
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
                  Daemon_rpcs.Get_staking_ledger.Next port
-           | s ->
+           | _ ->
                (* unreachable *)
-               failwithf "Unknown ledger kind: %s" s ()
+               failwithf "Unknown ledger kind: %s" ledger_kind ()
          in
          response >>| handle_dump_ledger_response ~json:(not plaintext) ))
 
