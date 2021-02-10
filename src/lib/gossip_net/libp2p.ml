@@ -541,6 +541,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers t = !(t.net2) >>= Mina_net2.peers
 
+    let set_telemetry_data t data =
+      !(t.net2) >>= Fn.flip Mina_net2.set_telemetry_data data
+
+    let get_peer_telemetry_data t peer =
+      !(t.net2) >>= Fn.flip Mina_net2.get_peer_telemetry_data peer
+
     let initial_peers t = t.config.initial_peers
 
     let add_peer t p ~seed =

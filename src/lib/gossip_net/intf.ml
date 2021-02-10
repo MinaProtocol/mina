@@ -18,6 +18,10 @@ module type Gossip_net_intf = sig
 
   val peers : t -> Peer.t list Deferred.t
 
+  val set_telemetry_data : t -> string -> unit Deferred.Or_error.t
+
+  val get_peer_telemetry_data : t -> Peer.t -> string Deferred.Or_error.t
+
   val initial_peers : t -> Mina_net2.Multiaddr.t list
 
   val add_peer : t -> Peer.t -> seed:bool -> unit Deferred.Or_error.t
