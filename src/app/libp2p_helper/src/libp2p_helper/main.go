@@ -1237,11 +1237,17 @@ func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
 		_ = s.Close()
 	}()
 
-	data := make([]byte, 8192)
+	size := 8192
+
+	data := make([]byte, size)
 	n, err := s.Read(data)
 	if err != nil && err != io.EOF {
 		app.P2p.Logger.Errorf("failed to decode telemetry data: err=%s", err)
 		return nil, err
+	}
+
+	if n == size && err == nil {
+		return nil, fmt.Errorf("telemetry data was greater than %d bytes", size)
 	}
 
 	return string(data[:n]), nil

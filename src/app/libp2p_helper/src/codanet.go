@@ -66,7 +66,7 @@ var (
 		"169.254.0.0/16",
 	}
 
-	pxProtocolID = protocol.ID("/mina/peer-exchange")
+	pxProtocolID        = protocol.ID("/mina/peer-exchange")
 	TelemetryProtocolID = protocol.ID("/mina/telemetry")
 
 	privateIpFilter *ma.Filters = nil
@@ -175,7 +175,7 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 		go func() {
 			// small delay to allow for remote peer to read from stream
 			time.Sleep(time.Millisecond * 400)
-			_ = c.Close()	
+			_ = c.Close()
 		}()
 	}()
 
@@ -521,7 +521,7 @@ func (h *Helper) handleTelemetryStreams(s network.Stream) {
 	defer func() {
 		_ = s.Close()
 	}()
-	
+
 	n, err := s.Write([]byte(h.TelemetryData))
 	if err != nil {
 		logger.Error("failed to write to stream", err)
