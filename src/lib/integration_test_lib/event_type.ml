@@ -194,6 +194,84 @@ module Breadcrumb_added = struct
     {user_commands}
 end
 
+module Gossip = struct
+  open Or_error.Let_syntax
+
+  module Direction = struct
+    type t = Sent | Received [@@deriving yojson]
+  end
+
+  module With_direction = struct
+    type 'a t = 'a * Direction.t [@@deriving yojson]
+  end
+
+  module Block = struct
+    let id = Mina_networking.block_received_structured_events_id
+
+    let structured_event_id = Some id
+
+    type r = {state_hash: State_hash.t} [@@deriving yojson, hash]
+
+    type t = r With_direction.t [@@deriving yojson]
+
+    let name = "Block_gossip"
+
+    let parse message : t Or_error.t =
+      match%bind parse id message with
+      | Mina_networking.Block_received {state_hash; sender= _} ->
+          Ok ({state_hash}, Direction.Received)
+      | Mina_networking.Gossip_new_state {state_hash} ->
+          Ok ({state_hash}, Sent)
+      | _ ->
+          bad_parse
+  end
+
+  module Snark_work = struct
+    let id = Mina_networking.snark_work_received_structured_events_id
+
+    let structured_event_id = Some id
+
+    type r = {work: Network_pool.Snark_pool.Resource_pool.Diff.compact}
+    [@@deriving yojson, hash]
+
+    type t = r With_direction.t [@@deriving yojson]
+
+    let name = "Snark_work_gossip"
+
+    let parse message =
+      match%bind parse id message with
+      | Mina_networking.Snark_work_received {work; sender= _} ->
+          Ok ({work}, Direction.Received)
+      | Mina_networking.Gossip_snark_pool_diff {work} ->
+          Ok ({work}, Direction.Received)
+      | _ ->
+          bad_parse
+  end
+
+  module Transactions = struct
+    let id = Mina_networking.transactions_received_structured_events_id
+
+    let structured_event_id = Some id
+
+    type r =
+      {txns: Network_pool.Transaction_pool.Diff_versioned.Stable.Latest.t}
+    [@@deriving yojson, hash]
+
+    type t = r With_direction.t [@@deriving yojson]
+
+    let name = "Transactions_gossip"
+
+    let parse message =
+      match%bind parse id message with
+      | Mina_networking.Transactions_received {txns; sender= _} ->
+          Ok ({txns}, Direction.Received)
+      | Mina_networking.Gossip_transaction_pool_diff {txns} ->
+          Ok ({txns}, Sent)
+      | _ ->
+          bad_parse
+  end
+end
+
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
@@ -201,6 +279,9 @@ type 'a t =
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
   | Breadcrumb_added : Breadcrumb_added.t t
+  | Block_gossip : Gossip.Block.t t
+  | Snark_work_gossip : Gossip.Snark_work.t t
+  | Transactions_gossip : Gossip.Transactions.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -215,6 +296,12 @@ let existential_to_string = function
       "Block_produced"
   | Event_type Breadcrumb_added ->
       "Breadcrumb_added"
+  | Event_type Block_gossip ->
+      "Block_gossip"
+  | Event_type Snark_work_gossip ->
+      "Snark_work_gossip"
+  | Event_type Transactions_gossip ->
+      "Transactions_gossip"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -275,6 +362,12 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Block_produced)
   | Breadcrumb_added ->
       (module Breadcrumb_added)
+  | Block_gossip ->
+      (module Gossip.Block)
+  | Snark_work_gossip ->
+      (module Gossip.Snark_work)
+  | Transactions_gossip ->
+      (module Gossip.Transactions)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in
