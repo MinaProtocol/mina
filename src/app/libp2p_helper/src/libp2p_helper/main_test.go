@@ -934,9 +934,11 @@ func TestGetTelemetry(t *testing.T) {
 	appC := newTestApp(t, nil)
 	appC.P2p.Host.Peerstore().AddAddrs(appA.P2p.Host.ID(), appAInfos[0].Addrs, peerstore.ConnectedAddrTTL)
 
+	maStrs := multiaddrs(appA.P2p.Host)
+
 	// ensure we can receive data before being disconnected
 	msg := &getPeerTelemetryDataMsg{
-		PeerID: string(appA.P2p.Host.ID()),
+		PeerMultiaddr: maStrs[0].String(),
 	}
 
 	ret, err := msg.run(appC)

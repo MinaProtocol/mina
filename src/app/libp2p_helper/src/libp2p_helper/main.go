@@ -1221,13 +1221,20 @@ func (m *setTelemetryDataMsg) run(app *app) (interface{}, error) {
 }
 
 type getPeerTelemetryDataMsg struct {
-	PeerID string `json:"peer_id"`
+	PeerMultiaddr string `json:"peer_multiaddr"`
 }
 
 func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
+	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
+
 	// Open a "get telemetry" stream on m.PeerID,
 	// block until you can read the response, return that.
-	s, err := app.P2p.Host.NewStream(app.Ctx, peer.ID(m.PeerID), codanet.TelemetryProtocolID)
+	s, err := app.P2p.Host.NewStream(app.Ctx, addrInfo.ID, codanet.TelemetryProtocolID)
 	if err != nil {
 		app.P2p.Logger.Error("failed to open stream: ", err)
 		return nil, err
