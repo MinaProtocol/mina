@@ -43,10 +43,10 @@ end) : S = struct
      records, and is not exposed outside this module. *)
   let update {trust; trust_last_updated; banned_until_opt} =
     let now = Now.now () in
-    let elapsed_time = Time.diff now trust_last_updated in
-    (* If time is non-monotonic lots of stuff is broken, so I think it's fine
-       not to do any error handling here. See #1494. *)
-    assert (Time.Span.is_non_negative elapsed_time) ;
+    let elap = Time.diff now trust_last_updated in
+    let elapsed_time =
+      if elap >= Time.Span.zero then elap else Time.Span.zero
+    in
     let new_trust = (decay_rate ** Time.Span.to_sec elapsed_time) *. trust in
     { trust= new_trust
     ; trust_last_updated= now
