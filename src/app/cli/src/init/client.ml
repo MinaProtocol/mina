@@ -873,14 +873,17 @@ let dump_ledger =
         ~doc:"STATE-HASH State hash (default: best state hash)"
         (optional string))
   in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 sl_hash_flag json_flag in
-  Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
+  let plaintext_flag = Cli_lib.Flag.plaintext in
+  let flags = Args.zip2 sl_hash_flag plaintext_flag in
+  Command.async
+    ~summary:
+      "Print the staged ledger from the block with the given state hash \
+       (default: staged ledger at the best tip)"
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, plaintext) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
          let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
-         >>| handle_dump_ledger_response ~json ))
+         >>| handle_dump_ledger_response ~json:(not plaintext) ))
 
 let dump_staking_ledger =
   let which =
@@ -891,12 +894,13 @@ let dump_staking_ledger =
     Command.Param.(anon ("current|next" %: t))
   in
   Command.async ~summary:"Print either the staking or next epoch ledger"
-    (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)
-       ~f:(fun port (which, json) ->
+    (Cli_lib.Background_daemon.rpc_init
+       (Args.zip2 which Cli_lib.Flag.plaintext)
+       ~f:(fun port (which, plaintext) ->
          (* TODO: allow input in Base58Check format: issue #3036 *)
          Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
            port
-         >>| handle_dump_ledger_response ~json ))
+         >>| handle_dump_ledger_response ~json:(not plaintext) ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1868,6 +1872,35 @@ let archive_blocks =
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ))
 
+let receipt_chain_hash =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:
+      "Compute the next receipt chain hash from the previous hash and \
+       transaction ID"
+    (let%map_open previous_hash =
+       flag "--previous-hash"
+         ~doc:"Previous receipt chain hash, base58check encoded"
+         (required string)
+     and transaction_id =
+       flag "--transaction-id" ~doc:"Transaction ID, base58check encoded"
+         (required string)
+     in
+     fun () ->
+       let previous_hash =
+         Receipt.Chain_hash.of_base58_check_exn previous_hash
+       in
+       (* What we call transation IDs in GraphQL are just base58_check-encoded
+         transactions. It's easy to handle, and we return it from the
+         transaction commands above, so lets use this format.
+      *)
+       let transaction = Signed_command.of_base58_check_exn transaction_id in
+       let hash =
+         Receipt.Chain_hash.cons (Signed_command transaction.payload)
+           previous_hash
+       in
+       printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1960,8 +1993,6 @@ let advanced =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
-    ; ("dump-ledger", dump_ledger)
-    ; ("dump-staking-ledger", dump_staking_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
@@ -1982,4 +2013,9 @@ let advanced =
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-blocks", archive_blocks) ]
+    ; ("archive-blocks", archive_blocks)
+    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
+
+let ledger =
+  Command.group ~summary:"Ledger commands"
+    [("dump-ledger", dump_ledger); ("dump-staking-ledger", dump_staking_ledger)]
