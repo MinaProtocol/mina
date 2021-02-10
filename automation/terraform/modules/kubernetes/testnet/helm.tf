@@ -158,7 +158,7 @@ locals {
     makeReportEveryMins = var.make_report_every_mins
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts = var.make_report_accounts
-    seedPeersURL = var.seedPeersURL
+    seedPeersURL = var.seed_peers_url
   }
   
 }

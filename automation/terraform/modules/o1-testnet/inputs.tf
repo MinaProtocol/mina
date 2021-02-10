@@ -269,7 +269,7 @@ variable "upload_blocks_to_gcloud" {
   default = false
 }
 
-variable "seedPeersURL" {
+variable "seed_peers_url" {
   type = string
   default = ""
 }
