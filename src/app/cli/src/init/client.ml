@@ -1891,6 +1891,35 @@ let archive_blocks =
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ))
 
+let receipt_chain_hash =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:
+      "Compute the next receipt chain hash from the previous hash and \
+       transaction ID"
+    (let%map_open previous_hash =
+       flag "--previous-hash"
+         ~doc:"Previous receipt chain hash, base58check encoded"
+         (required string)
+     and transaction_id =
+       flag "--transaction-id" ~doc:"Transaction ID, base58check encoded"
+         (required string)
+     in
+     fun () ->
+       let previous_hash =
+         Receipt.Chain_hash.of_base58_check_exn previous_hash
+       in
+       (* What we call transation IDs in GraphQL are just base58_check-encoded
+         transactions. It's easy to handle, and we return it from the
+         transaction commands above, so lets use this format.
+      *)
+       let transaction = Signed_command.of_base58_check_exn transaction_id in
+       let hash =
+         Receipt.Chain_hash.cons (Signed_command transaction.payload)
+           previous_hash
+       in
+       printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2003,7 +2032,8 @@ let advanced =
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-blocks", archive_blocks) ]
+    ; ("archive-blocks", archive_blocks)
+    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands" [("export", export_ledger)]
