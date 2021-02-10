@@ -122,7 +122,7 @@ let setup_daemon logger =
   and libp2p_port = Flag.Port.Daemon.external_
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
-  and graphql_port_limited = Flag.Port.Daemon.graphql_server_limited
+  and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
   and archive_process_location = Flag.Host_and_port.Daemon.archive
   and metrics_server_port =
     flag "--metrics-port" ~aliases:["metrics-port"]
@@ -481,7 +481,7 @@ let setup_daemon logger =
         { coda: 'a
         ; client_trustlist: 'b
         ; rest_server_port: 'c
-        ; graphql_port_limited: 'c option }
+        ; limited_graphql_port: 'c option }
     end in
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
@@ -687,9 +687,9 @@ let setup_daemon logger =
       in
       let libp2p_port = get_port libp2p_port in
       let rest_server_port = get_port rest_server_port in
-      let graphql_port_limited =
+      let limited_graphql_port =
         let ({value; name} : int option Flag.Types.with_name) =
-          graphql_port_limited
+          limited_graphql_port
         in
         maybe_from_config YJ.Util.to_int_option name value
       in
@@ -1061,7 +1061,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       { Coda_initialization.coda
       ; client_trustlist
       ; rest_server_port
-      ; graphql_port_limited }
+      ; limited_graphql_port }
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Mina_lib.t option ref = ref None in
@@ -1072,7 +1072,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
     let%bind { Coda_initialization.coda
              ; client_trustlist
              ; rest_server_port
-             ; graphql_port_limited } =
+             ; limited_graphql_port } =
       coda_initialization_deferred ()
     in
     coda_ref := Some coda ;
@@ -1082,7 +1082,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
          (Mina_lib.validated_transitions coda)
          ~f:ignore) ;
     Coda_run.setup_local_server ?client_trustlist ~rest_server_port
-      ~insecure_rest_server ?graphql_port_limited coda ;
+      ~insecure_rest_server ?limited_graphql_port coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
           Mina_metrics.server ~port ~logger >>| ignore )

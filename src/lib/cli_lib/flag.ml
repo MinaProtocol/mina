@@ -158,9 +158,9 @@ module Port = struct
       create ~name:"--rest-port" ~aliases:["rest-port"] ~default:default_rest
         "local REST-server for daemon interaction"
 
-    let graphql_server_limited =
-      create_optional ~name:"--graphql-port-limited"
-        ~aliases:["graphql-port-limited"]
+    let limited_graphql_server =
+      create_optional ~name:"--limited-graphql-port"
+        ~aliases:["limited-graphql-port"]
         "GraphQL-server for limited daemon interaction"
   end
 

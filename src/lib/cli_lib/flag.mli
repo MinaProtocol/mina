@@ -49,7 +49,7 @@ module Port : sig
     val rest_server :
       int Types.with_name_and_displayed_default Command.Spec.param
 
-    val graphql_server_limited : int option Types.with_name Command.Spec.param
+    val limited_graphql_server : int option Types.with_name Command.Spec.param
   end
 
   module Archive : sig
