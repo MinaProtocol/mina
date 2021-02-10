@@ -46,7 +46,7 @@ Pipeline.build
                   , "PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/drop_tables.sql"
                   , "PGPASSWORD=${password} psql -h localhost -p 5432 -U ${user} -d ${db} -a -f src/app/archive/create_schema.sql"
                   , "GO=/usr/lib/go/bin/go make libp2p_helper"
-                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir 'test_output' 'test_archive_processor:coda-archive-processor-test'"
+                  , "./scripts/test.py run --non-interactive --collect-artifacts --yes --out-dir 'test_output' 'test_archive_processor:mina-archive-processor-test'"
                   ])
             , label = "Archive node unit tests"
             , key = "archive-unit-tests"
