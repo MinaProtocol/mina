@@ -3,4 +3,4 @@ spec:
     spec:
       containers:
         - name: coda
-          image: gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-3ef8663-encore-3b5824a
+          image: gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-3ef8663-encore-200-connections
