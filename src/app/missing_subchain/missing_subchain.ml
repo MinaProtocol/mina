@@ -291,15 +291,15 @@ let fill_in_internal_command pool block_state_hash =
               global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
-let main ~archive_uri ~state_hash () =
+let main ~archive_uri ~start_state_hash_opt ~end_state_hash () =
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
   (* sanity-check input state hash *)
-  ( match State_hash.of_base58_check state_hash with
+  ( match State_hash.of_base58_check end_state_hash with
   | Ok _ ->
       ()
   | Error err ->
-      [%log error] "Error decoding input state hash"
+      [%log error] "Error decoding end state hash"
         ~metadata:[("error", Error_json.error_to_yojson err)] ;
       Core.exit 1 ) ;
   match Caqti_async.connect_pool ~max_size:128 archive_uri with
@@ -310,11 +310,24 @@ let main ~archive_uri ~state_hash () =
       exit 1
   | Ok pool ->
       [%log info] "Successfully created Caqti pool for Postgresql" ;
-      [%log info] "Querying for subchain to block with given state hash" ;
       let%bind blocks =
-        query_db pool
-          ~f:(fun db -> Sql.Subchain.run db state_hash)
-          ~item:"blocks"
+        match start_state_hash_opt with
+        | None ->
+            [%log info]
+              "Querying for subchain to end block with given state hash" ;
+            query_db pool
+              ~f:(fun db ->
+                Sql.Subchain.start_from_unparented db ~end_state_hash )
+              ~item:"blocks starting from unparented"
+        | Some start_state_hash ->
+            [%log info]
+              "Querying for subchain from start block to end block with given \
+               state hashes" ;
+            query_db pool
+              ~f:(fun db ->
+                Sql.Subchain.start_from_specified db ~start_state_hash
+                  ~end_state_hash )
+              ~item:"blocks starting from specified"
       in
       if List.is_empty blocks then (
         [%log error]
@@ -370,11 +383,16 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER:$USER@localhost:5432/archiver)"
              Param.(required string)
-         and state_hash =
-           Param.flag "--state-hash"
+         and start_state_hash_opt =
+           Param.flag "--start-state-hash"
              ~doc:
-               "State hash of the block that ends a chain from the genesis \
-                block"
+               "State hash of the block that begins a chain (default: start \
+                at the block closest to the end block without a parent, \
+                possibly the genesis block)"
+             Param.(optional string)
+         and end_state_hash =
+           Param.flag "--end-state-hash"
+             ~doc:"State hash of the block that ends a chain"
              Param.(required string)
          in
-         main ~archive_uri ~state_hash)))
+         main ~archive_uri ~start_state_hash_opt ~end_state_hash)))
