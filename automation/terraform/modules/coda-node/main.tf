@@ -49,7 +49,7 @@ hostnamectl set-hostname ${var.netname}_${var.region}_${var.rolename}_${count.in
 echo '127.0.1.1  ${var.netname}_${var.region}_${var.rolename}_${count.index}.${var.region}' >> /etc/hosts
 
 echo "Installing Coda"
-echo "deb [trusted=yes] http://packages.o1test.net ${var.coda_repo} main" > /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net ${var.coda_repo} main" > /etc/apt/sources.list.d/mina.list
 apt-get update
 apt-get install --force-yes -t ${var.coda_repo} coda-${var.coda_variant}=${var.coda_version} -y
 

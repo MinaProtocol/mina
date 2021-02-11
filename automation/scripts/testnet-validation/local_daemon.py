@@ -35,7 +35,7 @@ def fetch_peers(namespace="default", v1=client.CoreV1Api()):
   peer_addresses = []
   for i in peers:
     # Run mina client status and get output
-    command = f"kubectl exec --namespace={namespace} -c coda {i.metadata.name} mina client status"
+    command = f"kubectl exec --namespace={namespace} -c mina {i.metadata.name} mina client status"
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     if error:

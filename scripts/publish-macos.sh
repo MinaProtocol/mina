@@ -17,4 +17,4 @@ curl -fL https://getcli.jfrog.io | sh
 ./jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false
 
 # Upload Artifact to Artifactory
-./jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$GITBRANCH-$GITHASH.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM
+./jfrog rt u _build/mina-daemon-macos.zip macos-mina/mina-daemon-$GITBRANCH-$GITHASH.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM

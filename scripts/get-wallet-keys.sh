@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Script to get keypairs associated with genesis wallets in a format usable by
-# the coda cli, with blank passwords.
+# the mina cli, with blank passwords.
 
 set -euo pipefail
 

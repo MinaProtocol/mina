@@ -9,7 +9,7 @@ WHALE_COUNT=1
 FISH_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-CODA_DAEMON_IMAGE="codaprotocol/mina-daemon:0.3.2-coda-to-mina-82be2c0"
+MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:0.3.2-coda-to-mina-82be2c0"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -84,18 +84,18 @@ function generate_key_files {
   for k in $(seq 1 $COUNT); do
     docker run \
       -v "${output_dir}:/keys:z" \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+      --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
       -c "MINA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+      --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
       -c "MINA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container
   docker run \
     -v "${output_dir}:/keys:z" \
-    --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+    --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
     -c "chmod -R +rw /keys"
 }
 

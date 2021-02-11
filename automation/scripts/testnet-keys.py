@@ -13,7 +13,7 @@ import natsort
 client = docker.from_env()
 p = inflect.engine()
 
-CODA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:0.2.6-5c08d6d"
+MINA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:0.2.6-5c08d6d"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # Default output folders for various kinds of keys
@@ -30,8 +30,8 @@ DEFAULT_STAKER_CSV_FILE = SCRIPT_DIR / "staker_public_keys.csv"
 DEFAULT_SERVICES = {"faucet": 100000 * (10**9), "echo": 100 * (10**9)}
 
 
-def encode_nanocodas(nanocodas):
-    s = str(nanocodas)
+def encode_nanominas(nanominas):
+    s = str(nanominas)
     if len(s) > 9:
         return s[:-9] + '.' + s[-9:]
     else:
@@ -85,7 +85,7 @@ def generate_service_keys(output_dir, privkey_pass):
     for service in DEFAULT_SERVICES.keys():
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "MINA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/{}_service"
@@ -118,7 +118,7 @@ def generate_online_whale_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "MINA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/online_whale_account_{}"
@@ -151,7 +151,7 @@ def generate_offline_whale_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "MINA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/offline_whale_account_{}"
@@ -184,7 +184,7 @@ def generate_offline_fish_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "MINA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/offline_fish_account_{}"
@@ -218,7 +218,7 @@ def generate_online_fish_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "MINA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/online_fish_account_{}"
@@ -255,7 +255,7 @@ def generate_seed_keys(count, output_dir):
 
         # Key outputted to stdout
         key_raw = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=["mina advanced generate-libp2p-keypair"])
         key_parsed = str(key_raw).split("\\n")[1]
@@ -482,14 +482,14 @@ def generate_ledger(generate_remainder, service_accounts_directory,
         ledger.append({
             "pk": service["public_key"],
             "sk": None,
-            "balance": encode_nanocodas(service["balance"]),
+            "balance": encode_nanominas(service["balance"]),
             "delegate": None
         })
 
         annotated_ledger.append({
             "pk": service["public_key"],
             "sk": None,
-            "balance": encode_nanocodas(service["balance"]),
+            "balance": encode_nanominas(service["balance"]),
             "delegate": None,
             "nickname": service["service"]
         })
@@ -502,8 +502,8 @@ def generate_ledger(generate_remainder, service_accounts_directory,
             .format(num_fish_accounts,
                     len(ledger_public_keys["online_staker_keys"])))
 
-    fish_offline_balance = encode_nanocodas(65500 * (10**9))
-    fish_online_balance = encode_nanocodas(500 * (10**9))
+    fish_offline_balance = encode_nanominas(65500 * (10**9))
+    fish_online_balance = encode_nanominas(500 * (10**9))
 
     # Fish Accounts
     for index, fish in enumerate(ledger_public_keys["offline_fish_keys"]):
@@ -580,14 +580,14 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                 "sk":
                 None,
                 "balance":
-                encode_nanocodas(whale_offline_balance),
+                encode_nanominas(whale_offline_balance),
                 "delegate":
                 ledger_public_keys["online_whale_keys"][index]
             })
             ledger.append({
                 "pk": ledger_public_keys["online_whale_keys"][index],
                 "sk": None,
-                "balance": encode_nanocodas(0),
+                "balance": encode_nanominas(0),
                 "delegate": None
             })
 
@@ -597,7 +597,7 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                 "sk":
                 None,
                 "balance":
-                encode_nanocodas(whale_offline_balance),
+                encode_nanominas(whale_offline_balance),
                 "delegate":
                 ledger_public_keys["online_whale_keys"][index],
                 "delegate_discord_username":
@@ -609,7 +609,7 @@ def generate_ledger(generate_remainder, service_accounts_directory,
                 "sk":
                 None,
                 "balance":
-                encode_nanocodas(0),
+                encode_nanominas(0),
                 "delegate":
                 None,
                 "discord_username":
@@ -653,7 +653,7 @@ def generate_ledger(generate_remainder, service_accounts_directory,
               default=(SCRIPT_DIR / "seed_keys").absolute(),
               help='Location of Block Producer keys to Upload, a Directory.')
 @click.option('--namespace',
-              default="coda-testnet",
+              default="mina-testnet",
               help='The namespace the Kubernetes secret should be uploaded to.'
               )
 @click.option('--cluster',
@@ -686,7 +686,7 @@ def upload_seed_keys(key_dir, namespace, cluster):
               default=DEFAULT_ONLINE_WHALE_KEYS_DIR.absolute(),
               help='Location of Block Producer keys to Upload, a Directory.')
 @click.option('--namespace',
-              default="coda-testnet",
+              default="mina-testnet",
               help='The namespace the Kubernetes secret should be uploaded to.'
               )
 @click.option('--cluster',
@@ -724,7 +724,7 @@ def upload_online_whale_keys(key_dir, namespace, cluster):
               help='Location of Fish keys to Upload, a Directory.')
 @click.option(
     '--namespace',
-    default="coda-testnet",
+    default="mina-testnet",
     help='The namespace the Kubernetes secret(s) should be uploaded to.')
 @click.option('--cluster',
               default="",
@@ -763,7 +763,7 @@ def upload_online_fish_keys(key_dir, namespace, cluster, count, offset):
               default=DEFAULT_SERVICE_KEY_DIR.absolute(),
               help='Location of Block Producer keys to Upload, a Directory.')
 @click.option('--namespace',
-              default="coda-testnet",
+              default="mina-testnet",
               help='The namespace the Kubernetes secret should be uploaded to.'
               )
 @click.option('--cluster',

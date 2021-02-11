@@ -35,7 +35,7 @@ def fetch_peers(namespace="default", v1=client.CoreV1Api()):
   peer_addresses = []
   for i in peers:
     # Run mina client status and get output
-    command = f"kubectl exec --namespace={namespace} -c coda {i.metadata.name} mina client status"
+    command = f"kubectl exec --namespace={namespace} -c mina {i.metadata.name} mina client status"
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     if error:
@@ -132,10 +132,10 @@ def run(namespace, values_file, release_name, working_directory):
   addresses = fetch_peers(namespace)
   # Fetch Helm Release Values
   values = fetch_helm_values(namespace, release_name)
-  # Parse out coda.runtimeGenesis and prep overrides
+  # Parse out mina.runtimeGenesis and prep overrides
   overrides = {
-    "coda":{
-      "runtimeConfig": values["coda"]["runtimeConfig"],
+    "mina":{
+      "runtimeConfig": values["mina"]["runtimeConfig"],
       "seedPeers": addresses
     }
   }

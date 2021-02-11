@@ -3,7 +3,7 @@ FROM debian:stretch
 
 RUN apt-get update
 RUN apt-get install -y apt-transport-https ca-certificates
-RUN echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
+RUN echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/mina.list
 
 RUN apt-get update
 

@@ -19,7 +19,7 @@ get_logs() {
   lines=$(kubectl logs $pod -n $namespace 2>/dev/null)
   result=$?
   if [ $result == 1 ]; then
-    lines=$(kubectl logs $pod -n $namespace -c coda)
+    lines=$(kubectl logs $pod -n $namespace -c mina)
   fi
   echo "$lines" | grep '^{' | $logproc -f ".level == \"Fatal\""
   #echo "$lines" > $file # | grep '^{' | $logproc -f ".level == \"Fatal\"" > $file

@@ -15,7 +15,7 @@ def generate ():
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(conf_dir), autoescape=False)
 
-    output = subprocess.check_output(['coda', 'advanced', 'dump-ledger', '-json'])
+    output = subprocess.check_output(['mina', 'advanced', 'dump-ledger', '-json'])
 
     accounts=output.split('\n')
     accounts=map(lambda acct: '\"' + acct.replace('\"','\\"') + '\"',accounts)

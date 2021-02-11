@@ -146,8 +146,8 @@ class CustomError(Exception):
                       requests.exceptions.ConnectionError),
                       max_tries=3)
 def get_best_chain(port):
-  coda = CodaClient.Client (graphql_host="localhost", graphql_port=port)
-  result = coda._send_query (query="query bestChainQuery { bestChain { stateHash } }")
+  mina = CodaClient.Client (graphql_host="localhost", graphql_port=port)
+  result = mina._send_query (query="query bestChainQuery { bestChain { stateHash } }")
   return result
 
 

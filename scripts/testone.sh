@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# File assumes tat you are running the program at the program at the root directory of the coda repo
+# File assumes tat you are running the program at the program at the root directory of the mina repo
 
 if [[ "$#" -eq "0" ]]; then 
     echo "This script needs at least one argument, TEST-FILE, to run"

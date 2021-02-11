@@ -9,7 +9,7 @@ import argparse
 import json
 
 default_port=8301
-default_prog='coda'
+default_prog='mina'
 
 parser = argparse.ArgumentParser(description='Get telemetry data from all Mina nodes reachable from localhost daemon')
 parser.add_argument('--daemon-port',

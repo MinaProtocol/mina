@@ -339,7 +339,7 @@ class Executive:
 # It is responsible for dispatching builds and tests.
 class CodaProject:
     logproc_exe_path = 'src/app/logproc/logproc.exe'
-    coda_exe_path = 'src/app/cli/src/mina.exe'
+    mina_exe_path = 'src/app/cli/src/mina.exe'
 
     def __init__(self, executive, root='.'):
         self.executive = executive
@@ -349,7 +349,7 @@ class CodaProject:
 
     def build(self, build_log, profile='dev'):
         cmd = 'dune build --display=progress --profile=%s %s %s 2> %s' % (
-            profile, self.coda_exe_path, self.logproc_exe_path, build_log)
+            profile, self.mina_exe_path, self.logproc_exe_path, build_log)
         self.executive.run_cmd(cmd, directory=self.root, log=build_log)
         self.current_profile = profile
 
@@ -363,18 +363,18 @@ class CodaProject:
 
         cmd_template = (
             'set -o pipefail '
-            '&& {{coda}} integration-test {{test}} 2>&1 '
+            '&& {{mina}} integration-test {{test}} 2>&1 '
             '| tee \'{{log}}\' '
             '| {{logproc}} -f \'.level in ["Warn", "Error", "Fatal", "Faulty_peer"]\''
         )
         cmd = jinja2.Template(cmd_template).render(log=test_log,
-                                                   coda=self.coda_exe(),
+                                                   mina=self.mina_exe(),
                                                    logproc=self.logproc_exe(),
                                                    test=test)
         self.executive.run_cmd(cmd, log=test_log)
 
-    def coda_exe(self):
-        return os.path.join(self.build_path, self.coda_exe_path)
+    def mina_exe(self):
+        return os.path.join(self.build_path, self.mina_exe_path)
 
     def logproc_exe(self):
         return os.path.join(self.build_path, self.logproc_exe_path)

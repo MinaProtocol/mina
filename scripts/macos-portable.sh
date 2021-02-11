@@ -10,16 +10,16 @@ if [[ $# -ne 3 ]]; then
   exit 1
 fi
 
-LOCAL_CODA_EXE="$(basename "$1")"
+LOCAL_MINA_EXE="$(basename "$1")"
 LOCAL_LIBP2P="$(basename "$2")"
 DIST_DIR="$3"
 
 mkdir -p "$DIST_DIR"
 
 # move and sign mina.exe (if has rights)
-cp "$1" "$DIST_DIR/$LOCAL_CODA_EXE"
+cp "$1" "$DIST_DIR/$LOCAL_MINA_EXE"
 set +u
-[ -z "$APPLE_ID" ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_CODA_EXE"
+[ -z "$APPLE_ID" ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_MINA_EXE"
 set -u
 
 # move and sign libp2p helper (if has rights)
@@ -73,4 +73,4 @@ fixup() {
 }
 
 # Fix mina.exe
-fixup "$LOCAL_CODA_EXE"
+fixup "$LOCAL_MINA_EXE"
