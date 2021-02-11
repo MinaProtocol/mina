@@ -3,6 +3,9 @@ open Core_kernel
 let required_uri =
   Command.Param.(required (Command.Arg_type.map string ~f:Uri.of_string))
 
+let optional_uri =
+  Command.Param.(optional (Command.Arg_type.map string ~f:Uri.of_string))
+
 let log_level =
   let open Command.Param in
   optional_with_default Logger.Level.Info
