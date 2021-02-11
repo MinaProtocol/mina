@@ -1,6 +1,6 @@
-testnetName: "coda-testnet"
+testnetName: "mina-testnet"
 
-coda:
+mina:
   runtimeConfig:
   generateGenesisProof: true
   logLevel: "Debug"

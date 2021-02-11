@@ -13,5 +13,5 @@ spec:
     app: {{ template "archive-node.fullname" . }}
   ports:
   - name: tcp-p2p
-    port: {{ .Values.coda.ports.p2p }}
+    port: {{ .Values.mina.ports.p2p }}
     targetPort: external-port
