@@ -1,5 +1,5 @@
-testnetName: "coda-testnet"
-coda:
+testnetName: "mina-testnet"
+mina:
   runtimeConfig:
   generateGenesisProof: true
   image: codaprotocol/coda-daemon:0.0.12-beta-develop-589b507
