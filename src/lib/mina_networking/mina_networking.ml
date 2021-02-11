@@ -686,8 +686,6 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_telemetry_data
-        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
@@ -718,8 +716,6 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
-    | Get_telemetry_data ->
-        (module Get_telemetry_data)
     | Consensus_rpc rpc ->
         Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
@@ -746,8 +742,6 @@ module Rpcs = struct
     | Ban_notify, Ban_notify ->
         Some (do_ f)
     | Get_best_tip, Get_best_tip ->
-        Some (do_ f)
-    | Get_telemetry_data, Get_telemetry_data ->
         Some (do_ f)
     | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
         Consensus.Hooks.Rpcs.match_handler
@@ -1039,16 +1033,6 @@ let create (config : Config.t)
           result
         else None
   in
-  let get_telemetry_data_rpc conn ~version:_ query =
-    [%log debug] "Sending telemetry data to $peer" ~metadata:(md conn) ;
-    let action_msg = "Telemetry_data" in
-    let msg_args = [] in
-    (* if peer doesn't return telemetry data, don't change trust score *)
-    let%map result, _sender =
-      run_for_rpc_result conn query ~f:get_telemetry_data action_msg msg_args
-    in
-    result
-  in
   let get_transition_chain_proof_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain_proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
@@ -1131,11 +1115,6 @@ let create (config : Config.t)
         ; budget= (3, `Per minute)
         ; cost= unit }
     ; Rpc_handler
-        { rpc= Get_telemetry_data
-        ; f= get_telemetry_data_rpc
-        ; budget= (12, `Per minute)
-        ; cost= unit }
-    ; Rpc_handler
         { rpc= Get_ancestry
         ; f= get_ancestry_rpc
         ; budget= (5, `Per minute)
@@ -1172,6 +1151,25 @@ let create (config : Config.t)
   let%map gossip_net =
     Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
   in
+  (* The telemetry data RPC is implemented directly in go, serving a string which
+     is periodically updated. This is so that one can make this RPC on a node even
+     if that node is at its connection limit. *)
+  let fake_time = Time.now () in
+  Clock.every' (Time.Span.of_min 1.) (fun () ->
+      match%bind
+        get_telemetry_data {data= (); sender= Local; received_at= fake_time}
+      with
+      | Error _ ->
+          Deferred.unit
+      | Ok data ->
+          Gossip_net.Any.set_telemetry_data gossip_net
+            ( Binable.to_string
+                (module Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest)
+                data
+            |> Bytes.of_string
+            |> B58.encode Base58_check.coda_alphabet
+            |> Bytes.to_string )
+          >>| ignore ) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
@@ -1252,6 +1250,16 @@ include struct
   let lift f {gossip_net; _} = f gossip_net
 
   let peers = lift peers
+
+  let get_peer_telemetry_data t peer =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind s = get_peer_telemetry_data t.gossip_net peer in
+    Or_error.try_with (fun () ->
+        Binable.of_string
+          (module Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest)
+          ( B58.decode Base58_check.coda_alphabet (Bytes.of_string s)
+          |> Bytes.to_string ) )
+    |> Deferred.return
 
   let add_peer = lift add_peer
 
