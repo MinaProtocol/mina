@@ -1244,7 +1244,7 @@ func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
 		_ = s.Close()
 	}()
 
-	size := 8192
+	size := 32768
 
 	data := make([]byte, size)
 	n, err := s.Read(data)
