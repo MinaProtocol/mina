@@ -921,54 +921,121 @@ let export_ledger =
          response >>| handle_export_ledger_response ~json:(not plaintext) ))
 
 let hash_ledger =
-  let ledger_file_flag =
-    Command.Param.(
-      flag "--ledger-file"
-        ~doc:"LEDGER-FILE File containing an exported ledger" (required string))
-  in
-  let plaintext_flag = Cli_lib.Flag.plaintext in
-  let flags = Args.zip2 ledger_file_flag plaintext_flag in
+  let open Command.Let_syntax in
   Command.async
     ~summary:
       "Print the Merkle root of the ledger contained in the specified file"
-    (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun _port (ledger_file, plaintext) ->
-         let process_accounts accounts =
-           let constraint_constants =
-             Genesis_constants.Constraint_constants.compiled
-           in
-           let packed_ledger =
-             Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
-               ~depth:constraint_constants.ledger_depth accounts
-           in
-           let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-           Format.printf "%s@."
-             (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+    (let%map ledger_file =
+       Command.Param.(
+         flag "--ledger-file"
+           ~doc:"LEDGER-FILE File containing an exported ledger"
+           (required string))
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let process_accounts accounts =
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
          in
-         return
-         @@
-         if plaintext then
-           In_channel.with_file ledger_file ~f:(fun in_channel ->
-               let sexp = In_channel.input_all in_channel |> Sexp.of_string in
-               let accounts =
-                 lazy
-                   (List.map
-                      ([%of_sexp: Account.t list] sexp)
-                      ~f:(fun acct -> (None, acct)))
-               in
-               process_accounts accounts )
-         else
-           let json = Yojson.Safe.from_file ledger_file in
-           match Runtime_config.Accounts.of_yojson json with
-           | Ok runtime_accounts ->
-               let accounts =
-                 lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
-               in
-               process_accounts accounts
-           | Error err ->
-               Format.eprintf "Could not parse JSON in file %s: %s@"
-                 ledger_file err ;
-               ignore (exit 1) ))
+         let packed_ledger =
+           Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+             ~depth:constraint_constants.ledger_depth accounts
+         in
+         let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+         Format.printf "%s@."
+           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+       in
+       Deferred.return
+       @@
+       if plaintext then
+         In_channel.with_file ledger_file ~f:(fun in_channel ->
+             let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+             let accounts =
+               lazy
+                 (List.map
+                    ([%of_sexp: Account.t list] sexp)
+                    ~f:(fun acct -> (None, acct)))
+             in
+             process_accounts accounts )
+       else
+         let json = Yojson.Safe.from_file ledger_file in
+         match Runtime_config.Accounts.of_yojson json with
+         | Ok runtime_accounts ->
+             let accounts =
+               lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
+             in
+             process_accounts accounts
+         | Error err ->
+             Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
+               err ;
+             ignore (exit 1))
+
+let currency_in_ledger =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Print the total currency for each token present in the ledger \
+       contained in the specified file"
+    (let%map ledger_file =
+       Command.Param.(
+         flag "--ledger-file"
+           ~doc:"LEDGER-FILE File containing an exported ledger"
+           (required string))
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let process_accounts accounts =
+         (* track currency total for each token
+            use uint64 to make arithmetic simple
+         *)
+         let currency_tbl : Unsigned.UInt64.t Token_id.Table.t =
+           Token_id.Table.create ()
+         in
+         List.iter accounts ~f:(fun (acct : Account.t) ->
+             let token_id = Account.token acct in
+             let balance = acct.balance |> Currency.Balance.to_uint64 in
+             match Token_id.Table.find currency_tbl token_id with
+             | None ->
+                 Token_id.Table.add_exn currency_tbl ~key:token_id
+                   ~data:balance
+             | Some total ->
+                 let new_total = Unsigned.UInt64.add total balance in
+                 Token_id.Table.set currency_tbl ~key:token_id ~data:new_total
+         ) ;
+         let tokens =
+           Token_id.Table.keys currency_tbl
+           |> List.dedup_and_sort ~compare:Token_id.compare
+         in
+         List.iter tokens ~f:(fun token ->
+             let total =
+               Token_id.Table.find_exn currency_tbl token
+               |> Currency.Balance.of_uint64
+               |> Currency.Balance.to_formatted_string
+             in
+             if Token_id.equal token Token_id.default then
+               Format.printf "MINA: %s@." total
+             else
+               Format.printf "TOKEN %s: %s@." (Token_id.to_string token) total
+         )
+       in
+       Deferred.return
+       @@
+       if plaintext then
+         In_channel.with_file ledger_file ~f:(fun in_channel ->
+             let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+             let accounts = [%of_sexp: Account.t list] sexp in
+             process_accounts accounts )
+       else
+         let json = Yojson.Safe.from_file ledger_file in
+         match Runtime_config.Accounts.of_yojson json with
+         | Ok runtime_accounts ->
+             let accounts =
+               Genesis_ledger_helper.Accounts.to_full runtime_accounts
+               |> List.map ~f:(fun (_sk_opt, acct) -> acct)
+             in
+             process_accounts accounts
+         | Error err ->
+             Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
+               err ;
+             ignore (exit 1))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -2086,4 +2153,6 @@ let advanced =
 
 let ledger =
   Command.group ~summary:"Ledger commands"
-    [("export", export_ledger); ("hash", hash_ledger)]
+    [ ("export", export_ledger)
+    ; ("hash", hash_ledger)
+    ; ("currency", currency_in_ledger) ]
