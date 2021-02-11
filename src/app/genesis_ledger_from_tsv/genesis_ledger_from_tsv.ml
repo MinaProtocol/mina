@@ -1,5 +1,11 @@
 (* genesis_ledger_from_tsv.ml -- create JSON-format genesis ledger from tab-separated-value data *)
 
+(* columns in spreadsheet:
+
+ Wallet Address (Public Key)|Amount (MINA)|Initial Minimum Balance|(MINA) Cliff Time (Months)|Cliff Unlock Amount (MINA)|Unlock Frequency (0: per slot, 1: per month)|Unlock Amount (MINA)|Delegate (Public Key) [Optional]
+
+*)
+
 open Core_kernel
 open Async
 open Mina_numbers
