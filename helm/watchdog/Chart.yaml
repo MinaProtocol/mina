@@ -2,7 +2,7 @@ apiVersion: v2
 name: watchdog
 description: A Helm chart for Mina Protocol's Watchdog
 type: application
-version: 0.1.0
+version: 0.4.6
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |

@@ -16,10 +16,10 @@ spec:
         app: {{tpl .Values.coordinator.fullname .}}
         testnet: {{ .Values.testnetName }}
         role: snark-coordinator
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 6 (split ":" .Values.mina.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ .Values.mina.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
@@ -29,7 +29,7 @@ spec:
           requests:
             memory: 24Gi
             cpu: 8.0
-        image: {{ $.Values.coda.image }}
+        image: {{ $.Values.mina.image }}
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
@@ -43,23 +43,23 @@ spec:
           "-snark-worker-fee", "$(MINA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
-          {{- if $.Values.coda.runtimeConfig }}
+          {{- if $.Values.mina.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
-          {{- range $.Values.coda.seedPeers }}
+          {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ .Values.mina.generateGenesisProof | quote }}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
           value: "7"
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coda.ports.graphql | quote }}
+          value: {{ .Values.mina.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.client | quote }}
+          value: {{ .Values.mina.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coda.ports.metrics | quote }}
+          value: {{ .Values.mina.ports.metrics | quote }}
         - name: MINA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
@@ -69,26 +69,26 @@ spec:
         - name: MINA_SNARK_FEE
           value: {{ .Values.coordinator.snarkFee | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ .Values.mina.ports.p2p | quote }}
         - name: WORK_SELECTION
           value: {{$.Values.coordinator.workSelectionAlgorithm | quote }}
         ports:
         - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.client }}
+          containerPort: {{ .Values.mina.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.graphql }}
+          containerPort: {{ .Values.mina.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.metrics }}
+          containerPort: {{ .Values.mina.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.p2p }}
+          containerPort: {{ .Values.mina.ports.p2p }}
+          hostPort: {{ .Values.mina.ports.p2p }}
 {{- include "healthcheck.snarkCoordinator.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
-      {{- if .Values.coda.runtimeConfig }}
+      {{- if .Values.mina.runtimeConfig }}
         volumeMounts:
         - name: daemon-config
           mountPath: "/config/"

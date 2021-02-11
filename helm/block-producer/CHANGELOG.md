@@ -11,3 +11,6 @@
 ------
 - Add static peer id support
 
+0.5.1:
+------
+- coda -> mina
