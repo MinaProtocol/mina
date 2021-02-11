@@ -852,7 +852,7 @@ let dump_keypair =
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
 
-let handle_dump_ledger_response ~json = function
+let handle_export_ledger_response ~json = function
   | Error e ->
       Daemon_rpcs.Client.print_rpc_error e
   | Ok (Error e) ->
@@ -871,20 +871,19 @@ let export_ledger =
     Command.Param.(
       flag "--state-hash" ~aliases:["state-hash"]
         ~doc:
-          "STATE-HASH State hash, if printing the current staged ledger \
-           (default: state hash for the best tip)"
+          "STATE-HASH State hash, if printing a staged ledger (default: state \
+           hash for the best tip)"
         (optional string))
   in
   let ledger_kind =
     let t =
       Command.Param.Arg_type.of_alist_exn
         (List.map
-           [ "current-staged-ledger"
-           ; "staking-epoch-ledger"
-           ; "next-epoch-ledger" ] ~f:(fun s -> (s, s)))
+           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
+           ~f:(fun s -> (s, s)))
     in
     Command.Param.(
-      anon ("current-staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
+      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
@@ -901,7 +900,7 @@ let export_ledger =
          in
          let response =
            match ledger_kind with
-           | "current-staged-ledger" ->
+           | "staged-ledger" ->
                let state_hash =
                  Option.map ~f:State_hash.of_base58_check_exn state_hash
                in
@@ -919,7 +918,57 @@ let export_ledger =
                (* unreachable *)
                failwithf "Unknown ledger kind: %s" ledger_kind ()
          in
-         response >>| handle_dump_ledger_response ~json:(not plaintext) ))
+         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+
+let hash_ledger =
+  let ledger_file_flag =
+    Command.Param.(
+      flag "--ledger-file"
+        ~doc:"LEDGER-FILE File containing an exported ledger" (required string))
+  in
+  let plaintext_flag = Cli_lib.Flag.plaintext in
+  let flags = Args.zip2 ledger_file_flag plaintext_flag in
+  Command.async
+    ~summary:
+      "Print the Merkle root of the ledger contained in the specified file"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun _port (ledger_file, plaintext) ->
+         let process_accounts accounts =
+           let constraint_constants =
+             Genesis_constants.Constraint_constants.compiled
+           in
+           let packed_ledger =
+             Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+               ~depth:constraint_constants.ledger_depth accounts
+           in
+           let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+           Format.printf "%s@."
+             (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+         in
+         return
+         @@
+         if plaintext then
+           In_channel.with_file ledger_file ~f:(fun in_channel ->
+               let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+               let accounts =
+                 lazy
+                   (List.map
+                      ([%of_sexp: Account.t list] sexp)
+                      ~f:(fun acct -> (None, acct)))
+               in
+               process_accounts accounts )
+         else
+           let json = Yojson.Safe.from_file ledger_file in
+           match Runtime_config.Accounts.of_yojson json with
+           | Ok runtime_accounts ->
+               let accounts =
+                 lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
+               in
+               process_accounts accounts
+           | Error err ->
+               Format.eprintf "Could not parse JSON in file %s: %s@"
+                 ledger_file err ;
+               ignore (exit 1) ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -2036,4 +2085,5 @@ let advanced =
     ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
 
 let ledger =
-  Command.group ~summary:"Ledger commands" [("export", export_ledger)]
+  Command.group ~summary:"Ledger commands"
+    [("export", export_ledger); ("hash", hash_ledger)]
