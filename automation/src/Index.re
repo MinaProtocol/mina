@@ -156,11 +156,11 @@ let genesisTerm = {
  */
 
 let defaultCommand = {
-  let doc = "simple utility for spinning up coda testnets";
+  let doc = "simple utility for spinning up mina testnets";
   let sdocs = Manpage.s_common_options;
   (
     Term.(ret(const(_ => `Help((`Pager, None))) $ const())),
-    Term.info("coda-network", ~version="0.1.0-alpha", ~doc, ~sdocs),
+    Term.info("mina-network", ~version="0.1.0-alpha", ~doc, ~sdocs),
   );
 };
 

@@ -256,9 +256,9 @@ if [[ -s "terraform/testnets/${TESTNET}/genesis_ledger.json" ]] ; then
 fi
 
 #if $COMMUNITY_ENABLED ; then 
-#    echo "-- Creating genesis ledger with 'coda-network genesis' --"
+#    echo "-- Creating genesis ledger with 'mina-network genesis' --"
 #else
-#  echo "-- Creating genesis ledger with 'coda-network genesis' without community keys --"
+#  echo "-- Creating genesis ledger with 'mina-network genesis' without community keys --"
 
 PROMPT_KEYSETS=""
 function add_another_to_prompt {
@@ -333,11 +333,11 @@ fi
 PROMPT_KEYSETS="${PROMPT_KEYSETS}n
 "
 
-# Handle passing the above keyset info into interactive 'coda-network genesis' prompts
+# Handle passing the above keyset info into interactive 'mina-network genesis' prompts
 while read input
 do echo "$input"
   sleep 5
-done < <(echo -n "$PROMPT_KEYSETS") | coda-network genesis
+done < <(echo -n "$PROMPT_KEYSETS") | mina-network genesis
 
 GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 

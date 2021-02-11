@@ -170,7 +170,7 @@ There is a testnet module variable which determines the *Kubernetes* context to 
 
 The script `scripts/generate-keys-and-ledger.sh` handles key and genesis ledger generation. This script will build keysets and public/private key files to the output path in `./keys/keysets` and `keys/testnet-keys`.
 It is necessary to set the number of whales, fish, and extra-fish. The testnet name will specify the genesis ledger output folder for daemon consumption. `terraform/tests/TESTNET/`
-You will need to have compiled coda-network to the `bin/`
+You will need to have compiled mina-network to the `bin/`
 
 ```
 ./scripts/generate-keys-and-ledger.sh --testnet=beans --wc=5 --fc=1 --efc=2
@@ -455,7 +455,7 @@ yarn build
 yarn link
 ```
 
-Now you can use the `coda-network` command. To use some of the functionality, you'll need a [Google Cloud Service Account](https://cloud.google.com/iam/docs/service-accounts). Once you download the key for the service account, use the following command to configure it:
+Now you can use the `mina-network` command. To use some of the functionality, you'll need a [Google Cloud Service Account](https://cloud.google.com/iam/docs/service-accounts). Once you download the key for the service account, use the following command to configure it:
 
 ```
 export GOOGLE_APPLICATION_CREDENTIALS=<PATH_TO_KEYFILE>
@@ -464,14 +464,14 @@ export GOOGLE_APPLICATION_CREDENTIALS=<PATH_TO_KEYFILE>
 Try the following command to get started:
 
 ```
-coda-network --help
+mina-network --help
 ```
 
 Some of the common commands are:
 
 ```
-coda-network keypair create
-coda-netowrk keyset create -n <KEYSET_NAME>
-coda-network keyset add -n <KEYSET_NAME> -k <PUBLIC_KEY>
-coda-network genesis create
+mina-network keypair create
+mina-network keyset create -n <KEYSET_NAME>
+mina-network keyset add -n <KEYSET_NAME> -k <PUBLIC_KEY>
+mina-network genesis create
 ```

@@ -45,7 +45,7 @@ Keypairs have a private key and a corresponding public key. For new keypair gene
 However there are also existing keys which we'll need to be able to reference by public key alone since we don't control the private keys. An example of this would be community owned wallets for inclusion in the genesis ledger. Since this distinction can be made at a higher level, we'll keep the definition of a keypair to mean a public key for which we also have th private key.
 
 ```
-coda-network keypair create [--nickname <NAME>]
+mina-network keypair create [--nickname <NAME>]
 ```
 
 ### Keyset Management
@@ -55,32 +55,32 @@ Keysets are simply a collection of keypairs. We use these for categorizing diffe
 The datastructure for a given keyset is much simpler since it's essentially a list public keys. As such we can simply maintain a simple JSON document that contains all the public keys included in a given keyset using the name of the keyset for the filename.
 
 ```
-coda-network keyset create <NAME> [--count <NUMBER>]
+mina-network keyset create <NAME> [--count <NUMBER>]
 ```
 
 This simply creates a new keyset that keys can be included in. Optionally you can pass `-c`/`--count` to have the keyset populated with freshly generated keys.
 
 ```
-coda-network keyset add <NAME> <PUBLIC_KEY> ...
+mina-network keyset add <NAME> <PUBLIC_KEY> ...
 ```
 
 This command would add the public key(s) to a keyset.
 
 ```
-coda-network keyset remove <NAME> <PUBLIC_KEY> ...
+mina-network keyset remove <NAME> <PUBLIC_KEY> ...
 ```
 
 This command would remove the public key(s) from a keyset.
 
 ```
-coda-network keyset [ls|list]
+mina-network keyset [ls|list]
 ```
 
 Keysets and their corresponding keypairs can also be individually uploaded / downloaded which will also sync any keypairs that we have.
 
 ```
-coda-network keyset upload <KEYSET_NAME>
-coda-network keyset download <KEYSET_NAME>
+mina-network keyset upload <KEYSET_NAME>
+mina-network keyset download <KEYSET_NAME>
 ```
 
 ### Runtime Ledger Generation
@@ -88,7 +88,7 @@ coda-network keyset download <KEYSET_NAME>
 The code for generating the Runtime Genesis Ledger should be ported over from the [existing code](https://github.com/MinaProtocol/coda-automation/blob/master/scripts/testnet-keys.py#L203) but with the added flexibility of being able to inject any variety of keysets into the ledger with corresponding initial amounts.
 
 ```
-coda-network genesis create
+mina-network genesis create
 ```
 
 This command will prompt the user for the keysets which should be included in the ledger, their corresponding amounts and delegates. This would then output a `genesis_ledger.json` which contains entries of the following form:
@@ -109,7 +109,7 @@ Additionally we can output an annotated ledger file with additional fields such 
 Again this can be uploaded to Google Cloud Storage for sharing.
 
 ```
-coda-network genesis upload <VERSION>
+mina-network genesis upload <VERSION>
 ```
 
 Since the genesis ledger must be combined with the keypairs needed this command will also ensure the corresponding keysets have been uploaded.
@@ -119,7 +119,7 @@ Since the genesis ledger must be combined with the keypairs needed this command 
 The configuration deployment will consist of collecting all the "online" keys and the genesis ledger and uploading them to the kubernetes secret service. This tool should expose similar functionality to the existing tool, allowing users to upload keypairs to the kubernetes ConfigMap however not splitting out the task into predefined groups but rather allowing arbitrary keysets to be deployed. 
 
 ```
-coda-network deploy <GENESIS_VERSION>
+mina-network deploy <GENESIS_VERSION>
 ```
 
 This would collect all the "online" keypairs needed by the provided genesis version locally or remotely and upload them to the Kubernetes secret service.
@@ -190,7 +190,7 @@ Finally the configuration can be deployed to the kubernetes environment for use 
 For other tools that might want to use some aspects of the functionality, they can use the JavaScript API. Any other node based program will be able to do anything that can be accomplished on the command line:
 
 ```js
-import testnetSdk from 'coda-network'
+import testnetSdk from 'mina-network'
 
 testnetSdk.keyset.import(csv);
 testnetSdk.keyset.list();

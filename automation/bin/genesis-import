@@ -22,7 +22,7 @@ const results = [];
 const invalidKeys = [];
 
 // Create the keyset
-let createKeyset = spawnSync("coda-network", [
+let createKeyset = spawnSync("mina-network", [
   "keyset",
   "create",
   "-n",
@@ -67,7 +67,7 @@ const validateKeys = (entries) =>
 
 const importKeys = (keys) =>
   keys.map((publicKey) => {
-    spawnSync("coda-network", [
+    spawnSync("mina-network", [
       "keyset",
       "add",
       "-n",
