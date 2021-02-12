@@ -1,9 +1,9 @@
 open Cmdliner
 
-type t = {coda_automation_location: string}
+type t = {mina_automation_location: string}
 
 let term =
-  let coda_automation_location =
+  let mina_automation_location =
     let doc =
       "Location of the mina automation repository to use when deploying the \
        network."
@@ -15,5 +15,5 @@ let term =
           ["mina-automation-location"]
           ~env ~docv:"MINA_AUTOMATION_LOCATION" ~doc)
   in
-  let cons_inputs coda_automation_location = {coda_automation_location} in
-  Term.(const cons_inputs $ coda_automation_location)
+  let cons_inputs mina_automation_location = {mina_automation_location} in
+  Term.(const cons_inputs $ mina_automation_location)

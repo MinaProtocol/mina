@@ -27,7 +27,7 @@ module Node = struct
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
       Printf.sprintf
-        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
+        "%s -c mina exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
         base_kube_cmd base_kube_cmd node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
