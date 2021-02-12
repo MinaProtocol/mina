@@ -16,19 +16,19 @@ variable "netname" {
   default     = "NONETNAMESET"
 }
 
-variable "coda_repo" {
+variable "mina_repo" {
   description = "repo of the Mina Deb to Install"
   type = string
   default = "stable"
 }
 
-variable "coda_version" {
+variable "mina_version" {
   description = "Version of the Mina Deb to Install"
   type = string
   default = "0.0.1-release-beta-0d13213e"
 }
 
-variable "coda_variant" {
+variable "mina_variant" {
   description = "The variant (build profile) of the Mina Deb to install"
   type  = string
   default = "testnet-postake-medium-curves"

@@ -53,8 +53,8 @@ locals {
       "value" = var.artifact_upload_bin
     },
     {
-      "name" = "CODA_HELM_REPO"
-      "value" = var.coda_helm_repo
+      "name" = "MINA_HELM_REPO"
+      "value" = var.mina_helm_repo
     },
     {
       "name" = "KUBE_CONFIG_PATH"

@@ -4,7 +4,7 @@ This is an opinionated setup of a Prometheus Monitoring Service. It is designed 
 
 ## Environment Variables 
 
-`CODA_METRICS_URI`: **Required** The hostname:port combination of a Mina Daemon monitoring port. 
+`MINA_METRICS_URI`: **Required** The hostname:port combination of a Mina Daemon monitoring port. 
 `FAUCET_METRICS_URI`: *Optional* The hostname:port combination of a Mina Faucet Service monitoring port.
 `ECHO_METRICS_URI`: *Optional* The hostname:port combination of a Mina Echo Service monitoring port.
 `REMOTE_WRITE_URI`: *Optional* The URI for a remote Prometheus instance to forward metrics to.

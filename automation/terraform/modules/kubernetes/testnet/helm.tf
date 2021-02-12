@@ -5,22 +5,6 @@ provider helm {
   }
 }
 
-data "local_file" "genesis_ledger" {
-  # genesis_ledger.json is not required when generate_and_upload_artifacts is set to false
-  filename = var.generate_and_upload_artifacts ? "${var.artifact_path}/genesis_ledger.json" : "/dev/null"
-  depends_on = [
-    null_resource.block_producer_key_generation
-  ]
-}
-
-data "local_file" "libp2p_peers" {
-  for_each = toset([ for config in var.block_producer_configs : config.name ])
-  filename = "${path.module}/../../../../keys/libp2p/${var.testnet_name}/${each.key}"
-  depends_on = [
-    null_resource.block_producer_key_generation
-  ]
-}
-
 locals {
   use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
@@ -29,23 +13,13 @@ locals {
     "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
   ]
 
-  static_peers = { for index, name in keys(data.local_file.libp2p_peers) :
-    name => {
-      full_peer = "/dns4/${name}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port + index }/p2p/${trimspace(data.local_file.libp2p_peers[name].content)}",
-      port      = var.block_producer_starting_host_port + index
-      name      = name
-    }
-  }
+  peers = concat(var.additional_peers, local.seed_peers)
 
-  coda_vars = {
-    runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
+  mina_vars = {
+    runtimeConfig      = var.runtime_config
     image              = var.mina_image
     privkeyPass        = var.block_producer_key_pass
-    seedPeers          = concat(
-      var.additional_seed_peers,
-      local.seed_peers,
-      [ for name in keys(local.static_peers) : local.static_peers[name].full_peer ]
-    )
+    seedPeers          = local.peers
     logLevel           = var.log_level
     logSnarkWorkGossip = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
@@ -53,15 +27,12 @@ locals {
   
   seed_vars = {
     testnetName = var.testnet_name
-    coda        = {
-      runtimeConfig      = local.coda_vars.runtimeConfig
+    mina        = {
+      runtimeConfig      = local.mina_vars.runtimeConfig
       image              = var.mina_image
       privkeyPass        = var.block_producer_key_pass
       // TODO: Change this to a better name
-      seedPeers          = concat(
-        var.additional_seed_peers,
-        [ for name in keys(local.static_peers) : local.static_peers[name].full_peer ]
-      )
+      seedPeers          = var.additional_peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
       ports = {
@@ -80,10 +51,10 @@ locals {
   block_producer_vars = {
     testnetName = var.testnet_name
 
-    coda = local.coda_vars
+    mina = local.mina_vars
 
     userAgent = {
-      image         = var.coda_agent_image
+      image         = var.mina_agent_image
       minFee        = var.agent_min_fee
       maxFee        = var.agent_max_fee
       minTx         = var.agent_min_tx
@@ -94,10 +65,10 @@ locals {
     }
 
     bots = {
-      image  = var.coda_bots_image
+      image  = var.mina_bots_image
       faucet = {
-        amount = var.coda_faucet_amount
-        fee    = var.coda_faucet_fee
+        amount = var.mina_faucet_amount
+        fee    = var.mina_faucet_fee
       }
     }
 
@@ -105,7 +76,7 @@ locals {
       for index, config in var.block_producer_configs: {
         name                 = config.name
         class                = config.class
-        externalPort         = local.static_peers[config.name].port
+        externalPort         = config.external_port
         runWithUserAgent     = config.run_with_user_agent
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
@@ -119,7 +90,7 @@ locals {
   
   snark_worker_vars = {
     testnetName = var.testnet_name
-    coda = local.coda_vars 
+    mina = local.mina_vars 
     worker = {
       active = true
       numReplicas = var.snark_worker_replicas
@@ -135,13 +106,13 @@ locals {
 
   archive_node_vars = {
     testnetName = var.testnet_name
-    coda = {
+    mina = {
       image         = var.mina_image
-      seedPeers     = concat(var.additional_seed_peers, local.seed_peers)
-      runtimeConfig = local.coda_vars.runtimeConfig
+      seedPeers     = local.peers
+      runtimeConfig = local.mina_vars.runtimeConfig
     }
     archive = {
-      image = var.coda_archive_image
+      image = var.mina_archive_image
       remoteSchemaFile = var.mina_archive_schema
     }
     postgresql = {
@@ -176,7 +147,7 @@ locals {
   watchdog_vars = {
     testnetName = var.testnet_name
     image = var.watchdog_image
-    coda = {
+    mina = {
       image = var.mina_image
       ports =  { metrics: 8000 }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
@@ -187,13 +158,9 @@ locals {
     makeReportEveryMins = var.make_report_every_mins
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts = var.make_report_accounts
-    seedPeersURL = var.seedPeersURL
+    seedPeersURL = var.seed_peers_url
   }
   
-}
-
-output static_peers {
-  value = local.static_peers
 }
 
 # Cluster-Local Seed Node
@@ -231,8 +198,7 @@ resource "helm_release" "seed" {
   wait        = false
   timeout     = 600
   depends_on  = [
-    kubernetes_role_binding.helm_release,
-    null_resource.block_producer_uploads,
+    kubernetes_role_binding.helm_release
   ]
 }
 

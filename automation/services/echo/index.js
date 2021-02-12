@@ -13,19 +13,19 @@ const logger = require("./logger.js");
 // Set up our GraphQL client
 
 const {
-  CODA_HOST = "localhost",
-  CODA_PORT = 0xc0da,
+  MINA_HOST = "localhost",
+  MINA_PORT = 0xc0da,
   PUBLIC_KEY,
   FEE = 5
 } = process.env;
 
 const httpLink = new HttpLink({
-  uri: `http://${CODA_HOST}:${CODA_PORT}/graphql`,
+  uri: `http://${MINA_HOST}:${MINA_PORT}/graphql`,
   fetch
 });
 
 const wsLink = new WebSocketLink({
-  uri: `ws://${CODA_HOST}:${CODA_PORT}/graphql`,
+  uri: `ws://${MINA_HOST}:${MINA_PORT}/graphql`,
   options: {
     reconnect: true
   },

@@ -1,3 +1,7 @@
+provider "google" {
+  alias = "gke"
+}
+
 # K8s Cluster Vars
 
 variable "cluster_name" {
@@ -17,7 +21,12 @@ variable "k8s_context" {
 
 # Global Vars
 
-variable "mina_image" {
+variable "artifact_path" {
+  type    = string
+  default = "/tmp"
+}
+
+variable "coda_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
 }
@@ -70,23 +79,12 @@ variable "coda_faucet_fee" {
 }
 
 variable "testnet_name" {
-  type    = string
-  default = "mina-testnet"
-}
-
-variable "additional_peers" {
-  type    = list
-  default = []
+  type = string
 }
 
 variable "archive_node_count" {
   type    = number
   default = 0
-}
-
-variable "runtime_config" {
-  type    = string
-  default = ""
 }
 
 # Seed Vars
@@ -116,6 +114,16 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
+variable "whale_count" {
+  type    = number
+  default = 1
+}
+
+variable "fish_count" {
+  type    = number
+  default = 1
+}
+
 variable "log_level" {
   type    = string
   default = "Trace"
@@ -135,22 +143,9 @@ variable "block_producer_key_pass" {
   type = string
 }
 
-variable "block_producer_configs" {
-  type = list(
-    object({
-      name = string,
-      class = string,
-      private_key_secret = string,
-      external_port = number,
-      libp2p_secret = string,
-      enable_gossip_flooding = bool,
-      enable_peer_exchange = bool,
-      isolated = bool,
-      run_with_user_agent = bool,
-      run_with_bots = bool
-    })
-  )
-  default = []
+variable "block_producer_starting_host_port" {
+  type    = number
+  default = 10000
 }
 
 # Snark Worker Vars
@@ -210,7 +205,7 @@ variable "gcloud_seeds" {
   default = []
 }
 
-# Mina network services vars
+# Coda network services vars
 
 variable "restart_nodes" {
   type    = bool

@@ -1,10 +1,10 @@
 # Faucet Service
 
-The faucet service is a simple Discord bot that listens for requests for `CODA` in a Discord channel and issues transactions to a local Mina Daemon. It is currently best to run this against a mina daemon running on a host machine, as opposed to against a Daemon in a docker container. 
+The faucet service is a simple Discord bot that listens for requests for `MINA` in a Discord channel and issues transactions to a local Mina Daemon. It is currently best to run this against a mina daemon running on a host machine, as opposed to against a Daemon in a docker container. 
 
 ## Usage
 
-First you'll need to have a `coda` daemon running on your machine. See the docs [here](https://codaprotocol.com/docs/getting-started/) for instructions on getting a node, then run the following command:
+First you'll need to have a `mina` daemon running on your machine. See the docs [here](https://codaprotocol.com/docs/getting-started/) for instructions on getting a node, then run the following command:
 
 ```
 $ mina daemon -rest-port 49370 -peer beta.o1test.net:8303

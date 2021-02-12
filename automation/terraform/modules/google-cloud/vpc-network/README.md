@@ -10,10 +10,10 @@
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:-----:|
-| network\_name | n/a | `string` | `"coda-testnet"` | no |
+| network\_name | n/a | `string` | `"mina-testnet"` | no |
 | network\_region | n/a | `string` | `"us-west1"` | no |
 | subnet\_cidr | n/a | `string` | `"10.0.0.0/16"` | no |
-| subnet\_name | n/a | `string` | `"coda-subnet"` | no |
+| subnet\_name | n/a | `string` | `"mina-subnet"` | no |
 
 ## Outputs
 

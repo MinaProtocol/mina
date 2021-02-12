@@ -7,7 +7,7 @@ global:
   # Attach these labels to any time series or alerts when communicating with
   # external systems (federation, remote storage, Alertmanager).
   external_labels:
-      monitor: 'coda-monitor'
+      monitor: 'mina-monitor'
 
 # Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
 rule_files:
@@ -41,7 +41,7 @@ scrape_configs:
         replacement: "${1}:10000"
       # Only monitor instances with a tag module = coda-node
       - source_labels: [__meta_ec2_tag_module]
-        regex: coda-node
+        regex: mina-node
         action: keep
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
@@ -62,7 +62,7 @@ scrape_configs:
         replacement: "${1}:10000"
       # Only monitor instances with a tag module = coda-node
       - source_labels: [__meta_ec2_tag_module]
-        regex: coda-node
+        regex: mina-node
         action: keep
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
@@ -81,9 +81,9 @@ scrape_configs:
       - source_labels: [__meta_ec2_public_ip]
         target_label: __address__
         replacement: "${1}:10000"
-      # Only monitor instances with a tag module = coda-node
+      # Only monitor instances with a tag module = mina-node
       - source_labels: [__meta_ec2_tag_module]
-        regex: coda-node
+        regex: mina-node
         action: keep
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
@@ -102,9 +102,9 @@ scrape_configs:
       - source_labels: [__meta_ec2_public_ip]
         target_label: __address__
         replacement: "${1}:10000"
-      # Only monitor instances with a tag module = coda-node
+      # Only monitor instances with a tag module = mina-node
       - source_labels: [__meta_ec2_tag_module]
-        regex: coda-node
+        regex: mina-node
         action: keep
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
@@ -113,11 +113,11 @@ scrape_configs:
       - source_labels: [__meta_ec2_tag_role]
         target_label: role
 
-{% if CODA_METRICS_URI is defined %}
-  - job_name: "coda"
+{% if MINA_METRICS_URI is defined %}
+  - job_name: "mina"
     scrape_interval: "10s"
     static_configs:
-      - targets: ['{{ CODA_METRICS_URI }}']
+      - targets: ['{{ MINA_METRICS_URI }}']
 {% endif %}
 {% if FAUCET_METRICS_URI is defined %}
   - job_name: "faucet"

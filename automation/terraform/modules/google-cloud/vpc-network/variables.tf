@@ -14,7 +14,7 @@ variable "network_region" {
 
 variable "subnet_name" {
   type    = string
-  default = "coda-subnet"
+  default = "mina-subnet"
 }
 
 variable "subnet_cidr" {
