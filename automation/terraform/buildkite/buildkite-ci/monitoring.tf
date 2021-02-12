@@ -16,7 +16,7 @@ provider helm {
 resource "helm_release" "buildkite_graphql_exporter" {
   provider  = helm.bk_monitoring
 
-  name          = "buildkite-coda-exporter"
+  name          = "buildkite-mina-exporter"
   chart         = "buildkite-exporter"
   version       = "0.1.4"
   repository    = "https://coda-charts.storage.googleapis.com"

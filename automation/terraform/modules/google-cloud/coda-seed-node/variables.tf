@@ -18,7 +18,7 @@ variable "seed_peers" {
 
 variable "instance_name" {
   description = "The desired name to assign to the deployed instance"
-  default     = "coda-seed-node"
+  default     = "mina-seed-node"
 }
 
 variable "zone" {
