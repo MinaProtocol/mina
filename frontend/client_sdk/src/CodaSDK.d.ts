@@ -46,6 +46,15 @@ export declare const genKeys: () => keypair;
   */
 export declare const derivePublicKey: (privateKey: privateKey) => publicKey;
 /**
+  * Verifies if a keypair is valid by checking if the public key can be derived from
+  * the private key and additionally checking if we can use the private key to
+  * sign a transaction. If the keypair is invalid, an exception is thrown.
+  *
+  * @param keypair - A keypair
+  * @returns True if the `keypair` is a verifiable keypair, otherwise throw an exception
+   */
+export declare const verifyKeypair: (keypair: keypair) => boolean;
+/**
   * Signs an arbitrary message
   *
   * @param key - The keypair used to sign the message
@@ -85,3 +94,17 @@ export declare const signPayment: (payment: payment, key: keypair) => signed<pay
   * @returns A signed stake delegation
   */
 export declare const signStakeDelegation: (stakeDelegation: stakeDelegation, key: keypair) => signed<stakeDelegation>;
+/**
+  * Verifies a signed payment.
+  *
+  * @param signedPayment - A signed payment transaction
+  * @returns True if the `signed(payment)` is a verifiable payment
+   */
+export declare const verifyPaymentSignature: (signedPayment: signed<payment>) => boolean;
+/**
+  * Verifies a signed stake delegation.
+  *
+  * @param signedStakeDelegation - A signed stake delegation
+  * @returns True if the `signed(stakeDelegation)` is a verifiable stake delegation
+   */
+export declare const verifyStakeDelegationSignature: (signedStakeDelegation: signed<stakeDelegation>) => boolean;
