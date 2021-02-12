@@ -5,27 +5,24 @@ provider helm {
   }
 }
 
-data "local_file" "genesis_ledger" {
-  # genesis_ledger.json is not required when generate_and_upload_artifacts is set to false
-  filename = var.generate_and_upload_artifacts ? "${var.artifact_path}/genesis_ledger.json" : "/dev/null"
-  depends_on = [
-    null_resource.block_producer_key_generation
-  ]
-}
-
-data "local_file" "libp2p_peers" {
-  for_each = toset([ for config in var.block_producer_configs : config.name ])
-  filename = "${path.module}/../../../../keys/libp2p/${var.testnet_name}/${each.key}"
-  depends_on = [
-    null_resource.block_producer_key_generation
-  ]
-}
-
 # reserve gcloud external IP address for public seed access
 resource "google_compute_address" "seed_static_ip" {
   name         = "seed-static-ip"
   address_type = "EXTERNAL"
   region       = var.cluster_region
+}
+
+# create associated static DNS for seed access
+data "aws_route53_zone" "selected" {
+  name = "o1test.net."
+}
+
+resource "aws_route53_record" "seed_record" {
+  zone_id = data.aws_route53_zone.selected.zone_id
+  name    = "seed.${local.testnet_name}.${data.aws_route53_zone.selected.name}"
+  type    = "A"
+  ttl     = "300"
+  records = [google_compute_address.seed_static_ip.address]
 }
 
 locals {
