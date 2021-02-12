@@ -1504,6 +1504,14 @@ let get_peers_graphql =
 
 let add_peers_graphql =
   let open Command in
+  let seed =
+    Param.(
+      flag "--seed" ~aliases:["-seed"]
+        ~doc:
+          "true/false Whether to add these peers as 'seed' peers, which may \
+           perform peer exchange. Default: true"
+        (optional bool))
+  in
   let peers =
     Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
   in
@@ -1511,8 +1519,8 @@ let add_peers_graphql =
     ~summary:
       "Add peers to the daemon\n\n\
        Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
-    (Cli_lib.Background_daemon.graphql_init peers
-       ~f:(fun graphql_endpoint input_peers ->
+    (Cli_lib.Background_daemon.graphql_init (Param.both peers seed)
+       ~f:(fun graphql_endpoint (input_peers, seed) ->
          let open Deferred.Let_syntax in
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
@@ -1536,9 +1544,10 @@ let add_peers_graphql =
                      peer ;
                    Core.exit 1 )
          in
+         let seed = Option.value ~default:true seed in
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Add_peers.make ~peers ())
+             (Graphql_queries.Add_peers.make ~peers ~seed ())
              graphql_endpoint
          in
          printf "Requested to add peers:\n" ;
@@ -1859,6 +1868,35 @@ let archive_blocks =
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ))
 
+let receipt_chain_hash =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:
+      "Compute the next receipt chain hash from the previous hash and \
+       transaction ID"
+    (let%map_open previous_hash =
+       flag "--previous-hash"
+         ~doc:"Previous receipt chain hash, base58check encoded"
+         (required string)
+     and transaction_id =
+       flag "--transaction-id" ~doc:"Transaction ID, base58check encoded"
+         (required string)
+     in
+     fun () ->
+       let previous_hash =
+         Receipt.Chain_hash.of_base58_check_exn previous_hash
+       in
+       (* What we call transation IDs in GraphQL are just base58_check-encoded
+         transactions. It's easy to handle, and we return it from the
+         transaction commands above, so lets use this format.
+      *)
+       let transaction = Signed_command.of_base58_check_exn transaction_id in
+       let hash =
+         Receipt.Chain_hash.cons (Signed_command transaction.payload)
+           previous_hash
+       in
+       printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1973,4 +2011,5 @@ let advanced =
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-blocks", archive_blocks) ]
+    ; ("archive-blocks", archive_blocks)
+    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
