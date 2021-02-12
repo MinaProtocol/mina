@@ -4,7 +4,7 @@ variable "project_id" {
 
 variable "network_name" {
   type    = string
-  default = "coda-testnet"
+  default = "mina-testnet"
 }
 
 variable "network_region" {

@@ -329,7 +329,7 @@ def create_genesis_ledger(
 
 @cli.command()
 @click.option('--key-dir', default=(SCRIPT_DIR / "seed_keys").absolute(), help='Location of Block Producer keys to Upload, a Directory.')
-@click.option('--namespace', default="coda-testnet", help='The namespace the Kubernetes secret should be uploaded to.')
+@click.option('--namespace', default="mina-testnet", help='The namespace the Kubernetes secret should be uploaded to.')
 def upload_seed_keys(key_dir, namespace):
     """Upload LibP2P Keypairs to Kubernetes -- Ensure kubectl is properly configured!"""
     # Load all the public keys from seed_key_dir
@@ -357,7 +357,7 @@ def upload_seed_keys(key_dir, namespace):
 
 @cli.command()
 @click.option('--key-dir', default=(SCRIPT_DIR / "block_producers").absolute(), help='Location of Block Producer keys to Upload, a Directory.')
-@click.option('--namespace', default="coda-testnet", help='The namespace the Kubernetes secret should be uploaded to.')
+@click.option('--namespace', default="mina-testnet", help='The namespace the Kubernetes secret should be uploaded to.')
 def upload_block_producer_keys(key_dir, namespace):
     """Upload Private Keys for Block Producers to Kubernetes -- Ensure kubectl is properly configured!"""
     # Load all the public keys from seed_key_dir

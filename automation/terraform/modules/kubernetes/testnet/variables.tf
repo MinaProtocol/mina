@@ -84,7 +84,7 @@ variable "coda_faucet_fee" {
 
 variable "testnet_name" {
   type    = string
-  default = "coda-testnet"
+  default = "mina-testnet"
 }
 
 variable "additional_seed_peers" {
