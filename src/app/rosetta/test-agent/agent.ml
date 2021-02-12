@@ -14,7 +14,7 @@ end
 
 let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
 
-let snark_pk = "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf"
+let snark_pk = "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
 
 let wait span = Async.after span |> Deferred.map ~f:Result.return
 
@@ -618,19 +618,20 @@ let run ~logger ~rosetta_uri ~graphql_uri ~don't_exit =
 let command =
   let open Command.Let_syntax in
   let%map_open rosetta_uri =
-    flag "rosetta-uri" ~doc:"URI of Rosetta endpoint to connect to"
-      Cli.required_uri
+    flag "--rosetta-uri" ~aliases:["rosetta-uri"]
+      ~doc:"URI of Rosetta endpoint to connect to" Cli.required_uri
   and graphql_uri =
-    flag "graphql-uri" ~doc:"URI of Coda GraphQL endpoint to connect to"
-      Cli.required_uri
+    flag "--graphql-uri" ~aliases:["graphql-uri"]
+      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
   and log_json =
-    flag "log-json" ~doc:"Print log output as JSON (default: plain text)"
-      no_arg
+    flag "--log-json" ~aliases:["log-json"]
+      ~doc:"Print log output as JSON (default: plain text)" no_arg
   and log_level =
-    flag "log-level" ~doc:"Set log level (default: Info)" Cli.log_level
+    flag "--log-level" ~aliases:["log-level"]
+      ~doc:"Set log level (default: Info)" Cli.log_level
   and don't_exit =
-    flag "dont-exit" ~doc:"Don't exit after tests finish (default: do exit)"
-      no_arg
+    flag "--dont-exit" ~aliases:["dont-exit"]
+      ~doc:"Don't exit after tests finish (default: do exit)" no_arg
   in
   let open Deferred.Let_syntax in
   fun () ->
