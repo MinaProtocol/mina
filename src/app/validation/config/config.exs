@@ -9,7 +9,7 @@ config :logger, :console,
   format: {PrettyConsoleLog, :format},
   metadata: [:pid, :context]
 
-config :coda_validation,
+config :mina_validation,
   project_id: "o1labs-192920",
   region: "us-east1",
   cluster: "coda-infra-east",

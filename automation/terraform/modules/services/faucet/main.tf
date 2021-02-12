@@ -17,8 +17,8 @@ data "template_file" "container_definition" {
     # Faucet Vars
     faucet_container_version = var.faucet_container_version
     discord_api_key   = var.discord_api_key
-    coda_graphql_host = var.coda_graphql_host
-    coda_graphql_port = var.mina_rest_port
+    mina_graphql_host = var.mina_graphql_host
+    mina_graphql_port = var.mina_rest_port
     faucet_public_key = var.faucet_public_key
     faucet_password   = var.faucet_password
     echo_public_key   = var.echo_public_key
@@ -36,8 +36,8 @@ data "template_file" "container_definition" {
     mina_discovery_port = var.mina_discovery_port
     mina_metrics_port  = var.mina_metrics_port
     mina_privkey_pass  = var.mina_privkey_pass
-    coda_testnet = var.testnet
-    coda_client_port = var.coda_client_port
+    mina_testnet = var.testnet
+    mina_client_port = var.mina_client_port
   }
 }
 

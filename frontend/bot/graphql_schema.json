@@ -7842,7 +7842,7 @@
               "args": [
                 {
                   "name": "token",
-                  "description": "Token of account being retrieved (defaults to CODA)",
+                  "description": "Token of account being retrieved (defaults to MINA)",
                   "type": {
                     "kind": "SCALAR",
                     "name": "TokenId",

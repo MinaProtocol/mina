@@ -3,7 +3,7 @@ defmodule CodaValidation.MixProject do
 
   def project do
     [
-      app: :coda_validation,
+      app: :mina_validation,
       name: "CodaValidation",
       version: "0.1.0",
       elixir: "~> 1.10",

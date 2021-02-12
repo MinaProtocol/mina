@@ -20,11 +20,11 @@ data "aws_ami" "image" {
 }
 
 # The Node instance
-resource "aws_instance" "coda_node" {
+resource "aws_instance" "mina_node" {
   count                       = "${var.server_count}"
   ami                         = "${var.custom_ami != "" ? var.custom_ami : data.aws_ami.image.id}"
   instance_type               = "${var.instance_type}"
-  security_groups             = ["${aws_security_group.coda_sg.name}"]
+  security_groups             = ["${aws_security_group.mina_sg.name}"]
   key_name                    = "${var.public_key != "" ? aws_key_pair.testnet[0].key_name : var.key_name}"
   availability_zone           = "${element(data.aws_availability_zones.azs.names, count.index)}"
   associate_public_ip_address = "${var.use_eip}"
@@ -33,7 +33,7 @@ resource "aws_instance" "coda_node" {
     Name = "${var.netname}_${var.region}_${var.rolename}_${count.index}"
     role = "${var.netname}_${var.rolename}"
     testnet = "${var.netname}"
-    module = "coda-node"
+    module = "mina-node"
   }
 
   # Default root is 8GB
@@ -48,13 +48,13 @@ echo "Setting Hostname"
 hostnamectl set-hostname ${var.netname}_${var.region}_${var.rolename}_${count.index}.${var.region}
 echo '127.0.1.1  ${var.netname}_${var.region}_${var.rolename}_${count.index}.${var.region}' >> /etc/hosts
 
-echo "Installing Coda"
-echo "deb [trusted=yes] http://packages.o1test.net ${var.coda_repo} main" > /etc/apt/sources.list.d/mina.list
+echo "Installing Mina"
+echo "deb [trusted=yes] http://packages.o1test.net ${var.mina_repo} main" > /etc/apt/sources.list.d/mina.list
 apt-get update
-apt-get install --force-yes -t ${var.coda_repo} coda-${var.coda_variant}=${var.coda_version} -y
+apt-get install --force-yes -t ${var.mina_repo} mina-${var.mina_variant}=${var.mina_version} -y
 
-# coda flags
-echo ${var.rolename} > /etc/coda-rolename
+# mina flags
+echo ${var.rolename} > /etc/mina-rolename
 
 # journal logs on disk
 mkdir /var/log/journal

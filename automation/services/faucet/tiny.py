@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 LISTENING_CHANNELS = ["faucet"]
 FAUCET_APPROVE_ROLE = "faucet-approvers"
 MOD_ROLE = "mod"
-CODA_FAUCET_AMOUNT = os.environ.get("FAUCET_AMOUNT")
+MINA_FAUCET_AMOUNT = os.environ.get("FAUCET_AMOUNT")
 # A Dictionary to keep track of users
 # who have requested faucet funds 
 ACTIVE_REQUESTS = {}
@@ -38,7 +38,7 @@ SENT_TRANSACTION_THIS_BLOCK = False
 
 # PROMETHEUS METRICS
 TRANSACTION_COUNT = prometheus_client.Counter("faucet_transactions_sent", "Number of Transactions sent since the process started")
-TOTAL_CODA_SENT = prometheus_client.Counter("faucet_coda_sent", "Amount of Mina sent since the process started")
+TOTAL_MINA_SENT = prometheus_client.Counter("faucet_mina_sent", "Amount of Mina sent since the process started")
 PROCESS_METRICS = prometheus_client.ProcessCollector(namespace='faucet')
 PLEASE_WAIT_ERRORS = prometheus_client.Counter("faucet_please_wait_errors", "Number of 'Please Wait' Errors that have been issued")
 BLOCK_NOTIFICATIONS_RECIEVED = prometheus_client.Counter("faucet_block_notifications_recieved", "Number of Block Notifications recieved")
@@ -147,7 +147,7 @@ Once a mod approves, `100 MINA` will be sent to the requested address!
             m = re.search(regexp, message.content)
             if m and not SENT_TRANSACTION_THIS_BLOCK:
                 recipient = m.groups()[0]
-                amount = CODA_FAUCET_AMOUNT
+                amount = MINA_FAUCET_AMOUNT
                 logger.debug(recipient)
                 # Request transaction approval from the mods 
                 approval_text = 'Hey {}, should I approve this transaction?: \nRequester: {}\nRecipient: {}\nAmount: {}\n *To cancel, react with ❌*'.format(mod_role, requester.mention, recipient, amount)
@@ -202,7 +202,7 @@ Once a mod approves, `100 MINA` will be sent to the requested address!
 
                         #Increment metrics counters
                         TRANSACTION_COUNT.inc()
-                        TOTAL_CODA_SENT.inc(int(amount))
+                        TOTAL_MINA_SENT.inc(int(amount))
                     elif cancel in done:
                         await channel.send('Transaction Cancelled!')
                         logger.debug("Cancelled...")

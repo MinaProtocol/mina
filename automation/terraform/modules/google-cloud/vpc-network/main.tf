@@ -11,7 +11,7 @@ resource "google_compute_subnetwork" "default" {
   project = var.project_id
 }
 
-resource "google_compute_firewall" "coda_daemon_ingress" {
+resource "google_compute_firewall" "mina_daemon_ingress" {
   name    = "${var.network_name}-daemon-ingress"
   network = google_compute_network.default.name
   project = var.project_id

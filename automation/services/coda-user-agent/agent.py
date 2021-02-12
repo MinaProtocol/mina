@@ -23,7 +23,7 @@ def getenv_int(env_var: str, default: int) -> int:
 def getenv_currency(env_var: str, lower_bound: Currency, upper_bound: Currency) -> Currency:
     return getenv_default_map(env_var, Currency, Currency.random(lower_bound, upper_bound))
 
-CODA_PUBLIC_KEY = getenv_str("CODA_PUBLIC_KEY", "4vsRCVyVkSRs89neWnKPrnz4FRPmXXrWtbsAQ31hUTSi41EkbptYaLkzmxezQEGCgZnjqY2pQ6mdeCytu7LrYMGx9NiUNNJh8XfJYbzprhhJmm1ZjVbW9ZLRvhWBXRqes6znuF7fWbECrCpQ")
+MINA_PUBLIC_KEY = getenv_str("MINA_PUBLIC_KEY", "4vsRCVyVkSRs89neWnKPrnz4FRPmXXrWtbsAQ31hUTSi41EkbptYaLkzmxezQEGCgZnjqY2pQ6mdeCytu7LrYMGx9NiUNNJh8XfJYbzprhhJmm1ZjVbW9ZLRvhWBXRqes6znuF7fWbECrCpQ")
 MINA_PRIVKEY_PASS = getenv_str("MINA_PRIVKEY_PASS", "naughty blue worm")
 AGENT_MIN_FEE = getenv_currency("AGENT_MIN_FEE", Currency("0.06"), Currency("0.1"))
 AGENT_MAX_FEE = getenv_currency("AGENT_MAX_FEE", AGENT_MIN_FEE, AGENT_MIN_FEE + Currency("0.2"))
@@ -34,9 +34,9 @@ AGENT_SEND_EVERY_MINS = getenv_int("AGENT_SEND_EVERY_MINS", random.randint(1, 5)
 AGENT_METRICS_PORT = getenv_int("AGENT_METRICS_PORT", 8000)
 
 
-CODA_CLIENT_ARGS = {
-    "graphql_host": getenv_str("CODA_HOST", "localhost"),
-    "graphql_port": getenv_str("CODA_PORT", "3085")
+MINA_CLIENT_ARGS = {
+    "graphql_host": getenv_str("MINA_HOST", "localhost"),
+    "graphql_port": getenv_str("MINA_PORT", "3085")
 } 
 
 
@@ -110,7 +110,7 @@ class Agent(object):
 
 
 def main():
-    agent = Agent(CODA_CLIENT_ARGS, CODA_PUBLIC_KEY, MINA_PRIVKEY_PASS)
+    agent = Agent(MINA_CLIENT_ARGS, MINA_PUBLIC_KEY, MINA_PRIVKEY_PASS)
     schedule.every(AGENT_SEND_EVERY_MINS).minutes.do(agent.send_transaction_batch)
     print("Sending a transaction every {} minutes.".format(AGENT_SEND_EVERY_MINS))
     while True:

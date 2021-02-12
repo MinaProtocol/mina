@@ -27,13 +27,13 @@ variable "discord_api_key" {
   type        = string
 }
 
-variable "coda_graphql_host" {
+variable "mina_graphql_host" {
   description = "The hostname of the Mina GraphQL Endpoint"
   type        = string
   default     = "localhost"
 }
 
-variable "coda_graphql_port" {
+variable "mina_graphql_port" {
   description = "The port the Mina GraphQL Endpoint is listening on"
   type        = string
   default     = "3085"
@@ -120,7 +120,7 @@ variable "mina_metrics_port" {
   default       = "10000"
 }
 
-variable "coda_client_port" {
+variable "mina_client_port" {
   description = "The port that the daemon will expose prometheus metrics on"
   type        = string
   default       = "10103"

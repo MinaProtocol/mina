@@ -11,7 +11,7 @@ import csv
 client = docker.from_env()
 p = inflect.engine()
 
-CODA_DAEMON_IMAGE = "codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6"
+MINA_DAEMON_IMAGE = "codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 DEFAULT_BLOCK_PRODUCER_KEY_DIR = SCRIPT_DIR / "block_producer_keys"
 DEFAULT_WHALE_KEYS_DIR = SCRIPT_DIR / "whale_keys"
@@ -42,7 +42,7 @@ def generate_block_producer_keys(count, output_dir, privkey_pass):
             
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",  
             command=["MINA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/block_producer_{}".format(privkey_pass, block_producer_number)], 
             volumes={output_dir: {'bind': '/keys', 'mode': 'rw'}}
@@ -64,7 +64,7 @@ def generate_offline_whale_keys(count, output_dir, privkey_pass):
             
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",  
             command=["MINA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/whale_account_{}".format(privkey_pass, i+1)], 
             volumes={output_dir: {'bind': '/keys', 'mode': 'rw'}}
@@ -84,7 +84,7 @@ def generate_offline_fish_keys(count, output_dir, privkey_pass):
             
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",  
             command=["MINA_PRIVKEY_PASS='{}' mina client-old generate-keypair -privkey-path /keys/fish_account_{}".format(privkey_pass, i+1)], 
             volumes={output_dir: {'bind': '/keys', 'mode': 'rw'}}
@@ -108,7 +108,7 @@ def generate_seed_keys(count, output_dir):
         seed_number = p.number_to_words(i+1)
 
         # Key outputted to stdout
-        key_raw = client.containers.run(CODA_DAEMON_IMAGE, entrypoint="bash -c", command=["mina advanced generate-libp2p-keypair"])
+        key_raw = client.containers.run(MINA_DAEMON_IMAGE, entrypoint="bash -c", command=["mina advanced generate-libp2p-keypair"])
         key_parsed = str(key_raw).split("\\n")[1]
         all_key_file = open(SEED_KEYS_DIR / "seed_{}_libp2p.txt".format(seed_number), "w")
 

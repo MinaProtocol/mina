@@ -21,7 +21,7 @@ to be accommodated.
 The Jane Street Async library contains a module `Versioned_rpc` with
 the machinery to allow evolution of RPC call versions.
 
-In the `coda_network` library, the `Versioned_rpc` library is used in
+In the `mina_network` library, the `Versioned_rpc` library is used in
 two ways, for queries and for broadcasting.
 
 ### Queries

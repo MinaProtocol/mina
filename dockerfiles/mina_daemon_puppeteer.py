@@ -1,6 +1,6 @@
 # This is a temporary hack for the integration test framework to be able to stop
 # and start nodes dyamically in a kubernetes environment. This script takes
-# coda arguments and will start and monitor a coda process with those arguments.
+# mina arguments and will start and monitor a mina process with those arguments.
 # If a SIGUSR1 signal is sent, it will stop this process, and if a SIGUSR2 is
 # sent, it will resume the process. Since this script is a hack, there are some
 # shortcomings of the script. Most notably:
@@ -17,7 +17,7 @@ import time
 active_daemon_request = False
 inactive_daemon_request = False
 tail_process = None
-coda_process = None
+mina_process = None
 daemon_args = sys.argv[1:] if len(sys.argv) > 1 else []
 
 # just nooping on this signal suffices, since merely trapping it will cause
@@ -34,9 +34,9 @@ def handle_stop_request(signum, frame):
   inactive_daemon_request = True
 
 def start_daemon():
-  global coda_process
+  global mina_process
   with open('mina.log', 'a') as f:
-    coda_process = subprocess.Popen(
+    mina_process = subprocess.Popen(
         ['mina'] + daemon_args,
         stdout=f,
         stderr=subprocess.STDOUT
@@ -44,11 +44,11 @@ def start_daemon():
   Path('daemon-active').touch()
 
 def stop_daemon():
-  global coda_process
-  coda_process.send_signal(signal.SIGTERM)
-  coda_process.wait()
+  global mina_process
+  mina_process.send_signal(signal.SIGTERM)
+  mina_process.wait()
   Path('daemon-active').unlink()
-  coda_process = None
+  mina_process = None
 
 # technically, doing the loops like this will eventually result in a stack overflow
 # however, you would need to do a lot of starts and stops to hit this condition
@@ -65,10 +65,10 @@ def inactive_loop():
   active_loop()
 
 def active_loop():
-  global coda_process, inactive_daemon_request
+  global mina_process, inactive_daemon_request
   while True:
     signal.pause()
-    status = coda_process.poll()
+    status = mina_process.poll()
     if status != None:
       cleanup_and_exit(status)
     elif inactive_daemon_request:

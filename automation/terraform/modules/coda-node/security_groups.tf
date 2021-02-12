@@ -1,6 +1,6 @@
-resource "aws_security_group" "coda_sg" {
-  name        = "${var.netname}_${var.region}_${var.rolename}_coda_sg"
-  description = "Allow control access and coda ports open"
+resource "aws_security_group" "mina_sg" {
+  name        = "${var.netname}_${var.region}_${var.rolename}_mina_sg"
+  description = "Allow control access and mina ports open"
 
   ingress {
     description = "ssh"

@@ -23,4 +23,4 @@ Look at the logs for the address on which the service is listening. By default t
 
 When you send a payment to the service, it will send back a payment with the amount equal to `initial_amount - fee` which can be configured via the `FEE` environment variable, however is set to `5` by default.
 
-By default, the client tries to connect to the daemon at `localhost:49370` however this can be configured via the `CODA_HOST` and `CODA_PORT` environment variables. 
+By default, the client tries to connect to the daemon at `localhost:49370` however this can be configured via the `MINA_HOST` and `MINA_PORT` environment variables. 

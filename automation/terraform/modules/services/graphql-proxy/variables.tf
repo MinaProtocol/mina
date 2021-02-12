@@ -22,13 +22,13 @@ variable "proxy_container_version" {
   type        = string
 }
 
-variable "coda_graphql_host" {
+variable "mina_graphql_host" {
   description = "The hostname of the Mina GraphQL Endpoint"
   type        = string
   default     = "localhost"
 }
 
-variable "coda_graphql_port" {
+variable "mina_graphql_port" {
   description = "The port the Mina GraphQL Endpoint is listening on"
   type        = string
   default     = "3085"
@@ -96,7 +96,7 @@ variable "mina_metrics_port" {
   default       = "10000"
 }
 
-variable "coda_client_port" {
+variable "mina_client_port" {
   description = "The port that the daemon will expose prometheus metrics on"
   type        = string
   default       = "10103"
@@ -107,7 +107,7 @@ variable "mina_privkey_pass" {
   type        = string
 }
 
-variable "coda_archive_node" {
+variable "mina_archive_node" {
   description = "Should this be run as an archive node (set if yes, unset if not)"
   type        = string
   default = "false"

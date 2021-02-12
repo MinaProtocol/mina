@@ -1,16 +1,16 @@
 locals {
-  this_id                           = compact(coalescelist(aws_instance.coda_node.*.id, [""]))
-  this_availability_zone            = compact(coalescelist(aws_instance.coda_node.*.availability_zone, [""]))
-  this_key_name                     = compact(coalescelist(aws_instance.coda_node.*.key_name, [""]))
-  this_public_dns                   = compact(coalescelist(aws_instance.coda_node.*.public_dns, [""]))
-  this_public_ip                    = compact(coalescelist(aws_instance.coda_node.*.public_ip, [""]))
-  this_primary_network_interface_id = compact(coalescelist(aws_instance.coda_node.*.primary_network_interface_id, [""]))
-  this_private_dns                  = compact(coalescelist(aws_instance.coda_node.*.private_dns, [""]))
-  this_private_ip                   = compact(coalescelist(aws_instance.coda_node.*.private_ip, [""]))
-  this_security_groups              = coalescelist(aws_instance.coda_node.*.security_groups, [""])
-  this_vpc_security_group_ids       = coalescelist(flatten(aws_instance.coda_node.*.vpc_security_group_ids), [""])
-  this_subnet_id                    = compact(coalescelist(aws_instance.coda_node.*.subnet_id, [""]))
-  this_tags                         = coalescelist(aws_instance.coda_node.*.tags, [""])
+  this_id                           = compact(coalescelist(aws_instance.mina_node.*.id, [""]))
+  this_availability_zone            = compact(coalescelist(aws_instance.mina_node.*.availability_zone, [""]))
+  this_key_name                     = compact(coalescelist(aws_instance.mina_node.*.key_name, [""]))
+  this_public_dns                   = compact(coalescelist(aws_instance.mina_node.*.public_dns, [""]))
+  this_public_ip                    = compact(coalescelist(aws_instance.mina_node.*.public_ip, [""]))
+  this_primary_network_interface_id = compact(coalescelist(aws_instance.mina_node.*.primary_network_interface_id, [""]))
+  this_private_dns                  = compact(coalescelist(aws_instance.mina_node.*.private_dns, [""]))
+  this_private_ip                   = compact(coalescelist(aws_instance.mina_node.*.private_ip, [""]))
+  this_security_groups              = coalescelist(aws_instance.mina_node.*.security_groups, [""])
+  this_vpc_security_group_ids       = coalescelist(flatten(aws_instance.mina_node.*.vpc_security_group_ids), [""])
+  this_subnet_id                    = compact(coalescelist(aws_instance.mina_node.*.subnet_id, [""]))
+  this_tags                         = coalescelist(aws_instance.mina_node.*.tags, [""])
 }
 
 output "id" {

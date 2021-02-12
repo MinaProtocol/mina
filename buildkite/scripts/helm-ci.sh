@@ -51,7 +51,7 @@ if [ -n "$charts" ]; then
     stageDir="updates"
     mkdir -p $stageDir $syncDir
 
-    gsutil -m rsync ${CODA_CHART_REPO:-"gs://coda-charts/"} $syncDir
+    gsutil -m rsync ${MINA_CHART_REPO:-"gs://coda-charts/"} $syncDir
 
     for dir in $dirs; do
       if [[ "$dir" =~ .*"automation".* ]]; then
@@ -77,7 +77,7 @@ if [ -n "$charts" ]; then
 
     if [ -n "${AUTO_DEPLOY+x}" ]; then
         echo "--- Deploying/Syncing with remote repository"
-        gsutil -m rsync $syncDir ${CODA_CHART_REPO:-"gs://coda-charts/"}
+        gsutil -m rsync $syncDir ${MINA_CHART_REPO:-"gs://coda-charts/"}
     fi
   fi
 else

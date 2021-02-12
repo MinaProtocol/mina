@@ -16,9 +16,9 @@ This is a Terraform module that will deploy a service containing two tasks, a Mi
 
 `proxy_container_version`: The version of the container to be used when deploying the Daemon Service
 
-`coda_graphql_host` (Default: "localhost"): The hostname of the Mina GraphQL Endpoint
+`mina_graphql_host` (Default: "localhost"): The hostname of the Mina GraphQL Endpoint
 
-`coda_graphql_port` (Default: "3085"): The port the Mina GraphQL Endpoint is listening on
+`mina_graphql_port` (Default: "3085"): The port the Mina GraphQL Endpoint is listening on
 
 ### Daemon Variables
 
@@ -50,11 +50,11 @@ The Mina Daemon image build is a two-step process, with the base Mina dockerfile
 
 The manual commands to release each container are the following:
 
-### Coda-Daemon Container
+### Mina-Daemon Container
 
 *(From the root of the `MinaProtocol/mina` repository)*
 
-`./scripts/release-docker.sh -s coda-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg coda_version=<MINA_VERSION>"`
+`./scripts/release-docker.sh -s mina-daemon -v <major>.<minor>.<patch> --extra-args "--build-arg mina_version=<MINA_VERSION>"`
 
 ### daemon Container
 

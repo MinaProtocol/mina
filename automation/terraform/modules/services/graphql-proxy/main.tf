@@ -16,8 +16,8 @@ data "template_file" "container_definition" {
     region    = "us-west-2"
     # graphql-proxy Vars
     proxy_container_version = var.proxy_container_version
-    coda_graphql_host = var.coda_graphql_host
-    coda_graphql_port = var.mina_rest_port
+    mina_graphql_host = var.mina_graphql_host
+    mina_graphql_port = var.mina_rest_port
     proxy_external_port = var.proxy_external_port
     # Daemon Vars
     mina_container_version = var.mina_container_version
@@ -31,9 +31,9 @@ data "template_file" "container_definition" {
     mina_external_port = var.mina_external_port
     mina_metrics_port  = var.mina_metrics_port
     mina_privkey_pass  = var.mina_privkey_pass
-    coda_testnet  = var.testnet
-    coda_archive_node = var.coda_archive_node
-    coda_client_port = var.coda_client_port
+    mina_testnet  = var.testnet
+    mina_archive_node = var.mina_archive_node
+    mina_client_port = var.mina_client_port
   }
 }
 

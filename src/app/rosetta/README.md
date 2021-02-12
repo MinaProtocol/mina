@@ -154,5 +154,5 @@ git clone https://github.com/coinbase/rosetta-specifications.git
 cd rosetta-specifications
 `brew install openapi-generator`
 openapi-generator generate -i api.json -g ocaml
-mv src/models $CODA/src/lib/rosetta_models
+mv src/models $MINA/src/lib/rosetta_models
 ```
