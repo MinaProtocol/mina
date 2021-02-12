@@ -434,6 +434,9 @@ module type S = sig
 
       val to_global_slot : t -> Mina_numbers.Global_slot.t
 
+      val of_global_slot :
+        constants:Constants.t -> Mina_numbers.Global_slot.t -> t
+
       val zero : constants:Constants.t -> t
     end
 

@@ -314,8 +314,8 @@ query get_peers {
 module Add_peers =
 [%graphql
 {|
-mutation ($peers: [NetworkPeer!]!) {
-  addPeers(peers: $peers) {
+mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
+  addPeers(peers: $peers, seed: $seed) {
     host
     libp2pPort
     peerId
