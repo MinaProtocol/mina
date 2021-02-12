@@ -79,11 +79,13 @@ module "ci_testnet" {
   providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
+  artifact_path = var.ci_artifact_path
+
   # TODO: remove obsolete cluster_name var + cluster region
   cluster_name          = "mina-integration-west1"
   cluster_region        = var.ci_cluster_region
   k8s_context           = var.ci_k8s_ctx
-  testnet_name          = "${terraform.workspace}-ci-net"
+  testnet_name          = "ci-net-${substr(sha256(terraform.workspace), 0, 7)}"
 
   coda_image            = var.coda_image
   coda_archive_image    = var.coda_archive_image
@@ -119,6 +121,4 @@ module "ci_testnet" {
 
   whale_count = var.whale_count
   fish_count = var.fish_count
-
-  artifact_path = var.ci_artifact_path
 }
