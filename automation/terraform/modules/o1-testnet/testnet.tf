@@ -7,14 +7,14 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  coda_image         = var.coda_image
-  coda_archive_image = var.coda_archive_image
-  coda_agent_image   = var.coda_agent_image
-  coda_bots_image    = var.coda_bots_image
-  coda_points_image  = var.coda_points_image
+  mina_image         = var.mina_image
+  mina_archive_image = var.mina_archive_image
+  mina_agent_image   = var.mina_agent_image
+  mina_bots_image    = var.mina_bots_image
+  mina_points_image  = var.mina_points_image
 
-  coda_faucet_amount = var.coda_faucet_amount
-  coda_faucet_fee    = var.coda_faucet_amount
+  mina_faucet_amount = var.mina_faucet_amount
+  mina_faucet_fee    = var.mina_faucet_amount
 
   log_level           = var.log_level
   log_txn_pool_gossip = var.log_txn_pool_gossip

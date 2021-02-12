@@ -26,12 +26,12 @@ variable "artifact_path" {
   default = "/tmp"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type    = string
   default = ""
 }
@@ -41,22 +41,22 @@ variable "mina_archive_schema" {
   default = ""
 }
 
-variable "coda_agent_image" {
+variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
 
-variable "coda_agent_active" {
+variable "mina_agent_active" {
   type    = string
   default = "true"
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type    = string
   default = ""
 }
 
-variable "coda_points_image" {
+variable "mina_points_image" {
   type    = string
   default = ""
 }
@@ -67,13 +67,13 @@ variable "watchdog_image" {
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_amount" {
+variable "mina_faucet_amount" {
   type    = string
   default = "10000000000"
 }
 
 # this must be a string to avoid scientific notation truncation
-variable "coda_faucet_fee" {
+variable "mina_faucet_fee" {
   type    = string
   default = "100000000"
 }
