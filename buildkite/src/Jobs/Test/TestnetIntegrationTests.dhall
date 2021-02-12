@@ -21,7 +21,7 @@ in Pipeline.build Pipeline.Config::{
     name = "TestnetIntegrationTests"
   },
   steps = [
-    TestExecutive.build "testnet_postake_medium_curves",
+    TestExecutive.build "integration_testnet",
 
     TestExecutive.execute "block-production" dependsOn,
     TestExecutive.execute "bootstrap" dependsOn,
