@@ -34,21 +34,27 @@ def main():
     ledger = json.load(f)
 
   writeable = [ i for i, v in enumerate(ledger['accounts']) if float(v['balance']) == 65500 or float(v['balance']) == 500 ]
+  not_writeable = [ i for i, v in enumerate(ledger['accounts']) if float(v['balance']) != 65500 and float(v['balance']) != 500 ]
   assert(len(writeable) == 3*len(counter))
+  assert(len(not_writeable) > 0)
 
   grouped = list(zip(*(iter(writeable),) * 3))
   config_to_pks = {}
   for indexes, (balance, initial_min_balance, cliff_block_height, cliff_amount, vesting_period, vesting_increment, _, _, _) in zip(grouped, counter.keys()):
 
+    if cliff_amount == "":
+      cliff_amount = "0"
+
+    if vesting_period == "0":
+      vesting_period = "1"
+      assert(vesting_increment == "0")
+
+    cliff_block_height = str(math.ceil(int(cliff_block_height) / 2))
+    vesting_period = str(math.ceil(int(vesting_period) / 2))
     config = (balance, initial_min_balance, cliff_block_height, cliff_amount, vesting_period, vesting_increment)
     config_to_pks[config] = []
-    for index in indexes:
-      if cliff_amount == "":
-        cliff_amount = "0"
 
-      if vesting_period == "0":
-        vesting_period = "1"
-        assert(vesting_increment == "0")
+    for index in indexes:
 
       config_to_pks[config].append(ledger['accounts'][index]['pk'])
 
@@ -97,11 +103,12 @@ def main():
       break
     time.sleep(5)
 
-  for pk, sk_path in pk_to_sk_path.items():
-    cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' +  coda_cmd + ' account import -config-directory ' + node_dir + ' -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" -privkey-path ' + sk_path + ' &> /dev/null'
+  for i, (pk, sk_path) in enumerate(pk_to_sk_path.items()):
+    cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' +  coda_cmd + ' account import -config-directory ' + node_dir + ' -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" -privkey-path ' + sk_path
     print(run_local_cmd(cmd).stdout.read())
 
-    cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' + coda_cmd + ' account unlock -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" -public-key ' + pk + ' &> /dev/null'
+  for i, (pk, sk_path) in enumerate(pk_to_sk_path.items()):
+    cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' + coda_cmd + ' account unlock -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" -public-key ' + pk
     print(run_local_cmd(cmd).stdout.read())
 
   while True:
@@ -111,29 +118,110 @@ def main():
     time.sleep(5)
     
   def send_txn(sender, receiver, fee, amount):
-    cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' + coda_cmd + ' client send-payment -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" -fee ' + str(fee) + ' -amount ' + str(amount) + ' -receiver ' + receiver + ' -sender ' + sender + ' &> /dev/null'
+    cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' + coda_cmd + ' client send-payment -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" -fee ' + str(fee) + ' -amount ' + str(amount) + ' -receiver ' + receiver + ' -sender ' + sender
     print(run_local_cmd(cmd).stdout.read())
 
   def get_balance(pk):
     cmd = 'CODA_PRIVKEY_PASS="naughty blue worm" ' + coda_cmd + ' client get-balance -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" --public-key ' + pk
-    return run_local_cmd(cmd).stdout.read()
+    result = run_local_cmd(cmd).stdout.read()
+    balance = float(result.split('\n')[-2].split(':')[1].split(' ')[1])
+    return balance
+
+  def get_balances(pks):
+    cmds = [ 'CODA_PRIVKEY_PASS="naughty blue worm" ' + coda_cmd + ' client get-balance -rest-server "http://127.0.0.1:' + node_gql_port + '/graphql" --public-key ' + pk for pk in pks ]
+    procs = [ run_local_cmd(cmd) for cmd in cmds ]
+    results = [ p.stdout.read() for p in procs ]
+    balances = [ float(result.split('\n')[-2].split(':')[1].split(' ')[1]) for result in results ]
+    return balances
+
+  expected_states = {}
+
+  dest_pk = ledger['accounts'][not_writeable[0]]['pk']
+
+  pk_to_configs = {}
+  for config,pks in config_to_pks.items():
+    for pk in pks:
+      pk_to_configs[pk] = config
 
   while True:
     last_time = time.time()
+
     
     pks = list(pk_to_sk_path.keys())
 
+    # ==============================================================
+
     # check the last transactions
-    print(get_balance(pks[0]))
+
+    pk_to_balances = {}
+    balances = get_balances(pks)
+
+    for pk, b in zip(pks, balances):
+      pk_to_balances[pk] = b
+      if pk in expected_states:
+        print('check', pk, b, '==', expected_states[pk])
+        try:
+          assert(expected_states[pk] == b)
+        except:
+          import IPython; IPython.embed()
+
+    sleep_slots = 20
+
+    # ==============================================================
+
+    status = run_local_cmd('_build/default/src/app/cli/src/coda.exe client status -daemon-port 3000').stdout.read()
+    global_slot_number = int([ s for s in status.split('\n') if s.startswith('Best tip global') ][0].split(':')[1].strip())
+    global_slot_number_20 = global_slot_number + sleep_slots
 
     # send a transaction
 
-    fee = 1
-    amount = 1
-    send_txn(pks[0], pks[1], fee, amount)
+    all_unlocked = True
+
+    for config,pks in config_to_pks.items():
+
+      _, initial_min_balance, cliff_block_height, cliff_amount, vesting_period, vesting_increment = [ int(x) for x in config ]
+
+      still_locked_in_20_seconds = initial_min_balance if cliff_block_height > global_slot_number_20 else initial_min_balance - cliff_amount - max(math.floor((global_slot_number_20 - cliff_block_height) / vesting_period) * vesting_increment, 0)
+
+      locked_now = initial_min_balance if cliff_block_height > global_slot_number else initial_min_balance - cliff_amount - max(math.floor((global_slot_number - cliff_block_height) / vesting_period) * vesting_increment, 0)
+
+      #1. send such that account value + fee will be < locked amount (should not go through)
+      #2. send such that account value >= locked amount, but with fee < locked amount (should not go through; do not include if all tokens are locked)
+      #3. send such that account value + fee will be >= locked amount (should go through; do not include if all tokens are locked)
+
+      pk_too_much = pks[0]
+      too_much_unlocked_by_20 = pk_to_balances[pk_too_much] - still_locked_in_20_seconds
+      fee_too_much = 2
+      amount_too_much = too_much_unlocked_by_20 + 10
+      send_txn(pk_too_much, dest_pk, fee_too_much, amount_too_much)
+      expected_states[pk_too_much] = pk_to_balances[pk_too_much]
+
+      pk_barely_too_much = pks[1]
+      barely_too_much_unlocked_by_20 = pk_to_balances[pk_barely_too_much] - still_locked_in_20_seconds
+      fee_barely_too_much = 10
+      amount_barely_too_much = too_much_unlocked_by_20 - 5
+      send_txn(pk_barely_too_much, dest_pk, fee_barely_too_much, amount_barely_too_much)
+      expected_states[pk_barely_too_much] = pk_to_balances[pk_barely_too_much]
+
+      pk_okay = pks[2]
+      okay_unlocked_by_20 = pk_to_balances[pk_okay] - locked_now
+      fee_okay = 2
+      amount_okay = 5
+      if okay_unlocked_by_20 >= amount_okay + fee_okay:
+        send_txn(pk_okay, dest_pk, fee_okay, amount_okay)
+        expected_states[pk_okay] = pk_to_balances[pk_okay] - fee_okay - amount_okay
+
+      print('locked', locked_now, global_slot_number, cliff_block_height, vesting_period)
+
+      all_unlocked = all_unlocked and locked_now == 0
+
+    if all_unlocked:
+      break
+
+    # ==============================================================
 
 
-    sleep_time = 2*10 - (time.time() - last_time)
+    sleep_time = 2*sleep_slots - (time.time() - last_time)
     print('sleeping', sleep_time)
     assert(sleep_time > 0)
     time.sleep(sleep_time)
