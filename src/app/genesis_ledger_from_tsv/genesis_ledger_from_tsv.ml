@@ -11,22 +11,22 @@ open Async
 open Mina_numbers
 open Signature_lib
 
+(* populated during validation pass *)
+let delegates_tbl : unit String.Table.t = String.Table.create ()
+
+let add_delegate pk = ignore (String.Table.add delegates_tbl ~key:pk ~data:())
+
+(* populated during validation pass *)
 let accounts_tbl : unit String.Table.t = String.Table.create ()
 
 let add_account pk =
   match String.Table.add accounts_tbl ~key:pk ~data:() with
   | `Ok ->
-      ()
+      true
   | `Duplicate ->
-      failwithf "Duplicate entry for public key %s" pk ()
+      false
 
-let delegates_tbl : unit String.Table.t = String.Table.create ()
-
-let add_delegate pk = ignore (String.Table.add delegates_tbl ~key:pk ~data:())
-
-let validate_pk pk =
-  try ignore (Public_key.Compressed.of_base58_check_exn pk)
-  with _ -> failwithf "Invalid Base58Check for public key: %s" pk ()
+let valid_pk pk = Or_error.is_ok @@ Public_key.Compressed.of_base58_check pk
 
 let slot_duration_ms =
   Consensus.Configuration.t
@@ -82,33 +82,17 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     ~delegatee_pk =
   [%log info] "Processing record for $wallet_pk"
     ~metadata:[("wallet_pk", `String wallet_pk)] ;
-  (* validate wallet public key *)
-  validate_pk wallet_pk ;
   let pk = Some wallet_pk in
-  add_account wallet_pk ;
-  let balance =
-    if valid_mina_amount amount then
-      Currency.Balance.of_formatted_string amount
-    else failwithf "Amount is not a valid Mina amount: %s" amount ()
-  in
+  let balance = Currency.Balance.of_formatted_string amount in
   let initial_minimum_balance =
     (* if omitted in the TSV, use balance *)
     if String.is_empty initial_min_balance then balance
-    else if valid_mina_amount initial_min_balance then
-      Currency.Balance.of_formatted_string initial_min_balance
-    else
-      failwithf "Initial minimum balance is not a valid Mina amount: %s"
-        initial_min_balance ()
+    else Currency.Balance.of_formatted_string initial_min_balance
   in
   let cliff_time =
     Global_slot.of_int (Int.of_string cliff_time_months * slots_per_month)
   in
-  let cliff_amount =
-    if valid_mina_amount cliff_amount then
-      Currency.Amount.of_formatted_string cliff_amount
-    else
-      failwithf "Cliff amount is not a valid Mina amount: %s" cliff_amount ()
-  in
+  let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
   let vesting_period =
     match Int.of_string unlock_frequency with
     | 0 ->
@@ -119,12 +103,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
         failwithf "Expected unlock frequency to be 0 or 1, got %s"
           unlock_frequency ()
   in
-  let vesting_increment =
-    if valid_mina_amount unlock_amount then
-      Currency.Amount.of_formatted_string unlock_amount
-    else
-      failwithf "Unlock amount is not a valid Mina amount: %s" unlock_amount ()
-  in
+  let vesting_increment = Currency.Amount.of_formatted_string unlock_amount in
   let timing =
     Some
       { Runtime_config.Json_layout.Accounts.Single.Timed.initial_minimum_balance
@@ -135,12 +114,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
   in
   let delegate =
     (* 0 denotes "no delegation" *)
-    if String.equal delegatee_pk "0" then None
-    else (
-      (* validate delegatee *)
-      validate_pk delegatee_pk ;
-      add_delegate delegatee_pk ;
-      Some delegatee_pk )
+    if String.equal delegatee_pk "0" then None else Some delegatee_pk
   in
   { Runtime_config.Json_layout.Accounts.Single.default with
     pk
@@ -162,31 +136,118 @@ let account_of_tsv ~logger tsv =
         ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
         ~delegatee_pk
   | _ ->
-      failwithf "TSV line does not contain expected fields: %s" tsv ()
+      (* should not occur, we've already validated the record *)
+      failwithf "TSV line does not contain expected number of fields: %s" tsv
+        ()
+
+let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
+    ~cliff_amount ~unlock_frequency ~unlock_amount ~delegatee_pk =
+  let valid_wallet_pk = valid_pk wallet_pk in
+  let not_duplicate_wallet_pk = add_account wallet_pk in
+  let valid_amount = valid_mina_amount amount in
+  let valid_init_min_balance =
+    String.is_empty initial_min_balance
+    || valid_mina_amount initial_min_balance
+  in
+  let valid_cliff_time_months =
+    try
+      let n = Int.of_string cliff_time_months in
+      n >= 0
+    with _ -> false
+  in
+  let valid_cliff_amount = valid_mina_amount cliff_amount in
+  let valid_unlock_frequency =
+    List.mem ["0"; "1"] unlock_frequency ~equal:String.equal
+  in
+  let valid_unlock_amount = valid_mina_amount unlock_amount in
+  let valid_delegatee_pk =
+    String.equal delegatee_pk "0"
+    || (add_delegate delegatee_pk ; valid_pk delegatee_pk)
+  in
+  let valid_field_descs =
+    [ ("wallet_pk", valid_wallet_pk)
+    ; ("wallet_pk (duplicate)", not_duplicate_wallet_pk)
+    ; ("amount", valid_amount)
+    ; ("initial_minimum_balance", valid_init_min_balance)
+    ; ("cliff_time_months", valid_cliff_time_months)
+    ; ("cliff_amount", valid_cliff_amount)
+    ; ("unlock_frequency", valid_unlock_frequency)
+    ; ("unlock_amount", valid_unlock_amount)
+    ; ("delegatee_pk", valid_delegatee_pk) ]
+  in
+  let valid_str = "VALID" in
+  let invalid_fields =
+    List.map valid_field_descs ~f:(fun (field, valid) ->
+        if valid then valid_str else field )
+    |> List.filter ~f:(fun field -> not (String.equal field valid_str))
+    |> String.concat ~sep:","
+  in
+  if String.is_empty invalid_fields then None else Some invalid_fields
+
+let validate_record tsv =
+  match String.split tsv ~on:'\t' with
+  | [ wallet_pk
+    ; amount
+    ; initial_min_balance
+    ; cliff_time_months
+    ; cliff_amount
+    ; unlock_frequency
+    ; unlock_amount
+    ; delegatee_pk ] ->
+      validate_fields ~wallet_pk ~amount ~initial_min_balance
+        ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
+        ~delegatee_pk
+  | _ ->
+      Some "TSV line does not contain expected number of fields"
 
 let remove_commas s = String.filter s ~f:(fun c -> not (Char.equal c ','))
 
 let main ~tsv_file ~output_file () =
   let logger = Logger.create () in
+  (* validation pass *)
+  let validation_errors =
+    In_channel.with_file tsv_file ~f:(fun in_channel ->
+        [%log info] "Opened TSV file $tsv_file for validation"
+          ~metadata:[("tsv_file", `String tsv_file)] ;
+        let rec go num_accounts validation_errors =
+          match In_channel.input_line in_channel with
+          | Some line ->
+              let underscored_line = remove_commas line in
+              let validation_errors =
+                match validate_record underscored_line with
+                | None ->
+                    validation_errors
+                | Some invalid_fields ->
+                    [%log error]
+                      "Validation failure at row $row, invalid fields: \
+                       $invalid_fields"
+                      ~metadata:
+                        [ ("row", `Int (num_accounts + 2))
+                        ; ("invalid_fields", `String invalid_fields) ] ;
+                    true
+              in
+              go (num_accounts + 1) validation_errors
+          | None ->
+              validation_errors
+        in
+        (* skip first line *)
+        let _headers = In_channel.input_line in_channel in
+        go 0 false )
+  in
+  if validation_errors then (
+    [%log fatal] "Input has validation errors, exiting" ;
+    Core_kernel.exit 1 )
+  else [%log info] "No validation errors found" ;
+  (* translation pass *)
   let provided_accounts, num_accounts =
     In_channel.with_file tsv_file ~f:(fun in_channel ->
-        [%log info] "Opened TSV file $tsv_file"
+        [%log info] "Opened TSV file $tsv_file for translation"
           ~metadata:[("tsv_file", `String tsv_file)] ;
         let rec go accounts num_accounts =
           match In_channel.input_line in_channel with
           | Some line ->
               let underscored_line = remove_commas line in
-              let account =
-                try account_of_tsv ~logger underscored_line
-                with exn ->
-                  [%log fatal]
-                    "Could not process record at row $row_number, error: $error"
-                    ~metadata:
-                      [ ("row_number", `Int (num_accounts + 2))
-                      ; ("error", `String (Exn.to_string exn))
-                      ; ("tsv", `String line) ] ;
-                  Core_kernel.exit 1
-              in
+              let account = account_of_tsv ~logger underscored_line in
               go (account :: accounts) (num_accounts + 1)
           | None ->
               (List.rev accounts, num_accounts)
