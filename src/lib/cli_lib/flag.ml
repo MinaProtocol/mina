@@ -8,7 +8,7 @@ let json =
 let plaintext =
   Command.Param.(
     flag "--plaintext" ~aliases:["plaintext"] no_arg
-      ~doc:"Use plaintext output (default: JSON)")
+      ~doc:"Use plaintext input or output (default: JSON)")
 
 let performance =
   Command.Param.(
