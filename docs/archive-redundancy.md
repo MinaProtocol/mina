@@ -1,10 +1,16 @@
 # Archive Node Redundancy and Recovery
 
-An archive process (`coda_archive`) consumes blocks from a daemon, processes it and writes to a postgres database. (Show a diagram here?). 
+An archive process (`coda_archive`) consumes blocks from a daemon, processes it and writes to a postgres database.
 
-DAEMON —> block —>ARCHIVE PROCESS —> required-block-data —> POSTGRES DATABASE
+<img src="res/archive1.png" alt="archive node architecture" width="400" height="200"/>
 
-If the daemon that sends blocks to the archive process or if the archive process itself fails for some reason, there can be missing blocks in the database. To minimize this, it is possible to connect multiple daemons to the archive process and have multiple archive process write to the same database. Any block that is already in the database is ignored by the archive process. However, multiple archive processes writing to a database concurrently could cause data inconsistencies (explained in https://github.com/MinaProtocol/mina/issues/7567). To avoid this, set the transaction isolation level of the archive database to `Serializable` using the following query:
+If the daemon that sends blocks to the archive process or if the archive process itself fails for some reason, there can be missing blocks in the database. To minimize this, it is possible to connect multiple daemons to the archive process and have multiple archive process write to the same database. Any block that is already in the database is ignored by the archive process.
+
+<img src="res/archive2.png" alt="archive node architecture" width="400" height="200"/>
+
+<img src="res/archive3.png" alt="archive node architecture" width="400" height="200"/>
+
+However, multiple archive processes writing to a database concurrently could cause data inconsistencies (explained in https://github.com/MinaProtocol/mina/issues/7567). To avoid this, set the transaction isolation level of the archive database to `Serializable` using the following query:
 
     `ALTER DATABASE <DATABASE NAME> SET DEFAULT_TRANSACTION_ISOLATION TO SERIALIZABLE ;`
 
