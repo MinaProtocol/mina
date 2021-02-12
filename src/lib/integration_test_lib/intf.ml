@@ -23,7 +23,7 @@ module Engine = struct
       -> cli_inputs:Cli_inputs.t
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
-      -> t Deferred.t
+      -> t
   end
 
   module type Network_intf = sig
