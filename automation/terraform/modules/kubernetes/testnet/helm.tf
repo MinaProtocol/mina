@@ -9,11 +9,7 @@ locals {
   use_local_charts = true
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
-  seed_peers = [
-    "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
-  ]
-
-  peers = concat(var.additional_peers, local.seed_peers)
+  peers = var.additional_peers
 
   coda_vars = {
     runtimeConfig      = var.runtime_config

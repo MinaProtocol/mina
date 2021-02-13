@@ -38,7 +38,7 @@ spec:
           mountPath: /root/libp2p-keys
       {{- end }}
       containers:
-      - name: seed
+      - name: coda
         resources:
           limits:
           requests:
@@ -106,8 +106,6 @@ spec:
 {{- include "healthcheck.seed.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
-        - name: daemon-config
-          mountPath: "/config/"
         {{- if $config.libp2pSecret }}
         - name: actual-libp2p
           mountPath: /root/libp2p-keys

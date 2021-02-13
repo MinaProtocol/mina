@@ -80,8 +80,8 @@ module "kubernetes_testnet" {
         class                  = "seed"
         id                     = i + 1
         external_port          = local.static_peers[local.seed_names[i]].port
-        private_key_secret     = "online-seed-account-${i + 1}-key"
-        libp2p_secret          = "seed-libp2p-${i + 1}-key"
+        private_key_secret     = "online-seeds-account-${i + 1}-key"
+        libp2p_secret          = "online-seeds-libp2p-${i + 1}-key"
       }
     ]
 
