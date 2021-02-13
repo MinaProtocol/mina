@@ -53,3 +53,11 @@ Missing blocks in an archive database can be added if there is block data (preco
 
     To import extensional blocks generated from an archive database, specify the `--extensional` flag in the `archive_blocks` command
 
+## Staking ledgers
+
+Staking ledgers are used to determine slot winners for each epoch. Mina daemon stores staking ledger for the current epoch and the next epoch (after it is finalized). Whenever there is an epoch transition, the "next" staking ledger from the previous epoch is used to determine slot winners for the new epoch. The staking ledger from the previous epoch is replaced with the "next" staking ledger and a new "next" staking ledger is chosen. Since staking ledgers for older epochs are no longer accessible, users may want to still keep them around for reporting or other purposes.
+
+Currently these ledgers can be exported using the cli command:
+`coda.exe ledger export CURRENT-STAGED-LEDGER|STAKING-EPOCH-LEDGER|NEXT-EPOCH-LEDGER`
+
+Epoch ledger transition happens once every 14 days (given slot-time = 3mins and slots-per-epoch = 7140). The window to backup a staking ledger is ~27 days considering "next" staking ledger is finalized after k blocks in the current epoch and therefore will be available for the rest of the current epoch and the entire next epoch.
