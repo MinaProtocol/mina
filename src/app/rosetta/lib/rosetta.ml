@@ -2,17 +2,35 @@ open Core_kernel
 open Async
 open Rosetta_lib
 
-let router ~graphql_uri ~db ~logger route body =
+let router ~graphql_uri ~pool ~logger route body =
+  let with_db f =
+    let open Deferred.Result.Let_syntax in
+    let%bind pool = Lazy.force pool in
+    Caqti_async.Pool.use (fun db -> f ~db) pool
+    |> Deferred.Result.map_error ~f:(function
+         | `App e ->
+             `App e
+         | `Page_not_found ->
+             `Page_not_found
+         | `Exception exn ->
+             `Exception exn
+         | `Connect_failed _e ->
+             `App (Errors.create (`Sql "Connect failed"))
+         | `Connect_rejected _e ->
+             `App (Errors.create (`Sql "Connect rejected"))
+         | `Post_connect _e ->
+             `App (Errors.create (`Sql "Post connect error")) )
+  in
   try
     match route with
     | "network" :: tl ->
-        Network.router tl body ~db ~graphql_uri ~logger
+        with_db (Network.router tl body ~graphql_uri ~logger)
     | "account" :: tl ->
-        Account.router tl body ~db ~graphql_uri ~logger
+        with_db (Account.router tl body ~graphql_uri ~logger)
     | "mempool" :: tl ->
-        Mempool.router tl body ~db ~graphql_uri ~logger
+        with_db (Mempool.router tl body ~graphql_uri ~logger)
     | "block" :: tl ->
-        Block.router tl body ~db ~graphql_uri ~logger
+        with_db (Block.router tl body ~graphql_uri ~logger)
     | "construction" :: tl ->
         Construction.router tl body ~graphql_uri ~logger
     | _ ->
@@ -24,27 +42,11 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
   let%bind body = Cohttp_async.Body.to_string body in
   let route = List.tl_exn (String.split ~on:'/' (Uri.path uri)) in
   let%bind result =
-    let with_db f =
-      Caqti_async.Pool.use (fun db -> f ~db) pool
-      |> Deferred.Result.map_error ~f:(function
-           | `App e ->
-               `App e
-           | `Page_not_found ->
-               `Page_not_found
-           | `Exception exn ->
-               `Exception exn
-           | `Connect_failed _e ->
-               `App (Errors.create (`Sql "Connect failed"))
-           | `Connect_rejected _e ->
-               `App (Errors.create (`Sql "Connect rejected"))
-           | `Post_connect _e ->
-               `App (Errors.create (`Sql "Post connect error")) )
-    in
     match Yojson.Safe.from_string body with
     | body ->
-        with_db (router route body ~graphql_uri ~logger)
+        router route body ~pool ~graphql_uri ~logger
     | exception Yojson.Json_error "Blank input data" ->
-        with_db (router route `Null ~graphql_uri ~logger)
+        router route `Null ~pool ~graphql_uri ~logger
     | exception Yojson.Json_error err ->
         Errors.create ~context:"JSON in request malformed"
           (`Json_parse (Some err))
@@ -84,7 +86,7 @@ let command =
   let%map_open archive_uri =
     flag "--archive-uri" ~aliases:["archive-uri"]
       ~doc:"Postgres connection string URI corresponding to archive node"
-      Cli.required_uri
+      Cli.optional_uri
   and graphql_uri =
     flag "--graphql-uri" ~aliases:["graphql-uri"]
       ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
@@ -102,27 +104,40 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Cli.logger_setup log_json log_level ;
-    match Caqti_async.connect_pool ~max_size:128 archive_uri with
-    | Error e ->
-        [%log error]
-          ~metadata:[("error", `String (Caqti_error.show e))]
-          "Failed to create a caqti pool to postgres. Error: $error" ;
-        Deferred.unit
-    | Ok pool ->
-        let%bind server =
-          Cohttp_async.Server.create_expert ~max_connections:128
-            ~on_handler_error:
-              (`Call
-                (fun _net exn ->
-                  [%log error]
-                    "Exception while handling Rosetta server request: $error"
-                    ~metadata:
-                      [ ("error", `String (Exn.to_string_mach exn))
-                      ; ("context", `String "rest_server") ] ))
-            (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
-            (server_handler ~pool ~graphql_uri ~logger)
+    let pool =
+      lazy
+        (let open Deferred.Result.Let_syntax in
+        let%bind archive_uri =
+          match archive_uri with
+          | None ->
+              Deferred.Result.fail
+                (`App (Errors.create (`Sql "No archive URI set")))
+          | Some archive_uri ->
+              Deferred.Result.return archive_uri
         in
-        [%log info]
-          ~metadata:[("port", `Int port)]
-          "Rosetta process running on http://localhost:$port" ;
-        Cohttp_async.Server.close_finished server
+        match Caqti_async.connect_pool ~max_size:128 archive_uri with
+        | Error e ->
+            [%log error]
+              ~metadata:[("error", `String (Caqti_error.show e))]
+              "Failed to create a caqti pool to postgres. Error: $error" ;
+            Deferred.Result.fail (`App (Errors.create (`Sql "Connect failed")))
+        | Ok pool ->
+            Deferred.Result.return pool)
+    in
+    let%bind server =
+      Cohttp_async.Server.create_expert ~max_connections:128
+        ~on_handler_error:
+          (`Call
+            (fun _net exn ->
+              [%log error]
+                "Exception while handling Rosetta server request: $error"
+                ~metadata:
+                  [ ("error", `String (Exn.to_string_mach exn))
+                  ; ("context", `String "rest_server") ] ))
+        (Async.Tcp.Where_to_listen.bind_to All_addresses (On_port port))
+        (server_handler ~pool ~graphql_uri ~logger)
+    in
+    [%log info]
+      ~metadata:[("port", `Int port)]
+      "Rosetta process running on http://localhost:$port" ;
+    Cohttp_async.Server.close_finished server

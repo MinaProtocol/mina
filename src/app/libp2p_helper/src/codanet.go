@@ -53,7 +53,6 @@ type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
 var (
 	logger      = logging.Logger("codanet.Helper")
-	gsLogger    = logging.Logger("codanet.CodaGatingState")
 	NoDHT       bool // option for testing to completely disable the DHT
 	WithPrivate bool // option for testing to allow private IPs
 
@@ -189,16 +188,16 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	stream, err := cm.host.NewStream(cm.ctx, c.RemotePeer(), pxProtocolID)
 	if err != nil {
-		logger.Error("failed to open stream", err)
+		logger.Debug("failed to open stream", err)
 		return
 	}
 
 	n, err := stream.Write(bz)
 	if err != nil {
-		logger.Error("failed to write to stream", err)
+		logger.Debug("failed to write to stream", err)
 		return
 	} else if n != len(bz) {
-		logger.Error("failed to write all data to stream")
+		logger.Debug("failed to write all data to stream")
 		return
 	}
 
@@ -435,7 +434,7 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 		for {
 			if idx >= len(peers) {
 				return ret
-			} else if peers[idx] != h.Host.ID() && peers[idx] != from {
+			} else if peers[idx] != h.Host.ID() && peers[idx] != from && len(h.Host.Peerstore().PeerInfo(peers[idx]).Addrs) != 0 {
 				break
 			} else {
 				idx += 1
@@ -465,52 +464,50 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
-	fromSeed := false
-
-	for _, seed := range h.Seeds {
-		if s.Conn().RemotePeer() == seed.ID {
-			fromSeed = true
-			break
-		}
-	}
-
-	if !fromSeed {
-		logger.Debugf("ignoring peer-exchange stream from non-seed peer=%s", s.Conn().RemotePeer())
+	defer func() {
 		_ = s.Close()
+	}()
+
+	stat := s.Conn().Stat()
+	if stat.Direction != network.DirOutbound {
 		return
 	}
 
-	for {
-		dec := json.NewDecoder(s)
-		peers := []peer.AddrInfo{}
-		err := dec.Decode(&peers)
-		if err != nil && err == io.EOF {
-			continue
-		} else if err != nil && err.Error() == "stream reset" {
-			_ = s.Close()
-			return
-		} else if err != nil {
-			logger.Errorf("failed to decode list of peers err=%s", err)
-			continue
-		}
+	connInfo := h.ConnectionManager.GetInfo()
+	if connInfo.ConnCount >= connInfo.LowWater {
+		return
+	}
 
-		for _, peer := range peers {
-			go func() {
-				connInfo := h.ConnectionManager.GetInfo()
-				if connInfo.ConnCount < connInfo.LowWater {
-					err = h.Host.Connect(h.Ctx, peer)
-					if err != nil {
-						logger.Errorf("failed to connect to peer err=%s", err)
-					} else {
-						logger.Debugf("connected to peer! %s", peer)
-					}
+	buf := make([]byte, 8192)
+	_, err := s.Read(buf)
+	if err != nil && err != io.EOF {
+		logger.Debugf("failed to decode list of peers err=%s", err)
+		return
+	}
+
+	r := bytes.NewReader(buf)
+	peers := []peer.AddrInfo{}
+	dec := json.NewDecoder(r)
+	err = dec.Decode(&peers)
+	if err != nil {
+		logger.Debugf("failed to decode list of peers err=%s", err)
+		return
+	}
+
+	for _, p := range peers {
+		go func(p peer.AddrInfo) {
+			connInfo := h.ConnectionManager.GetInfo()
+			if connInfo.ConnCount < connInfo.LowWater {
+				err = h.Host.Connect(h.Ctx, p)
+				if err != nil {
+					logger.Debugf("failed to connect to peer %v err=%s", p, err)
 				} else {
-					h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
+					logger.Debugf("connected to peer! %v", p)
 				}
-			}()
-		}
-
-		_ = s.Close()
+			} else {
+				h.Host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.ConnectedAddrTTL)
+			}
+		}(p)
 	}
 }
 
