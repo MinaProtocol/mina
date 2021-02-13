@@ -54,6 +54,7 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
+          "-super-catchup",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end -}}

@@ -198,6 +198,7 @@ spec:
           "-insecure-rest-server",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
+          "-super-catchup",
           "-block-producer-key", "/root/wallet-keys/key",
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
