@@ -6,7 +6,7 @@ provider helm {
 }
 
 locals {
-  use_local_charts = false
+  use_local_charts = true
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   seed_peers = [
@@ -32,7 +32,7 @@ locals {
       image              = var.coda_image
       privkeyPass        = var.block_producer_key_pass
       // TODO: Change this to a better name
-      seedPeers          = var.additional_peers
+      seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
       ports = {
@@ -42,10 +42,14 @@ locals {
         p2p     = var.seed_port
       }
     }
-    seed        = {
-      active = true
-      discovery_keypair = var.seed_discovery_keypairs[0]
-    }
+
+    seedConfigs = [
+      for index, config in var.seed_configs: {
+        name                 = config.name
+        class                = config.class
+        libp2pSecret         = config.libp2p_secret
+      }
+    ]
   }
 
   block_producer_vars = {
@@ -184,13 +188,13 @@ resource "kubernetes_role_binding" "helm_release" {
   }
 }
 
-resource "helm_release" "seed" {
+resource "helm_release" "seeds" {
   provider   = helm.testnet_deploy
 
-  name        = "${var.testnet_name}-seed"
+  name        = "${var.testnet_name}-seeds"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version     = "0.4.5"
+  version     = "0.5.0"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -218,7 +222,7 @@ resource "helm_release" "block_producers" {
   ]
   wait        = false
   timeout     = 600
-  depends_on  = [helm_release.seed]
+  depends_on  = [helm_release.seeds]
 }
 
 # Snark Worker
@@ -236,7 +240,7 @@ resource "helm_release" "snark_workers" {
   ]
   wait        = false
   timeout     = 600
-  depends_on  = [helm_release.seed]
+  depends_on  = [helm_release.seeds]
 }
 
 # Archive Node
@@ -257,7 +261,7 @@ resource "helm_release" "archive_node" {
 
   wait = false
   timeout     = 600
-  depends_on = [helm_release.seed]
+  depends_on = [helm_release.seeds]
 }
 
 # Watchdog
@@ -275,6 +279,6 @@ resource "helm_release" "watchdog" {
   ]
   wait        = false
   timeout     = 600
-  depends_on  = [helm_release.seed]
+  depends_on  = [helm_release.seeds]
 }
 

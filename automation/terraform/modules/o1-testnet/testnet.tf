@@ -12,6 +12,7 @@ module "kubernetes_testnet" {
   coda_agent_image   = var.coda_agent_image
   coda_bots_image    = var.coda_bots_image
   coda_points_image  = var.coda_points_image
+  watchdog_image     = var.watchdog_image
 
   coda_faucet_amount = var.coda_faucet_amount
   coda_faucet_fee    = var.coda_faucet_amount
@@ -72,6 +73,15 @@ module "kubernetes_testnet" {
       }
     ]
   )
+
+  seed_configs = [
+      for i in range(var.seed_count): {
+        name                   = local.seed_names[i]
+        class                  = "seed"
+        id                     = i + 1
+        libp2p_secret          = "seed-libp2p-${i + 1}-key"
+      }
+    ]
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes

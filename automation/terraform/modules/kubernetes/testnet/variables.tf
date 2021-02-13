@@ -153,6 +153,17 @@ variable "block_producer_configs" {
   default = []
 }
 
+variable "seed_configs" {
+  type = list(
+    object({
+      name = string,
+      class = string
+      libp2p_secret = string,
+    })
+  )
+  default = []
+}
+
 # Snark Worker Vars
 
 variable "snark_worker_replicas" {

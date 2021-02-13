@@ -49,15 +49,16 @@ variable "fish_count" {
   default     = 2
 }
 
+variable "seed_count" {
+  default     = 5
+}
+
 locals {
   testnet_name = "multiple-seeds-test"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.2.11-compatible-a5fa443-multiple-seeds-test-feb43ca"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.2.11-compatible-a5fa443"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-compatible-9e2b5bc-testworld-496409d"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.3.3-compatible-9e2b5bc"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
-  seed_discovery_keypairs = [
-  "CAESQBEHe2zCcQDHcSaeIydGggamzmTapdCS8SP0hb5FWvYhe9XEygmlUGV4zNu2P8zAIba4X84Gm4usQFLamjRywA8=,CAESIHvVxMoJpVBleMzbtj/MwCG2uF/OBpuLrEBS2po0csAP,12D3KooWJ9mNdbUXUpUNeMnejRumKzmQF15YeWwAPAhTAWB6dhiv",
-  "CAESQO+8qvMqTaQEX9uh4NnNoyOy4Xwv3U80jAsWweQ1J37AVgx7kgs4pPVSBzlP7NDANP1qvSvEPOTh2atbMMUO8EQ=,CAESIFYMe5ILOKT1Ugc5T+zQwDT9ar0rxDzk4dmrWzDFDvBE,12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5" ]
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -116,6 +117,7 @@ module "testnet_east" {
   snark_worker_host_port = 10401
   whale_count           = var.whale_count
   fish_count            = var.fish_count
+  seed_count            = var.seed_count
 
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
