@@ -48,6 +48,8 @@ locals {
         name                 = config.name
         class                = config.class
         libp2pSecret         = config.libp2p_secret
+        privateKeySecret     = config.private_key_secret
+        externalPort         = config.external_port
       }
     ]
   }

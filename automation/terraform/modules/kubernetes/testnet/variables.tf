@@ -158,7 +158,9 @@ variable "seed_configs" {
     object({
       name = string,
       class = string
-      libp2p_secret = string,
+      libp2p_secret = string
+      external_port = number
+      private_key_secret = string
     })
   )
   default = []
