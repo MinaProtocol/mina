@@ -1,41 +1,49 @@
-# 22kB sized blockchain!
+# 22kB sized blockchain -- A technical refernce
 
 "The entire Mina blockchain is and will always be about 22kb - the size of a couple of tweets."
 
-To analyze the above statement, first, let us clarify what we mean by "blockchain" here.
-The data that a node needs in order to verify a specific state of the blockchain and the state itself in a trustless manner is what we are mainly referring to as blockchain. In the UTXO model this would be transactions in each block which are processed to verify the resulting UTXOs in the latest block. In an account based model, this would again be transactions in each block which are applied to the accounts in a previous state to verify the accounts in the new state.
+To analyze the above statement, first, let us clarify what we mean by "blockchain" here: A term that captures two groups of information. (1) An unambiguous usable representation (ie. not merely hashes) of the parts of the state a typical user would care about -- namely the current balance of their account. (2) The data that a node needs in order to verify that this state is real in a trustless manner. (3) The ability to broadcast transactions on the network to make a transfer. "Blockchain" captures (1), (2), and (3) here.
 
-Miners/block producers or full nodes perform this verification to sync to the network without having to trust another node and therefore are able to verify the correctness of the state (account balances or resulting UTXOs). Any new node (or a node that was offline for a long period) will have to perform this verification by dowloading the required blocks to sync to the network.
+In other networks, like Bitcoin or Ethereum, miners require the entire history of the transactions in the network (organized via the chain of blocks) to fully validate any portion of the current state of those networks. This is true for both account or UTXO-based networks. Any new node (or a node that was offline for a long period) will have to sync to the network trustlessly by downloading all the blocks they missed.
 
-Light clients which are intended for low-capacity environments help users to verify/access information relevant to them from the latest state of the blockchain without having to sync. They do so by reading the header from a block and verifying that the balance is correct w.r.t to the block they recieved, thereby trusting that the full node that sends them the data. The data light nodes need is therefore minimal and any new light node can sync to the network pretty quickly as a result of delegating trust.
+In other networks, like Bitcoin or Ethereum, there is a notion of a "light client". These light clients are intended for low-capacity environments help users to verify/access information relevant to them from the latest state of the blockchain without having to do an expensive (both in time and space) syncing operation. They do so by reading the header from a block and verifying that the balance is correct w.r.t to the block they recieved, thereby _trusting_ that the full node that sends them the data. These light nodes are not capable of representing "the blockhain" as we've defined it above.
 
-Mina replaces the entire blockchain, starting from genesis to any block, with an easily verifiable constant-sized cryptographic proof. Verifying this proof corresponding to a block amounts to verifying [all the transactions up until a few blocks behind the current block](#snarked-ledger). The proof and inputs to the verification function are all in the block that gets gossiped.
-This process of verification applies to all the nodes in Mina network. Let's dig a bit deeper to see how much state is required for different type of nodes in Mina network.
+Mina replaces the entire blockchain, starting from genesis to any block, with an easily verifiable constant-sized cryptographic proof. Verifying this proof corresponding to a block amounts to verifying [all the transactions up until a few blocks behind the current block](#snarked-ledger). The proof and inputs to the verification function are all in the latest block that gets gossiped. Note that due to the definition of "blockchain" above including the term "usable" This definition means in succinct protocol like Mina, we need more than just a proof object coupled with a state full of opaque hashes.
 
-## Light clients
+This process of verification applies to all the nodes in Mina network. Some roles in the network do need extra information to perform their duties, but this is beyond the definition we gave above. Read more about a "Block producer" node in the appendix.
 
-The main functionalities of a light client are 1) to be able to check balances of specific accounts 2) to be able to submit transactions to the network. For this, they need the following information.
+## Data needed for a usable represntation of the blockchain
 
-#### Block
+We wish (1) to be able to check balances of a specific account (2) to be able to submit transactions to the network. For this, a node, we call it a "non-consensus node" needs stored on in memory merely: a protocol state, the account, a merkle path to this account, and a verification key. Importantly, these powerful nodes are not light clients. They have equivalent security to full nodes.
 
-A block in mina respresents the state of the blockchain at a given height. It mainly consists of a blockchain proof, state represented using hashes of various datastructures including the ledger (we call this a protocol state), new transactions, SNARKs for the transactions included in the previous blocks. To verify the current block and all the previous blocks in the chain starting from genesis, one just needs the proof and the protocol state included in the current block (all hail recursive zk-SNARKS!). Then using the verifier function and verification keys, a node can determine whether this state is valid or not.
+This node role is not yet implemented. The protocol will support it, we just need to prioritize the engineering work.
 
-On receiving a new block, the node can also independently check if the new block is better than the existing one without having to trust the source. The protocol state basically has all the information to perform this check.
+### Protocol State
 
-#### Merkle path to an account
+The protocol state is an unambiguous representation of the current state of network. It includes hashes of various datastructures including the ledger. Block producing nodes gossip around blocks that contain the protocol state inside.
 
-Mina uses an account-based model (similar to Ethereum); balance corresponding to a public key is stored in an account record. A node that does not store the entire account-based ledger, can request a particular account record from a node that stores it (For example, block producing nodes). Additionally, the node will also request the merkle path to the account to verify the account record. The resulting merkle root should match the ledger state that was verified by the blockchain snark.
+A block in mina contains other information as well; a proof including new transactions and SNARKs for the transactions included in the previous blocks. Recursive zk-SNARKs, a verification function, and a verification key enable us to verify the entire sequence of blocks just via the proof and the protocol state from one single new block.
 
-#### Size
+After verifying the new state is valid, the node can also independently check if the new block is better than the existing one without having to trust the source by comparing it to the last known best protocol state -- then we can choose to forget this information if it's not better than the existing one or replace the one we stored. In other words, we only need to hold on to _one_ protocol state as we're listening for newer states.
 
-A light client in Mina is therefore able to verify the entire blockchain and accounts from the ledger certified by the blockchain SNARK in a trustless manner like any other full node. Let's look at how big this data is.
+### Account
+
+Mina uses an account-based model (similar to Ethereum); balance corresponding to a public key is stored in an account record. A node that does not store the entire account-based ledger, can request a particular account record from a node that stores it (for example, block producing nodes -- see the appendix).
+
+### Merkle path to an account
+
+Additionally, the node will also request the merkle path to the account to verify the account record is valid without needing to trust any node. The resulting merkle root should match the ledger state that was verified by the blockchain snark.
+
+## Measurement of Size
+
+A non-consensus node in Mina is therefore able to verify the entire blockchain and accounts from the ledger certified by the blockchain SNARK in a trustless manner like any other larger, more expensive (in syncing time, and space) full node would on other networks (like Bitcoin or Ethereum). Let's look at how big this data is:
 
 The size of each of these pieces of data can be measured empirically — we determined them (the actual binary data that gets stored) using this code [https://github.com/MinaProtocol/mina/commit/8b77e0f25424a364eb8fad10e9fae9dd6d6a9126#diff-ff77f063832ae5235355bf7790b3b00910e57caec5940203628766a5888272e9R638](https://github.com/MinaProtocol/mina/commit/8b77e0f25424a364eb8fad10e9fae9dd6d6a9126#diff-ff77f063832ae5235355bf7790b3b00910e57caec5940203628766a5888272e9R638).
-When executed we get the following information (in bytes):
+When executed, we get the following information (in bytes):
 
 ```
 
-Proof size: 7063 
+Proof size: 7063
 Protocol State size: 822
 Account size: 181
 Path size: 741
@@ -43,15 +51,18 @@ Total size (combined): 8807
 
 ```
 
-A node also requires a key to verify blockchain SNARKS and its size on disk is 2039 bytes  
+A node also requires a key to verify blockchain SNARKS and its size on disk is 2039 bytes
 
-The result is approximately 11kB! Mina's cryptography has evolved, and the protocol has gotten a bit more efficient so we're actually significantly below 22kB now.
+The result is approximately 11kB. Mina's cryptography has evolved since we initially crunched the numbers on the 22kB -- the protocol has gotten a bit more efficient.
 
 #### Snarked-ledger
+
 Note that the ledger proven by the blockchain snark is a few blocks behind the latest ledger because of the way transaction SNARKS are processed (explained in detail [here](https://minaprotocol.com/blog/scanning-for-scans)). We call this the snarked ledger and is proven by transaction SNARKS produced by snark worker nodes. The latest ledger corresponding to a block (staged-ledger) is verified explicitly by block producerss by applying the transactions to the ledger and are not guranteed by the blockchain proof.
 
-## Block-producing nodes
+## Conclusion
 
-Block-producing nodes perform more tasks than just verifying the state. In addition to producing blocks and generating blockchain SNARKs, block producers maintain a chain of last `k` blocks (where `k` is a constant from our consensus algorithm - ouroboros samasika, and currently is set to 290). `k` signifies the finality aspect of a block; a block that has `k` blocks on top of it has a negligible probability to be reversed and therefore all the transactions in it can be confirmed. A block producer maintains any forks that occur within the last `k` blocks so as to determine the best chain and produce blocks off of it. A block producer also maintains all the data structures including the full ledger to be able to generate the protocol state that other nodes can then verify. Albiet needing a bigger state, for a new block-producing node, syncing to the latest state amounts to verifying `k` blockchain SNARKs and applying the transactions in those `k` blocks. The batch-verification functionality has made this process much faster!
+Our aim was to show that an entire blockchain can be represented and verified using data that is just 11kB. We claim `The entire Mina blockchain is and will always be about 22kb` -- in reality, it is even smaller.
 
-Mina light clients or what we like to call non-consensus nodes, are not implemented currently. Our aim was to show, regardless of the type of the node, an entire blockchain can be represented and verified using data that is just 11kB. The transaction history can be stored separately using archive nodes for other uses but they are not required for validating the blockchain. This is precisely why we claim `The entire Mina blockchain is and will always be about 22kb`... oops `11kB`.
+## Appendix: Block-producing nodes
+
+Block-producing nodes perform more tasks than just verifying the state. In order to effectively produce blocks, block producers maintain a chain of last `k` blocks (where `k` is a constant from our consensus algorithm - ouroboros samasika, and currently is set to 290). `k` signifies the finality aspect of a block; a block that has `k` blocks on top of it has a negligible probability to be reversed and therefore all the transactions in it will always be confirmed for all eternity (TODO: Vanishree to clarify). A block producer maintains any forks that occur within the last `k` blocks so as to determine the best chain and produce blocks off of it. A block producer also maintains all the data structures including the full ledger to be able to generate the protocol state that other nodes can then verify. Albeit needing a bigger state, for a new block-producing node, syncing to the latest state amounts to verifying `k` blockchain SNARKs and applying the transactions in those `k` blocks.
