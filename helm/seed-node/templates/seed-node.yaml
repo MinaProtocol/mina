@@ -42,8 +42,8 @@ spec:
         resources:
           limits:
           requests:
-            memory: 16.0Gi
-            cpu: 8.0
+            memory: 32.0Gi
+            cpu: 12.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
           "-log-level", "Trace",
