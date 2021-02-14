@@ -163,7 +163,12 @@ kind: Service
 metadata:
   name: {{ $config.name }}
 spec:
+  {{- if $config.externalIp }}
+  type: LoadBalancer
+  loadBalancerIP: {{ $config.externalIp }}
+  {{- else }}
   type: ClusterIP
+  {{- end }}
   # We want all pods to have their addresses published for the sake of the
   # other testnet pods even before they're ready, since they
   # have to be able to talk to each other in order to become ready.
@@ -174,5 +179,6 @@ spec:
   - name: tcp-p2p
     port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
+    nodePort: {{ $config.nodePort }}
 ---
 {{ end }}
