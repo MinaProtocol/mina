@@ -34,7 +34,7 @@ in
     Command.build
       Command.Config::{
         commands = [
-          Cmd.run "cd automation && yarn install && yarn build && cd .."
+          Cmd.run "cd automation && yarn install && yarn build && cd ..",
 
           Cmd.run "cd ${spec.testnetDir} && terraform init",
 
