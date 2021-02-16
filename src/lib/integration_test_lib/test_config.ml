@@ -1,5 +1,5 @@
 module Container_images = struct
-  type t = {coda: string; user_agent: string; bots: string; points: string}
+  type t = {mina: string; user_agent: string; bots: string; points: string}
 end
 
 module Block_producer = struct

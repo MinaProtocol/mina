@@ -198,7 +198,7 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let images =
-    { Test_config.Container_images.coda= inputs.mina_image
+    { Test_config.Container_images.mina= inputs.mina_image
     ; user_agent= "codaprotocol/coda-user-agent:0.1.5"
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
