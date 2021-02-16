@@ -9,7 +9,7 @@ WHALE_COUNT=1
 FISH_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:0.3.2-coda-to-mina-82be2c0"
+MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:0.3.3-coda-to-mina-d654c75"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
