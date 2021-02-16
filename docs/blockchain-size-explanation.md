@@ -16,7 +16,7 @@ This process of verification applies to all the nodes in Mina network. Some role
 
 We wish (1) to be able to check balances of a specific account (2) to be able to submit transactions to the network. For this, a node, we call it a "non-consensus node" needs stored on in memory merely: a protocol state, the account, a merkle path to this account, and a verification key. Importantly, these powerful nodes are not light clients. They have equivalent security to full nodes.
 
-This node role is not yet implemented. The protocol will support it, we just need to prioritize the engineering work.
+This node role is not yet implemented. The protocol will support it, we just need to prioritize the engineering work. It is on the roadmap post-mainnet.
 
 ### Protocol State
 
