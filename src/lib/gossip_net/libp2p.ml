@@ -117,7 +117,11 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       in
       transport
 
+    (* peers_snapshot is updated every 30 seconds.
+*)
     let peers_snapshot = ref []
+
+    let peers_snapshot_max_staleness = Time.Span.of_sec 30.
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
@@ -165,9 +169,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           [%log' info config.logger] "libp2p peer ID this session is $peer_id"
             ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
-          let throttle =
-            Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
-          in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
@@ -176,24 +177,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               Ivar.fill_if_empty first_peer_ivar () ;
               if !ctr < 4 then incr ctr
               else Ivar.fill_if_empty high_connectivity_ivar ()
-            in
-            let reload_peers_snapshot () =
-              if Throttle.num_jobs_waiting_to_start throttle = 0 then
-                don't_wait_for
-                  (Throttle.enqueue throttle (fun () ->
-                       let open Deferred.Let_syntax in
-                       let%bind peers = peers net2 in
-                       peers_snapshot :=
-                         List.map peers
-                           ~f:
-                             (Fn.compose Mina_net2.Multiaddr.of_string
-                                Peer.to_multiaddr_string) ;
-                       Mina_metrics.(
-                         Gauge.set Network.peers
-                           (List.length peers |> Int.to_float)) ;
-                       after (Time.Span.of_sec 2.)
-                       (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
-                   ))
             in
             let seed_peers =
               List.dedup_and_sort ~compare:Mina_net2.Multiaddr.compare
@@ -241,9 +224,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
                     ; isolate= config.isolate }
-                ~on_peer_connected:(fun _ ->
-                  record_peer_connection () ; reload_peers_snapshot () )
-                ~on_peer_disconnected:(fun _ -> reload_peers_snapshot ())
+                ~on_peer_connected:(fun _ -> record_peer_connection ())
+                ~on_peer_disconnected:ignore
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -419,6 +401,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       | Error e ->
           fail (Error.of_exn e)
 
+    let peers t = !(t.net2) >>= Mina_net2.peers
+
     let create (config : Config.t) rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
@@ -529,17 +513,27 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
              ~f:do_ban
          in
          Linear_pipe.close ban_writer) ;
-      { config
-      ; added_seeds
-      ; net2= net2_ref
-      ; first_peer_ivar
-      ; high_connectivity_ivar
-      ; subscription= subscription_ref
-      ; message_reader
-      ; ban_reader
-      ; restart_helper= (fun () -> Strict_pipe.Writer.write restarts_w ()) }
-
-    let peers t = !(t.net2) >>= Mina_net2.peers
+      let t =
+        { config
+        ; added_seeds
+        ; net2= net2_ref
+        ; first_peer_ivar
+        ; high_connectivity_ivar
+        ; subscription= subscription_ref
+        ; message_reader
+        ; ban_reader
+        ; restart_helper= (fun () -> Strict_pipe.Writer.write restarts_w ()) }
+      in
+      Clock.every' peers_snapshot_max_staleness (fun () ->
+          let%map peers = peers t in
+          Mina_metrics.(
+            Gauge.set Network.peers (List.length peers |> Int.to_float)) ;
+          peers_snapshot :=
+            List.map peers
+              ~f:
+                (Fn.compose Mina_net2.Multiaddr.of_string
+                   Peer.to_multiaddr_string) ) ;
+      t
 
     let initial_peers t = t.config.initial_peers
 
