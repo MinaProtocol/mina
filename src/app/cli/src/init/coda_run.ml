@@ -265,7 +265,8 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
-    ?limited_graphql_port ?(insecure_rest_server = false) coda =
+    ?limited_graphql_port ?(open_limited_graphql_port = false)
+    ?(insecure_rest_server = false) coda =
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
@@ -489,7 +490,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   (*Second graphql server with limited queries exopsed*)
   Option.iter limited_graphql_port ~f:(fun rest_server_port ->
       trace_task "Second REST server (with limited queries)" (fun () ->
-          create_graphql_server ~bind_to_address:Tcp.Bind_to_address.Localhost
+          create_graphql_server
+            ~bind_to_address:
+              Tcp.Bind_to_address.(
+                if open_limited_graphql_port then All_addresses else Localhost)
             ~schema:Mina_graphql.schema_limited
             ~server_description:"GraphQL server with limited queries"
             rest_server_port ) ) ;

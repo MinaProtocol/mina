@@ -123,6 +123,14 @@ let setup_daemon logger =
   and client_port = Flag.Port.Daemon.client
   and rest_server_port = Flag.Port.Daemon.rest_server
   and limited_graphql_port = Flag.Port.Daemon.limited_graphql_server
+  and open_limited_graphql_port =
+    flag "--open-limited-graphql-port"
+      ~aliases:["open-limited-graphql-port"]
+      no_arg
+      ~doc:
+        "Have the limited GraphQL server listen on all addresses, not just \
+         localhost (this is INSECURE, make sure your firewall is configured \
+         correctly!)"
   and archive_process_location = Flag.Host_and_port.Daemon.archive
   and metrics_server_port =
     flag "--metrics-port" ~aliases:["metrics-port"]
@@ -1082,7 +1090,8 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
          (Mina_lib.validated_transitions coda)
          ~f:ignore) ;
     Coda_run.setup_local_server ?client_trustlist ~rest_server_port
-      ~insecure_rest_server ?limited_graphql_port coda ;
+      ~insecure_rest_server ~open_limited_graphql_port ?limited_graphql_port
+      coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
           Mina_metrics.server ~port ~logger >>| ignore )
