@@ -59,6 +59,7 @@ module Network_config = struct
     { k8s_context: string
     ; cluster_name: string
     ; cluster_region: string
+    ; aws_route53_zone_id: string
     ; testnet_name: string
     ; coda_image: string
     ; coda_agent_image: string
