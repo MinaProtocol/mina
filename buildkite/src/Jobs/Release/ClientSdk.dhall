@@ -19,6 +19,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/ClientSdk"),
+          S.strictlyStart (S.contains "frontend/client_sdk"),
           S.strictlyStart (S.contains "src")
         ],
         path = "Release",
