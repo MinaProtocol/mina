@@ -141,7 +141,7 @@ let updateChallengeSheet = (client, spreadsheetId, range, userMap, metricsMap) =
   });
 };
 
-let uploadChallengePoints = (spreadsheetId, metricsMap, cb) => {
+let uploadChallengePoints = (spreadsheetId, metricsMap) => {
   let client = createClient();
   getRange(
     client,
@@ -160,11 +160,10 @@ let uploadChallengePoints = (spreadsheetId, metricsMap, cb) => {
       updateChallengeSheet(
         client,
         spreadsheetId,
-        Sheets.getSheet(Sheets.CurrentReleaseLeaderboard).name ++ "!A4:N",
+        Sheets.getSheet(Sheets.CurrentReleaseLeaderboard).name ++ "!A4:V",
         userMap,
         metricsMap,
       );
-      cb();
     | Error(error) => Js.log(error)
     }
   });
