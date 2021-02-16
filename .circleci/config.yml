@@ -1189,10 +1189,10 @@ workflows:
               - true
               - << pipeline.parameters.run-ci >>
         jobs:
-            - lint
-            - lint-opt
-            - compare-test-signatures
-            - client-sdk-unit-tests
+            #- lint
+            #- lint-opt
+            #- compare-test-signatures
+            #- client-sdk-unit-tests
             #- update-branch-protection:
                 #filters:
                   #branches:
@@ -1201,55 +1201,82 @@ workflows:
                     #- master
                     #- develop-until-4.1-hardfork
                     #- develop-until-adversarial
-            - tracetool
-            - test-archive
-            - build-archive
-            - test-unit--nonconsensus_medium_curves
-            - test--test_postake_catchup
-            - test--test_postake_five_even_txns
-            - test--test_postake_snarkless
-            - test--test_postake_split
-            - test--test_postake_three_producers
-            - build-binaries--dev
-            - test--dev--coda-bootstrap-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-shared-state-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-peers-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-transitive-peers-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-block-production-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-shared-prefix-test_-who-produces_0:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-shared-prefix-test_-who-produces_1:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-change-snark-worker-test:
-                requires:
-                  - build-binaries--dev
-            - test--dev--coda-delegation-test:
-                requires:
-                  - build-binaries--dev
+            #- tracetool
+            #- test-archive
+            #- build-archive
+            #
+            #
+            #
+            #- test-unit--nonconsensus_medium_curves
+            #
+            #- test--test_postake_catchup
+            #
+            #- test--test_postake_five_even_txns
+            #
+            #- test--test_postake_snarkless
+            #
+            #- test--test_postake_split
+            #
+            #- test--test_postake_three_producers
+            #
+            #
+            #- build-binaries--dev
+            #
+            #- test--dev--coda-bootstrap-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-shared-state-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-peers-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-transitive-peers-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-block-production-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-shared-prefix-test_-who-produces_0:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-shared-prefix-test_-who-produces_1:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-change-snark-worker-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #- test--dev--coda-delegation-test:
+                #requires:
+                  #- build-binaries--dev
+            #
+            #
 
-    daily:
-        triggers:
-          - schedule:
-              cron: "0 12 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-                    - /release\/.*/
-        jobs:
-          - test--test_postake_full_epoch
-          - test--test_postake_medium_curves
-          - test--test_postake_snarkless_medium_curves
-          - test--test_postake_split_medium_curves
+    #daily:
+        #triggers:
+          #- schedule:
+              #cron: "0 12 * * *"
+              #filters:
+                #branches:
+                  #only:
+                    #- develop
+                    #- /release\/.*/
+        #jobs:
+          #
+          #
+          #- test--test_postake_full_epoch
+          #
+          #- test--test_postake_medium_curves
+          #
+          #- test--test_postake_snarkless_medium_curves
+          #
+          #- test--test_postake_split_medium_curves
+          #
