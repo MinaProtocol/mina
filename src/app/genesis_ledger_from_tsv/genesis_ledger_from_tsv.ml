@@ -94,7 +94,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
           let pk_str = Public_key.Compressed.to_base58_check pk in
           if String.Table.mem accounts_tbl pk_str then
             failwith "Dummy key found among real keys" ;
-          (Some (Public_key.Compressed.to_base58_check pk), tl)
+          (Some pk_str, tl)
       | _ ->
           failwith "Ran out of dummy public keys"
     else (Some wallet_pk, dummy_pks)
