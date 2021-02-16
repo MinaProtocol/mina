@@ -858,9 +858,6 @@ let handle_export_ledger_response ~json = function
   | Ok (Error e) ->
       printf !"Ledger not found: %s\n" (Error.to_string_hum e)
   | Ok (Ok accounts) ->
-      Format.eprintf "NUM ACCTS: %d@." (List.length accounts) ;
-      Format.eprintf "MEMORY USED: %d@."
-        ((Obj.reachable_words @@ Obj.repr accounts) * 8) ;
       if json then (
         Yojson.Safe.pretty_print Format.std_formatter
           (Runtime_config.Accounts.to_yojson
