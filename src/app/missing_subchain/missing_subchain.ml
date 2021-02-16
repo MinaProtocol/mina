@@ -342,7 +342,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash () =
                      String.equal block.state_hash state_hash ) )
           then (
             [%log error]
-              "No subchain with given start and end state hashes available" ;
+              "No subchain with given start and end state hashes available; \
+               try omitting the start state hash, to get a chain from an \
+               unparented block to the block with the end state hash" ;
             Core.exit 1 )
       | None ->
           if not end_block_found then (
