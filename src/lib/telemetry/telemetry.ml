@@ -1,17 +1,23 @@
 (* telemetry.ml *)
 
+open Core
 open Async
 
 let get_telemetry_data_from_peers (net : Mina_networking.t)
-    (peers : Network_peer.Peer.t list option) =
-  let open Deferred.Let_syntax in
-  let run peer = Mina_networking.get_peer_telemetry_data net peer in
-  let%bind peer_ids =
-    match peers with
-    | Some ps ->
-        return ps
-    | None ->
-        (* use daemon peers *)
-        Mina_networking.peers net
+    (peers : Mina_net2.Multiaddr.t list option) =
+  let run =
+    Deferred.List.map ~how:`Parallel
+      ~f:(Mina_networking.get_peer_telemetry_data net)
   in
-  Deferred.List.map ~how:`Parallel peer_ids ~f:run
+  match peers with
+  | None ->
+      Mina_networking.peers net >>= run
+  | Some peers -> (
+    match Option.all (List.map ~f:Mina_net2.Multiaddr.to_peer peers) with
+    | Some peers ->
+        run peers
+    | None ->
+        Deferred.return
+          (List.map peers ~f:(fun _ ->
+               Or_error.error_string
+                 "Could not parse peers in telemetry data request" )) )

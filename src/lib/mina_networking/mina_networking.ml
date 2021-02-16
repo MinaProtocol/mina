@@ -565,15 +565,6 @@ module Rpcs = struct
 
   module Get_telemetry_data = struct
     module Telemetry_data = struct
-      let yojson_of_ban_status (peer, peer_status) =
-        `Assoc
-          [ ("IP_address", `String (Unix.Inet_addr.to_string peer.Peer.host))
-          ; ("peer_id", `String peer.peer_id)
-          ; ("peer_status", Trust_system.Peer_status.to_yojson peer_status) ]
-
-      let yojson_of_ban_statuses ban_statuses =
-        `List (List.map ban_statuses ~f:yojson_of_ban_status)
-
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -581,8 +572,16 @@ module Rpcs = struct
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
                   [@to_yojson
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
+                  [@of_yojson
+                    function
+                    | `String s ->
+                        Ok (Unix.Inet_addr.of_string s)
+                    | _ ->
+                        Error "expected string"]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
+                  [@of_yojson
+                    function `String s -> Ok s | _ -> Error "expected string"]
             ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
@@ -592,12 +591,11 @@ module Rpcs = struct
                 ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
-                  [@to_yojson yojson_of_ban_statuses]
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int }
-          [@@deriving to_yojson]
+          [@@deriving to_yojson, of_yojson]
 
           let to_latest = Fn.id
         end
@@ -1163,12 +1161,8 @@ let create (config : Config.t)
           Deferred.unit
       | Ok data ->
           Gossip_net.Any.set_telemetry_data gossip_net
-            ( Binable.to_string
-                (module Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest)
-                data
-            |> Bytes.of_string
-            |> B58.encode Base58_check.coda_alphabet
-            |> Bytes.to_string )
+            ( Rpcs.Get_telemetry_data.Telemetry_data.to_yojson data
+            |> Yojson.Safe.to_string )
           >>| ignore ) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
@@ -1255,10 +1249,14 @@ include struct
     let open Deferred.Or_error.Let_syntax in
     let%bind s = get_peer_telemetry_data t.gossip_net peer in
     Or_error.try_with (fun () ->
-        Binable.of_string
-          (module Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest)
-          ( B58.decode Base58_check.coda_alphabet (Bytes.of_string s)
-          |> Bytes.to_string ) )
+        match
+          Rpcs.Get_telemetry_data.Telemetry_data.of_yojson
+            (Yojson.Safe.from_string s)
+        with
+        | Ok x ->
+            x
+        | Error e ->
+            failwith e )
     |> Deferred.return
 
   let add_peer = lift add_peer

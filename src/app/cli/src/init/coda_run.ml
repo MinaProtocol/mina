@@ -396,22 +396,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
     ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
-          match peers with
-          | None ->
-              Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda) None
-          | Some peers -> (
-            match
-              Option.all (List.map ~f:Mina_net2.Multiaddr.to_peer peers)
-            with
-            | Some ps ->
-                Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda)
-                  (Some ps)
-            | None ->
-                Deferred.return
-                  (List.map peers ~f:(fun _ ->
-                       Or_error.error_string
-                         "Could not parse peers in telemetry data request" )) )
-      )
+          Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
