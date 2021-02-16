@@ -34,6 +34,8 @@ in
     Command.build
       Command.Config::{
         commands = [
+          Cmd.run "cd automation && yarn install && yarn build && cd .."
+
           Cmd.run "cd ${spec.testnetDir} && terraform init",
 
           -- create separate workspace based on build branch to isolate infrastructure states
