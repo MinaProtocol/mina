@@ -1,13 +1,13 @@
 (* sql.ml -- (Postgresql) SQL queries for missing subchain app *)
 
 module Subchain = struct
-  let query =
-    Caqti_request.collect Caqti_type.string Archive_lib.Processor.Block.typ
+  let make_sql ~join_condition =
+    Core_kernel.sprintf
       {sql| WITH RECURSIVE chain AS (
 
               SELECT id,state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
                      next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp
-              FROM blocks b WHERE b.state_hash = ?
+              FROM blocks b WHERE b.state_hash = $1
 
               UNION ALL
 
@@ -17,17 +17,35 @@ module Subchain = struct
 
               INNER JOIN chain
 
-              ON b.id = chain.parent_id
+              ON %s
            )
 
            SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
                   next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp
            FROM chain
       |sql}
+      join_condition
 
-  (* state_hash from end block of the subchain *)
-  let run (module Conn : Caqti_async.CONNECTION) state_hash =
-    Conn.collect_list query state_hash
+  let query_unparented =
+    Caqti_request.collect Caqti_type.string Archive_lib.Processor.Block.typ
+      (make_sql ~join_condition:"b.id = chain.parent_id")
+
+  let query_from_start =
+    Caqti_request.collect
+      Caqti_type.(tup2 string string)
+      Archive_lib.Processor.Block.typ
+      (make_sql
+         ~join_condition:
+           "b.id = chain.parent_id AND (chain.state_hash <> $2 OR \
+            b.state_hash = $2)")
+
+  let start_from_unparented (module Conn : Caqti_async.CONNECTION)
+      ~end_state_hash =
+    Conn.collect_list query_unparented end_state_hash
+
+  let start_from_specified (module Conn : Caqti_async.CONNECTION)
+      ~start_state_hash ~end_state_hash =
+    Conn.collect_list query_from_start (end_state_hash, start_state_hash)
 end
 
 (* Archive_lib.Processor does not have the queries given here *)

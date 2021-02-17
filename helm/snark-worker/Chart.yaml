@@ -2,11 +2,11 @@ apiVersion: v2
 name: snark-worker
 description: A Helm chart for Mina Protocol's SNARK worker nodes
 type: application
-version: 0.4.6
+version: 0.4.7
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - add capability to enable/disable daemon genesis proof generation
+    - add peers list URL chart value
 dependencies:
   - name: common-utilities
     version: 0.0.8
