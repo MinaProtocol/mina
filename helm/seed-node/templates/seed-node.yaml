@@ -46,7 +46,8 @@ spec:
             cpu: 12.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
-          "-log-level", "Trace",
+          "-log-level", "Debug",
+          "-log-precomputed-blocks", "true",
           "-log-json",
           "-log-snark-work-gossip", "true",
           "-config-directory", "/root/.coda-config",
