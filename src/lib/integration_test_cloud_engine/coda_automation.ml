@@ -102,7 +102,7 @@ module Network_config = struct
         ; snark_worker_public_key } =
       test_config
     in
-    let user_from_env = Option.value (Unix.getenv "USER") ~default:"" in
+    let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
     let user_sanitized =
       Str.global_replace (Str.regexp "\\W|_") "" user_from_env
     in
@@ -246,7 +246,7 @@ module Network_config = struct
   let to_terraform network_config =
     let open Terraform in
     [ Block.Terraform
-        { Block.Terraform.required_version= "~> 0.14.5"
+        { Block.Terraform.required_version= ">= 0.12.0"
         ; backend=
             Backend.S3
               { Backend.S3.key=
