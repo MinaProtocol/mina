@@ -48,7 +48,7 @@ echo "MINA Flags: $MINA_FLAGS -config-file ${MINA_CONFIG_FILE}"
 sleep 3
 
 # Daemon w/ mounted config file, initial file is phase 3 config.json
-/mina-bin/cli/src/coda.exe daemon \
+/mina-bin/cli/src/mina.exe daemon \
     -config-file ${MINA_CONFIG_FILE} \
     ${MINA_FLAGS} $@ &
 

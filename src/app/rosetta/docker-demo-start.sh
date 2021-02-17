@@ -51,7 +51,7 @@ MINA_CONFIG_DIR=/root/.coda-config
 
 # MINA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 echo "========================= STARTING DAEMON ==========================="
-/mina-bin/cli/src/coda.exe daemon \
+/mina-bin/cli/src/mina.exe daemon \
   -archive-address 3086 \
   -background \
   -block-producer-key "$MINA_CONFIG_DIR/wallets/store/$PK" \
