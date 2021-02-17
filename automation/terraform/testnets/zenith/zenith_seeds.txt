@@ -1,6 +1,6 @@
-/dns4/seed-1-zenith.o1test.net/tcp/10000/p2p/12D3KooWEEkNQY482QZ9RzTjsAYnczNNWS592guYKZHn9MMAkqpj
-/dns4/seed-2-zenith.o1test.net/tcp/10001/p2p/12D3KooWS7uzsMH7WS9RkeNh29ZhgtEX6Yqq1xJ6fjeUCDReotVP
-/dns4/seed-3-zenith.o1test.net/tcp/10002/p2p/12D3KooWC6u6AzJucP6WesQDrBXSqffZASv4Yu72SUZNcgNzFHxW
-/dns4/seed-4-zenith.o1test.net/tcp/10003/p2p/12D3KooWLL6K2FJ9VE1gF2upwBkKvAL7KMySfxyJ1VD8L8fdg6Vp
-/dns4/seed-5-zenith.o1test.net/tcp/10004/p2p/12D3KooWG9yG5XaKQHBFakqnsZKNfDskMs8S8PELGQLEGj5Lx1CX
+/dns4/seed-1.zenith.o1test.net/tcp/10000/p2p/12D3KooWEEkNQY482QZ9RzTjsAYnczNNWS592guYKZHn9MMAkqpj
+/dns4/seed-2.zenith.o1test.net/tcp/10001/p2p/12D3KooWS7uzsMH7WS9RkeNh29ZhgtEX6Yqq1xJ6fjeUCDReotVP
+/dns4/seed-3.zenith.o1test.net/tcp/10002/p2p/12D3KooWC6u6AzJucP6WesQDrBXSqffZASv4Yu72SUZNcgNzFHxW
+/dns4/seed-4.zenith.o1test.net/tcp/10003/p2p/12D3KooWLL6K2FJ9VE1gF2upwBkKvAL7KMySfxyJ1VD8L8fdg6Vp
+/dns4/seed-5.zenith.o1test.net/tcp/10004/p2p/12D3KooWG9yG5XaKQHBFakqnsZKNfDskMs8S8PELGQLEGj5Lx1CX
 
