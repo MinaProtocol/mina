@@ -303,7 +303,8 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      async ~summary:"Write blocks to an archive database"
+      async
+        ~summary:"Convert tab-separated-values genesis ledger to JSON format"
         (let%map output_file =
            Param.flag "--output-file"
              ~doc:
