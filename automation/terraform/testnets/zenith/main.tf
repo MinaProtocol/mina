@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "zenith"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-compatible-9e2b5bc-testworld-496409d"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.3.3-compatible-9e2b5bc"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.0-bb489dd-zenith-620b7c7"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.0-bb489dd"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
@@ -126,5 +126,5 @@ module "testnet_east" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/zenith_seeds.txt"
 }

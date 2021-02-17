@@ -6,7 +6,7 @@ provider helm {
 }
 
 locals {
-  use_local_charts = false
+  use_local_charts = true
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   peers = var.additional_peers
@@ -38,6 +38,8 @@ locals {
         metrics = "8081"
         p2p     = var.seed_port
       }
+      seedPeersURL         = var.seed_peers_url
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
 
     seedConfigs = [
@@ -115,6 +117,7 @@ locals {
       image         = var.coda_image
       seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
+      seedPeersURL         = var.seed_peers_url
     }
     archive = {
       image = var.coda_archive_image
