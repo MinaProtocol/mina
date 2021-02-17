@@ -362,8 +362,9 @@ struct
 
     let check_command (t : User_command.t) : User_command.Valid.t option =
       match t with
-      | Snapp_command _ ->
-          None
+      | Snapp_command t ->
+        (* TODO: This is fine because of how we verify now, but actually the call to the batcher should be in here. *)
+        Some (User_command.Snapp_command t)
       | Signed_command t ->
           Option.map (Signed_command.check t) ~f:(fun x ->
               User_command.Signed_command x )
