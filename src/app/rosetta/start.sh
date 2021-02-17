@@ -7,8 +7,8 @@ function cleanup
   CODE=${1:-0}
   echo "Killing archive.exe"
   kill $(ps aux | egrep '_build/default/src/app/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
-  echo "Killing coda.exe"
-  kill $(ps aux | egrep '_build/default/src/app/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
+  echo "Killing mina.exe"
+  kill $(ps aux | egrep '_build/default/src/app/.*mina.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing agent.exe"
   kill $(ps aux | egrep '_build/default/src/app/rosetta/test-agent/agent.exe'       | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"

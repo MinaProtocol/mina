@@ -108,7 +108,7 @@ to begin with. The interface may be extremely basic, reusing the current
 runtime configuration files:
 
 ```
-coda.exe advanced generate-snark-keys -config-file path/to/config.json
+mina.exe advanced generate-snark-keys -config-file path/to/config.json
 ```
 
 Suggested optional arguments are:
@@ -181,7 +181,7 @@ specific details of these are not clear yet and may vary, so these details are
 considered out of the scope of this RFC.
 
 In most cases, it should be possible to use the
-`coda.exe advanced generate-snark-keys -config-file path/to/input_config.json -output-config-file path/to/output_config.json`
+`mina.exe advanced generate-snark-keys -config-file path/to/input_config.json -output-config-file path/to/output_config.json`
 form of the `generate-snark-keys` function above to do most or all of the
 necessary setup work.
 
