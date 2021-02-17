@@ -5,13 +5,15 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let DeployTestnet = ../../Command/DeployTestnet.dhall
 
-let testTestnet = "ci-net"
-let dependsOn = [
-    { name = "MinaArtifact", key = "mina-docker-image" }
-]
-let deployDestroyOp = "sleep 10 && terraform destroy -auto-approve"
 
-in Pipeline.build Pipeline.Config::{
+let spec = DeployTestnet.DeploySpec::{
+  deps = [ { name = "MinaArtifact", key = "mina-docker-image" } ],
+  postDeploy = "sleep 10 && terraform destroy -auto-approve"
+}
+
+in
+
+Pipeline.build Pipeline.Config::{
   spec =
     JobSpec::{
     dirtyWhen = [
@@ -23,6 +25,6 @@ in Pipeline.build Pipeline.Config::{
     name = "DeployTestnetAndDestroy"
   },
   steps = [
-    DeployTestnet.step testTestnet dependsOn deployDestroyOp
+    DeployTestnet.step spec
   ]
 }
