@@ -2,7 +2,7 @@ open Core
 open Async
 
 (**
- * Test the basic functionality of the coda daemon and client through the CLI
+ * Test the basic functionality of the mina daemon and client through the CLI
  *)
 
 let%test_module "Command line tests" =
@@ -20,7 +20,7 @@ let%test_module "Command line tests" =
        here, else it will fail
 
      *)
-    let coda_exe = "../../app/cli/src/coda.exe"
+    let coda_exe = "../../app/cli/src/mina.exe"
 
     let start_daemon config_dir genesis_ledger_dir port =
       let%bind working_dir = Sys.getcwd () in
@@ -107,7 +107,7 @@ let%test_module "Command line tests" =
               test_failed := true ;
               Error.raise err )
 
-    let%test "The coda daemon works in background mode" =
+    let%test "The mina daemon works in background mode" =
       match Core.Sys.is_file coda_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon

@@ -21,7 +21,7 @@ RUN head ${CONFIG_FILE}
 # Create the defautl config dir and an empty config
 RUN mkdir -p /root/.coda-config && echo "{}" > /root/.coda-config/daemon.json
 
-RUN coda daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
+RUN mina daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
   mv ~/.coda-config/genesis/genesis_* /var/lib/coda/
 
 RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt
