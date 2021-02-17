@@ -49,6 +49,9 @@ spec:
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
+          {{- if $.Values.mina.seedPeersURL }}
+          "-peers-list-url", {{ $.Values.mina.seedPeersURL }},
+          {{- end }}
           "-generate-genesis-proof", {{ .Values.mina.generateGenesisProof | quote }}
         ]
         env:

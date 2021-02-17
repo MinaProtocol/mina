@@ -53,7 +53,7 @@ if [[ $CLOUD == true ]]
 then
   echo Building $gcr_baked_tag in the cloud
 
-  gcloud builds submit --config=cloudbuild.yaml \
+  gcloud builds submit --timeout=900s --config=cloudbuild.yaml \
   --substitutions=_BAKE_VERSION="$DOCKER_TAG",_COMMIT_HASH="$GIT_PATHSPEC",_TESTNET_NAME="$TESTNET",_CONFIG_FILE="$CONFIG_FILE",_GCR_BAKED_TAG="$gcr_baked_tag" .
 
   exit 0

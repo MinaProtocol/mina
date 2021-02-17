@@ -1771,29 +1771,29 @@ let telemetry =
     flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
       ~doc:"Get telemetry data for peers known to the daemon"
   in
-  let peer_ids_flag =
-    flag "--peer-ids" ~aliases:["peer-ids"]
+  let peers_flag =
+    flag "--peers" ~aliases:["peers"]
       (optional (Arg_type.comma_separated string))
-      ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
+      ~doc:"CSV-LIST Peer multiaddrs for obtaining telemetry data"
   in
   let show_errors_flag =
     flag "--show-errors" ~aliases:["show-errors"] no_arg
       ~doc:"Include error responses in output"
   in
-  let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
+  let flags = Args.zip3 daemon_peers_flag peers_flag show_errors_flag in
   Command.async ~summary:"Get telemetry data for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
+       ~f:(fun port (daemon_peers, peers, show_errors) ->
          if
-           (Option.is_none peer_ids && not daemon_peers)
-           || (Option.is_some peer_ids && daemon_peers)
+           (Option.is_none peers && not daemon_peers)
+           || (Option.is_some peers && daemon_peers)
          then (
            eprintf
              "Must provide exactly one of daemon-peers or peer-ids flags\n%!" ;
            don't_wait_for (exit 33) ) ;
          let peer_ids_opt =
-           Option.map peer_ids ~f:(fun peer_ids ->
-               List.map peer_ids ~f:Network_peer.Peer.Id.unsafe_of_string )
+           Option.map peers ~f:(fun peers ->
+               List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
          match%map
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc

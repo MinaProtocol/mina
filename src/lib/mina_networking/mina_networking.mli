@@ -147,8 +147,6 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_telemetry_data
-        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -184,6 +182,11 @@ val states :
      Strict_pipe.Reader.t
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
+
+val get_peer_telemetry_data :
+     t
+  -> Network_peer.Peer.t
+  -> Rpcs.Get_telemetry_data.Telemetry_data.t Deferred.Or_error.t
 
 val add_peer :
   t -> Network_peer.Peer.t -> seed:bool -> unit Deferred.Or_error.t

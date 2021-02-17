@@ -153,6 +153,21 @@ variable "block_producer_configs" {
   default = []
 }
 
+variable "seed_configs" {
+  type = list(
+    object({
+      name = string,
+      class = string
+      libp2p_secret = string
+      external_port = number
+      external_ip   = string
+      node_port     = number
+      private_key_secret = string
+    })
+  )
+  default = []
+}
+
 # Snark Worker Vars
 
 variable "snark_worker_replicas" {

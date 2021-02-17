@@ -192,6 +192,9 @@ spec:
           {{- range $.Values.mina.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
+          {{- if $.Values.mina.seedPeersURL }}
+          "-peers-list-url", {{ $.Values.mina.seedPeersURL }},
+          {{- end -}}
           "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",

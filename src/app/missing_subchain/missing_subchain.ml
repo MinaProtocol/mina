@@ -329,11 +329,29 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash () =
                   ~end_state_hash )
               ~item:"blocks starting from specified"
       in
-      if List.is_empty blocks then (
-        [%log error]
-          "No subchain available from genesis block to block with given state \
-           hash" ;
-        Core.exit 1 ) ;
+      let end_block_found =
+        List.exists blocks ~f:(fun block ->
+            String.equal block.state_hash end_state_hash )
+      in
+      ( match start_state_hash_opt with
+      | Some state_hash ->
+          if
+            not
+              ( end_block_found
+              && List.exists blocks ~f:(fun block ->
+                     String.equal block.state_hash state_hash ) )
+          then (
+            [%log error]
+              "No subchain with given start and end state hashes available; \
+               try omitting the start state hash, to get a chain from an \
+               unparented block to the block with the end state hash" ;
+            Core.exit 1 )
+      | None ->
+          if not end_block_found then (
+            [%log error]
+              "No subchain available from an unparented block (possibly the \
+               genesis block) to block with given end state hash" ;
+            Core.exit 1 ) ) ;
       let%bind extensional_blocks =
         Deferred.List.map blocks ~f:(fill_in_block pool)
       in
