@@ -68,7 +68,7 @@ spec:
           {{- end }}
           "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
           {{- if $.Values.coda.uploadBlocksToGCloud }}
-          "-upload-blocks-to-gcloud", "true",
+          "-upload-blocks-to-gcloud", "true"
           {{- end }}
         ]
         env:
