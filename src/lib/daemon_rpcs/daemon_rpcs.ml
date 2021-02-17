@@ -285,7 +285,7 @@ end
     Mina_networking's Get_telemetry_data for each provided peer
 *)
 module Get_telemetry_data = struct
-  type query = Network_peer.Peer.Id.Stable.Latest.t list option
+  type query = Mina_net2.Multiaddr.t list option
   [@@deriving bin_io_unversioned]
 
   type response =
