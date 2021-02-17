@@ -65,6 +65,19 @@ data "aws_iam_policy_document" "buildkite_aws_policydoc" {
       "arn:aws:s3:::o1labs-terraform-state-destination"
     ]
   }
+
+  statement {
+    actions = [
+      "route53:ListHostedZones",
+      "route53:GetHostedZone"
+    ]
+
+    effect = "Allow"
+
+    resources = [
+      "*",
+    ]
+  }
 }
 
 resource "aws_iam_user_policy" "buildkite_aws_policy" {
