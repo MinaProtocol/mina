@@ -42,6 +42,7 @@ struct
   let node_to_initialize node =
     let open Network_state in
     let check () (state : Network_state.t) =
+      Printf.printf !"checking for %s -- %s\n%!" (Node.id node) (String.Map.to_alist state.node_initialization |> List.map ~f:(fun (k, v) -> Printf.sprintf "%s:%b" k v) |> String.concat ~sep:",") ;
       if
         String.Map.find state.node_initialization (Node.id node)
         |> Option.value ~default:false

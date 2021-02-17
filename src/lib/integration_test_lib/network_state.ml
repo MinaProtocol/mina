@@ -38,12 +38,11 @@ module Make
   let listen ~logger event_router =
     let r, w = Broadcast_pipe.create empty in
     let update ~f =
-      (* should be safe to ignore the write here, so long as `f` is synchronous *)
       let state = f (Broadcast_pipe.Reader.peek r) in
       [%log debug] "updated network state to: $state"
         ~metadata:[("state", to_yojson state)] ;
-      ignore (Broadcast_pipe.Writer.write w state) ;
-      Deferred.return `Continue
+      let%map () = Broadcast_pipe.Writer.write w state in
+      `Continue
     in
     ignore
       (Event_router.on event_router Event_type.Block_produced

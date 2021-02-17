@@ -43,6 +43,7 @@ module Make (Engine : Intf.Engine.S) () :
     let event_handlers =
       Map.find !handlers (type_of_event event) |> Option.value ~default:[]
     in
+    Printf.printf !"Dispatching to %d handlers\n%!" (List.length event_handlers) ;
     (* This loop cannot directly mutate or recompute the handlers. Doing so will introduce a race condition. *)
     let%map ids_to_remove =
       Deferred.List.filter_map ~how:`Parallel event_handlers ~f:(fun handler ->
@@ -65,6 +66,7 @@ module Make (Engine : Intf.Engine.S) () :
               Ivar.fill handler_finished_ivar result ;
               Some handler_id )
     in
+    Printf.printf !"Pruning to %d handlers\n%!" (List.length ids_to_remove) ;
     unregister_event_handlers_by_id handlers
       (Event_type.type_of_event event)
       ids_to_remove
