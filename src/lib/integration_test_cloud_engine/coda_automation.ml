@@ -242,7 +242,8 @@ module Network_config = struct
             List.mapi block_producer_keypairs ~f:block_producer_config
         ; snark_worker_replicas= num_snark_workers
         ; snark_worker_public_key
-        ; snark_worker_fee } }
+        ; snark_worker_fee
+        ; aws_route53_zone_id= "" } }
 
   let to_terraform network_config =
     let open Terraform in
@@ -355,17 +356,18 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id port =
-      { Kubernetes_network.Node.cluster= cluster_id
-      ; namespace=
-          network_config.terraform.testnet_name
+    let cons_node pod_id =
+      { testnet_name= network_config.terraform.testnet_name
+      ; Kubernetes_network.Node.cluster= cluster_id
+      ; namespace= network_config.terraform.testnet_name
       ; pod_id }
     in
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
     let snark_coordinator_nodes = [cons_node "snark-coordinator-1"] in
     let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i -> cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)))
+        ~f:(fun i ->
+          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) )
     in
     let nodes_by_app_id =
       let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
@@ -407,11 +409,17 @@ module Network_manager = struct
       ; testnet_log_filter= t.testnet_log_filter
       ; keypairs= t.keypairs }
     in
-    let nodes_to_string = Fn.compose (String.concat ~sep:", ") (List.map ~f:Kubernetes_network.Node.id) in
+    let nodes_to_string =
+      Fn.compose (String.concat ~sep:", ")
+        (List.map ~f:Kubernetes_network.Node.id)
+    in
     [%log' info t.logger] "Network deployed" ;
-    [%log' info t.logger] "snark coordinators: %s" (nodes_to_string result.snark_coordinators) ;
-    [%log' info t.logger] "block producers: %s" (nodes_to_string result.block_producers) ;
-    [%log' info t.logger] "archive nodes: %s" (nodes_to_string result.archive_nodes) ;
+    [%log' info t.logger] "snark coordinators: %s"
+      (nodes_to_string result.snark_coordinators) ;
+    [%log' info t.logger] "block producers: %s"
+      (nodes_to_string result.block_producers) ;
+    [%log' info t.logger] "archive nodes: %s"
+      (nodes_to_string result.archive_nodes) ;
     result
 
   let destroy t =
