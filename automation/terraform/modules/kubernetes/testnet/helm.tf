@@ -6,7 +6,7 @@ provider helm {
 }
 
 locals {
-  use_local_charts = false
+  use_local_charts = true
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   peers = var.additional_peers

@@ -39,7 +39,7 @@ variable "whale_count" {
   type = number
 
   description = "Number of online whales for the network to run"
-  default     = 1
+  default     = 0
 }
 
 variable "fish_count" {
@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "zenith"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.0-bb489dd-zenith-620b7c7"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.0-bb489dd"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.1-1940bd6-zenith-2e85c73"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.1-1940bd6"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
