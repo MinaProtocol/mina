@@ -246,7 +246,7 @@ module Network_config = struct
   let to_terraform network_config =
     let open Terraform in
     [ Block.Terraform
-        { Block.Terraform.required_version= "~> 0.14.5"
+        { Block.Terraform.required_version= ">= 0.12.0"
         ; backend=
             Backend.S3
               { Backend.S3.key=
