@@ -132,8 +132,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar ~added_seeds ~seeds_from_url
-        ~on_unexpected_termination =
+        high_connectivity_ivar ~added_seeds ~on_unexpected_termination =
+      let%bind seeds_from_url =
+        match config.seed_peer_list_url with
+        | None ->
+            Deferred.return []
+        | Some u ->
+            download_seed_peer_list u
+      in
       let fail err =
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
         |> Error.raise
@@ -412,8 +418,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers t = !(t.net2) >>= Mina_net2.peers
 
-    let download_seeds_interval = Time.Span.of_min 10.
-
     let create (config : Config.t) rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
@@ -425,20 +429,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let restarts_r, restarts_w =
         Strict_pipe.create ~name:"libp2p-restarts"
           (Strict_pipe.Buffered (`Capacity 0, `Overflow Strict_pipe.Drop_head))
-      in
-      let seeds_from_url = ref [] in
-      let%bind () =
-        match config.seed_peer_list_url with
-        | None ->
-            Deferred.unit
-        | Some u ->
-            let set () =
-              let%map ps = download_seed_peer_list u in
-              seeds_from_url := ps
-            in
-            let%map () = set () in
-            upon (after download_seeds_interval) (fun () ->
-                Clock.every' download_seeds_interval set )
       in
       let added_seeds = Peer.Hash_set.create () in
       let%bind () =
@@ -481,14 +471,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         and on_unexpected_termination () =
           on_libp2p_create
             (create_libp2p config rpc_handlers first_peer_ivar
-               high_connectivity_ivar ~added_seeds
-               ~seeds_from_url:!seeds_from_url ~on_unexpected_termination) ;
+               high_connectivity_ivar ~added_seeds ~on_unexpected_termination) ;
           Deferred.unit
         in
         let res =
           create_libp2p config rpc_handlers first_peer_ivar
-            high_connectivity_ivar ~added_seeds ~seeds_from_url:!seeds_from_url
-            ~on_unexpected_termination
+            high_connectivity_ivar ~added_seeds ~on_unexpected_termination
         in
         on_libp2p_create res ;
         don't_wait_for
