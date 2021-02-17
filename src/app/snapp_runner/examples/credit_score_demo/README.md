@@ -10,7 +10,7 @@
   - `export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))`
 * create a configuration file `config.json` containing
   ```json
-  {"ledger":{"accounts":[{"pk":"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g","balance":"66000","sk":null,"delegate":null}]}}
+  {"ledger":{"accounts":[{"pk":"B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV","balance":"66000","sk":null,"delegate":null}]}}
   ```
 * add the private key for the ledger key to a file (e.g. `demo-block-producer`)
   - `chmod 0600 demo-block-producer` to set the expected permissions
@@ -26,11 +26,11 @@
   - `_build/default/src/app/cli/src/coda.exe accounts list -privkey-path demo-block-producer`
     + This should show the imported key in the list
 * unlock the demo-block-producer wallet
-  - `_build/default/src/app/cli/src/coda.exe accounts unlock -public-key B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g`
+  - `_build/default/src/app/cli/src/coda.exe accounts unlock -public-key B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV`
   - Equivalently, issue the GraphQL mutation
     ```graphql
     mutation Unlock {
-        unlockAccount(input: {publicKey: "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g", password: ""})
+        unlockAccount(input: {publicKey: "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV", password: ""})
     }
     ```
 
@@ -60,10 +60,10 @@
   mutation CreateSnappAccount {
     createTokenAccount(input:
       { fee: 10000000
-      , feePayer: "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g"
+      , feePayer: "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV"
       , receiver:"NEW_PK_HERE"
       , token: "1"
-      , tokenOwner:"B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g" })
+      , tokenOwner:"B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV" })
   }
   ```
 * When the new account has been successfully created, it will show in `_build/default/src/app/cli/src/coda.exe advanced dump-ledger`
@@ -99,7 +99,7 @@
                 , stake: true } }}
       , feePayment:
           { fee: "10000000"
-          , publicKey: "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g" }
+          , publicKey: "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV" }
       , token: "1" })
   }
   ```
@@ -112,11 +112,11 @@
       { fee: "10000000"
       , amount: "100000000"
       , to: "NEW_PK_HERE"
-      , from: "B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g" })
+      , from: "B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV" })
   }
   ```
 * Lock the demo-block-producer's wallet.
-  - `_build/default/src/app/cli/src/coda.exe accounts lock -public-key B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g`
+  - `_build/default/src/app/cli/src/coda.exe accounts lock -public-key B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV`
   - This demonstrates that the client isn't generating a signature in order for
     the snapp command to be valid.
 
