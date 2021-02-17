@@ -9,6 +9,8 @@ open Unix
 
 let aws_region = "us-west-2"
 
+let aws_route53_zone_id = "ZJPR9NA6W9M7F"
+
 let project_id = "o1labs-192920"
 
 let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1"
@@ -243,7 +245,7 @@ module Network_config = struct
         ; snark_worker_replicas= num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
-        ; aws_route53_zone_id= "" } }
+        ; aws_route53_zone_id } }
 
   let to_terraform network_config =
     let open Terraform in
