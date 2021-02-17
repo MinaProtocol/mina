@@ -19,6 +19,7 @@ locals {
     logLevel           = var.log_level
     logSnarkWorkGossip = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+    seedPeersURL         = var.seed_peers_url
   }
   
   seed_vars = {

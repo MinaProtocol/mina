@@ -47,6 +47,7 @@ spec:
           {{- range .Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
           {{- end -}}
+          "-seed-peers-url", {{ $.Values.coda.seedPeersURL }},
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -54,7 +55,6 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
-          "-super-catchup",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end -}}
