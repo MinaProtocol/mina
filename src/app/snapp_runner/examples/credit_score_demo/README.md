@@ -18,12 +18,12 @@
   {"box_primitive":"xsalsa20poly1305","pw_primitive":"argon2i","nonce":"8jGuTAxw3zxtWasVqcD1H6rEojHLS1yJmG3aHHd","pwsalt":"AiUCrMJ6243h3TBmZ2rqt3Voim1Y","pwdiff":[134217728,6],"ciphertext":"DbAy736GqEKWe9NQWT4yaejiZUo9dJ6rsK7cpS43APuEf5AH1Qw6xb1s35z8D2akyLJBrUr6m"}
   ```
 * start the daemon with the given configuration, using the given key
-  - `_build/default/src/app/cli/src/coda.exe daemon -seed -working-dir $PWD -current-protocol-version 0.0.0 -block-producer-key demo-block-producer -config-file config.json -generate-genesis-proof true`
+  - `CODA_PRIVKEY_PASS='' _build/default/src/app/cli/src/coda.exe daemon -seed -working-dir $PWD -current-protocol-version 0.0.0 -block-producer-key demo-block-producer -config-file config.json -generate-genesis-proof true`
   - To use dedicated configuration and genesis ledger directories, add the `-config-directory $CODA_CONFIG_DIR` and `genesis-ledger-dir $CODA_GENESIS_DIR` directories
 * import the demo-block-producer public key
   - `_build/default/src/app/cli/src/coda.exe accounts import -privkey-path demo-block-producer`
     + Add the `-config-directory $CODA_CONFIG_DIR` flag to match the one passed to the above, if given.
-  - `_build/default/src/app/cli/src/coda.exe accounts list -privkey-path demo-block-producer`
+  - `_build/default/src/app/cli/src/coda.exe accounts list`
     + This should show the imported key in the list
 * unlock the demo-block-producer wallet
   - `_build/default/src/app/cli/src/coda.exe accounts unlock -public-key B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV`
