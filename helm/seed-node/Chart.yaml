@@ -2,11 +2,13 @@ apiVersion: v2
 name: seed-node
 description: A Helm chart for Mina Protocol's seed nodes
 type: application
-version: 0.5.0
+version: 0.6.0
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - add capability to enable/disable daemon genesis proof generation
+    - add seed-node static external IP chart value
+    - enable multiple seed-node deployment configurations
+    - add peers list URL chart value
 dependencies:
   - name: common-utilities
     version: 0.0.8

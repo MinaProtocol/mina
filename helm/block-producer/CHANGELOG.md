@@ -11,3 +11,7 @@
 ------
 - Add static peer id support
 
+0.5.1:
+------
+- add peers list URL chart value
+

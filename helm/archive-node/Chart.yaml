@@ -2,11 +2,12 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.4.7
+version: 0.4.8
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - add capability to enable/disable daemon genesis proof generation
+    - fix daemon side-car hostPort reference
+    - add peers list URL chart value
 dependencies:
   - name: postgresql
     version: "*"
