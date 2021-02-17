@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ template "buildkite-exporter.fullname" . }}
+  name: {{tpl .Values.exporter.name .}}
   labels:
-    app: {{ template "buildkite-exporter.fullname" . }}
+    app: {{tpl .Values.exporter.name .}}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ template "buildkite-exporter.fullname" . }}
+      app: {{tpl .Values.exporter.name .}}
   template:
     metadata:
       labels:
-        app: {{ template "buildkite-exporter.fullname" . }}
+        app: {{tpl .Values.exporter.name .}}
         pipeline: {{ .Values.exporter.pipeline }}
       annotations:
         prometheus.io/scrape: 'true'
@@ -32,7 +32,7 @@ spec:
         - name: BUILDKITE_API_KEY
           value: {{ .Values.exporter.buildkiteApiKey }}
         - name: METRICS_PORT
-          value: {{ .Values.exporter.ports.metricsPort | quote }}
+          value: {{ .Values.exporter.ports.metricsPort }}
 {{- if .Values.exporter.optionalEnv }}
 {{ toYaml .Values.exporter.optionalEnv | indent 10 }}
 {{- end }}

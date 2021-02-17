@@ -28,8 +28,7 @@ buildkite-exporter readiness check settings
 readinessProbe:
   exec:
     command:
-      - "curl"
-      - "localhost:{{ .exporter.ports.metricsPort }}/metrics"
+      - "curl localhost:{{ .exporter.ports.metricsPort }}/metrics"
   initialDelaySeconds: {{ .healthcheck.initialDelaySeconds }}
   periodSeconds: 60
   failureThreshold: 5

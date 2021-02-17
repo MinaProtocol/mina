@@ -454,7 +454,7 @@ module Options = struct
           ; operation_types= Lazy.force Operation_types.all
           ; errors= Lazy.force Errors.all_errors
           ; historical_balance_lookup=
-              true
+              false
               (* TODO: #6872 We should expose info for the timestamp_start_index via GraphQL then consume it here *)
           ; timestamp_start_index=
               None
@@ -489,7 +489,7 @@ module Options = struct
                    { Allow.operation_statuses= Lazy.force Operation_statuses.all
                    ; operation_types= Lazy.force Operation_types.all
                    ; errors= Lazy.force Errors.all_errors
-                   ; historical_balance_lookup= true
+                   ; historical_balance_lookup= false
                    ; timestamp_start_index= None
                    ; call_methods= []
                    ; balance_exemptions= []

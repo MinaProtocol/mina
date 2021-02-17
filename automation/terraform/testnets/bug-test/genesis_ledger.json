@@ -1,0 +1,42 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2020-12-19T23:25:24Z"
+  },
+  "ledger": {
+    "name": "bug-test",
+    "num_accounts": 4,
+    "accounts": [
+      {
+        "pk": "B62qpWmh6xunjipBXV1P6vB2T2srxesEhoRQ3MdYJGdke6FTUuYLLpm",
+        "balance": "66000.000000000",
+        "delegate": "B62qpWmh6xunjipBXV1P6vB2T2srxesEhoRQ3MdYJGdke6FTUuYLLpm",
+        "sk": null,
+        "timing": {
+          "initial_minimum_balance": "60000",
+          "cliff_time": "150",
+          "cliff_amount": "12000",
+          "vesting_period": "6",
+          "vesting_increment": "150"
+        }
+      },
+      {
+        "pk": "B62qriWXxKZp4Ng5SerPyQwyvkvGb92CAngp3Fmg4VfDr2TDEd9HEa4",
+        "balance": "20000.000000000",
+        "delegate": "B62qriWXxKZp4Ng5SerPyQwyvkvGb92CAngp3Fmg4VfDr2TDEd9HEa4",
+        "sk": null
+      },
+      {
+        "pk": "B62qqihZydBDWsNWK4QzRVi61e4PNibBVNbRmd7juYqhjwh4sijwcgZ",
+        "balance": "20000.000000000",
+        "delegate": "B62qriWXxKZp4Ng5SerPyQwyvkvGb92CAngp3Fmg4VfDr2TDEd9HEa4",
+        "sk": null
+      },
+      {
+        "pk": "B62qmVofZeMZUiA2aYu3RMAxg52mxujRk45DoqMGW249SjKome7syef",
+        "balance": "2250000.000000000",
+        "delegate": "B62qpnYXTDMe4jjjVmrJs16QZWM2byVuu23h5AxKLjRGn8NrruzJHzt",
+        "sk": null
+      }
+    ]
+  }
+}

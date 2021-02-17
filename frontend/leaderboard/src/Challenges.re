@@ -43,7 +43,6 @@ let coinbaseReceiverChallenge = (points, metricsMap) => {
 };
 
 let snarkFeeChallenge = metricsMap => {
-  Js.log("SNARK Fee Challenge");
   Points.applyTopNPoints(
     [|
       (0, 6500), // 1st place: 6500 pts
@@ -63,7 +62,6 @@ let snarkFeeChallenge = metricsMap => {
 };
 
 let blocksChallenge = metricsMap => {
-  Js.log("Blocks Challenge");
   Points.applyTopNPoints(
     [|
       (0, 6500), // 1st place: 6500 pts
@@ -83,7 +81,6 @@ let blocksChallenge = metricsMap => {
 };
 
 let sendMinaChallenge = metricsMap => {
-  Js.log("Send Mina Challenge");
   Points.applyTopNPoints(
     [|
       (0, 6500), // 1st place: 6500 pts
@@ -100,6 +97,19 @@ let sendMinaChallenge = metricsMap => {
     (metricRecord: Types.Metrics.t) => metricRecord.transactionSent,
     compare,
   );
+};
+
+let createAndSendTokenChallenge = metricsMap => {
+  [
+    // you will receive 1000 pts for minting and sending your own token to another account
+    Points.addPointsToUsersWithAtleastN(
+      (metricRecord: Types.Metrics.t) => metricRecord.createAndSendToken,
+      1,
+      1000,
+      metricsMap,
+    ),
+  ]
+  |> Points.sumPointsMaps;
 };
 
 let calculatePoints = (challengeName, metricsMap) => {

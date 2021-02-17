@@ -1,0 +1,53 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2020-11-05T02:56:51Z"
+  },
+  "ledger": {
+    "name": "test-nhreports",
+    "num_accounts": 89,
+    "accounts": [
+      {
+        "pk": "B62qnjYHbt7BXu3AWSVbh515asFJLeSW6avvi6YRXjCkgq4oQEnZfrj",
+        "balance": "1000.000000000",
+        "delegate": "B62qpb34xNcMx4L9PwKbGf8jcRwXWKirDsFBWdpmToQHYuiWvTCGGwM",
+        "sk": null
+      },
+      {
+        "pk": "B62qpb34xNcMx4L9PwKbGf8jcRwXWKirDsFBWdpmToQHYuiWvTCGGwM",
+        "balance": "9000.000000000",
+        "delegate": "B62qpb34xNcMx4L9PwKbGf8jcRwXWKirDsFBWdpmToQHYuiWvTCGGwM",
+        "sk": null
+      },
+      {
+        "pk": "B62qronBqamoNAqvYj9rFfcHkUh8uJGmwxBcXAjeix6WToycGRRuRe1",
+        "balance": "100000.000000000",
+        "delegate": "B62qkxgdJbGMB5qxgrjwjZdghGc9yWwKvwZs4vgN6Xiq9Fa3STSgZtd",
+        "sk": null
+      },
+      {
+        "pk": "B62qm4gc92cSgt6uDvkQUHKRtXJ9aY2g2SsePTiep4dbWjkUV1C1913",
+        "balance": "100000.000000000",
+        "delegate": "B62qkKgBEFKSGNQjD6zoMAQvZfSapKfe531Wm6yfng4BNHndgTWyor4",
+        "sk": null
+      },
+      {
+        "pk": "B62qmxbguVxV7BKCZ8Az2Dv1wJ6deKhXX6vKTj7JXhuA2Kes3cc7R46",
+        "balance": "100000.000000000",
+        "delegate": "B62qmFVtp46YWKN1eDggom11jqcmGEcagJfrsj2k2YTBpMqxrWS5NhN",
+        "sk": null
+      },
+      {
+        "pk": "B62qry1Vd5zNw5BZjt2D2tAFGwEL5tvRnv7aMAkgk2VJW66mwYgNkdT",
+        "balance": "100000.000000000",
+        "delegate": "B62qnBoZZj6T3hkQ3VCpVfk7JdWhkknEwxwPiHqARVtweEWUZTzWUtQ",
+        "sk": null
+      },
+      {
+        "pk": "B62qieVAisaD36peTTGDq4oKwRVKYRaAnVWDw6KQ9euQ1TnHvjVxBJ4",
+        "balance": "100000.000000000",
+        "delegate": "B62qneNEkSZz4DuuNBXUeNfNyGzUQv7YbFqtCwQtGsrSeHDiAXGWBTg",
+        "sk": null
+      }
+    ]
+  }
+}

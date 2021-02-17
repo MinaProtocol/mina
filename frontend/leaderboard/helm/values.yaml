@@ -16,6 +16,3 @@ postgresql:
   postgresHost: "postgresql"
   postgresPort: "5432"
   postgresDB: "archive"
-
-googleSheets:
-  spreadsheetId: "1Nq_Y76ALzSVJRhSFZZm4pfuGbPkZs2vTtCnVQ1ehujE"

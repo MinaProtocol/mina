@@ -1,0 +1,8 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: coda
+          image: gcr.io/o1labs-192920/coda-daemon-baked:0.1.0-beta1-56b97f1-turbo-pickles-88f3b12
+        - name: bots
+          image: minaprotocol/mina-bots:latest

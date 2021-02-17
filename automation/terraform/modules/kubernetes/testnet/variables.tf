@@ -1,3 +1,16 @@
+# Control Vars
+
+# when set to true, this module generates and uploads artifacts from `genesis_ledger.json`
+variable "generate_and_upload_artifacts" {
+  type = bool
+  default = true
+}
+
+variable "artifact_path" {
+  type = string
+  default = "/tmp"
+}
+
 # K8s Cluster Vars
 
 variable "cluster_name" {
@@ -74,7 +87,7 @@ variable "testnet_name" {
   default = "coda-testnet"
 }
 
-variable "additional_peers" {
+variable "additional_seed_peers" {
   type    = list
   default = []
 }
@@ -84,6 +97,7 @@ variable "archive_node_count" {
   default = 0
 }
 
+# only used if `generate_and_upload_artifacts` is set to false
 variable "runtime_config" {
   type    = string
   default = ""
@@ -116,6 +130,16 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
+variable "whale_count" {
+  type    = number
+  default = 1
+}
+
+variable "fish_count" {
+  type    = number
+  default = 1
+}
+
 variable "log_level" {
   type    = string
   default = "Trace"
@@ -135,13 +159,17 @@ variable "block_producer_key_pass" {
   type = string
 }
 
+variable "block_producer_starting_host_port" {
+  type    = number
+  default = 10000
+}
+
 variable "block_producer_configs" {
   type = list(
     object({
       name = string,
       class = string,
       private_key_secret = string,
-      external_port = number,
       libp2p_secret = string,
       enable_gossip_flooding = bool,
       enable_peer_exchange = bool,
@@ -294,7 +322,7 @@ variable "upload_blocks_to_gcloud" {
   default = false
 }
 
-variable "seed_peers_url" {
+variable "seedPeersURL" {
   type = string
   default = ""
 }
