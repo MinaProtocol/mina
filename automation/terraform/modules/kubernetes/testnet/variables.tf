@@ -297,16 +297,3 @@ variable "seed_peers_url" {
   type = string
   default = ""
 }
-
-# graphql ingress vars
-
-variable "aws_route53_zone_id" {
-  type = string
-  default = ""
-}
-
-variable "deploy_graphql_ingress" {
-  type = bool
-  default = true
-}
-

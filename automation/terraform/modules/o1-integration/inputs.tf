@@ -2,6 +2,10 @@ provider "google" {
   alias = "gke"
 }
 
+variable "aws_route53_zone_id" {
+  type = string
+}
+
 variable "cluster_name" {
   type = string
 }
@@ -65,11 +69,4 @@ variable "block_producer_configs" {
       libp2p_secret = string
     })
   )
-}
-
-
-variable "aws_route53_zone_id" {
-
-  type = string
-
 }
