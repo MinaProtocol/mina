@@ -6,8 +6,8 @@ function cleanup
 {
   echo "Killing archive.exe"
   kill $(ps aux | egrep '/mina-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
-  echo "Killing coda.exe"
-  kill $(ps aux | egrep '/mina-bin/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
+  echo "Killing mina.exe"
+  kill $(ps aux | egrep '/mina-bin/.*mina.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"
   kill $(ps aux | egrep '/mina-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
   echo "Stopping postgres"
