@@ -46,8 +46,7 @@ module Node = struct
       Uri.make
         ~host:(Printf.sprintf "%s.graphql.o1test.net" node.testnet_name)
         ~path:(Printf.sprintf "%s/graphql" node.pod_id)
-        ~port:3085
-        ()
+        ~port:3085 ()
 
     let get_pod_name t : string Malleable_error.t =
       let args =
@@ -209,8 +208,8 @@ module Node = struct
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
-      exec_graphql_request ~logger ~node:t
-        ~retry_on_graphql_error:true ~query_name:"query_peer_id" query_obj
+      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
+        ~query_name:"query_peer_id" query_obj
     in
     [%log info] "get_peer_id, finished exec_graphql_request" ;
     let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
@@ -245,9 +244,8 @@ module Node = struct
           ()
       in
       let%bind balance_obj =
-        exec_graphql_request ~logger ~node:t
-          ~retry_on_graphql_error:true ~query_name:"get_balance_graphql"
-          get_balance_obj
+        exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
+          ~query_name:"get_balance_graphql" get_balance_obj
       in
       match balance_obj#account with
       | None ->
@@ -290,9 +288,8 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_request ~logger ~node:t
-        ~retry_on_graphql_error ~query_name:"send_payment_graphql"
-        send_payment_obj
+      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error
+        ~query_name:"send_payment_graphql" send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in

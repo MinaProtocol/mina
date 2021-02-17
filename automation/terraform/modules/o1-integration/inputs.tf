@@ -66,3 +66,10 @@ variable "block_producer_configs" {
     })
   )
 }
+
+
+variable "aws_route53_zone_id" {
+
+  type = string
+
+}
