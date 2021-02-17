@@ -35,7 +35,7 @@ module Make (Engine : Intf.Engine.S) () :
       Event_type.Map.update !handlers event_type ~f:(fun registered_handlers ->
           registered_handlers |> Option.value ~default:[]
           |> List.filter ~f:(fun (Event_handler (registered_id, _, _, _)) ->
-                 List.mem ids registered_id ~equal:Event_handler_id.equal ) )
+                 not (List.mem ids registered_id ~equal:Event_handler_id.equal) ) )
 
   let dispatch_event handlers node event =
     let open Event_type in
