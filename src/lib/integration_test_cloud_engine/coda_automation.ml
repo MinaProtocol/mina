@@ -7,59 +7,76 @@ open Cmd_util
 open Integration_test_lib
 open Unix
 
+let aws_region = "us-west-2"
+
+let project_id = "o1labs-192920"
+
+let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1"
+
+let cluster_name = "mina-integration-west1"
+
+let cluster_region = "us-west1"
+
+let cluster_zone = "us-west1a"
+
+type network_keypair =
+  { keypair: Keypair.t
+  ; secret_name: string
+  ; public_key_file: string
+  ; private_key_file: string }
+[@@deriving to_yojson]
+
+let create_network_keypair ~keypair ~secret_name =
+  let open Keypair in
+  let public_key_file =
+    Public_key.Compressed.to_base58_check
+      (Public_key.compress keypair.public_key)
+    ^ "\n"
+  in
+  let private_key_file =
+    let plaintext =
+      Bigstring.to_bytes (Private_key.to_bigstring keypair.private_key)
+    in
+    let password = Bytes.of_string "naughty blue worm" in
+    Secrets.Secret_box.encrypt ~plaintext ~password
+    |> Secrets.Secret_box.to_yojson |> Yojson.Safe.to_string
+  in
+  {keypair; secret_name; public_key_file; private_key_file}
+
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
   type block_producer_config =
     { name: string
-    ; class_: string [@key "class"]
     ; id: string
-    ; private_key_secret: string
-    ; enable_gossip_flooding: bool
-    ; run_with_user_agent: bool
-    ; run_with_bots: bool
-    ; enable_peer_exchange: bool
-    ; isolated: bool
+    ; public_key: string
+    ; private_key: string
+    ; keypair_secret: string
     ; libp2p_secret: string }
   [@@deriving to_yojson]
 
   type terraform_config =
-    { generate_and_upload_artifacts: bool
+    { k8s_context: string
     ; cluster_name: string
     ; cluster_region: string
     ; testnet_name: string
-    ; k8s_context: string
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
     ; coda_points_image: string
+    ; coda_archive_image: string
           (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
-    ; coda_faucet_amount: string
-    ; coda_faucet_fee: string
-    ; seed_zone: string
-    ; seed_region: string
-    ; log_level: string
-    ; log_txn_pool_gossip: bool
-    ; block_producer_key_pass: string
-    ; block_producer_starting_host_port: int
     ; block_producer_configs: block_producer_config list
     ; snark_worker_replicas: int
     ; snark_worker_fee: string
-    ; snark_worker_public_key: string
-    ; snark_worker_host_port: int
-    ; agent_min_fee: string
-    ; agent_max_fee: string
-    ; agent_min_tx: string
-    ; agent_max_tx: string }
+    ; snark_worker_public_key: string }
   [@@deriving to_yojson]
 
   type t =
     { coda_automation_location: string
-    ; project_id: string
-    ; cluster_id: string
-    ; keypairs: (string * Keypair.t) list
+    ; keypairs: network_keypair list
     ; constants: Test_config.constants
     ; terraform: terraform_config }
   [@@deriving to_yojson]
@@ -101,14 +118,6 @@ module Network_config = struct
     (* username-testname-DaymonthHrMin *)
     (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
     let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
-    (* HARD CODED NETWORK VALUES *)
-    let project_id = "o1labs-192920" in
-    let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1" in
-    let cluster_name = "mina-integration-west1" in
-    let k8s_context = cluster_id in
-    let cluster_region = "us-west1" in
-    let seed_zone = "us-west1-a" in
-    let seed_region = "us-west1" in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -148,7 +157,7 @@ module Network_config = struct
         let keypair =
           {Keypair.public_key= Public_key.decompress_exn pk; private_key= sk}
         in
-        ((secret_name, keypair), runtime_account)
+        (create_network_keypair ~keypair ~secret_name, runtime_account)
       in
       List.mapi ~f
         (List.zip_exn block_producers
@@ -205,87 +214,64 @@ module Network_config = struct
       {constraints= constraint_constants; genesis= genesis_constants}
     in
     (* BLOCK PRODUCER CONFIG *)
-    let base_port = 10001 in
-    let block_producer_config index (secret_name, _) =
+    let block_producer_config index keypair =
       { name= "test-block-producer-" ^ Int.to_string (index + 1)
-      ; class_= "test"
       ; id= Int.to_string index
-      ; private_key_secret= secret_name
-      ; enable_gossip_flooding= false
-      ; run_with_user_agent= false
-      ; run_with_bots= false
-      ; enable_peer_exchange= false
-      ; isolated= false
+      ; keypair_secret= keypair.secret_name
+      ; public_key= keypair.public_key_file
+      ; private_key= keypair.private_key_file
       ; libp2p_secret= "" }
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
-    ; project_id
-    ; cluster_id
     ; keypairs= block_producer_keypairs
     ; constants
     ; terraform=
-        { generate_and_upload_artifacts= false
-        ; cluster_name
+        { cluster_name
         ; cluster_region
+        ; k8s_context= cluster_id
         ; testnet_name
-        ; seed_zone
-        ; seed_region
-        ; k8s_context
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
         ; coda_points_image= images.points
+        ; coda_archive_image= ""
         ; runtime_config= Runtime_config.to_yojson runtime_config
-        ; block_producer_key_pass= "naughty blue worm"
-        ; block_producer_starting_host_port= base_port
         ; block_producer_configs=
             List.mapi block_producer_keypairs ~f:block_producer_config
         ; snark_worker_replicas= num_snark_workers
-        ; snark_worker_host_port= base_port + num_block_producers
         ; snark_worker_public_key
-        ; snark_worker_fee
-            (* log level is currently statically set and not directly configurable *)
-        ; log_level= "Trace"
-        ; log_txn_pool_gossip=
-            true
-            (* these currently aren't used for testnets, so we just give them defaults *)
-        ; coda_faucet_amount= "10000000000"
-        ; coda_faucet_fee= "100000000"
-        ; agent_min_fee= "0.06"
-        ; agent_max_fee= "0.1"
-        ; agent_min_tx= "0.0015"
-        ; agent_max_tx= "0.0015" } }
+        ; snark_worker_fee } }
 
   let to_terraform network_config =
     let open Terraform in
     [ Block.Terraform
-        { Block.Terraform.required_version= "~> 0.13.0"
+        { Block.Terraform.required_version= "~> 0.14.5"
         ; backend=
             Backend.S3
               { Backend.S3.key=
                   "terraform-" ^ network_config.terraform.testnet_name
                   ^ ".tfstate"
               ; encrypt= true
-              ; region= "us-west-2"
+              ; region= aws_region
               ; bucket= "o1labs-terraform-state"
               ; acl= "bucket-owner-full-control" } }
     ; Block.Provider
         { Block.Provider.provider= "aws"
-        ; region= "us-west-2"
+        ; region= aws_region
         ; zone= None
-        ; alias= None
-        ; project= None }
+        ; project= None
+        ; alias= None }
     ; Block.Provider
         { Block.Provider.provider= "google"
-        ; region= network_config.terraform.cluster_region
-        ; zone= Some "us-east1b"
-        ; alias= Some "google-us-east1"
-        ; project= Some network_config.project_id }
+        ; region= cluster_region
+        ; zone= Some cluster_zone
+        ; project= Some project_id
+        ; alias= None }
     ; Block.Module
-        { Block.Module.local_name= "testnet_east"
-        ; providers= [("google", ("google", "google-us-east1"))]
-        ; source= "../../modules/kubernetes/testnet"
+        { Block.Module.local_name= "integration_testnet"
+        ; providers= [("google.gke", "google")]
+        ; source= "../../modules/o1-integration"
         ; args= terraform_config_to_assoc network_config.terraform } ]
 
   let testnet_log_filter network_config =
@@ -296,8 +282,7 @@ module Network_config = struct
         resource.labels.cluster_name="%s"
         resource.labels.namespace_name="%s"
       |}
-      network_config.project_id network_config.terraform.cluster_region
-      network_config.terraform.cluster_name
+      project_id cluster_region cluster_name
       network_config.terraform.testnet_name
 end
 
@@ -306,7 +291,6 @@ module Network_manager = struct
     { logger: Logger.t
     ; cluster: string
     ; namespace: string
-    ; keypair_secrets: string list
     ; testnet_dir: string
     ; testnet_log_filter: string
     ; constants: Test_config.constants
@@ -367,18 +351,11 @@ module Network_manager = struct
         Network_config.to_terraform network_config
         |> Terraform.to_string
         |> Out_channel.output_string ch ) ;
-    let%bind () =
-      Deferred.List.iter network_config.keypairs
-        ~f:(fun (secret_name, keypair) ->
-          Secrets.Keypair.write_exn keypair
-            ~privkey_path:(testnet_dir ^/ secret_name)
-            ~password:(lazy (return (Bytes.of_string "naughty blue worm"))) )
-    in
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
     let cons_node pod_id port =
-      { Kubernetes_network.Node.cluster= network_config.cluster_id
+      { Kubernetes_network.Node.cluster= cluster_id
       ; Kubernetes_network.Node.namespace=
           network_config.terraform.testnet_name
       ; Kubernetes_network.Node.pod_id
@@ -400,17 +377,17 @@ module Network_manager = struct
     in
     let t =
       { logger
-      ; cluster= network_config.cluster_id
+      ; cluster= cluster_id
       ; namespace= network_config.terraform.testnet_name
       ; testnet_dir
       ; testnet_log_filter
       ; constants= network_config.constants
-      ; keypair_secrets= List.map network_config.keypairs ~f:fst
       ; block_producer_nodes
       ; snark_coordinator_nodes
       ; nodes_by_app_id
       ; deployed= false
-      ; keypairs= List.unzip network_config.keypairs |> snd }
+      ; keypairs=
+          List.map network_config.keypairs ~f:(fun {keypair; _} -> keypair) }
     in
     [%log info] "Initializing terraform" ;
     let%bind _ = run_cmd_exn t "terraform" ["init"] in
@@ -420,23 +397,7 @@ module Network_manager = struct
   let deploy t =
     if t.deployed then failwith "network already deployed" ;
     [%log' info t.logger] "Deploying network" ;
-    let%bind _ = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
-    [%log' info t.logger] "Uploading network secrets" ;
-    let%map () =
-      Deferred.List.iter t.keypair_secrets ~f:(fun secret ->
-          let%map _ =
-            run_cmd_exn t "kubectl"
-              [ "create"
-              ; "secret"
-              ; "generic"
-              ; secret
-              ; "--cluster=" ^ t.cluster
-              ; "--namespace=" ^ t.namespace
-              ; "--from-file=key=" ^ secret
-              ; "--from-file=pub=" ^ secret ^ ".pub" ]
-          in
-          () )
-    in
+    let%map _ = run_cmd_exn t "terraform" ["apply"; "-auto-approve"] in
     t.deployed <- true ;
     let result =
       { Kubernetes_network.namespace= t.namespace
