@@ -132,6 +132,7 @@ let inferred_nonce ~get_current_nonce ~(account_id : Account_id.t) ~nonce_map =
 
 (* TODO: [nonce_map] may need to be updated regardless of whether we actually
    use it or not. *)
+      HERE is where the command is actually created (apparently with an invalid signature)
 let to_snapp_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     ~find_identity ({token_id; fee_payment; one; two} as snapp_input : t) :
     (Snapp_command.t * Account_nonce.t Account_id.Map.t, _) Deferred.Result.t =
