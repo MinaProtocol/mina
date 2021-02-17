@@ -1,3 +1,24 @@
+resource "google_compute_address" "seed_static_ip" {
+  count        = var.seed_count
+  name         = "seed-static-ip-${count.index + 1}"
+  address_type = "EXTERNAL"
+  region       = var.cluster_region
+  project      = "o1labs-192920"
+}
+
+data "aws_route53_zone" "selected" {
+  name = "o1test.net."
+}
+
+resource "aws_route53_record" "seed_record" {
+  count        = var.seed_count
+  zone_id = data.aws_route53_zone.selected.zone_id
+  name    = "seed-${count.index + 1}.${var.testnet_name}.${data.aws_route53_zone.selected.name}"
+  type    = "A"
+  ttl     = "300"
+  records = [google_compute_address.seed_static_ip[count.index].address]
+}
+
 module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
@@ -12,6 +33,7 @@ module "kubernetes_testnet" {
   coda_agent_image   = var.coda_agent_image
   coda_bots_image    = var.coda_bots_image
   coda_points_image  = var.coda_points_image
+  watchdog_image     = var.watchdog_image
 
   coda_faucet_amount = var.coda_faucet_amount
   coda_faucet_fee    = var.coda_faucet_amount
@@ -72,6 +94,19 @@ module "kubernetes_testnet" {
       }
     ]
   )
+
+  seed_configs = [
+      for i in range(var.seed_count): {
+        name                   = local.seed_names[i]
+        class                  = "seed"
+        id                     = i + 1
+        external_port          = local.static_peers[local.seed_names[i]].port
+        node_port              = i + 30000
+        external_ip            = google_compute_address.seed_static_ip[i].address
+        private_key_secret     = "online-seeds-account-${i + 1}-key"
+        libp2p_secret          = "online-seeds-libp2p-${i + 1}-key"
+      }
+    ]
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes

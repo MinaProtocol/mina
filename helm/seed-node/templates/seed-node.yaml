@@ -1,34 +1,49 @@
-{{- if .Values.seed.active }}
+{{ range $config := $.Values.seedConfigs}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{tpl .Values.seed.fullname .}}
+  name: {{ $config.name }}
   labels:
-    app: {{tpl .Values.seed.fullname .}}
+    app: {{ $config.name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{tpl .Values.seed.fullname .}}
+      app: {{ $config.name }}
   template:
     metadata:
       labels:
-        app: {{tpl .Values.seed.fullname .}}
-        testnet: {{ .Values.testnetName }}
+        app: {{ $config.name }}
+        testnet: {{ $.Values.testnetName }}
         role: seed
-        version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        class: {{ default "undefined" $config.class }}
+        version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
+      initContainers:
+      {{ if $config.libp2pSecret -}}
+      - name: libp2p-perms
+        image: {{ $.Values.coda.image | quote }}
+        command:
+        - bash
+        - -c
+        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: libp2p-keys
+          mountPath: /libp2p-keys
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+      {{- end }}
       containers:
-      - name: seed
+      - name: coda
         resources:
           limits:
           requests:
-            memory: 16.0Gi
-            cpu: 8.0
+            memory: 32.0Gi
+            cpu: 12.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
           "-log-level", "Trace",
@@ -40,55 +55,130 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
+          "-peers-list-url", {{ $.Values.coda.seedPeersURL }},
           "-seed",
-          "-discovery-keypair", "{{ .Values.seed.discoveryKeypair }}",
-          {{- if .Values.coda.runtimeConfig }}
+          {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
+          {{- if $config.libp2pSecret }}
+          "-discovery-keypair", "/root/libp2p-keys/key",
+          {{- end -}}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          "-upload-blocks-to-gcloud", "true",
+          {{- end }}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
           value: "6"
         - name: DAEMON_REST_PORT
-          value: {{ .Values.coda.ports.graphql | quote }}
+          value: {{ $.Values.coda.ports.graphql | quote }}
         - name: DAEMON_CLIENT_PORT
-          value: {{ .Values.coda.ports.client | quote }}
+          value: {{ $.Values.coda.ports.client | quote }}
         - name: DAEMON_METRICS_PORT
-          value: {{ .Values.coda.ports.metrics | quote }}
+          value: {{ $.Values.coda.ports.metrics | quote }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ .Values.coda.ports.p2p | quote }}
+          value: {{ default $.Values.coda.ports.p2p $config.externalPort | quote }}
+        {{- if $config.libp2pSecret }}
+        - name: CODA_LIBP2P_PASS
+          value: {{ $.Values.coda.privkeyPass | quote }}
+        {{- end }}
         ports:
         - name: client-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.client }}
+          containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.graphql }}
+          containerPort: {{ $.Values.coda.ports.graphql }}
         - name: metrics-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.metrics }}
+          containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.p2p }}
-{{- include "healthcheck.seed.allChecks" .Values | indent 8 }}
+          containerPort: {{ default $.Values.coda.ports.p2p $config.externalPort }}
+          hostPort: {{ default $.Values.coda.ports.external $config.externalPort }}
+{{- include "healthcheck.seed.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
-      {{- if .Values.coda.runtimeConfig }}
         volumeMounts:
+        {{- if $config.libp2pSecret }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        {{- end }}
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+        {{- if $.Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
+        {{- end }}
       volumes:
+      {{- if $.Values.coda.runtimeConfig }}
       - name: daemon-config
         configMap:
-          name: {{ tpl .Values.seed.fullname . }}-daemon-config
-      {{- end -}}
-{{- include "nodeSelector.preemptible" .Values | indent 6 }}
-{{- end }}
+          name: seed-daemon-config
+      {{- end }}
+      - name: private-keys
+        secret:
+          secretName: {{ $config.privateKeySecret }}
+          defaultMode: 256
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- if $config.libp2pSecret }}
+      - name: libp2p-keys
+        secret:
+          secretName: {{ $config.libp2pSecret }}
+          defaultMode: 0700
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}
+      - name: actual-libp2p
+        emptyDir: {}
+{{- include "nodeSelector.preemptible" $.Values | indent 6 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}
+spec:
+  {{- if $config.externalIp }}
+  type: LoadBalancer
+  loadBalancerIP: {{ $config.externalIp }}
+  {{- else }}
+  type: ClusterIP
+  {{- end }}
+  # We want all pods to have their addresses published for the sake of the
+  # other testnet pods even before they're ready, since they
+  # have to be able to talk to each other in order to become ready.
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: tcp-p2p
+    port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
+    targetPort: external-port
+    nodePort: {{ $config.nodePort }}
+---
+{{ end }}
