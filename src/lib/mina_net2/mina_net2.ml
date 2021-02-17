@@ -1165,6 +1165,10 @@ module Multiaddr = struct
         true
     | _ ->
         false
+
+  let of_file_contents ~(contents : string) : t list =
+    String.split ~on:'\n' contents
+    |> List.filter ~f:(fun s -> not (String.is_empty s))
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
