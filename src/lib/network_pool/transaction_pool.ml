@@ -53,7 +53,7 @@ module Diff_versioned = struct
    the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
    and do the same for snapp commands as well.
 *)
-  type verified = Signed_command.t list [@@deriving sexp, yojson]
+  type verified = User_command.Verifiable.t list [@@deriving sexp, yojson]
 
   type t = User_command.t list [@@deriving sexp, yojson]
 
@@ -752,7 +752,7 @@ struct
     module Diff = struct
       type t = User_command.t list [@@deriving sexp, yojson]
 
-      type verified = Signed_command.t list [@@deriving sexp, yojson]
+      type verified = User_command.Verifiable.t list [@@deriving sexp, yojson]
 
       type _unused = unit constraint t = Diff_versioned.t
 
@@ -783,7 +783,7 @@ struct
 
       let reject_overloaded_diff (diffs : verified) =
         List.map diffs ~f:(fun cmd ->
-            (User_command.Signed_command cmd, Diff_error.Overloaded) )
+            (User_command.Verifiable.forget cmd, Diff_error.Overloaded) )
 
       let empty = []
 
@@ -830,8 +830,6 @@ struct
       (* Transaction verification currently happens in apply. In the future we could batch it. *)
       let verify (t : pool) (diffs : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
-        let open Deferred.Let_syntax in
-        let sender = Envelope.Incoming.sender diffs in
         let diffs_are_valid () =
           List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
               let is_valid = not (User_command.has_insufficient_fee cmd) in
@@ -859,34 +857,24 @@ struct
               Deferred.Or_error.error_string
                 "We don't have a transition frontier at the moment, so we're \
                  unable to verify any transactions."
-          | Some _ledger -> (
+          | Some ledger -> (
             match
               Option.all
-                (List.map diffs.data ~f:(function
-                  | Snapp_command _ ->
-                      None
-                  | Signed_command x ->
-                      Some x ))
+                (List.map diffs.data ~f:(
+                    User_command.to_verifiable
+                      ~ledger 
+                      ~get:Base_ledger.get 
+                      ~location_of_account:Base_ledger.location_of_account
+                  ))
               |> Option.map ~f:(fun data -> {diffs with data})
             with
             | None ->
-                let trust_record =
-                  Trust_system.record_envelope_sender t.config.trust_system
-                    t.logger sender
-                in
-                let%map () =
-                  (* that's an insta-ban *)
-                  trust_record
-                    ( Trust_system.Actions.Sent_snapp_transaction
-                    , Some ("peer sent snapp transaction", []) )
-                in
-                Or_error.error_string "diff contained snapp transactions"
+                Deferred.Or_error.error_string "diff contained snapp transactions"
             | Some diffs' ->
-                Deferred.Or_error.return diffs'
-                (* Currently we defer all verification to [apply] *) )
+              Deferred.Or_error.return diffs'
+          )
 
       let apply t (env : verified Envelope.Incoming.t) =
-        let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
         let pool_max_size = t.config.pool_max_size in
@@ -901,16 +889,15 @@ struct
               Trust_system.record_envelope_sender t.config.trust_system
                 t.logger sender
             in
-            let rec go txs' pool (accepted, rejected) =
+            let rec go (txs' : User_command.Valid.t list) pool (accepted, rejected) =
               let open Interruptible.Deferred_let_syntax in
               match txs' with
               | [] ->
                   t.pool <- pool ;
                   Interruptible.Or_error.return
                   @@ (List.rev accepted, List.rev rejected)
-              | tx :: txs'' -> (
-                  let tx = User_command.Signed_command tx in
-                  (*                   let tx = User_command.forget_check tx' in *)
+              | tx' :: txs'' -> (
+                  let tx = User_command.forget_check tx' in
                   let tx' = Transaction_hash.User_command.create tx in
                   if Indexed_pool.member pool tx' then
                     let%bind _ =
@@ -1191,7 +1178,20 @@ struct
                     |> Error.tag ~tag:"Transaction_pool.apply" )
               in
               let%bind () = Interruptible.lift Deferred.unit signal in
-              go txs t.pool ([], [])
+              Interruptible.Deferred_let_syntax.(
+                match%bind Batcher.verify t.batcher env with
+                | Error _ ->
+                  (* Our bad (the verifier failed) but reject anyway. *)
+                  return (Or_error.error_string "verifier failure")
+                | Ok (Error ()) ->
+                  (* Bad proof *)
+                  let%map () =
+                    trust_record
+                      (Trust_system.Actions.Sent_invalid_proof, None)
+                  in
+                  Or_error.error_string "bad proof"
+                | Ok (Ok txs) ->
+                  go txs t.pool ([], []) )
             with
             | Ok res ->
                 res
@@ -1455,7 +1455,7 @@ let%test_module _ =
     let independent_signed_cmds' =
       List.map independent_cmds' ~f:(function
         | User_command.Signed_command x ->
-            x
+            User_command.Signed_command x
         | _ ->
             failwith
               "when snapp commands are enabled, [independent_signed_cmds'] \
@@ -1632,7 +1632,7 @@ let%test_module _ =
             @@ Envelope.Incoming.local
                  [ ( match cmd1 with
                    | Signed_command x ->
-                       Signed_command.forget_check x
+                       User_command.Signed_command (Signed_command.forget_check x)
                    | _ ->
                        failwith "fix when snapps are enabled" ) ]
           in
@@ -1657,7 +1657,7 @@ let%test_module _ =
     let extract_signed_commands =
       List.map ~f:(function
         | User_command.Signed_command x ->
-            Signed_command.forget_check x
+            User_command.Signed_command ( Signed_command.forget_check x )
         | _ ->
             failwith
               "when snapp commands are enabled, [extract_signed_commands] \
