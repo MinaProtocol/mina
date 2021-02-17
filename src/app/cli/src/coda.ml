@@ -288,6 +288,10 @@ let setup_daemon logger =
         "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
          discovery inside a file delimited by new-lines (\\n)"
       (optional string)
+  and seed_peer_list_url =
+    flag "--peer-list-url" ~aliases:["peer-list-url"]
+      ~doc:"URL URL of seed peer list file. Will be polled periodically."
+      (optional string)
   and curr_protocol_version =
     flag "--current-protocol-version"
       ~aliases:["current-protocol-version"]
@@ -921,10 +925,7 @@ let setup_daemon logger =
               Monitor.try_with_or_error (fun () -> Reader.file_contents file)
             with
             | Ok contents ->
-                String.split ~on:'\n' contents
-                |> List.filter ~f:(fun s -> not (String.is_empty s))
-                |> List.map ~f:Mina_net2.Multiaddr.of_string
-                |> return
+                return (Mina_net2.Multiaddr.of_file_contents ~contents)
             | Error _ ->
                 Mina_user_error.raisef
                   ~where:"reading libp2p peer address file"
@@ -978,6 +979,7 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
           ; conf_dir
           ; chain_id
           ; unsafe_no_trust_ip= false
+          ; seed_peer_list_url= Option.map seed_peer_list_url ~f:Uri.of_string
           ; initial_peers
           ; addrs_and_ports
           ; metrics_port= Option.map libp2p_metrics_port ~f:Int.to_string
@@ -1401,6 +1403,7 @@ let mina_commands logger =
   ; ("daemon", daemon logger)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
+  ; ("ledger", Client.ledger)
   ; ( "internal"
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)

@@ -34,6 +34,7 @@ module Config = struct
     ; direct_peers: Mina_net2.Multiaddr.t list
     ; peer_exchange: bool
     ; mina_peer_exchange: bool
+    ; seed_peer_list_url: Uri.t option
     ; max_connections: int
     ; validation_queue_size: int
     ; mutable keypair: Mina_net2.Keypair.t option }
@@ -47,6 +48,11 @@ module type S = sig
 end
 
 let rpc_transport_proto = "coda/rpcs/0.0.1"
+
+let download_seed_peer_list uri =
+  let%bind _resp, body = Cohttp_async.Client.get uri in
+  let%map contents = Cohttp_async.Body.to_string body in
+  Mina_net2.Multiaddr.of_file_contents ~contents
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
@@ -127,6 +133,13 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~added_seeds ~on_unexpected_termination =
+      let%bind seeds_from_url =
+        match config.seed_peer_list_url with
+        | None ->
+            Deferred.return []
+        | Some u ->
+            download_seed_peer_list u
+      in
       let fail err =
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
         |> Error.raise
@@ -180,12 +193,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             in
             let seed_peers =
               List.dedup_and_sort ~compare:Mina_net2.Multiaddr.compare
-                (List.rev_append config.initial_peers
-                   (List.map
-                      ~f:
-                        (Fn.compose Mina_net2.Multiaddr.of_string
-                           Peer.to_multiaddr_string)
-                      (Hash_set.to_list added_seeds)))
+                (List.concat
+                   [ config.initial_peers
+                   ; seeds_from_url
+                   ; List.map
+                       ~f:
+                         (Fn.compose Mina_net2.Multiaddr.of_string
+                            Peer.to_multiaddr_string)
+                       (Hash_set.to_list added_seeds) ])
             in
             let%bind () =
               configure net2 ~me ~logger:config.logger
@@ -534,6 +549,12 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 (Fn.compose Mina_net2.Multiaddr.of_string
                    Peer.to_multiaddr_string) ) ;
       t
+
+    let set_telemetry_data t data =
+      !(t.net2) >>= Fn.flip Mina_net2.set_telemetry_data data
+
+    let get_peer_telemetry_data t peer =
+      !(t.net2) >>= Fn.flip Mina_net2.get_peer_telemetry_data peer
 
     let initial_peers t = t.config.initial_peers
 

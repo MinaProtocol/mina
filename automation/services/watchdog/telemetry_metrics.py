@@ -15,6 +15,12 @@ import ast
 
 # ========================================================================
 
+def peer_to_multiaddr(peer):
+  return '/ip4/{}/tcp/{}/p2p/{}'.format(
+    peer['host'],
+    peer['libp2p_port'],
+    peer['peer_id'] )
+
 def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
   print('collecting telemetry metrics')
 
@@ -89,7 +95,7 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
   peer_table = {}
 
   queried_peers = set()
-  unqueried_peers = set()
+  unqueried_peers = {}
 
   def contains_error(resp):
     try:
@@ -115,9 +121,11 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
         peer_table[k] = v
 
     queried_peers.update([ p['node_peer_id'] for p in peers ])
-    queried_peers.update(direct_queried_peers)
-    unqueried_peers.update([ p['peer_id'] for p in list(itertools.chain(*[ p['peers'] for p in peers ])) ])
-    unqueried_peers.difference_update(queried_peers)
+    queried_peers.update([p['peer_id'] for p in direct_queried_peers])
+    for p in itertools.chain(*[ p['peers'] for p in peers ]):
+        unqueried_peers[p['peer_id']] = p
+    for p in queried_peers:
+        del unqueried_peers[p]
 
   cmd = "coda advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
   resp = util.exec_on_pod(v1, namespace, seed, 'seed', cmd)
@@ -126,12 +134,13 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
   requests = 0
 
   while len(unqueried_peers) > 0 and requests < max_crawl_requests:
-    peer_ids = ','.join(list(unqueried_peers))
+    peers_to_query = list(unqueried_peers.values())
+    peers = ','.join(to_multiaddr_string(p) for p in peers_to_query)
 
     print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
 
-    util.exec_on_pod(v1, namespace, seed, 'seed', "coda advanced telemetry -daemon-port " + seed_daemon_port + " -peer-ids " + peer_ids + " -show-errors")
-    add_resp(resp, list(unqueried_peers))
+    util.exec_on_pod(v1, namespace, seed, 'seed', "coda advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
+    add_resp(resp, peers_to_query)
 
     requests += 1
 
