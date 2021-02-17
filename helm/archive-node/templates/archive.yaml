@@ -47,7 +47,9 @@ spec:
           {{- range .Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
           {{- end -}}
+          {{- if .Values.coda.seedPeersURL }}
           "-peers-list-url", {{ $.Values.coda.seedPeersURL }},
+          {{- end -}}
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
