@@ -297,7 +297,7 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
                 "janitor",
                 "cleanup-namespace-resources",
                 "--namespace-pattern",
-                ".*",
+                ".*integration|auto|ci-net.*",
                 "--k8s-context",
                 "gke_o1labs-192920_us-west1_mina-integration-west1",
                 "--kube-config-file",

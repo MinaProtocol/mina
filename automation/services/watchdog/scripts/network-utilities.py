@@ -82,7 +82,7 @@ def cleanup_namespace_resources(namespace_pattern, cleanup_older_than, k8s_conte
                 # cleanup all namespace resources which match pattern and whose creation time is older than threshold
                 if ns.metadata.name and regexp.search(ns.metadata.name) \
                     and (ns.metadata.creation_timestamp <= datetime.datetime.now(pytz.utc) - datetime.timedelta(seconds=cleanup_older_than)):
-                    
+
                     print("Namespace [{namespace}] exceeds age of {age} seconds. Cleaning up resources...".format(
                         namespace=ns.metadata.name, age=cleanup_older_than))
 
