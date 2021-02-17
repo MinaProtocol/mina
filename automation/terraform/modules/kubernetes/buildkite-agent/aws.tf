@@ -69,6 +69,7 @@ data "aws_iam_policy_document" "buildkite_aws_policydoc" {
   statement {
     actions = [
       "route53:ListHostedZones",
+      "route53:ListTagsForResource",
       "route53:GetHostedZone"
     ]
 
