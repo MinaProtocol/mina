@@ -569,7 +569,7 @@ let coda_crash_message ~log_issue ~action ~error =
 
 let no_report exn_json status =
   sprintf
-    "include the last 20 lines from .coda-config/coda.log and then paste the \
+    "include the last 20 lines from .mina-config/coda.log and then paste the \
      following:\n\
      Summary:\n\
      %s\n\
@@ -644,7 +644,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                  coda_crash_message
                    ~error:"failed to initialize the genesis state"
                    ~action:
-                     "include the last 50 lines from .coda-config/coda.log"
+                     "include the last 50 lines from .mina-config/coda.log"
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
