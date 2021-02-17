@@ -99,7 +99,7 @@ module "testnet_east" {
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
 
-  archive_node_count  = 0
+  archive_node_count  = 1
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/474e314bf6a35adb4976ed7c5b1b68f5c776ad78/src/app/archive/create_schema.sql" 
 
   seed_zone   = local.seed_zone
