@@ -126,6 +126,8 @@ module Multiaddr : sig
        be used as a peer by libp2p
   *)
   val valid_as_peer : t -> bool
+
+  val of_file_contents : contents:string -> t list
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
