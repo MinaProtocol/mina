@@ -218,9 +218,9 @@ let setup_daemon logger =
          generate per-run temporary keypair)"
   and is_seed =
     flag "--seed" ~aliases:["seed"] ~doc:"Start the node as a seed node" no_arg
-  and super_catchup =
-    flag "--super-catchup" ~aliases:["super-catchup"]
-      ~doc:"Use the experimental super-catchup" no_arg
+  and no_super_catchup =
+    flag "--no-super-catchup" ~aliases:["no-super-catchup"]
+      ~doc:"Don't use super-catchup" no_arg
   and enable_flooding =
     flag "--enable-flooding" ~aliases:["enable-flooding"]
       ~doc:
@@ -1024,8 +1024,8 @@ Pass one of -peer, -peer-list-file, -seed.|} ;
       let%map coda =
         Mina_lib.create ~wallets
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
-             ~is_seed ~super_catchup ~disable_telemetry ~demo_mode
-             ~coinbase_receiver ~net_config ~gossip_net_params
+             ~is_seed ~super_catchup:(not no_super_catchup) ~disable_telemetry
+             ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
              ~proposed_protocol_version_opt
              ~work_selection_method:
