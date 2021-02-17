@@ -27,4 +27,4 @@ for f in keys/libp2p/zenith/seed-*; do
   addrs=$addrs$libp2p_addr"\n"
 done
 
-echo -e "$addrs" > $ARTIFACT_PATH/seeds.txt
+echo -e "$addrs" > $ARTIFACT_PATH/"$TESTNET"_seeds.txt
