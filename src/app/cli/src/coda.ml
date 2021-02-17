@@ -1403,6 +1403,7 @@ let mina_commands logger =
   ; ("daemon", daemon logger)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
+  ; ("ledger", Client.ledger)
   ; ( "internal"
     , Command.group ~summary:"Internal commands" (internal_commands logger) )
   ; (Parallel.worker_command_name, Parallel.worker_command)
