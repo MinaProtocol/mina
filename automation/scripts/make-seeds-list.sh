@@ -18,7 +18,7 @@ if [[ ! $ARTIFACT_PATH ]]; then
 fi
 
 addrs=
-for f in keys/libp2p/zenith/seed-*; do
+for f in keys/libp2p/${TESTNET}/seed-*; do
   node=$(basename $f)
   peerid=$(cat $f)
   idx=$(echo "$f" | awk -F- '{print $NF}')
