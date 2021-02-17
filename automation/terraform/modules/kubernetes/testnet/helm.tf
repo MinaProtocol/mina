@@ -6,7 +6,7 @@ provider helm {
 }
 
 locals {
-  use_local_charts = true
+  use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   peers = var.additional_peers
@@ -99,12 +99,12 @@ locals {
     testnetName = var.testnet_name
     coda = local.coda_vars 
     worker = {
-      active = true
+      active = var.snark_worker_replicas > 0
       numReplicas = var.snark_worker_replicas
     }
     coordinator = {
-      active = true
-      deployService = true
+      active = var.snark_worker_replicas > 0
+      deployService = var.snark_worker_replicas > 0
       publicKey   = var.snark_worker_public_key
       snarkFee    = var.snark_worker_fee
       hostPort    = var.snark_worker_host_port
