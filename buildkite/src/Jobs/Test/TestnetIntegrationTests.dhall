@@ -25,7 +25,6 @@ in Pipeline.build Pipeline.Config::{
 
     TestExecutive.execute "block-production" dependsOn,
     TestExecutive.execute "bootstrap" dependsOn,
-    TestExecutive.execute "bp-timed-accts" dependsOn,
     TestExecutive.execute "peers" dependsOn,
     TestExecutive.execute "pmt-timed-accts" dependsOn,
     TestExecutive.execute "send-payment" dependsOn
