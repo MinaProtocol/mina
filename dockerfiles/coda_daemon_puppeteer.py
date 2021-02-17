@@ -89,15 +89,15 @@ if __name__ == '__main__':
   signal.signal(signal.SIGUSR1, handle_stop_request)
   signal.signal(signal.SIGUSR2, handle_start_request)
 
-  Path('.coda-config').mkdir(exist_ok=True)
+  Path('.mina-config').mkdir(exist_ok=True)
   Path('coda.log').touch()
-  Path('.coda-config/coda-prover.log').touch()
-  Path('.coda-config/coda-verifier.log').touch()
-  Path('.coda-config/mina-best-tip.log').touch()
+  Path('.mina-config/coda-prover.log').touch()
+  Path('.mina-config/coda-verifier.log').touch()
+  Path('.mina-config/mina-best-tip.log').touch()
 
   # currently does not handle tail process dying
   tail_process = subprocess.Popen(
-      ['tail', '-q', '-f', 'coda.log', '-f', '.coda-config/coda-prover.log', '-f', '.coda-config/coda-verifier.log', '-f' , '.coda-config/mina-best-tip.log']
+      ['tail', '-q', '-f', 'coda.log', '-f', '.mina-config/coda-prover.log', '-f', '.mina-config/coda-verifier.log', '-f' , '.mina-config/mina-best-tip.log']
   )
 
   start_daemon()

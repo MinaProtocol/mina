@@ -35,7 +35,7 @@ mina daemon \
 || true
 
 # Remove lockfile if present
-rm ~/.coda-config/.mina-lock ||:
+rm ~/.mina-config/.mina-lock ||:
 
 # Restart in the background
 mina daemon \
