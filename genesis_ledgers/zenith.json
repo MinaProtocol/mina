@@ -22,18 +22,6 @@
         "timing": {
             "vesting_increment": "0",
             "vesting_period": "1",
-            "cliff_amount": "190698",
-            "cliff_time": "86400",
-            "initial_minimum_balance": "190698"
-        },
-        "delegate": "B62qjYbjZC7DBP78LheCLjD8WRWxku6YzqarNVK2er6t8SQfXyk1ybc",
-        "balance": "190698",
-        "pk": "B62qonY7qj4qi5FTiLLXTPa12geN4tCtBJgoJBsSuoo4jcYyYnKGhTD"
-    },
-    {
-        "timing": {
-            "vesting_increment": "0",
-            "vesting_period": "1",
             "cliff_amount": "116279",
             "cliff_time": "86400",
             "initial_minimum_balance": "116279"
@@ -8279,6 +8267,889 @@
     },
     {
         "timing": {
+            "vesting_increment": "14167",
+            "vesting_period": "14400",
+            "cliff_amount": "14167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "85000"
+        },
+        "delegate": "B62qj3Gzxgb4G4M8CwZRXZPtmVwGJtGfVXVbpMrACNDSqQLoXzSQ9HW",
+        "balance": "85000",
+        "pk": "B62qmT1gn5equzmv5LtUSR7uW1ST1d2mCvpgeWcN5DKGAJedWFVCSN5"
+    },
+    {
+        "timing": {
+            "vesting_increment": "7333",
+            "vesting_period": "14400",
+            "cliff_amount": "7333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "44000"
+        },
+        "delegate": "B62qkBqSkXgkirtU3n8HJ9YgwHh3vUD6kGJ5ZRkQYGNPeL5xYL2tL1L",
+        "balance": "44000",
+        "pk": "B62qnr6wsfZxsxFk9xEZvsgKTLTmFmd9czVieRpEv4YnQmHUaVMMDTa"
+    },
+    {
+        "timing": {
+            "vesting_increment": "2833",
+            "vesting_period": "14400",
+            "cliff_amount": "2833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "17000"
+        },
+        "delegate": "B62qmBBEPcCpWqvMhParohskEjDttye1A7iSxwmMncXXgKkgjQ9PA7y",
+        "balance": "17000",
+        "pk": "B62qpJPsP9ef7vbgtwcRveQJgAsWKZduzL6BAj3k39qSpfFr2dxB2io"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1667",
+            "vesting_period": "14400",
+            "cliff_amount": "1667",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "10000"
+        },
+        "delegate": "B62qjwAoLA1iT82EQQidZDDovQND5PeJtmcZXq7USbNDGEqgYnBbKam",
+        "balance": "10000",
+        "pk": "B62qopxMBgKZehZ28XCa67puBLdaFJcetetQ5Eqzsov63t9G4frjJQe"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1667",
+            "vesting_period": "14400",
+            "cliff_amount": "1667",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "10000"
+        },
+        "delegate": "B62qoVopcNoQPFydweGWUBnJJbrokkebVDiWGmAzYoaLysrFfzNCbya",
+        "balance": "10000",
+        "pk": "B62qmiHLHuXxGC5fcy1QqM185VeW8CN3MZm72d2PraRNFxAzzcQ3K8c"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1667",
+            "vesting_period": "14400",
+            "cliff_amount": "1667",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "10000"
+        },
+        "delegate": "B62qik2auL1VbkX6fijdzwT6fGgjpi8caKUH6vbov573DbdT2UbQkDp",
+        "balance": "10000",
+        "pk": "B62qmfjBQ8xtj4MfcQA5kd65VAp7usta45qmowjMeNuZhvizAxYnoPD"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1500",
+            "vesting_period": "14400",
+            "cliff_amount": "1500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "9000"
+        },
+        "delegate": "B62qphpEdBwSycpN67XFjcXSEY9j18chmttFTXYerhTPMX4JkXubWkd",
+        "balance": "9000",
+        "pk": "B62qoyHpeJHELgZGhECbCQ6tn5gHK5MJY8RYUi4UYaf1B5oTTwjMjb1"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1000",
+            "vesting_period": "14400",
+            "cliff_amount": "1000",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "6000"
+        },
+        "delegate": "B62qijDC2gCTtcqYGnUAc9YgH2Uw4fzr8xEKKL4faZmWyAypgEe3oWC",
+        "balance": "6000",
+        "pk": "B62qitBtpsUFVthx4w8pWXTMX33iYm6hRKEjsN43QeRuieUfwk52SbD"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1667",
+            "vesting_period": "14400",
+            "cliff_amount": "1667",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "10000"
+        },
+        "delegate": "B62qn7dN3hhEyqEYLG9Le1KwJpJfcJQXfiBoKiB7sZVrwYvT1NyRfDr",
+        "balance": "10000",
+        "pk": "B62qo758VUF9BH7kdmzxvchdQg1e4DfJNaDaLubdMYTwjtKU48NrTsU"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN",
+        "balance": "5000",
+        "pk": "B62qrAjwKEug5bXehb1WoxPrDf7heb2VSy8yEmKHVp1dAfseYHhBmfk"
+    },
+    {
+        "timing": {
+            "vesting_increment": "500",
+            "vesting_period": "14400",
+            "cliff_amount": "500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "3000"
+        },
+        "delegate": "B62qkXQoFvTuTH7ARfihY8XmsUi5AfCpZgjmeQnf7bj81oTdT4GCsh9",
+        "balance": "3000",
+        "pk": "B62qrSiA6i3HQRDS2boxepfMaXQeof88YLTJBEr3qjCNZerNfrZkEYs"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1000",
+            "vesting_period": "14400",
+            "cliff_amount": "1000",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "6000"
+        },
+        "balance": "6000",
+        "pk": "B62qrHQbB4jYT1oCtbX3V37GvMSwPSw6oYmYFPYnjYNLdc7rpSdkERD"
+    },
+    {
+        "timing": {
+            "vesting_increment": "7000",
+            "vesting_period": "14400",
+            "cliff_amount": "7000",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "42000"
+        },
+        "delegate": "B62qoTASPAqsxJb1kmDZtYhxRAuuegWG1WhzkxqmZVD3BmKLenPa3hx",
+        "balance": "42000",
+        "pk": "B62qreGujxwhvS7FM3yLHfHVUnkrj5KSWyQPkAz2B5sYkFBacvboE4R"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qkDxbJZ1g7iER3Pv4Gid19m63wp5DKs7Jz7ELxVerWqWeBwrr2dT",
+        "balance": "2000",
+        "pk": "B62qqP9XWKj3xMTxXrjpUR25d8k5ocEh8fiGxp8C3EszYHLuXMUPCgc"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qjBpH4zeWgy4d4p59qUXDA3DtYeCyBrRM286sdXZFw4A8SiswfBh",
+        "balance": "2000",
+        "pk": "B62qjajZHX3V9boBnG4gNupuR6EYbT9racDtJC1GHY6bThdyHe6GGU8"
+    },
+    {
+        "timing": {
+            "vesting_increment": "500",
+            "vesting_period": "14400",
+            "cliff_amount": "500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "3000"
+        },
+        "delegate": "B62qqoBaTeqq6K5kpPEBh22HHq2BJ3ukegb4csDDoyoaFzdpgKLidYS",
+        "balance": "3000",
+        "pk": "B62qmpK6T59DvNivKs3zDXNcR7FRMQJxJVW7h9QimNjd3yegAPxjknN"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "balance": "2000",
+        "pk": "B62qj5xvECtvu1eWdLWWHkUUULbkazUL2kRJZm1hkgwv7N8KJeE3GsU"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qnU9faP18C3nQVwGNxreapkp65v11j6JHQVMgZWtEMJcQW4x1HsR",
+        "balance": "2000",
+        "pk": "B62qr7KAAzUrv7hkKDgnSzz1xDi6BuetvDrckQxtz7GNh9PrENkiH1c"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qpzWppkJex4Hx7Y6rSq8yH9JMaGc8R1b3nkSjH3mk3aYKNyX6DKW",
+        "balance": "2000",
+        "pk": "B62qkoKSrcJms7W8HNvFteypzAYLdGMoe52mGjzx1pvNRLQLX6ZCqRh"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qoERu6rA6UUxk6yNYN9CfrvXwNB7tBF94TQucZNRkabQNiDJoMiR",
+        "balance": "2000",
+        "pk": "B62qp48Cwkd7MpGfQBbYkUqpeeRhT5dDfW7MUBYH3zgSuwWQPpBMbSP"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN",
+        "balance": "2000",
+        "pk": "B62qoSKy5LTX48VRcvVuCfWLMeuHNqsqPZXXeYwHVkxshneaeW1rKPh"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qqV16g8s744GHM6Dph1uhW4fggYwyvtDnVSoRUyYqNvTir3Rqqzx",
+        "balance": "2000",
+        "pk": "B62qrBcgyttwueJWQDiYA6r8PQ3X3Jh3Fkn6Y3k6XTDehoR9L5kQ4zG"
+    },
+    {
+        "timing": {
+            "vesting_increment": "500",
+            "vesting_period": "14400",
+            "cliff_amount": "500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "3000"
+        },
+        "delegate": "B62qpdKVxef96UTWaEPEbGQ7FruwCSbEckDHDGtpAQqxUfDmHR725AV",
+        "balance": "3000",
+        "pk": "B62qooudywX15CbVbZ1KA2ZVMJ8aWqCvYKgYnE36u8qDqZsXkS8psyk"
+    },
+    {
+        "timing": {
+            "vesting_increment": "3333",
+            "vesting_period": "14400",
+            "cliff_amount": "3333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "20000"
+        },
+        "delegate": "B62qjYFuUkb1D8xgwdADbiZ6UUr6KA6x61BzzE1K9sgemawDbytmjTb",
+        "balance": "20000",
+        "pk": "B62qqDvzvGP798vcVLeGczsY3sKypYTfhk5zKk2sNyCPx9kWBkh9Emx"
+    },
+    {
+        "timing": {
+            "vesting_increment": "2500",
+            "vesting_period": "14400",
+            "cliff_amount": "2500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "15000"
+        },
+        "delegate": "B62qrae3PEBj66KV2obWnzVxMjDCMuFWnyzxEzvLkQutaKPmWtfUPm3",
+        "balance": "15000",
+        "pk": "B62qj2hYKc8e6ehN7V2x4TPR1M8NjKaJZRR68fHLRh7D3BRNJSXnNKn"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1000",
+            "vesting_period": "14400",
+            "cliff_amount": "1000",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "6000"
+        },
+        "delegate": "B62qoazqR1ag2hDwjkSSm6qV3eJtkiPvVPKhfVyeea7TehBAWu4dWJ5",
+        "balance": "6000",
+        "pk": "B62qoYG6v71VxyYiGERuReb4V6etLF3vdzryEXQUHWiCSz8bsaA2qZA"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qj3Gzxgb4G4M8CwZRXZPtmVwGJtGfVXVbpMrACNDSqQLoXzSQ9HW",
+        "balance": "5000",
+        "pk": "B62qpSnqVrNamS2jT9UJRxUTWajt1uzamEb9Rp6AztWiXnMEeooP5h4"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qp4Gwy1ZxVA6EhqFPJ7oZphYKhuJYgVdYNkBUQEmwhY2J7d311Ys",
+        "balance": "5000",
+        "pk": "B62qp8dFx9w5si4QzcPdMmSqFd55MPgNJiAsxtsYCzRYLGvV4XDHXXu"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qkoSio33qzxjsAuY4KVYmjw784KuyDSxbRL4d8UJaLXmdgVqb4N4",
+        "balance": "5000",
+        "pk": "B62qmDfmcUqZTwxsomFzMBfqFisLS63VSsfyH8v2ezwh44sZH3KkEHA"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qny4snW5cBovDvVFLSipUMaDiu7xwYMrfbTscDLDne7enKJyGkbh",
+        "balance": "5000",
+        "pk": "B62qktozdEL1KySmBrr5kTZVyjcpoi74mzK3tshi2qXptqeuX56DY4m"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN",
+        "balance": "2000",
+        "pk": "B62qn519rweP51hpDGQYqCZ8JRPkpxHd2JzDoBFQcupGppuwkpGBHp9"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qm5ESJuFWe5JypXPQMyuw2BzkVXGHFgNBgeuvBnfiLKRaqYRW6rX",
+        "balance": "2000",
+        "pk": "B62qmEorLV4gifAPeg4GoN8PpTWEr7ytx8Xejazc1skGepEALxEbENH"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "balance": "2000",
+        "pk": "B62qnTdTtkepo2yfBXCeMp9afk77oo3EKWDNWuvLzEHSZz2gkgr5JHj"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "2000",
+        "pk": "B62qiuqZjBn29vKLHgDffoyYCzvn3iqciQd1LqtMKKii6VJgZfM4cTm"
+    },
+    {
+        "timing": {
+            "vesting_increment": "500",
+            "vesting_period": "14400",
+            "cliff_amount": "500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "3000"
+        },
+        "delegate": "B62qne38nSn1gwHkAn9vPN5SZntgXg3cM5pfuad1zQxFRuvAQmKkGTi",
+        "balance": "3000",
+        "pk": "B62qnjzqEn9dxzz2e6PtoRKipZWKToySCQbKaMTjuyuTdxdmMCHGjLD"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qnMTo6ii49AJa83i3i2WeG3bJN6WHDYh9K7BvKb42aQHC3Pibvxp",
+        "balance": "2000",
+        "pk": "B62qkkNzkCjbwhhEtu1HJ7SuEezuEzpkdUCfBrvo4vtCVutiTtECS1w"
+    },
+    {
+        "timing": {
+            "vesting_increment": "500",
+            "vesting_period": "14400",
+            "cliff_amount": "500",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "3000"
+        },
+        "delegate": "B62qnSUbgFfPTsZGPhFU9hEy4PerBLCHVcTCYthU7BUN75nHiZQPg6r",
+        "balance": "3000",
+        "pk": "B62qrUS2A6sjnk95D83g1sjAryRBDwjBWhBdzPKZJbgoeMaY1YrHnzQ"
+    },
+    {
+        "timing": {
+            "vesting_increment": "3333",
+            "vesting_period": "14400",
+            "cliff_amount": "3333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "20000"
+        },
+        "delegate": "B62qqV16g8s744GHM6Dph1uhW4fggYwyvtDnVSoRUyYqNvTir3Rqqzx",
+        "balance": "20000",
+        "pk": "B62qm5HhL5ESWzGMBRdzjVkRGD5ZzAf8YYErcXYyDbSy7o9EXUXMqnk"
+    },
+    {
+        "timing": {
+            "vesting_increment": "1667",
+            "vesting_period": "14400",
+            "cliff_amount": "1667",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "10000"
+        },
+        "delegate": "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN",
+        "balance": "10000",
+        "pk": "B62qkwrHj3YCKgQsXRktpwhVFij19RiwYDgMmiwp7iggNBi8712a4W4"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qpJavug1VGCBSttepmXr6nh8fvXY5SigbN44ttYDia65vwbTEcq2",
+        "balance": "5000",
+        "pk": "B62qk2bwhv6KNHyaUjC4ab8XPhAvDDUByaR4dGXqvR8d7duavJVNq8e"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qny4snW5cBovDvVFLSipUMaDiu7xwYMrfbTscDLDne7enKJyGkbh",
+        "balance": "5000",
+        "pk": "B62qkx6oy3qGwxaYYTeh3WeUZemaLo1Kqyui9io6Y5wxeJPEWHEVey6"
+    },
+    {
+        "timing": {
+            "vesting_increment": "833",
+            "vesting_period": "14400",
+            "cliff_amount": "833",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "5000"
+        },
+        "delegate": "B62qnSUbgFfPTsZGPhFU9hEy4PerBLCHVcTCYthU7BUN75nHiZQPg6r",
+        "balance": "5000",
+        "pk": "B62qobHLtqcoUqhpmpjsJQNXhfUTbKyV4Ug5qJWV8mTqtbZbJAmn1P6"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qqKoxyhPfHY9kw283dafk5jztbbKdH78eDXpNCyj69cmckC8KZqs",
+        "balance": "2000",
+        "pk": "B62qmtWtBjJjBoTrCGdTop1uZqmf7b3nnY1RX48hXUy9XkNNxj6o5fH"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qm4QbSnmQWM3x7SUiQeWAjb6iiooWNd8iaxtDvsne7YP4nC8Nh7f",
+        "balance": "2000",
+        "pk": "B62qmAuxm3DoE2Mp5doamtmKwmD6TGmeA3SPuh57bvH6LUcZspbaF7b"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN",
+        "balance": "2000",
+        "pk": "B62qo1EYgARevAzQyNDxhNmKwZAdHg4j65Sr4JnJwtoLGXt6ustog1n"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qoeKm4p9J6Q3hYWzb82Yo5uP163MqooBX4ZWjp8FpX3N6Y81QgFc",
+        "balance": "2000",
+        "pk": "B62qoeJgVm3MzkQD8GiHNSFmEcGYRT5WaAQZ16DFYjcE2R38nCsXc6A"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy",
+        "balance": "2000",
+        "pk": "B62qj4odmzXgncnBCmBQ5CGoaD7y6rPTQC3qNezGrw31sdDqxbTzRab"
+    },
+    {
+        "timing": {
+            "vesting_increment": "333",
+            "vesting_period": "14400",
+            "cliff_amount": "333",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "2000"
+        },
+        "delegate": "B62qkXQoFvTuTH7ARfihY8XmsUi5AfCpZgjmeQnf7bj81oTdT4GCsh9",
+        "balance": "2000",
+        "pk": "B62qm8BBqTFCc1KKiDU6wuqjZf6n65dasH8jAHSrLZiNyzhQJLZUizQ"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qnXy1f75qq8c6HS2Am88Gk6UyvTHK3iSYh4Hb3nD6DS2eS6wZ4or",
+        "balance": "1000",
+        "pk": "B62qjHdRfaxSdUkta6Qqa6oiXQ8WnRGkMa3rDuX1e9zZTUHwooQ9wHy"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qkXeeeerxc4YMtV8qBki2bTQc5KBZ5CCZk85xsjTBh2iEQ2PJmce",
+        "balance": "1000",
+        "pk": "B62qjShUd15Mezic2rixrzAfJ9HRDQKbWqSoocLMUqoLrGVv7avL8uq"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qkhfgERAi7TUjujZ8gdwSbA9TnJxvErjwfZTeftKmpdjJxWxGHGT",
+        "balance": "1000",
+        "pk": "B62qmhF6ip7xWbEoUSUUtuvZno6itX4bTfCPoAfkmjAbv14XJfsUMgZ"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qp4Xg1zuAkTc1cyG8N2xQrujJaZ9uesm26Jy9sr2w65XUnNaGEEQ",
+        "balance": "1000",
+        "pk": "B62qq5W8QExpM1qgMitciWQghnEQc5Gy6y2v9rEKEbxfBSw3Hh5NgHW"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qoi7wVz5NDCYa37usdATKcvMVcbtXYLjn3KiELXSEsG7XcbifC3q",
+        "balance": "1000",
+        "pk": "B62qjD5F3fYFhRUbdfrvUzuEhouPX8zgxDmRKL39oEWppJMRuhM5uGn"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qmpHMDeuGL1KAkneV1RTKMez2ZNcDUJKNAEZgweJna62xuJQ6Mqm",
+        "balance": "1000",
+        "pk": "B62qkY65gWYLm68fqW4nKj8URcr5BTb8BN5UHo65Dkh35tDMrgPeyeH"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qnR6HKx34NCyDkSeRcJ44KATjUCs4xmQYDbwTXPJPQ4J6ebfeQe4",
+        "balance": "1000",
+        "pk": "B62qqdTvDUeXvUSAUiNQ12BthhmgLDpXUrmxzYdbHxLz3dUNM4vEt4Y"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qjQ3k78nzaePyXhg298UEVnwbCeqQUcNwZRSR4VK1gVJ6mer6M8V",
+        "balance": "1000",
+        "pk": "B62qpeTWsqipUEyG6nQb54SfbDrCrzK5zBwFoVqggexDNrUnV1aXAdo"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qkxZba8d9MWL9nXRvMaGJXESxHbkLhfogtqsCXKs8ueSZkhJNboQ",
+        "balance": "1000",
+        "pk": "B62qorPGKrHgPAkt2FM16N8JttM8CrYVwL15tBy5oigLESPFYC1SyXh"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qrLf5xV1fdE2RikXzzogaJYhPmWMf75GGSpJSG2yLiE3nM24C2Nd",
+        "balance": "1000",
+        "pk": "B62qqhmvrqpBEJ55rR6v42AFnh59KktBsXBqs4i2fBVTb7uBqBsUNSy"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qoRsqqfdfDb3s4nTgTVUQGLep77ZcoKjjWoyxspTn4CEbtBknDek",
+        "balance": "1000",
+        "pk": "B62qrLdrRjY339ix4YneW5hQwXcaPFYbL4y35VEJUKoUugrv6x1DAFk"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qqV16g8s744GHM6Dph1uhW4fggYwyvtDnVSoRUyYqNvTir3Rqqzx",
+        "balance": "1000",
+        "pk": "B62qo2eh5weVKJH7AtwBJewA9rKKwPYeScV9y5QgJWPJqMaYuc6kQ7T"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qqoBaTeqq6K5kpPEBh22HHq2BJ3ukegb4csDDoyoaFzdpgKLidYS",
+        "balance": "1000",
+        "pk": "B62qpV2bk8Pge5E9D2JrMwg3ZTjZ7G7YKH3k5Bmo1D33yhiYgu92Cn3"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qnWPnneWPobbir3JncBDVnj9dGvT1RA713xYVxJ9sBYgYHiu68Xh",
+        "balance": "1000",
+        "pk": "B62qkL5VU2iDpUgr4rqkGiu1PaYspDnE266618gUVmpVnARaXbd7iiB"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qqV16g8s744GHM6Dph1uhW4fggYwyvtDnVSoRUyYqNvTir3Rqqzx",
+        "balance": "1000",
+        "pk": "B62qpW3zh1yMd6n7bkXuT4SrWjEp9bZeDTkY449DMBYBSjEX8wJTy15"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qmWbgvGV1MwxS6rJEG3BSbT2T8b5DP2Theb2CaBduBXGJz6qfCqb",
+        "balance": "1000",
+        "pk": "B62qmfZo5Hbs4iJ2edczgFJsbSnTunDPPaXjR1AtJVX1e9DHuezeKXg"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qoZHCPoNTozrDqDtj6vjY7MmD9ZEakVMxTR7btNnqjoKzUqp4EKx",
+        "balance": "1000",
+        "pk": "B62qqsDZB9aHvRqLGzsvMzC1ZHewLEkActsP3VFRBBdGabAdSrgMrnD"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "balance": "1000",
+        "pk": "B62qnMXrsM3J1pjdiDuwcem1dZeRtn3aDDyr19fTEcAbyaxwyZSWEuN"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qqV16g8s744GHM6Dph1uhW4fggYwyvtDnVSoRUyYqNvTir3Rqqzx",
+        "balance": "1000",
+        "pk": "B62qn4BzvXMoAxWPpRf59yjgowibyXBhcUzGZJmCJ7RRUaDwDdxpq7G"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qozyeUmdsCUP3kCJXNMDwCENUA6SA7ZtnGWiZbSWaB5yeuMVVJF2",
+        "balance": "1000",
+        "pk": "B62qmQ4WrMAxMV1tBjANXZiH1FbCwhhsR2p3uXWcVbRQaj4bPTH7fGj"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qqV16g8s744GHM6Dph1uhW4fggYwyvtDnVSoRUyYqNvTir3Rqqzx",
+        "balance": "1000",
+        "pk": "B62qqoDxUHd2E3g5Ngm3HphxN474YzRwdSVyYoNnUo4um5qGxLxtZ9K"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qqc3eKfNYpdRByoN4V3BTjoPRgacLrqtx4WkBQgnVcQ1MHSWTyWL",
+        "balance": "1000",
+        "pk": "B62qmVHYfw8BGCpw6ngZcM4tBo9GFeyRw952N2WB1LNaGZEtGAtFBFS"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA",
+        "balance": "1000",
+        "pk": "B62qqCFf6pUfES9zA3h3t7qTezP3RJvYkb1Y4szDNkQj9LuYayXtkVU"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "balance": "1000",
+        "pk": "B62qmT4DxZoFZqJgfKYpZaHyV8KBfkmYCuGTKBfioKd9Lddd7HgeARV"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qocWXdgZV7hC7bDVbLvM2fAKZTFjVoqVP3ppJhpgeUV37Qem4PSs",
+        "balance": "1000",
+        "pk": "B62qjVUmgXQikmcey3JHSF6fVqX7MoQGnDfaNu2AQpka8YiKfTmggZe"
+    },
+    {
+        "timing": {
+            "vesting_increment": "167",
+            "vesting_period": "14400",
+            "cliff_amount": "167",
+            "cliff_time": "86400",
+            "initial_minimum_balance": "1000"
+        },
+        "delegate": "B62qp69bsgUNySCY2wEYDCrRN3gdMB6cDSZGBucTzc9vUUH4jUoDSED",
+        "balance": "1000",
+        "pk": "B62qqDR4cmdfXz56KDVG86TDvaa2To1gDxh4XPXEcPE5SEZJTawznVA"
+    },
+    {
+        "timing": {
             "vesting_increment": "1",
             "vesting_period": "1",
             "cliff_amount": "27777",
@@ -14194,112 +15065,122 @@
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qqrJBL4dJcHBRCxXRkCbYfBXqhRHRPS6dnPtbumAeKhMmWzQ3c4b"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qjprTZdUaTRW9g2RMLs5LQ37BiHmb6hoh9kFAwq4jp9mrg4fLJvK"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qnNhJHPxHesaq4GpphxupDQ96wtFfN5UMdKBor1BLYvmh5f1c2JW"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qiZg8JuWmaTSGPhTYhJnN2VmS4ugT43gMBaKwU41waV1p4NrsvUj"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qnmoXDcF4X82pyozed2uo3oBfHiejuUzkNiB9sR7zP2vpKYZSrKf"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qq86gnFpTZRSwg3nQJrNSyM3x2h5qdEX8Cy9VBLEtDUAVf7aASGT"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qo8CVqwtP8T26KTTkvTyu2LLa6yYV2aGvkTdDM7MExJEGnPDuFYa"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qqjwT6PYbpYCLDcqUhoduYSof1NzBfUCDRYwySLh2YNvNyzJL2jw"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qmyDUzBxgGuJ9P3CEsPqMgSQfwP4GovsRYPvhnKfkt97ZiV3oYiY"
     },
     {
         "timing": {
-            "vesting_increment": "444",
+            "vesting_increment": "6370",
             "vesting_period": "14400",
-            "cliff_amount": "444",
+            "cliff_amount": "6370",
             "cliff_time": "86400",
-            "initial_minimum_balance": "8000"
+            "initial_minimum_balance": "114667"
         },
-        "balance": "8000",
+        "delegate": "B62qrHzjcZbYSsrcXVgGko7go1DzSEBfdQGPon5X4LEGExtNJZA4ECj",
+        "balance": "114667",
         "pk": "B62qnrXdaJz2ovq9YZHJqtg29FU4iwNA7aY6vyaCrERwGfWzrGtiq4C"
     },
     {
@@ -21339,6 +22220,10 @@
     },
     {
         "balance": "0",
+        "pk": "B62qnU9faP18C3nQVwGNxreapkp65v11j6JHQVMgZWtEMJcQW4x1HsR"
+    },
+    {
+        "balance": "0",
         "pk": "B62qiZi62RK552P54BGEb7saNF5mSVRCFcxULPvGVi64KudP1s7TSm6"
     },
     {
@@ -22035,10 +22920,6 @@
     },
     {
         "balance": "0",
-        "pk": "B62qnTdTtkepo2yfBXCeMp9afk77oo3EKWDNWuvLzEHSZz2gkgr5JHj"
-    },
-    {
-        "balance": "0",
         "pk": "B62qrJowiiRAYWQUrhyieAdFuDJgQ2MoyCqTzotP2ECRVptb63f7bG3"
     },
     {
@@ -22223,10 +23104,6 @@
     },
     {
         "balance": "0",
-        "pk": "B62qjYbjZC7DBP78LheCLjD8WRWxku6YzqarNVK2er6t8SQfXyk1ybc"
-    },
-    {
-        "balance": "0",
         "pk": "B62qmBBEPcCpWqvMhParohskEjDttye1A7iSxwmMncXXgKkgjQ9PA7y"
     },
     {
@@ -22301,7 +23178,6 @@
         "balance": "0",
         "pk": "B62qpFJeY8uiLwzhrmwFGthQS7yjZonyUACq32G4ULkZcRB9W3WVFgE"
     }
-    ]
+]
   }
 }
-

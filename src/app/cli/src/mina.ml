@@ -963,11 +963,12 @@ let setup_daemon logger =
       in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
       if is_seed then [%log info] "Starting node as a seed node"
-      else if List.is_empty initial_peers then
+      else if List.is_empty initial_peers && Option.is_none seed_peer_list_url
+      then
         Mina_user_error.raise
           {|No peers were given.
 
-Pass one of -peer, -peer-list-file, -seed.|} ;
+Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       let chain_id =
         chain_id ~genesis_state_hash
           ~genesis_constants:precomputed_values.genesis_constants
