@@ -1,4 +1,11 @@
-[
+{
+  "genesis": {
+    "genesis_state_timestamp": "2021-02-17T19:30:00Z"
+  },
+  "ledger": {
+    "name": "zenith",
+    "num_accounts": 6,
+    "accounts": [
     {
         "timing": {
             "vesting_increment": "0",
@@ -23172,3 +23179,5 @@
         "pk": "B62qpFJeY8uiLwzhrmwFGthQS7yjZonyUACq32G4ULkZcRB9W3WVFgE"
     }
 ]
+  }
+}
