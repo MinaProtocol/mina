@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import pytz
 import datetime
 import timedelta
 import json
@@ -37,6 +38,14 @@ DEFAULT_CLEANUP_PATTERNS = []
 DEFAULT_K8S_CONTEXTS = []
 
 
+def _execute_command(command):
+    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+    output, error = process.communicate()
+    if error:
+        print(error)
+    if output:
+        print(output)
+
 @janitor.command()
 @click.option('--namespace-pattern',
               multiple=True,
@@ -71,19 +80,15 @@ def cleanup_namespace_resources(namespace_pattern, cleanup_older_than, k8s_conte
                     namespace=ns.metadata.name, createdAt=ns.metadata.creation_timestamp))
 
                 # cleanup all namespace resources which match pattern and whose creation time is older than threshold
-                if regexp.search(ns.metadata.name) and (ns.metadata.creation_timestamp <= now-timedelta(seconds=cleanup_older_than)):
+                if ns.metadata.name and regexp.search(ns.metadata.name) \
+                    and (ns.metadata.creation_timestamp <= datetime.datetime.now(pytz.utc) - datetime.timedelta(seconds=cleanup_older_than)):
+
                     print("Namespace [{namespace}] exceeds age of {age} seconds. Cleaning up resources...".format(
                         namespace=ns.metadata.name, age=cleanup_older_than))
 
-                    command = "kubectl delete all --all -n {namespace}".format(
-                        namespace=ns)
-                    process = subprocess.Popen(
-                        command.split(), stdout=subprocess.PIPE)
-                    output, error = process.communicate()
-                    if error:
-                        print(error)
-                    if output:
-                        print(output)
+                    _execute_command("kubectl config use-context {context}".format(context=ctx))
+                    _execute_command("kubectl delete all -n {namespace} --all".format(namespace=ns.metadata.name))
+                    _execute_command("kubectl delete ns {namespace}".format(namespace=ns.metadata.name))
                 else:
                     print("Skipping Namespace {namespace}.".format(
                         namespace=ns.metadata.name))
