@@ -119,13 +119,13 @@ locals {
       # in addition to stand-alone servers up to input count
       [
         for index in range(2, var.archive_node_count + 1):
-          defaults(
+          merge(
+            local.default_archive_node,
             {
               name = "archive-${index}",
               enableLocalDaemon = false,
               enablePostgresDB = false
-            },
-            local.default_archive_node
+            }
           )
       ]
     )
