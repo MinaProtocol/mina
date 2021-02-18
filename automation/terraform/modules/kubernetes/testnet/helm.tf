@@ -111,37 +111,24 @@ locals {
       seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
     }
-    archive = {
-      image = var.coda_archive_image
-      remoteSchemaFile = var.mina_archive_schema
-    }
-    postgresql = {
-      persistence = {
-        enabled = var.archive_persistence_enabled
-        storageClass = "${var.cluster_region}-${var.archive_persistence_class}-${lower(var.archive_persistence_reclaim_policy)}"
-        accessModes = var.archive_persistence_access_modes
-        size = var.archive_persistence_size
-      }
-      primary = {
-        affinity = {
-          nodeAffinity = {
-            requiredDuringSchedulingIgnoredDuringExecution = {
-              nodeSelectorTerms = [
-                {
-                  matchExpressions = [
-                    {
-                      key = "cloud.google.com/gke-preemptible"
-                      operator = "NotIn"
-                      values = ["true"]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      }
-    }
+    node_configs = length(var.archive_configs) != 0 ? defaults(var.archive_configs, local.default_archive_node) : concat(
+      # By default deploy a single postgres and local daemon enabled server
+      [
+        merge(local.default_archive_node, { name = "archive-1", persistence = { enabled = true } })
+      ],
+      # in addition to stand-alone servers up to input count
+      [
+        for index in range(2, var.archive_node_count + 1):
+          defaults(
+            {
+              name = "archive-${index}",
+              enableLocalDaemon = false,
+              enablePostgresDB = false
+            },
+            local.default_archive_node
+          )
+      ]
+    )
   }
 
   watchdog_vars = {
@@ -202,7 +189,6 @@ resource "helm_release" "seed" {
   ]
 }
 
-
 # Block Producer
 
 resource "helm_release" "block_producers" {
@@ -243,8 +229,7 @@ resource "helm_release" "snark_workers" {
 
 resource "helm_release" "archive_node" {
   provider   = helm.testnet_deploy
-
-  count       = var.archive_node_count
+  count       = length(local.archive_node_vars.node_configs)
   
   name        = "archive-node-${count.index + 1}"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
@@ -252,7 +237,11 @@ resource "helm_release" "archive_node" {
   version     = "0.4.6"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
-    yamlencode(local.archive_node_vars)
+    yamlencode({
+      testnetName = var.testnet_name
+      coda = local.archive_node_vars.coda
+      archive = local.archive_node_vars.node_configs[count.index]
+    })
   ]
 
   wait = false
