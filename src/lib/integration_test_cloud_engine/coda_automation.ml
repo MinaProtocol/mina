@@ -73,6 +73,7 @@ module Network_config = struct
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs: block_producer_config list
     ; snark_worker_replicas: int
+    ; archive_node_count: int
     ; snark_worker_fee: string
     ; snark_worker_public_key: string }
   [@@deriving to_yojson]
@@ -101,6 +102,7 @@ module Network_config = struct
         ; txpool_max_size
         ; block_producers
         ; num_snark_workers
+        ; num_archive_nodes
         ; snark_worker_fee
         ; snark_worker_public_key } =
       test_config
@@ -243,6 +245,7 @@ module Network_config = struct
         ; block_producer_configs=
             List.mapi block_producer_keypairs ~f:block_producer_config
         ; snark_worker_replicas= num_snark_workers
+        ; archive_node_count= num_archive_nodes
         ; snark_worker_public_key
         ; snark_worker_fee
         ; aws_route53_zone_id } }
@@ -299,6 +302,7 @@ module Network_manager = struct
     ; testnet_log_filter: string
     ; constants: Test_config.constants
     ; block_producer_nodes: Kubernetes_network.Node.t list
+    ; archive_nodes: Kubernetes_network.Node.t list
     ; snark_coordinator_nodes: Kubernetes_network.Node.t list
     ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
     ; mutable deployed: bool
@@ -367,9 +371,12 @@ module Network_manager = struct
     (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
     let snark_coordinator_nodes = [cons_node "snark-coordinator-1"] in
     let block_producer_nodes =
-      List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i ->
-          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) )
+      List.map network_config.terraform.block_producer_configs
+        ~f:(fun block_producer_conf -> cons_node block_producer_conf.name)
+    in
+    let archive_nodes =
+      List.init network_config.terraform.archive_node_count ~f:(fun i ->
+          cons_node (Printf.sprintf "archive-node-%d-postgresql" (i + 1)) )
     in
     let nodes_by_app_id =
       let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
@@ -385,6 +392,7 @@ module Network_manager = struct
       ; testnet_log_filter
       ; constants= network_config.constants
       ; block_producer_nodes
+      ; archive_nodes
       ; snark_coordinator_nodes
       ; nodes_by_app_id
       ; deployed= false
@@ -406,7 +414,7 @@ module Network_manager = struct
       ; constants= t.constants
       ; block_producers= t.block_producer_nodes
       ; snark_coordinators= t.snark_coordinator_nodes
-      ; archive_nodes= []
+      ; archive_nodes= t.archive_nodes
       ; nodes_by_app_id= t.nodes_by_app_id
       ; testnet_log_filter= t.testnet_log_filter
       ; keypairs= t.keypairs }

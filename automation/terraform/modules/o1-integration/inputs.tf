@@ -30,6 +30,10 @@ variable "coda_archive_image" {
   type = string
 }
 
+variable "archive_node_count" {
+  type = number
+}
+
 variable "coda_agent_image" {
   type = string
 }

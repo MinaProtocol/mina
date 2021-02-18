@@ -20,6 +20,7 @@ type t =
   ; txpool_max_size: int
   ; block_producers: Block_producer.t list
   ; num_snark_workers: int
+  ; num_archive_nodes: int
   ; snark_worker_fee: string
   ; snark_worker_public_key: string }
 
@@ -31,6 +32,7 @@ let default =
   ; proof_level= Full
   ; txpool_max_size= 3000
   ; num_snark_workers= 2
+  ; num_archive_nodes= 0
   ; block_producers= []
   ; snark_worker_fee= "0.025"
   ; snark_worker_public_key=

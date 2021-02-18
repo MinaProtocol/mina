@@ -25,7 +25,7 @@ module "kubernetes_testnet" {
   seed_zone   = "us-west1-a"
   seed_region = "us-west1"
 
-  archive_node_count  = 0
+  archive_node_count  = var.archive_node_count
 
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
