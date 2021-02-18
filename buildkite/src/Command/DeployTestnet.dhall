@@ -48,7 +48,7 @@ in
             "terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
               " -var ci_artifact_path=${spec.artifactPath}" ++
-              " || (terraform destroy -auto-approve)"
+              " || (terraform destroy -auto-approve && exit 1)"
           ),
           -- upload/cache testnet genesis_ledger
           Cmd.run "artifact-cache-helper.sh ${spec.artifactPath}/genesis_ledger.json --upload",
