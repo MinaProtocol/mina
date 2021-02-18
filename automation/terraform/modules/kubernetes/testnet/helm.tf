@@ -38,6 +38,8 @@ locals {
         metrics = "8081"
         p2p     = var.seed_port
       }
+      seedPeersURL         = var.seed_peers_url
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
 
     seedConfigs = [
@@ -97,12 +99,12 @@ locals {
     testnetName = var.testnet_name
     coda = local.coda_vars 
     worker = {
-      active = true
+      active = var.snark_worker_replicas > 0
       numReplicas = var.snark_worker_replicas
     }
     coordinator = {
-      active = true
-      deployService = true
+      active = var.snark_worker_replicas > 0
+      deployService = var.snark_worker_replicas > 0
       publicKey   = var.snark_worker_public_key
       snarkFee    = var.snark_worker_fee
       hostPort    = var.snark_worker_host_port
@@ -115,6 +117,7 @@ locals {
       image         = var.coda_image
       seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
+      seedPeersURL         = var.seed_peers_url
     }
     archive = {
       image = var.coda_archive_image
@@ -195,7 +198,7 @@ resource "helm_release" "seeds" {
   name        = "${var.testnet_name}-seeds"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version     = "0.5.0"
+  version     = "0.6.1"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -216,7 +219,7 @@ resource "helm_release" "block_producers" {
   name        = "${var.testnet_name}-block-producers"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version     = "0.5.0"
+  version     = "0.5.2"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -234,7 +237,7 @@ resource "helm_release" "snark_workers" {
   name        = "${var.testnet_name}-snark-worker"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version     = "0.4.5"
+  version     = "0.4.8"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
@@ -254,7 +257,7 @@ resource "helm_release" "archive_node" {
   name        = "archive-node-${count.index + 1}"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version     = "0.4.6"
+  version     = "0.4.9"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
     yamlencode(local.archive_node_vars)
