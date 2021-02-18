@@ -1200,7 +1200,12 @@ struct
 
       let unsafe_apply t diff =
         match%map apply t diff with
-        | Ok e ->
+        | Ok ((accepted, _) as e) ->
+            ( if not (List.is_empty accepted) then
+              Mina_metrics.(
+                Gauge.set
+                  Transaction_pool.useful_transactions_received_time_sec
+                  Time.(now () |> to_span_since_epoch |> Span.to_sec)) ) ;
             Ok e
         | Error e ->
             Error (`Other e)
