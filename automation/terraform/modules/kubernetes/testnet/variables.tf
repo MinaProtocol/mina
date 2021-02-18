@@ -259,13 +259,6 @@ variable "archive_configs" {
       postgresUri        = optional(string)
       enableLocalDaemon  = optional(bool)
       enablePostgresDB   = optional(bool)
-      persistence = object({
-        enabled       = optional(bool)
-        size          = optional(string)
-        storageClass  = optional(string)
-        reclaimPolicy = optional(string)
-        accessModes   = optional(list(string))
-      })
     })
   )
   default = []

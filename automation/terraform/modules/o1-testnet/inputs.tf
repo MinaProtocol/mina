@@ -87,6 +87,11 @@ variable "archive_node_count" {
   default = 0
 }
 
+variable "archive_configs" {
+  type    = list(any)
+  default = []
+}
+
 # Seed Vars
 
 variable "seed_port" {

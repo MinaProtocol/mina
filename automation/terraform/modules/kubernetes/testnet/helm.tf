@@ -111,24 +111,7 @@ locals {
       seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
     }
-    node_configs = length(var.archive_configs) != 0 ? defaults(var.archive_configs, local.default_archive_node) : concat(
-      # By default deploy a single postgres and local daemon enabled server
-      [
-        merge(local.default_archive_node, { name = "archive-1", persistence = { enabled = true } })
-      ],
-      # in addition to stand-alone servers up to input count
-      [
-        for index in range(2, var.archive_node_count + 1) :
-        merge(
-          local.default_archive_node,
-          {
-            name              = "archive-${index}",
-            enableLocalDaemon = false,
-            enablePostgresDB  = false
-          }
-        )
-      ]
-    )
+    node_configs = defaults(var.archive_configs, local.default_archive_node)
   }
 
   watchdog_vars = {
@@ -241,6 +224,7 @@ resource "helm_release" "archive_node" {
       testnetName = var.testnet_name
       coda        = local.archive_node_vars.coda
       archive     = local.archive_node_vars.node_configs[count.index]
+      postgresql  = local.default_postgres_config
     })
   ]
 
