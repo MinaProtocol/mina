@@ -9,11 +9,7 @@ locals {
   use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
-  seed_peers = [
-    "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
-  ]
-
-  peers = concat(var.additional_peers, local.seed_peers)
+  peers = var.additional_peers
 
   coda_vars = {
     runtimeConfig        = var.runtime_config
@@ -23,6 +19,7 @@ locals {
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+    seedPeersURL         = var.seed_peers_url
   }
 
   seed_vars = {
@@ -32,7 +29,7 @@ locals {
       image         = var.coda_image
       privkeyPass   = var.block_producer_key_pass
       // TODO: Change this to a better name
-      seedPeers          = var.additional_peers
+      seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
       ports = {
@@ -41,11 +38,21 @@ locals {
         metrics = "8081"
         p2p     = var.seed_port
       }
+      seedPeersURL         = var.seed_peers_url
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
-    seed = {
-      active            = true
-      discovery_keypair = var.seed_discovery_keypairs[0]
-    }
+
+    seedConfigs = [
+      for index, config in var.seed_configs: {
+        name                 = config.name
+        class                = config.class
+        libp2pSecret         = config.libp2p_secret
+        privateKeySecret     = config.private_key_secret
+        externalPort         = config.external_port
+        externalIp           = config.external_ip
+        nodePort             = config.node_port
+      }
+    ]
   }
 
   block_producer_vars = {
@@ -92,15 +99,15 @@ locals {
     testnetName = var.testnet_name
     coda        = local.coda_vars
     worker = {
-      active      = true
+      active = var.snark_worker_replicas > 0
       numReplicas = var.snark_worker_replicas
     }
     coordinator = {
-      active        = true
-      deployService = true
-      publicKey     = var.snark_worker_public_key
-      snarkFee      = var.snark_worker_fee
-      hostPort      = var.snark_worker_host_port
+      active = var.snark_worker_replicas > 0
+      deployService = var.snark_worker_replicas > 0
+      publicKey   = var.snark_worker_public_key
+      snarkFee    = var.snark_worker_fee
+      hostPort    = var.snark_worker_host_port
     }
   }
 
@@ -110,6 +117,7 @@ locals {
       image         = var.coda_image
       seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
+      seedPeersURL         = var.seed_peers_url
     }
     node_configs = defaults(var.archive_configs, local.default_archive_node)
   }
@@ -154,14 +162,14 @@ resource "kubernetes_role_binding" "helm_release" {
   }
 }
 
-resource "helm_release" "seed" {
-  provider = helm.testnet_deploy
+resource "helm_release" "seeds" {
+  provider   = helm.testnet_deploy
 
-  name       = "${var.testnet_name}-seed"
-  repository = local.use_local_charts ? "" : local.mina_helm_repo
-  chart      = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version    = "0.4.5"
-  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  name        = "${var.testnet_name}-seeds"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
+  version     = "0.6.1"
+  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
   ]
@@ -177,17 +185,17 @@ resource "helm_release" "seed" {
 resource "helm_release" "block_producers" {
   provider = helm.testnet_deploy
 
-  name       = "${var.testnet_name}-block-producers"
-  repository = local.use_local_charts ? "" : local.mina_helm_repo
-  chart      = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version    = "0.5.0"
-  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  name        = "${var.testnet_name}-block-producers"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
+  version     = "0.5.2"
+  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
   ]
-  wait       = false
-  timeout    = 600
-  depends_on = [helm_release.seed]
+  wait        = false
+  timeout     = 600
+  depends_on  = [helm_release.seeds]
 }
 
 # Snark Worker
@@ -195,17 +203,17 @@ resource "helm_release" "block_producers" {
 resource "helm_release" "snark_workers" {
   provider = helm.testnet_deploy
 
-  name       = "${var.testnet_name}-snark-worker"
-  repository = local.use_local_charts ? "" : local.mina_helm_repo
-  chart      = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version    = "0.4.5"
-  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  name        = "${var.testnet_name}-snark-worker"
+  repository  = local.use_local_charts ? "" : local.mina_helm_repo
+  chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
+  version     = "0.4.8"
+  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
   ]
-  wait       = false
-  timeout    = 600
-  depends_on = [helm_release.seed]
+  wait        = false
+  timeout     = 600
+  depends_on  = [helm_release.seeds]
 }
 
 # Archive Node
@@ -217,7 +225,7 @@ resource "helm_release" "archive_node" {
   name       = "archive-node-${count.index + 1}"
   repository = local.use_local_charts ? "" : local.mina_helm_repo
   chart      = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version    = "0.4.6"
+  version    = "0.5.0"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode({
@@ -230,7 +238,7 @@ resource "helm_release" "archive_node" {
 
   wait       = false
   timeout    = 600
-  depends_on = [helm_release.seed]
+  depends_on = [helm_release.seeds]
 }
 
 # Watchdog
@@ -246,8 +254,8 @@ resource "helm_release" "watchdog" {
   values = [
     yamlencode(local.watchdog_vars)
   ]
-  wait       = false
-  timeout    = 600
-  depends_on = [helm_release.seed]
+  wait        = false
+  timeout     = 600
+  depends_on  = [helm_release.seeds]
 }
 

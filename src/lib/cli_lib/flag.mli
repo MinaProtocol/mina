@@ -2,6 +2,8 @@ open Core
 
 val json : bool Command.Spec.param
 
+val plaintext : bool Command.Spec.param
+
 val performance : bool Command.Spec.param
 
 val privkey_write_path : string Command.Spec.param

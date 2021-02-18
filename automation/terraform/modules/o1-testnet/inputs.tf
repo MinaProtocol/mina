@@ -129,6 +129,11 @@ variable "fish_count" {
   default = 1
 }
 
+variable "seed_count" {
+  type    = number
+  default = 1
+}
+
 variable "log_level" {
   type    = string
   default = "Trace"
@@ -149,6 +154,11 @@ variable "block_producer_key_pass" {
 }
 
 variable "block_producer_starting_host_port" {
+  type    = number
+  default = 10000
+}
+
+variable "seed_starting_host_port" {
   type    = number
   default = 10000
 }
