@@ -1,0 +1,114 @@
+{
+  "genesis": {
+    "genesis_state_timestamp": "2021-02-18T03:18:41Z"
+  },
+  "ledger": {
+    "name": "archive-test",
+    "num_accounts": 16,
+    "accounts": [
+      {
+        "pk": "B62qr8ExTkFNueu6h9VB2iNemvio4oHKtLRZ6kKZCFqoouAp9Pmkmck",
+        "balance": "66000.000000000",
+        "delegate": "B62qr8ExTkFNueu6h9VB2iNemvio4oHKtLRZ6kKZCFqoouAp9Pmkmck",
+        "sk": null,
+        "timing": {
+          "initial_minimum_balance": "60000",
+          "cliff_time": "150",
+          "cliff_amount": "12000",
+          "vesting_period": "6",
+          "vesting_increment": "150"
+        }
+      },
+      {
+        "pk": "B62qr7NWxrtZm5PXw4qTUpKwvjmvjNySakU8LDsy71HepE5sVNJKqQx",
+        "balance": "20000.000000000",
+        "delegate": "B62qr7NWxrtZm5PXw4qTUpKwvjmvjNySakU8LDsy71HepE5sVNJKqQx",
+        "sk": null
+      },
+      {
+        "pk": "B62qmp3A4PUzEzc25HJckVNqmLTCSutDbp8DoACbxgLrUFa2gdVXUwv",
+        "balance": "20000.000000000",
+        "delegate": "B62qmp3A4PUzEzc25HJckVNqmLTCSutDbp8DoACbxgLrUFa2gdVXUwv",
+        "sk": null
+      },
+      {
+        "pk": "B62qkyp868ux6imQYTVdrEvNmUdn7opA3h15KbAfF6fQV1Jsr4Syy7K",
+        "balance": "20000.000000000",
+        "delegate": "B62qkyp868ux6imQYTVdrEvNmUdn7opA3h15KbAfF6fQV1Jsr4Syy7K",
+        "sk": null
+      },
+      {
+        "pk": "B62qkiXCE813ydhXHjutwUHvtANCCQJpmFiG5BX3D9uiaLm5xeu5Ecb",
+        "balance": "20000.000000000",
+        "delegate": "B62qkiXCE813ydhXHjutwUHvtANCCQJpmFiG5BX3D9uiaLm5xeu5Ecb",
+        "sk": null
+      },
+      {
+        "pk": "B62qm8yvRDd94AFB3H53MNgT843omdqoUXBwuiGNVUiSJoXfWgP6c6L",
+        "balance": "20000.000000000",
+        "delegate": "B62qm8yvRDd94AFB3H53MNgT843omdqoUXBwuiGNVUiSJoXfWgP6c6L",
+        "sk": null
+      },
+      {
+        "pk": "B62qnrqEcL9ceG44CU8KDTKzCFuvBLF2VmNB7wR9UPMxRse3xoQ52ct",
+        "balance": "20000.000000000",
+        "delegate": "B62qr7NWxrtZm5PXw4qTUpKwvjmvjNySakU8LDsy71HepE5sVNJKqQx",
+        "sk": null
+      },
+      {
+        "pk": "B62qrQKF2QLTKxwpH27WpJYsRUp2Hr1XZETfouG8p3jmGuSuXJuDb7Y",
+        "balance": "20000.000000000",
+        "delegate": "B62qmp3A4PUzEzc25HJckVNqmLTCSutDbp8DoACbxgLrUFa2gdVXUwv",
+        "sk": null
+      },
+      {
+        "pk": "B62qm7rj4eTLSi4GgkCdJB1CYPoC9tKXC4DvbQm6KVu6YhNKmyxxjnr",
+        "balance": "20000.000000000",
+        "delegate": "B62qkyp868ux6imQYTVdrEvNmUdn7opA3h15KbAfF6fQV1Jsr4Syy7K",
+        "sk": null
+      },
+      {
+        "pk": "B62qnZPrzqemLeCr7ECMx7xuj9NSpQZghBPsUrggBQSvtqcCaXRt725",
+        "balance": "20000.000000000",
+        "delegate": "B62qkiXCE813ydhXHjutwUHvtANCCQJpmFiG5BX3D9uiaLm5xeu5Ecb",
+        "sk": null
+      },
+      {
+        "pk": "B62qjTk9AeHpJpbFdtfCCPS6ekiJBoz94NgLmdwC4dNj5YuawhJaiYn",
+        "balance": "20000.000000000",
+        "delegate": "B62qm8yvRDd94AFB3H53MNgT843omdqoUXBwuiGNVUiSJoXfWgP6c6L",
+        "sk": null
+      },
+      {
+        "pk": "B62qihiJSdAC3WBrhsDNWhvFF5WwL3kbcXQwZENZRcctGvmuRgag2is",
+        "balance": "2250000.000000000",
+        "delegate": "B62qmsFn2BYEQfh8UzpFVDfUY8UyJiE5AH1t5XADxdZgrRGqDkx1d1N",
+        "sk": null
+      },
+      {
+        "pk": "B62qmYpYRi7Mhr7iUxaxptDN1xD2X86ti1h7zrVT1jEvi7Gxoe3aqBe",
+        "balance": "2250000.000000000",
+        "delegate": "B62qkgnDMBpXaos5YxxnvD772Fe22sEyC1bzYhRZ3DoqmzQtB6x6iee",
+        "sk": null
+      },
+      {
+        "pk": "B62qpUQ5mGYYxnkWQoDuAA4jsB1u4sKAMpccrSbutnEpLhitFhgx9hE",
+        "balance": "2250000.000000000",
+        "delegate": "B62qkk58DYuK7Evmv8YtDsXbrJ8aWL4Kzo26dPKYXLrnfybQJFJt3bL",
+        "sk": null
+      },
+      {
+        "pk": "B62qpMz3qgyzQfGm3ESMNdTkWknmV6xkAy5BFsMxhqRcFQqwR6EdMhx",
+        "balance": "2250000.000000000",
+        "delegate": "B62qm3PegQP8fC2TKJ1gMGU7fCZuk4GEVYZ3FBq7Wkku1MAGonvRZWT",
+        "sk": null
+      },
+      {
+        "pk": "B62qm43TArPrvDa4AzzXEh5x15DwKGcmW4KVHt4BGEsGf2LUzFe5wUA",
+        "balance": "2250000.000000000",
+        "delegate": "B62qrnYiLytyqnuRphrL6K5rcanmiRSBZsr69y1jFwAuLURxTxykjPM",
+        "sk": null
+      }
+    ]
+  }
+}

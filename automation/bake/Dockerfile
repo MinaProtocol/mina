@@ -11,17 +11,21 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyri
 RUN apt-get update && apt-get install -y google-cloud-sdk
 
 ARG COMMIT_HASH=master
-ARG TESTNET_NAME=testworld
-ARG CONFIG_FILE="/root/daemon.json"
+ARG TESTNET_NAME=encore
+ARG CONFIG_FILE=/root/daemon.json
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
+RUN echo "config-file: ${CONFIG_FILE}"
 
-RUN head ${CONFIG_FILE}
+COPY $CONFIG_FILE /root/daemon.json
+
+#RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
+
+RUN head /root/daemon.json
 
 # Create the defautl config dir and an empty config
 RUN mkdir -p /root/.coda-config && echo "{}" > /root/.coda-config/daemon.json
 
-RUN coda daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
+RUN coda daemon -config-file /root/daemon.json -generate-genesis-proof true; \
   mv ~/.coda-config/genesis/genesis_* /var/lib/coda/
 
 RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt
@@ -37,7 +41,7 @@ command=$1 \n\
 shift \n\
 while true; do\n\
   rm -f /root/.coda-config/.mina-lock\n\
-  coda "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >coda.log &\n\
+  coda "$command" -config-file /root/daemon.json "$@" 2>&1 >coda.log &\n\
   coda_pid=$!\n\
   tail -q -f coda.log &\n\
   tail_pid=$!\n\
