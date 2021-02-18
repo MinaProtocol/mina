@@ -257,7 +257,7 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// send large message from A to B
-	actualMessage := createMessage(1 << 30)
+	msg := createMessage(1 << 30)
 
 	// create handler that reads 1<<30 bytes
 	done := make(chan struct{})
@@ -280,7 +280,7 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 		expectedMessage, err := codaDecode(data.(string))
 		require.NoError(t, err)
 
-		require.Equal(t, expectedMessage, actualMessage)
+		require.Equal(t, expectedMessage, msg)
 		close(done)
 	}
 
@@ -288,9 +288,6 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 
 	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
 	require.NoError(t, err)
-
-	lenBytes := uint64ToLEB128(uint64(len(actualMessage)))
-	msg := append(lenBytes, actualMessage...)
 
 	_, err = stream.Write(msg)
 	require.NoError(t, err)
@@ -320,7 +317,7 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Send multiple messages from A to B
-	actualMessage := createMessage(1 << 10)
+	msg := createMessage(1 << 10)
 
 	// create handler that reads 3 messages of size 1<<10 bytes
 	done := make(chan struct{})
@@ -350,7 +347,7 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 			expectedMessage, err := codaDecode(data.(string))
 			require.NoError(t, err)
 
-			require.Equal(t, expectedMessage, actualMessage)
+			require.Equal(t, expectedMessage, msg)
 		}
 		close(done)
 	}
@@ -359,9 +356,6 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 
 	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
 	require.NoError(t, err)
-
-	lenBytes := uint64ToLEB128(uint64(len(actualMessage)))
-	msg := append(lenBytes, actualMessage...)
 
 	_, err = stream.Write(msg)
 	require.NoError(t, err)
@@ -421,16 +415,12 @@ func TestLib2pMetrics(t *testing.T) {
 	go appB.checkMessageStats(appB.P2p.Me)
 
 	// Send multiple messages from A to B
-	message := createMessage(maxStatsMsg)
-	lenBytes := uint64ToLEB128(maxStatsMsg)
-	msg := append(lenBytes, message...)
+	msg := createMessage(maxStatsMsg)
 
 	_, err = stream.Write(msg)
 	require.NoError(t, err)
 
-	smallMessage := createMessage(minStatsMsg)
-	newMsgLen := uint64ToLEB128(minStatsMsg)
-	newMsg := append(newMsgLen, smallMessage...)
+	newMsg := createMessage(minStatsMsg)
 
 	_, err = stream.Write(newMsg)
 	require.NoError(t, err)

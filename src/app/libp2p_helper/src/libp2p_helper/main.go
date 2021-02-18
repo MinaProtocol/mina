@@ -658,55 +658,46 @@ type incomingMsgUpcall struct {
 }
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
-	// create buffer stream for non-blocking read
-	r := bufio.NewReader(stream)
 	msg := app.P2p.MsgStats
 
-	var msgBytes []byte
 	go func() {
 		defer func() {
 			_ = stream.Close()
 		}()
+
+		buf := make([]byte, 4096)
+		tot := uint64(0)
 		for {
-			length, err := readLEB128ToUint64(r)
-			if err == io.EOF {
-				continue
-			} else if err != nil {
+			len, err := stream.Read(buf)
+
+			if len != 0 {
+				app.writeMsg(incomingMsgUpcall{
+					Upcall:    "incomingStreamMsg",
+					Data:      codaEncode(buf[:len]),
+					StreamIdx: idx,
+				})
+			}
+
+			if err != nil && err != io.EOF {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
 					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
 				})
-				return
+				break
 			}
 
-			if length == 0 {
-				continue
+			tot += uint64(len)
+
+			if err == io.EOF {
+				msg.UpdateMetrics(tot)
+				break
 			}
-
-			msg.UpdateMetrics(length)
-
-			msgBytes = make([]byte, length)
-			n, err := io.ReadFull(r, msgBytes)
-			if err != nil {
-				app.writeMsg(streamLostUpcall{
-					Upcall:    "streamLost",
-					StreamIdx: idx,
-					Reason:    fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n),
-				})
-				return
-			}
-
-			app.writeMsg(incomingMsgUpcall{
-				Upcall:    "incomingStreamMsg",
-				Data:      codaEncode(msgBytes),
-				StreamIdx: idx,
-			})
-			app.writeMsg(streamReadCompleteUpcall{
-				Upcall:    "streamReadComplete",
-				StreamIdx: idx,
-			})
 		}
+		app.writeMsg(streamReadCompleteUpcall{
+			Upcall:    "streamReadComplete",
+			StreamIdx: idx,
+		})
 	}()
 }
 
@@ -812,10 +803,6 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		msgLen := uint64(len(data))
-		lenBytes := uint64ToLEB128(msgLen)
-		data = append(lenBytes, data...)
-
 		n, err := stream.Write(data)
 		if err != nil {
 			return nil, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
@@ -1560,38 +1547,3 @@ func main() {
 }
 
 var _ json.Marshaler = (*methodIdx)(nil)
-
-func uint64ToLEB128(in uint64) []byte {
-	var out []byte
-	for {
-		b := uint8(in & 0x7f)
-		in >>= 7
-		if in != 0 {
-			b |= 0x80
-		}
-		out = append(out, b)
-		if in == 0 {
-			break
-		}
-	}
-	return out
-}
-
-func readLEB128ToUint64(r io.Reader) (uint64, error) {
-	buffer := make([]byte, 1)
-	var out uint64
-	var shift uint
-	for {
-		_, err := io.ReadFull(r, buffer)
-		if err != nil {
-			return 0, err
-		}
-		b := buffer[0]
-		out |= uint64(0x7F&b) << shift
-		if b&0x80 == 0 {
-			break
-		}
-		shift += 7
-	}
-	return out, nil
-}
