@@ -106,7 +106,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
 cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -193,7 +193,7 @@ cp ../genesis_ledgers/zenith.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CON
 mkdir -p "${BUILDDIR}/etc/bash_completion.d"
 cwd=$(pwd)
 export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
-env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > "${BUILDDIR}/etc/bash_completion.d/coda"
+env COMMAND_OUTPUT_INSTALLATION_BASH=1 mina  > "${BUILDDIR}/etc/bash_completion.d/mina"
 
 # echo contents of deb
 echo "------------------------------------------------------------"

@@ -41,7 +41,7 @@ touch .mina-config/coda-verifier.log\n\
 touch .mina-config/mina-best-tip.log\n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
-  coda "$@" 2>&1 >coda.log &\n\
+  mina "$@" 2>&1 >coda.log &\n\
   coda_pid=$!\n\
   tail -q -f coda.log -f .mina-config/coda-prover.log -f .mina-config/coda-verifier.log -f .mina-config/mina-best-tip.log &\n\
   tail_pid=$!\n\
