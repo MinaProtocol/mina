@@ -28,8 +28,8 @@ spec:
             memory: 512m
             cpu: 1.0
         image: {{ .Values.image }}
-        command: ["bash"]
-        args: ["-c", "/code/main.sh"]
+        command: ["python3"]
+        args: ["-u", "/code/watchdog.py"]
         env:
           - name: "RESTART_EVERY_MINS"
             value: {{ .Values.restartEveryMins | quote }}
@@ -43,7 +43,34 @@ spec:
             value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
           - name: "MAKE_REPORT_ACCOUNTS"
             value: {{ .Values.makeReportAccounts | quote }}
+          - name: "METRICS_PORT"
+            value: {{ $.Values.coda.ports.metrics | quote }}
+          - name: "SEED_PEERS_URL"
+            value: {{ $.Values.seedPeersURL | quote }}
+          - name: "GOOGLE_APPLICATION_CREDENTIALS"
+            value: "/gcloud/keyfile.json"
+          {{- if $.Values.coda.uploadBlocksToGCloud }}
+          - name: "CHECK_GCLOUD_STORAGE_BUCKET"
+            value: "true"
+          {{- end }}
+
         ports: 
         - name: metrics-port
-          containerPort: 8000
+          protocol: TCP 
+          containerPort: {{ $.Values.coda.ports.metrics }}
         imagePullPolicy: Always
+        volumeMounts:
+        {{- if $.Values.coda.uploadBlocksToGCloud }}
+        - name: gcloud-keyfile
+          mountPath: "/gcloud/"
+        {{- end }}
+      volumes:
+      {{- if $.Values.coda.uploadBlocksToGCloud }}
+      - name: gcloud-keyfile
+        secret:
+          secretName: gcloud-keyfile
+          defaultMode: 256
+          items:
+          - key: keyfile
+            path: keyfile.json
+      {{- end }}

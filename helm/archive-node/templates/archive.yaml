@@ -47,6 +47,9 @@ spec:
           {{- range .Values.coda.directPeers }}
           "-direct-peers", {{ . | quote }},
           {{- end -}}
+          {{- if .Values.coda.seedPeersURL }}
+          "-peer-list-url", {{ .Values.coda.seedPeersURL | quote }},
+          {{- end -}}
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -87,7 +90,7 @@ spec:
         - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.external }}
+          hostPort: {{ .Values.coda.ports.p2p }}
 {{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 

@@ -137,7 +137,9 @@ let run_test () : unit Deferred.t =
           ; chain_id
           ; flooding= false
           ; direct_peers= []
+          ; seed_peer_list_url= None
           ; peer_exchange= true
+          ; mina_peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost

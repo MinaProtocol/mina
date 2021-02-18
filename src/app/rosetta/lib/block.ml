@@ -287,13 +287,52 @@ WITH RECURSIVE chain AS (
 
   module User_commands = struct
     module Extras = struct
-      let fee_payer (x, _, _) = `Pk x
+      (* TODO: A few of these actually aren't used; should we leave in for future or remove? *)
+      type t =
+        { fee_payer: string
+        ; source: string
+        ; receiver: string
+        ; status: string option
+        ; failure_reason: string option
+        ; fee_payer_account_creation_fee_paid: int64 option
+        ; receiver_account_creation_fee_paid: int64 option
+        ; created_token: int64 option }
+      [@@deriving hlist]
 
-      let source (_, y, _) = `Pk y
+      let fee_payer t = `Pk t.fee_payer
 
-      let receiver (_, _, z) = `Pk z
+      let source t = `Pk t.source
 
-      let typ = Caqti_type.(tup3 string string string)
+      let receiver t = `Pk t.receiver
+
+      let status t = t.status
+
+      let failure_reason t = t.failure_reason
+
+      let fee_payer_account_creation_fee_paid t =
+        t.fee_payer_account_creation_fee_paid
+
+      let receiver_account_creation_fee_paid t =
+        t.receiver_account_creation_fee_paid
+
+      let created_token t = t.created_token
+
+      let typ =
+        let open Archive_lib.Processor.Caqti_type_spec in
+        let spec =
+          Caqti_type.
+            [ string
+            ; string
+            ; string
+            ; option string
+            ; option string
+            ; option int64
+            ; option int64
+            ; option int64 ]
+        in
+        let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+        let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+        Caqti_type.custom ~encode ~decode (to_rep spec)
     end
 
     let typ =
@@ -304,8 +343,13 @@ WITH RECURSIVE chain AS (
     let query =
       Caqti_request.collect Caqti_type.int typ
         {| SELECT DISTINCT ON (u.hash) u.id, u.type, u.fee_payer_id, u.source_id, u.receiver_id, u.fee_token, u.token, u.nonce, u.amount, u.fee,
-        u.valid_until, u.memo, u.hash, u.status, u.failure_reason, u.fee_payer_account_creation_fee_paid, u.receiver_account_creation_fee_paid, u.created_token,
-        pk1.value as fee_payer, pk2.value as source, pk3.value as receiver
+        u.valid_until, u.memo, u.hash,
+        pk1.value as fee_payer, pk2.value as source, pk3.value as receiver,
+        blocks_user_commands.status,
+        blocks_user_commands.failure_reason,
+        blocks_user_commands.fee_payer_account_creation_fee_paid,
+        blocks_user_commands.receiver_account_creation_fee_paid,
+        blocks_user_commands.created_token
         FROM user_commands u
         INNER JOIN blocks_user_commands ON blocks_user_commands.user_command_id = u.id
         INNER JOIN public_keys pk1 ON pk1.id = u.fee_payer_id
@@ -442,11 +486,13 @@ WITH RECURSIVE chain AS (
                      `Invariant_violation)
           in
           let%map failure_status =
-            match uc.failure_reason with
+            match User_commands.Extras.failure_reason extras with
             | None -> (
               match
-                ( uc.fee_payer_account_creation_fee_paid
-                , uc.receiver_account_creation_fee_paid )
+                ( User_commands.Extras.fee_payer_account_creation_fee_paid
+                    extras
+                , User_commands.Extras.receiver_account_creation_fee_paid
+                    extras )
               with
               | None, None ->
                   M.return

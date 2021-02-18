@@ -9,6 +9,8 @@ module Node = struct
   type t =
     {cluster: string; namespace: string; pod_id: string; node_graphql_port: int}
 
+  let id {pod_id; _} = pod_id
+
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
   let node_to_string (n : t) : String.t =
@@ -29,7 +31,8 @@ module Node = struct
         base_kube_cmd base_kube_cmd node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
-    Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
+    let%map _ = Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
+    ()
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
@@ -84,9 +87,10 @@ module Node = struct
           Malleable_error.of_error_hard e.error
 
     (* default GraphQL port is 3085, may need to be explicit if multiple daemons are running *)
-    let set_port_forwarding ~logger t port =
+    let set_port_forwarding ~logger t =
       let open Malleable_error.Let_syntax in
       let%bind name = get_pod_name t in
+      let port = t.node_graphql_port in
       let portmap = string_of_int port ^ ":3085" in
       let args =
         List.append (base_kube_args t) ["port-forward"; name; portmap]
@@ -171,10 +175,8 @@ module Node = struct
     |}]
   end
 
-  let set_port_forwarding_exn ~logger t graphql_port =
-    match%map.Deferred.Let_syntax
-      Graphql.set_port_forwarding ~logger t graphql_port
-    with
+  let set_port_forwarding_exn ~logger t =
+    match%map.Deferred.Let_syntax Graphql.set_port_forwarding ~logger t with
     | Ok _ ->
         (* not reachable, port forwarder does not terminate *)
         ()
@@ -249,8 +251,7 @@ module Node = struct
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     (* let graphql_port = 3085 in *)
-    Deferred.don't_wait_for
-      (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
       exec_graphql_request ~logger ~graphql_port:t.node_graphql_port
@@ -280,8 +281,7 @@ module Node = struct
         ; ("pod_id", `String t.pod_id)
         ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     (* let graphql_port = 3085 in *)
-    Deferred.don't_wait_for
-      (set_port_forwarding_exn ~logger t t.node_graphql_port) ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
     let get_balance () =
@@ -313,6 +313,7 @@ module Node = struct
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
+    Deferred.don't_wait_for (set_port_forwarding_exn ~logger t) ;
     let open Malleable_error.Let_syntax in
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
     (* let graphql_port = 3085 in *)
@@ -352,13 +353,29 @@ end
 
 type t =
   { namespace: string
-  ; constraint_constants: Genesis_constants.Constraint_constants.t
-  ; genesis_constants: Genesis_constants.t
+  ; constants: Test_config.constants
   ; block_producers: Node.t list
   ; snark_coordinators: Node.t list
   ; archive_nodes: Node.t list
   ; testnet_log_filter: string
-  ; keypairs: Signature_lib.Keypair.t list }
+  ; keypairs: Signature_lib.Keypair.t list
+  ; nodes_by_app_id: Node.t String.Map.t }
+
+let constants {constants; _} = constants
+
+let constraint_constants {constants; _} = constants.constraints
+
+let genesis_constants {constants; _} = constants.genesis
+
+let block_producers {block_producers; _} = block_producers
+
+let snark_coordinators {snark_coordinators; _} = snark_coordinators
+
+let archive_nodes {archive_nodes; _} = archive_nodes
+
+let keypairs {keypairs; _} = keypairs
 
 let all_nodes {block_producers; snark_coordinators; archive_nodes; _} =
   block_producers @ snark_coordinators @ archive_nodes
+
+let lookup_node_by_app_id t = Map.find t.nodes_by_app_id

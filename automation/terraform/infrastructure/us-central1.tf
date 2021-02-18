@@ -1,6 +1,7 @@
 locals {
   central1_region = "us-central1"
   central1_k8s_context = "gke_o1labs-192920_us-central1_coda-infra-central1"
+  bk_central1_k8s_context = "gke_o1labs-192920_us-central1_buildkite-infra-central1"
 
   central1_prometheus_helm_values = {
     server = {
@@ -22,7 +23,7 @@ locals {
           write_relabel_configs = [
             {
               source_labels: ["__name__"]
-              regex: "(container.*|Coda.*)"
+              regex: "(buildkite.*|container.*|Coda.*|watchdog.*)"
               action: "keep"
             }
           ]
@@ -165,11 +166,11 @@ resource "google_container_node_pool" "central1_compute_nodes" {
   node_count = 1
   autoscaling {
     min_node_count = 1
-    max_node_count = 1
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
-    machine_type = "c2-standard-60"
+    machine_type = "c2-standard-16"
     disk_size_gb = 500
 
     metadata = {
@@ -179,6 +180,7 @@ resource "google_container_node_pool" "central1_compute_nodes" {
     oauth_scopes = [
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/cloud-platform"
     ]
   }
 }
@@ -228,9 +230,31 @@ provider helm {
   }
 }
 
+provider helm {
+  alias = "bk_helm_central1"
+  kubernetes {
+    config_context = local.bk_central1_k8s_context
+  }
+}
+
 resource "helm_release" "central1_prometheus" {
   provider  = helm.helm_central1
+
   name      = "central1-prometheus"
+  chart     = "stable/prometheus"
+  namespace = "default"
+  values = [
+    yamlencode(local.central1_prometheus_helm_values)
+  ]
+  wait       = true
+  depends_on = [google_container_cluster.coda_cluster_central1]
+  force_update  = true
+}
+
+resource "helm_release" "bk_central1_prometheus" {
+  provider  = helm.bk_helm_central1
+
+  name      = "bk-central1-prometheus"
   chart     = "stable/prometheus"
   namespace = "default"
   values = [

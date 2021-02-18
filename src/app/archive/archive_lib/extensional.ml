@@ -34,12 +34,15 @@ module User_command = struct
     ; hash: Transaction_hash.Stable.Latest.t
           [@to_yojson Transaction_hash.to_yojson]
           [@of_yojson Transaction_hash.of_yojson]
-    ; status: string option
+    ; status: string
     ; failure_reason: Transaction_status.Failure.Stable.Latest.t option
+    ; source_balance: Currency.Balance.Stable.Latest.t option
     ; fee_payer_account_creation_fee_paid:
         Currency.Amount.Stable.Latest.t option
+    ; fee_payer_balance: Currency.Balance.Stable.Latest.t
     ; receiver_account_creation_fee_paid:
         Currency.Amount.Stable.Latest.t option
+    ; receiver_balance: Currency.Balance.Stable.Latest.t option
     ; created_token: Token_id.Stable.Latest.t option }
   [@@deriving yojson, bin_io_unversioned]
 end
@@ -53,6 +56,7 @@ module Internal_command = struct
     ; secondary_sequence_no: int
     ; typ: string
     ; receiver: Public_key.Compressed.Stable.Latest.t
+    ; receiver_balance: Currency.Balance.Stable.Latest.t
     ; fee: Currency.Fee.Stable.Latest.t
     ; token: Token_id.Stable.Latest.t
     ; hash: Transaction_hash.Stable.Latest.t

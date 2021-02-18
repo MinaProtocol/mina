@@ -5,30 +5,21 @@ provider helm {
   }
 }
 
-data "local_file" "genesis_ledger" {
-  # genesis_ledger.json is not required when generate_and_upload_artifacts is set to false
-  filename = var.generate_and_upload_artifacts ? "genesis_ledger.json" : "/dev/null"
-  depends_on = [
-    null_resource.block_producer_key_generation
-  ]
-}
-
 locals {
   use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
-  seed_peers = [
-    "/dns4/seed-node.${var.testnet_name}/tcp/${var.seed_port}/p2p/${split(",", var.seed_discovery_keypairs[0])[2]}"
-  ]
+  peers = var.additional_peers
 
   coda_vars = {
-    runtimeConfig      = var.generate_and_upload_artifacts ? data.local_file.genesis_ledger.content : var.runtime_config
+    runtimeConfig      = var.runtime_config
     image              = var.coda_image
     privkeyPass        = var.block_producer_key_pass
-    seedPeers          = concat(var.additional_seed_peers, local.seed_peers)
+    seedPeers          = local.peers
     logLevel           = var.log_level
     logSnarkWorkGossip = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+    seedPeersURL         = var.seed_peers_url
   }
   
   seed_vars = {
@@ -37,7 +28,8 @@ locals {
       runtimeConfig      = local.coda_vars.runtimeConfig
       image              = var.coda_image
       privkeyPass        = var.block_producer_key_pass
-      seedPeers          = var.additional_seed_peers
+      // TODO: Change this to a better name
+      seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
       ports = {
@@ -46,11 +38,21 @@ locals {
         metrics = "8081"
         p2p     = var.seed_port
       }
+      seedPeersURL         = var.seed_peers_url
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
-    seed        = {
-      active = true
-      discovery_keypair = var.seed_discovery_keypairs[0]
-    }
+
+    seedConfigs = [
+      for index, config in var.seed_configs: {
+        name                 = config.name
+        class                = config.class
+        libp2pSecret         = config.libp2p_secret
+        privateKeySecret     = config.private_key_secret
+        externalPort         = config.external_port
+        externalIp           = config.external_ip
+        nodePort             = config.node_port
+      }
+    ]
   }
 
   block_producer_vars = {
@@ -81,7 +83,7 @@ locals {
       for index, config in var.block_producer_configs: {
         name                 = config.name
         class                = config.class
-        externalPort         = var.block_producer_starting_host_port + index
+        externalPort         = config.external_port
         runWithUserAgent     = config.run_with_user_agent
         runWithBots          = config.run_with_bots
         enableGossipFlooding = config.enable_gossip_flooding
@@ -97,12 +99,12 @@ locals {
     testnetName = var.testnet_name
     coda = local.coda_vars 
     worker = {
-      active = true
+      active = var.snark_worker_replicas > 0
       numReplicas = var.snark_worker_replicas
     }
     coordinator = {
-      active = true
-      deployService = true
+      active = var.snark_worker_replicas > 0
+      deployService = var.snark_worker_replicas > 0
       publicKey   = var.snark_worker_public_key
       snarkFee    = var.snark_worker_fee
       hostPort    = var.snark_worker_host_port
@@ -113,8 +115,9 @@ locals {
     testnetName = var.testnet_name
     coda = {
       image         = var.coda_image
-      seedPeers     = concat(var.additional_seed_peers, local.seed_peers)
+      seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
+      seedPeersURL         = var.seed_peers_url
     }
     archive = {
       image = var.coda_archive_image
@@ -154,9 +157,8 @@ locals {
     image = var.watchdog_image
     coda = {
       image = var.coda_image
-      ports = {
-        metrics = "8081"
-      }
+      ports =  { metrics: 8000 }
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
     restartEveryMins = var.restart_nodes_every_mins
     restartNodes = var.restart_nodes
@@ -164,6 +166,7 @@ locals {
     makeReportEveryMins = var.make_report_every_mins
     makeReportDiscordWebhookUrl = var.make_report_discord_webhook_url
     makeReportAccounts = var.make_report_accounts
+    seedPeersURL = var.seed_peers_url
   }
   
 }
@@ -189,13 +192,13 @@ resource "kubernetes_role_binding" "helm_release" {
   }
 }
 
-resource "helm_release" "seed" {
+resource "helm_release" "seeds" {
   provider   = helm.testnet_deploy
 
-  name        = "${var.testnet_name}-seed"
+  name        = "${var.testnet_name}-seeds"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version     = "0.4.5"
+  version     = "0.6.1"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -203,8 +206,7 @@ resource "helm_release" "seed" {
   wait        = false
   timeout     = 600
   depends_on  = [
-    kubernetes_role_binding.helm_release,
-    null_resource.block_producer_uploads,
+    kubernetes_role_binding.helm_release
   ]
 }
 
@@ -217,14 +219,14 @@ resource "helm_release" "block_producers" {
   name        = "${var.testnet_name}-block-producers"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version     = "0.4.5"
+  version     = "0.5.2"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
   ]
   wait        = false
   timeout     = 600
-  depends_on  = [helm_release.seed]
+  depends_on  = [helm_release.seeds]
 }
 
 # Snark Worker
@@ -235,14 +237,14 @@ resource "helm_release" "snark_workers" {
   name        = "${var.testnet_name}-snark-worker"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version     = "0.4.5"
+  version     = "0.4.8"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
   ]
   wait        = false
   timeout     = 600
-  depends_on  = [helm_release.seed]
+  depends_on  = [helm_release.seeds]
 }
 
 # Archive Node
@@ -255,7 +257,7 @@ resource "helm_release" "archive_node" {
   name        = "archive-node-${count.index + 1}"
   repository  = local.use_local_charts ? "" : local.mina_helm_repo
   chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version     = "0.4.6"
+  version     = "0.4.9"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
     yamlencode(local.archive_node_vars)
@@ -263,7 +265,7 @@ resource "helm_release" "archive_node" {
 
   wait = false
   timeout     = 600
-  depends_on = [helm_release.seed]
+  depends_on = [helm_release.seeds]
 }
 
 # Watchdog
@@ -281,6 +283,6 @@ resource "helm_release" "watchdog" {
   ]
   wait        = false
   timeout     = 600
-  depends_on  = [helm_release.seed]
+  depends_on  = [helm_release.seeds]
 }
 

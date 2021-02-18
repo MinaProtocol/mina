@@ -715,10 +715,10 @@ workflows:
               - true
               - << pipeline.parameters.run-ci >>
         jobs:
-            - lint
-            - lint-opt
-            - compare-test-signatures
-            - client-sdk-unit-tests
+            #- lint
+            #- lint-opt
+            #- compare-test-signatures
+            #- client-sdk-unit-tests
             #- update-branch-protection:
                 #filters:
                   #branches:
@@ -727,50 +727,50 @@ workflows:
                     #- master
                     #- develop-until-4.1-hardfork
                     #- develop-until-adversarial
-            - tracetool
-            - test-archive
-            - build-archive
-            {%- for profile in build_artifact_profiles %}
-            - build-artifacts--{{profile}}
-            {%- endfor %}
-            {%- for profile in build_artifact_profiles %}
-            {%- if profile in medium_curve_profiles %}
-            {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
-            - build-artifacts-docker--{{profile}}--{{docker_image}}:
-                requires:
-                  - build-artifacts--{{profile}}
-            {%- endfor %}
-            {%- endif %}
-            {%- endfor %}
-            {%- for profile in unit_test_profiles %}
-            - test-unit--{{profile}}
-            {%- endfor %}
-            - test-unit--nonconsensus_medium_curves
-            {%- for profile in small_curves_tests.keys() | sort %}
-            - test--{{profile}}
-            {%- endfor %}
-            {%- for profile in compile_config_agnostic_profiles %}
-            - build-binaries--{{profile}}
-            {%- for test in compile_config_agnostic_tests %}
-            - test--{{profile}}--{{test.replace(' ','_')}}:
-                requires:
-                  - build-binaries--{{profile}}
-            {%- endfor %}
-            {%- endfor %}
+            #- tracetool
+            #- test-archive
+            #- build-archive
+            #{%- for profile in build_artifact_profiles %}
+            #- build-artifacts--{{profile}}
+            #{%- endfor %}
+            #{%- for profile in build_artifact_profiles %}
+            #{%- if profile in medium_curve_profiles %}
+            #{%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+            #- build-artifacts-docker--{{profile}}--{{docker_image}}:
+                #requires:
+                  #- build-artifacts--{{profile}}
+            #{%- endfor %}
+            #{%- endif %}
+            #{%- endfor %}
+            #{%- for profile in unit_test_profiles %}
+            #- test-unit--{{profile}}
+            #{%- endfor %}
+            #- test-unit--nonconsensus_medium_curves
+            #{%- for profile in small_curves_tests.keys() | sort %}
+            #- test--{{profile}}
+            #{%- endfor %}
+            #{%- for profile in compile_config_agnostic_profiles %}
+            #- build-binaries--{{profile}}
+            #{%- for test in compile_config_agnostic_tests %}
+            #- test--{{profile}}--{{test.replace(' ','_')}}:
+                #requires:
+                  #- build-binaries--{{profile}}
+            #{%- endfor %}
+            #{%- endfor %}
 
-    daily:
-        triggers:
-          - schedule:
-              cron: "0 12 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-                    - /release\/.*/
-        jobs:
-          {%- for profile in unit_test_profiles_medium_curves %}
-          - test-unit--{{profile}}
-          {%- endfor %}
-          {%- for profile in medium_curves_and_other_tests.keys() | sort %}
-          - test--{{profile}}
-          {%- endfor %}
+    #daily:
+        #triggers:
+          #- schedule:
+              #cron: "0 12 * * *"
+              #filters:
+                #branches:
+                  #only:
+                    #- develop
+                    #- /release\/.*/
+        #jobs:
+          #{%- for profile in unit_test_profiles_medium_curves %}
+          #- test-unit--{{profile}}
+          #{%- endfor %}
+          #{%- for profile in medium_curves_and_other_tests.keys() | sort %}
+          #- test--{{profile}}
+          #{%- endfor %}

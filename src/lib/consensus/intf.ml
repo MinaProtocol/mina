@@ -434,6 +434,9 @@ module type S = sig
 
       val to_global_slot : t -> Mina_numbers.Global_slot.t
 
+      val of_global_slot :
+        constants:Constants.t -> Mina_numbers.Global_slot.t -> t
+
       val zero : constants:Constants.t -> t
     end
 
@@ -525,6 +528,8 @@ module type S = sig
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 
       val curr_slot : Value.t -> Slot.t
+
+      val epoch_count : Value.t -> Length.t
 
       val curr_global_slot : Value.t -> Mina_numbers.Global_slot.t
 

@@ -2,6 +2,7 @@ locals {
   east4_k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
   east4_region = "us-east4"
   k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
+  bk_k8s_context = "gke_o1labs-192920_us-east4_buildkite-infra-east4"
 
   east4_prometheus_helm_values = {
     server = {
@@ -23,7 +24,7 @@ locals {
           write_relabel_configs = [
             {
               source_labels: ["__name__"]
-              regex: "(container.*|Coda.*)"
+              regex: "(buildkite.*|container.*|Coda.*|watchdog.*)"
               action: "keep"
             }
           ]
@@ -165,7 +166,7 @@ resource "google_container_node_pool" "east4_compute_nodes" {
   node_count = 5
   autoscaling {
     min_node_count = 2
-    max_node_count = 5
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
@@ -179,6 +180,7 @@ resource "google_container_node_pool" "east4_compute_nodes" {
     oauth_scopes = [
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring",
+      "https://www.googleapis.com/auth/cloud-platform"
     ]
   }
 }
@@ -228,8 +230,16 @@ provider helm {
   }
 }
 
+provider helm {
+  alias = "bk_helm_east4"
+  kubernetes {
+    config_context = local.bk_east4_k8s_context
+  }
+}
+
 resource "helm_release" "east4_prometheus" {
   provider  = helm.helm_east4
+
   name      = "east4-prometheus"
   chart     = "stable/prometheus"
   namespace = "default"
@@ -238,6 +248,20 @@ resource "helm_release" "east4_prometheus" {
   ]
   wait       = true
   depends_on = [google_container_cluster.coda_cluster_east4]
+  force_update  = true
+}
+
+resource "helm_release" "bk_east4_prometheus" {
+  provider  = helm.bk_helm_east4
+
+  name      = "bk-east4-prometheus"
+  chart     = "stable/prometheus"
+  namespace = "default"
+  values = [
+    yamlencode(local.east4_prometheus_helm_values)
+  ]
+  wait       = true
+  depends_on = [google_container_cluster.buildkite_infra_east4]
   force_update  = true
 }
 
@@ -268,13 +292,13 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
           spec {
             container {
               name    = "integration-test-janitor"
-              image   = "gcr.io/o1labs-192920/watchdog:0.1.0"
+              image   = "gcr.io/o1labs-192920/watchdog:0.3.8"
               args = [
                 "/scripts/network-utilities.py",
                 "janitor",
                 "cleanup-namespace-resources",
                 "--namespace-pattern",
-                ".*integration.*",
+                ".*integration|auto|ci-net.*",
                 "--k8s-context",
                 "gke_o1labs-192920_us-west1_mina-integration-west1",
                 "--kube-config-file",

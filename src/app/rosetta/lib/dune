@@ -34,4 +34,5 @@
                ppx_inline_test
                ppx_assert
                ppx_version
+               h_list.ppx
 )))
