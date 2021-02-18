@@ -39,7 +39,7 @@ variable "whale_count" {
   type = number
 
   description = "Number of online whales for the network to run"
-  default     = 1
+  default     = 0
 }
 
 variable "fish_count" {
@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "zenith"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-compatible-9e2b5bc-testworld-496409d"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.3.3-compatible-9e2b5bc"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-zenith-7a89538"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
@@ -99,7 +99,7 @@ module "testnet_east" {
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
 
-  archive_node_count  = 0
+  archive_node_count  = 1
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/474e314bf6a35adb4976ed7c5b1b68f5c776ad78/src/app/archive/create_schema.sql" 
 
   seed_zone   = local.seed_zone
@@ -111,7 +111,7 @@ module "testnet_east" {
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_worker_replicas = 5
+  snark_worker_replicas = 0
   snark_worker_fee      = "0.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
   snark_worker_host_port = 10401
@@ -126,5 +126,5 @@ module "testnet_east" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/zenith_seeds.txt?123"
 }

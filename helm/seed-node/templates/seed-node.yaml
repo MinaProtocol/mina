@@ -46,7 +46,8 @@ spec:
             cpu: 12.0
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
-          "-log-level", "Trace",
+          "-log-level", "Debug",
+          "-log-precomputed-blocks", "true",
           "-log-json",
           "-log-snark-work-gossip", "true",
           "-config-directory", "/root/.coda-config",
@@ -56,9 +57,8 @@ spec:
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
           {{- if $.Values.coda.seedPeersURL }}
-          "-peers-list-url", {{ $.Values.coda.seedPeersURL }},
+          "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end -}}
-          "-seed",
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
@@ -68,10 +68,11 @@ spec:
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
+          "-seed"
         ]
         env:
         - name: "RAYON_NUM_THREADS"

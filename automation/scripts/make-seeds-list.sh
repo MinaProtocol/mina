@@ -23,7 +23,7 @@ for f in keys/libp2p/${TESTNET}/seed-*; do
   peerid=$(cat $f)
   idx=$(echo "$f" | awk -F- '{print $NF}')
 
-  libp2p_addr="/dns4/"$node"-"$TESTNET".o1test.net/tcp/$((10000 + idx - 1))/p2p/$peerid"
+  libp2p_addr="/dns4/"$node"."$TESTNET".o1test.net/tcp/$((10000 + idx - 1))/p2p/$peerid"
   addrs=$addrs$libp2p_addr"\n"
 done
 

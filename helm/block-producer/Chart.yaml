@@ -2,11 +2,11 @@ apiVersion: v2
 name: block-producer
 description: A Helm chart for Mina Protocol's block producing network nodes
 type: application
-version: 0.5.1
+version: 0.5.2
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - add peers list URL chart value
+    - fix peer-list-url flag
 dependencies:
   - name: common-utilities
     version: 0.0.8

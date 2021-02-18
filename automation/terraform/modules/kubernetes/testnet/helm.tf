@@ -38,6 +38,8 @@ locals {
         metrics = "8081"
         p2p     = var.seed_port
       }
+      seedPeersURL         = var.seed_peers_url
+      uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }
 
     seedConfigs = [
@@ -97,12 +99,12 @@ locals {
     testnetName = var.testnet_name
     coda = local.coda_vars 
     worker = {
-      active = true
+      active = var.snark_worker_replicas > 0
       numReplicas = var.snark_worker_replicas
     }
     coordinator = {
-      active = true
-      deployService = true
+      active = var.snark_worker_replicas > 0
+      deployService = var.snark_worker_replicas > 0
       publicKey   = var.snark_worker_public_key
       snarkFee    = var.snark_worker_fee
       hostPort    = var.snark_worker_host_port
@@ -115,6 +117,7 @@ locals {
       image         = var.coda_image
       seedPeers     = local.peers
       runtimeConfig = local.coda_vars.runtimeConfig
+      seedPeersURL         = var.seed_peers_url
     }
     archive = {
       image = var.coda_archive_image
