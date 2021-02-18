@@ -350,7 +350,7 @@ let active_or_bootstrapping =
    To address this, we restart the libp2p helper when we become offline. *)
 let next_helper_restart = ref None
 
-let create_sync_status_observer ~logger ~demo_mode ~net
+let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
@@ -401,6 +401,44 @@ let create_sync_status_observer ~logger ~demo_mode ~net
                     `Synced ) ) )
   in
   let observer = observe incremental_status in
+  (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
+  ( if not is_seed then
+    let offline_timeout_min = 15.0 in
+    let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
+    let offline_timeout = ref None in
+    let log_offline_warning _tm =
+      [%log warn] "Daemon has been continuously offline for %0.0f minutes"
+        offline_timeout_min
+    in
+    let start_offline_timeout () =
+      match !offline_timeout with
+      | Some _ ->
+          ()
+      | None ->
+          offline_timeout :=
+            Some
+              (Timeout.create () offline_timeout_duration
+                 ~f:log_offline_warning)
+    in
+    let stop_offline_timeout () =
+      match !offline_timeout with
+      | Some timeout ->
+          Timeout.cancel () timeout () ;
+          offline_timeout := None
+      | None ->
+          ()
+    in
+    let handle_status_change status =
+      if status = `Offline then start_offline_timeout ()
+      else stop_offline_timeout ()
+    in
+    Observer.on_update_exn observer ~f:(function
+      | Initialized value ->
+          handle_status_change value
+      | Changed (_, value) ->
+          handle_status_change value
+      | Invalidated ->
+          () ) ) ;
   (* recompute Mina status on an interval *)
   stabilize () ;
   every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
@@ -1552,7 +1590,7 @@ let create ?wallets (config : Config.t) =
           in
           let sync_status =
             create_sync_status_observer ~logger:config.logger ~net
-              ~demo_mode:config.demo_mode
+              ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe
