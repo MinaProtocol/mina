@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 0.12.0"
+  required_version = "~> 0.13.4"
   backend "s3" {
     key     = "terraform-jiawei.tfstate"
     encrypt = true
@@ -20,18 +20,18 @@ provider "google" {
   zone    = "us-east4-b"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.11-develop"
+  default     = "gcr.io/o1labs-192920/mina-daemon-baked:0.3.3-coda-to-mina-3eaff9a-jiawei-674e852"
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.2.11-develop"
+  default     = "gcr.io/o1labs-192920/mina-archive:0.3.3-coda-to-mina-3eaff9a-jiawei-674e852"
 }
 
 variable "whale_count" {
@@ -87,14 +87,14 @@ module "ci_testnet" {
   k8s_context           = var.ci_k8s_ctx
   testnet_name          = "jiawei"
 
-  coda_image            = var.coda_image
-  coda_archive_image    = var.coda_archive_image
-  coda_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image       = "codaprotocol/bots:1.0.0"
-  coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
+  mina_image            = var.mina_image
+  mina_archive_image    = var.mina_archive_image
+  mina_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
+  mina_bots_image       = "codaprotocol/bots:1.0.0"
+  mina_points_image     = "codaprotocol/coda-points-hack:32b.4"
 
-  coda_faucet_amount    = "10000000000"
-  coda_faucet_fee       = "100000000"
+  mina_faucet_amount    = "10000000000"
+  mina_faucet_fee       = "100000000"
 
   agent_min_fee = "0.05"
   agent_max_fee = "0.1"
