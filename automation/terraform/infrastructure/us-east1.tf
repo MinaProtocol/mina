@@ -166,7 +166,7 @@ resource "google_container_node_pool" "east1_compute_nodes" {
   node_count = 5
   autoscaling {
     min_node_count = 2
-    max_node_count = 5
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
@@ -222,21 +222,21 @@ resource "kubernetes_storage_class" "east1_standard" {
 ## Monitoring 
 
 provider helm {
-  alias = "helm_east1"
+  alias = "helm_east"
   kubernetes {
     config_context = local.east1_k8s_context
   }
 }
 
 provider helm {
-  alias = "bk_helm_east1"
+  alias = "bk_helm_east"
   kubernetes {
     config_context = local.bk_east1_k8s_context
   }
 }
 
 resource "helm_release" "east1_prometheus" {
-  provider  = helm.helm_east1
+  provider  = helm.helm_east
 
   name      = "east-prometheus"
   chart     = "stable/prometheus"
@@ -250,7 +250,7 @@ resource "helm_release" "east1_prometheus" {
 }
 
 resource "helm_release" "bk_east1_prometheus" {
-  provider  = helm.bk_helm_east1
+  provider  = helm.bk_helm_east
 
   name      = "bk-east-prometheus"
   chart     = "stable/prometheus"

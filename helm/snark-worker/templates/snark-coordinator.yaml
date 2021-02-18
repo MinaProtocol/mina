@@ -49,6 +49,9 @@ spec:
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
+          {{- if $.Values.coda.seedPeersURL }}
+          "-peers-list-url", {{ $.Values.coda.seedPeersURL }},
+          {{- end }}
           "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:

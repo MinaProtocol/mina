@@ -290,8 +290,7 @@ module Metadata = struct
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
-          (* TODO: Set this to our default fee, assuming it is fixed when we launch *)
-      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 2_000_000_000)]
+      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 1_000_000_000)]
       }
   end
 
