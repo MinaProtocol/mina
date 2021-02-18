@@ -1,3 +1,4 @@
+{{- if .Values.archive.enableLocalDaemon }}
 ---
 apiVersion: v1
 kind: Service
@@ -15,3 +16,4 @@ spec:
   - name: tcp-p2p
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
+{{- end }}
