@@ -24,14 +24,14 @@ variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.11-develop"
+  default     = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-renaming-mina-binary-and-mina-config-a46b9ef-renaming-cfa762e"
 }
 
 variable "coda_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.2.11-develop"
+  default     = "gcr.io/o1labs-192920/coda-archive:0.4.2-renaming-mina-binary-and-mina-config-a46b9ef-renaming-cfa762e"
 }
 
 variable "whale_count" {
@@ -66,7 +66,7 @@ variable "ci_k8s_ctx" {
 
 variable "ci_artifact_path" {
   type    = string
-  default = abspath(path.module)
+  default = "/tmp"
 }
 
 locals {
@@ -79,7 +79,7 @@ module "ci_testnet" {
   providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
-  artifact_path = var.ci_artifact_path
+  artifact_path = abspath(path.module)
 
   # TODO: remove obsolete cluster_name var + cluster region
   cluster_name          = "mina-integration-west1"
