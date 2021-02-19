@@ -516,7 +516,18 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 
 func (h *Helper) handleTelemetryStreams(s network.Stream) {
 	defer func() {
-		_ = s.Close()
+		err := s.Close()
+		if err != nil {
+			logger.Error("failed to close write side of stream", err)
+			return
+		}
+
+		<-time.After(400 * time.Millisecond)
+
+		err = s.Reset()
+		if err != nil {
+			logger.Error("failed to reset stream", err)
+		}
 	}()
 
 	n, err := s.Write([]byte(h.TelemetryData))
