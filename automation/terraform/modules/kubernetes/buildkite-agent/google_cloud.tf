@@ -9,7 +9,6 @@ locals {
     "roles/compute.viewer",
     "roles/container.developer",
     "roles/container.serviceAgent",
-    "roles/logging.configWriter",
     "roles/stackdriver.accounts.viewer",
     "roles/pubsub.editor",
     "roles/storage.objectAdmin",

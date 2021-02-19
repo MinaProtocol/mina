@@ -41,12 +41,6 @@ let of_string string =
 
 let to_yojson status = `String (to_string status)
 
-let of_yojson : Yojson.Safe.t -> (_, string) Result.t = function
-  | `String s ->
-      Result.map_error ~f:Error.to_string_hum (of_string s)
-  | _ ->
-      Error "expected string"
-
 module T = struct
   [%%versioned
   module Stable = struct
@@ -58,8 +52,6 @@ module T = struct
       let to_latest = Fn.id
 
       let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
 
       module T = struct
         type typ = t [@@deriving sexp, hash, compare, equal, enumerate]
@@ -75,14 +67,9 @@ end
 include T
 include Hashable.Make (T)
 
-let check_conv to_repr of_repr ok_or_fail =
+let%test "of_string (to_string x) == x" =
   List.for_all
     [`Offline; `Bootstrap; `Synced; `Connecting; `Listening; `Catchup]
     ~f:(fun sync_status ->
-      equal sync_status (of_repr (to_repr sync_status) |> ok_or_fail) )
-
-let%test "of_string (to_string x) == x" =
-  check_conv to_string of_string Or_error.ok_exn
-
-let%test "of_yojson (to_yojson x) == x" =
-  check_conv to_yojson of_yojson (function Error e -> failwith e | Ok x -> x)
+      equal sync_status (of_string (to_string sync_status) |> Or_error.ok_exn)
+  )

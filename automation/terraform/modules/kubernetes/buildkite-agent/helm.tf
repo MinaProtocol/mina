@@ -17,12 +17,9 @@ locals {
   buildkite_config_envs = [
     # Buildkite EnvVars
     {
+      # inject Google Cloud application credentials into agent runtime for enabling buildkite artifact uploads
       "name" = "BUILDKITE_GS_APPLICATION_CREDENTIALS_JSON"
       "value" = var.enable_gcs_access ? base64decode(google_service_account_key.buildkite_svc_key[0].private_key) : var.google_app_credentials
-    },
-    {
-      "name" = "GCLOUD_API_KEY"
-      "value" = data.aws_secretsmanager_secret_version.testnet_logengine_apikey.secret_string
     },
     {
       "name" = "BUILDKITE_ARTIFACT_UPLOAD_DESTINATION"
@@ -80,11 +77,6 @@ locals {
     {
       "name" = "DOCKER_PASSWORD"
       "value" = data.aws_secretsmanager_secret_version.buildkite_docker_token.secret_string
-    },
-    # NPM EnvVars
-    {
-      "name" = "NPM_TOKEN"
-      "value" = data.aws_secretsmanager_secret_version.npm_token.secret_string
     }
   ]
 }
@@ -136,54 +128,10 @@ locals {
     }
 
     entrypointd = {
-      "00-artifact-cache-helper" = <<-EOF
-        #!/bin/bash
-
-        set -o pipefail
-
-        if [[ $1 ]]; then
-          export BUILDKITE_ARTIFACT_UPLOAD_DESTINATION="gs://buildkite_k8s/coda/shared/$${BUILDKITE_JOB_ID}"
-          FILE="$1"
-          DOWNLOAD_CMD="buildkite-agent artifact download --build $${BUILDKITE_BUILD_ID} --include-retried-jobs"
-
-          while [[ "$#" -gt 0 ]]; do case $1 in
-            --upload) UPLOAD="true"; shift;;
-            --miss-cmd) MISS_CMD="$${2}"; shift;;
-          esac; shift; done
-
-          # upload artifact if explicitly set and exit
-          if [[ $UPLOAD ]]; then
-            echo "--- Uploading artifact: $${FILE}"
-            pushd $(dirname $FILE)
-            buildkite-agent artifact upload "$(basename $FILE)"; popd
-            exit
-          fi
-
-          set +e
-          if [[ -f "$${FILE}" ]] || $${DOWNLOAD_CMD} "$${FILE}" .; then
-            set -e
-            echo "*** Cache Hit -- skipping step ***"
-          elif [[ $${MISS_CMD} ]]; then
-            set -e
-            echo "*** Cache miss -- executing step ***"
-            bash -c "$${MISS_CMD}"
-
-            echo "--- Uploading artifact: $${FILE}"
-            pushd $(dirname $FILE)
-            buildkite-agent artifact upload "$${FILE}"; popd
-          else
-            echo "*** Cache miss -- failing since a miss command was NOT provided ***"
-            exit 1
-          fi
-        else
-          echo "*** Artifact not provided - skipping ***"
-        fi
-      EOF
-
       "01-install-gcloudsdk" = <<-EOF
         #!/bin/bash
 
-        set -euo pipefail
+        set -eou pipefail
         set +x
 
         if [[ ! -f $${UPLOAD_BIN} ]]; then
@@ -210,7 +158,7 @@ locals {
       "01-install-summon" = <<-EOF
         #!/bin/bash
 
-        set -euo pipefail
+        set -eou pipefail
         set +x
 
         export SUMMON_BIN=/usr/local/bin/summon
@@ -237,7 +185,7 @@ locals {
       "02-install-k8s-tools" = <<-EOF
         #!/bin/bash
 
-        set -euo pipefail
+        set -eou pipefail
         set +x
 
         export CI_SHARED_BIN="/var/buildkite/shared/bin"
@@ -262,7 +210,7 @@ locals {
       "02-install-terraform" = <<-EOF
         #!/bin/bash
 
-        set -euo pipefail
+        set -eou pipefail
 
         apt install -y unzip
         curl -sL https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip -o terraform.zip
@@ -272,11 +220,11 @@ locals {
       "02-install-coda-network-tools" = <<-EOF
         #!/bin/bash
 
-        set -euo pipefail
+        set -eou pipefail
 
         # Download and install NodeJS
         curl -sL https://deb.nodesource.com/setup_12.x | bash -
-        apt-get install -y nodejs libjemalloc-dev
+        apt-get install -y nodejs
 
         # Build coda-network library
         mkdir -p /tmp/mina && git clone https://github.com/MinaProtocol/mina.git /tmp/mina
@@ -288,7 +236,7 @@ locals {
       "03-setup-k8s-ctx" = <<-EOF
         #!/bin/bash
 
-        set -euo pipefail
+        set -eou pipefail
 
         # k8s_ctx = <gcloud_project>_<cluster-region>_<cluster-name>
         # k8s context mappings: <cluster-name> => <cluster-region>
@@ -309,19 +257,6 @@ locals {
 
         # set agent default Kubernetes context for deployment
         kubectl config use-context ${var.testnet_k8s_ctx}
-      EOF
-
-      "03-setup-utiltiies" = <<-EOF
-        #!/bin/bash
-
-        set -euo pipefail
-
-        # Ensure artifact cache helper tool is in PATH
-        ln --symbolic --force /docker-entrypoint.d/00-artifact-cache-helper /usr/local/bin/artifact-cache-helper.sh
-
-        # Install mina debian package tools
-        echo "deb [trusted=yes] http://packages.o1test.net unstable main" > /etc/apt/sources.list.d/o1.list
-        apt-get update && apt-get install -y "mina-testnet-postake-medium-curves"
       EOF
     }
   }

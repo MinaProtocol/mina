@@ -29,12 +29,6 @@ namespace = ''
 discord_webhook_url = None
 discord_char_limit = 2000
 
-def peer_to_multiaddr(peer):
-  return '/ip4/{}/tcp/{}/p2p/{}'.format(
-    peer['host'],
-    peer['libp2p_port'],
-    peer['peer_id'] )
-
 def main():
 
     global discord_webhook_url
@@ -131,7 +125,7 @@ def main():
     peer_table = {}
 
     queried_peers = set()
-    unqueried_peers = {}
+    unqueried_peers = set()
 
     telemetry_heartbeat_errors = []
     telemetry_transport_stopped_errors = []
@@ -176,11 +170,9 @@ def main():
           peer_table[k] = v
 
       queried_peers.update([ p['node_peer_id'] for p in peers ])
-      queried_peers.update([ p['peer_id'] for p in direct_queried_peers ])
-      for p in itertools.chain(*[ p['peers'] for p in peers ]):
-        unqueried_peers[p['peer_id']] = p
-      for p in queried_peers:
-        del unqueried_peers[p]
+      queried_peers.update(direct_queried_peers)
+      unqueried_peers.update([ p['peer_id'] for p in list(itertools.chain(*[ p['peers'] for p in peers ])) ])
+      unqueried_peers.difference_update(queried_peers)
 
       for p in peers:
         uptime = int(p['uptime_minutes'])
@@ -225,13 +217,12 @@ def main():
     requests = 0
 
     while len(unqueried_peers) > 0 and requests < 10:
-      peers_to_query = list(unqueried_peers.values())
-      peers = ','.join(to_multiaddr_string(p) for p in peers_to_query)
+      peer_ids = ','.join(list(unqueried_peers))
 
       print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
 
-      resp = exec_on_seed("coda advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
-      add_resp(resp, peers_to_query)
+      resp = exec_on_seed("coda advanced telemetry -daemon-port " + seed_daemon_port + " -peer-ids " + peer_ids + " -show-errors")
+      add_resp(resp, list(unqueried_peers))
 
       requests += 1
 

@@ -416,7 +416,6 @@ module T = struct
               ; conf_dir
               ; chain_id
               ; logger
-              ; seed_peer_list_url= None
               ; unsafe_no_trust_ip= true
               ; isolate= false
               ; trust_system

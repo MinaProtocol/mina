@@ -40,7 +40,7 @@ def add_telemetries (output) :
     lines = output.decode ('utf-8').split ('\n')
 
     # set of peers to query on next round
-    peers_to_query = {}
+    peer_ids_to_query = set ()
 
     # populate map from responses
     for line in lines :
@@ -50,11 +50,12 @@ def add_telemetries (output) :
         telem = json.loads (line)
 
         try :
+
             telemetries[telem['node_peer_id']] = telem
 
             for peer in telem['peers'] :
                 peer_id = peer['peer_id']
-                peers_to_query[peer_id] = peer
+                peer_ids_to_query.add (peer_id)
                 # don't consider this peer_id again
                 # the query to this peer may not succeed, though
                 seen_peer_ids.add (peer_id)
@@ -63,45 +64,38 @@ def add_telemetries (output) :
 
             print ('Error in telemetry response: ' + line)
 
-    return peers_to_query.items()
+    return peer_ids_to_query
 
 # get telemetry data from peers known to daemon
 output = subprocess.check_output([prog, 'advanced', 'telemetry', '-daemon-peers', '-daemon-port', daemon_port])
 
-peers_to_query = add_telemetries (output)
+peer_ids_to_query = add_telemetries (output)
 
 done = False
-
-def peer_to_multiaddr(peer):
-    return '/ip4/{}/tcp/{}/p2p/{}'.format(
-        peer['host'],
-        peer['libp2p_port'],
-        peer['peer_id'] )
 
 # calculate fixpoint: add telemetries from peer ids until we see no new peer ids
 while not done :
 
     done = True
 
-    formatted_peers = ''
+    formatted_peer_ids = ''
 
-    for (peer_id, peer) in peers_to_query :
-        peer = peer_to_multiaddr(peer)
+    for peer_id in peer_ids_to_query :
 
         if peer_id in seen_peer_ids :
             continue
         else :
             done = False
             if peer_id_count == 0 :
-                formatted_peers = peer
+                formatted_peer_ids = peer_id
             else :
-                formatted_peers = peer + ',' + formatted_peers
+                formatted_peer_ids = peer_id + ',' + formatted_peer_ids
 
     if done :
         break
 
-    output = subprocess.check_output([prog, 'advanced', 'telemetry', '-peers', formatted_peers, '-daemon-port', daemon_port])
-    peers_to_query = add_telemetries (output)
+    output = subprocess.check_output([prog, 'advanced', 'telemetry', '-peer-ids', formatted_peer_ids, '-daemon-port', daemon_port])
+    peer_ids_to_query = add_telemetries (output)
 
 
 

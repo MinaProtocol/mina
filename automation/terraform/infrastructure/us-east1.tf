@@ -166,7 +166,7 @@ resource "google_container_node_pool" "east1_compute_nodes" {
   node_count = 5
   autoscaling {
     min_node_count = 2
-    max_node_count = 10
+    max_node_count = 5
   }
   node_config {
     preemptible  = true
@@ -180,7 +180,6 @@ resource "google_container_node_pool" "east1_compute_nodes" {
     oauth_scopes = [
       "https://www.googleapis.com/auth/logging.write",
       "https://www.googleapis.com/auth/monitoring",
-      "https://www.googleapis.com/auth/cloud-platform"
     ]
   }
 }
@@ -223,21 +222,21 @@ resource "kubernetes_storage_class" "east1_standard" {
 ## Monitoring 
 
 provider helm {
-  alias = "helm_east"
+  alias = "helm_east1"
   kubernetes {
     config_context = local.east1_k8s_context
   }
 }
 
 provider helm {
-  alias = "bk_helm_east"
+  alias = "bk_helm_east1"
   kubernetes {
     config_context = local.bk_east1_k8s_context
   }
 }
 
 resource "helm_release" "east1_prometheus" {
-  provider  = helm.helm_east
+  provider  = helm.helm_east1
 
   name      = "east-prometheus"
   chart     = "stable/prometheus"
@@ -251,7 +250,7 @@ resource "helm_release" "east1_prometheus" {
 }
 
 resource "helm_release" "bk_east1_prometheus" {
-  provider  = helm.bk_helm_east
+  provider  = helm.bk_helm_east1
 
   name      = "bk-east-prometheus"
   chart     = "stable/prometheus"
