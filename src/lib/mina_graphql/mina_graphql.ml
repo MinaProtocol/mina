@@ -1376,8 +1376,14 @@ module Types = struct
                 coinbase_receiver ) ] )
 
   let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
-    (* TODO *)
-    obj "protocolStateProof" ~fields:(fun _ -> [])
+    obj "protocolStateProof" ~fields:(fun _ ->
+        [ field "base64" ~typ:string ~doc:"Base-64 encoded proof"
+            ~args:Arg.[]
+            ~resolve:(fun _ proof ->
+              (* Use the precomputed block proof encoding, for consistency. *)
+              Some
+                (Mina_transition.External_transition.Precomputed_block.Proof
+                 .to_bin_string proof) ) ] )
 
   let block :
       ( Mina_lib.t
