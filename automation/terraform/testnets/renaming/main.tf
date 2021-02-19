@@ -14,10 +14,10 @@ provider "aws" {
 }
 
 provider "google" {
-  alias   = "google-us-east4"
+  alias   = "google-us-west1"
   project = "o1labs-192920"
-  region  = "us-east4"
-  zone    = "us-east4-b"
+  region  = "us-west1"
+  zone    = "us-west1-a"
 }
 
 variable "coda_image" {
@@ -76,7 +76,7 @@ locals {
 
 
 module "ci_testnet" {
-  providers = { google.gke = google.google-us-east4 }
+  providers = { google.gke = google.google-us-west1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
