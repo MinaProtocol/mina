@@ -37,7 +37,7 @@ variable "coda_archive_image" {
 }
 
 variable "mina_archive_schema" {
-  type = string
+  type    = string
   default = ""
 }
 
@@ -62,7 +62,7 @@ variable "coda_points_image" {
 }
 
 variable "watchdog_image" {
-  type = string
+  type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
@@ -228,12 +228,12 @@ variable "restart_nodes" {
 }
 
 variable "restart_nodes_every_mins" {
-  type = string
+  type    = string
   default = "60"
 }
 
 variable "make_report_every_mins" {
-  type = string
+  type    = string
   default = "30"
 }
 
@@ -285,6 +285,6 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
-  type = string
+  type    = string
   default = ""
 }
