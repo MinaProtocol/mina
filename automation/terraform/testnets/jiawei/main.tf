@@ -36,12 +36,12 @@ variable "mina_archive_image" {
 
 variable "whale_count" {
   type    = number
-  default = 1
+  default = 10
 }
 
 variable "fish_count" {
   type    = number
-  default = 1
+  default = 10
 }
 
 variable "archive_count" {
@@ -64,22 +64,17 @@ variable "ci_k8s_ctx" {
   default = "gke_o1labs-192920_us-west1_mina-integration-west1"
 }
 
-variable "ci_artifact_path" {
-  type    = string
-  default = "/tmp"
-}
-
 locals {
   seed_region = "us-west1"
   seed_zone = "us-west1-b"
 }
 
 
-module "ci_testnet" {
+module "testnet_east" {
   providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
-  artifact_path = var.ci_artifact_path
+  artifact_path = abspath(path.module)
 
   # TODO: remove obsolete cluster_name var + cluster region
   cluster_name          = "mina-integration-west1"
