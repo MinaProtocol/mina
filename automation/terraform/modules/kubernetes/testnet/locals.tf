@@ -15,13 +15,4 @@ locals {
     postgresqlPassword = "foobar"
     remoteSchemaFile   = var.mina_archive_schema
   }
-
-  default_postgres_config = {
-    persistence = {
-      enabled      = false
-      storageClass = "ssd-retain"
-      accessModes  = ["ReadWriteOnce"]
-      size         = "8Gi"
-    }
-  }
 }
