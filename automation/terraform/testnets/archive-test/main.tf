@@ -24,7 +24,7 @@ variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-add-dhall-job-step-condition-f4bbf61-archive-test-f6fa6b8"
+  default     = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-test-archive-node-redundancy-92b9521-archive-test-92b9521"
 }
 
 variable "coda_archive_image" {
@@ -66,7 +66,7 @@ variable "ci_k8s_ctx" {
 
 variable "ci_artifact_path" {
   type    = string
-  default = "/tmp"
+  default = "/home/o1labs/Documents/projects/mina3/automation/terraform/testnets/archive-test"
 }
 
 locals {

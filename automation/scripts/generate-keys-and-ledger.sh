@@ -82,18 +82,18 @@ function generate_key_files {
   mkdir -p $output_dir
 
   for k in $(seq 1 $COUNT); do
-    docker run \
+    sudo docker run \
       -v "${output_dir}:/keys:z" \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
       -c "CODA_PRIVKEY_PASS='${privkey_pass}' coda advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
-    docker run \
+    sudo docker run \
       --mount type=bind,source=${output_dir},target=/keys \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
       -c "CODA_LIBP2P_PASS='${privkey_pass}' coda advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container
-  docker run \
+  sudo docker run \
     -v "${output_dir}:/keys:z" \
     --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
     -c "chmod -R +rw /keys"

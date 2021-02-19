@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set defaults before parsing args
-TESTNET=testworld
+TESTNET=archive-test
 DOCKER_TAG=0.1.1-41db206
 GIT_PATHSPEC=$(git log -1 --pretty=format:%H)
 CONFIG_FILE=/root/daemon.json
