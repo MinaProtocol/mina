@@ -10,6 +10,8 @@
 `gcloud container clusters get-credentials --region us-west1 mina-integration-west1`
 `gcloud auth activate-service-account <name of service account> --key-file=<path to key file>`
 
+If, in the course of other development, one switches to a separate account, one may need to run the last line again in order to switch back to the service account.
+
 3) OPTIONAL: set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
 
 `alias test_executive=./_build/default/src/app/test_executive/test_executive.exe`
