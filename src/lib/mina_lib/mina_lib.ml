@@ -408,7 +408,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     let offline_timeout = ref None in
     let offline_warned = ref false in
     let log_offline_warning _tm =
-      [%log warn]
+      [%log error]
         "Daemon has not received any gossip messages for %0.0f minutes; check \
          the daemon's external port forwarding, if needed"
         offline_timeout_min ;
