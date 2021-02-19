@@ -2,6 +2,10 @@ provider "google" {
   alias = "gke"
 }
 
+variable "aws_route53_zone_id" {
+  type = string
+}
+
 variable "cluster_name" {
   type = string
 }
