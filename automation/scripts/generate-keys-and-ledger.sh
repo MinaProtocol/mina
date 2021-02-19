@@ -10,7 +10,7 @@ FISH_COUNT=1
 SEED_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-d280651"
+CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-a46b9ef"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
