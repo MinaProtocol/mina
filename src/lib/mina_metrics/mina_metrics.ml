@@ -6,6 +6,8 @@ open Prometheus
 open Namespace
 open Metric_generators
 
+let time_offset_sec = 1609459200.
+
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"

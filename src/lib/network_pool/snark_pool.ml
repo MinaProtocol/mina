@@ -354,7 +354,9 @@ struct
           (*when snark work is added to the pool*)
           Mina_metrics.(
             Gauge.set Snark_work.useful_snark_work_received_time_sec
-              Time.(now () |> to_span_since_epoch |> Span.to_sec) ;
+              Time.(
+                let x = now () |> to_span_since_epoch |> Span.to_sec in
+                x -. Mina_metrics.time_offset_sec) ;
             Gauge.set Snark_work.snark_pool_size
               (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
