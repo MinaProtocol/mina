@@ -1,9 +1,32 @@
 # How to Run Integration Tests
 
-1) pick an image to run the tests with
-2) build `test_executive.exe` with the `integration_testnet` profile
-3) run test executive, passing in the coda image selected in step 1
-  3.a) it's recommended to run with the `--debug` flag when iterating on tests (this flag will pause testnet cleanup so that you can inspect a testnet after a test fails)
+## Prerequisites
+
+1) ensure the following environment variables are properly set if not already: `GCLOUD_API_KEY`, `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, vars relating to AWS access, vars relating to ocaml compilation.
+
+2) log in to Google Cloud, with the correct cluster, using the service account
+
+`gcloud auth login --no-launch-browser <personal login name>`
+`gcloud container clusters get-credentials --region us-west1 mina-integration-west1`
+`gcloud auth activate-service-account <name of service account> --key-file=<path to key file>`
+
+3) OPTIONAL: set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+
+`alias test_executive=./_build/default/src/app/test_executive/test_executive.exe`
+`alias logproc=./_build/default/src/app/logproc/logproc.exe`
+
+
+
+## Routine Test Run
+
+1) go to mina protocol's dockerhub and pick a `coda-daemon-puppeteered` image to run the tests with.  usually, this image should be a recent image on the same branch as one is currently on.
+
+2) build `test_executive.exe` with the `integration_tests` profile
+
+3) run `test_executive.exe`, passing in the coda image selected in step 1, and the name of the test one intends to run
+  
+  3.a) it's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
+  
   3.b) it's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals); use `tee` to store the raw output for later inspection
 
 ```sh
