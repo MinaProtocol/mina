@@ -223,7 +223,7 @@ resource "helm_release" "archive_node" {
   provider = helm.testnet_deploy
   count    = length(local.archive_node_vars.node_configs)
 
-  name       = "archive-node-${count.index + 1}"
+  name       = "archive-${count.index + 1}"
   repository = local.use_local_charts ? "" : local.mina_helm_repo
   chart      = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
   version    = "0.5.0"

@@ -258,6 +258,7 @@ variable "archive_configs" {
   type = list(
     object({
       name               = string
+      image              = optional(string)
       serverPort         = optional(string)
       externalPort       = optional(string)
       postgresHost       = optional(string)
@@ -266,7 +267,6 @@ variable "archive_configs" {
       postgresqlUsername = optional(string)
       postgresqlPassword = optional(string)
       remoteSchemaFile   = optional(string)
-      postgresUri        = optional(string)
       enableLocalDaemon  = optional(bool)
       enablePostgresDB   = optional(bool)
     })
@@ -286,7 +286,7 @@ variable "persistence_config" {
     enabled = true
     size  = "8Gi"
     reclaimPolicy = "retain"
-    storageClass  = "ssd"
+    storageClass  = "us-west1-ssd-retain"
     accessModes  = ["ReadWriteOnce"]
   }
 }
