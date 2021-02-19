@@ -428,7 +428,9 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
       match !offline_timeout with
       | Some timeout ->
           if !offline_warned then (
-            [%log info] "Daemon had been offline, now back online" ;
+            [%log info]
+              "Daemon had been offline (no gossip messages received), now \
+               back online" ;
             offline_warned := false ) ;
           Timeout.cancel () timeout () ;
           offline_timeout := None
