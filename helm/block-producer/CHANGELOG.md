@@ -13,5 +13,5 @@
 
 0.5.1:
 ------
-- add toggle for archiving daemon activity
+- add peers list URL chart value
 

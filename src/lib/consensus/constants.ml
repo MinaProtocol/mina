@@ -212,21 +212,22 @@ let create' (type a b c)
     let duration = Slot.duration_ms * size
   end in
   let delta_duration = Slot.duration_ms * (delta + M.one) in
-  (* We forgo updating the min density for the first 10 days (or epoch, whichever comes first)
+  let num_days = 3. in
+  assert (num_days < 14.) ;
+  (* We forgo updating the min density for the first [num_days] days (or epoch, whichever comes first)
       of the network's operation. The reasoning is as follows:
 
       - There may be many empty slots in the beginning of the network, as everyone
-        gets their nodes up and running. 10 days gives all involved in the project
+        gets their nodes up and running. [num_days] days gives all involved in the project
         a chance to observe the actual fill rate and try to fix what's keeping it down.
-      - With actual network parameters, 1 epoch = 2 weeks < 10 days,
+      - With actual network parameters, 1 epoch = 2 weeks > [num_days] days,
         which means the long fork rule will not come into play during the grace period,
-        and then we still have 4 days (= 1920 slots) to compute min-density for the next epoch. *)
+        and then we still have several days to compute min-density for the next epoch. *)
   let grace_period_end =
     let slots =
-      let n = 10. in
       let n_days =
         let n_days_ms =
-          Time_ns.Span.(to_ms (of_day n))
+          Time_ns.Span.(to_ms (of_day num_days))
           |> Float.round_up |> Float.to_int |> M.constant
         in
         M.( / ) n_days_ms block_window_duration_ms

@@ -28,7 +28,7 @@ variable "coda_archive_image" {
 }
 
 variable "mina_archive_schema" {
-  type = string
+  type    = string
   default = ""
 }
 
@@ -53,7 +53,7 @@ variable "coda_points_image" {
 }
 
 variable "watchdog_image" {
-  type = string
+  type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
@@ -138,16 +138,31 @@ variable "block_producer_key_pass" {
 variable "block_producer_configs" {
   type = list(
     object({
-      name = string,
-      class = string,
-      private_key_secret = string,
-      external_port = number,
-      libp2p_secret = string,
+      name                   = string,
+      class                  = string,
+      private_key_secret     = string,
+      external_port          = number,
+      libp2p_secret          = string,
       enable_gossip_flooding = bool,
-      enable_peer_exchange = bool,
-      isolated = bool,
-      run_with_user_agent = bool,
-      run_with_bots = bool
+      enable_peer_exchange   = bool,
+      isolated               = bool,
+      run_with_user_agent    = bool,
+      run_with_bots          = bool
+    })
+  )
+  default = []
+}
+
+variable "seed_configs" {
+  type = list(
+    object({
+      name = string,
+      class = string
+      libp2p_secret = string
+      external_port = number
+      external_ip   = string
+      node_port     = number
+      private_key_secret = string
     })
   )
   default = []
@@ -218,12 +233,12 @@ variable "restart_nodes" {
 }
 
 variable "restart_nodes_every_mins" {
-  type = string
+  type    = string
   default = "60"
 }
 
 variable "make_report_every_mins" {
-  type = string
+  type    = string
   default = "30"
 }
 
@@ -247,18 +262,18 @@ variable "make_report_accounts" {
 variable "archive_configs" {
   type = list(
     object({
-      name = string
-      serverPort = string
-      externalPort = string
-      postgresHost = string
-      postgresPort = string
-      postgresDB = string
-      postgresqlUsername = string
-      postgresqlPassword = string
-      remoteSchemaFile = string
-      postgresUri = string
-      enableLocalDaemon = bool
-      enablePostgresDB = bool
+      name               = string
+      serverPort         = optional(string)
+      externalPort       = optional(string)
+      postgresHost       = optional(string)
+      postgresPort       = optional(string)
+      postgresDB         = optional(string)
+      postgresqlUsername = optional(string)
+      postgresqlPassword = optional(string)
+      remoteSchemaFile   = optional(string)
+      postgresUri        = optional(string)
+      enableLocalDaemon  = optional(bool)
+      enablePostgresDB   = optional(bool)
     })
   )
   default = []
@@ -295,6 +310,6 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
-  type = string
+  type    = string
   default = ""
 }
