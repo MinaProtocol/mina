@@ -406,9 +406,13 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     let offline_timeout_min = 15.0 in
     let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
     let offline_timeout = ref None in
+    let offline_warned = ref false in
     let log_offline_warning _tm =
-      [%log warn] "Daemon has been continuously offline for %0.0f minutes"
-        offline_timeout_min
+      [%log warn]
+        "Daemon has been continuously offline for %0.0f minutes; check the \
+         daemon's external port forwarding, if needed"
+        offline_timeout_min ;
+      offline_warned := true
     in
     let start_offline_timeout () =
       match !offline_timeout with
@@ -423,6 +427,9 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     let stop_offline_timeout () =
       match !offline_timeout with
       | Some timeout ->
+          if !offline_warned then (
+            [%log info] "Daemon had been offline, now back online" ;
+            offline_warned := false ) ;
           Timeout.cancel () timeout () ;
           offline_timeout := None
       | None ->
