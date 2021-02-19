@@ -53,14 +53,7 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_configs  = length(var.archive_configs) != 0 ? var.archive_configs : [
-    # By default deploy a single postgres and local daemon enabled server
-    {
-      name = "archive-1",
-      enableLocalDaemon = true,
-      enablePostgresDB = true,
-      persistence = { enabled = true } }
-  ]
+  archive_configs  = var.archive_configs
 
   mina_archive_schema = var.mina_archive_schema
 
