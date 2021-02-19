@@ -50,7 +50,7 @@ spec:
           "-peer", {{ . | quote }},
           {{- end }}
           {{- if $.Values.coda.seedPeersURL }}
-          "-peers-list-url", {{ $.Values.coda.seedPeersURL }},
+          "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end }}
           "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]

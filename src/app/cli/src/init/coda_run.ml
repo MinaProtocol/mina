@@ -265,6 +265,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
+    ?limited_graphql_port ?(open_limited_graphql_port = false)
     ?(insecure_rest_server = false) coda =
   let client_trustlist =
     ref
@@ -435,53 +436,67 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     total ) ;
           Deferred.return @@ Mina_lib.add_work coda work ) ]
   in
+  let create_graphql_server ~bind_to_address ~schema ~server_description port =
+    let graphql_callback =
+      Graphql_cohttp_async.make_callback (fun _req -> coda) schema
+    in
+    Cohttp_async.(
+      Server.create_expert
+        ~on_handler_error:
+          (`Call
+            (fun _net exn ->
+              [%log error]
+                "Exception while handling REST server request: $error"
+                ~metadata:
+                  [ ("error", `String (Exn.to_string_mach exn))
+                  ; ("context", `String "rest_server") ] ))
+        (Tcp.Where_to_listen.bind_to bind_to_address (On_port port))
+        (fun ~body _sock req ->
+          let uri = Cohttp.Request.uri req in
+          let status flag =
+            let%bind status = Mina_commands.get_status ~flag coda in
+            Server.respond_string
+              ( status |> Daemon_rpcs.Types.Status.to_yojson
+              |> Yojson.Safe.pretty_to_string )
+          in
+          let lift x = `Response x in
+          match Uri.path uri with
+          | "/graphql" ->
+              [%log debug] "Received graphql request. Uri: $uri"
+                ~metadata:
+                  [ ("uri", `String (Uri.to_string uri))
+                  ; ("context", `String "rest_server") ] ;
+              graphql_callback () req body
+          | "/status" ->
+              status `None >>| lift
+          | "/status/performance" ->
+              status `Performance >>| lift
+          | _ ->
+              Server.respond_string ~status:`Not_found "Route not found"
+              >>| lift ))
+    |> Deferred.map ~f:(fun _ ->
+           [%log info]
+             !"Created %s at: http://localhost:%i/graphql"
+             server_description port )
+  in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
-          let graphql_callback =
-            Graphql_cohttp_async.make_callback
-              (fun _req -> coda)
-              Mina_graphql.schema
-          in
-          Cohttp_async.(
-            Server.create_expert
-              ~on_handler_error:
-                (`Call
-                  (fun _net exn ->
-                    [%log error]
-                      "Exception while handling REST server request: $error"
-                      ~metadata:
-                        [ ("error", `String (Exn.to_string_mach exn))
-                        ; ("context", `String "rest_server") ] ))
-              (Tcp.Where_to_listen.bind_to
-                 (if insecure_rest_server then All_addresses else Localhost)
-                 (On_port rest_server_port))
-              (fun ~body _sock req ->
-                let uri = Cohttp.Request.uri req in
-                let status flag =
-                  let%bind status = Mina_commands.get_status ~flag coda in
-                  Server.respond_string
-                    ( status |> Daemon_rpcs.Types.Status.to_yojson
-                    |> Yojson.Safe.pretty_to_string )
-                in
-                let lift x = `Response x in
-                match Uri.path uri with
-                | "/graphql" ->
-                    [%log debug] "Received graphql request. Uri: $uri"
-                      ~metadata:
-                        [ ("uri", `String (Uri.to_string uri))
-                        ; ("context", `String "rest_server") ] ;
-                    graphql_callback () req body
-                | "/status" ->
-                    status `None >>| lift
-                | "/status/performance" ->
-                    status `Performance >>| lift
-                | _ ->
-                    Server.respond_string ~status:`Not_found "Route not found"
-                    >>| lift ))
-          |> Deferred.map ~f:(fun _ ->
-                 [%log info]
-                   !"Created GraphQL server at: http://localhost:%i/graphql"
-                   rest_server_port ) ) ) ;
+          create_graphql_server
+            ~bind_to_address:
+              Tcp.Bind_to_address.(
+                if insecure_rest_server then All_addresses else Localhost)
+            ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
+            rest_server_port ) ) ;
+  (*Second graphql server with limited queries exopsed*)
+  Option.iter limited_graphql_port ~f:(fun rest_server_port ->
+      trace_task "Second REST server (with limited queries)" (fun () ->
+          create_graphql_server
+            ~bind_to_address:
+              Tcp.Bind_to_address.(
+                if open_limited_graphql_port then All_addresses else Localhost)
+            ~schema:Mina_graphql.schema_limited
+            ~server_description:"GraphQL server with limited queries"
+            rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port coda))
