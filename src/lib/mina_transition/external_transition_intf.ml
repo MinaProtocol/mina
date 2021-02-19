@@ -83,6 +83,15 @@ module type S = sig
   type external_transition = t
 
   module Precomputed_block : sig
+    module Proof : sig
+      (* Proof with overridden base64-encoding *)
+      type t = Proof.t [@@deriving sexp, yojson]
+
+      val to_bin_string : t -> string
+
+      val of_bin_string : string -> t
+    end
+
     type t =
       { scheduled_time: Block_time.Time.t
       ; protocol_state: Protocol_state.value
