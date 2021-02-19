@@ -92,6 +92,8 @@ const (
 	findPeer
 	listPeers
 	setGatingConfig
+	setTelemetryData
+	getPeerTelemetryData
 )
 
 const validationTimeout = 5 * time.Minute
@@ -1209,6 +1211,56 @@ func (ap *findPeerMsg) run(app *app) (interface{}, error) {
 	return *maybePeer, nil
 }
 
+type setTelemetryDataMsg struct {
+	Data string `json:"data"`
+}
+
+func (m *setTelemetryDataMsg) run(app *app) (interface{}, error) {
+	app.P2p.TelemetryData = m.Data
+	return "setTelemetryData success", nil
+}
+
+type getPeerTelemetryDataMsg struct {
+	PeerMultiaddr string `json:"peer_multiaddr"`
+}
+
+func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
+	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
+
+	// Open a "get telemetry" stream on m.PeerID,
+	// block until you can read the response, return that.
+	s, err := app.P2p.Host.NewStream(app.Ctx, addrInfo.ID, codanet.TelemetryProtocolID)
+	if err != nil {
+		app.P2p.Logger.Error("failed to open stream: ", err)
+		return nil, err
+	}
+
+	defer func() {
+		_ = s.Close()
+	}()
+
+	// 1 megabyte
+	size := 1048576
+
+	data := make([]byte, size)
+	n, err := s.Read(data)
+	if err != nil && err != io.EOF {
+		app.P2p.Logger.Errorf("failed to decode telemetry data: err=%s", err)
+		return nil, err
+	}
+
+	if n == size && err == nil {
+		return nil, fmt.Errorf("telemetry data was greater than %d bytes", size)
+	}
+
+	return string(data[:n]), nil
+}
+
 type listPeersMsg struct {
 }
 
@@ -1317,25 +1369,27 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 }
 
 var msgHandlers = map[methodIdx]func() action{
-	configure:           func() action { return &configureMsg{} },
-	listen:              func() action { return &listenMsg{} },
-	publish:             func() action { return &publishMsg{} },
-	subscribe:           func() action { return &subscribeMsg{} },
-	unsubscribe:         func() action { return &unsubscribeMsg{} },
-	validationComplete:  func() action { return &validationCompleteMsg{} },
-	generateKeypair:     func() action { return &generateKeypairMsg{} },
-	openStream:          func() action { return &openStreamMsg{} },
-	closeStream:         func() action { return &closeStreamMsg{} },
-	resetStream:         func() action { return &resetStreamMsg{} },
-	sendStreamMsg:       func() action { return &sendStreamMsgMsg{} },
-	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
-	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
-	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
-	addPeer:             func() action { return &addPeerMsg{} },
-	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
-	findPeer:            func() action { return &findPeerMsg{} },
-	listPeers:           func() action { return &listPeersMsg{} },
-	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
+	configure:            func() action { return &configureMsg{} },
+	listen:               func() action { return &listenMsg{} },
+	publish:              func() action { return &publishMsg{} },
+	subscribe:            func() action { return &subscribeMsg{} },
+	unsubscribe:          func() action { return &unsubscribeMsg{} },
+	validationComplete:   func() action { return &validationCompleteMsg{} },
+	generateKeypair:      func() action { return &generateKeypairMsg{} },
+	openStream:           func() action { return &openStreamMsg{} },
+	closeStream:          func() action { return &closeStreamMsg{} },
+	resetStream:          func() action { return &resetStreamMsg{} },
+	sendStreamMsg:        func() action { return &sendStreamMsgMsg{} },
+	removeStreamHandler:  func() action { return &removeStreamHandlerMsg{} },
+	addStreamHandler:     func() action { return &addStreamHandlerMsg{} },
+	listeningAddrs:       func() action { return &listeningAddrsMsg{} },
+	addPeer:              func() action { return &addPeerMsg{} },
+	beginAdvertising:     func() action { return &beginAdvertisingMsg{} },
+	findPeer:             func() action { return &findPeerMsg{} },
+	listPeers:            func() action { return &listPeersMsg{} },
+	setGatingConfig:      func() action { return &setGatingConfigMsg{} },
+	setTelemetryData:     func() action { return &setTelemetryDataMsg{} },
+	getPeerTelemetryData: func() action { return &getPeerTelemetryDataMsg{} },
 }
 
 type errorResult struct {
