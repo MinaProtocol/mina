@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 0.13.0"
+  required_version = "~> 0.14.7"
   backend "s3" {
     key     = "terraform-archive-test.tfstate"
     encrypt = true

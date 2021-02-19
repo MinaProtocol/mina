@@ -1,15 +1,15 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2021-02-18T08:13:39Z"
+    "genesis_state_timestamp": "2021-02-19T19:17:43Z"
   },
   "ledger": {
     "name": "archive-test",
     "num_accounts": 16,
     "accounts": [
       {
-        "pk": "B62qnYASuYcU1hgY34HP5A28ZndKDsUoJnW3SHpD8aYXXFy6YXANi6f",
+        "pk": "B62qoSKcBY3NjoXSerFrZ1pj5je27R33WnYAjFSqzAWK9eVigZmYCMZ",
         "balance": "66000.000000000",
-        "delegate": "B62qnYASuYcU1hgY34HP5A28ZndKDsUoJnW3SHpD8aYXXFy6YXANi6f",
+        "delegate": "B62qoSKcBY3NjoXSerFrZ1pj5je27R33WnYAjFSqzAWK9eVigZmYCMZ",
         "sk": null,
         "timing": {
           "initial_minimum_balance": "60000",
@@ -20,93 +20,93 @@
         }
       },
       {
-        "pk": "B62qkyHhuS3zwXKHt19MbuHxjyVfUCSdEt9dvnKB58Q9cepbKRSazNE",
+        "pk": "B62qoEqnamSzeK1k4rx6Pq9WYZ1rMj6wEoRFripMj3vFoPDcicuVFw8",
         "balance": "20000.000000000",
-        "delegate": "B62qkyHhuS3zwXKHt19MbuHxjyVfUCSdEt9dvnKB58Q9cepbKRSazNE",
+        "delegate": "B62qoEqnamSzeK1k4rx6Pq9WYZ1rMj6wEoRFripMj3vFoPDcicuVFw8",
         "sk": null
       },
       {
-        "pk": "B62qnfbcAaS8rrStnofbxXnsvnoAXL6StBbQJ9XJjJLP6PL3PqwUKbK",
+        "pk": "B62qoxTqdHNHDSx7m8eCrRohShNWE9xPLbJ7ShyytqKgjMKB3ZeVFZs",
         "balance": "20000.000000000",
-        "delegate": "B62qnfbcAaS8rrStnofbxXnsvnoAXL6StBbQJ9XJjJLP6PL3PqwUKbK",
+        "delegate": "B62qoxTqdHNHDSx7m8eCrRohShNWE9xPLbJ7ShyytqKgjMKB3ZeVFZs",
         "sk": null
       },
       {
-        "pk": "B62qoCVtaXJxGt1uteS1JxvgKmX5QdFHg4TdqKRgaxx4o99LFRDNwj8",
+        "pk": "B62qrLfEZAMREaG9T352wpaNqcqMNixNHsQbj2mJNZcYjEYVjFB1C1z",
         "balance": "20000.000000000",
-        "delegate": "B62qoCVtaXJxGt1uteS1JxvgKmX5QdFHg4TdqKRgaxx4o99LFRDNwj8",
+        "delegate": "B62qrLfEZAMREaG9T352wpaNqcqMNixNHsQbj2mJNZcYjEYVjFB1C1z",
         "sk": null
       },
       {
-        "pk": "B62qmc2mav1MiPdwP5rC3gEnVqw5YphfqJDhRgqhKYSpSneNfMxWDND",
+        "pk": "B62qjUA8xPHKUu62rUS3aRbv36rmPgAP3XMrCxshDbJPLmtJo4KftZM",
         "balance": "20000.000000000",
-        "delegate": "B62qmc2mav1MiPdwP5rC3gEnVqw5YphfqJDhRgqhKYSpSneNfMxWDND",
+        "delegate": "B62qjUA8xPHKUu62rUS3aRbv36rmPgAP3XMrCxshDbJPLmtJo4KftZM",
         "sk": null
       },
       {
-        "pk": "B62qmdwV9QGXpiQPihJ9L4yBFk2aGFhYqy3Vf6pjqWxrQNYCCW3NZAV",
+        "pk": "B62qpERGu4dpSpKUnLjEK37g6xrBPeDXEjZ5gUE78KMkWgYyT1HCZZk",
         "balance": "20000.000000000",
-        "delegate": "B62qmdwV9QGXpiQPihJ9L4yBFk2aGFhYqy3Vf6pjqWxrQNYCCW3NZAV",
+        "delegate": "B62qpERGu4dpSpKUnLjEK37g6xrBPeDXEjZ5gUE78KMkWgYyT1HCZZk",
         "sk": null
       },
       {
-        "pk": "B62qksEJC2nbHfiPewMPcP9QjGqyo1hbiYMDUDYMzCP2XXBzkDdzvMs",
+        "pk": "B62qnMuK9XpN9Gr8Qd7tBKuZWKm1W9mrwVn1fjEasEfdhshmPyzkJno",
         "balance": "20000.000000000",
-        "delegate": "B62qkyHhuS3zwXKHt19MbuHxjyVfUCSdEt9dvnKB58Q9cepbKRSazNE",
+        "delegate": "B62qoEqnamSzeK1k4rx6Pq9WYZ1rMj6wEoRFripMj3vFoPDcicuVFw8",
         "sk": null
       },
       {
-        "pk": "B62qnh5eh4RgY4vvmoxc9HoeCABGrmqkYtmhrzoH5PuKTS8YSEN38YG",
+        "pk": "B62qq1zjKfuzfHKcDBq5gVEqofwjevK4ocE9N8cdN7STDzbK2W318M4",
         "balance": "20000.000000000",
-        "delegate": "B62qnfbcAaS8rrStnofbxXnsvnoAXL6StBbQJ9XJjJLP6PL3PqwUKbK",
+        "delegate": "B62qoxTqdHNHDSx7m8eCrRohShNWE9xPLbJ7ShyytqKgjMKB3ZeVFZs",
         "sk": null
       },
       {
-        "pk": "B62qoYkev5F4cGtBUhs9eXxhkMg3SoHaSXv2yykzGW1evqiHeptZNZz",
+        "pk": "B62qqwZEfAAuPVNTmEGraEkdNca2HfdJQnf2DfMvC4C2DdWshKyiFdL",
         "balance": "20000.000000000",
-        "delegate": "B62qoCVtaXJxGt1uteS1JxvgKmX5QdFHg4TdqKRgaxx4o99LFRDNwj8",
+        "delegate": "B62qrLfEZAMREaG9T352wpaNqcqMNixNHsQbj2mJNZcYjEYVjFB1C1z",
         "sk": null
       },
       {
-        "pk": "B62qpeNGbCQWCscmN7AVhAKf7Cs6HLkhxUeFU1WfHChq3YoQAzu2Twc",
+        "pk": "B62qni7stKicMFWuLpJT3wnK2duo12XQzPVZfXekyyTuRx5nVmxkqyS",
         "balance": "20000.000000000",
-        "delegate": "B62qmc2mav1MiPdwP5rC3gEnVqw5YphfqJDhRgqhKYSpSneNfMxWDND",
+        "delegate": "B62qjUA8xPHKUu62rUS3aRbv36rmPgAP3XMrCxshDbJPLmtJo4KftZM",
         "sk": null
       },
       {
-        "pk": "B62qmHnH3ZaX1i21P34eVczDqMpXyi24H7Z6N1b4wu8fRUZs7fGF7fV",
+        "pk": "B62qpJFvY7wXT9qXh8vjzbEcRpVM3ghpgWRYhgMporHw8fWdq7vbdH2",
         "balance": "20000.000000000",
-        "delegate": "B62qmdwV9QGXpiQPihJ9L4yBFk2aGFhYqy3Vf6pjqWxrQNYCCW3NZAV",
+        "delegate": "B62qpERGu4dpSpKUnLjEK37g6xrBPeDXEjZ5gUE78KMkWgYyT1HCZZk",
         "sk": null
       },
       {
-        "pk": "B62qjuKKddyFi3yQKt1GpaZhn8cTp7nPJmfgt8Se8WfiGfGa1Dn53Cj",
+        "pk": "B62qkFfsoFUBDSu3KWmDZNERthEzTvhkTimXHaqqwQ6vY8HcHaowmbK",
         "balance": "2250000.000000000",
-        "delegate": "B62qjLKeUc6c9NrE4YJtWNrLTYUsDGJVCgYe4zVvBAXAD9z3gfZK3DE",
+        "delegate": "B62qjebwKVKMwzUUoLqU33cv2KMeM5DiETyg5EDnxwHW5qZsP8ZjZaH",
         "sk": null
       },
       {
-        "pk": "B62qni77r8SfGLfEk6LCgszNdztnt5TeFeCvyxVgmZw9nzPSgK8sLZj",
+        "pk": "B62qqkEcjxEfKY9boh83Mcv1rMbnMeQuUS4K9Gc78dybKZh1r4ZyQWz",
         "balance": "2250000.000000000",
-        "delegate": "B62qrum9sWg3fqvsEXDECJqDfX3h8HhHfQ9QAPV9tFJEJnDHTG7kQKu",
+        "delegate": "B62qiVBwaGyWGnRmpDme2eNt8SpCnXfxHYzrqpSfwC7x2pdbyciqGim",
         "sk": null
       },
       {
-        "pk": "B62qpwTAyRTUbwySCDS7scTv1U3rs4CEhVDjwwi1S1DHNGvCdp92SEP",
+        "pk": "B62qoum3NiQuPDHadiTBBhMD4T4XJKdJjb521Q9huehELaxGpAaYaNk",
         "balance": "2250000.000000000",
-        "delegate": "B62qrAYsZcTzrxhvwPZdbthK4NE1bw6iedVvYfAxxSv2arQApAuHBA6",
+        "delegate": "B62qrwgyL8zHkJXhXHKRL8jYFWHXH4XxwDUBVHWp7QhEecyRgCbNCub",
         "sk": null
       },
       {
-        "pk": "B62qqP86KbuRcdH2UT9SAVNND3dE8m3vVicDZePTS98S97SgTSMsCCa",
+        "pk": "B62qqMtXtSGw9ZPsyFmtFmGrc8piSPSVcKSVfykCQWUTijJRgTKYiti",
         "balance": "2250000.000000000",
-        "delegate": "B62qqihfChZfDPAFMeL5X6cAZKgoUez4s7X345StbaiyrhEJUSbDX6M",
+        "delegate": "B62qqah41dhZG8S6mwqAe6yXhYTyv4wucDAfbhcvfqMiZ7VBL13o9Yo",
         "sk": null
       },
       {
-        "pk": "B62qrPj8p2vYgZkT2jPaHEarr64kLH3b2A2FsZUgn4bFHNjWSUwAhUC",
+        "pk": "B62qqMnSWKprUjt95c9U8em6xSTj8iLS3bTDRZwdVVYbKjR7FoQtAdp",
         "balance": "2250000.000000000",
-        "delegate": "B62qjML6MjFLJEpgkF4WnAxj4uzWQotSvjnWpNe1kh2mVdHMn754rbL",
+        "delegate": "B62qiU7S5bin6ACrpj2faAgVmgS9TnHryv4jFRdHdrCP8BPFbtw22Js",
         "sk": null
       }
     ]
