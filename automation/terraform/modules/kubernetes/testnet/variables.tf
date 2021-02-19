@@ -79,11 +79,6 @@ variable "additional_peers" {
   default = []
 }
 
-variable "archive_node_count" {
-  type    = number
-  default = 0
-}
-
 variable "runtime_config" {
   type    = string
   default = ""
@@ -263,6 +258,7 @@ variable "archive_configs" {
   type = list(
     object({
       name               = string
+      image              = optional(string)
       serverPort         = optional(string)
       externalPort       = optional(string)
       postgresHost       = optional(string)
@@ -271,7 +267,6 @@ variable "archive_configs" {
       postgresqlUsername = optional(string)
       postgresqlPassword = optional(string)
       remoteSchemaFile   = optional(string)
-      postgresUri        = optional(string)
       enableLocalDaemon  = optional(bool)
       enablePostgresDB   = optional(bool)
     })
@@ -279,29 +274,21 @@ variable "archive_configs" {
   default = []
 }
 
-variable "archive_persistence_enabled" {
-  type    = bool
-  default = true
-}
-
-variable "archive_persistence_class" {
-  type    = string
-  default = "ssd"
-}
-
-variable "archive_persistence_reclaim_policy" {
-  type    = string
-  default = "retain"
-}
-
-variable "archive_persistence_access_modes" {
-  type    = list
-  default = ["ReadWriteOnce"]
-}
-
-variable "archive_persistence_size" {
-  type    = string
-  default = "8Gi"
+variable "persistence_config" {
+  type = object({
+      enabled            = optional(bool)
+      size               = optional(string)
+      reclaimPolicy      = optional(string)
+      storageClass       = optional(string)
+      accessModes       = optional(list(string))
+  })
+  default = {
+    enabled = true
+    size  = "8Gi"
+    reclaimPolicy = "retain"
+    storageClass  = "us-west1-ssd-retain"
+    accessModes  = ["ReadWriteOnce"]
+  }
 }
 
 variable "upload_blocks_to_gcloud" {

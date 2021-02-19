@@ -119,6 +119,7 @@ locals {
       seedPeersURL         = var.seed_peers_url
     }
     node_configs = defaults(var.archive_configs, local.default_archive_node)
+    postgresql = { persistence = var.persistence_config }
   }
 
   watchdog_vars = {
@@ -221,7 +222,7 @@ resource "helm_release" "archive_node" {
   provider = helm.testnet_deploy
   count    = length(local.archive_node_vars.node_configs)
 
-  name       = "archive-node-${count.index + 1}"
+  name       = "archive-${count.index + 1}"
   repository = local.use_local_charts ? "" : local.mina_helm_repo
   chart      = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
   version    = "0.5.0"
@@ -231,7 +232,7 @@ resource "helm_release" "archive_node" {
       testnetName = var.testnet_name
       coda        = local.archive_node_vars.coda
       archive     = local.archive_node_vars.node_configs[count.index]
-      postgresql  = local.default_postgres_config
+      postgresql  = local.archive_node_vars.postgresql
     })
   ]
 
