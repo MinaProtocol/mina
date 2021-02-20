@@ -173,7 +173,7 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	defer func() {
 		go func() {
 			// small delay to allow for remote peer to read from stream
-			time.Sleep(time.Millisecond * 2000)
+			time.Sleep(time.Millisecond * 400)
 			_ = c.Close()
 		}()
 	}()
@@ -522,7 +522,7 @@ func (h *Helper) handleTelemetryStreams(s network.Stream) {
 			return
 		}
 
-		<-time.After(2000 * time.Millisecond)
+		<-time.After(400 * time.Millisecond)
 
 		err = s.Reset()
 		if err != nil {
