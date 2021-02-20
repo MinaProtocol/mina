@@ -24,14 +24,14 @@ variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-test-archive-node-redundancy-92b9521-archive-test-92b9521"
+  default     = "gcr.io/o1labs-192920/coda-daemon-baked:0.3.3-test-archive-node-redundancy-92b9521-archive-test-7e5427e"
 }
 
 variable "coda_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.3.3-add-dhall-job-step-condition-f4bbf61"
+  default     = "gcr.io/o1labs-192920/coda-archive:0.3.3-test-archive-node-redundancy-92b9521"
 }
 
 variable "whale_count" {
@@ -41,17 +41,12 @@ variable "whale_count" {
 
 variable "fish_count" {
   type    = number
-  default = 5
-}
-
-variable "archive_count" {
-  type    = number
   default = 1
 }
 
 variable "snark_worker_count" {
   type    = number
-  default = 10
+  default = 2
 }
 
 variable "ci_cluster_region" {
@@ -69,10 +64,14 @@ variable "ci_artifact_path" {
   default = "/home/o1labs/Documents/projects/mina3/automation/terraform/testnets/archive-test"
 }
 
+variable "mina_archive_schema" {
+  type = string
+  default = "https://raw.githubusercontent.com/MinaProtocol/mina/master/src/app/archive/create_schema.sql"
+}
+
 locals {
   seed_region = "us-central1"
-  seed_zone = "us-central1-b"
-  mina_archive_schema   = "https://raw.githubusercontent.com/MinaProtocol/mina/master/src/app/archive/create_schema.sql"
+  seed_zone = "us-central1-b" 
 }
 
 
@@ -96,8 +95,8 @@ module "ci_testnet" {
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"
 
-  archive_node_count    = var.archive_count
-  mina_archive_schema   = local.mina_archive_schema
+
+  mina_archive_schema   = var.mina_archive_schema
 
 
   seed_zone = local.seed_zone
@@ -111,6 +110,63 @@ module "ci_testnet" {
 
   whale_count = var.whale_count
   fish_count = var.fish_count
+
+  block_producer_configs = concat(
+    [
+      for i in range(var.whale_count): {
+        name                   = "whale-block-producer-${i + 1}"
+        class                  = "whale"
+        id                     = i + 1
+        private_key_secret     = "online-whale-account-${i + 1}-key"
+        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
+        externalPort           = "blah"
+        enable_gossip_flooding = false
+        run_with_user_agent    = false
+        run_with_bots          = false
+        enable_peer_exchange   = true
+        isolated               = false
+        enableArchive          = true
+        archiveAddress         = "archive-1:3086"
+      }
+    ],
+    [
+      for i in range(var.fish_count): {
+        name                   = "fish-block-producer-${i + 1}"
+        class                  = "fish"
+        id                     = i + 1
+        private_key_secret     = "online-fish-account-${i + 1}-key"
+        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
+        externalPort           = "blah"
+        enable_gossip_flooding = false
+        run_with_user_agent    = true
+        run_with_bots          = false
+        enable_peer_exchange   = true
+        isolated               = false
+        enableArchive          = false
+        archiveAddress         = ""
+      }
+    ]
+  )
+
+  archive_configs = [
+    {
+      name                = "archive-1"
+      enableLocalDaemon   = true
+      enablePostgresDB    = true
+    },
+    {
+      name                = "archive-2"
+      enableLocalDaemon   = true
+      enablePostgresDB    = true
+      postgresHost        = "archive-2-postgresql"
+    },
+    {
+      name                = "archive-3"
+      enableLocalDaemon   = true
+      enablePostgresDB    = false
+      postgresHost        = "archive-2-postgresql"
+    }
+  ]
 
   snark_worker_replicas = var.snark_worker_count
   snark_worker_fee      = "0.025"

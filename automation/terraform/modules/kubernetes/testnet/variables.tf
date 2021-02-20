@@ -286,7 +286,7 @@ variable "persistence_config" {
     enabled = true
     size  = "8Gi"
     reclaimPolicy = "retain"
-    storageClass  = "us-west1-ssd-retain"
+    storageClass  = "us-central1-ssd-retain"
     accessModes  = ["ReadWriteOnce"]
   }
 }

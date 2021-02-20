@@ -134,6 +134,11 @@ variable "seed_count" {
   default = 1
 }
 
+variable "block_producer_configs" {
+  type    = list(any)
+  default = []
+}
+
 variable "log_level" {
   type    = string
   default = "Trace"

@@ -63,38 +63,58 @@ module "kubernetes_testnet" {
   snark_worker_host_port  = var.snark_worker_host_port
 
   block_producer_key_pass = var.block_producer_key_pass
-  block_producer_configs = concat(
+  block_producer_configs = concat (
     [
-      for i in range(var.whale_count) : {
-        name                   = local.whale_block_producer_names[i]
-        class                  = "whale"
-        id                     = i + 1
-        external_port          = local.static_peers[local.whale_block_producer_names[i]].port
-        private_key_secret     = "online-whale-account-${i + 1}-key"
-        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
-        enable_gossip_flooding = false
-        run_with_user_agent    = false
-        run_with_bots          = false
-        enable_peer_exchange   = true
-        isolated               = false
+      for config in var.block_producer_configs : {
+        name                   = config.name
+        class                  = config.class
+        id                     = config.id
+        external_port          = local.static_peers[local.whale_block_producer_names[config.id - 1]].port
+        private_key_secret     = config.private_key_secret
+        libp2p_secret          = config.libp2p_secret
+        enable_gossip_flooding = config.enable_gossip_flooding
+        run_with_user_agent    = config.run_with_user_agent
+        run_with_bots          = config.run_with_bots
+        enable_peer_exchange   = config.enable_peer_exchange
+        isolated               = config.isolated
+        enableArchive          = config.enableArchive
+        archiveAddress         = config.archiveAddress
       }
     ],
-    [
-      for i in range(var.fish_count) : {
-        name                   = local.fish_block_producer_names[i]
-        class                  = "fish"
-        id                     = i + 1
-        external_port          = local.static_peers[local.fish_block_producer_names[i]].port
-        private_key_secret     = "online-fish-account-${i + 1}-key"
-        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
-        enable_gossip_flooding = false
-        run_with_user_agent    = true
-        run_with_bots          = false
-        enable_peer_exchange   = true
-        isolated               = false
-      }
-    ]
-  )
+    []
+    )
+#concat(
+#    [
+#      for i in range(var.whale_count) : {
+#        name                   = local.whale_block_producer_names[i]
+#        class                  = "whale"
+#        id                     = i + 1
+#        external_port          = local.static_peers[local.whale_block_producer_names[i]].port
+#        private_key_secret     = "online-whale-account-${i + 1}-key"
+#        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
+#        enable_gossip_flooding = false
+#        run_with_user_agent    = false
+#        run_with_bots          = false
+#        enable_peer_exchange   = true
+#        isolated               = false
+#      }
+#    ],
+#    [
+#      for i in range(var.fish_count) : {
+#        name                   = local.fish_block_producer_names[i]
+#        class                  = "fish"
+#        id                     = i + 1
+#        external_port          = local.static_peers[local.fish_block_producer_names[i]].port
+#        private_key_secret     = "online-fish-account-${i + 1}-key"
+#        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
+#        enable_gossip_flooding = false
+#        run_with_user_agent    = true
+#        run_with_bots          = false
+#        enable_peer_exchange   = true
+#        isolated               = false
+#      }
+#    ]
+#  )
 
   seed_configs = [
     for i in range(var.seed_count) : {
