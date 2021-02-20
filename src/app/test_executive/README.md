@@ -41,3 +41,5 @@ TEST=... # name of the test you want to run
 dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 test_executive cloud $TEST --coda-image=$CODA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
 ```
+
+4) OPTIONAL: In the event that the automatic cleanup doesn't work properly, one needs to do it manually.  Firstly, destroy what's on GCP with `kubectl delete namespace <namespace of test>`.  Then, delete the local testnet directory, which is in `./automation/terraform/testnets/`
