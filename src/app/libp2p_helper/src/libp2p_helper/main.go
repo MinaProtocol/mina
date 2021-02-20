@@ -1225,7 +1225,7 @@ type getPeerTelemetryDataMsg struct {
 }
 
 func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
-	ctx, _ := context.WithTimeout(app.Ctx, 400*time.Millisecond)
+	ctx, _ := context.WithTimeout(app.Ctx, 2000*time.Millisecond)
 
 	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
 	if err != nil {
