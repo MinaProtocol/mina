@@ -24,13 +24,13 @@ let router ~graphql_uri ~pool ~logger route body =
   try
     match route with
     | "network" :: tl ->
-        with_db (Network.router tl body ~graphql_uri ~logger)
+        Network.router tl body ~graphql_uri ~logger ~with_db
     | "account" :: tl ->
-        with_db (Account.router tl body ~graphql_uri ~logger)
+        Account.router tl body ~graphql_uri ~logger ~with_db
     | "mempool" :: tl ->
-        with_db (Mempool.router tl body ~graphql_uri ~logger)
+        Mempool.router tl body ~graphql_uri ~logger
     | "block" :: tl ->
-        with_db (Block.router tl body ~graphql_uri ~logger)
+        Block.router tl body ~graphql_uri ~logger ~with_db
     | "construction" :: tl ->
         Construction.router tl body ~graphql_uri ~logger
     | _ ->
