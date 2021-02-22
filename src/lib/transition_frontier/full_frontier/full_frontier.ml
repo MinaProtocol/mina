@@ -582,15 +582,6 @@ module Metrics = struct
       |> (fun x -> Int64.(x / of_int 1000))
       |> Int64.to_float
     in
-    (*
-    [%log' info t.logger] "slot time %f (wouldve been %f)" r
-      ( Breadcrumb.consensus_state b
-      |> Consensus.Data.Consensus_state.consensus_time
-      |> Consensus.Data.Consensus_time.to_time
-           ~constants:t.precomputed_values.consensus_constants
-      |> Block_time.to_span_since_epoch |> Block_time.Span.to_time_span
-      |> Time.Span.to_sec ) ;
-*)
     r -. Mina_metrics.time_offset_sec
 
   let has_coinbase b =
