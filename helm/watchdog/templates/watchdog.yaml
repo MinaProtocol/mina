@@ -93,7 +93,7 @@ spec:
             command: ["python3"]
             args: ["/code/make_report.py", 
                    "--incluster", "true", 
-                   "--namespace", "''", 
+                   "--namespace", "", 
                    {{- if .Values.makeReportDiscordWebhookUrl }}
                    "--discord_webhook_url", "$(MAKE_REPORT_DISCORD_WEBHOOK_URL)",
                    {{- end }}
