@@ -36,8 +36,7 @@ let engines : engine list =
   [("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))]
 
 let tests : test list =
-  [ ( "block-production"
-    , (module Block_production_test.Make : Intf.Test.Functor_intf) )
+  [ ("block-prod", (module Block_production_test.Make : Intf.Test.Functor_intf))
   ; ("bootstrap", (module Bootstrap_test.Make : Intf.Test.Functor_intf))
   ; ("send-payment", (module Send_payment_test.Make : Intf.Test.Functor_intf))
   ; ( "pmt-timed-accts"
