@@ -19,7 +19,7 @@ Parameter | Description
 --- | ---
 `testnetName` | Mina protocol testnet name to deploy to
 `coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon 
-`archive.nodeName` | name identifier of archive node pod
+`archive.fullame` | name identifier of archive node pod
 
 ### Optional Settings
 
@@ -29,17 +29,15 @@ Parameter | Description | Default
 `archive.postgresHost` | Postgres database host to store archival data | `see [default] values.yaml`
 `archive.postgresPort` | Postgres database port | `5432`
 `archive.postgresDB` | Postgres database to store archival data | `archive`
-`archive.postgresUri` | port on which to listen for data collection requests | `see [default] values.yaml`
+`archive.postgresUri` | Postgres [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) to access postgres datastore instance | `see [default] values.yaml`
 `archive.remoteSchemaFile` | archive database schema during initialization | `see [default] values.yaml`
 `archive.hostPort` | Kubernetes node port to expose | `10909`
-`archive.optionalEnv` | optional environment variable configuration settings | `[]`
 `postgres.postgresqlUsername` | Postgress database access username (if set) | `postgres`
 `postgres.postgresPassword` | Postgres database access password (if set) | `foobar`
 `coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898`
 `coda.logLevel` | log level to set for Coda daemon | `TRACE` 
 `coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
-`coda.privKeyPass` | public-private key-pair associated with Coda test account/wallet | `see [default] values.yaml`
 
 ## archive-node launch examples
 
