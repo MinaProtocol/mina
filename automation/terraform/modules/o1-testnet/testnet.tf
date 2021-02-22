@@ -77,6 +77,8 @@ module "kubernetes_testnet" {
         run_with_bots          = false
         enable_peer_exchange   = true
         isolated               = false
+        enableArchive          = false
+        archiveAddress         = "archive-1:3086"
       }
     ],
     [

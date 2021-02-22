@@ -45,7 +45,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     libp2pSecret: "libp2pYolo"
-    enableArchive: false
+    enableArchive: true
+    archiveAddress: archive-1:3086
   - name: "test-2"
     runWithUserAgent: true
     runWithBots: false

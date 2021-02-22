@@ -91,6 +91,8 @@ locals {
         libp2pSecret         = config.libp2p_secret
         enablePeerExchange   = config.enable_peer_exchange
         isolated             = config.isolated
+        enableArchive        = config.enableArchive
+        archiveAddress       = config.archiveAddress
       }
     ]
   }

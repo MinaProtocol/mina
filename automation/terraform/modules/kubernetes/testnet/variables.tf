@@ -142,7 +142,9 @@ variable "block_producer_configs" {
       enable_peer_exchange   = bool,
       isolated               = bool,
       run_with_user_agent    = bool,
-      run_with_bots          = bool
+      run_with_bots          = bool,
+      enableArchive          = bool,
+      archiveAddress         = string
     })
   )
   default = []
