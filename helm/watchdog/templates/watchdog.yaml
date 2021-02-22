@@ -93,11 +93,22 @@ spec:
             command: ["python3"]
             args: ["/code/make_report.py", 
                    "--incluster", "true", 
+                   "--namespace", "''", 
+                   {{- if .Values.makeReportDiscordWebhookUrl }}
                    "--discord_webhook_url", "$(MAKE_REPORT_DISCORD_WEBHOOK_URL)",
+                   {{- end }}
+                   {{- if $.Values.makeReportAccounts }}
                    "--accounts", "$(MAKE_REPORT_ACCOUNTS)" 
+                   {{- end }}
                   ]
             env:
+            {{- if .Values.makeReportDiscordWebhookUrl }}
             - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
               value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
+            {{- if .Values.makeReportAccount }}
+            {{- end }}
+            - name: "MAKE_REPORT_ACCOUNTS"
+              value: {{ .Values.makeReportAccounts | quote }}
+            {{- end }}
           restartPolicy: OnFailure
 

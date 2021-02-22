@@ -1,6 +1,6 @@
 resource "google_compute_address" "seed_static_ip" {
   count        = var.seed_count
-  name         = "seed-static-ip-${count.index + 1}"
+  name         = "seed-static-ip-${count.index + 1}-${var.testnet_name}"
   address_type = "EXTERNAL"
   region       = var.cluster_region
   project      = "o1labs-192920"
