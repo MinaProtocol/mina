@@ -37,7 +37,7 @@ command=$1 \n\
 shift \n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
-  coda "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >coda.log &\n\
+  mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >coda.log &\n\
   coda_pid=$!\n\
   tail -q -f coda.log &\n\
   tail_pid=$!\n\
