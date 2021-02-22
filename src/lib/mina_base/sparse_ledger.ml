@@ -38,10 +38,21 @@ module L = struct
   type location = int
 
   let get : t -> location -> Account.t option =
-   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
+   fun t loc ->
+    try
+      let account = M.get_exn !t loc in
+      if Public_key.Compressed.(equal empty account.public_key) then None
+      else Some account
+    with _ -> None
 
   let location_of_account : t -> Account_id.t -> location option =
-   fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
+   fun t id ->
+    try
+      let loc = M.find_index_exn !t id in
+      let account = M.get_exn !t loc in
+      if Public_key.Compressed.(equal empty account.public_key) then None
+      else Some loc
+    with _ -> None
 
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a
@@ -66,7 +77,14 @@ module L = struct
   let get_or_create_account_exn :
       t -> Account_id.t -> Account.t -> [`Added | `Existed] * location =
    fun t id to_set ->
-    let loc = M.find_index_exn !t id in
+    let loc =
+      let t = !t in
+      try M.find_index_exn t id
+      with _ ->
+        failwithf
+          !"%{sexp: (Account_id.t * int) list} | %{sexp:Account_id.t}"
+          t.indexes id ()
+    in
     let a = M.get_exn !t loc in
     if Public_key.Compressed.(equal empty a.public_key) then (
       set t loc to_set ;
