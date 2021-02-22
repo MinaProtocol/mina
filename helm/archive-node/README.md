@@ -32,14 +32,12 @@ Parameter | Description | Default
 `archive.postgresUri` | Postgres [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) to access postgres datastore instance | `see [default] values.yaml`
 `archive.remoteSchemaFile` | archive database schema during initialization | `see [default] values.yaml`
 `archive.hostPort` | Kubernetes node port to expose | `10909`
-`archive.optionalEnv` | optional environment variable configuration settings | `[]`
 `postgres.postgresqlUsername` | Postgress database access username (if set) | `postgres`
 `postgres.postgresPassword` | Postgres database access password (if set) | `foobar`
 `coda.image` | container image to use for operating the archive node's Coda daemon | `codaprotocol/coda-daemon:0.0.14-rosetta-scaffold-inversion-489d898`
 `coda.logLevel` | log level to set for Coda daemon | `TRACE` 
 `coda.logSnarkWorkGossip` | whether the Coda daemon should log SNARK work gossip | `false`
 `coda.runtimeConfig` | Coda daemon configuration to use at runtime | `undefined`
-`coda.privKeyPass` | public-private key-pair associated with Coda test account/wallet | `see [default] values.yaml`
 
 ## archive-node launch examples
 
