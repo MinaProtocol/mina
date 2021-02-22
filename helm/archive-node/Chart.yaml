@@ -2,12 +2,11 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.4.8
+version: 0.4.9
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - fix daemon side-car hostPort reference
-    - add peers list URL chart value
+    - fix peer-list-url flag
 dependencies:
   - name: postgresql
     version: "*"

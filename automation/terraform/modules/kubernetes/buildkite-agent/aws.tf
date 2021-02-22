@@ -70,7 +70,10 @@ data "aws_iam_policy_document" "buildkite_aws_policydoc" {
     actions = [
       "route53:ListHostedZones",
       "route53:ListTagsForResource",
-      "route53:GetHostedZone"
+      "route53:GetHostedZone",
+      "route53:GetChange",
+      "route53:ListResourceRecordSets",
+      "route53:ChangeResourceRecordSets"
     ]
 
     effect = "Allow"
@@ -103,6 +106,13 @@ data "aws_secretsmanager_secret" "buildkite_api_token_metadata" {
 data "aws_secretsmanager_secret_version" "buildkite_api_token" {
   secret_id = "${data.aws_secretsmanager_secret.buildkite_api_token_metadata.id}"
 }
+
+data "aws_secretsmanager_secret" "npm_token_metadata" {
+  name = "mina-services/client-sdk/npm_token"
+}
+
+data "aws_secretsmanager_secret_version" "npm_token" {
+  secret_id = "${data.aws_secretsmanager_secret.npm_token_metadata.id}"
 
 data "aws_secretsmanager_secret" "testnet_logengine_apikey_metadata" {
   name = "testnet/gcp/api-key/log-engine"

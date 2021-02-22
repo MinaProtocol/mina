@@ -64,8 +64,10 @@ module Types = struct
   type 'a with_name_and_displayed_default =
     {name: string; value: 'a option; default: 'a}
 
+  (*Difference between Optional and Optional_value is that the name is still accessible if the value is None*)
   type ('value, 'output) t =
     | Optional : ('value, 'value with_name option) t
+    | Optional_value : ('value, 'value option with_name) t
     | Optional_with_displayed_default :
         'value
         -> ('value, 'value with_name_and_displayed_default) t
@@ -89,6 +91,14 @@ let create (type value output) :
     | Optional ->
         setup_flag ~arg_type ~name ?aliases
           (Doc_builder.display ~default:None doc_builder)
+    | Optional_value -> (
+        setup_flag ~arg_type ~name ?aliases
+          (Doc_builder.display ~default:None doc_builder)
+        >>| function
+        | Some {name; value} ->
+            {Types.name; value= Some value}
+        | None ->
+            {name; value= None} )
     | Optional_with_displayed_default default -> (
         setup_flag ~arg_type ~name ?aliases
           (Doc_builder.display ~default:(Some default) doc_builder)
@@ -107,6 +117,10 @@ module Port = struct
 
   let doc_builder description =
     Doc_builder.create ~display:to_string "PORT" description
+
+  let create_optional ~name ?aliases description =
+    create ~name ?aliases (doc_builder description) Optional_value
+      ~arg_type:Arg_type.int16
 
   let create ~name ?aliases ~default description =
     create ~name ?aliases (doc_builder description)
@@ -148,6 +162,11 @@ module Port = struct
     let rest_server =
       create ~name:"--rest-port" ~aliases:["rest-port"] ~default:default_rest
         "local REST-server for daemon interaction"
+
+    let limited_graphql_server =
+      create_optional ~name:"--limited-graphql-port"
+        ~aliases:["limited-graphql-port"]
+        "GraphQL-server for limited daemon interaction"
   end
 
   module Archive = struct

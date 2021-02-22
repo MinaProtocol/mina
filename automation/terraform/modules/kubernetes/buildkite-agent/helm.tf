@@ -80,6 +80,11 @@ locals {
     {
       "name" = "DOCKER_PASSWORD"
       "value" = data.aws_secretsmanager_secret_version.buildkite_docker_token.secret_string
+    },
+    # NPM EnvVars
+    {
+      "name" = "NPM_TOKEN"
+      "value" = data.aws_secretsmanager_secret_version.npm_token.secret_string
     }
   ]
 }
