@@ -90,9 +90,10 @@ module Repr = struct
       type 'g t =
         { step_data:
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
+            Max_branches_vec.T.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t }
+      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
@@ -214,7 +215,15 @@ end = struct
   module Stable = struct
     module V1 = struct
       type t = (G.t, Vk.t) Poly.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving eq, sexp, compare, hash, yojson]
+
+      let of_repr ({Repr.Stable.V1.step_data; max_width; wrap_index= c} as t) :
+          t =
+        {Poly.step_data; max_width; wrap_index= c; wrap_vk= Some (Vk.of_repr t)}
+
+      let sexp_of_t (t : t) = Repr.Stable.V1.sexp_of_t G.sexp_of_t (to_repr t)
+
+      let t_of_sexp s : t = of_repr (Repr.Stable.V1.t_of_sexp G.t_of_sexp s)
 
       let of_yojson json =
         let open Result.Let_syntax in
@@ -234,13 +243,7 @@ end = struct
 
                   let to_binable = to_repr
 
-                  let of_binable
-                      ( {Repr.Stable.V1.step_data; max_width; wrap_index= c} as
-                      t ) =
-                    { Poly.step_data
-                    ; max_width
-                    ; wrap_index= c
-                    ; wrap_vk= Some (Vk.of_repr t) }
+                  let of_binable = of_repr
                 end)
     end
   end]
