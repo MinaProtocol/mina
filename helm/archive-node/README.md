@@ -19,7 +19,7 @@ Parameter | Description
 --- | ---
 `testnetName` | Mina protocol testnet name to deploy to
 `coda.seedPeers` | peers to bootstrap the the archive node's Mina daemon 
-`archive.nodeName` | name identifier of archive node pod
+`archive.fullame` | name identifier of archive node pod
 
 ### Optional Settings
 
@@ -29,7 +29,7 @@ Parameter | Description | Default
 `archive.postgresHost` | Postgres database host to store archival data | `see [default] values.yaml`
 `archive.postgresPort` | Postgres database port | `5432`
 `archive.postgresDB` | Postgres database to store archival data | `archive`
-`archive.postgresUri` | port on which to listen for data collection requests | `see [default] values.yaml`
+`archive.postgresUri` | Postgres [connection URI](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING) to access postgres datastore instance | `see [default] values.yaml`
 `archive.remoteSchemaFile` | archive database schema during initialization | `see [default] values.yaml`
 `archive.hostPort` | Kubernetes node port to expose | `10909`
 `archive.optionalEnv` | optional environment variable configuration settings | `[]`
