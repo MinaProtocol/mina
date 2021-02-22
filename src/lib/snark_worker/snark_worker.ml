@@ -2,6 +2,7 @@
 "/src/config.mlh"]
 
 module Intf = Intf
+module Prod = Prod
 
 [%%if
 proof_level = "full"]
