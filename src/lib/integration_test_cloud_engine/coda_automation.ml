@@ -294,6 +294,7 @@ module Network_manager = struct
     ; testnet_dir: string
     ; testnet_log_filter: string
     ; constants: Test_config.constants
+    ; seed_nodes: Kubernetes_network.Node.t list
     ; block_producer_nodes: Kubernetes_network.Node.t list
     ; snark_coordinator_nodes: Kubernetes_network.Node.t list
     ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
@@ -361,7 +362,8 @@ module Network_manager = struct
       ; Kubernetes_network.Node.pod_id
       ; Kubernetes_network.Node.node_graphql_port= port }
     in
-    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
+    (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
+    let seed_nodes = [cons_node "seed" 3085] in
     let snark_coordinator_nodes = [cons_node "snark-coordinator-1" 3085] in
     let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
@@ -370,7 +372,9 @@ module Network_manager = struct
       )
     in
     let nodes_by_app_id =
-      let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
+      let all_nodes =
+        seed_nodes @ snark_coordinator_nodes @ block_producer_nodes
+      in
       all_nodes
       |> List.map ~f:(fun node -> (node.pod_id, node))
       |> String.Map.of_alist_exn
@@ -382,6 +386,7 @@ module Network_manager = struct
       ; testnet_dir
       ; testnet_log_filter
       ; constants= network_config.constants
+      ; seed_nodes
       ; block_producer_nodes
       ; snark_coordinator_nodes
       ; nodes_by_app_id
