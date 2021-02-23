@@ -47,7 +47,13 @@ Pipeline.build
           label = "Build Archive node debian package",
           key = "build-archive-deb-pkg",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "./*.deb" ]
+          artifact_paths = [ S.contains "./*.deb" ],
+          depends_on = [
+            { name = "ArchiveRedundancyTools", key = "missing_subchain" },
+            { name = "ArchiveRedundancyTools", key = "build-archive" },
+            { name = "ArchiveRedundancyTools", key = "archive_blocks" },
+            { name = "ArchiveRedundancyTools", key = "missing_blocks_auditor" }
+          ]
         },
       DockerImage.generateStep spec
     ]

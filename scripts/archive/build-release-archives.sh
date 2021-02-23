@@ -41,6 +41,8 @@ pwd
 ls
 cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
+cp ./_build/default/src/app/missing_subchain/missing_subchain.exe "${BUILD_DIR}/usr/local/bin/mina-missing_subchain"
+cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing_blocks_auditor"
 
 # echo contents of deb
 echo "------------------------------------------------------------"

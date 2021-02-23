@@ -20,7 +20,7 @@ let buildToolCmd : Text -> Size -> Command.Type = \(tool : Text) -> \(cmd_target
       key = "archive-redundancy-${tool}",
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "_build/default/src/app/${tool}/*exe" ]
+      artifact_paths = [ S.contains "_build/default/src/app/**/*exe" ]
     }
 
 in
@@ -39,6 +39,7 @@ Pipeline.build
         name = "ArchiveRedundancyTools"
       },
     steps = [
+      buildToolCmd "build_archive" Size.Medium,
       buildToolCmd "missing_subchain" Size.Medium,
       buildToolCmd "missing_blocks_auditor" Size.Medium,
       buildToolCmd "archive_blocks" Size.Medium
