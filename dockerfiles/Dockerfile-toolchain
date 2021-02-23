@@ -101,7 +101,7 @@ RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
 RUN sudo apt-get install --yes wget 
-RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
+RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.15.8.linux-amd64.tar.gz && sudo tar -xvf go1.15.8.linux-amd64.tar.gz && sudo rm go1.15.8.linux-amd64.tar.gz
 RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
