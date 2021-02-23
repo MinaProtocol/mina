@@ -82,7 +82,7 @@ module Dlog_based = struct
             ; endomul0: 'fp
             ; endomul1: 'fp
             ; endomul2: 'fp }
-          [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq, fields]
+          [@@deriving sexp, compare, yojson, hlist, hash, eq, fields]
 
           let map_challenges t ~f ~scalar =
             { t with
@@ -165,7 +165,7 @@ module Dlog_based = struct
           , 'bulletproof_challenges
           , 'index )
           t_
-        [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, eq]
       end
 
       let map_challenges
@@ -197,7 +197,7 @@ module Dlog_based = struct
           , 'bulletproof_challenges
           , 'index )
           t_
-        [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, eq]
 
         let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
@@ -280,7 +280,7 @@ module Dlog_based = struct
         , 'bp_chals
         , 'index )
         t_
-      [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, eq]
     end
 
     module In_circuit = struct
@@ -305,7 +305,7 @@ module Dlog_based = struct
         , 'bp_chals
         , 'index )
         t_
-      [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, eq]
 
       let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
 
@@ -446,7 +446,7 @@ module Dlog_based = struct
         , 'bp_chals
         , 'index )
         t_
-      [@@deriving bin_io, compare, yojson, sexp, hash, eq]
+      [@@deriving compare, yojson, sexp, hash, eq]
 
       let spec =
         let open Spec in
@@ -626,7 +626,7 @@ module Pairing_based = struct
         ; xi: 'scalar_challenge (* 128 bits *)
         ; bulletproof_challenges: 'bulletproof_challenges
         ; b: 'fq }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
@@ -635,7 +635,7 @@ module Pairing_based = struct
           , 'fq
           , 'bulletproof_challenges )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
 
       module In_circuit = struct
@@ -645,7 +645,7 @@ module Pairing_based = struct
           , 'fq
           , 'bulletproof_challenges )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
     end
 
@@ -668,7 +668,7 @@ module Pairing_based = struct
             Deferred_values.t_
         ; should_finalize: 'bool
         ; sponge_digest_before_evaluations: 'digest }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
         type ( 'challenge
@@ -685,7 +685,7 @@ module Pairing_based = struct
           , 'digest
           , 'bool )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
 
       module In_circuit = struct
@@ -706,7 +706,7 @@ module Pairing_based = struct
           , 'digest
           , 'bool )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
 
         let spec bp_log2 =
           let open Spec in
@@ -824,7 +824,7 @@ module Pairing_based = struct
 
     type ('unfinalized_proofs, 'me_only) t =
       {unfinalized_proofs: 'unfinalized_proofs; me_only: 'me_only}
-    [@@deriving bin_io, sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson]
 
     let spec unfinalized_proofs me_only =
       let open Spec in
@@ -862,7 +862,7 @@ module Pairing_based = struct
     type ('unfinalized_proofs, 'me_only, 'pass_through) t =
       { proof_state: ('unfinalized_proofs, 'me_only) Proof_state.t
       ; pass_through: 'pass_through }
-    [@@deriving bin_io, sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson]
 
     let to_data {proof_state= {unfinalized_proofs; me_only}; pass_through} =
       let open Hlist.HlistId in
