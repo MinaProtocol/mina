@@ -3710,7 +3710,7 @@ module Mutations = struct
 
   let send_snapp_command =
     io_field "sendSnappCommand" ~doc:"Send a snapp command"
-      ~typ:(non_null bool) (* TODO: Non-bool *)
+      ~typ:(non_null Types.SnappCommand.typ)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.SendSnappCommand.typ)]
       ~resolve:(fun {ctx= coda; _} () snapp_command_input ->
         match
@@ -3718,8 +3718,8 @@ module Mutations = struct
         with
         | `Active f -> (
             match%map f with
-            | Ok _snapp_command ->
-                Ok true
+            | Ok snapp_command ->
+                Ok snapp_command
             | Error e ->
                 Error ("Couldn't send snapp command: " ^ Error.to_string_hum e)
             )
