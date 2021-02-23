@@ -4156,6 +4156,29 @@ module Queries = struct
              ~transaction_pool payment.data)
           ~f:Error.to_string_hum )
 
+  let snapp_status =
+    result_field "snappStatus" ~doc:"Get the status of a snapp command"
+      ~typ:(non_null Types.transaction_status)
+      ~args:
+        Arg.[arg "command" ~typ:(non_null guid) ~doc:"Id of a SnappCommand"]
+      ~resolve:(fun {ctx= coda; _} () serialized_snapp ->
+        let open Result.Let_syntax in
+        let deserialize_snapp serialized_snapp =
+          result_of_or_error
+            (Snapp_command.of_base58_check serialized_snapp)
+            ~error:"Invalid payment provided"
+          |> Result.map ~f:(fun cmd ->
+                 { With_hash.data= cmd
+                 ; hash= Transaction_hash.hash_command (Snapp_command cmd) } )
+        in
+        let%bind snapp_cmd = deserialize_snapp serialized_snapp in
+        let frontier_broadcast_pipe = Mina_lib.transition_frontier coda in
+        let transaction_pool = Mina_lib.transaction_pool coda in
+        Result.map_error
+          (Transaction_inclusion_status.get_snapp_status
+             ~frontier_broadcast_pipe ~transaction_pool snapp_cmd.data)
+          ~f:Error.to_string_hum )
+
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
       ~args:Arg.[]
@@ -4463,6 +4486,7 @@ module Queries = struct
     ; get_peers
     ; pooled_user_commands
     ; transaction_status
+    ; snapp_status
     ; trust_status
     ; trust_status_all
     ; snark_pool

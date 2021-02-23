@@ -61,6 +61,45 @@ let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
             return State.Pending ;
           State.Unknown )
 
+(* TODO: This is extremely expensive as implemented and needs to be replaced
+         with an extension.
+*)
+let get_snapp_status ~frontier_broadcast_pipe ~transaction_pool cmd =
+  let open Or_error.Let_syntax in
+  let%map check_cmd =
+    Snapp_command.check cmd
+    |> Result.map ~f:(fun () ->
+           Transaction_hash.User_command_with_valid_signature.create
+             (Snapp_command cmd) )
+  in
+  let resource_pool = Transaction_pool.resource_pool transaction_pool in
+  match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
+  | None ->
+      State.Unknown
+  | Some transition_frontier ->
+      with_return (fun {return} ->
+          let best_tip_path =
+            Transition_frontier.best_tip_path transition_frontier
+          in
+          let in_breadcrumb breadcrumb =
+            List.exists (Transition_frontier.Breadcrumb.commands breadcrumb)
+              ~f:(fun {data= cmd'; _} ->
+                match cmd' with
+                | Signed_command _ ->
+                    false
+                | Snapp_command cmd' ->
+                    Snapp_command.equal cmd cmd' )
+          in
+          if List.exists ~f:in_breadcrumb best_tip_path then
+            return State.Included ;
+          if
+            List.exists ~f:in_breadcrumb
+              (Transition_frontier.all_breadcrumbs transition_frontier)
+          then return State.Pending ;
+          if Transaction_pool.Resource_pool.member resource_pool check_cmd then
+            return State.Pending ;
+          State.Unknown )
+
 let%test_module "transaction_status" =
   ( module struct
     open Async
