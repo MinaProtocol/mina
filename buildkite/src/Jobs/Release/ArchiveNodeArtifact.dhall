@@ -38,12 +38,24 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker [
-            "DUNE_PROFILE=testnet_postake_medium_curves",
-            "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY",
-            "BUILDKITE"
-          ] "./buildkite/scripts/ci-archive-release.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./${spec.deploy_env_file}" ],
+          commands = [
+              Cmd.run "buildkite/scripts/ci-archive-release.sh"
+            ]
+
+            #
+
+            OpamInit.andThenRunInDocker [
+              "DUNE_PROFILE=testnet_postake_medium_curves",
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+              "BUILDKITE"
+            ] "./scripts/archive/build-release-archives.sh"
+
+            #
+
+            [
+              Cmd.run "artifact-cache-helper.sh ./${spec.deploy_env_file} --upload"
+            ],
           label = "Build Archive node debian package",
           key = "build-archive-deb-pkg",
           target = Size.XLarge,
