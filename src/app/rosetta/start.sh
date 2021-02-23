@@ -27,7 +27,7 @@ PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_
 popd
 
 # make genesis (synchronously)
-./make-runtime-genesis.sh
+./make-runtime-genesis.sh # TODO: Need to do this in docker too?
 
 # drop tables and recreate
 psql -d archiver < drop_tables.sql

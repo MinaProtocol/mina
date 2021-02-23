@@ -22,7 +22,7 @@ trap cleanup INT
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # Start postgres
-pg_ctlcluster 11 main start
+# pg_ctlcluster 11 main start
 
 # wait for it to settle
 sleep 3
