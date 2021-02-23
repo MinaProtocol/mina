@@ -30,16 +30,16 @@ RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/auto
 
 RUN echo '#!/bin/bash -x\n\
 mkdir -p .mina-config\n\
-touch .mina-config/coda-prover.log\n\
-touch .mina-config/coda-verifier.log\n\
+touch .mina-config/mina-prover.log\n\
+touch .mina-config/mina-verifier.log\n\
 touch .mina-config/mina-best-tip.log\n\
 command=$1 \n\
 shift \n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
-  mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >coda.log &\n\
+  mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
   coda_pid=$!\n\
-  tail -q -f coda.log &\n\
+  tail -q -f mina.log &\n\
   tail_pid=$!\n\
   wait "$coda_pid"\n\
   echo "Coda process exited with status code $?"\n\

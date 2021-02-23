@@ -82,7 +82,7 @@
 
 #             - run:
 #                 name: Tail Logs
-#                 command: cd ansible && ./adhoc tag_testnet_smoke_test "hostname; tail -n 100 test-coda/coda.log"
+#                 command: cd ansible && ./adhoc tag_testnet_smoke_test "hostname; tail -n 100 test-coda/mina.log"
 #                 when: on_fail
 #             - run:
 #                 name: Tests Failed - destroy
@@ -106,7 +106,7 @@
 #                 command: cd ansible && ./adhoc tag_testnet_smoke_test "hostname; mina client status"
 #             - run:
 #                 name: Tail Logs
-#                 command: cd ansible && ./adhoc tag_testnet_smoke_test "hostname; tail -n 100 test-coda/coda.log"
+#                 command: cd ansible && ./adhoc tag_testnet_smoke_test "hostname; tail -n 100 test-coda/mina.log"
 #                 when: always
 #             - run:
 #                 name: terraform init
