@@ -52,7 +52,7 @@ module Base = struct
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
               , Index.Stable.V1.t )
-              Types.Dlog_based.Statement.Minimal.t
+              Types.Dlog_based.Statement.Minimal.Stable.V1.t
           ; prev_evals:
               Tick.Field.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t
               Dlog_plonk_types.Evals.Stable.V1.t
@@ -165,7 +165,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
             , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
               MLMB_vec.Stable.V1.t )
-            Dlog_based.Proof_state.Me_only.t
+            Dlog_based.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t Max_branching_at_most.t
             , Challenge.Constant.t Scalar_challenge.Stable.V1.t
