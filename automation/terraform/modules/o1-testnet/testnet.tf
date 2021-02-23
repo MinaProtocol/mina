@@ -28,7 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  use_local_charts   = false
+  use_local_charts   = true
   coda_image         = var.coda_image
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
