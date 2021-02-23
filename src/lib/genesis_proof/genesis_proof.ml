@@ -127,7 +127,9 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     ~handler:
       (Consensus.Data.Prover_state.precomputed_handler ~constraint_constants
          ~genesis_epoch_ledger)
-    { transition= Snark_transition.genesis ~constraint_constants ~genesis_ledger
+    { transition=
+        Snark_transition.genesis ~constraint_constants ~consensus_constants
+          ~genesis_ledger
     ; prev_state }
     [(prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy)]
     t.protocol_state_with_hash.data
