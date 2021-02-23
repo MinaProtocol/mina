@@ -27,6 +27,7 @@ seedConfigs:
   external_ip: 1.1.1.1
   node_port: 1111
   enableArchive: false
+  archiveAddress: archive-1:3086
 
 healthcheck:
   enabled: true

@@ -50,8 +50,8 @@ struct
     in
     { description= Printf.sprintf "\"%s\" to initialize" (Node.id node)
     ; predicate= Network_state_predicate (check (), check)
-    ; soft_timeout= Literal (Time.Span.of_min 5.0)
-    ; hard_timeout= Literal (Time.Span.of_min 7.5) }
+    ; soft_timeout= Literal (Time.Span.of_min 10.0)
+    ; hard_timeout= Literal (Time.Span.of_min 15.0) }
 
   (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =

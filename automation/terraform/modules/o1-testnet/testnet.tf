@@ -28,6 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
+  use_local_charts   = true
   coda_image         = var.coda_image
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
@@ -54,7 +55,6 @@ module "kubernetes_testnet" {
   seed_region = var.seed_region
 
   archive_configs = var.archive_configs
-
   mina_archive_schema = var.mina_archive_schema
 
   snark_worker_replicas   = var.snark_worker_replicas
@@ -112,6 +112,40 @@ module "kubernetes_testnet" {
 #        run_with_bots          = false
 #        enable_peer_exchange   = true
 #        isolated               = false
+#      }
+#    ]
+#  )
+#      for i in range(var.whale_count) : {
+#        name                   = local.whale_block_producer_names[i]
+#        class                  = "whale"
+#        id                     = i + 1
+#        external_port          = local.static_peers[local.whale_block_producer_names[i]].port
+#        private_key_secret     = "online-whale-account-${i + 1}-key"
+#        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
+#        enable_gossip_flooding = false
+#        run_with_user_agent    = false
+#        run_with_bots          = false
+#        enable_peer_exchange   = true
+#        isolated               = false
+#        enableArchive          = false
+#        archiveAddress         = "archive-1:3086"
+#      }
+#    ],
+#    [
+#      for i in range(var.fish_count) : {
+#        name                   = local.fish_block_producer_names[i]
+#        class                  = "fish"
+#        id                     = i + 1
+#        external_port          = local.static_peers[local.fish_block_producer_names[i]].port
+#        private_key_secret     = "online-fish-account-${i + 1}-key"
+#        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
+#        enable_gossip_flooding = false
+#        run_with_user_agent    = true
+#        run_with_bots          = false
+#        enable_peer_exchange   = true
+#        isolated               = false
+#        enableArchive          = true
+#        archiveAddress         = "archive-1:3086"
 #      }
 #    ]
 #  )

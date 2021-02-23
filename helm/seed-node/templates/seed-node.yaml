@@ -131,6 +131,7 @@ spec:
         configMap:
           name: seed-daemon-config
       {{- end }}
+      {{- if $config.privateKeySecret }}
       - name: private-keys
         secret:
           secretName: {{ $config.privateKeySecret }}
@@ -140,6 +141,7 @@ spec:
             path: key
           - key: pub
             path: key.pub
+      {{- end }}
       {{- if $config.libp2pSecret }}
       - name: libp2p-keys
         secret:

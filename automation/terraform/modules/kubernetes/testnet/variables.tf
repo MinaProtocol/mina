@@ -17,6 +17,11 @@ variable "k8s_context" {
 
 # Global Vars
 
+variable "use_local_charts" {
+  type    = bool
+  default = false
+}
+
 variable "coda_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
@@ -142,7 +147,9 @@ variable "block_producer_configs" {
       enable_peer_exchange   = bool,
       isolated               = bool,
       run_with_user_agent    = bool,
-      run_with_bots          = bool
+      run_with_bots          = bool,
+      enableArchive          = bool,
+      archiveAddress         = string
     })
   )
   default = []

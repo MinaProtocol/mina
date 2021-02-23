@@ -401,34 +401,45 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                     `Synced ) ) )
   in
   let observer = observe incremental_status in
-  (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
+  (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
   ( if not is_seed then
-    let offline_shutdown_timeout_duration = Time.Span.of_min 15.0 in
-    let shutdown_timeout = ref None in
-    let shutdown _ =
-      Mina_user_error.raisef "Node has been offline for %s; shutting down"
-        (Time.Span.to_string_hum offline_shutdown_timeout_duration)
+    let offline_timeout_min = 15.0 in
+    let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
+    let offline_timeout = ref None in
+    let offline_warned = ref false in
+    let log_offline_warning _tm =
+      [%log error]
+        "Daemon has not received any gossip messages for %0.0f minutes; check \
+         the daemon's external port forwarding, if needed"
+        offline_timeout_min ;
+      offline_warned := true
     in
-    let start_shutdown_timeout () =
-      match !shutdown_timeout with
+    let start_offline_timeout () =
+      match !offline_timeout with
       | Some _ ->
           ()
       | None ->
-          shutdown_timeout :=
+          offline_timeout :=
             Some
-              (Timeout.create () offline_shutdown_timeout_duration ~f:shutdown)
+              (Timeout.create () offline_timeout_duration
+                 ~f:log_offline_warning)
     in
-    let stop_shutdown_timeout () =
-      match !shutdown_timeout with
+    let stop_offline_timeout () =
+      match !offline_timeout with
       | Some timeout ->
+          if !offline_warned then (
+            [%log info]
+              "Daemon had been offline (no gossip messages received), now \
+               back online" ;
+            offline_warned := false ) ;
           Timeout.cancel () timeout () ;
-          shutdown_timeout := None
+          offline_timeout := None
       | None ->
           ()
     in
     let handle_status_change status =
-      if status = `Offline then start_shutdown_timeout ()
-      else stop_shutdown_timeout ()
+      if status = `Offline then start_offline_timeout ()
+      else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
       | Initialized value ->
@@ -437,7 +448,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           handle_status_change value
       | Invalidated ->
           () ) ) ;
-  (* recompute coda status on an interval *)
+  (* recompute Mina status on an interval *)
   stabilize () ;
   every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
   observer

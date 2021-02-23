@@ -1,7 +1,7 @@
 terraform {
-  required_version = "~> 0.12.0"
+  required_version = ">= 0.12.0"
   backend "s3" {
-    key     = "terraform-ci-net.tfstate"
+    key     = "ci-net.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"

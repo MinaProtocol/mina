@@ -497,8 +497,7 @@ module Options = struct
     end )
 end
 
-let router ~graphql_uri ~logger ~db (route : string list) body =
-  let (module Db : Caqti_async.CONNECTION) = db in
+let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /network/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
@@ -514,15 +513,17 @@ let router ~graphql_uri ~logger ~db (route : string list) body =
       in
       Network_list_response.to_yojson res
   | ["status"] ->
-      let%bind network =
-        Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
-        |> Errors.Lift.wrap
-      in
-      let%map res =
-        Status.Real.handle ~env:(Status.Env.real ~graphql_uri ~db) network
-        |> Errors.Lift.wrap
-      in
-      Network_status_response.to_yojson res
+      with_db (fun ~db ->
+          let%bind network =
+            Errors.Lift.parse ~context:"Request"
+            @@ Network_request.of_yojson body
+            |> Errors.Lift.wrap
+          in
+          let%map res =
+            Status.Real.handle ~env:(Status.Env.real ~graphql_uri ~db) network
+            |> Errors.Lift.wrap
+          in
+          Network_status_response.to_yojson res )
   | ["options"] ->
       let%bind network =
         Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
