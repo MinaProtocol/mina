@@ -72,6 +72,27 @@ resource "docker_container" "verify_alert_receivers" {
 
 # Deploy alert updates
 
+resource "docker_container" "sync_alert_rules" {
+  name  = "cortex_rules_update"
+  image = local.cortex_image
+  command = [
+    "rules",
+    "sync",
+    "--rule-files=/config/alert_rules.yml",
+    "--address=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["auth_url"]}",
+    "--id=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["id"]}",
+    "--key=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["password"]}"
+  ]
+
+  upload {
+    content = data.template_file.testnet_alerts.rendered
+    file    = "/config/alert_rules.yml"
+  }
+
+  rm         = true
+  depends_on = [docker_container.check_rules_config, docker_container.lint_rules_config]
+}
+
 resource "docker_container" "update_alert_rules" {
   name  = "cortex_rules_update"
   image = local.cortex_image
@@ -79,9 +100,9 @@ resource "docker_container" "update_alert_rules" {
     "rules",
     "load",
     "/config/alert_rules.yml",
-    "--address=${jsondecode(data.aws_secretsmanager_secret_version.current_prometheus_remote_write_config.secret_string)["remote_write_uri"]}",
-    "--id=${jsondecode(data.aws_secretsmanager_secret_version.current_prometheus_remote_write_config.secret_string)["remote_write_username"]}",
-    "--key=${jsondecode(data.aws_secretsmanager_secret_version.current_prometheus_remote_write_config.secret_string)["remote_write_password"]}"
+    "--address=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["auth_url"]}",
+    "--id=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["id"]}",
+    "--key=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["password"]}"
   ]
 
   upload {
