@@ -82,16 +82,6 @@ variable "testnet_name" {
   type = string
 }
 
-variable "archive_node_count" {
-  type    = number
-  default = 0
-}
-
-variable "archive_configs" {
-  type    = list(any)
-  default = []
-}
-
 # Seed Vars
 
 variable "seed_port" {
@@ -254,29 +244,14 @@ variable "make_report_accounts" {
 
 # Archive-Postgres Vars
 
-variable "archive_persistence_enabled" {
-  type    = bool
-  default = true
+variable "archive_node_count" {
+  type    = number
+  default = 0
 }
 
-variable "archive_persistence_class" {
-  type    = string
-  default = "ssd"
-}
-
-variable "archive_persistence_reclaim_policy" {
-  type    = string
-  default = "retain"
-}
-
-variable "archive_persistence_access_modes" {
+variable "archive_configs" {
   type    = list(any)
-  default = ["ReadWriteOnce"]
-}
-
-variable "archive_persistence_size" {
-  type    = string
-  default = "8Gi"
+  default = []
 }
 
 variable "upload_blocks_to_gcloud" {
