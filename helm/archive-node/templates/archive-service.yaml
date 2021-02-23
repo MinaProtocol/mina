@@ -16,4 +16,7 @@ spec:
   - name: tcp-p2p
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
+  - name: tcp-archive
+    port: {{ .Values.archive.ports.server }}
+    targetPort: archive-port
 {{- end }}
