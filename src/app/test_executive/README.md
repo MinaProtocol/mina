@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-1) ensure the following environment variables are properly set if not already: `GCLOUD_API_KEY`, `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, vars relating to AWS access, vars relating to ocaml compilation.
+1) ensure the following environment variables are properly set if not already: `GCLOUD_API_KEY` (relating to the gcloud service account used in step 2), `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, vars relating to AWS access, vars relating to ocaml compilation.
 
-2) log in to Google Cloud, with the correct cluster, using the service account
+2) log in to Google Cloud, with the correct cluster, and activate the service account
 
 `gcloud auth login --no-launch-browser <personal login name>`
 `gcloud container clusters get-credentials --region us-west1 mina-integration-west1`
