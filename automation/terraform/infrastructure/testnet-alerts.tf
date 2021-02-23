@@ -5,7 +5,7 @@ locals {
 data "template_file" "testnet_alerts" {
   template = "${file("${path.module}/templates/testnet-alerts.yml.tpl")}"
   vars = {
-    rule_filter = "{testnet=~\"testworld|.+\"}", # any non-empty testnet name + 'testworld'
+    rule_filter        = "{testnet=~\"testworld|.+\"}", # any non-empty testnet name + 'testworld'
     alerting_timeframe = "1h"
   }
 }
@@ -13,7 +13,7 @@ data "template_file" "testnet_alerts" {
 data "template_file" "testnet_alert_receivers" {
   template = "${file("${path.module}/templates/testnet-alert-receivers.yml.tpl")}"
   vars = {
-    pagerduty_service_key = "${data.aws_secretsmanager_secret_version.pagerduty_testnet_primary_key.secret_string}"
+    pagerduty_service_key  = "${data.aws_secretsmanager_secret_version.pagerduty_testnet_primary_key.secret_string}"
     pagerduty_alert_filter = "testworld"
 
     discord_alert_webhook = "${data.aws_secretsmanager_secret_version.discord_testnet_alerts_webhook.secret_string}"
@@ -26,14 +26,14 @@ resource "docker_container" "lint_rules_config" {
   name  = "cortex_lint"
   image = local.cortex_image
   command = [
-      "rules",
-      "lint",
-      "--rule-files=/config/alert_rules.yml"
+    "rules",
+    "lint",
+    "--rule-files=/config/alert_rules.yml"
   ]
 
   upload {
-      content = data.template_file.testnet_alerts.rendered
-      file ="/config/alert_rules.yml"
+    content = data.template_file.testnet_alerts.rendered
+    file    = "/config/alert_rules.yml"
   }
 
   rm = true
@@ -49,8 +49,8 @@ resource "docker_container" "check_rules_config" {
   ]
 
   upload {
-      content = data.template_file.testnet_alerts.rendered
-      file ="/config/alert_rules.yml"
+    content = data.template_file.testnet_alerts.rendered
+    file    = "/config/alert_rules.yml"
   }
 
   rm = true
@@ -85,12 +85,12 @@ resource "docker_container" "update_alert_rules" {
   ]
 
   upload {
-      content = data.template_file.testnet_alerts.rendered
-      file ="/config/alert_rules.yml"
+    content = data.template_file.testnet_alerts.rendered
+    file    = "/config/alert_rules.yml"
   }
 
-  rm = true
-  depends_on  = [docker_container.check_rules_config, docker_container.lint_rules_config]
+  rm         = true
+  depends_on = [docker_container.check_rules_config, docker_container.lint_rules_config]
 }
 
 resource "docker_container" "update_alert_receivers" {
@@ -106,16 +106,21 @@ resource "docker_container" "update_alert_receivers" {
   ]
 
   upload {
-      content = data.template_file.testnet_alert_receivers.rendered
-      file ="/config/pagerduty_alert_receivers.yml"
+    content = data.template_file.testnet_alert_receivers.rendered
+    file    = "/config/pagerduty_alert_receivers.yml"
   }
 
-  rm = true
-  depends_on  = [docker_container.verify_alert_receivers]
+  rm         = true
+  depends_on = [docker_container.verify_alert_receivers]
 }
 
 # Outputs
 
 output "rendered_alerts_config" {
-    value = "\n${data.template_file.testnet_alerts.rendered}"
+  value = "\n${data.template_file.testnet_alerts.rendered}"
+}
+
+output "rendered_receivers_config" {
+  value     = "\n${data.template_file.testnet_alert_receivers.rendered}"
+  sensitive = true
 }
