@@ -110,7 +110,8 @@ let set_timestamp t timestamp = {t with Poly.timestamp}
 
 let negative_one
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-    ~genesis_ledger_hash ~snarked_next_available_token : Value.t =
+    ~(consensus_constants : Consensus.Constants.t) ~genesis_ledger_hash
+    ~snarked_next_available_token : Value.t =
   let genesis_ledger_hash =
     Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
   in
@@ -119,7 +120,7 @@ let negative_one
   ; snarked_ledger_hash= genesis_ledger_hash
   ; genesis_ledger_hash
   ; snarked_next_available_token
-  ; timestamp= Block_time.of_time Time.epoch }
+  ; timestamp= consensus_constants.genesis_state_timestamp }
 
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one

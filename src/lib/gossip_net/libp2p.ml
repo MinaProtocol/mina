@@ -34,6 +34,7 @@ module Config = struct
     ; direct_peers: Mina_net2.Multiaddr.t list
     ; peer_exchange: bool
     ; mina_peer_exchange: bool
+    ; seed_peer_list_url: Uri.t option
     ; max_connections: int
     ; validation_queue_size: int
     ; mutable keypair: Mina_net2.Keypair.t option }
@@ -47,6 +48,11 @@ module type S = sig
 end
 
 let rpc_transport_proto = "coda/rpcs/0.0.1"
+
+let download_seed_peer_list uri =
+  let%bind _resp, body = Cohttp_async.Client.get uri in
+  let%map contents = Cohttp_async.Body.to_string body in
+  Mina_net2.Multiaddr.of_file_contents ~contents
 
 module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
@@ -117,12 +123,23 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       in
       transport
 
+    (* peers_snapshot is updated every 30 seconds.
+*)
     let peers_snapshot = ref []
+
+    let peers_snapshot_max_staleness = Time.Span.of_sec 30.
 
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar ~added_seeds ~on_unexpected_termination =
+      let%bind seeds_from_url =
+        match config.seed_peer_list_url with
+        | None ->
+            Deferred.return []
+        | Some u ->
+            download_seed_peer_list u
+      in
       let fail err =
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
         |> Error.raise
@@ -165,9 +182,6 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           [%log' info config.logger] "libp2p peer ID this session is $peer_id"
             ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
-          let throttle =
-            Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
-          in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             [%log' debug config.logger] "(Re)initializing libp2p result" ;
             let open Deferred.Or_error.Let_syntax in
@@ -177,32 +191,16 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               if !ctr < 4 then incr ctr
               else Ivar.fill_if_empty high_connectivity_ivar ()
             in
-            let reload_peers_snapshot () =
-              if Throttle.num_jobs_waiting_to_start throttle = 0 then
-                don't_wait_for
-                  (Throttle.enqueue throttle (fun () ->
-                       let open Deferred.Let_syntax in
-                       let%bind peers = peers net2 in
-                       peers_snapshot :=
-                         List.map peers
-                           ~f:
-                             (Fn.compose Mina_net2.Multiaddr.of_string
-                                Peer.to_multiaddr_string) ;
-                       Mina_metrics.(
-                         Gauge.set Network.peers
-                           (List.length peers |> Int.to_float)) ;
-                       after (Time.Span.of_sec 2.)
-                       (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
-                   ))
-            in
             let seed_peers =
               List.dedup_and_sort ~compare:Mina_net2.Multiaddr.compare
-                (List.rev_append config.initial_peers
-                   (List.map
-                      ~f:
-                        (Fn.compose Mina_net2.Multiaddr.of_string
-                           Peer.to_multiaddr_string)
-                      (Hash_set.to_list added_seeds)))
+                (List.concat
+                   [ config.initial_peers
+                   ; seeds_from_url
+                   ; List.map
+                       ~f:
+                         (Fn.compose Mina_net2.Multiaddr.of_string
+                            Peer.to_multiaddr_string)
+                       (Hash_set.to_list added_seeds) ])
             in
             let%bind () =
               configure net2 ~me ~logger:config.logger
@@ -241,9 +239,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                         List.filter_map ~f:Mina_net2.Multiaddr.to_peer
                           config.initial_peers
                     ; isolate= config.isolate }
-                ~on_peer_connected:(fun _ ->
-                  record_peer_connection () ; reload_peers_snapshot () )
-                ~on_peer_disconnected:(fun _ -> reload_peers_snapshot ())
+                ~on_peer_connected:(fun _ -> record_peer_connection ())
+                ~on_peer_disconnected:ignore
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
@@ -419,6 +416,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       | Error e ->
           fail (Error.of_exn e)
 
+    let peers t = !(t.net2) >>= Mina_net2.peers
+
     let create (config : Config.t) rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
@@ -529,17 +528,33 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
              ~f:do_ban
          in
          Linear_pipe.close ban_writer) ;
-      { config
-      ; added_seeds
-      ; net2= net2_ref
-      ; first_peer_ivar
-      ; high_connectivity_ivar
-      ; subscription= subscription_ref
-      ; message_reader
-      ; ban_reader
-      ; restart_helper= (fun () -> Strict_pipe.Writer.write restarts_w ()) }
+      let t =
+        { config
+        ; added_seeds
+        ; net2= net2_ref
+        ; first_peer_ivar
+        ; high_connectivity_ivar
+        ; subscription= subscription_ref
+        ; message_reader
+        ; ban_reader
+        ; restart_helper= (fun () -> Strict_pipe.Writer.write restarts_w ()) }
+      in
+      Clock.every' peers_snapshot_max_staleness (fun () ->
+          let%map peers = peers t in
+          Mina_metrics.(
+            Gauge.set Network.peers (List.length peers |> Int.to_float)) ;
+          peers_snapshot :=
+            List.map peers
+              ~f:
+                (Fn.compose Mina_net2.Multiaddr.of_string
+                   Peer.to_multiaddr_string) ) ;
+      t
 
-    let peers t = !(t.net2) >>= Mina_net2.peers
+    let set_telemetry_data t data =
+      !(t.net2) >>= Fn.flip Mina_net2.set_telemetry_data data
+
+    let get_peer_telemetry_data t peer =
+      !(t.net2) >>= Fn.flip Mina_net2.get_peer_telemetry_data peer
 
     let initial_peers t = t.config.initial_peers
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
 	"math/rand"
 	gonet "net"
@@ -52,7 +53,6 @@ type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
 var (
 	logger      = logging.Logger("codanet.Helper")
-	gsLogger    = logging.Logger("codanet.CodaGatingState")
 	NoDHT       bool // option for testing to completely disable the DHT
 	WithPrivate bool // option for testing to allow private IPs
 
@@ -65,7 +65,8 @@ var (
 		"169.254.0.0/16",
 	}
 
-	pxProtocolID = protocol.ID("/mina/peer-exchange")
+	pxProtocolID        = protocol.ID("/mina/peer-exchange")
+	TelemetryProtocolID = protocol.ID("/mina/telemetry")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -170,7 +171,11 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
 	defer func() {
-		_ = c.Close()
+		go func() {
+			// small delay to allow for remote peer to read from stream
+			time.Sleep(time.Millisecond * 400)
+			_ = c.Close()
+		}()
 	}()
 
 	// select random subset of our peers to send over, then disconnect
@@ -188,23 +193,20 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	stream, err := cm.host.NewStream(cm.ctx, c.RemotePeer(), pxProtocolID)
 	if err != nil {
-		logger.Error("failed to open stream", err)
+		logger.Debug("failed to open stream", err)
 		return
 	}
 
 	n, err := stream.Write(bz)
 	if err != nil {
-		logger.Error("failed to write to stream", err)
+		logger.Debug("failed to write to stream", err)
 		return
 	} else if n != len(bz) {
-		logger.Error("failed to write all data to stream")
+		logger.Debug("failed to write all data to stream")
 		return
 	}
 
 	logger.Debugf("wrote peers to stream %s", stream.Protocol())
-
-	// small delay to allow for remote peer to read from stream
-	time.Sleep(time.Millisecond * 400)
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
@@ -232,6 +234,7 @@ type Helper struct {
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	Seeds             []peer.AddrInfo
+	TelemetryData     string
 }
 
 // this type implements the ConnectionGating interface
@@ -434,7 +437,7 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 		for {
 			if idx >= len(peers) {
 				return ret
-			} else if peers[idx] != h.Host.ID() && peers[idx] != from {
+			} else if peers[idx] != h.Host.ID() && peers[idx] != from && len(h.Host.Peerstore().PeerInfo(peers[idx]).Addrs) != 0 {
 				break
 			} else {
 				idx += 1
@@ -464,47 +467,68 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
-	fromSeed := false
-
-	for _, seed := range h.Seeds {
-		if s.Conn().RemotePeer() == seed.ID {
-			fromSeed = true
-			break
-		}
-	}
-
-	if !fromSeed {
-		logger.Debugf("ignoring peer-exchange stream from non-seed peer=%s", s.Conn().RemotePeer())
+	defer func() {
 		_ = s.Close()
+	}()
+
+	stat := s.Conn().Stat()
+	if stat.Direction != network.DirOutbound {
 		return
 	}
 
-	for {
-		dec := json.NewDecoder(s)
-		peers := []peer.AddrInfo{}
-		err := dec.Decode(&peers)
-		if err != nil && err == io.EOF {
-			continue
-		} else if err != nil && err.Error() == "stream reset" {
-			_ = s.Close()
-			return
-		} else if err != nil {
-			logger.Errorf("failed to decode list of peers err=%s", err)
-			continue
-		}
-
-		for _, peer := range peers {
-			go func() {
-				err = h.Host.Connect(h.Ctx, peer)
-				if err != nil {
-					logger.Errorf("failed to connect to peer err=%s", err)
-				}
-				logger.Debugf("connected to peer! %s", peer)
-			}()
-		}
-
-		_ = s.Close()
+	connInfo := h.ConnectionManager.GetInfo()
+	if connInfo.ConnCount >= connInfo.LowWater {
+		return
 	}
+
+	buf := make([]byte, 8192)
+	_, err := s.Read(buf)
+	if err != nil && err != io.EOF {
+		logger.Debugf("failed to decode list of peers err=%s", err)
+		return
+	}
+
+	r := bytes.NewReader(buf)
+	peers := []peer.AddrInfo{}
+	dec := json.NewDecoder(r)
+	err = dec.Decode(&peers)
+	if err != nil {
+		logger.Debugf("failed to decode list of peers err=%s", err)
+		return
+	}
+
+	for _, p := range peers {
+		go func(p peer.AddrInfo) {
+			connInfo := h.ConnectionManager.GetInfo()
+			if connInfo.ConnCount < connInfo.LowWater {
+				err = h.Host.Connect(h.Ctx, p)
+				if err != nil {
+					logger.Debugf("failed to connect to peer %v err=%s", p, err)
+				} else {
+					logger.Debugf("connected to peer! %v", p)
+				}
+			} else {
+				h.Host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.ConnectedAddrTTL)
+			}
+		}(p)
+	}
+}
+
+func (h *Helper) handleTelemetryStreams(s network.Stream) {
+	defer func() {
+		_ = s.Close()
+	}()
+
+	n, err := s.Write([]byte(h.TelemetryData))
+	if err != nil {
+		logger.Error("failed to write to stream", err)
+		return
+	} else if n != len(h.TelemetryData) {
+		logger.Error("failed to write all data to stream")
+		return
+	}
+
+	logger.Debugf("wrote telemetry data to stream %s", s.Protocol())
 }
 
 // MakeHelper does all the initialization to run one host
@@ -612,5 +636,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	connManager.ctx = ctx
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
+	h.Host.SetStreamHandler(TelemetryProtocolID, h.handleTelemetryStreams)
 	return h, nil
 }

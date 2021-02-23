@@ -434,6 +434,9 @@ module type S = sig
 
       val to_global_slot : t -> Mina_numbers.Global_slot.t
 
+      val of_global_slot :
+        constants:Constants.t -> Mina_numbers.Global_slot.t -> t
+
       val zero : constants:Constants.t -> t
     end
 
@@ -496,6 +499,8 @@ module type S = sig
       val consensus_time : Value.t -> Consensus_time.t
 
       val blockchain_length : Value.t -> Length.t
+
+      val min_window_density : Value.t -> Length.t
 
       val block_stake_winner : Value.t -> Public_key.Compressed.t
 

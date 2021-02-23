@@ -1,16 +1,3 @@
-# Control Vars
-
-# when set to true, this module generates and uploads artifacts from `genesis_ledger.json`
-variable "generate_and_upload_artifacts" {
-  type = bool
-  default = true
-}
-
-variable "artifact_path" {
-  type = string
-  default = "/tmp"
-}
-
 # K8s Cluster Vars
 
 variable "cluster_name" {
@@ -29,6 +16,11 @@ variable "k8s_context" {
 }
 
 # Global Vars
+
+variable "use_local_charts" {
+  type    = bool
+  default = false
+}
 
 variable "coda_image" {
   type    = string
@@ -87,7 +79,7 @@ variable "testnet_name" {
   default = "coda-testnet"
 }
 
-variable "additional_seed_peers" {
+variable "additional_peers" {
   type    = list
   default = []
 }
@@ -97,7 +89,6 @@ variable "archive_node_count" {
   default = 0
 }
 
-# only used if `generate_and_upload_artifacts` is set to false
 variable "runtime_config" {
   type    = string
   default = ""
@@ -130,16 +121,6 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
-variable "whale_count" {
-  type    = number
-  default = 1
-}
-
-variable "fish_count" {
-  type    = number
-  default = 1
-}
-
 variable "log_level" {
   type    = string
   default = "Trace"
@@ -159,23 +140,34 @@ variable "block_producer_key_pass" {
   type = string
 }
 
-variable "block_producer_starting_host_port" {
-  type    = number
-  default = 10000
-}
-
 variable "block_producer_configs" {
   type = list(
     object({
       name = string,
       class = string,
       private_key_secret = string,
+      external_port = number,
       libp2p_secret = string,
       enable_gossip_flooding = bool,
       enable_peer_exchange = bool,
       isolated = bool,
       run_with_user_agent = bool,
       run_with_bots = bool
+    })
+  )
+  default = []
+}
+
+variable "seed_configs" {
+  type = list(
+    object({
+      name = string,
+      class = string
+      libp2p_secret = string
+      external_port = number
+      external_ip   = string
+      node_port     = number
+      private_key_secret = string
     })
   )
   default = []
@@ -302,7 +294,7 @@ variable "upload_blocks_to_gcloud" {
   default = false
 }
 
-variable "seedPeersURL" {
+variable "seed_peers_url" {
   type = string
   default = ""
 }
