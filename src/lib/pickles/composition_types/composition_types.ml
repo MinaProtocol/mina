@@ -113,8 +113,6 @@ module Dlog_based = struct
             ; endomul1= f t.endomul1
             ; endomul2= f t.endomul2 }
 
-          open Snarky_backendless.H_list
-
           let typ (type f fp) ~challenge ~scalar_challenge
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
             Snarky_backendless.Typ.of_hlistable

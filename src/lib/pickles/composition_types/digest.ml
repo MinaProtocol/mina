@@ -11,8 +11,6 @@ module Constant = struct
   let to_tock_field x = Tock.Field.of_bits (to_bits x)
 
   let of_tick_field x = of_bits (Tick.Field.to_bits x)
-
-  let of_tick_field x = of_bits (Tick.Field.to_bits x)
 end
 
 module Make (Impl : Snarky_backendless.Snark_intf.Run) = struct
