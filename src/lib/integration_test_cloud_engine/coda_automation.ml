@@ -115,10 +115,7 @@ module Network_config = struct
       ^ string_of_int time_now.tm_hour
       ^ string_of_int time_now.tm_min
     in
-    (* append the first 5 chars of the local system username of the person running the test, short 7 char git hash, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments. format is: *)
-    (* username-gitHash-testname-DayofmonthHrMin *)
-    (* ex: adalo-3a9f8ce-block-prod-151134 ; user is adalovelace, git commit 3a9f8ce, running block production test, 15th of a month, 11:34 AM, GMT time*)
-    (* GCP namespaces are limited to 53 characters.  this format uses up a fixed minimum of 22 characters, the longest release name for any resource is "-block-producers" which is another 16 characters. so the name of a test including dashes cannot exceed 15 characters*)
+    (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name =
       user ^ "-" ^ git_commit ^ "-" ^ test_name ^ "-" ^ timestr
     in
