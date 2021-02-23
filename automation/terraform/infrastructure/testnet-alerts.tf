@@ -119,7 +119,3 @@ resource "docker_container" "update_alert_receivers" {
 output "rendered_alerts_config" {
     value = "\n${data.template_file.testnet_alerts.rendered}"
 }
-
-output "rendered_receivers_config" {
-    value = "\n${data.template_file.testnet_alert_receivers.rendered}"
-}
