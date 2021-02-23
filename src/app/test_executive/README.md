@@ -13,6 +13,6 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe
 CODA_IMAGE=... # pick a suitable (recent) "coda-daemon-puppeteered:XXX-develop-XXX" dockerhub
 TEST=... # name of the test you want to run
 
-dune build --profile=integration_testnet src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
+dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 test_executive cloud $TEST --coda-image=$CODA_IMAGE --debug | tee test.log | logproc -i inline -f '!(.level in ["Debug", "Spam"])'
 ```
