@@ -2,6 +2,8 @@ module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
 
+  use_local_charts = true
+
   cluster_name   = var.cluster_name
   cluster_region = var.cluster_region
   k8s_context    = var.k8s_context
@@ -17,11 +19,22 @@ module "kubernetes_testnet" {
   log_txn_pool_gossip   = true
   log_snark_work_gossip = true
 
-  additional_peers = []
+  additional_peers = [local.seed_peer.multiaddr]
   runtime_config   = var.runtime_config
 
   seed_zone   = "us-west1-a"
   seed_region = "us-west1"
+  seed_configs = [
+    {
+      name               = "seed",
+      class              = "seed",
+      libp2p_secret      = local.seed_peer.secret,
+      external_port      = 10401,
+      node_port          = null,
+      external_ip        = null,
+      private_key_secret = null
+    }
+  ]
 
   archive_node_count  = 0
 

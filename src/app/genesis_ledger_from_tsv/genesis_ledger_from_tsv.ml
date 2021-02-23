@@ -28,7 +28,8 @@ let add_account pk =
 
 let valid_pk pk = Or_error.is_ok @@ Public_key.Compressed.of_base58_check pk
 
-let is_pending pk = String.Caseless.equal "pending" pk
+let is_pending pk =
+  List.mem ["pending"; "finoa"; "secret"] pk ~equal:String.Caseless.equal
 
 let no_delegatee pk = String.is_empty pk || String.equal pk "0"
 
@@ -295,7 +296,7 @@ let main ~tsv_file ~output_file () =
       let json =
         `List (List.map accounts ~f:Runtime_config.Accounts.Single.to_yojson)
       in
-      Out_channel.output_string out_channel (Yojson.Safe.to_string json) ;
+      Out_channel.output_string out_channel (Yojson.Safe.pretty_to_string json) ;
       Out_channel.newline out_channel ) ;
   return ()
 

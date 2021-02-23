@@ -104,20 +104,24 @@ module Network_config = struct
     in
     let user_from_env = Option.value (Unix.getenv "USER") ~default:"auto" in
     let user_sanitized =
-      Str.global_replace (Str.regexp "\\W|_") "" user_from_env
+      Str.global_replace (Str.regexp "\\W|_-") "" user_from_env
     in
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
+    let git_commit = Mina_version.commit_id_short in
     let time_now = Unix.gmtime (Unix.gettimeofday ()) in
     let timestr =
       string_of_int time_now.tm_mday
       ^ string_of_int time_now.tm_hour
       ^ string_of_int time_now.tm_min
     in
-    (* append the first 5 chars of the local system username of the person running the test, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments, format is: *)
-    (* username-testname-DaymonthHrMin *)
-    (* ex: adalo-block-production-151134 ; user is adalovelace, running block production test, 15th of a month, 11:34 AM, GMT time*)
-    let testnet_name = user ^ "-" ^ test_name ^ "-" ^ timestr in
+    (* append the first 5 chars of the local system username of the person running the test, short 7 char git hash, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments. format is: *)
+    (* username-gitHash-testname-DayofmonthHrMin *)
+    (* ex: adalo-3a9f8ce-block-prod-151134 ; user is adalovelace, git commit 3a9f8ce, running block production test, 15th of a month, 11:34 AM, GMT time*)
+    (* GCP namespaces are limited to 53 characters.  this format uses up a fixed minimum of 22 characters, the longest release name for any resource is "-block-producers" which is another 16 characters. so the name of a test including dashes cannot exceed 15 characters*)
+    let testnet_name =
+      user ^ "-" ^ git_commit ^ "-" ^ test_name ^ "-" ^ timestr
+    in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -294,6 +298,7 @@ module Network_manager = struct
     ; testnet_dir: string
     ; testnet_log_filter: string
     ; constants: Test_config.constants
+    ; seed_nodes: Kubernetes_network.Node.t list
     ; block_producer_nodes: Kubernetes_network.Node.t list
     ; snark_coordinator_nodes: Kubernetes_network.Node.t list
     ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
@@ -361,7 +366,8 @@ module Network_manager = struct
       ; Kubernetes_network.Node.pod_id
       ; Kubernetes_network.Node.node_graphql_port= port }
     in
-    (* we currently only deploy 1 coordinator per deploy (will be configurable later) *)
+    (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
+    let seed_nodes = [cons_node "seed" 3085] in
     let snark_coordinator_nodes = [cons_node "snark-coordinator-1" 3085] in
     let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
@@ -370,7 +376,9 @@ module Network_manager = struct
       )
     in
     let nodes_by_app_id =
-      let all_nodes = snark_coordinator_nodes @ block_producer_nodes in
+      let all_nodes =
+        seed_nodes @ snark_coordinator_nodes @ block_producer_nodes
+      in
       all_nodes
       |> List.map ~f:(fun node -> (node.pod_id, node))
       |> String.Map.of_alist_exn
@@ -382,6 +390,7 @@ module Network_manager = struct
       ; testnet_dir
       ; testnet_log_filter
       ; constants= network_config.constants
+      ; seed_nodes
       ; block_producer_nodes
       ; snark_coordinator_nodes
       ; nodes_by_app_id
