@@ -6,6 +6,8 @@ open Prometheus
 open Namespace
 open Metric_generators
 
+let time_offset_sec = 1609459200.
+
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -297,11 +299,15 @@ module Bootstrap = struct
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
 end
 
-(* TODO:
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
+
+  let useful_transactions_received_time_sec : Gauge.t =
+    let help =
+      "Time at which useful transactions were seen (seconds since 1/1/1970)"
+    in
+    Gauge.v "useful_transactions_received_time_sec" ~help ~namespace ~subsystem
 end
-*)
 
 module Metric_map (Metric : sig
   type t
@@ -397,6 +403,12 @@ end
 
 module Snark_work = struct
   let subsystem = "Snark_work"
+
+  let useful_snark_work_received_time_sec : Gauge.t =
+    let help =
+      "Time at which useful snark work was seen (seconds since 1/1/1970)"
+    in
+    Gauge.v "useful_snark_work_received_time_sec" ~help ~namespace ~subsystem
 
   let completed_snark_work_received_gossip : Counter.t =
     let help = "# of completed snark work bundles received from peers" in
@@ -576,8 +588,15 @@ module Transition_frontier = struct
       max_unvalidated_blocklength_observed := blockchain_length )
 
   let slot_fill_rate : Gauge.t =
-    let help = "number of blocks / total slots since genesis" in
+    let help =
+      "fill rate for the last k slots (or fewer if there have not been k \
+       slots between the best tip and the frontier root)"
+    in
     Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
+
+  let min_window_density : Gauge.t =
+    let help = "min window density for the best tip" in
+    Gauge.v "min_window_density" ~help ~namespace ~subsystem
 
   let active_breadcrumbs : Gauge.t =
     let help = "current # of breadcrumbs in the transition frontier" in
@@ -631,6 +650,36 @@ module Transition_frontier = struct
   let best_tip_user_txns : Gauge.t =
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
+  let best_tip_coinbase : Gauge.t =
+    let help =
+      "0 if there is no coinbase in the current best tip, 1 otherwise"
+    in
+    Gauge.v "best_tip_coinbase" ~help ~namespace ~subsystem
+
+  let longest_fork : Gauge.t =
+    let help = "Length of the longest path in the frontier" in
+    Gauge.v "longest_fork" ~help ~namespace ~subsystem
+
+  let empty_blocks_at_best_tip : Gauge.t =
+    let help =
+      "Number of blocks at the best tip that have no user-commands in them"
+    in
+    Gauge.v "empty_blocks_at_best_tip" ~help ~namespace ~subsystem
+
+  let accepted_block_slot_time_sec : Gauge.t =
+    let help =
+      "Slot time (seconds since 1/1/1970) corresponding to the most recently \
+       accepted block"
+    in
+    Gauge.v "accepted_block_slot_time_sec" ~help ~namespace ~subsystem
+
+  let best_tip_slot_time_sec : Gauge.t =
+    let help =
+      "Slot time (seconds since 1/1/1970) corresponding to the most recent \
+       best tip"
+    in
+    Gauge.v "best_tip_slot_time_sec" ~help ~namespace ~subsystem
 
   (* TODO:
   let recently_finalized_snarked_txns : Gauge.t =
