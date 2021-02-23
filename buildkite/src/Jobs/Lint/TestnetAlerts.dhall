@@ -16,21 +16,21 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.contains "helm/",
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
-        -- trigger on HelmRelease job change due to dependency
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
-        S.exactly "buildkite/scripts/helm-ci" "sh"
+        S.exactly "automation/terraform/infrastructure/templates/testnet-alerts.yml" "tpl",
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/TestnetAlerts"),
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
       path = "Lint",
-      name = "HelmChart"
+      name = "TestnetAlerts"
     },
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "HELM_LINT=true buildkite/scripts/helm-ci.sh" ]
-          , label = "Helm chart lint steps"
-          , key = "lint-helm-chart"
+          commands = [
+              Cmd.run "cd automation/terraform/infrastructure && terraform init",
+              Cmd.run "terraform apply -auto-approve -target docker_container.lint_rules_config" ]
+          , label = "Testnet monitoring & alerts lint steps"
+          , key = "lint-testnet-alerts"
           , target = Size.Small
           , docker = None Docker.Type
         }
