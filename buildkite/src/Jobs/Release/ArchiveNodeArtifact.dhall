@@ -49,10 +49,10 @@ Pipeline.build
           target = Size.XLarge,
           artifact_paths = [ S.contains "./*.deb" ],
           depends_on = [
-            { name = "ArchiveRedundancyTools", key = "missing_subchain" },
-            { name = "ArchiveRedundancyTools", key = "build-archive" },
-            { name = "ArchiveRedundancyTools", key = "archive_blocks" },
-            { name = "ArchiveRedundancyTools", key = "missing_blocks_auditor" }
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-missing_subchain" },
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-build-archive" },
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-archive_blocks" },
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-missing_blocks_auditor" }
           ]
         },
       DockerImage.generateStep spec
