@@ -961,7 +961,15 @@ module Types = struct
 
     let typ : (_, Snapp_command.t option) typ =
       obj "SnappCommand" ~fields:(fun _ ->
-          [ field "token" ~doc:"Token associated with the snapp account(s)"
+          [ field "id" ~typ:(non_null guid) ~args:[]
+              ~resolve:(fun _ snapp_command ->
+                Snapp_command.to_base58_check snapp_command )
+          ; field "hash" ~typ:(non_null string) ~args:[]
+              ~resolve:(fun _ snapp_command ->
+                Transaction_hash.to_base58_check
+                  (Transaction_hash.hash_command (Snapp_command snapp_command))
+            )
+          ; field "token" ~doc:"Token associated with the snapp account(s)"
               ~typ:token_id ~args:[] ~resolve:(fun _ -> function
               | Snapp_command.Proved_empty {token_id; _}
               | Snapp_command.Proved_signed {token_id; _}
