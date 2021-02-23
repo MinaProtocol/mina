@@ -12,3 +12,6 @@
 - fix daemon side-car hostPort reference
 - add peers list URL chart value
 
+0.4.9:
+------
+- coda -> mina

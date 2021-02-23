@@ -15,3 +15,7 @@
 ------
 - add peers list URL chart value
 
+0.5.3:
+------
+- coda -> mina
+
