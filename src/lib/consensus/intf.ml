@@ -500,6 +500,8 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val min_window_density : Value.t -> Length.t
+
       val block_stake_winner : Value.t -> Public_key.Compressed.t
 
       val block_creator : Value.t -> Public_key.Compressed.t
