@@ -49,7 +49,6 @@ locals {
         privateKeySecret     = config.private_key_secret
         externalPort         = config.external_port
         externalIp           = config.external_ip
-        nodePort             = config.node_port
       }
     ]
   }
