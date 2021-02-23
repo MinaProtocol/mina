@@ -55,7 +55,7 @@ variable "seed_count" {
 
 locals {
   testnet_name = "devnet"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-watchdog-test-88a86bc"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-devnet-4744658"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
