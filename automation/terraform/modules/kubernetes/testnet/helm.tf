@@ -221,17 +221,21 @@ resource "helm_release" "snark_workers" {
 # Archive Node
 
 resource "helm_release" "archive_node" {
-  provider   = helm.testnet_deploy
+  provider = helm.testnet_deploy
+  count    = length(local.archive_node_vars.node_configs)
 
-  count       = var.archive_node_count
-  
-  name        = "archive-node-${count.index + 1}"
-  repository  = var.use_local_charts ? "" : local.mina_helm_repo
-  chart       = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version     = "0.4.9"
-  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
-  values      = [
-    yamlencode(local.archive_node_vars)
+  name       = "archive-${count.index + 1}"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  chart      = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
+  version    = "0.5.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
+    yamlencode({
+      testnetName = var.testnet_name
+      coda        = local.archive_node_vars.coda
+      archive     = local.archive_node_vars.node_configs[count.index]
+      postgresql  = local.archive_node_vars.postgresql
+    })
   ]
 
   wait       = false
@@ -244,12 +248,12 @@ resource "helm_release" "archive_node" {
 resource "helm_release" "watchdog" {
   provider = helm.testnet_deploy
 
-  name        = "${var.testnet_name}-watchdog"
-  repository  = var.use_local_charts ? "" : local.mina_helm_repo
-  chart       = var.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
-  version     = "0.1.0"
-  namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
-  values      = [
+  name       = "${var.testnet_name}-watchdog"
+  repository = var.use_local_charts ? "" : local.mina_helm_repo
+  chart      = var.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
+  version    = "0.1.0"
+  namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
+  values = [
     yamlencode(local.watchdog_vars)
   ]
   wait        = false

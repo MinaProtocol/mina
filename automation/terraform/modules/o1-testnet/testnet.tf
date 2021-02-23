@@ -28,6 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
+  use_local_charts   = false
   coda_image         = var.coda_image
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
@@ -54,7 +55,6 @@ module "kubernetes_testnet" {
   seed_region = var.seed_region
 
   archive_configs = var.archive_configs
-
   mina_archive_schema = var.mina_archive_schema
 
   snark_worker_replicas   = var.snark_worker_replicas
