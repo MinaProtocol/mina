@@ -1922,8 +1922,18 @@ module Types = struct
                   | Signed_command c ->
                       Some (UserCommand.mk_user_command {t with data= c})
                   | Snapp_command _ ->
-                      (* TODO: This should be supported in some graph QL query *)
                       None ) )
+        ; field "snappCommands"
+            ~doc:"List of snapp commands included in this block"
+            ~typ:(non_null @@ list @@ non_null SnappCommand.typ)
+            ~args:Arg.[]
+            ~resolve:(fun _ {commands; _} ->
+              List.filter_map commands ~f:(fun t ->
+                  match t.data with
+                  | Signed_command _ ->
+                      None
+                  | Snapp_command snapp ->
+                      Some snapp ) )
         ; field "feeTransfer"
             ~doc:"List of fee transfers included in this block"
             ~typ:(non_null @@ list @@ non_null fee_transfer)
