@@ -49,10 +49,10 @@ while true; do\n\
     exit 0\n\
   fi\n\
 done'\
-> init_coda_baked.sh
+> init_mina_baked.sh
 
-RUN chmod +x init_coda_baked.sh
+RUN chmod +x init_mina_baked.sh
 
 ENV CODA_TIME_OFFSET 0
 
-ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_coda_baked.sh"]
+ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_mina_baked.sh"]

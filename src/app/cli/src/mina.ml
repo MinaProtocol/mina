@@ -446,7 +446,7 @@ let setup_daemon logger =
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
-      let version_filename = conf_dir ^/ "coda.version" in
+      let version_filename = conf_dir ^/ "mina.version" in
       let make_version () =
         let%map () =
           (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)

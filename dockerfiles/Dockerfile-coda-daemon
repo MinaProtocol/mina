@@ -53,10 +53,10 @@ while true; do\n\
     exit 0\n\
   fi\n\
 done'\
-> init_coda.sh
+> init_mina.sh
 
-RUN chmod +x init_coda.sh
+RUN chmod +x init_mina.sh
 
 ENV CODA_TIME_OFFSET 0
 
-ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_coda.sh"]
+ENTRYPOINT ["/usr/bin/dumb-init", "/root/init_mina.sh"]
