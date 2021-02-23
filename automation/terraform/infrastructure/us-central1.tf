@@ -193,7 +193,7 @@ resource "kubernetes_storage_class" "central1_ssd" {
   count = length(local.storage_reclaim_policies)
 
   metadata {
-    name = "${local.central1_region}-ssd-${lower(local.storage_reclaim_policies[count.index])}"
+    name = "ssd-${lower(local.storage_reclaim_policies[count.index])}"
   }
 
   storage_provisioner = "kubernetes.io/gce-pd"
@@ -210,7 +210,7 @@ resource "kubernetes_storage_class" "central1_standard" {
   count = length(local.storage_reclaim_policies)
 
   metadata {
-    name = "${local.central1_region}-standard-${lower(local.storage_reclaim_policies[count.index])}"
+    name = "standard-${lower(local.storage_reclaim_policies[count.index])}"
   }
 
   storage_provisioner = "kubernetes.io/gce-pd"
