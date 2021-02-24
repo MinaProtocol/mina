@@ -28,8 +28,8 @@ Pipeline.build
         Command.Config::{
           commands = [
               Cmd.run "cd automation/terraform/infrastructure && terraform init",
-              Cmd.run "terraform apply -auto-approve -target docker_container.lint_rules_config" ]
-          , label = "Testnet monitoring & alerts lint steps"
+              Cmd.run "terraform apply -auto-approve -target docker_container.lint_rules_config -target docker_container.check_rules_config" ]
+          , label = "Lint Testnet alert rules"
           , key = "lint-testnet-alerts"
           , target = Size.Small
           , docker = None Docker.Type

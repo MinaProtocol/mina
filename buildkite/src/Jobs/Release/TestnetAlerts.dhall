@@ -27,8 +27,8 @@ Pipeline.build
         Command.Config::{
           commands = [
               Cmd.run "cd automation/terraform/infrastructure && terraform init",
-              Cmd.run "terraform apply -auto-approve -target docker_container.update_alert_rules" ]
-          , label = "Deploy Testnet monitoring & alerts updates"
+              Cmd.run "terraform apply -auto-approve -target docker_container.sync_alert_rules" ]
+          , label = "Deploy Testnet alert rules"
           , key = "deploy-testnet-alerts"
           , target = Size.Medium
           , docker = None Docker.Type

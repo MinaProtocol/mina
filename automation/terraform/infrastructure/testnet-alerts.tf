@@ -93,27 +93,6 @@ resource "docker_container" "sync_alert_rules" {
   depends_on = [docker_container.check_rules_config, docker_container.lint_rules_config]
 }
 
-resource "docker_container" "update_alert_rules" {
-  name  = "cortex_rules_update"
-  image = local.cortex_image
-  command = [
-    "rules",
-    "load",
-    "/config/alert_rules.yml",
-    "--address=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["auth_url"]}",
-    "--id=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["id"]}",
-    "--key=${jsondecode(data.aws_secretsmanager_secret_version.prometheus_api_auth.secret_string)["password"]}"
-  ]
-
-  upload {
-    content = data.template_file.testnet_alerts.rendered
-    file    = "/config/alert_rules.yml"
-  }
-
-  rm         = true
-  depends_on = [docker_container.check_rules_config, docker_container.lint_rules_config]
-}
-
 resource "docker_container" "update_alert_receivers" {
   name  = "cortex_receivers_update"
   image = local.cortex_image
