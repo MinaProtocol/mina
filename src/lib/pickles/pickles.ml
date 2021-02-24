@@ -825,7 +825,7 @@ module Side_loaded = struct
     module Stable = struct
       module V1 = struct
         type t = T.t
-        [@@deriving version {asserted}, sexp, eq, yojson, hash, compare]
+        [@@deriving version {asserted}, sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end

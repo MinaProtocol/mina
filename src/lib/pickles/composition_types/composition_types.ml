@@ -62,7 +62,7 @@ module Dlog_based = struct
                 ; beta: 'challenge
                 ; gamma: 'challenge
                 ; zeta: 'scalar_challenge }
-              [@@deriving sexp, compare, yojson, hlist, hash, eq]
+              [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
               let to_latest = Fn.id
             end
@@ -89,7 +89,7 @@ module Dlog_based = struct
             ; endomul0: 'fp
             ; endomul1: 'fp
             ; endomul2: 'fp }
-          [@@deriving sexp, compare, yojson, hlist, hash, eq, fields]
+          [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
           let map_challenges t ~f ~scalar =
             { t with
@@ -158,7 +158,7 @@ module Dlog_based = struct
             ; xi: 'scalar_challenge
             ; bulletproof_challenges: 'bulletproof_challenges
             ; which_branch: 'index }
-          [@@deriving sexp, compare, yojson, hlist, hash, eq]
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
           let to_latest = Fn.id
         end
@@ -184,7 +184,7 @@ module Dlog_based = struct
         ; xi: 'scalar_challenge
         ; bulletproof_challenges: 'bulletproof_challenges
         ; which_branch: 'index }
-      [@@deriving sexp, compare, yojson, hlist, hash, eq]
+      [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
         type ( 'challenge
@@ -201,7 +201,7 @@ module Dlog_based = struct
           , 'bulletproof_challenges
           , 'index )
           Stable.Latest.t
-        [@@deriving sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, equal]
       end
 
       let map_challenges
@@ -233,7 +233,7 @@ module Dlog_based = struct
           , 'bulletproof_challenges
           , 'index )
           Stable.Latest.t
-        [@@deriving sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, equal]
 
         let to_hlist, of_hlist = (to_hlist, of_hlist)
 
@@ -262,7 +262,7 @@ module Dlog_based = struct
         module V1 = struct
           type ('g1, 'bulletproof_challenges) t =
             {sg: 'g1; old_bulletproof_challenges: 'bulletproof_challenges}
-          [@@deriving sexp, compare, yojson, hlist, hash, eq]
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
         end
       end]
 
@@ -303,7 +303,7 @@ module Dlog_based = struct
           ; sponge_digest_before_evaluations: 'digest
                 (* Not needed by other proof system *)
           ; me_only: 'me_only }
-        [@@deriving sexp, compare, yojson, hlist, hash, eq]
+        [@@deriving sexp, compare, yojson, hlist, hash, equal]
       end
     end]
 
@@ -326,7 +326,7 @@ module Dlog_based = struct
         , 'bp_chals
         , 'index )
         Stable.Latest.t
-      [@@deriving sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, equal]
     end
 
     module In_circuit = struct
@@ -351,7 +351,7 @@ module Dlog_based = struct
         , 'bp_chals
         , 'index )
         Stable.Latest.t
-      [@@deriving sexp, compare, yojson, hash, eq]
+      [@@deriving sexp, compare, yojson, hash, equal]
 
       let to_hlist, of_hlist = (to_hlist, of_hlist)
 
@@ -443,7 +443,7 @@ module Dlog_based = struct
               , 'index )
               Proof_state.Stable.V1.t
           ; pass_through: 'pass_through }
-        [@@deriving compare, yojson, sexp, hash, eq]
+        [@@deriving compare, yojson, sexp, hash, equal]
       end
     end]
 
@@ -473,7 +473,7 @@ module Dlog_based = struct
             , 'bp_chals
             , 'index )
             Stable.V1.t
-          [@@deriving compare, yojson, sexp, hash, eq]
+          [@@deriving compare, yojson, sexp, hash, equal]
         end
       end]
     end
@@ -502,7 +502,7 @@ module Dlog_based = struct
         , 'bp_chals
         , 'index )
         Stable.Latest.t
-      [@@deriving compare, yojson, sexp, hash, eq]
+      [@@deriving compare, yojson, sexp, hash, equal]
 
       let spec =
         let open Spec in

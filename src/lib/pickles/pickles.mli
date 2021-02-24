@@ -36,7 +36,7 @@ module Verification_key : sig
   val dummy : t Lazy.t
 
   module Id : sig
-    type t [@@deriving sexp, eq]
+    type t [@@deriving sexp, equal]
 
     val dummy : unit -> t
 
@@ -113,7 +113,7 @@ module Side_loaded : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving sexp, eq, compare, hash, yojson]
+        type t [@@deriving sexp, equal, compare, hash, yojson]
       end
     end]
 
@@ -143,7 +143,7 @@ module Side_loaded : sig
         (* TODO: This should really be able to be any width up to the max width... *)
         type t =
           (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
-        [@@deriving sexp, eq, yojson, hash, compare]
+        [@@deriving sexp, equal, yojson, hash, compare]
       end
     end]
   end

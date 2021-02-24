@@ -30,7 +30,7 @@ module Base = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, eq]
+        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
   end
@@ -59,7 +59,7 @@ module Base = struct
               Double.Stable.V1.t
           ; prev_x_hat: Tick.Field.Stable.V1.t Double.Stable.V1.t
           ; proof: Tock.Proof.Stable.V1.t }
-        [@@deriving compare, sexp, yojson, hash, eq]
+        [@@deriving compare, sexp, yojson, hash, equal]
       end
 
       module Tests = struct end
@@ -174,7 +174,7 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
               Max_branching_at_most.Stable.V1.t )
             Base.Me_only.Pairing_based.Stable.V1.t )
           Base.Dlog_based.Stable.V1.t
-        [@@deriving compare, sexp, yojson, hash, eq]
+        [@@deriving compare, sexp, yojson, hash, equal]
 
         let to_latest = Fn.id
       end

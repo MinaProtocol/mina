@@ -10,7 +10,7 @@ module Width : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, eq, compare, hash, yojson]
+      type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -29,7 +29,7 @@ end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = char [@@deriving sexp, eq, compare, hash, yojson]
+      type t = char [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -74,7 +74,7 @@ module Domains = struct
   module Stable = struct
     module V1 = struct
       type 'a t = {h: 'a}
-      [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -110,7 +110,7 @@ module Poly = struct
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t
         ; wrap_vk: 'vk option }
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 end
@@ -193,9 +193,9 @@ let to_input : _ Poly.t -> _ =
       : _ Random_oracle_input.t )
 
 module Make (G : sig
-  type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+  type t [@@deriving sexp, bin_io, equal, compare, hash, yojson]
 end) (Vk : sig
-  type t [@@deriving sexp, eq, compare, hash, yojson]
+  type t [@@deriving sexp, equal, compare, hash, yojson]
 
   val of_repr : G.t Repr.t -> t
 end) : sig
@@ -203,7 +203,7 @@ end) : sig
   module Stable : sig
     module V1 : sig
       type t = (G.t, Vk.t) Poly.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 end = struct
@@ -211,7 +211,7 @@ end = struct
   module Stable = struct
     module V1 = struct
       type t = (G.t, Vk.t) Poly.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
 

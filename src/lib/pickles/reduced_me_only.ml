@@ -15,7 +15,7 @@ module Pairing_based = struct
     module V1 = struct
       type ('s, 'sgs, 'bpcs) t =
         {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
-      [@@deriving sexp, yojson, sexp, compare, hash, eq]
+      [@@deriving sexp, yojson, sexp, compare, hash, equal]
     end
   end]
 
@@ -36,7 +36,7 @@ module Dlog_based = struct
           Challenge.Constant.t Scalar_challenge.Stable.V1.t
           Bulletproof_challenge.Stable.V1.t
           Wrap_bp_vec.Stable.V1.t
-        [@@deriving sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, equal]
 
         let to_latest = Fn.id
       end
