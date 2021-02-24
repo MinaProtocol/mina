@@ -5,6 +5,30 @@ open Mina_base
 open Signature_lib
 open Currency
 
+(** Convert a GraphQL constant to the equivalent json representation.
+    We can't coerce this directly because of the presence of the [`Enum]
+    constructor, so we have to recurse over the structure replacing all of the
+    [`Enum]s with [`String]s.
+*)
+let rec to_yojson (json : Graphql_parser.const_value) : Yojson.Safe.t =
+  match json with
+  | `Assoc fields ->
+      `Assoc (List.map fields ~f:(fun (name, json) -> (name, to_yojson json)))
+  | `Bool b ->
+      `Bool b
+  | `Enum s ->
+      `String s
+  | `Float f ->
+      `Float f
+  | `Int i ->
+      `Int i
+  | `List l ->
+      `List (List.map ~f:to_yojson l)
+  | `Null ->
+      `Null
+  | `String s ->
+      `String s
+
 let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
 let result_of_or_error ?error v =
@@ -16,13 +40,19 @@ let result_of_or_error ?error v =
       | Some error ->
           sprintf "%s (%s)" error str_error )
 
+let result_field_no_inputs ~resolve =
+  Schema.io_field ~resolve:(fun resolve_info src ->
+      Deferred.return @@ resolve resolve_info src )
+
+(* one input *)
 let result_field ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src inputs ->
       Deferred.return @@ resolve resolve_info src inputs )
 
-let result_field_no_inputs ~resolve =
-  Schema.io_field ~resolve:(fun resolve_info src ->
-      Deferred.return @@ resolve resolve_info src )
+(* two inputs *)
+let result_field2 ~resolve =
+  Schema.io_field ~resolve:(fun resolve_info src input1 input2 ->
+      Deferred.return @@ resolve resolve_info src input1 input2 )
 
 module Doc = struct
   let date ?(extra = "") s =
@@ -71,6 +101,33 @@ module Reflection = struct
       reflect
         (fun t -> Block_time.to_time t |> Time.to_string)
         ~typ:(non_null string) a x
+
+    let nn_catchup_status a x =
+      reflect
+        (fun o ->
+          Option.map o
+            ~f:
+              (List.map ~f:(function
+                | ( Transition_frontier.Full_catchup_tree.Node.State.Enum
+                    .Finished
+                  , _ ) ->
+                    "finished"
+                | Failed, _ ->
+                    "failed"
+                | To_download, _ ->
+                    "to_download"
+                | To_initial_validate, _ ->
+                    "to_initial_validate"
+                | To_verify, _ ->
+                    "to_verify"
+                | Wait_for_parent, _ ->
+                    "wait_for_parent"
+                | To_build_breadcrumb, _ ->
+                    "to_build_breadcrumb"
+                | Root, _ ->
+                    "root" )) )
+        ~typ:(list (non_null string))
+        a x
 
     let string a x = id ~typ:string a x
 
@@ -150,11 +207,23 @@ module Types = struct
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
+  let consensus_time_with_global_slot_since_genesis =
+    obj "ConsensusTimeGlobalSlot"
+      ~doc:"Consensus time and the corresponding global slot since genesis"
+      ~fields:(fun _ ->
+        [ field "consensusTime" ~typ:(non_null consensus_time)
+            ~doc:
+              "Time in terms of slot number in an epoch, start and end time \
+               of the slot since UTC epoch"
+            ~args:Arg.[]
+            ~resolve:(fun _ (time, _) -> time)
+        ; field "globalSlotSinceGenesis"
+            ~args:Arg.[]
+            ~typ:(non_null uint32)
+            ~resolve:(fun _ (_, slot) -> slot) ] )
+
   let block_producer_timing :
-      ( _
-      , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
-        option )
-      typ =
+      (_, Daemon_rpcs.Types.Status.Next_producer_timing.t option) typ =
     obj "BlockProducerTimings" ~fields:(fun _ ->
         let of_time ~consensus_constants =
           Consensus.Data.Consensus_time.of_time_exn
@@ -162,20 +231,52 @@ module Types = struct
         in
         [ field "times"
             ~typ:(non_null @@ list @@ non_null consensus_time)
+            ~doc:"Next block production time"
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} ->
+            ~resolve:
+              (fun {ctx= coda; _}
+                   {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
               let consensus_constants =
                 (Mina_lib.config coda).precomputed_values.consensus_constants
               in
-              function
-              | `Check_again _time ->
+              match timing with
+              | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
                   []
-              | `Produce time ->
-                  [of_time time ~consensus_constants]
-              | `Produce_now ->
-                  [ of_time ~consensus_constants
-                    @@ Block_time.now (Mina_lib.config coda).time_controller ]
-              ) ] )
+              | Produce info ->
+                  [of_time info.time ~consensus_constants]
+              | Produce_now info ->
+                  [of_time ~consensus_constants info.time] )
+        ; field "globalSlotSinceGenesis"
+            ~typ:(non_null @@ list @@ non_null uint32)
+            ~doc:"Next block production global-slot-since-genesis "
+            ~args:Arg.[]
+            ~resolve:
+              (fun _ {Daemon_rpcs.Types.Status.Next_producer_timing.timing; _} ->
+              match timing with
+              | Daemon_rpcs.Types.Status.Next_producer_timing.Check_again _ ->
+                  []
+              | Produce info ->
+                  [info.for_slot.global_slot_since_genesis]
+              | Produce_now info ->
+                  [info.for_slot.global_slot_since_genesis] )
+        ; field "generatedFromConsensusAt"
+            ~typ:(non_null consensus_time_with_global_slot_since_genesis)
+            ~doc:
+              "Consensus time of the block that was used to determine the \
+               next block production time"
+            ~args:Arg.[]
+            ~resolve:
+              (fun {ctx= coda; _}
+                   { Daemon_rpcs.Types.Status.Next_producer_timing
+                     .generated_from_consensus_at=
+                       {slot; global_slot_since_genesis}
+                   ; _ } ->
+              let consensus_constants =
+                (Mina_lib.config coda).precomputed_values.consensus_constants
+              in
+              ( Consensus.Data.Consensus_time.of_global_slot
+                  ~constants:consensus_constants slot
+              , global_slot_since_genesis ) ) ] )
 
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
@@ -260,17 +361,17 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~chain_id:nn_string
+               ~catchup_status:nn_catchup_status ~chain_id:nn_string
                ~next_block_production:(id ~typ:block_producer_timing)
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
                ~commit_id:nn_string ~conf_dir:nn_string
-               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~peers:(id ~typ:(non_null (list (non_null peer))))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
                ~block_production_keys:
-                 (id ~typ:Schema.(non_null @@ list (non_null string)))
+                 (id ~typ:(non_null @@ list (non_null Schema.string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
                ~global_slot_since_genesis_best_tip:int
@@ -279,7 +380,8 @@ module Types = struct
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
-               ~highest_block_length_received:nn_int )
+               ~highest_block_length_received:nn_int
+               ~highest_unvalidated_block_length_received:nn_int )
   end
 
   let fee_transfer =
@@ -294,6 +396,57 @@ module Types = struct
             ~doc:"Amount that the recipient is paid in this fee transfer"
             ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
         ] )
+
+  let account_timing : (Mina_lib.t, Account_timing.t option) typ =
+    obj "AccountTiming" ~fields:(fun _ ->
+        [ field "initial_mininum_balance" ~typ:uint64
+            ~doc:"The initial minimum balance for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some (Balance.to_uint64 timing_info.initial_minimum_balance)
+              )
+        ; field "cliff_time" ~typ:uint32
+            ~doc:"The cliff time for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some timing_info.cliff_time )
+        ; field "cliff_amount" ~typ:uint64
+            ~doc:"The cliff amount for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some (Currency.Amount.to_uint64 timing_info.cliff_amount) )
+        ; field "vesting_period" ~typ:uint32
+            ~doc:"The vesting period for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some timing_info.vesting_period )
+        ; field "vesting_increment" ~typ:uint64
+            ~doc:"The vesting increment for a time-locked account"
+            ~args:Arg.[]
+            ~resolve:(fun _ timing ->
+              match timing with
+              | Account_timing.Untimed ->
+                  None
+              | Timed timing_info ->
+                  Some
+                    (Currency.Amount.to_uint64 timing_info.vesting_increment)
+              ) ] )
 
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->
@@ -379,7 +532,7 @@ module Types = struct
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
             ~args:Arg.[]
-            ~resolve:(fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+            ~resolve:(fun _ {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
@@ -391,7 +544,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:
               (fun {ctx= coda; _}
-                   {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+                   {Mina_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string_system_time
                 (Mina_lib.time_controller coda)
                 timestamp )
@@ -399,13 +552,13 @@ module Types = struct
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
               Frozen_ledger_hash.to_string snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
             ~resolve:
-              (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
+              (fun _ {Mina_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
               Mina_base.Ledger_hash.to_string
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
@@ -456,13 +609,37 @@ module Types = struct
       type t =
         { total: Balance.t
         ; unknown: Balance.t
+        ; timing: Mina_base.Account_timing.t
         ; breadcrumb: Transition_frontier.Breadcrumb.t option }
+
+      let min_balance (b : t) =
+        match (b.timing, b.breadcrumb) with
+        | Untimed, _ ->
+            Some Balance.zero
+        | Timed _, None ->
+            None
+        | Timed timing_info, Some crumb ->
+            let consensus_state =
+              Transition_frontier.Breadcrumb.consensus_state crumb
+            in
+            let global_slot =
+              Consensus.Data.Consensus_state.global_slot_since_genesis
+                consensus_state
+            in
+            Some
+              (Account.min_balance_at_slot ~global_slot
+                 ~cliff_time:timing_info.cliff_time
+                 ~cliff_amount:timing_info.cliff_amount
+                 ~vesting_period:timing_info.vesting_period
+                 ~vesting_increment:timing_info.vesting_increment
+                 ~initial_minimum_balance:timing_info.initial_minimum_balance)
 
       let obj =
         obj "AnnotatedBalance"
           ~doc:
             "A total balance annotated with the amount that is currently \
-             unknown with the invariant: unknown <= total" ~fields:(fun _ ->
+             unknown with the invariant unknown <= total, as well as the \
+             currently liquid and locked balances." ~fields:(fun _ ->
             [ field "total" ~typ:(non_null uint64)
                 ~doc:"The amount of coda owned by the account"
                 ~args:Arg.[]
@@ -474,7 +651,25 @@ module Types = struct
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
-              (* TODO: Mutually recurse with "block" instead -- #5396 *)
+            ; field "liquid" ~typ:uint64
+                ~doc:
+                  "The amount of coda owned by the account which is currently \
+                   available. Can be null if bootstrapping."
+                ~deprecated:(Deprecated None)
+                ~args:Arg.[]
+                ~resolve:(fun _ (b : t) ->
+                  Option.map (min_balance b) ~f:(fun min_balance ->
+                      let total_balance : uint64 = Balance.to_uint64 b.total in
+                      Unsigned.UInt64.sub total_balance
+                        (Balance.to_uint64 min_balance) ) )
+            ; field "locked" ~typ:uint64
+                ~doc:
+                  "The amount of coda owned by the account which is currently \
+                   locked. Can be null if bootstrapping."
+                ~deprecated:(Deprecated None)
+                ~args:Arg.[]
+                ~resolve:(fun _ (b : t) ->
+                  Option.map (min_balance b) ~f:Balance.to_uint64 )
             ; field "blockHeight" ~typ:(non_null uint32)
                 ~doc:"Block height at which balance was measured"
                 ~args:Arg.[]
@@ -484,6 +679,7 @@ module Types = struct
                       Unsigned.UInt32.zero
                   | Some crumb ->
                       Transition_frontier.Breadcrumb.blockchain_length crumb )
+              (* TODO: Mutually recurse with "block" instead -- #5396 *)
             ; field "stateHash" ~typ:string
                 ~doc:
                   "Hash of block at which balance was measured. Can be null \
@@ -551,7 +747,10 @@ module Types = struct
         ; token_permissions= Some token_permissions
         ; nonce= Some nonce
         ; balance=
-            {AnnotatedBalance.total= balance; unknown= balance; breadcrumb}
+            { AnnotatedBalance.total= balance
+            ; unknown= balance
+            ; timing
+            ; breadcrumb }
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate
         ; voting_for= Some voting_for
@@ -584,6 +783,7 @@ module Types = struct
               ; balance=
                   { AnnotatedBalance.total= Balance.zero
                   ; unknown= Balance.zero
+                  ; timing= Timing.Untimed
                   ; breadcrumb= None }
               ; receipt_chain_hash= None
               ; voting_for= None
@@ -649,6 +849,10 @@ module Types = struct
                  ~doc:"The token associated with this account"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} -> account.Account.Poly.token_id)
+             ; field "timing" ~typ:(non_null account_timing)
+                 ~doc:"The timing associated with this account"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ {account; _} -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
                  ~doc:"The amount of coda owned by the account"
@@ -1172,8 +1376,14 @@ module Types = struct
                 coinbase_receiver ) ] )
 
   let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
-    (* TODO *)
-    obj "protocolStateProof" ~fields:(fun _ -> [])
+    obj "protocolStateProof" ~fields:(fun _ ->
+        [ field "base64" ~typ:string ~doc:"Base-64 encoded proof"
+            ~args:Arg.[]
+            ~resolve:(fun _ proof ->
+              (* Use the precomputed block proof encoding, for consistency. *)
+              Some
+                (Mina_transition.External_transition.Precomputed_block.Proof
+                 .to_bin_string proof) ) ] )
 
   let block :
       ( Mina_lib.t
@@ -1436,20 +1646,20 @@ module Types = struct
               ~typ:(non_null (list (non_null peer)))
               ~doc:"Peers we will always allow connections from"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.trusted_peers)
+              ~resolve:(fun _ config -> config.Mina_net2.trusted_peers)
           ; field "bannedPeers"
               ~typ:(non_null (list (non_null peer)))
               ~doc:
                 "Peers we will never allow connections from (unless they are \
                  also trusted!)"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.banned_peers)
+              ~resolve:(fun _ config -> config.Mina_net2.banned_peers)
           ; field "isolate" ~typ:(non_null bool)
               ~doc:
                 "If true, no connections will be allowed unless they are from \
                  a trusted peer"
               ~args:Arg.[]
-              ~resolve:(fun _ config -> config.Coda_net2.isolate) ] )
+              ~resolve:(fun _ config -> config.Mina_net2.isolate) ] )
   end
 
   module Arguments = struct
@@ -1497,6 +1707,19 @@ module Types = struct
             | _ ->
                 Error "Invalid format for token."
           with _ -> Error "Invalid format for token." )
+
+    let precomputed_block =
+      scalar "PrecomputedBlock"
+        ~doc:"Block encoded in precomputed block format" ~coerce:(fun json ->
+          let json = to_yojson json in
+          Mina_transition.External_transition.Precomputed_block.of_yojson json
+      )
+
+    let extensional_block =
+      scalar "ExtensionalBlock"
+        ~doc:"Block encoded in extensional block format" ~coerce:(fun json ->
+          let json = to_yojson json in
+          Archive_lib.Extensional.Block.of_yojson json )
 
     module type Numeric_type = sig
       type t
@@ -1796,7 +2019,7 @@ module Types = struct
           let open Result.Let_syntax in
           let%bind trusted_peers = Result.all trusted_peers in
           let%map banned_peers = Result.all banned_peers in
-          Coda_net2.{isolate; trusted_peers; banned_peers} )
+          Mina_net2.{isolate; trusted_peers; banned_peers} )
         ~fields:
           Arg.
             [ arg "trustedPeers"
@@ -1841,7 +2064,7 @@ module Subscriptions = struct
               ~typ:Types.Input.public_key_arg ]
       ~resolve:(fun {ctx= coda; _} public_key ->
         Deferred.Result.return
-        @@ Coda_commands.Subscriptions.new_block coda public_key )
+        @@ Mina_commands.Subscriptions.new_block coda public_key )
 
   let chain_reorganization =
     subscription_field "chainReorganization"
@@ -1852,7 +2075,7 @@ module Subscriptions = struct
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
         Deferred.Result.return
-        @@ Coda_commands.Subscriptions.reorganization coda )
+        @@ Mina_commands.Subscriptions.reorganization coda )
 
   let commands = [new_sync_update; new_block; chain_reorganization]
 end
@@ -1999,11 +2222,11 @@ module Mutations = struct
           Deferred.return
           @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
         in
-        Some (Coda_commands.reset_trust_status coda ip_address) )
+        Some (Mina_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
     match
-      Coda_commands.setup_and_submit_user_command coda user_command_input
+      Mina_commands.setup_and_submit_user_command coda user_command_input
     with
     | `Active f -> (
         match%map f with
@@ -2027,7 +2250,7 @@ module Mutations = struct
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
-      Option.map ~f:Coda_numbers.Global_slot.of_uint32 valid_until
+      Option.map ~f:Mina_numbers.Global_slot.of_uint32 valid_until
     in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
@@ -2051,15 +2274,24 @@ module Mutations = struct
     User_command_input.create ~signer ~fee ~fee_token ~fee_payer_pk
       ?nonce:nonce_opt ~valid_until ~memo ~body ~sign_choice ()
 
-  let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
+  let make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
       ~fee_token ~fee_payer_pk ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind signature = signature |> Deferred.return in
-    let%bind user_command_input =
+    let%map user_command_input =
       create_user_command_input ~nonce_opt ~signer ~memo ~fee ~fee_token
         ~fee_payer_pk ~valid_until ~body
         ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
+    in
+    user_command_input
+
+  let send_signed_user_command ~signature ~coda ~nonce_opt ~signer ~memo ~fee
+      ~fee_token ~fee_payer_pk ~valid_until ~body =
+    let open Deferred.Result.Let_syntax in
+    let%bind user_command_input =
+      make_signed_user_command ~signature ~nonce_opt ~signer ~memo ~fee
+        ~fee_token ~fee_payer_pk ~valid_until ~body
     in
     let%map cmd = send_user_command coda user_command_input in
     { With_hash.data= cmd
@@ -2332,10 +2564,11 @@ module Mutations = struct
     io_field "addPeers"
       ~args:
         Arg.
-          [arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)]
+          [ arg "peers" ~typ:(non_null @@ list @@ non_null @@ Types.Input.peer)
+          ; arg "seed" ~typ:bool ]
       ~doc:"Connect to the given peers"
       ~typ:(non_null @@ list @@ non_null Types.DaemonStatus.peer)
-      ~resolve:(fun {ctx= coda; _} () peers ->
+      ~resolve:(fun {ctx= coda; _} () peers seed ->
         let open Deferred.Result.Let_syntax in
         let%bind peers =
           Result.combine_errors peers
@@ -2344,10 +2577,11 @@ module Mutations = struct
           |> Deferred.return
         in
         let net = Mina_lib.net coda in
+        let seed = Option.value ~default:true seed in
         let%bind.Async maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Mina_networking.add_peer net peer with
+              match%map.Async Mina_networking.add_peer net peer ~seed with
               | Ok () ->
                   None
               | Error err ->
@@ -2361,6 +2595,64 @@ module Mutations = struct
               Deferred.return err
         in
         List.map ~f:Network_peer.Peer.to_display peers )
+
+  let archive_precomputed_block =
+    io_field "archivePrecomputedBlock"
+      ~args:
+        Arg.
+          [ arg "block" ~doc:"Block encoded in precomputed block format"
+              ~typ:(non_null Types.Input.precomputed_block) ]
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true) ] )))
+      ~resolve:(fun {ctx= coda; _} () block ->
+        let open Deferred.Result.Let_syntax in
+        let%bind archive_location =
+          match (Mina_lib.config coda).archive_process_location with
+          | Some archive_location ->
+              return archive_location
+          | None ->
+              Deferred.Result.fail
+                "Could not find an archive process to connect to"
+        in
+        let%map () =
+          Mina_lib.Archive_client.dispatch_precomputed_block archive_location
+            block
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        () )
+
+  let archive_extensional_block =
+    io_field "archiveExtensionalBlock"
+      ~args:
+        Arg.
+          [ arg "block" ~doc:"Block encoded in extensional block format"
+              ~typ:(non_null Types.Input.extensional_block) ]
+      ~typ:
+        (non_null
+           (obj "Applied" ~fields:(fun _ ->
+                [ field "applied" ~typ:(non_null bool)
+                    ~args:Arg.[]
+                    ~resolve:(fun _ _ -> true) ] )))
+      ~resolve:(fun {ctx= coda; _} () block ->
+        let open Deferred.Result.Let_syntax in
+        let%bind archive_location =
+          match (Mina_lib.config coda).archive_process_location with
+          | Some archive_location ->
+              return archive_location
+          | None ->
+              Deferred.Result.fail
+                "Could not find an archive process to connect to"
+        in
+        let%map () =
+          Mina_lib.Archive_client.dispatch_extensional_block archive_location
+            block
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        () )
 
   let commands =
     [ add_wallet
@@ -2384,7 +2676,9 @@ module Mutations = struct
     ; set_snark_worker
     ; set_snark_work_fee
     ; set_connection_gating_config
-    ; add_peer ]
+    ; add_peer
+    ; archive_precomputed_block
+    ; archive_extensional_block ]
 end
 
 module Queries = struct
@@ -2460,7 +2754,7 @@ module Queries = struct
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
+        Mina_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
     field "trustStatus"
@@ -2470,7 +2764,7 @@ module Queries = struct
       ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
         match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
         | Ok ip_addr ->
-            Some (Coda_commands.get_trust_status coda ip_addr)
+            Some (Mina_commands.get_trust_status coda ip_addr)
         | Error _ ->
             None )
 
@@ -2480,13 +2774,13 @@ module Queries = struct
       ~args:Arg.[]
       ~doc:"IP address and trust status for all peers"
       ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_trust_status_all coda )
+        Mina_commands.get_trust_status_all coda )
 
   let version =
     field "version" ~typ:string
       ~args:Arg.[]
       ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some Coda_version.commit_id)
+      ~resolve:(fun _ _ -> Some Mina_version.commit_id)
 
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Mina_lib.wallets coda in
@@ -2531,7 +2825,7 @@ module Queries = struct
       ~resolve:account_resolver
 
   let account =
-    field "account" ~doc:"Find any account via a public key"
+    field "account" ~doc:"Find any account via a public key and token"
       ~typ:Types.AccountObj.account
       ~args:
         Arg.
@@ -2626,7 +2920,7 @@ module Queries = struct
   let genesis_block =
     field "genesisBlock" ~typ:(non_null Types.block) ~args:[]
       ~doc:"Get the genesis block" ~resolve:(fun {ctx= coda; _} () ->
-        let open Coda_state in
+        let open Mina_state in
         let { Precomputed_values.genesis_ledger
             ; constraint_constants
             ; consensus_constants
@@ -2661,11 +2955,29 @@ module Queries = struct
             ; proof= genesis_proof }
         ; hash } )
 
+  (* used by best_chain, block below *)
+  let block_of_breadcrumb coda breadcrumb =
+    let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+    let transition =
+      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+    in
+    let transactions =
+      Mina_transition.External_transition.Validated.transactions
+        ~constraint_constants:
+          (Mina_lib.config coda).precomputed_values.constraint_constants
+        transition
+    in
+    With_hash.Stable.Latest.
+      { data=
+          Filtered_external_transition.of_transition transition `All
+            transactions
+      ; hash }
+
   let best_chain =
-    field "bestChain"
+    io_field "bestChain"
       ~doc:
         "Retrieve a list of blocks from transition frontier's root to the \
-         current best tip. Returns null if the system is bootstrapping."
+         current best tip. Returns an error if the system is bootstrapping."
       ~typ:(list @@ non_null Types.block)
       ~args:
         Arg.
@@ -2676,24 +2988,93 @@ module Queries = struct
                  blocks closest to the best tip will be returned"
               ~typ:int ]
       ~resolve:(fun {ctx= coda; _} () max_length ->
-        let open Option.Let_syntax in
-        let%map best_chain = Mina_lib.best_chain ?max_length coda in
-        List.map best_chain ~f:(fun breadcrumb ->
-            let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
-            let transition =
-              Transition_frontier.Breadcrumb.validated_transition breadcrumb
+        match Mina_lib.best_chain ?max_length coda with
+        | Some best_chain ->
+            let%map blocks =
+              Deferred.List.map best_chain ~f:(fun bc ->
+                  Deferred.return @@ block_of_breadcrumb coda bc )
             in
-            let transactions =
-              Coda_transition.External_transition.Validated.transactions
-                ~constraint_constants:
-                  (Mina_lib.config coda).precomputed_values
-                    .constraint_constants transition
-            in
-            With_hash.Stable.Latest.
-              { data=
-                  Filtered_external_transition.of_transition transition `All
-                    transactions
-              ; hash } ) )
+            Ok (Some blocks)
+        | None ->
+            return
+            @@ Error "Could not obtain best chain from transition frontier" )
+
+  let block =
+    result_field2 "block"
+      ~doc:
+        "Retrieve a block with the given state hash or height, if contained \
+         in the transition frontier."
+      ~typ:(non_null Types.block)
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"The state hash of the desired block"
+              ~typ:string
+          ; arg "height" ~doc:"The height of the desired block" ~typ:int ]
+      ~resolve:
+        (fun {ctx= coda; _} () (state_hash_base58_opt : string option)
+             (height_opt : int option) ->
+        let open Result.Let_syntax in
+        let get_transition_frontier () =
+          let transition_frontier_pipe = Mina_lib.transition_frontier coda in
+          Pipe_lib.Broadcast_pipe.Reader.peek transition_frontier_pipe
+          |> Result.of_option ~error:"Could not obtain transition frontier"
+        in
+        let block_from_state_hash state_hash_base58 =
+          let%bind state_hash =
+            State_hash.of_base58_check state_hash_base58
+            |> Result.map_error ~f:Error.to_string_hum
+          in
+          let%bind transition_frontier = get_transition_frontier () in
+          let%map breadcrumb =
+            Transition_frontier.find transition_frontier state_hash
+            |> Result.of_option
+                 ~error:
+                   (sprintf
+                      "Block with state hash %s not found in transition \
+                       frontier"
+                      state_hash_base58)
+          in
+          block_of_breadcrumb coda breadcrumb
+        in
+        let block_from_height height =
+          let height_uint32 =
+            (* GraphQL int is signed 32-bit
+                 empirically, conversion does not raise even if
+                 - the number is negative
+                 - the number is not representable using 32 bits
+              *)
+            Unsigned.UInt32.of_int height
+          in
+          let%bind transition_frontier = get_transition_frontier () in
+          let breadcrumbs =
+            Transition_frontier.all_breadcrumbs transition_frontier
+          in
+          let%map desired_breadcrumb =
+            List.find breadcrumbs ~f:(fun bc ->
+                let validated_transition =
+                  Transition_frontier.Breadcrumb.validated_transition bc
+                in
+                let block_height =
+                  Mina_transition.External_transition.Validated
+                  .blockchain_length validated_transition
+                in
+                Unsigned.UInt32.equal block_height height_uint32 )
+            |> Result.of_option
+                 ~error:
+                   (sprintf
+                      "Could not find block in transition frontier with \
+                       height %d"
+                      height)
+          in
+          block_of_breadcrumb coda desired_breadcrumb
+        in
+        match (state_hash_base58_opt, height_opt) with
+        | Some state_hash_base58, None ->
+            block_from_state_hash state_hash_base58
+        | None, Some height ->
+            block_from_height height
+        | None, None | Some _, Some _ ->
+            Error "Must provide exactly one of state hash, height" )
 
   let initial_peers =
     field "initialPeers"
@@ -2701,7 +3082,7 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun {ctx= coda; _} () ->
-        List.map (Mina_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
+        List.map (Mina_lib.initial_peers coda) ~f:Mina_net2.Multiaddr.to_string
         )
 
   let get_peers =
@@ -2783,6 +3164,46 @@ module Queries = struct
         let%map config = Mina_networking.connection_gating_config net in
         Ok config )
 
+  let validate_payment =
+    io_field "validatePayment"
+      ~doc:"Validate the format and signature of a payment"
+      ~typ:(non_null bool)
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.send_payment)
+          ; Types.Input.Fields.signature ]
+      ~resolve:
+        (fun {ctx= mina; _} ()
+             (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
+             signature ->
+        let open Deferred.Result.Let_syntax in
+        let body =
+          Signed_command_payload.Body.Payment
+            { source_pk= from
+            ; receiver_pk= to_
+            ; token_id= Option.value ~default:Token_id.default token_id
+            ; amount= Amount.of_uint64 amount }
+        in
+        let fee_token = Token_id.default in
+        let%bind signature =
+          match signature with
+          | Some signature ->
+              return signature
+          | None ->
+              Deferred.Result.fail "Signature field is missing"
+        in
+        let%bind user_command_input =
+          Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
+            ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
+        in
+        let%map user_command, _ =
+          User_command_input.to_user_command
+            ~get_current_nonce:(Mina_lib.get_current_nonce mina)
+            user_command_input
+          |> Deferred.Result.map_error ~f:Error.to_string_hum
+        in
+        Signed_command.check_signature user_command )
+
   let commands =
     [ sync_state
     ; daemon_status
@@ -2796,6 +3217,7 @@ module Queries = struct
     ; token_owner
     ; current_snark_worker
     ; best_chain
+    ; block
     ; genesis_block
     ; initial_peers
     ; get_peers
@@ -2807,10 +3229,16 @@ module Queries = struct
     ; pending_snark_work
     ; genesis_constants
     ; time_offset
-    ; next_available_token ]
+    ; next_available_token
+    ; validate_payment ]
 end
 
 let schema =
   Graphql_async.Schema.(
     schema Queries.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
+
+let schema_limited =
+  (*including version because that's the default query*)
+  Graphql_async.Schema.(
+    schema [Queries.block; Queries.version] ~mutations:[] ~subscriptions:[])

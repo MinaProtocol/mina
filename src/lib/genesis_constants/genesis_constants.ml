@@ -39,8 +39,8 @@ module Fork_constants = struct
     module V1 = struct
       type t =
         { previous_state_hash: Pickles.Backend.Tick.Field.Stable.V1.t
-        ; previous_length: Coda_numbers.Length.Stable.V1.t
-        ; previous_global_slot: Coda_numbers.Global_slot.Stable.V1.t }
+        ; previous_length: Mina_numbers.Length.Stable.V1.t
+        ; previous_global_slot: Mina_numbers.Global_slot.Stable.V1.t }
       [@@deriving sexp, eq, yojson]
 
       let to_latest = Fn.id
@@ -201,12 +201,12 @@ module Constraint_constants = struct
         let fork =
           Some
             { Fork_constants.previous_length=
-                Coda_numbers.Length.of_int fork_previous_length
+                Mina_numbers.Length.of_int fork_previous_length
             ; previous_state_hash=
                 Data_hash_lib.State_hash.of_base58_check_exn
                   fork_previous_state_hash
             ; previous_global_slot=
-                Coda_numbers.Global_slot.of_int fork_previous_global_slot }
+                Mina_numbers.Global_slot.of_int fork_previous_global_slot }
 
         [%%endif]
 

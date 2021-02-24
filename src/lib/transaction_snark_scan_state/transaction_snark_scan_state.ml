@@ -626,7 +626,7 @@ let staged_transactions t =
   @@ Parallel_scan.pending_data t
 
 let staged_transactions_with_protocol_states t
-    ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
+    ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) =
   let open Or_error.Let_syntax in
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
       let txn =
@@ -712,7 +712,7 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
                  stmt )) )
 
 let all_work_pairs t
-    ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) :
+    ~(get_state : State_hash.t -> Mina_state.Protocol_state.value Or_error.t) :
     ( Transaction.t
     , Transaction_witness.t
     , Ledger_proof.t )
@@ -736,7 +736,7 @@ let all_work_pairs t
         in
         let%bind protocol_state_body =
           let%map state = get_state (fst state_hash) in
-          Coda_state.Protocol_state.body state
+          Mina_state.Protocol_state.body state
         in
         let%map init_stack =
           match init_stack with
@@ -838,7 +838,7 @@ let check_required_protocol_states t ~protocol_states =
   let received_state_map =
     List.fold protocol_states ~init:Mina_base.State_hash.Map.empty
       ~f:(fun m ps ->
-        State_hash.Map.set m ~key:(Coda_state.Protocol_state.hash ps) ~data:ps
+        State_hash.Map.set m ~key:(Mina_state.Protocol_state.hash ps) ~data:ps
     )
   in
   let protocol_states_assoc =

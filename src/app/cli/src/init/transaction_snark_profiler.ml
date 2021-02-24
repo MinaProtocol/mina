@@ -119,15 +119,15 @@ let rec pair_up = function
 let precomputed_values = Precomputed_values.compiled
 
 let state_body =
-  Coda_state.(
+  Mina_state.(
     Lazy.map precomputed_values ~f:(fun values ->
         values.protocol_state_with_hash.data |> Protocol_state.body ))
 
 let curr_state_view =
-  Lazy.map state_body ~f:Coda_state.Protocol_state.Body.view
+  Lazy.map state_body ~f:Mina_state.Protocol_state.Body.view
 
 let state_body_hash =
-  Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
+  Lazy.map ~f:Mina_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
@@ -337,25 +337,25 @@ let command =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler"
     (let%map_open n =
-       flag "k"
+       flag "-k"
          ~doc:
            "count count = log_2(number of transactions to snark) or none for \
             the mocked ones"
          (optional int)
      and repeats =
-       flag "repeat" ~doc:"count number of times to repeat the profile"
-         (optional int)
+       flag "--repeat" ~aliases:["repeat"]
+         ~doc:"count number of times to repeat the profile" (optional int)
      and preeval =
-       flag "preeval"
+       flag "--preeval" ~aliases:["preeval"]
          ~doc:
            "true/false whether to pre-evaluate the checked computation to \
             cache interpreter and computation state"
          (optional bool)
      and check_only =
-       flag "check-only"
+       flag "--check-only" ~aliases:["check-only"]
          ~doc:"Just check base snarks, don't keys or time anything" no_arg
      and witness_only =
-       flag "witness-only"
+       flag "--witness-only" ~aliases:["witness-only"]
          ~doc:"Just generate the witnesses for the base snarks" no_arg
      in
      let num_transactions =

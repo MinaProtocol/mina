@@ -120,7 +120,7 @@ module Worker = struct
                 [ ( "hash"
                   , `String
                       (State_hash.to_base58_check
-                         (Coda_transition.External_transition.Validated
+                         (Mina_transition.External_transition.Validated
                           .state_hash transition)) )
                 ; ("parent", `String (State_hash.to_base58_check h)) ] ;
             Ok ()

@@ -1,5 +1,5 @@
 open Core
-open Coda_transition
+open Mina_transition
 open Signature_lib
 open Async
 

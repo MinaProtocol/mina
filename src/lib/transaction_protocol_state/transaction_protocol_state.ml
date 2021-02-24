@@ -4,16 +4,16 @@ module Block_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Coda_state.Protocol_state.Body.Value.Stable.V1.t
+      type t = Mina_state.Protocol_state.Body.Value.Stable.V1.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
     end
   end]
 
-  type var = Coda_state.Protocol_state.Body.var
+  type var = Mina_state.Protocol_state.Body.var
 
-  let typ = Coda_state.Protocol_state.Body.typ
+  let typ = Mina_state.Protocol_state.Body.typ
 end
 
 module Poly = struct

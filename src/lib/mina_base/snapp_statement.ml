@@ -7,11 +7,11 @@ open Core_kernel
 consensus_mechanism]
 
 open Snark_params.Tick
-module Coda_numbers = Coda_numbers
+module Mina_numbers = Mina_numbers
 
 [%%else]
 
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
@@ -116,7 +116,7 @@ module Complement = struct
       [@@deriving hlist, sexp, eq, yojson, hash, compare]
     end
 
-    open Coda_numbers
+    open Mina_numbers
 
     module Checked = struct
       type t =

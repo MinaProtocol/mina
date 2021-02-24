@@ -1,5 +1,5 @@
 open Core_kernel
-open Coda_numbers
+open Mina_numbers
 
 module Poly = struct
   [%%versioned

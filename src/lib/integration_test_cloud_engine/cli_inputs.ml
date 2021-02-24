@@ -10,8 +10,7 @@ let term =
     in
     let env = Arg.env_var "CODA_AUTOMATION_LOCATION" ~doc in
     Arg.(
-      value
-      & opt string "./coda-automation"
+      value & opt string "./automation"
       & info
           ["coda-automation-location"]
           ~env ~docv:"CODA_AUTOMATION_LOCATION" ~doc)

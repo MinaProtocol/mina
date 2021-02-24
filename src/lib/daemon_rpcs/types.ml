@@ -159,13 +159,33 @@ module Status = struct
       digest_entries ~title:"Performance Histograms" entries
   end
 
+  module Next_producer_timing = struct
+    type slot =
+      { slot: Mina_numbers.Global_slot.Stable.Latest.t
+      ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.Latest.t }
+    [@@deriving to_yojson, fields, bin_io_unversioned]
+
+    (* time is the start-time of for_slot.slot*)
+    type producing_time = {time: Block_time.Stable.Latest.t; for_slot: slot}
+    [@@deriving to_yojson, bin_io_unversioned, fields]
+
+    type timing =
+      | Check_again of Block_time.Stable.Latest.t
+      | Produce of producing_time
+      | Produce_now of producing_time
+    [@@deriving to_yojson, bin_io_unversioned]
+
+    type t = {generated_from_consensus_at: slot; timing: timing}
+    [@@deriving to_yojson, bin_io_unversioned]
+  end
+
   module Make_entries (FieldT : sig
     type 'a t
 
     val get : 'a t -> 'a
   end) =
   struct
-    let map_entry ~f (name : string) field = Some (name, f @@ FieldT.get field)
+    let map_entry (name : string) ~f field = Some (name, f @@ FieldT.get field)
 
     let string_entry (name : string) (field : string FieldT.t) =
       map_entry ~f:Fn.id name field
@@ -182,11 +202,11 @@ module Status = struct
 
     let int_option_entry = option_entry ~f:Int.to_string
 
-    let list_entry name ~to_string =
-      map_entry name ~f:(fun keys ->
-          let len = List.length keys in
+    let list_string_entry name ~to_string =
+      map_entry name ~f:(fun list ->
+          let len = List.length list in
           let list_str =
-            if len > 0 then " " ^ List.to_string ~f:to_string keys else ""
+            if len > 0 then " " ^ List.to_string ~f:to_string list else ""
           in
           Printf.sprintf "%d%s" len list_str )
 
@@ -194,7 +214,10 @@ module Status = struct
 
     let blockchain_length = int_option_entry "Block height"
 
-    let highest_block_length_received = int_entry "Max observed block length"
+    let highest_block_length_received = int_entry "Max observed block height"
+
+    let highest_unvalidated_block_length_received =
+      int_entry "Max observed unvalidated block height"
 
     let uptime_secs =
       map_entry "Local uptime" ~f:(fun secs ->
@@ -212,7 +235,8 @@ module Status = struct
 
     let conf_dir = string_entry "Configuration directory"
 
-    let peers = list_entry "Peers" ~to_string:Fn.id
+    let peers field =
+      Some ("Peers", string_of_int @@ List.length (FieldT.get field))
 
     let user_commands_sent = int_entry "User_commands sent"
 
@@ -224,12 +248,13 @@ module Status = struct
     let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
     let block_production_keys =
-      list_entry "Block producers running" ~to_string:Fn.id
+      list_string_entry "Block producers running" ~to_string:Fn.id
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
     let next_block_production =
-      option_entry "Next block will be produced in" ~f:(fun producer_timing ->
+      option_entry "Next block will be produced in"
+        ~f:(fun (producer_timing : Next_producer_timing.t) ->
           let str time =
             let open Block_time in
             let current_time =
@@ -243,13 +268,25 @@ module Status = struct
               sprintf "in %s" (Span.to_string_hum diff)
             else "Producing a block now..."
           in
-          match producer_timing with
-          | `Check_again time ->
-              sprintf "None this epoch… checking at %s" (str time)
-          | `Produce producing_time ->
-              str producing_time
-          | `Produce_now ->
-              "Now" )
+          let slot_str (slot : Next_producer_timing.slot) =
+            sprintf "slot: %s slot-since-genesis: %s"
+              (Mina_numbers.Global_slot.to_string slot.slot)
+              (Mina_numbers.Global_slot.to_string
+                 slot.global_slot_since_genesis)
+          in
+          let generated_from =
+            sprintf "Generated from consensus at %s"
+              (slot_str producer_timing.generated_from_consensus_at)
+          in
+          match producer_timing.timing with
+          | Check_again time ->
+              sprintf "None this epoch… checking at %s (%s)" (str time)
+                generated_from
+          | Produce {time; for_slot} ->
+              sprintf "%s for %s (%s)" (str time) (slot_str for_slot)
+                generated_from
+          | Produce_now {for_slot; _} ->
+              sprintf "Now (for %s %s)" (slot_str for_slot) generated_from )
 
     let consensus_time_best_tip =
       option_entry "Best tip consensus time"
@@ -307,33 +344,62 @@ module Status = struct
         |> digest_entries ~title:""
       in
       map_entry "Addresses and ports" ~f:render
+
+    let catchup_status =
+      let render xs =
+        List.map xs ~f:(fun (s, n) ->
+            let s =
+              match
+                (s : Transition_frontier.Full_catchup_tree.Node.State.Enum.t)
+              with
+              | Failed ->
+                  "Failed"
+              | To_download ->
+                  "To download"
+              | To_initial_validate ->
+                  "To initial validate"
+              | To_build_breadcrumb ->
+                  "To build breadcrumb"
+              | Root ->
+                  "Root"
+              | Finished ->
+                  "Finished"
+              | To_verify ->
+                  "To verify"
+              | Wait_for_parent ->
+                  "Waiting for parent to finish"
+            in
+            ("\t" ^ s, Int.to_string n) )
+        |> digest_entries ~title:""
+      in
+      option_entry "Catchup status" ~f:render
   end
 
   type t =
     { num_accounts: int option
     ; blockchain_length: int option
     ; highest_block_length_received: int
+    ; highest_unvalidated_block_length_received: int
     ; uptime_secs: int
     ; ledger_merkle_root: string option
     ; state_hash: string option
     ; chain_id: string
     ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
-    ; peers: string list
+    ; peers: Network_peer.Peer.Display.Stable.Latest.t list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int
     ; sync_status: Sync_status.Stable.Latest.t
+    ; catchup_status:
+        (Transition_frontier.Full_catchup_tree.Node.State.Enum.t * int) list
+        option
     ; block_production_keys: string list
     ; histograms: Histograms.t option
     ; consensus_time_best_tip:
         Consensus.Data.Consensus_time.Stable.Latest.t option
     ; global_slot_since_genesis_best_tip: int option
-    ; next_block_production:
-        [ `Check_again of Block_time.Stable.Latest.t
-        | `Produce of Block_time.Stable.Latest.t
-        | `Produce_now ]
-        option
+    ; next_block_production: Next_producer_timing.t option
     ; consensus_time_now: Consensus.Data.Consensus_time.Stable.Latest.t
     ; consensus_mechanism: string
     ; consensus_configuration: Consensus.Configuration.Stable.Latest.t
@@ -348,12 +414,12 @@ module Status = struct
     end) in
     let open M in
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
-      ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
-      ~state_hash ~chain_id ~commit_id ~conf_dir ~peers ~user_commands_sent
-      ~snark_worker ~block_production_keys ~histograms ~consensus_time_best_tip
-      ~global_slot_since_genesis_best_tip ~consensus_time_now
-      ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports
+      ~highest_unvalidated_block_length_received ~highest_block_length_received
+      ~uptime_secs ~ledger_merkle_root ~state_hash ~chain_id ~commit_id
+      ~conf_dir ~peers ~user_commands_sent ~snark_worker ~block_production_keys
+      ~histograms ~consensus_time_best_tip ~global_slot_since_genesis_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_block_production ~snark_work_fee ~addrs_and_ports ~catchup_status
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

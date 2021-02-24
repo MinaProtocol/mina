@@ -56,7 +56,7 @@ module Answer = struct
         ( Ledger_hash.Stable.V1.t
         , Account.Stable.V1.t )
         Syncable_ledger.Answer.Stable.V1.t
-      [@@deriving sexp]
+      [@@deriving sexp, to_yojson]
 
       let to_latest = Fn.id
     end
@@ -69,7 +69,7 @@ module Query = struct
     module V1 = struct
       type t =
         Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, to_yojson, hash, compare]
 
       let to_latest = Fn.id
     end

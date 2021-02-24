@@ -7,12 +7,12 @@ open Core_kernel
 consensus_mechanism]
 
 open Snark_params.Tick
-module Coda_numbers = Coda_numbers
+module Mina_numbers = Mina_numbers
 module Hash_prefix_states = Hash_prefix_states
 
 [%%else]
 
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 module Currency = Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Hash_prefix_states = Hash_prefix_states_nonconsensus.Hash_prefix_states

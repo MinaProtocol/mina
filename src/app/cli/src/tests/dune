@@ -5,8 +5,8 @@
    ; opam deps
    async core
    ; libs
-   mina_base mina_graphql mina_lib coda_state coda_net2
-   coda_transition coda_version parallel protocol_version
+   mina_base mina_graphql mina_lib mina_state mina_net2
+   mina_transition mina_version parallel protocol_version
    node_addrs_and_ports transition_frontier
    ; internal deps
    init)

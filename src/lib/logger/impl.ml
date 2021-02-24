@@ -273,7 +273,9 @@ module Consumer_registry = struct
 
   let t : t = Consumer_tbl.create ()
 
-  let register ~id ~processor ~transport =
+  type id = string
+
+  let register ~(id : id) ~processor ~transport =
     Consumer_tbl.add_multi t ~key:id ~data:{processor; transport}
 
   let broadcast_log_message ~id msg =

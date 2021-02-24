@@ -4,10 +4,10 @@ open Cli_lib
 
 module Graphql_block = struct
   open Mina_base
-  open Coda_state
+  open Mina_state
 
   let validation_callback =
-    Coda_net2.Validation_callback.create_without_expiration ()
+    Mina_net2.Validation_callback.create_without_expiration ()
 
   let delta_transition_chain_proof = (State_hash.zero, [])
 
@@ -41,7 +41,7 @@ module Graphql_block = struct
 
   let dummy_sub_window_densities = []
 
-  open Coda_numbers
+  open Mina_numbers
 
   let dummy_coinbase_receiver =
     Signature_lib.Public_key.Compressed.of_base58_check_exn
@@ -104,6 +104,19 @@ module Graphql_block = struct
           pubkey (txns -. "coinbaseReceiverAccount" -. "publicKey")
         else dummy_coinbase_receiver
       in
+      let zero_balance = Some Currency.Balance.zero in
+      let zero_amount = Some Currency.Amount.zero in
+      let balance_data =
+        { Transaction_status.Balance_data.fee_payer_balance= zero_balance
+        ; source_balance= zero_balance
+        ; receiver_balance= zero_balance }
+      in
+      let aux_data =
+        { Transaction_status.Auxiliary_data.fee_payer_account_creation_fee_paid=
+            zero_amount
+        ; receiver_account_creation_fee_paid= zero_amount
+        ; created_token= None }
+      in
       let transactions =
         let fts =
           List.map
@@ -119,8 +132,8 @@ module Graphql_block = struct
                        (Or_error.ok_exn (Fee_transfer.of_singles x))
                  ; status=
                      Applied
-                       ( Transaction_status.Auxiliary_data.empty
-                       , Transaction_status.Balance_data.empty ) } )
+                       (aux_data, {balance_data with source_balance= None}) }
+             )
         in
         let commands : Transaction.t With_status.t list =
           List.map
@@ -144,10 +157,7 @@ module Graphql_block = struct
                   | s ->
                       failwithf "unknown kind: %s" s ()
                 in
-                { Mina_base.With_status.status=
-                    Applied
-                      ( Transaction_status.Auxiliary_data.empty
-                      , Transaction_status.Balance_data.empty )
+                { Mina_base.With_status.status= Applied (aux_data, balance_data)
                 ; data=
                     Transaction.Command
                       (User_command.Signed_command
@@ -171,9 +181,7 @@ module Graphql_block = struct
         commands
         @ ( if has_coinbase then
             [ { Mina_base.With_status.status=
-                  Applied
-                    ( Transaction_status.Auxiliary_data.empty
-                    , Transaction_status.Balance_data.empty )
+                  Applied (aux_data, {balance_data with source_balance= None})
               ; data=
                   Transaction.Coinbase
                     ( Coinbase.create ~amount:coinbase_amount
@@ -212,7 +220,7 @@ module Graphql_block = struct
              ~genesis_ledger_hash ~snarked_next_available_token
              ~timestamp:(Block_time.of_string_exn (to_string (bs -. "date"))))
         ~consensus_state:
-          (let length x = Coda_numbers.Length.of_string (to_string x) in
+          (let length x = Mina_numbers.Length.of_string (to_string x) in
            { Consensus.Proof_of_stake.Consensus_state.Poly.blockchain_length=
                length (cs -. "blockchainLength")
            ; epoch_count= length (cs -. "epochCount")
@@ -233,7 +241,7 @@ module Graphql_block = struct
                  ( Consensus.Epoch.of_string (to_string (cs -. "epoch"))
                  , Consensus.Slot.of_string (to_string (cs -. "slot")) )
            ; global_slot_since_genesis=
-               Coda_numbers.Global_slot.of_string
+               Mina_numbers.Global_slot.of_string
                  (to_string (cs -. "slotSinceGenesis"))
            ; staking_epoch_data
            ; next_epoch_data
@@ -244,7 +252,7 @@ module Graphql_block = struct
            ; coinbase_receiver
            ; supercharge_coinbase= false (*not in the json/schema*) })
     in
-    ( Coda_transition.External_transition.create ~protocol_state
+    ( Mina_transition.External_transition.create ~protocol_state
         ~staged_ledger_diff ~protocol_state_proof ~delta_transition_chain_proof
         ~validation_callback ()
       |> With_hash.of_data ~hash_data:(fun _ -> curr_state_hash)
@@ -301,7 +309,7 @@ let deferred_result_map xs ~f =
 
 open Mina_base
 
-let recover_main () =
+let recover_main ~path () =
   (*let best_tip_logs =
     [ "frontend/archive-node-blocks/recover/best_tip_logs__2020-11-23T09-18.json"
     ; "frontend/archive-node-blocks/recover/missing-best-tip-logs-2020-11-19T02-16.json"
@@ -321,7 +329,6 @@ let recover_main () =
   in*)
   let states = State_hash.Map.empty in
   let%bind bs =
-    let path = "/home/o1labs/Downloads/blocks2.json" in
     let%map s = Reader.file_contents path in
     List.filter_map
       ~f:(fun x -> try Some (Graphql_block.read_one states x) with _ -> None)
@@ -337,14 +344,14 @@ let recover_main () =
     let children =
       State_hash.Table.of_alist_multi
         (List.map bs ~f:(fun (b, _ts) ->
-             (Coda_transition.External_transition.parent_hash b.data, b.hash)
+             (Mina_transition.External_transition.parent_hash b.data, b.hash)
          ))
     in
     let roots =
       List.filter_map bs ~f:(fun (b, _) ->
           let parent_present =
             Hashtbl.mem by_hash
-              (Coda_transition.External_transition.parent_hash b.data)
+              (Mina_transition.External_transition.parent_hash b.data)
           in
           if parent_present then None else Some b.hash )
     in
@@ -365,7 +372,7 @@ let recover_main () =
   let%bind res =
     let open Deferred.Result.Let_syntax in
     let postgres =
-      Uri.of_string "postgres://o1labs:o1labs@127.0.0.1:5432/testworld_archive"
+      Uri.of_string "postgres://o1labs:o1labs@127.0.0.1:5432/encore_o1"
     in
     let%bind ((module Conn) as conn) = Caqti_async.connect postgres in
     Core.printf "yo: %d\n%!" (List.length bs) ;
@@ -396,22 +403,34 @@ let recover_main () =
 let command_recover =
   let open Command.Let_syntax in
   Command.async ~summary:"Recover"
-    (let%map_open _ = return () in
-     fun () -> recover_main ())
+    (let%map_open path =
+       flag "--path" (required string)
+         ~doc:"path to the json file containing blocks"
+     in
+     fun () -> recover_main ~path ())
 
 let command_run =
   let open Command.Let_syntax in
   Command.async
-    ~summary:"Run an archive process that can store all of the data of Coda"
+    ~summary:"Run an archive process that can store all of the data of Mina"
     (let%map_open log_json = Flag.Log.json
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
      and postgres = Flag.Uri.Archive.postgres
+     and runtime_config_file =
+       flag "--config-file" ~aliases:["-config-file"] (optional string)
+         ~doc:"PATH to the configuration file containing the genesis ledger"
      and delete_older_than =
-       flag "-delete-older-than" (optional int)
+       flag "--delete-older-than" ~aliases:["-delete-older-than"]
+         (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
+     in
+     let runtime_config_opt =
+       Option.map runtime_config_file ~f:(fun file ->
+           Yojson.Safe.from_file file |> Runtime_config.of_yojson
+           |> Result.ok_or_failwith )
      in
      fun () ->
        let logger = Logger.create () in
@@ -421,7 +440,7 @@ let command_run =
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than)
+         ~delete_older_than ~runtime_config_opt)
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
@@ -433,16 +452,16 @@ let command_prune =
   let open Command.Let_syntax in
   Command.async ~summary:"Prune old blocks and their transactions"
     (let%map_open height =
-       flag "-height" (optional int)
+       flag "--height" ~aliases:["-height"] (optional int)
          ~doc:"int Delete blocks with height lower than the given height"
      and num_blocks =
-       flag "-num-blocks" (optional int)
+       flag "--num-blocks" ~aliases:["-num-blocks"] (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block. This argument is ignored if the --height \
             argument is also given"
      and timestamp =
-       flag "-timestamp" (optional time_arg)
+       flag "--timestamp" ~aliases:["-timestamp"] (optional time_arg)
          ~doc:
            "timestamp Delete blocks that are older than the given timestamp. \
             Format: 2000-00-00 12:00:00+0100"

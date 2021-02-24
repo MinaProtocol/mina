@@ -67,7 +67,7 @@ module Input = struct
                           ; peer_ids= String.Set.singleton peer_id }
                         in
                         let parent_hash =
-                          Coda_state.Protocol_state.previous_state_hash
+                          Mina_state.Protocol_state.previous_state_hash
                             tr.protocol_state
                         in
                         let new_state_hash = tr.state_hash in
@@ -140,7 +140,7 @@ module Output = struct
       List.fold (Hashtbl.data input.init_states) ~init:State_hash.Map.empty
         ~f:(fun map root_state ->
           Map.update map
-            (Coda_state.Protocol_state.previous_state_hash
+            (Mina_state.Protocol_state.previous_state_hash
                root_state.state.protocol_state) ~f:(function
             | Some peer_ids ->
                 Set.union peer_ids root_state.peer_ids
@@ -213,8 +213,8 @@ module Compact_display = struct
     | Node of
         { current: State_hash.t
         ; parent: State_hash.t
-        ; blockchain_length: Coda_numbers.Length.t
-        ; global_slot: Coda_numbers.Global_slot.t }
+        ; blockchain_length: Mina_numbers.Length.t
+        ; global_slot: Mina_numbers.Global_slot.t }
   [@@deriving yojson]
 
   type node = {state: state; peers: int} [@@deriving yojson]
@@ -233,11 +233,11 @@ module Compact_display = struct
                     { current= t.state.state_hash
                     ; parent= t.state.protocol_state.previous_state_hash
                     ; blockchain_length=
-                        Coda_state.Protocol_state.consensus_state
+                        Mina_state.Protocol_state.consensus_state
                           t.state.protocol_state
                         |> Consensus.Data.Consensus_state.blockchain_length
                     ; global_slot=
-                        Coda_state.Protocol_state.consensus_state
+                        Mina_state.Protocol_state.consensus_state
                           t.state.protocol_state
                         |> Consensus.Data.Consensus_state.curr_global_slot }
                 in
@@ -249,8 +249,8 @@ module Graph_node = struct
     | Root of State_hash.t
     | Node of
         { current: State_hash.t
-        ; length: Coda_numbers.Length.t
-        ; slot: Coda_numbers.Global_slot.t }
+        ; length: Mina_numbers.Length.t
+        ; slot: Mina_numbers.Global_slot.t }
   [@@deriving yojson, eq, hash]
 
   type t = {state: state; peers: int} [@@deriving yojson, eq, hash]
@@ -272,8 +272,8 @@ module Graph_node = struct
       | Root _ ->
           ("NA", "NA")
       | Node s ->
-          ( Coda_numbers.Length.to_string s.length
-          , Coda_numbers.Global_slot.to_string s.slot )
+          ( Mina_numbers.Length.to_string s.length
+          , Mina_numbers.Global_slot.to_string s.slot )
     in
     {state; slot; length; peers= t.peers}
 
@@ -370,15 +370,16 @@ let () =
           "Consolidates best tip history from multiple log files into a rose \
            tree representation"
         (let%map input_dir =
-           Param.flag "-input-dir"
+           Param.flag "--input-dir" ~aliases:["-input-dir"]
              ~doc:
                "PATH Directory containing one or more mina-best-tip.log files"
              Param.(required string)
          and output_dir =
-           Param.flag "-output-dir" ~doc:"PATH Directory to save the output"
+           Param.flag "--output-dir" ~aliases:["-output-dir"]
+             ~doc:"PATH Directory to save the output"
              Param.(required string)
          and output_format =
-           Param.flag "-output-format"
+           Param.flag "--output-format" ~aliases:["-output-format"]
              ~doc:
                "Full|Compact Information shown for each block. Full= Protocol \
                 state and Compact= Current state hash, previous state hash, \
@@ -387,7 +388,7 @@ let () =
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and min_peers =
-           Param.flag "-min-peers"
+           Param.flag "--min-peers" ~aliases:["-min-peers"]
              ~doc:
                "Int(>0) Keep blocks that were accepted by at least min-peers \
                 number of peers and prune the rest (Default=1)"

@@ -1,6 +1,6 @@
 open Async
 open Core_kernel
-open Coda_transition
+open Mina_transition
 open Network_pool
 
 module Master = struct

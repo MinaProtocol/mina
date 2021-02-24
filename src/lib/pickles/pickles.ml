@@ -422,9 +422,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       ; kind
       ; constraint_constants
       ; commits=
-          {mina= Coda_version.commit_id; marlin= Coda_version.marlin_commit_id}
+          {mina= Mina_version.commit_id; marlin= Mina_version.marlin_commit_id}
       ; length= (* This is a dummy, it gets filled in on read/write. *) 0
-      ; commit_date= Coda_version.commit_date
+      ; commit_date= Mina_version.commit_date
       ; constraint_system_hash
       ; identifying_hash=
           (* TODO: Proper identifying hash. *)

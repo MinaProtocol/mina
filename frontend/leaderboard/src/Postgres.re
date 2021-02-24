@@ -1,56 +1,90 @@
 open Bindings.Postgres;
 
-let getBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, ic.id AS internalCommandId, b.state_hash, pk1.value AS blockcreatorAccount, b.height, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, ic.token AS internalCommandToken, uc.type AS userCommandType, uc.status AS userCommandStatus, uc.amount AS userCommandAmount, uc.fee AS userCommandFee, pk3.value AS userCommandFeePayerAccount, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount, uc.memo AS userCommandMemo, uc.token AS userCommandToken
+let getUsers = "SELECT * FROM public_keys";
 
-FROM blocks AS b
+let getBlocksChallenge = pk => {
+  {j|
+    SELECT COUNT(*)
+    FROM
+      (SELECT DISTINCT ON (global_slot) global_slot, state_hash
+      FROM blocks
+      INNER JOIN public_keys AS p ON creator_id=p.id
+      WHERE p.value = '$(pk)') AS blocksCreated
+  |j};
+};
 
-INNER JOIN public_keys AS pk1 ON b.creator_id = pk1.id
+let getTransactionsSentChallenge = pk => {
+  {j|
+    SELECT MAX(nonce)
+    FROM user_commands
+    INNER JOIN public_keys AS p ON source_id=p.id
+    WHERE status = 'applied'
+    AND type = 'payment'
+    AND p.value = '$(pk)'
+  |j};
+};
 
-LEFT JOIN blocks_internal_commands AS bic ON b.id = bic.block_id
-LEFT JOIN internal_commands AS ic ON ic.id = bic.internal_command_id
-
-LEFT JOIN blocks_user_commands AS buc ON b.id = buc.block_id
-LEFT JOIN user_commands AS uc ON uc.id = buc.user_command_id
-
-LEFT JOIN public_keys AS pk2 ON ic.receiver_id = pk2.id
-LEFT JOIN public_keys AS pk3 ON uc.fee_payer_id = pk3.id
-LEFT JOIN public_keys AS pk4 ON uc.source_id = pk4.id
-LEFT JOIN public_keys AS pk5 ON uc.receiver_id = pk5.id";
-
-let getLateBlocks = "SELECT b.id AS blockid, uc.id AS userCommandId, ic.id AS internalCommandId, b.state_hash, pk1.value AS blockcreatorAccount, b.height, b.timestamp, ic.type AS internalCommandType, pk2.value AS internalCommandRecipient, ic.fee as internalCommandFee, ic.token AS internalCommandToken, uc.type AS userCommandType, uc.status AS userCommandStatus, uc.amount AS userCommandAmount, uc.fee AS userCommandFee, pk3.value AS userCommandFeePayerAccount, pk4.value AS userCommandFromAccount, pk5.value AS userCommandToAccount, uc.memo AS userCommandMemo, uc.token AS userCommandToken
-
-FROM blocks AS b
-
-INNER JOIN public_keys AS pk1 ON b.creator_id = pk1.id
-
-LEFT JOIN blocks_internal_commands AS bic ON b.id = bic.block_id
-LEFT JOIN internal_commands AS ic ON ic.id = bic.internal_command_id
-
-LEFT JOIN blocks_user_commands AS buc ON b.id = buc.block_id
-LEFT JOIN user_commands AS uc ON uc.id = buc.user_command_id
-
-LEFT JOIN public_keys AS pk2 ON ic.receiver_id = pk2.id
-LEFT JOIN public_keys AS pk3 ON uc.fee_payer_id = pk3.id
-LEFT JOIN public_keys AS pk4 ON uc.source_id = pk4.id
-LEFT JOIN public_keys AS pk5 ON uc.receiver_id = pk5.id
-
-WHERE height >= 110";
+let getSnarkFeeChallenge = pk => {
+  {j|
+    SELECT SUM(fee)
+    FROM internal_commands as ic
+    INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
+    INNER JOIN blocks as b ON b.id = bic.block_id
+    INNER JOIN public_keys as p ON p.id=ic.receiver_id
+    WHERE type = 'fee_transfer'
+    AND value = '$(pk)'
+    AND b.id NOT IN
+    (
+      SELECT b.id
+      FROM internal_commands as ic
+      INNER JOIN blocks_internal_commands as bic ON bic.internal_command_id=ic.id
+      INNER JOIN blocks as b ON b.id = bic.block_id
+      INNER JOIN public_keys as p ON p.id=ic.receiver_id
+      WHERE type = 'coinbase'
+      AND value = '$(pk)'
+    )
+  |j};
+};
 
 let getBlockHeight = "SELECT MAX(height) FROM blocks";
 
 let createPool = pgConn => {
-  makePool({connectionString: pgConn, connectionTimeoutMillis: 5000});
+  makePool({connectionString: pgConn, connectionTimeoutMillis: 900000});
 };
 
 let endPool = pool => {
   endPool(pool);
 };
 
-let makeQuery = (pool, queryText, cb) => {
-  query(pool, queryText, (~error, ~res) => {
-    switch (Js.Nullable.toOption(error)) {
-    | None => cb(Ok(res.rows))
-    | Some(error) => cb(Error(error))
-    }
+let makeQuery = (pool, queryText) => {
+  Js.Promise.make((~resolve, ~reject) => {
+    query(pool, queryText, (~error, ~res) => {
+      switch (Js.Nullable.toOption(error)) {
+      | None => resolve(. res.rows)
+      | Some(error) => reject(. failwith(error))
+      }
+    })
   });
+};
+
+let getColumn = (cell, columnName) => {
+  Belt.Option.(
+    Js.Json.(
+      cell
+      ->decodeObject
+      ->flatMap(x => Js.Dict.get(x, columnName))
+      ->flatMap(decodeString)
+    )
+  );
+};
+
+let getRow = (cell, columnName, index) => {
+  Belt.Option.(
+    Js.Json.(
+      cell[index]
+      ->decodeObject
+      ->flatMap(x => Js.Dict.get(x, columnName))
+      ->flatMap(decodeString)
+    )
+  );
 };

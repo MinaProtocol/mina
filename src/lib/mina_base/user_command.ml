@@ -173,7 +173,7 @@ let fee_exn : t -> Currency.Fee.t = function
       Snapp_command.fee_exn x
 
 (* for filtering *)
-let minimum_fee = Coda_compile_config.minimum_user_command_fee
+let minimum_fee = Mina_compile_config.minimum_user_command_fee
 
 let has_insufficient_fee t = Currency.Fee.(fee_exn t < minimum_fee)
 
@@ -231,7 +231,7 @@ let valid_until (t : t) =
   | Signed_command x ->
       Signed_command.valid_until x
   | Snapp_command _ ->
-      Coda_numbers.Global_slot.max_value
+      Mina_numbers.Global_slot.max_value
 
 let forget_check (t : Valid.t) : t = (t :> t)
 

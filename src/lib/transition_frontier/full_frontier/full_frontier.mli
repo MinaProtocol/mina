@@ -11,7 +11,7 @@
 
 open Mina_base
 open Frontier_base
-open Coda_state
+open Mina_state
 
 include Frontier_intf.S
 
@@ -55,5 +55,5 @@ module For_tests : sig
   val equal : t -> t -> bool
 
   val find_protocol_state_exn :
-    t -> State_hash.t -> Coda_state.Protocol_state.value
+    t -> State_hash.t -> Mina_state.Protocol_state.value
 end

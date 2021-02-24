@@ -2,7 +2,7 @@ open Mina_base
 open Core
 open Async
 open Cache_lib
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier

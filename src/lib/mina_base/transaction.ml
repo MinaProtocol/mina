@@ -66,6 +66,19 @@ let supply_increase = function
   | Coinbase t ->
       Coinbase.supply_increase t
 
+let public_keys : t -> _ = function
+  | Command (Signed_command cmd) ->
+      [ Signed_command.fee_payer_pk cmd
+      ; Signed_command.source_pk cmd
+      ; Signed_command.receiver_pk cmd ]
+  | Command (Snapp_command t) ->
+      Snapp_command.(accounts_accessed (t :> t))
+      |> List.map ~f:Account_id.public_key
+  | Fee_transfer ft ->
+      Fee_transfer.receiver_pks ft
+  | Coinbase cb ->
+      Coinbase.accounts_accessed cb |> List.map ~f:Account_id.public_key
+
 let accounts_accessed ~next_available_token : t -> _ = function
   | Command (Signed_command cmd) ->
       Signed_command.accounts_accessed ~next_available_token cmd
@@ -86,3 +99,14 @@ let next_available_token (t : t) next_available_token =
       next_available_token
   | Coinbase _ ->
       next_available_token
+
+let fee_payer_pk (t : t) =
+  match t with
+  | Command (Signed_command cmd) ->
+      Signed_command.fee_payer_pk cmd
+  | Command (Snapp_command t) ->
+      Snapp_command.fee_payer t |> Account_id.public_key
+  | Fee_transfer ft ->
+      Fee_transfer.fee_payer_pk ft
+  | Coinbase cb ->
+      Coinbase.fee_payer_pk cb

@@ -1,7 +1,0 @@
-(library
- (name coda_compile_config_nonconsensus)
- (public_name coda_compile_config_nonconsensus)
- (libraries currency_nonconsensus)
- (preprocessor_deps ../../config.mlh)
- (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_base ppx_optcomp)))

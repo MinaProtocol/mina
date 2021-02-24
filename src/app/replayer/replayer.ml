@@ -110,6 +110,21 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
           failwithf "Error retrieving public key with id %d, error: %s" pk_id
             (Caqti_error.show msg) () )
 
+let balance_of_id_and_pk_id pool ~id ~pk_id : Currency.Balance.t Deferred.t =
+  let open Deferred.Let_syntax in
+  match%map
+    Caqti_async.Pool.use (fun db -> Sql.Balance.run db ~id ~pk_id) pool
+  with
+  | Ok (Some balance) ->
+      balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
+  | Ok None ->
+      failwithf "Could not find balance with id %d and public key %d" id pk_id
+        ()
+  | Error msg ->
+      failwithf
+        "Error retrieving balance with id %d and public key %d, error: %s" id
+        pk_id (Caqti_error.show msg) ()
+
 let state_hash_of_epoch_ledgers_state_hash ~logger pool
     epoch_ledgers_state_hash =
   match%map
@@ -258,6 +273,38 @@ let cache_fee_transfer_via_coinbase pool
   | _ ->
       Deferred.unit
 
+let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64 =
+  let%bind pk = pk_of_pk_id pool pk_id in
+  let%map claimed_balance =
+    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
+  in
+  let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
+  let account_id = Account_id.create pk token in
+  let actual_balance =
+    match Ledger.location_of_account ledger account_id with
+    | Some loc -> (
+      match Ledger.get ledger loc with
+      | Some account ->
+          account.balance
+      | None ->
+          failwithf
+            "Could not find account in ledger for public key %s and token id %s"
+            (Signature_lib.Public_key.Compressed.to_base58_check pk)
+            (Token_id.to_string token) () )
+    | None ->
+        failwithf
+          "Could not get location of account for public key %s and token id %s"
+          (Signature_lib.Public_key.Compressed.to_base58_check pk)
+          (Token_id.to_string token) ()
+  in
+  if not (Currency.Balance.equal actual_balance claimed_balance) then (
+    [%log error] "Claimed balance does not match actual balance in ledger"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("claimed_balance", Currency.Balance.to_yojson claimed_balance)
+        ; ("actual_balance", Currency.Balance.to_yojson actual_balance) ] ;
+    Core_kernel.exit 1 )
+
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   [%log info]
     "Applying internal command (%s) with global slot %Ld, sequence number %d, \
@@ -268,7 +315,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   let fee_token = Token_id.of_uint64 (Unsigned.UInt64.of_int64 cmd.token) in
   let txn_global_slot =
     cmd.txn_global_slot |> Unsigned.UInt32.of_int64
-    |> Coda_numbers.Global_slot.of_uint32
+    |> Mina_numbers.Global_slot.of_uint32
   in
   let fail_on_error err =
     Error.tag_arg err "Could not apply internal command"
@@ -276,6 +323,9 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       [%sexp_of: (string * int64) * (string * int)]
     |> Error.raise
   in
+  let pk_id = cmd.receiver_id in
+  let balance_id = cmd.receiver_balance in
+  let token_int64 = cmd.token in
   let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
@@ -288,7 +338,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       in
       match undo_or_error with
       | Ok _undo ->
-          Deferred.unit
+          verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
+            ~balance_id ~pk_id ~token_int64
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -311,7 +362,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       in
       match undo_or_error with
       | Ok _undo ->
-          Deferred.unit
+          verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
+            ~balance_id ~pk_id ~token_int64
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
@@ -344,7 +396,7 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
   in
   let txn_global_slot =
     cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
-    |> Coda_numbers.Global_slot.of_uint32
+    |> Mina_numbers.Global_slot.of_uint32
   in
   let undo_or_error =
     Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
@@ -352,7 +404,19 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
   in
   match undo_or_error with
   | Ok _undo ->
-      Deferred.unit
+      (* in Transaction_log.process_transfer_fee, when the fee transfer has two components,
+         as here, the balance depends only on the first transfer if the receiver is the same
+         in both components
+
+         because of the way fee transfers are synthesized, the receivers here are expected never
+         to be the same
+      *)
+      let cmd =
+        if Int.equal cmd1.receiver_id cmd2.receiver_id then cmd1 else cmd2
+      in
+      verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer"
+        ~balance_id:cmd.receiver_balance ~pk_id:cmd.receiver_id
+        ~token_int64:cmd.token
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -412,11 +476,11 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
      number %d"
     cmd.type_ cmd.nonce cmd.global_slot cmd.sequence_no ;
   let%bind body = body_of_sql_user_cmd pool cmd in
-  let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
+  let%bind fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
-        Coda_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
+        Mina_numbers.Global_slot.of_uint32 @@ Unsigned.UInt32.of_int64 slot )
   in
   let payload =
     Signed_command_payload.create
@@ -447,9 +511,41 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
       valid_signed_cmd
   with
   | Ok _undo ->
-      ()
+      (* verify balances in database against current ledger *)
+      let token_int64 =
+        (* if the command is "create token", the token for the command is 0 (meaning unused),
+         and the balance is for source/receiver account using the new token
+      *)
+        match (cmd.token, cmd.created_token) with
+        | 0L, Some token ->
+            token
+        | n, Some m ->
+            failwithf "New token %Ld in user command with nonzero token %Ld" n
+              m ()
+        | _, None ->
+            cmd.token
+      in
+      let%bind () =
+        match cmd.source_balance with
+        | Some balance_id ->
+            verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
+              ~pk_id:cmd.source_id ~token_int64
+        | None ->
+            return ()
+      in
+      let%bind () =
+        match cmd.receiver_balance with
+        | Some balance_id ->
+            verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
+              ~pk_id:cmd.receiver_id ~token_int64
+        | None ->
+            return ()
+      in
+      verify_balance ~logger ~pool ~ledger ~who:"fee payer"
+        ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
+        ~token_int64:cmd.fee_token
   | Error err ->
-      Error.tag_arg err "User command failed on replace"
+      Error.tag_arg err "User command failed on replay"
         (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
         [%sexp_of: (string * int64) * (string * int)]
       |> Error.raise

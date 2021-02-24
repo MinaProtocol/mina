@@ -2,6 +2,8 @@ open Core
 
 val json : bool Command.Spec.param
 
+val plaintext : bool Command.Spec.param
+
 val performance : bool Command.Spec.param
 
 val privkey_write_path : string Command.Spec.param
@@ -48,6 +50,8 @@ module Port : sig
 
     val rest_server :
       int Types.with_name_and_displayed_default Command.Spec.param
+
+    val limited_graphql_server : int option Types.with_name Command.Spec.param
   end
 
   module Archive : sig
@@ -72,7 +76,7 @@ type signed_command_common =
 val signed_command_common : signed_command_common Command.Param.t
 
 module Signed_command : sig
-  val hd_index : Coda_numbers.Hd_index.t Command.Spec.param
+  val hd_index : Mina_numbers.Hd_index.t Command.Spec.param
 
   val receiver_pk : Signature_lib.Public_key.Compressed.t Command.Spec.param
 
@@ -80,9 +84,9 @@ module Signed_command : sig
 
   val fee : Currency.Fee.t option Command.Spec.param
 
-  val valid_until : Coda_numbers.Global_slot.t option Command.Spec.param
+  val valid_until : Mina_numbers.Global_slot.t option Command.Spec.param
 
-  val nonce : Coda_numbers.Account_nonce.t option Command.Spec.param
+  val nonce : Mina_numbers.Account_nonce.t option Command.Spec.param
 
   val memo : string option Command.Spec.param
 end

@@ -3,7 +3,7 @@ open Async_kernel
 open Pipe_lib
 open Cache_lib
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 module type Transition_handler_validator_intf = sig
@@ -230,13 +230,15 @@ module type Sync_handler_intf = sig
     -> ( Staged_ledger.Scan_state.t
        * Ledger_hash.t
        * Pending_coinbase.t
-       * Coda_state.Protocol_state.value list )
+       * Mina_state.Protocol_state.value list )
        Option.t
 
   val get_transition_chain :
        frontier:transition_frontier
     -> State_hash.t sexp_list
     -> External_transition.t sexp_list option
+
+  val best_tip_path : frontier:transition_frontier -> State_hash.t sexp_list
 
   (** Allows a peer to prove to a node that they can bootstrap from transition
       that they have gossiped to the network *)
@@ -321,7 +323,7 @@ module type Initial_validator_intf = sig
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of Block_time.t]
                          * [ `Valid_cb of
-                             Coda_net2.Validation_callback.t -> unit ] )
+                             Mina_net2.Validation_callback.t -> unit ] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -366,7 +368,7 @@ module type Transition_router_intf = sig
                                    ]
                                  * [`Time_received of Block_time.t]
                                  * [ `Valid_cb of
-                                     Coda_net2.Validation_callback.t ] )
+                                     Mina_net2.Validation_callback.t ] )
                                  Strict_pipe.Reader.t
     -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t
@@ -374,6 +376,7 @@ module type Transition_router_intf = sig
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
     -> precomputed_values:Precomputed_values.t
+    -> catchup_mode:[`Normal | `Super]
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
        Strict_pipe.Reader.t

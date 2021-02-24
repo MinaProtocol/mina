@@ -5,5 +5,5 @@
  (preprocess (pps ppx_version ppx_jane ppx_deriving.eq))
  (libraries
    core
-   coda_numbers
+   mina_numbers
 ))

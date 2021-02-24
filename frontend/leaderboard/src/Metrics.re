@@ -1,7 +1,7 @@
 /*
-  Metrics.re has the responsibilities of taking a collection of blocks as input
-  and transforming that block data into a Map of public keys to metricRecord types.
-  The metricRecord type is defined in Types/Metrics.
+  Metrics.re has the responsibilities of making all the necessary queries to
+  the archive node to gather user metrics on testnet challenges and transforming
+  that data into a map of public_keys to metricRecord types.
 
   The data visualized for a Map is as follows, where x is some int value:
 
@@ -22,6 +22,12 @@
 
 module StringMap = Map.Make(String);
 
+let echoBotPublicKeys = [
+  "B62qndJi5mnRoBZ8SAYDM1oR2SgAk5WpZC8hGpJUZ4e64kDHGbFMeLJ",
+];
+
+let excludePublicKeys = [];
+
 // Helper functions for gathering metrics
 let printMap = map => {
   map
@@ -31,243 +37,215 @@ let printMap = map => {
      });
 };
 
-// Iterate through list of blocks and apply f on all fields in a block
-let calculateProperty = (f, blocks) => {
-  blocks
-  |> Array.fold_left((map, block) => {f(map, block)}, StringMap.empty);
-};
-
-let incrementMapValue = (key, map) => {
-  map
-  |> StringMap.update(key, value => {
-       switch (value) {
-       | Some(valueCount) => Some(valueCount + 1)
-       | None => Some(1)
-       }
-     });
-};
-
-let max = (a, b) => {
-  a > b ? a : b;
-};
-
-let filterBlocksByTimeWindow = (startTime, endTime, blocks) => {
-  blocks->Belt.Array.keep((block: Types.Block.t) => {
-    endTime < block.blockchainState.timestamp
-    && block.blockchainState.timestamp > startTime
-  });
-};
-
-// Gather metrics
-let getBlocksCreatedByUser = blocks => {
-  blocks
+let convertDBRowsToMap = (a, f) => {
+  a
   |> Array.fold_left(
-       (map, block: Types.Block.t) => {
-         incrementMapValue(block.blockchainState.creatorAccount, map)
-       },
+       (map, info) => {StringMap.add(info[0], f(info[1]), map)},
        StringMap.empty,
      );
 };
 
-let calculateTransactionSent = (map, block: Types.Block.t) => {
-  block.userCommands
-  |> Array.fold_left(
-       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
-         switch (userCommand.type_, userCommand.status) {
-         | (Payment, Some(Applied)) =>
-           incrementMapValue(userCommand.fromAccount, transactionMap)
-         | _ => transactionMap
-         }
-       },
-       map,
-     );
+let mergeMetricsMaps = (metricMap, oldMetricMap, f) => {
+  let oldMetricsMap =
+    StringMap.mapi(
+      (key, challengeMetric) =>
+        if (StringMap.mem(key, metricMap)) {
+          f(StringMap.find(key, metricMap), challengeMetric);
+        } else {
+          challengeMetric;
+        },
+      oldMetricMap,
+    );
+
+  StringMap.mapi(
+    (key, challengeMetric) =>
+      if (StringMap.mem(key, oldMetricsMap)) {
+        StringMap.find(key, oldMetricsMap);
+      } else {
+        challengeMetric;
+      },
+    metricMap,
+  );
 };
 
-let getTransactionSentByUser = blocks => {
-  blocks |> calculateProperty(calculateTransactionSent);
+let mergeIntMap = (challenges, challengesOld) => {
+  let challengeMap = convertDBRowsToMap(challenges, int_of_string);
+  let challengeMapOld = convertDBRowsToMap(challengesOld, int_of_string);
+  mergeMetricsMaps(challengeMap, challengeMapOld, (a, b) => a + b);
 };
 
-let calculateCreateTokenAndSend = (map, block: Types.Block.t) => {
-  block.userCommands
-  |> Array.fold_left(
-       (transactionMap, userCommand: Types.Block.UserCommand.t) => {
-         switch (userCommand.type_, userCommand.status) {
-         | (Payment, Some(Applied)) =>
-           /* If tokenID is 1, that means it's native coda */
-           if (userCommand.token |> int_of_string != 1) {
-             incrementMapValue(userCommand.fromAccount, transactionMap);
-           } else {
-             transactionMap;
-           }
-         | _ => transactionMap
-         }
-       },
-       map,
-     );
+let mergeInt64Map = (challenges, challengesOld) => {
+  let challengeMap = convertDBRowsToMap(challenges, Int64.of_string);
+  let challengeMapOld = convertDBRowsToMap(challengesOld, Int64.of_string);
+  mergeMetricsMaps(challengeMap, challengeMapOld, Int64.add);
 };
 
-let getCreateTokenAndSend = blocks => {
-  blocks |> calculateProperty(calculateCreateTokenAndSend);
-};
-
-/*
-  Due to snarkJobs not being apart of the archive API, we calculate
-  snark fees differently in the meantime.
-
-  Snark fees will be calculated by inspecting fees paid out to snark
-  workers inside blocks. This means that if you get more than one
-  snark work included in a block we will measure as the sum of all fees
-  for the work that has been included.
+/**
+ * Makes a query to the archive node for the specified challenge.
+ * Returns a 2d array where the first column is the public keys of
+ * users and the second column being the returned query data.
+ *
  */
-let calculateSnarkFeeSum = (map, block: Types.Block.t) => {
-  block.internalCommands
-  |> Array.fold_left(
-       (map, command: Types.Block.InternalCommand.t) => {
-         switch (
-           command.type_,
-           command.receiverAccount != block.blockchainState.creatorAccount,
-         ) {
-         | (FeeTransfer, true) =>
-           map
-           |> StringMap.update(
-                command.receiverAccount,
-                feeSum => {
-                  let snarkFee = Int64.of_string(command.fee);
-                  switch (feeSum) {
-                  | Some(feeSum) => Some(Int64.add(snarkFee, feeSum))
-                  | None => Some(snarkFee)
-                  };
-                },
-              )
-         | _ => map
-         }
-       },
-       map,
-     );
+let getPromisifiedChallenge = (users, pgPool, f, index, columnName) => {
+  Js.Promise.(
+    users
+    |> then_(users => {
+         users
+         |> Array.map(user => {
+              Postgres.makeQuery(pgPool, f(user))
+              |> then_(row => {
+                   (
+                     switch (Postgres.getRow(row, columnName, index)) {
+                     | Some(dbResult) => Some([|user, dbResult|])
+                     | None => None
+                     }
+                   )
+                   |> resolve
+                 })
+            })
+         |> resolve
+       })
+  );
 };
 
-let getSnarkFeesCollected = blocks => {
-  blocks |> calculateProperty(calculateSnarkFeeSum);
+let filterNonePromises = challenges => {
+  Js.Promise.(
+    challenges
+    |> then_(challenge => {
+         let result =
+           challenge
+           |> all
+           |> then_(rows => {
+                Array.fold_left(
+                  (values, row) => {
+                    switch (row) {
+                    | Some(row) => Array.append(values, [|row|])
+                    | None => values
+                    }
+                  },
+                  [||],
+                  rows,
+                )
+                |> resolve
+              });
+         resolve(result);
+       })
+  );
 };
 
-let calculateHighestSnarkFeeCollected = (map, block: Types.Block.t) => {
-  block.internalCommands
-  |> Array.fold_left(
-       (map, command: Types.Block.InternalCommand.t) => {
-         switch (
-           command.type_,
-           command.receiverAccount != block.blockchainState.creatorAccount,
-         ) {
-         | (FeeTransfer, true) =>
-           map
-           |> StringMap.update(
-                command.receiverAccount,
-                feeCount => {
-                  let snarkFee = Int64.of_string(command.fee);
-                  switch (feeCount) {
-                  | Some(feeCount) => Some(max(snarkFee, feeCount))
-                  | None => Some(snarkFee)
-                  };
-                },
-              )
-         | _ => map
-         }
-       },
-       map,
-     );
-};
+let calculateMetrics =
+    (users, blocksChallenge, snarkChallenge, transactionChallenge) => {
+  let usersMap =
+    Array.fold_left(
+      (map, user) => {StringMap.add(user, (), map)},
+      StringMap.empty,
+      users,
+    );
 
-let getHighestSnarkFeeCollected = blocks => {
-  blocks |> calculateProperty(calculateHighestSnarkFeeCollected);
-};
+  let highestSnarkFeeCollected = StringMap.empty;
+  let transactionsReceivedByEcho = StringMap.empty;
+  let coinbaseReceiverChallenge = StringMap.empty;
 
-let getTransactionsSentToAddress = (blocks, addresses) => {
-  blocks
-  |> Array.fold_left(
-       (map, block: Types.Block.t) => {
-         block.userCommands
-         |> Array.fold_left(
-              (map, userCommand: Types.Block.UserCommand.t) => {
-                addresses
-                |> List.filter(address => {userCommand.toAccount === address})
-                |> List.length > 0
-                  ? incrementMapValue(userCommand.fromAccount, map) : map
-              },
-              map,
-            )
-       },
-       StringMap.empty,
-     );
-};
-
-let calculateCoinbaseReceiverChallenge = (map, block: Types.Block.t) => {
-  block.internalCommands
-  |> Array.fold_left(
-       (map, command: Types.Block.InternalCommand.t) => {
-         switch (command.type_) {
-         | Coinbase =>
-           StringMap.update(
-             command.receiverAccount,
-             _ =>
-               Some(
-                 command.receiverAccount
-                 != block.blockchainState.creatorAccount,
-               ),
-             map,
-           )
-         | _ => map
-         }
-       },
-       map,
-     );
-};
-
-let getCoinbaseReceiverChallenge = blocks => {
-  blocks |> calculateProperty(calculateCoinbaseReceiverChallenge);
-};
-
-let throwAwayValues = metrics => {
-  metrics |> StringMap.map(_ => {()});
-};
-
-let calculateAllUsers = metrics => {
-  metrics
-  |> List.fold_left(StringMap.merge((_, _, _) => {Some()}), StringMap.empty);
-};
-
-let echoBotPublicKeys = [
-  "B62qndJi5mnRoBZ8SAYDM1oR2SgAk5WpZC8hGpJUZ4e64kDHGbFMeLJ",
-];
-let calculateMetrics = blocks => {
-  let blocksCreated = getBlocksCreatedByUser(blocks);
-  let transactionSent = getTransactionSentByUser(blocks);
-  let snarkFeesCollected = getSnarkFeesCollected(blocks);
-  let highestSnarkFeeCollected = getHighestSnarkFeeCollected(blocks);
-  let transactionsReceivedByEcho =
-    getTransactionsSentToAddress(blocks, echoBotPublicKeys);
-  let coinbaseReceiverChallenge = getCoinbaseReceiverChallenge(blocks);
-  let createAndSendToken = getCreateTokenAndSend(blocks);
-
-  calculateAllUsers([
-    throwAwayValues(blocksCreated),
-    throwAwayValues(transactionSent),
-    throwAwayValues(snarkFeesCollected),
-    throwAwayValues(highestSnarkFeeCollected),
-    throwAwayValues(transactionsReceivedByEcho),
-    throwAwayValues(coinbaseReceiverChallenge),
-    throwAwayValues(createAndSendToken),
-  ])
+  usersMap
+  |> StringMap.filter((key, _) => {!List.mem(key, excludePublicKeys)})
   |> StringMap.mapi((key, _) =>
        {
-         Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksCreated),
-         transactionSent: StringMap.find_opt(key, transactionSent),
-         snarkFeesCollected: StringMap.find_opt(key, snarkFeesCollected),
+         Types.Metrics.blocksCreated: StringMap.find_opt(key, blocksChallenge),
+         transactionSent: StringMap.find_opt(key, transactionChallenge),
+         snarkFeesCollected: StringMap.find_opt(key, snarkChallenge),
          highestSnarkFeeCollected:
            StringMap.find_opt(key, highestSnarkFeeCollected),
          transactionsReceivedByEcho:
            StringMap.find_opt(key, transactionsReceivedByEcho),
          coinbaseReceiver: StringMap.find_opt(key, coinbaseReceiverChallenge),
-         createAndSendToken: StringMap.find_opt(key, createAndSendToken),
        }
      );
+};
+
+let calculateMetricsAndUploadPoints = (pgPool, spreadsheetId) => {
+  open Js.Promise;
+  let users =
+    Postgres.makeQuery(pgPool, Postgres.getUsers)
+    |> then_(userRows => {
+         userRows
+         |> Array.map(userRow => {
+              switch (Postgres.getColumn(userRow, "value")) {
+              | Some(pk) => pk
+              | None => ""
+              }
+            })
+         |> resolve
+       });
+
+  let blocksChallenge =
+    getPromisifiedChallenge(
+      users,
+      pgPool,
+      Postgres.getBlocksChallenge,
+      0,
+      "count",
+    )
+    |> filterNonePromises;
+
+  let snarkFeeChallenge =
+    getPromisifiedChallenge(
+      users,
+      pgPool,
+      Postgres.getSnarkFeeChallenge,
+      0,
+      "sum",
+    )
+    |> filterNonePromises;
+
+  let transactionSentChallenge =
+    getPromisifiedChallenge(
+      users,
+      pgPool,
+      Postgres.getTransactionsSentChallenge,
+      0,
+      "max",
+    )
+    |> filterNonePromises;
+
+  [|blocksChallenge, snarkFeeChallenge, transactionSentChallenge|]
+  |> all
+  |> then_(result => {
+       result
+       |> all
+       |> then_(result => {
+            users
+            |> then_(users => {
+                 let blocksMetrics = result[0];
+                 let snarkFeeMetrics = result[1];
+                 let transactionMetrics = result[2];
+
+                 let blocksChallenge =
+                   convertDBRowsToMap(blocksMetrics, int_of_string);
+                 let snarkFeeChallenge =
+                   convertDBRowsToMap(snarkFeeMetrics, Int64.of_string);
+                 let transactionChallenge =
+                   convertDBRowsToMap(transactionMetrics, int_of_string);
+
+                 Js.log("Computing Metrics - In Progress");
+
+                 let metrics =
+                   calculateMetrics(
+                     users,
+                     blocksChallenge,
+                     snarkFeeChallenge,
+                     transactionChallenge,
+                   );
+
+                 Js.log("Computing Metrics - Done");
+
+                 UploadLeaderboardPoints.uploadChallengePoints(
+                   spreadsheetId,
+                   metrics,
+                 );
+                 resolve();
+               })
+            |> ignore;
+            resolve();
+          })
+     });
 };

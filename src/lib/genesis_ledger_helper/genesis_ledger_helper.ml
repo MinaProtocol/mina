@@ -433,7 +433,7 @@ module Ledger = struct
 
   let named_filename
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-      ~num_accounts ~balances ~ledger_name_prefix name =
+      ~num_accounts ~balances ~ledger_name_prefix ?other_data name =
     let str =
       String.concat
         [ Int.to_string constraint_constants.ledger_depth
@@ -447,16 +447,16 @@ module Ledger = struct
             Mina_base.Account.Stable.Latest.bin_writer_t
             Mina_base.Account.empty ]
     in
+    let str =
+      match other_data with None -> str | Some other_data -> str ^ other_data
+    in
     ledger_name_prefix ^ "_" ^ name ^ "_"
     ^ Blake2.(to_hex (digest_string str))
     ^ ".tar.gz"
 
-  let accounts_name accounts =
-    let hash =
-      Runtime_config.Accounts.to_yojson accounts
-      |> Yojson.Safe.to_string |> Blake2.digest_string
-    in
-    "accounts_" ^ Blake2.to_hex hash
+  let accounts_hash accounts =
+    Runtime_config.Accounts.to_yojson accounts
+    |> Yojson.Safe.to_string |> Blake2.digest_string |> Blake2.to_hex
 
   let find_tar ~logger ~genesis_dir ~constraint_constants ~ledger_name_prefix
       (config : Runtime_config.Ledger.t) =
@@ -500,10 +500,10 @@ module Ledger = struct
       | None ->
           return None
     in
-    let search_local_and_s3 name =
+    let search_local_and_s3 ?other_data name =
       let named_filename =
         named_filename ~constraint_constants ~num_accounts:config.num_accounts
-          ~balances:config.balances ~ledger_name_prefix name
+          ~balances:config.balances ~ledger_name_prefix ?other_data name
       in
       match%bind
         Deferred.List.find_map ~f:(file_exists named_filename) search_paths
@@ -526,7 +526,7 @@ module Ledger = struct
           in
           Deferred.List.find_map ~f:(file_exists named_filename) search_paths
       | Accounts accounts, _ ->
-          search_local_and_s3 (accounts_name accounts)
+          search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
       | Hash hash, None ->
           assert (Some hash = config.hash) ;
           return None
@@ -607,7 +607,7 @@ module Ledger = struct
             Genesis_constants.Proof_level.equal Full proof_level
       in
       if add_genesis_winner_account then
-        let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+        let pk, _ = Mina_state.Consensus_state_hooks.genesis_winner in
         match accounts with
         | (_, account) :: _
           when Public_key.Compressed.equal (Account.public_key account) pk ->
@@ -732,16 +732,16 @@ module Ledger = struct
                   hash= Some (State_hash.to_string @@ Ledger.merkle_root ledger)
                 }
               in
-              let name =
+              let name, other_data =
                 match (config.base, config.name) with
                 | Named name, _ ->
-                    Some name
+                    (Some name, None)
                 | Accounts accounts, _ ->
-                    Some (accounts_name accounts)
+                    (Some "accounts", Some (accounts_hash accounts))
                 | Hash _, None ->
-                    None
+                    (None, None)
                 | _, Some name ->
-                    Some name
+                    (Some name, None)
               in
               match (tar_path, name) with
               | Ok tar_path, Some name ->
@@ -749,7 +749,8 @@ module Ledger = struct
                     genesis_dir
                     ^/ named_filename ~constraint_constants
                          ~num_accounts:config.num_accounts
-                         ~balances:config.balances ~ledger_name_prefix name
+                         ~balances:config.balances ~ledger_name_prefix
+                         ?other_data name
                   in
                   (* Delete the file if it already exists. *)
                   let%bind () =
@@ -897,7 +898,7 @@ module Genesis_proof = struct
         ~protocol_constants:genesis_constants.protocol
     in
     let protocol_state_with_hash =
-      Coda_state.Genesis_protocol_state.t
+      Mina_state.Genesis_protocol_state.t
         ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
         ~genesis_epoch_data ~constraint_constants ~consensus_constants
     in
@@ -1153,9 +1154,9 @@ let make_constraint_constants
           Some
             { previous_state_hash=
                 State_hash.of_base58_check_exn previous_state_hash
-            ; previous_length= Coda_numbers.Length.of_int previous_length
+            ; previous_length= Mina_numbers.Length.of_int previous_length
             ; previous_global_slot=
-                Coda_numbers.Global_slot.of_int previous_global_slot } ) }
+                Mina_numbers.Global_slot.of_int previous_global_slot } ) }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -1319,7 +1320,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
     Ledger.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       (Option.value config.ledger
          ~default:
-           { base= Named Coda_compile_config.genesis_ledger
+           { base= Named Mina_compile_config.genesis_ledger
            ; num_accounts= None
            ; balances= []
            ; hash= None

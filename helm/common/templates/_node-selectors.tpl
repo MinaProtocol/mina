@@ -4,19 +4,18 @@
 Node selector: preemptible node affinity
 */}}
 {{- define "nodeSelector.preemptible" }}
-{{- if .nodeSelector.preemptible }}
-nodeSelector:
-  cloud.google.com/gke-preemptible: "true"
-{{- else }}
 affinity:
-  podAffinity:
+  nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
-    - labelSelector:
-        matchExpressions:
-        - key: "cloud.google.com/gke-preemptible"
-          operator: DoesNotExist
-      topologyKey: failure-domain.beta.kubernetes.io/region
-{{- end }}
+      nodeSelectorTerms:
+        - matchExpressions:
+          - key: "cloud.google.com/gke-preemptible"
+            {{- if .nodeSelector.preemptible }}
+            operator: In
+            {{- else }}
+            operator: NotIn
+            {{- end }}
+            values: ["true"]
 {{- end }}
 
 {{/*

@@ -1,8 +1,8 @@
 open Async_kernel
 open Core
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Network_peer
 
 module T = struct
@@ -144,7 +144,8 @@ let build ?skip_staged_ledger_verification ~logger ~precomputed_values
                       | Pre_diff _
                       | Non_zero_fee_excess _
                       | Insufficient_work _
-                      | Mismatched_statuses _ ->
+                      | Mismatched_statuses _
+                      | Invalid_public_key _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -425,7 +426,7 @@ module For_tests = struct
           ~protocol_state_proof:Proof.blockchain_dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:
-            (Coda_net2.Validation_callback.create_without_expiration ())
+            (Mina_net2.Validation_callback.create_without_expiration ())
           ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)
@@ -440,7 +441,7 @@ module For_tests = struct
           ~transition:
             (External_transition.Validation.reset_staged_ledger_diff_validation
                next_verified_external_transition)
-          ~sender:None ~skip_staged_ledger_verification:true
+          ~sender:None ~skip_staged_ledger_verification:`All
           ~transition_receipt_time ()
       with
       | Ok new_breadcrumb ->

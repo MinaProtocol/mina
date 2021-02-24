@@ -27,9 +27,9 @@
 
 /src/lib/blake2/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/cli_lib/ @MinaProtocol/product-eng-reviewers
-/src/lib/coda_commands @MinaProtocol/product-eng-reviewers
+/src/lib/mina_commands @MinaProtocol/product-eng-reviewers
 /src/lib/mina_graphql @MinaProtocol/product-eng-reviewers
-/src/lib/coda_numbers/ @MinaProtocol/crypto-eng-reviewers
+/src/lib/mina_numbers/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crs/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/crypto_params/ @MinaProtocol/crypto-eng-reviewers
 /src/lib/dummy_values/ @MinaProtocol/crypto-eng-reviewers

@@ -1,5 +1,5 @@
 open Core
-open Coda_numbers
+open Mina_numbers
 
 module type Key = Hashtbl.Key_plain
 

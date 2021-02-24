@@ -17,7 +17,7 @@ open Pipe_lib.Strict_pipe
 open Cache_lib
 open Otp_lib
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Network_peer
 
 type t =
@@ -102,7 +102,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 Writer.write catchup_breadcrumbs_writer
                   (trees_of_breadcrumbs, `Catchup_scheduler)
             | Error err ->
-                [%log trace]
+                [%log debug]
                   !"Error during buildup breadcrumbs inside \
                     catchup_scheduler: $error"
                   ~metadata:[("error", Error_json.error_to_yojson err)] ;

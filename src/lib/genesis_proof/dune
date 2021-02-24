@@ -3,7 +3,7 @@
  (public_name coda_genesis_proof)
  (libraries
    mina_base
-   coda_state
+   mina_state
    blockchain_snark
    genesis_constants
    runtime_config

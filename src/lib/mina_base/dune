@@ -10,10 +10,10 @@
    base58_check
    bignum_bigint
    block_time
-   coda_compile_config
+   mina_compile_config
    genesis_constants
    digestif
-   coda_numbers
+   mina_numbers
    codable
    core
    crypto_params

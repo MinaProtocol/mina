@@ -1,9 +1,18 @@
 healthcheck:
+  enabled: true
   startup:
     failureThreshold: 30
     periodSeconds: 10
   failureThreshold: 60
   periodSeconds: 5
   initialDelaySeconds: 30
+
 nodeSelector:
   preemptible: false
+
+watchman:
+  enable: false
+  # image: icalialabs/watchman:latest
+  # volumeName: watchman-dir
+  # volumeMountPath: /tmp
+  # command: ls

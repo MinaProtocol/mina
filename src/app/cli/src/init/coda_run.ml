@@ -160,7 +160,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
   Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
   match !coda_ref with
   | None ->
-      [%log trace]
+      [%log warn]
         "Shutdown before Coda instance was created, not saving a visualization"
   | Some t -> (
     (*Transition frontier visualization*)
@@ -185,15 +185,15 @@ let summary exn_json =
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", exn_json)
     ; ("Command", `String daemon_command)
-    ; ("Coda_branch", `String Coda_version.branch)
-    ; ("Coda_commit", `String Coda_version.commit_id) ]
+    ; ("Coda_branch", `String Mina_version.branch)
+    ; ("Coda_commit", `String Mina_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:
       (Deferred.return (`String "Shutdown before Coda instance was created"))
     ~f:(fun t ->
-      Coda_commands.get_status ~flag:`Performance t
+      Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_json ~conf_dir ~top_logger coda_ref =
@@ -265,6 +265,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
+    ?limited_graphql_port ?(open_limited_graphql_port = false)
     ?(insecure_rest_server = false) coda =
   let client_trustlist =
     ref
@@ -286,34 +287,34 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let client_impls =
     [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
-            ( Coda_commands.setup_and_submit_user_commands coda ts
+            ( Mina_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
-            ( Coda_commands.get_balance coda aid
+            ( Mina_commands.get_balance coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
-          return (Coda_commands.get_trust_status coda ip_address) )
+          return (Mina_commands.get_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
-          return (Coda_commands.get_trust_status_all coda) )
+          return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
-          return (Coda_commands.reset_trust_status coda ip_address) )
+          return (Mina_commands.reset_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
-            ( Coda_commands.verify_payment coda aid tx proof
+            ( Mina_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Get_public_keys_with_details.rpc (fun () () ->
           return
-            ( Coda_commands.get_keys_with_details coda
+            ( Mina_commands.get_keys_with_details coda
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
           return
-            ( Coda_commands.get_public_keys coda
+            ( Mina_commands.get_public_keys coda
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
-            ( Coda_commands.get_nonce coda aid
+            ( Mina_commands.get_nonce coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
@@ -321,11 +322,35 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          Coda_commands.get_status ~flag coda )
+          Mina_commands.get_status ~flag coda )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          Coda_commands.clear_hist_status ~flag coda )
+          Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Mina_lib.get_ledger coda lh )
+    ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
+          ( match which with
+          | Next ->
+              Option.value_map (Mina_lib.next_epoch_ledger coda)
+                ~default:
+                  (Or_error.error_string "next staking ledger not available")
+                ~f:(function
+                | `Finalized ledger ->
+                    Ok ledger
+                | `Notfinalized ->
+                    Or_error.error_string
+                      "next staking ledger is not finalized yet" )
+          | Current ->
+              Option.value_map
+                (Mina_lib.staking_ledger coda)
+                ~default:
+                  (Or_error.error_string "current staking ledger not available")
+                ~f:Or_error.return )
+          |> Or_error.map ~f:(function
+               | Genesis_epoch_ledger l ->
+                   Mina_base.Ledger.to_list l
+               | Ledger_db db ->
+                   Mina_base.Ledger.Db.to_list db )
+          |> Deferred.return )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
           Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
           Deferred.unit )
@@ -411,53 +436,67 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     total ) ;
           Deferred.return @@ Mina_lib.add_work coda work ) ]
   in
+  let create_graphql_server ~bind_to_address ~schema ~server_description port =
+    let graphql_callback =
+      Graphql_cohttp_async.make_callback (fun _req -> coda) schema
+    in
+    Cohttp_async.(
+      Server.create_expert
+        ~on_handler_error:
+          (`Call
+            (fun _net exn ->
+              [%log error]
+                "Exception while handling REST server request: $error"
+                ~metadata:
+                  [ ("error", `String (Exn.to_string_mach exn))
+                  ; ("context", `String "rest_server") ] ))
+        (Tcp.Where_to_listen.bind_to bind_to_address (On_port port))
+        (fun ~body _sock req ->
+          let uri = Cohttp.Request.uri req in
+          let status flag =
+            let%bind status = Mina_commands.get_status ~flag coda in
+            Server.respond_string
+              ( status |> Daemon_rpcs.Types.Status.to_yojson
+              |> Yojson.Safe.pretty_to_string )
+          in
+          let lift x = `Response x in
+          match Uri.path uri with
+          | "/graphql" ->
+              [%log debug] "Received graphql request. Uri: $uri"
+                ~metadata:
+                  [ ("uri", `String (Uri.to_string uri))
+                  ; ("context", `String "rest_server") ] ;
+              graphql_callback () req body
+          | "/status" ->
+              status `None >>| lift
+          | "/status/performance" ->
+              status `Performance >>| lift
+          | _ ->
+              Server.respond_string ~status:`Not_found "Route not found"
+              >>| lift ))
+    |> Deferred.map ~f:(fun _ ->
+           [%log info]
+             !"Created %s at: http://localhost:%i/graphql"
+             server_description port )
+  in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
-          let graphql_callback =
-            Graphql_cohttp_async.make_callback
-              (fun _req -> coda)
-              Mina_graphql.schema
-          in
-          Cohttp_async.(
-            Server.create_expert
-              ~on_handler_error:
-                (`Call
-                  (fun _net exn ->
-                    [%log error]
-                      "Exception while handling REST server request: $error"
-                      ~metadata:
-                        [ ("error", `String (Exn.to_string_mach exn))
-                        ; ("context", `String "rest_server") ] ))
-              (Tcp.Where_to_listen.bind_to
-                 (if insecure_rest_server then All_addresses else Localhost)
-                 (On_port rest_server_port))
-              (fun ~body _sock req ->
-                let uri = Cohttp.Request.uri req in
-                let status flag =
-                  let%bind status = Coda_commands.get_status ~flag coda in
-                  Server.respond_string
-                    ( status |> Daemon_rpcs.Types.Status.to_yojson
-                    |> Yojson.Safe.pretty_to_string )
-                in
-                let lift x = `Response x in
-                match Uri.path uri with
-                | "/graphql" ->
-                    [%log debug] "Received graphql request. Uri: $uri"
-                      ~metadata:
-                        [ ("uri", `String (Uri.to_string uri))
-                        ; ("context", `String "rest_server") ] ;
-                    graphql_callback () req body
-                | "/status" ->
-                    status `None >>| lift
-                | "/status/performance" ->
-                    status `Performance >>| lift
-                | _ ->
-                    Server.respond_string ~status:`Not_found "Route not found"
-                    >>| lift ))
-          |> Deferred.map ~f:(fun _ ->
-                 [%log info]
-                   !"Created GraphQL server at: http://localhost:%i/graphql"
-                   rest_server_port ) ) ) ;
+          create_graphql_server
+            ~bind_to_address:
+              Tcp.Bind_to_address.(
+                if insecure_rest_server then All_addresses else Localhost)
+            ~schema:Mina_graphql.schema ~server_description:"GraphQL server"
+            rest_server_port ) ) ;
+  (*Second graphql server with limited queries exopsed*)
+  Option.iter limited_graphql_port ~f:(fun rest_server_port ->
+      trace_task "Second REST server (with limited queries)" (fun () ->
+          create_graphql_server
+            ~bind_to_address:
+              Tcp.Bind_to_address.(
+                if open_limited_graphql_port then All_addresses else Localhost)
+            ~schema:Mina_graphql.schema_limited
+            ~server_description:"GraphQL server with limited queries"
+            rest_server_port ) ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Mina_lib.client_port coda))
@@ -492,15 +531,15 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                   Rpc.Connection.server_with_close
                     ~handshake_timeout:
                       (Time.Span.of_sec
-                         Coda_compile_config.rpc_handshake_timeout_sec)
+                         Mina_compile_config.rpc_handshake_timeout_sec)
                     ~heartbeat_config:
                       (Rpc.Connection.Heartbeat_config.create
                          ~timeout:
                            (Time_ns.Span.of_sec
-                              Coda_compile_config.rpc_heartbeat_timeout_sec)
+                              Mina_compile_config.rpc_heartbeat_timeout_sec)
                          ~send_every:
                            (Time_ns.Span.of_sec
-                              Coda_compile_config.rpc_heartbeat_send_every_sec))
+                              Mina_compile_config.rpc_heartbeat_send_every_sec))
                     reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn
@@ -638,7 +677,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                    ~log_issue:false
                in
                Core.print_string message ; Deferred.unit
-           | exn ->
+           | _exn ->
                handle_crash exn ~time_controller ~conf_dir ~child_pids
                  ~top_logger coda_ref
          in

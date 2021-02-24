@@ -73,10 +73,12 @@ let main dry_run check path =
 let cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
-    (let%map_open path = flag "path" ~doc:"Path to traverse" (required string)
-     and dry_run = flag "dry-run" no_arg ~doc:"Dry run"
+    (let%map_open path =
+       flag "--path" ~aliases:["path"] ~doc:"Path to traverse"
+         (required string)
+     and dry_run = flag "--dry-run" ~aliases:["dry-run"] no_arg ~doc:"Dry run"
      and check =
-       flag "check" no_arg
+       flag "--check" ~aliases:["check"] no_arg
          ~doc:
            "Return with an error code if there exists an ml file that was \
             formatted improperly"

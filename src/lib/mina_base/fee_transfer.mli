@@ -88,6 +88,8 @@ val receiver_pks : t -> Public_key.Compressed.t list
 
 val receivers : t -> Account_id.t list
 
+val fee_payer_pk : t -> Public_key.Compressed.t
+
 val map : t -> f:(Single.t -> 'b) -> 'b One_or_two.t
 
 val fold : t -> init:'acc -> f:('acc -> Single.t -> 'acc) -> 'acc

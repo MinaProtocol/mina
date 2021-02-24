@@ -3,7 +3,7 @@ open Signed
 open Unsigned
 open Num_util
 
-include Coda_numbers.Nat.Make32 ()
+include Mina_numbers.Nat.Make32 ()
 
 module Time = Block_time
 
@@ -95,6 +95,6 @@ let incr ~(constants : Constants.t) ((epoch, slot) : t * Slot.t) =
   let open UInt32 in
   if
     Slot.equal slot
-      (sub (Coda_numbers.Length.to_uint32 constants.epoch_size) one)
+      (sub (Mina_numbers.Length.to_uint32 constants.epoch_size) one)
   then (add epoch one, zero)
   else (epoch, add slot one)

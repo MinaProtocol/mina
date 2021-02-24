@@ -101,7 +101,7 @@ module type S = sig
     -> consensus_constants:Consensus.Constants.t
     -> time_controller:Block_time.Controller.t
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
-                      * Coda_net2.Validation_callback.t )
+                      * Mina_net2.Validation_callback.t )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
                    * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
@@ -341,7 +341,7 @@ struct
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
-          Diff.unsafe_apply which calls this function*)
+            Diff.unsafe_apply which calls this function*)
           Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
           if is_local then
             Hashtbl.set t.snark_tables.rebroadcastable ~key:work
@@ -443,18 +443,33 @@ struct
                     ~data:(One_or_two.map proofs ~f:fst, message)
                     ~sender
                 in
-                match%bind Batcher.Snark_pool.verify t.batcher proof_env with
-                | Ok true ->
-                    return true
-                | Ok false ->
-                    (* if this proof is in the set of invalid proofs*)
-                    let e = Error.of_string "Invalid proof" in
-                    let%map () = log e in
-                    false
-                | Error e ->
-                    (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                    let%map () = log ~punish:false e in
-                    false )
+                match Signature_lib.Public_key.decompress prover with
+                | None ->
+                    (* We may need to decompress the key when paying the fee
+                 transfer, so check that we can do it now.
+              *)
+                    [%log' error t.logger]
+                      "Proof had an invalid key: $public_key"
+                      ~metadata:
+                        [ ( "public_key"
+                          , Signature_lib.Public_key.Compressed.to_yojson
+                              prover ) ] ;
+                    Deferred.return false
+                | Some _ -> (
+                    match%bind
+                      Batcher.Snark_pool.verify t.batcher proof_env
+                    with
+                    | Ok true ->
+                        return true
+                    | Ok false ->
+                        (* if this proof is in the set of invalid proofs*)
+                        let e = Error.of_string "Invalid proof" in
+                        let%map () = log e in
+                        false
+                    | Error e ->
+                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                        let%map () = log ~punish:false e in
+                        false ) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->
@@ -614,8 +629,8 @@ let%test_module "random set test" =
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     (* SNARK work is rejected if the prover doesn't have an account and the fee
-   is below the account creation fee. So, just to make generating valid SNARK
-   work easier for testing, we set the account creation fee to 0. *)
+       is below the account creation fee. So, just to make generating valid SNARK
+       work easier for testing, we set the account creation fee to 0. *)
     let constraint_constants =
       { precomputed_values.constraint_constants with
         account_creation_fee= Currency.Fee.zero }
@@ -945,7 +960,7 @@ let%test_module "random set test" =
             List.map (List.take works per_reader) ~f:create_work
             |> List.map ~f:(fun work ->
                    ( Envelope.Incoming.local work
-                   , Coda_net2.Validation_callback.create_without_expiration ()
+                   , Mina_net2.Validation_callback.create_without_expiration ()
                    ) )
             |> List.iter ~f:(fun diff ->
                    Strict_pipe.Writer.write pool_writer diff

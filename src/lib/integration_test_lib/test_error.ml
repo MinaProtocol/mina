@@ -49,6 +49,18 @@ module Set = struct
 
   let hard_singleton err = {empty with hard_errors= [err]}
 
+  let of_soft_or_error = function
+    | Ok () ->
+        empty
+    | Error err ->
+        soft_singleton (internal_error err)
+
+  let of_hard_or_error = function
+    | Ok () ->
+        empty
+    | Error err ->
+        hard_singleton (internal_error err)
+
   let from_list_soft err_list = {empty with soft_errors= err_list}
 
   let from_list_hard err_list = {empty with hard_errors= err_list}

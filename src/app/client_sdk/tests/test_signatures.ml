@@ -18,7 +18,7 @@ open Snark_params_nonconsensus
 module Mina_base = Mina_base_nonconsensus
 module Signature_lib = Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency
-module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
 
 [%%endif]
 
@@ -52,7 +52,7 @@ let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_int fee in
   let fee_token = Token_id.default in
   let nonce = Account.Nonce.of_int nonce in
-  let valid_until = Coda_numbers.Global_slot.of_int valid_until in
+  let valid_until = Mina_numbers.Global_slot.of_int valid_until in
   let memo = Signed_command_memo.create_from_string_exn memo in
   Signed_command_payload.Common.Poly.
     {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}

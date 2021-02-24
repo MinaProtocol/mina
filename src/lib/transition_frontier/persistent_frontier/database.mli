@@ -10,7 +10,7 @@
 open Async_kernel
 open Core_kernel
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Frontier_base
 
 type t
@@ -98,7 +98,7 @@ val get_root : t -> (Root_data.Minimal.t, [> `Not_found of [> `Root]]) Result.t
 
 val get_protocol_states_for_root_scan_state :
      t
-  -> ( Coda_state.Protocol_state.value list
+  -> ( Mina_state.Protocol_state.value list
      , [> `Not_found of [> `Protocol_states_for_root_scan_state]] )
      Result.t
 

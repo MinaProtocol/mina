@@ -53,22 +53,22 @@ module Consensus_state : sig
     module Stable : sig
       module V1 : sig
         type t =
-          ( Coda_numbers.Length.Stable.V1.t
+          ( Mina_numbers.Length.Stable.V1.t
           , Vrf_output.Truncated.Stable.V1.t
           , Currency.Amount.Stable.V1.t
           , Global_slot.Stable.V1.t
-          , Coda_numbers.Global_slot.Stable.V1.t
+          , Mina_numbers.Global_slot.Stable.V1.t
           , ( Mina_base.Epoch_ledger.Value.Stable.V1.t
             , Mina_base.Epoch_seed.Stable.V1.t
             , Mina_base.State_hash.Stable.V1.t
             , Mina_base.State_hash.Stable.V1.t
-            , Coda_numbers.Length.Stable.V1.t )
+            , Mina_numbers.Length.Stable.V1.t )
             Mina_base.Epoch_data.Poly.Stable.V1.t
           , ( Mina_base.Epoch_ledger.Value.Stable.V1.t
             , Mina_base.Epoch_seed.Stable.V1.t
             , Mina_base.State_hash.Stable.V1.t
             , Mina_base.State_hash.Stable.V1.t
-            , Coda_numbers.Length.Stable.V1.t )
+            , Mina_numbers.Length.Stable.V1.t )
             Mina_base.Epoch_data.Poly.Stable.V1.t
           , bool
           , Signature_lib.Public_key.Compressed.Stable.V1.t )
@@ -106,7 +106,7 @@ module Exported : sig
 
     val total_currency : Value.t -> Currency.Amount.t
 
-    val min_window_density : Value.t -> Coda_numbers.Length.t
+    val min_window_density : Value.t -> Mina_numbers.Length.t
 
     val staking_epoch_data : Value.t -> Mina_base.Epoch_data.Value.t
 

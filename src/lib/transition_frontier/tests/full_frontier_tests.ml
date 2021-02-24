@@ -4,7 +4,7 @@ open Async_kernel
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Coda_transition
+open Mina_transition
 open Frontier_base
 open Deferred.Let_syntax
 

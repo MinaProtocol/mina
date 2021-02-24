@@ -65,7 +65,7 @@ if [ ! -d "$ledgerfolder" ]; then
   
   mkdir $ledgerfolder
 
-  S=./coda-automation/scripts
+  S=./automation/scripts
 
   rm -rf $ledgerfolder/offline_whale_keys
   rm -rf $ledgerfolder/offline_fish_keys
@@ -107,7 +107,7 @@ fi
 # ================================================
 # Update Timestamp
 
-python - <<END
+python3 - <<END
 import json
 import datetime
 
@@ -170,7 +170,7 @@ for i in $(seq 1 $whales); do
   metrics_port=$(echo $whale_start_port + 3 + $i*5 | bc)
   libp2p_metrics_port=$(echo $whale_start_port + 4 + $i*5 | bc)
 
-  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -snark-worker-fee "0.01" -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
   whale_pids[${i}]=$!
   whale_logfiles[${i}]=$logfile
   whale_clientport[${i}]=$client_port
@@ -190,7 +190,7 @@ for i in $(seq 1 $fish); do
   metrics_port=$(echo $fish_start_port + 3 + $i*5 | bc)
   libp2p_metrics_port=$(echo $fish_start_port + 4 + $i*5 | bc)
 
-  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
+  CODA_PRIVKEY_PASS="naughty blue worm" $CODA daemon -peer "/ip4/127.0.0.1/tcp/3002/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr" -client-port $client_port -rest-port $rest_port -external-port $ext_port -metrics-port $metrics_port -libp2p-metrics-port $libp2p_metrics_port -config-directory $folder -config-file $daemon -generate-genesis-proof true -block-producer-key $keyfile -log-json -snark-worker-fee "0.01" -run-snark-worker B62qp4UturELw4MmhAZhor8rwzaH1BBAivRnvdp1Yhkq6odhhFiT8uC -work-selection seq -log-level Trace &> $logfile &
   fish_pids[${i}]=$!
   fish_logfiles[${i}]=$logfile
   fish_clientport[${i}]=$client_port

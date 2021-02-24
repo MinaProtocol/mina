@@ -1,4 +1,4 @@
-open Coda_transition
+open Mina_transition
 open Core_kernel
 open Mina_base
 module Breadcrumb = Transition_frontier.Breadcrumb

@@ -9,7 +9,7 @@ module Get_all_transactions =
     query all_transactions {
       initialPeers
       daemonStatus {
-        peers
+        peers { peerId }
       }
       pooledUserCommands(publicKey: null) {
         hash
@@ -23,7 +23,7 @@ module Get_transactions_by_hash =
     query all_transactions_by_hash($hashes: [String!]) {
       initialPeers
       daemonStatus {
-        peers
+        peers { host }
       }
       pooledUserCommands(hashes: $hashes) {
         hash

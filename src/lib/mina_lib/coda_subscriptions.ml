@@ -114,11 +114,11 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
             new_block
-            |> Coda_transition.External_transition.Validated.state_hash
+            |> Mina_transition.External_transition.Validated.state_hash
           in
           (let path, log = !precomputed_block_writer in
            let precomputed_block =
-             let open Coda_transition in
+             let open Mina_transition in
              lazy
                (let scheduled_time = Block_time.now time_controller in
                 let precomputed_block =
@@ -162,21 +162,31 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    ( Mina_metrics.(
                        Gauge.inc_one
                          Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks) ;
+                     let tmp_file =
+                       Core.Filename.temp_file ~in_dir:"/tmp"
+                         "upload_block_file" ""
+                     in
+                     let f = Stdlib.open_out tmp_file in
+                     fprintf f "%s" json ;
+                     Stdlib.close_out f ;
+                     let command =
+                       Printf.sprintf "gsutil cp -n %s gs://%s/%s" tmp_file
+                         bucket name
+                     in
                      let%map output =
-                       Async.Process.run () ~prog:"bash"
-                         ~args:
-                           [ "-c"
-                           ; Printf.sprintf
-                               "echo '%s' | gsutil cp -n - gs://%s/%s" json
-                               bucket name ]
+                       Async.Process.run () ~prog:"bash" ~args:["-c"; command]
                      in
                      ( match output with
                      | Ok _result ->
                          ()
                      | Error e ->
                          [%log warn]
-                           ~metadata:[("error", Error_json.error_to_yojson e)]
-                           "Uploading block to gcloud failed: $error" ) ;
+                           ~metadata:
+                             [ ("error", Error_json.error_to_yojson e)
+                             ; ("command", `String command) ]
+                           "Uploading block to gcloud with command $command \
+                            failed: $error" ) ;
+                     Sys.remove tmp_file ;
                      Mina_metrics.(
                        Gauge.dec_one
                          Block_latency.Upload_to_gcloud.upload_to_gcloud_blocks)
@@ -188,10 +198,15 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                    Out_channel.output_lines out_channel
                      [Yojson.Safe.to_string (Lazy.force precomputed_block)] )
            ) ;
-           Option.iter log ~f:(fun `Log ->
-               [%log info] "Saw block $precomputed_block"
-                 ~metadata:[("precomputed_block", Lazy.force precomputed_block)]
-           )) ;
+           [%log info] "Saw block with state hash $state_hash"
+             ~metadata:
+               (let state_hash_data =
+                  [("state_hash", `String (State_hash.to_base58_check hash))]
+                in
+                if is_some log then
+                  state_hash_data
+                  @ [("precomputed_block", Lazy.force precomputed_block)]
+                else state_hash_data)) ;
           match
             Filtered_external_transition.validate_transactions
               ~constraint_constants new_block

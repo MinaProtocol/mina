@@ -111,7 +111,7 @@ module Time = struct
   module Checked = struct
     type t = Unpacked.var
 
-    module N = Coda_numbers.Nat.Make_checked (UInt64) (Bits)
+    module N = Mina_numbers.Nat.Make_checked (UInt64) (Bits)
 
     let op f (x : t) (y : t) : (Boolean.var, 'a) Checked.t =
       let g = Fn.compose N.of_bits Unpacked.var_to_bits in

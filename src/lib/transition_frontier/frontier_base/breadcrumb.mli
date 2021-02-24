@@ -7,8 +7,8 @@ open Async_kernel
 open Core_kernel
 open Signature_lib
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Network_peer
 
 type t [@@deriving sexp, eq, compare, to_yojson]
@@ -28,7 +28,7 @@ val create :
   -> t
 
 val build :
-     ?skip_staged_ledger_verification:bool
+     ?skip_staged_ledger_verification:[`All | `Proofs]
   -> logger:Logger.t
   -> precomputed_values:Precomputed_values.t
   -> verifier:Verifier.t
@@ -55,9 +55,9 @@ val transition_receipt_time : t -> Time.t option
 
 val hash : t -> int
 
-val blockchain_state : t -> Coda_state.Blockchain_state.Value.t
+val blockchain_state : t -> Mina_state.Blockchain_state.Value.t
 
-val protocol_state : t -> Coda_state.Protocol_state.Value.t
+val protocol_state : t -> Mina_state.Protocol_state.Value.t
 
 val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 

@@ -1,8 +1,8 @@
 open Core
 open Async
 open Mina_base
-open Coda_state
-open Coda_transition
+open Mina_state
+open Mina_transition
 open Blockchain_snark
 
 module type S = Intf.S

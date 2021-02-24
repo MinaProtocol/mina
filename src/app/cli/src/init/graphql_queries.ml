@@ -314,11 +314,31 @@ query get_peers {
 module Add_peers =
 [%graphql
 {|
-mutation ($peers: [NetworkPeer!]!) {
-  addPeers(peers: $peers) {
+mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
+  addPeers(peers: $peers, seed: $seed) {
     host
     libp2pPort
     peerId
+  }
+}
+|}]
+
+module Archive_precomputed_block =
+[%graphql
+{|
+mutation ($block: PrecomputedBlock!) {
+  archivePrecomputedBlock(block: $block) {
+      applied
+  }
+}
+|}]
+
+module Archive_extensional_block =
+[%graphql
+{|
+mutation ($block: ExtensionalBlock!) {
+  archiveExtensionalBlock(block: $block) {
+      applied
   }
 }
 |}]

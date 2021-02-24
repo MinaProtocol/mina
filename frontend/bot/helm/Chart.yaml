@@ -1,10 +1,14 @@
 apiVersion: v2
 name: o1-bot
-description: A Helm chart for Coda Protocol's O(1) role-based testnet service bots
+description: A Helm chart for Mina Protocol's O(1) role-based testnet service bots
 type: application
-version: 0.0.2
+version: 0.0.3
 appVersion: 0.0.1
-icon: https://github.com/CodaProtocol/coda/blob/develop/frontend/website/public/static/img/coda-logo@3x.png
+annotations:
+  artifacthub.io/changes: |
+    - enable Artifacthub repository hosting *changes* annotations
+    - add CHANGELOG.md for chart version => changelog tracking
+icon: https://storage.googleapis.com/coda-charts/Mina_Icon_Secondary_RGB_Black.png
 keywords:
 - bot
 - faucet
@@ -12,6 +16,6 @@ keywords:
 - community
 - mina
 - testnet
-home: https://codaprotocol.com/
+home: https://minaprotocol.com/
 sources:
-- https://github.com/CodaProtocol
+- https://github.com/MinaProtocol/mina/tree/develop/frontend/leaderboard/helm

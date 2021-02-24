@@ -27,6 +27,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "src"),
+          S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
@@ -54,9 +55,6 @@ Pipeline.build
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ]
         },
-
-      -- Tests that depend on the debian package
-      ConnectToTestnet.step dependsOn,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{

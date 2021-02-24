@@ -1,0 +1,7 @@
+discord
+websockets>=8.0
+asyncio
+backoff
+prometheus_client
+--extra-index-url https://o1labs.jfrog.io/o1labs/api/pypi/pypi/simple
+CodaClient==0.0.10
