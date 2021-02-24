@@ -3058,9 +3058,6 @@ module Hooks = struct
         in
         sync {snapshot_id= Next_epoch_snapshot; expected_root= next}
 
-  (*if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
-    else Error (Error.of_string "failed to synchronize epoch ledger")*)
-
   let received_within_window ~constants (epoch, slot) ~time_received =
     let open Time in
     let open Int64 in
