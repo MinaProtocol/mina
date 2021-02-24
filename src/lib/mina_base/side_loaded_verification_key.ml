@@ -30,7 +30,7 @@ module R = struct
     module V1 = struct
       type t =
         G.Stable.V1.t
-        Pickles_base.Side_loaded_verification_key.Repr.Stable.Latest.t
+        Pickles_base.Side_loaded_verification_key.Repr.Stable.V1.t
 
       let to_latest = Fn.id
     end
