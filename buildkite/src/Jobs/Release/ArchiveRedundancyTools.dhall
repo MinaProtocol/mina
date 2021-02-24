@@ -20,7 +20,7 @@ let buildToolCmd : Text -> Size -> Command.Type = \(tool : Text) -> \(cmd_target
       key = "archive-redundancy-${tool}",
       target = cmd_target,
       docker = None Docker.Type,
-      artifact_paths = [ S.contains "_build/default/src/app/${tool}/*exe", S.contains "./*.deb" ]
+      artifact_paths = [ S.contains "_build/default/src/app/**/*.exe" ]
     }
 
 in
