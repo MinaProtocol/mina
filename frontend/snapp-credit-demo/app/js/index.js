@@ -62,7 +62,7 @@ ipcRenderer.on("status:web-scrape", () => {
   progressSpinner.classList.add("active");
   let progressLoader = document.getElementById("progress-container");
   progressLoader.classList.remove("hide");
-  status.innerText = "Web Scraping...";
+  status.innerText = "Attempting to log in...";
 });
 
 ipcRenderer.on("status:valid-login", () => {
@@ -76,7 +76,7 @@ ipcRenderer.on("status:invalid-login", () => {
   document.getElementById("progress-container").classList.remove("hide");
   document.getElementById("progress-status-spinner").classList.remove("active");
   document.getElementById("progress-status-text").innerText =
-    "Login unsuccessful. Please check your credentials or restart the application";
+    "Login unsuccessful. Please check your credentials or restart the application and try again.";
 });
 
 ipcRenderer.on("status:proof-gen", () => {
