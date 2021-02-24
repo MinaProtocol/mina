@@ -13,13 +13,6 @@ provider "aws" {
   region = "us-west-2"
 }
 
-provider "google" {
-  alias   = "google-us-east4"
-  project = "o1labs-192920"
-  region  = "us-east4"
-  zone    = "us-east4-b"
-}
-
 variable "coda_image" {
   type = string
 
@@ -76,7 +69,6 @@ locals {
 
 
 module "ci_testnet" {
-  providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = var.ci_artifact_path
