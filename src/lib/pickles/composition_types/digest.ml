@@ -4,6 +4,26 @@ module Limbs = Nat.N4
 
 module Constant = struct
   include Limb_vector.Constant.Make (Limbs)
+
+  [%%versioned
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t =
+        Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_4.Stable.V1.t
+      [@@deriving compare, sexp, yojson, hash, equal]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  let _ =
+    let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+
   open Backend
 
   let to_tick_field x = Tick.Field.of_bits (to_bits x)

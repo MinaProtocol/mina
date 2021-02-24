@@ -944,8 +944,8 @@ module Pairing_based = struct
 end
 
 module Nvector = Vector.With_length
-module Wrap_bp_vec = Nvector (Backend.Tock.Rounds)
-module Step_bp_vec = Nvector (Backend.Tick.Rounds)
+module Wrap_bp_vec = Backend.Tock.Rounds_vector
+module Step_bp_vec = Backend.Tick.Rounds_vector
 
 module Challenges_vector = struct
   type 'n t =

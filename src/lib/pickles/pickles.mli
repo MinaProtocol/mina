@@ -52,7 +52,7 @@ end
 module type Proof_intf = sig
   type statement
 
-  type t [@@deriving bin_io]
+  type t
 
   val verification_key : Verification_key.t Lazy.t
 
@@ -67,7 +67,16 @@ module Proof : sig
   val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
 
   module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
-    type nonrec t = (W.n, MLMB.n) t [@@deriving bin_io, sexp, compare, yojson]
+    type nonrec t = (W.n, MLMB.n) t [@@deriving sexp, compare, yojson]
+  end
+
+  module Branching_2 : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = Make(Nat.N2)(Nat.N2).t [@@deriving sexp, compare, yojson]
+      end
+    end]
   end
 end
 

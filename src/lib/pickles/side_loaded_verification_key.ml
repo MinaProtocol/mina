@@ -56,6 +56,18 @@ module Width : sig
 
   module Max : Nat.Add.Intf_transparent
 
+  module Max_vector : Vector.With_version(Max).S
+
+  module Max_at_most : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'a t = ('a, Max.n) At_most.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+      end
+    end]
+  end
+
   module Length : Nat.Add.Intf_transparent
 end = struct
   include V.Width

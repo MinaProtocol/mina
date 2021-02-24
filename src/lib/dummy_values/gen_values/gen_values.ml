@@ -7,9 +7,8 @@ open Async
 open Pickles_types
 
 let proof_string prev_width =
-  let module Proof = Pickles.Proof.Make (Nat.N2) (Nat.N2) in
   let dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n prev_width in
-  Binable.to_string (module Proof) dummy
+  Binable.to_string (module Pickles.Proof.Branching_2.Stable.Latest) dummy
 
 let blockchain_proof_string = proof_string Nat.N2.n
 
@@ -22,13 +21,11 @@ let str ~loc =
   let open E in
   [%str
     let blockchain_proof, transaction_proof =
-      let open Pickles_types in
-      let module Proof = Pickles.Proof.Make (Nat.N2) (Nat.N2) in
       ( Core_kernel.Binable.of_string
-          (module Proof)
+          (module Pickles.Proof.Branching_2.Stable.Latest)
           [%e estring blockchain_proof_string]
       , Core_kernel.Binable.of_string
-          (module Proof)
+          (module Pickles.Proof.Branching_2.Stable.Latest)
           [%e estring transaction_proof_string] )]
 
 let main () =
