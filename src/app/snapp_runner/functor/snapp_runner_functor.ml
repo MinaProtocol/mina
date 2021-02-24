@@ -6,7 +6,7 @@ module Intf = struct
   module type Input = sig
     module Public_input : sig
       module Value : sig
-        type t [@@deriving of_sexp, of_yojson]
+        type t [@@deriving sexp, of_yojson]
 
         val if_not_given : [`Default_to of t | `Raise]
 

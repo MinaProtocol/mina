@@ -1332,12 +1332,15 @@ module Base = struct
       let%bind signature =
         exists Schnorr.Signature.typ ~request:(As_prover.return req)
       in
-      let%bind pk =
-        Public_key.decompress_var pk
+      let%bind pk, decompressed =
+        Public_key.decompress_var' pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Checked.verifies shifted signature pk
-        (Random_oracle.Input.field payload_digest)
+      let%bind v =
+        Schnorr.Checked.verifies shifted signature pk
+          (Random_oracle.Input.field payload_digest)
+      in
+      Boolean.all [decompressed; v]
 
     let pay_fee
         ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -1859,12 +1862,16 @@ module Base = struct
 
       let rule ~constraint_constants : _ Pickles.Inductive_rule.t =
         { identifier= "snapp-one-proved"
-        ; prevs= [snapp1_tag]
+        ; prevs= [ (*snapp1_tag*) ]
         ; main=
-            (fun [t1] x ->
-              let s1 = main t1 ~constraint_constants x in
-              [s1] )
-        ; main_value= (fun _ _ -> [true]) }
+            (fun [ (*t1*) ] x ->
+              dummy_constraints () ;
+              (*
+              let s1 = main t1 ~constraint_constants x in *)
+              ignore x ;
+              ignore constraint_constants ;
+              [] )
+        ; main_value= (fun _ _ -> []) }
     end
 
     module Zero_proved = struct
@@ -2003,7 +2010,10 @@ module Base = struct
         ; prevs= []
         ; main=
             (fun [] x ->
-              let () = main ~constraint_constants x in
+              dummy_constraints () ;
+              ignore constraint_constants ;
+              ignore x ;
+              (*               let () = main ~constraint_constants x in *)
               [] )
         ; main_value= (fun _ _ -> []) }
     end
@@ -3397,8 +3407,14 @@ struct
       match command_to_proofs t with
       | [] ->
           snapp_zero_proved ~handler [] statement
-      | [proof1] ->
-          snapp_one_proved ~handler [proof1] statement
+      | [_proof1] ->
+          (*
+        let a1 = Option.value_exn snapp_account1 in
+        let k = Option.value_exn a1.verification_key in
+          Pickles.Side_loaded.in_prover 
+            Base.Snapp_command.snapp1_tag
+            k.data  ; *)
+          snapp_one_proved ~handler [ (*proof1*) ] statement
       | [_proof1; _proof2] ->
           failwith "not supported"
     in

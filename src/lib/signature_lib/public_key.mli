@@ -131,4 +131,6 @@ val compress_var : var -> (Compressed.var, _) Checked.t
 
 val decompress_var : Compressed.var -> (var, _) Checked.t
 
+val decompress_var' : Compressed.var -> (var * Boolean.var, _) Checked.t
+
 [%%endif]
