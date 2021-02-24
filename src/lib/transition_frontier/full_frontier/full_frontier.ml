@@ -742,10 +742,7 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
                  required_local_state_sync or frontier_root_transition."
                 ~metadata:
                   [ ( "sync_jobs"
-                    , `List
-                        ( Non_empty_list.to_list jobs
-                        |> List.map
-                             ~f:Consensus.Hooks.local_state_sync_to_yojson ) )
+                    , Consensus.Hooks.local_state_sync_to_yojson jobs )
                   ; ( "local_state"
                     , Consensus.Data.Local_state.to_yojson
                         t.consensus_local_state )
