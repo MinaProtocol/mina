@@ -916,7 +916,7 @@ module Types = struct
             | `Signed of Snapp_command.Party.Authorized.Signed.t ]
             option )
           typ =
-        party "authorizedParty"
+        party "AuthorizedParty"
           ~doc:"A snapp account with an associated authorization"
 
       let secondParty :
@@ -926,7 +926,7 @@ module Types = struct
             | `Empty of Snapp_command.Party.Authorized.Empty.t ]
             option )
           typ =
-        party "secondParty"
+        party "SecondParty"
           ~doc:"The secondary account involved in a snapp transaction"
 
       let feePayment : (_, Other_fee_payer.t option) typ =
@@ -2599,7 +2599,7 @@ module Types = struct
     module SendSnappCommand = struct
       module Types = struct
         let authRequired =
-          scalar "AuthRequired"
+          scalar "InputAuthRequired"
             ~doc:
               "The kind of authorization required to make a change to a snapp \
                account property. One of None, Proof, Signature, Either, Both"
@@ -2626,7 +2626,7 @@ module Types = struct
                    Either, Both" )
 
         let permissions =
-          obj "SnappAccountPermissions"
+          obj "InputSnappAccountPermissions"
             ~coerce:
               (fun stake edit_state send receive set_delegate set_permissions
                    set_verification_key ->
@@ -2664,7 +2664,7 @@ module Types = struct
                   ~typ:(non_null authRequired) ]
 
         let verificationKey =
-          scalar "VerificationKey"
+          scalar "InputVerificationKey"
             ~doc:"A base64-encoded snark verification key" ~coerce:(function
             | `String s ->
                 (* Use a URI-safe alphabet to make life easier for GraphQL clients.
@@ -2685,7 +2685,7 @@ module Types = struct
                 |> Pickles.Side_loaded.Verification_key.of_yojson )
 
         let snarkProof =
-          scalar "SnarkProof" ~doc:"A base64-encoded snark proof"
+          scalar "InputSnarkProof" ~doc:"A base64-encoded snark proof"
             ~coerce:(function
             | `String s ->
                 (* Use a URI-safe alphabet to make life easier for GraphQL clients.
@@ -2705,7 +2705,7 @@ module Types = struct
                 |> Pickles.Side_loaded.Proof.of_yojson )
 
         let fieldElement =
-          scalar "FieldElement" ~doc:"A string-encoded field element"
+          scalar "InputFieldElement" ~doc:"A string-encoded field element"
             ~coerce:(function
             | `String s ->
                 Or_error.try_with (fun () ->
@@ -2733,12 +2733,12 @@ module Types = struct
               ; arg "7" ~typ ]
 
         let snappState =
-          snappState_vector "SnappState" ~doc:"The state for the snapp account"
+          snappState_vector "InputSnappState" ~doc:"The state for the snapp account"
             ~coerce:(fun x -> Snapp_basic.Set_or_keep.Set x)
             ~typ:fieldElement ~default:Snapp_basic.Set_or_keep.Keep
 
         let changes =
-          obj "SnappAccountChanges"
+          obj "InputSnappAccountChanges"
             ~coerce:(fun app_state delegate verification_key permissions ->
               { Snapp_command.Party.Update.Poly.app_state
               ; delegate= Snapp_basic.Set_or_keep.of_option delegate
@@ -2767,7 +2767,7 @@ module Types = struct
 
         module Predicate = struct
           let eq ~desc arg_type =
-            obj "PredicateEquals"
+            obj "InputPredicateEquals"
               ~doc:"A predicate to check equality against the given value"
               ~coerce:Snapp_basic.Or_ignore.of_option
               ~fields:
@@ -2780,7 +2780,7 @@ module Types = struct
                     ~typ:arg_type ]
 
           let closed_interval arg_type =
-            obj "PredicateClosedInterval"
+            obj "InputPredicateClosedInterval"
               ~doc:
                 "A predicate to check that the value is within the given \
                  bounds (inclusive)"
@@ -2804,14 +2804,14 @@ module Types = struct
         end
 
         let snappStatePredicate =
-          snappState_vector "SnappStatePredicate"
+          snappState_vector "InputSnappStatePredicate"
             ~doc:"Predicates to be evaluated on the snapp state vector"
             ~coerce:Fn.id
             ~typ:(Predicate.eq ~desc:"field element" fieldElement)
             ~default:Snapp_basic.Or_ignore.Ignore
 
         let accountPredicate =
-          obj "AccountPredicate"
+          obj "InputAccountPredicate"
             ~doc:"Predicates to be evaluated on an account"
             ~coerce:
               (fun balance nonce receipt_chain_hash public_key delegate state ->
@@ -2855,7 +2855,7 @@ module Types = struct
                   ~typ:snappStatePredicate ]
 
         let accountStatePredicate =
-          scalar "accountStatePredicate"
+          scalar "InputAccountStatePredicate"
             ~doc:
               "A predicate on the state of an account. One of Empty, \
                Non_empty, Any" ~coerce:(function
@@ -2878,7 +2878,7 @@ module Types = struct
                   "Account state predicate must be one of Empty, Non_empty, Any" )
 
         let accountTransitionPredicate =
-          obj "AccountTransitionPredicate"
+          obj "InputAccountTransitionPredicate"
             ~doc:"Predicates to be evaluated on an account state transition"
             ~coerce:(fun prev next -> {Snapp_basic.Transition.prev; next})
             ~fields:
@@ -2893,7 +2893,7 @@ module Types = struct
                   ~typ:accountStatePredicate ~default:Any ]
 
         let otherAccountPredicate =
-          obj "OtherAccountPredicate"
+          obj "InputOtherAccountPredicate"
             ~doc:"Predicates to be evaluated on the other account"
             ~coerce:(fun predicate account_transition account_vk ->
               ( {predicate; account_transition; account_vk}
@@ -2917,7 +2917,7 @@ module Types = struct
                   ~default:Snapp_predicate.Other.accept.account_vk ]
 
         let epochDataPredicate =
-          obj "EpochDataPredicate"
+          obj "InputEpochDataPredicate"
             ~doc:"Predicates to be evaluated on the epoch data"
             ~coerce:
               (fun ledger_hash total_currency seed start_checkpoint
@@ -2964,7 +2964,7 @@ module Types = struct
                   ~default:Ignore ]
 
         let protocolStatePredicate =
-          obj "ProtocolStatePredicate"
+          obj "InputProtocolStatePredicate"
             ~doc:"Predicates to be evaluated on the protocol state"
             ~coerce:
               (fun snarked_ledger_hash snarked_next_available_token timestamp
@@ -3040,7 +3040,7 @@ module Types = struct
                     Snapp_predicate.Protocol_state.accept.next_epoch_data ]
 
         let snappPredicate =
-          obj "SnappPredicate"
+          obj "InputSnappPredicate"
             ~doc:"The predicates associated with the snapp proof"
             ~coerce:
               (fun self_predicate other protocol_state_predicate fee_payer ->
@@ -3066,7 +3066,7 @@ module Types = struct
                   ~default:Snapp_predicate.accept.fee_payer ]
 
         let authorizedParty =
-          obj "authorizedParty"
+          obj "InputAuthorizedParty"
             ~doc:"A snapp account with an associated authorization"
             ~coerce:(fun pk update delta proof signature snapp_predicate ->
               let predicate =
@@ -3120,7 +3120,7 @@ module Types = struct
                   ~typ:snappPredicate ]
 
         let secondParty =
-          obj "secondParty"
+          obj "InputSecondParty"
             ~doc:"The secondary account involved in a snapp transaction"
             ~coerce:
               (fun pk update delta proof signature generate_signature
@@ -3191,7 +3191,7 @@ module Types = struct
                   ~typ:snappPredicate ]
 
         let feePayment =
-          obj "SnappFeePayment" ~doc:"Fee payment details for snapp commands"
+          obj "InputSnappFeePayment" ~doc:"Fee payment details for snapp commands"
             ~coerce:(fun pk nonce fee signature ->
               ( { payload=
                     { pk
@@ -3223,7 +3223,7 @@ module Types = struct
       end
 
       let typ =
-        obj "SendSnappCommand"
+        obj "InputSendSnappCommand"
           ~coerce:(fun token_id one two fee_payment ->
             ({token_id; one; two; fee_payment} : Snapp_command_input.t) )
           ~fields:
