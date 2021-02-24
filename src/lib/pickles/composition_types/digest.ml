@@ -18,6 +18,7 @@ module Constant = struct
     end
   end]
 
+  (* Force the typechecker to verify that these types are equal. *)
   let _ =
     let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
      fun () -> Type_equal.T
