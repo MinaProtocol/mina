@@ -14,7 +14,7 @@ data "template_file" "testnet_alert_receivers" {
   template = "${file("${path.module}/templates/testnet-alert-receivers.yml.tpl")}"
   vars = {
     pagerduty_service_key = "${data.aws_secretsmanager_secret_version.pagerduty_testnet_primary_key.secret_string}"
-    pagerduty_alert_filter = "testworld|encore|zenith"
+    pagerduty_alert_filter = "zenith"
 
     discord_alert_webhook = "${data.aws_secretsmanager_secret_version.discord_testnet_alerts_webhook.secret_string}"
   }
