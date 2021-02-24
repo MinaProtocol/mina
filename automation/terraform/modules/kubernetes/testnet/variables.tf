@@ -1,3 +1,7 @@
+terraform {
+  experiments = [module_variable_optional_attrs]
+}
+
 # K8s Cluster Vars
 
 variable "cluster_name" {
@@ -293,7 +297,7 @@ variable "persistence_config" {
     enabled       = true
     size          = "8Gi"
     reclaimPolicy = "retain"
-    storageClass  = "us-west1-ssd-retain"
+    storageClass  = "ssd-retain"
     accessModes   = ["ReadWriteOnce"]
   }
 }

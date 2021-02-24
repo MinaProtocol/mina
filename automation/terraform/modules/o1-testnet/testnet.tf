@@ -73,6 +73,7 @@ module "kubernetes_testnet" {
     ]
   )
   mina_archive_schema = var.mina_archive_schema
+  persistence_config  = var.postgres_persistence_config
 
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
