@@ -2,9 +2,7 @@ const puppeteer = require("puppeteer");
 
 let scrape = (username, password) => {
   return new Promise(async (resolve, reject) => {
-    const browser = await puppeteer.launch({
-      headless: false,
-    });
+    const browser = await puppeteer.launch();
     try {
       const page = await browser.newPage();
       // TODO: Targeting .ca, should be changed and verified to work on .com
@@ -12,12 +10,13 @@ let scrape = (username, password) => {
         waitUntil: "domcontentloaded",
       });
 
-      await page.waitForSelector("[type=email]");
+      await page.waitForSelector("[type=submit]");
       await page.type("[type=email]", username);
       await page.type("[type=password]", password);
+      await page.waitForTimeout(500);
       await page.click("[type=submit]");
 
-      await page.waitForSelector(".score-dial", { timeout: 6000 });
+      await page.waitForSelector(".score-dial", { timeout: 8000 });
       let creditScore = await page.evaluate(() => {
         let creditContainer = document.querySelectorAll(".score-dial");
         // Return credit score value
