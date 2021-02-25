@@ -42,9 +42,9 @@ module Stable = struct
   module V1 = struct
     type t =
       ( G.Stable.V1.t
-      , Core_kernel.Unit.Stable.V1.t )
-      Pickles.Side_loaded.Verification_key.Poly.Stable.V1.t
-    [@@deriving sexp, equal, compare, hash, yojson]
+      , unit )
+      Pickles_base.Side_loaded_verification_key.Poly.Stable.V1.t
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     open Pickles_base.Side_loaded_verification_key
 
@@ -60,8 +60,7 @@ module Stable = struct
                   {Repr.Stable.V1.step_data; max_width; wrap_index}
 
                 let of_binable
-                    ({Repr.Stable.V1.step_data; max_width; wrap_index= c} as t)
-                    =
+                    {Repr.Stable.V1.step_data; max_width; wrap_index= c} =
                   {Poly.step_data; max_width; wrap_index= c; wrap_vk= Some ()}
               end)
   end
