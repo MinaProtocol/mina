@@ -1,8 +1,8 @@
 locals {
   east4_k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
-  east4_region = "us-east4"
-  k8s_context = "gke_o1labs-192920_us-east4_coda-infra-east4"
-  bk_k8s_context = "gke_o1labs-192920_us-east4_buildkite-infra-east4"
+  east4_region      = "us-east4"
+  k8s_context       = "gke_o1labs-192920_us-east4_coda-infra-east4"
+  bk_k8s_context    = "gke_o1labs-192920_us-east4_buildkite-infra-east4"
 
   east4_prometheus_helm_values = {
     server = {
@@ -23,9 +23,9 @@ locals {
           }
           write_relabel_configs = [
             {
-              source_labels: ["__name__"]
-              regex: "(buildkite.*|container.*|Coda.*|watchdog.*)"
-              action: "keep"
+              source_labels : ["__name__"]
+              regex : "(buildkite.*|container.*|Coda.*|watchdog.*)"
+              action : "keep"
             }
           ]
         }
@@ -45,22 +45,22 @@ provider "google" {
 }
 
 provider "kubernetes" {
-  alias   = "k8s_east4"
+  alias          = "k8s_east4"
   config_context = local.east4_k8s_context
 }
 
 data "google_compute_zones" "east4_available" {
   project = "o1labs-192920"
-  region = local.east4_region
-  status = "UP"
+  region  = local.east4_region
+  status  = "UP"
 }
 
 ### Testnets
 
 resource "google_container_cluster" "coda_cluster_east4" {
-  provider = google.google_east4
-  name     = "coda-infra-east4"
-  location = local.east4_region
+  provider           = google.google_east4
+  name               = "coda-infra-east4"
+  location           = local.east4_region
   min_master_version = "1.15"
 
   node_locations = data.google_compute_zones.east4_available.names
@@ -82,7 +82,7 @@ resource "google_container_cluster" "coda_cluster_east4" {
 }
 
 resource "google_container_node_pool" "east4_primary_nodes" {
-  provider = google.google_east4
+  provider   = google.google_east4
   name       = "coda-infra-east4"
   location   = local.east4_region
   cluster    = google_container_cluster.coda_cluster_east4.name
@@ -108,7 +108,7 @@ resource "google_container_node_pool" "east4_primary_nodes" {
 }
 
 resource "google_container_node_pool" "east4_preemptible_nodes" {
-  provider = google.google_east4
+  provider   = google.google_east4
   name       = "mina-preemptible-east4"
   location   = local.east4_region
   cluster    = google_container_cluster.coda_cluster_east4.name
@@ -136,16 +136,16 @@ resource "google_container_node_pool" "east4_preemptible_nodes" {
 ### Buildkite
 
 resource "google_container_cluster" "buildkite_infra_east4" {
-  provider = google.google_east4
-  name     = "buildkite-infra-east4"
-  location = local.east4_region
+  provider           = google.google_east4
+  name               = "buildkite-infra-east4"
+  location           = local.east4_region
   min_master_version = "1.15"
 
   node_locations = data.google_compute_zones.east4_available.names
 
   remove_default_node_pool = true
   initial_node_count       = 1
-  
+
   master_auth {
     username = ""
     password = ""
@@ -158,9 +158,9 @@ resource "google_container_cluster" "buildkite_infra_east4" {
 
 resource "google_container_node_pool" "east4_compute_nodes" {
   provider = google.google_east4
-  name       = "buildkite-east4-compute"
-  location   = local.east4_region
-  cluster    = google_container_cluster.buildkite_infra_east4.name
+  name     = "buildkite-east4-compute"
+  location = local.east4_region
+  cluster  = google_container_cluster.buildkite_infra_east4.name
 
   # total nodes provisioned = node_count * # of AZs
   node_count = 5
@@ -187,6 +187,7 @@ resource "google_container_node_pool" "east4_compute_nodes" {
 
 ## Data Persistence
 
+# TODO: deprecate below region based storage classes once OK to do so (i.e. all testnets have migrated to new classes)
 resource "kubernetes_storage_class" "east4_ssd" {
   provider = kubernetes.k8s_east4
 
@@ -221,6 +222,43 @@ resource "kubernetes_storage_class" "east4_standard" {
   }
 }
 
+# ---
+
+resource "kubernetes_storage_class" "east4_infra_ssd" {
+  provider = kubernetes.k8s_east4
+
+  count = length(local.storage_reclaim_policies)
+
+  metadata {
+    name = "ssd-${lower(local.storage_reclaim_policies[count.index])}"
+  }
+
+  storage_provisioner = "kubernetes.io/gce-pd"
+  reclaim_policy      = local.storage_reclaim_policies[count.index]
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "pd-ssd"
+  }
+}
+
+resource "kubernetes_storage_class" "east4_infra_standard" {
+  provider = kubernetes.k8s_east4
+
+  count = length(local.storage_reclaim_policies)
+
+  metadata {
+    name = "standard-${lower(local.storage_reclaim_policies[count.index])}"
+  }
+
+  storage_provisioner = "kubernetes.io/gce-pd"
+  reclaim_policy      = local.storage_reclaim_policies[count.index]
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "pd-standard"
+  }
+}
+
+
 ## Monitoring
 
 provider helm {
@@ -238,7 +276,7 @@ provider helm {
 }
 
 resource "helm_release" "east4_prometheus" {
-  provider  = helm.helm_east4
+  provider = helm.helm_east4
 
   name      = "east4-prometheus"
   chart     = "stable/prometheus"
@@ -246,13 +284,13 @@ resource "helm_release" "east4_prometheus" {
   values = [
     yamlencode(local.east4_prometheus_helm_values)
   ]
-  wait       = true
-  depends_on = [google_container_cluster.coda_cluster_east4]
-  force_update  = true
+  wait         = true
+  depends_on   = [google_container_cluster.coda_cluster_east4]
+  force_update = true
 }
 
 resource "helm_release" "bk_east4_prometheus" {
-  provider  = helm.bk_helm_east4
+  provider = helm.bk_helm_east4
 
   name      = "bk-east4-prometheus"
   chart     = "stable/prometheus"
@@ -260,20 +298,20 @@ resource "helm_release" "bk_east4_prometheus" {
   values = [
     yamlencode(local.east4_prometheus_helm_values)
   ]
-  wait       = true
-  depends_on = [google_container_cluster.buildkite_infra_east4]
-  force_update  = true
+  wait         = true
+  depends_on   = [google_container_cluster.buildkite_infra_east4]
+  force_update = true
 }
 
 # Utilities
 
 provider kubernetes {
-    config_context  = local.east4_k8s_context
+  config_context = local.east4_k8s_context
 }
 
 resource "kubernetes_cron_job" "integration-testnet-cleanup" {
   metadata {
-    name = "integration-test-cleanup"
+    name      = "integration-test-cleanup"
     namespace = "default"
   }
   spec {
@@ -291,8 +329,8 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
           metadata {}
           spec {
             container {
-              name    = "integration-test-janitor"
-              image   = "gcr.io/o1labs-192920/watchdog:0.3.8"
+              name  = "integration-test-janitor"
+              image = "gcr.io/o1labs-192920/watchdog:0.3.8"
               args = [
                 "/scripts/network-utilities.py",
                 "janitor",
