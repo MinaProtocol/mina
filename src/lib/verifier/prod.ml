@@ -272,12 +272,20 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
   in
   let%map worker = create_worker () in
   let worker_ref = ref (Deferred.return worker) in
+  let wait_safe process =
+    Deferred.Or_error.try_with (fun () -> Process.wait process)
+  in
   let rec on_worker {connection= _; process} =
     let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
     let finished =
       Deferred.any
         [ (after restart_after >>| fun () -> `Time_to_restart)
-        ; (Process.wait process >>| fun _ -> `Unexpected_termination) ]
+        ; ( wait_safe process
+          >>| function
+          | Ok _ ->
+              `Unexpected_termination
+          | Error err ->
+              `Wait_threw_an_exception err ) ]
     in
     upon finished (fun e ->
         let pid = Process.pid process in
@@ -286,7 +294,15 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
           | `Unexpected_termination ->
               [%log error] "verifier terminated unexpectedly"
                 ~metadata:[("verifier_pid", `Int (Pid.to_int pid))]
-          | `Time_to_restart -> (
+          | `Time_to_restart | `Wait_threw_an_exception _ -> (
+              ( match e with
+              | `Wait_threw_an_exception err ->
+                  [%log info]
+                    "Saw an exception while trying to wait for the verifier \
+                     process: $exn"
+                    ~metadata:[("exn", Error_json.error_to_yojson err)]
+              | _ ->
+                  () ) ;
               Child_processes.Termination.mark_termination_as_expected pids pid ;
               match Signal.send Signal.kill (`Pid pid) with
               | `No_such_process ->
@@ -298,12 +314,19 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
                     ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] )
         in
         let new_worker =
-          let%bind res = Process.wait process in
+          let%bind exit_metadata =
+            match%map wait_safe process with
+            | Ok res ->
+                [ ( "exit_status"
+                  , `String (Unix.Exit_or_signal.to_string_hum res) ) ]
+            | Error err ->
+                [ ("exit_status", `String "Unknown: wait threw an error")
+                ; ("exn", Error_json.error_to_yojson err) ]
+          in
           [%log info] "verifier successfully stopped"
             ~metadata:
-              [ ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
-              ; ("exit_status", `String (Unix.Exit_or_signal.to_string_hum res))
-              ] ;
+              ( ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
+              :: exit_metadata ) ;
           Child_processes.Termination.remove pids pid ;
           let%map worker = create_worker () in
           on_worker worker ; worker

@@ -28,7 +28,9 @@ module T = struct
   end
 
   let create ~logger frontier =
-    let best_tip_diff_logger = Logger.create ~id:"best_tip_diff" () in
+    let best_tip_diff_logger =
+      Logger.create ~id:Logger.Logger_id.best_tip_diff ()
+    in
     ( {logger; best_tip_diff_logger}
     , { new_commands= Breadcrumb.commands (Full_frontier.root frontier)
       ; removed_commands= []

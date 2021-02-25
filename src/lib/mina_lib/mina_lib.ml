@@ -78,7 +78,10 @@ type pipes =
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
-        * (Account_id.t -> (Mina_base.Account.Nonce.t, string) Result.t)
+        * (   Account_id.t
+           -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
+              , string )
+              Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -103,10 +106,13 @@ type t =
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t
-  ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
+  ; mutable next_producer_timing:
+      Daemon_rpcs.Types.Status.Next_producer_timing.t option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Mina_incremental.Status.Observer.t
-  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref }
+  ; precomputed_block_writer: ([`Path of string] option * [`Log] option) ref
+  ; block_production_status:
+      [`Producing | `Producing_in_ms of float | `Free] ref }
 [@@deriving fields]
 
 let time_controller t = t.config.time_controller
@@ -175,6 +181,8 @@ module Snark_worker = struct
         match signal_or_error with
         | Ok () ->
             [%log info] "Snark worker process died" ;
+            if Ivar.is_full kill_ivar then
+              [%log error] "Ivar.fill bug is here!" ;
             Ivar.fill kill_ivar () ;
             Deferred.unit
         | Error (`Exit_non_zero non_zero_error) ->
@@ -223,6 +231,8 @@ module Snark_worker = struct
             [ ( "snark_worker_pid"
               , `Int (Pid.to_int (Process.pid snark_worker_process)) ) ]
           "Started snark worker process with pid: $snark_worker_pid" ;
+        if Ivar.is_full process_ivar then
+          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
         Ivar.fill process_ivar snark_worker_process
     | `Off _ ->
         [%log' info t.config.logger]
@@ -334,10 +344,17 @@ let active_or_bootstrapping =
         (Broadcast_pipe.Reader.peek t.components.transition_frontier)
         ~f:(Fn.const (Some ())) )
 
-let create_sync_status_observer ~logger ~is_seed ~demo_mode
+(* This is a hack put in place to deal with nodes getting stuck
+   in Offline states, that is, not receiving blocks for an extended period.
+
+   To address this, we restart the libp2p helper when we become offline. *)
+let next_helper_restart = ref None
+
+let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Mina_incremental.Status in
+  let restart_delay = Time.Span.of_min 5. in
   let incremental_status =
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
@@ -347,6 +364,17 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
         else
           match online_status with
           | `Offline ->
+              ( match !next_helper_restart with
+              | None ->
+                  next_helper_restart :=
+                    Some
+                      (Async.Clock.Event.run_after restart_delay
+                         (fun () ->
+                           Mina_networking.restart_helper net ;
+                           next_helper_restart := None )
+                         ())
+              | Some _ ->
+                  () ) ;
               if `Empty = first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
@@ -355,49 +383,63 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
                 `Listening )
               else `Offline
           | `Online -> (
-            match active_status with
-            | None ->
-                let logger = Logger.create () in
-                [%str_log info] Bootstrapping ;
-                `Bootstrap
-            | Some (_, catchup_jobs) ->
-                let logger = Logger.create () in
-                if catchup_jobs > 0 then (
-                  [%str_log info] Ledger_catchup ;
-                  `Catchup )
-                else (
-                  [%str_log info] Synced ;
-                  `Synced ) ) )
+              Option.iter !next_helper_restart ~f:(fun e ->
+                  Async.Clock.Event.abort_if_possible e () ) ;
+              next_helper_restart := None ;
+              match active_status with
+              | None ->
+                  let logger = Logger.create () in
+                  [%str_log info] Bootstrapping ;
+                  `Bootstrap
+              | Some (_, catchup_jobs) ->
+                  let logger = Logger.create () in
+                  if catchup_jobs > 0 then (
+                    [%str_log info] Ledger_catchup ;
+                    `Catchup )
+                  else (
+                    [%str_log info] Synced ;
+                    `Synced ) ) )
   in
   let observer = observe incremental_status in
-  (* monitor coda status and shutdown node if offline for too long (unless we are a seed node) *)
+  (* monitor Mina status, issue a warning if offline for too long (unless we are a seed node) *)
   ( if not is_seed then
-    let offline_shutdown_timeout_duration = Time.Span.of_min 15.0 in
-    let shutdown_timeout = ref None in
-    let shutdown _ =
-      Mina_user_error.raisef "Node has been offline for %s; shutting down"
-        (Time.Span.to_string_hum offline_shutdown_timeout_duration)
+    let offline_timeout_min = 15.0 in
+    let offline_timeout_duration = Time.Span.of_min offline_timeout_min in
+    let offline_timeout = ref None in
+    let offline_warned = ref false in
+    let log_offline_warning _tm =
+      [%log error]
+        "Daemon has not received any gossip messages for %0.0f minutes; check \
+         the daemon's external port forwarding, if needed"
+        offline_timeout_min ;
+      offline_warned := true
     in
-    let start_shutdown_timeout () =
-      match !shutdown_timeout with
+    let start_offline_timeout () =
+      match !offline_timeout with
       | Some _ ->
           ()
       | None ->
-          shutdown_timeout :=
+          offline_timeout :=
             Some
-              (Timeout.create () offline_shutdown_timeout_duration ~f:shutdown)
+              (Timeout.create () offline_timeout_duration
+                 ~f:log_offline_warning)
     in
-    let stop_shutdown_timeout () =
-      match !shutdown_timeout with
+    let stop_offline_timeout () =
+      match !offline_timeout with
       | Some timeout ->
+          if !offline_warned then (
+            [%log info]
+              "Daemon had been offline (no gossip messages received), now \
+               back online" ;
+            offline_warned := false ) ;
           Timeout.cancel () timeout () ;
-          shutdown_timeout := None
+          offline_timeout := None
       | None ->
           ()
     in
     let handle_status_change status =
-      if status = `Offline then start_shutdown_timeout ()
-      else stop_shutdown_timeout ()
+      if status = `Offline then start_offline_timeout ()
+      else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
       | Initialized value ->
@@ -406,7 +448,7 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode
           handle_status_change value
       | Invalidated ->
           () ) ) ;
-  (* recompute coda status on an interval *)
+  (* recompute Mina status on an interval *)
   stabilize () ;
   every (Time.Span.of_sec 15.0) ~stop:(never ()) stabilize ;
   observer
@@ -459,15 +501,15 @@ let get_ledger t state_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
 
+let get_account t aid =
+  let open Participating_state.Let_syntax in
+  let%map ledger = best_ledger t in
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_account ledger aid in
+  Ledger.get ledger loc
+
 let get_inferred_nonce_from_transaction_pool_and_ledger t
     (account_id : Account_id.t) =
-  let get_account aid =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind loc = Ledger.location_of_account ledger aid in
-    Ledger.get ledger loc
-  in
   let transaction_pool = t.components.transaction_pool in
   let resource_pool =
     Network_pool.Transaction_pool.resource_pool transaction_pool
@@ -491,7 +533,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
       let open Participating_state.Option.Let_syntax in
-      let%map account = get_account account_id in
+      let%map account = get_account t account_id in
       account.Account.Poly.nonce
 
 let snark_job_state t = t.snark_job_state
@@ -673,24 +715,34 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
 
+let get_current_nonce t aid =
+  match
+    Participating_state.active
+      (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
+    |> Option.join
+  with
+  | None ->
+      Error
+        "Couldn't infer nonce for transaction from specified `sender` since \
+         `sender` is not in the ledger or sent a transaction in transaction \
+         pool."
+  | Some nonce ->
+      let ledger_nonce =
+        Participating_state.active (get_account t aid)
+        |> Option.join
+        |> Option.map ~f:(fun {Account.Poly.nonce; _} -> nonce)
+        |> Option.value ~default:nonce
+      in
+      Ok (`Min ledger_nonce, nonce)
+
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let get_current_nonce aid =
-    match
-      Participating_state.active
-        (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
-      |> Option.join
-    with
-    | None ->
-        Error
-          "Couldn't infer nonce for transaction from specified `sender` since \
-           `sender` is not in the ledger or sent a transaction in transaction \
-           pool."
-    | Some nonce ->
-        Ok nonce
-  in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
+    ( uc_inputs
+    , ( if Ivar.is_full result_ivar then
+          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
+        Ivar.fill result_ivar )
+    , get_current_nonce t )
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -711,7 +763,31 @@ let staking_ledger t =
     ~consensus_state ~local_state
 
 let next_epoch_ledger t =
-  Consensus.Data.Local_state.next_epoch_ledger t.config.consensus_local_state
+  let open Option.Let_syntax in
+  let%map frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let root = Transition_frontier.root frontier in
+  let root_epoch =
+    Transition_frontier.Breadcrumb.consensus_state root
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  let best_tip = Transition_frontier.best_tip frontier in
+  let best_tip_epoch =
+    Transition_frontier.Breadcrumb.consensus_state best_tip
+    |> Consensus.Data.Consensus_state.epoch_count
+  in
+  if
+    Mina_numbers.Length.(
+      equal root_epoch best_tip_epoch || equal root_epoch zero)
+  then
+    (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
+    `Finalized
+      (Consensus.Data.Local_state.next_epoch_ledger
+         t.config.consensus_local_state)
+  else
+    (*No blocks in the new epoch is finalized yet, return nothing*)
+    `Notfinalized
 
 let find_delegators table pk =
   Option.value_map
@@ -740,10 +816,129 @@ let last_epoch_delegators t ~pk =
   in
   find_delegators last_epoch_delegatee_table pk
 
+let perform_compaction t =
+  match Mina_compile_config.compaction_interval_ms with
+  | None ->
+      ()
+  | Some compaction_interval_compiled ->
+      let slot_duration_ms =
+        let leeway = 1000 in
+        t.config.precomputed_values.constraint_constants
+          .block_window_duration_ms + leeway
+      in
+      let expected_time_for_compaction =
+        match Sys.getenv "MINA_COMPACTION_MS" with
+        | Some ms ->
+            Float.of_string ms
+        | None ->
+            6000.
+      in
+      let span ?(incr = 0.) ms =
+        Float.(of_int ms +. incr) |> Time.Span.of_ms
+      in
+      let interval_configured =
+        match Sys.getenv "MINA_COMPACTION_INTERVAL_MS" with
+        | Some ms ->
+            Time.Span.of_ms (Float.of_string ms)
+        | None ->
+            span compaction_interval_compiled
+      in
+      if Time.Span.(interval_configured <= of_ms expected_time_for_compaction)
+      then (
+        [%log' fatal t.config.logger]
+          "Time between compactions %f should be greater than the expected \
+           time for compaction %f"
+          (Time.Span.to_ms interval_configured)
+          expected_time_for_compaction ;
+        failwith
+          (sprintf
+             "Time between compactions %f should be greater than the expected \
+              time for compaction %f"
+             (Time.Span.to_ms interval_configured)
+             expected_time_for_compaction) ) ;
+      let call_compact () =
+        let start = Time.now () in
+        Gc.compact () ;
+        let span = Time.diff (Time.now ()) start in
+        [%log' debug t.config.logger]
+          ~metadata:[("time", `Float (Time.Span.to_ms span))]
+          "Gc.compact took $time ms"
+      in
+      let rec perform interval =
+        upon (after interval) (fun () ->
+            match !(t.block_production_status) with
+            | `Free ->
+                call_compact () ;
+                perform interval_configured
+            | `Producing ->
+                perform (span slot_duration_ms)
+            | `Producing_in_ms ms ->
+                if ms < expected_time_for_compaction then
+                  (*too close to block production; perform compaction after block production*)
+                  perform (span slot_duration_ms ~incr:ms)
+                else (
+                  call_compact () ;
+                  perform interval_configured ) )
+      in
+      perform interval_configured
+
 let start t =
+  let set_next_producer_timing timing consensus_state =
+    let block_production_status, next_producer_timing =
+      let generated_from_consensus_at :
+          Daemon_rpcs.Types.Status.Next_producer_timing.slot =
+        { slot= Consensus.Data.Consensus_state.curr_global_slot consensus_state
+        ; global_slot_since_genesis=
+            Consensus.Data.Consensus_state.global_slot_since_genesis
+              consensus_state }
+      in
+      let info time (data : Consensus.Data.Block_data.t) :
+          Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
+        let for_slot : Daemon_rpcs.Types.Status.Next_producer_timing.slot =
+          { slot= Consensus.Data.Block_data.global_slot data
+          ; global_slot_since_genesis=
+              Consensus.Data.Block_data.global_slot_since_genesis data }
+        in
+        {time; for_slot}
+      in
+      let status, timing =
+        match timing with
+        | `Check_again time ->
+            ( `Free
+            , Daemon_rpcs.Types.Status.Next_producer_timing.Check_again
+                ( time |> Block_time.Span.of_ms
+                |> Block_time.of_span_since_epoch ) )
+        | `Produce_now (block_data, _) ->
+            let info :
+                Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =
+              let time =
+                Consensus.Data.Consensus_time.of_global_slot
+                  ~constants:t.config.precomputed_values.consensus_constants
+                  (Consensus.Data.Block_data.global_slot block_data)
+                |> Consensus.Data.Consensus_time.to_time
+                     ~constants:t.config.precomputed_values.consensus_constants
+              in
+              info time block_data
+            in
+            (`Producing, Produce_now info)
+        | `Produce (time, block_data, _) ->
+            ( `Producing_in_ms (Int64.to_float time)
+            , Produce
+                (info
+                   ( time |> Block_time.Span.of_ms
+                   |> Block_time.of_span_since_epoch )
+                   block_data) )
+      in
+      ( status
+      , { Daemon_rpcs.Types.Status.Next_producer_timing.timing
+        ; generated_from_consensus_at } )
+    in
+    t.block_production_status := block_production_status ;
+    t.next_producer_timing <- Some next_producer_timing
+  in
   Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
-    ~prover:t.processes.prover ~trust_system:t.config.trust_system
+    ~set_next_producer_timing ~prover:t.processes.prover
+    ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
          t.components.transaction_pool)
@@ -757,6 +952,7 @@ let start t =
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
     ~precomputed_values:t.config.precomputed_values ;
+  perform_compaction t ;
   Snark_worker.start t
 
 let start_with_precomputed_blocks t blocks =
@@ -772,6 +968,7 @@ let start_with_precomputed_blocks t blocks =
   start t
 
 let create ?wallets (config : Config.t) =
+  let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
   let consensus_constants = config.precomputed_values.consensus_constants in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
@@ -1084,6 +1281,15 @@ let create ?wallets (config : Config.t) =
               ~get_transition_chain:
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
+              ~get_transition_knowledge:(fun _q ->
+                return
+                  ( match
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    with
+                  | None ->
+                      []
+                  | Some frontier ->
+                      Sync_handler.best_tip_path ~frontier ) )
           in
           (* tie the first knot *)
           net_ref := Some net ;
@@ -1154,6 +1360,7 @@ let create ?wallets (config : Config.t) =
                     config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                  ~catchup_mode
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
@@ -1391,7 +1598,7 @@ let create ?wallets (config : Config.t) =
                 return None
           in
           let sync_status =
-            create_sync_status_observer ~logger:config.logger
+            create_sync_status_observer ~logger:config.logger ~net
               ~is_seed:config.is_seed ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
@@ -1431,6 +1638,7 @@ let create ?wallets (config : Config.t) =
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status
-            ; precomputed_block_writer } ) )
+            ; precomputed_block_writer
+            ; block_production_status= ref `Free } ) )
 
 let net {components= {net; _}; _} = net

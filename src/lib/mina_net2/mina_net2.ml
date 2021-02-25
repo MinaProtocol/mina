@@ -58,10 +58,16 @@ module Validation_callback = struct
         result
 
   let fire_if_not_already_fired cb result =
-    if not (is_expired cb) then Ivar.fill cb.signal result
+    if not (is_expired cb) then (
+      if Ivar.is_full cb.signal then
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+      Ivar.fill cb.signal result )
 
   let fire_exn cb result =
-    if not (is_expired cb) then Ivar.fill cb.signal result
+    if not (is_expired cb) then (
+      if Ivar.is_full cb.signal then
+        [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+      Ivar.fill cb.signal result )
 end
 
 (** simple types for yojson to derive, later mapped into a Peer.t *)
@@ -425,7 +431,8 @@ module Helper = struct
         ; gating_config: Set_gater_config.input
         ; seed_peers: string list
         ; max_connections: int
-        ; validation_queue_size: int }
+        ; validation_queue_size: int
+        ; mina_peer_exchange: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -482,7 +489,7 @@ module Helper = struct
     end
 
     module Add_peer = struct
-      type input = {multiaddr: string} [@@deriving yojson]
+      type input = {multiaddr: string; seed: bool} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -503,6 +510,22 @@ module Helper = struct
       type output = peer_info list [@@deriving yojson]
 
       let name = "listPeers"
+    end
+
+    module Set_telemetry_data = struct
+      type input = {data: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "setTelemetryData"
+    end
+
+    module Get_peer_telemetry_data = struct
+      type input = {peer_multiaddr: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "getPeerTelemetryData"
     end
 
     module Find_peer = struct
@@ -759,7 +782,10 @@ module Helper = struct
       match Hashtbl.find_and_remove t.outstanding_requests seq with
       | Some ivar ->
           (* This fill should be okay because we "found and removed" the request *)
-          Ivar.fill ivar fill_result ; Ok ()
+          if Ivar.is_full ivar then
+            [%log' error t.logger] "Ivar.fill bug is here!" ;
+          Ivar.fill ivar fill_result ;
+          Ok ()
       | None ->
           Or_error.errorf "spurious reply to RPC #%d: %s" seq
             (Yojson.Safe.to_string v)
@@ -1130,7 +1156,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string [@@deriving compare]
+  type t = string [@@deriving compare, bin_io_unversioned]
 
   let to_string t = t
 
@@ -1146,6 +1172,19 @@ module Multiaddr = struct
       with _ -> None )
     | _ ->
         None
+
+  let valid_as_peer t =
+    match String.split ~on:'/' t with
+    | [""; protocol; _; "tcp"; _; "p2p"; _]
+      when List.mem ["ip4"; "ip6"; "dns4"; "dns6"] protocol ~equal:String.equal
+      ->
+        true
+    | _ ->
+        false
+
+  let of_file_contents ~(contents : string) : t list =
+    String.split ~on:'\n' contents
+    |> List.filter ~f:(fun s -> not (String.is_empty s))
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -1286,6 +1325,22 @@ end
 
 let me (net : Helper.t) = Ivar.read net.me_keypair
 
+let set_telemetry_data net data =
+  match%map
+    Helper.do_rpc net (module Helper.Rpcs.Set_telemetry_data) {data}
+  with
+  | Ok "setTelemetryData success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: setTelemetryData got %s" v ()
+  | Error e ->
+      Error e
+
+let get_peer_telemetry_data net peer =
+  Helper.do_rpc net
+    (module Helper.Rpcs.Get_peer_telemetry_data)
+    {peer_multiaddr= Peer.to_multiaddr_string peer}
+
 let list_peers net =
   match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
   | Ok peers ->
@@ -1307,8 +1362,8 @@ let list_peers net =
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~metrics_port ~on_peer_connected ~on_peer_disconnected ~unsafe_no_trust_ip
-    ~flooding ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
-    ~max_connections ~validation_queue_size =
+    ~flooding ~direct_peers ~peer_exchange ~mina_peer_exchange ~seed_peers
+    ~initial_gating_config ~max_connections ~validation_queue_size =
   net.Helper.peer_connected_callback
   <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
   net.Helper.peer_disconnected_callback
@@ -1328,6 +1383,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
+      ; mina_peer_exchange
       ; max_connections
       ; validation_queue_size
       ; gating_config=
@@ -1458,10 +1514,12 @@ let open_stream net ~protocol peer =
   | Error e ->
       Error e
 
-let add_peer net maddr =
+let add_peer net maddr ~seed =
   match%map
     Helper.(
-      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+      do_rpc net
+        (module Rpcs.Add_peer)
+        {multiaddr= Multiaddr.to_string maddr; seed})
   with
   | Ok "addPeer success" ->
       Ok ()
@@ -1516,6 +1574,7 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                 Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering") ) ;
+            Hashtbl.clear outstanding_requests ;
             if
               (not killed)
               && not
@@ -1524,23 +1583,47 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
                       !termination_hack_ref)
             then (
               match e with
-              | Error (`Exit_non_zero _) | Error (`Signal _) ->
+              | Ok ((Error (`Exit_non_zero _) | Error (`Signal _)) as e) ->
                   [%log fatal]
-                    !"libp2p_helper process died unexpectedly: %s"
-                    (Unix.Exit_or_signal.to_string_hum e) ;
+                    !"libp2p_helper process died unexpectedly: $exit_status"
+                    ~metadata:
+                      [ ( "exit_status"
+                        , `String (Unix.Exit_or_signal.to_string_hum e) ) ] ;
                   Option.iter !termination_hack_ref ~f:(fun t ->
                       t.finished <- true ) ;
                   on_unexpected_termination ()
-              | Ok () ->
+              | Error err ->
+                  [%log fatal]
+                    !"Child processes library could not track libp2p_helper \
+                      process: $err"
+                    ~metadata:[("err", Error_json.error_to_yojson err)] ;
+                  Option.iter !termination_hack_ref ~f:(fun t ->
+                      t.finished <- true ) ;
+                  let%bind () =
+                    match !termination_hack_ref with
+                    | Some {subprocess; _} ->
+                        Deferred.ignore_m (Child_processes.kill subprocess)
+                    | None ->
+                        Deferred.unit
+                  in
+                  on_unexpected_termination ()
+              | Ok (Ok ()) ->
                   [%log error]
                     "libp2p helper process exited peacefully but it should \
                      have been killed by shutdown!" ;
                   Deferred.unit )
-            else (
+            else
+              let exit_status =
+                match e with
+                | Ok e ->
+                    `String (Unix.Exit_or_signal.to_string_hum e)
+                | Error err ->
+                    Error_json.error_to_yojson err
+              in
               [%log info]
-                !"libp2p_helper process killed successfully: %s"
-                (Unix.Exit_or_signal.to_string_hum e) ;
-              Deferred.unit ) ))
+                !"libp2p_helper process killed successfully: $exit_status"
+                ~metadata:[("exit_status", exit_status)] ;
+              Deferred.unit ))
   with
   | Error e ->
       Deferred.Or_error.fail
@@ -1664,8 +1747,8 @@ let%test_module "coda network tests" =
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
@@ -1682,8 +1765,8 @@ let%test_module "coda network tests" =
       [%log error] ~metadata:[("peer", `String seed_peer)] "Seed_peer: $peer" ;
       let%bind () =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
@@ -1692,8 +1775,8 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       and () =
         configure c ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_c
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150

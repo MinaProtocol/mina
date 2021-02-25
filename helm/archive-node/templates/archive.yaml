@@ -45,8 +45,10 @@ spec:
           "-peer-exchange true"
           {{- end -}}
           {{- range .Values.coda.directPeers }}
-
           "-direct-peers", {{ . | quote }},
+          {{- end -}}
+          {{- if .Values.coda.seedPeersURL }}
+          "-peer-list-url", {{ .Values.coda.seedPeersURL | quote }},
           {{- end -}}
           "-config-directory", "/root/.coda-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
@@ -57,8 +59,8 @@ spec:
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end -}}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: DAEMON_REST_PORT
@@ -88,7 +90,7 @@ spec:
         - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.external }}
+          hostPort: {{ .Values.coda.ports.p2p }}
 {{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 

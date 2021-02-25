@@ -1,4 +1,6 @@
 resource "kubernetes_secret" "google_application_credentials" {
+  provider = kubernetes.bk_deploy
+
   count = var.enable_gcs_access ? 1 : 0
 
   metadata {

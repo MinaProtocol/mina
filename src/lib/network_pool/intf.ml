@@ -68,8 +68,8 @@ module type Resource_pool_diff_intf = sig
   (** How big to consider this diff for purposes of metering. *)
   val score : t -> int
 
-  (** The maximum "diff score" permitted per IP/peer-id per second. *)
-  val max_per_second : int
+  (** The maximum "diff score" permitted per IP/peer-id per 15 seconds. *)
+  val max_per_15_seconds : int
 
   val summary : t -> string
 

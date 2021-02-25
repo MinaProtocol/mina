@@ -333,6 +333,57 @@ module Rpcs = struct
     end
   end
 
+  module Get_transition_knowledge = struct
+    module Master = struct
+      let name = "Get_transition_knowledge"
+
+      module T = struct
+        type query = unit [@@deriving sexp, to_yojson]
+
+        type response = State_hash.t list
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response = State_hash.Stable.V1.t list
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+  end
+
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -514,15 +565,6 @@ module Rpcs = struct
 
   module Get_telemetry_data = struct
     module Telemetry_data = struct
-      let yojson_of_ban_status (peer, peer_status) =
-        `Assoc
-          [ ("IP_address", `String (Unix.Inet_addr.to_string peer.Peer.host))
-          ; ("peer_id", `String peer.peer_id)
-          ; ("peer_status", Trust_system.Peer_status.to_yojson peer_status) ]
-
-      let yojson_of_ban_statuses ban_statuses =
-        `List (List.map ban_statuses ~f:yojson_of_ban_status)
-
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -530,8 +572,16 @@ module Rpcs = struct
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
                   [@to_yojson
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
+                  [@of_yojson
+                    function
+                    | `String s ->
+                        Ok (Unix.Inet_addr.of_string s)
+                    | _ ->
+                        Error "expected string"]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
+                  [@of_yojson
+                    function `String s -> Ok s | _ -> Error "expected string"]
             ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
@@ -541,12 +591,11 @@ module Rpcs = struct
                 ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
-                  [@to_yojson yojson_of_ban_statuses]
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int }
-          [@@deriving to_yojson]
+          [@@deriving to_yojson, of_yojson]
 
           let to_latest = Fn.id
         end
@@ -624,6 +673,10 @@ module Rpcs = struct
           rpc
     | Get_transition_chain
         : (Get_transition_chain.query, Get_transition_chain.response) rpc
+    | Get_transition_knowledge
+        : ( Get_transition_knowledge.query
+          , Get_transition_knowledge.response )
+          rpc
     | Get_transition_chain_proof
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
@@ -631,8 +684,6 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_telemetry_data
-        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
@@ -653,6 +704,8 @@ module Rpcs = struct
         (module Answer_sync_ledger_query)
     | Get_transition_chain ->
         (module Get_transition_chain)
+    | Get_transition_knowledge ->
+        (module Get_transition_knowledge)
     | Get_transition_chain_proof ->
         (module Get_transition_chain_proof)
     | Get_ancestry ->
@@ -661,8 +714,6 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
-    | Get_telemetry_data ->
-        (module Get_telemetry_data)
     | Consensus_rpc rpc ->
         Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
@@ -689,8 +740,6 @@ module Rpcs = struct
     | Ban_notify, Ban_notify ->
         Some (do_ f)
     | Get_best_tip, Get_best_tip ->
-        Some (do_ f)
-    | Get_telemetry_data, Get_telemetry_data ->
         Some (do_ f)
     | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
         Consensus.Hooks.Rpcs.match_handler
@@ -798,7 +847,10 @@ let create (config : Config.t)
        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
     ~(get_transition_chain :
           Rpcs.Get_transition_chain.query Envelope.Incoming.t
-       -> Rpcs.Get_transition_chain.response Deferred.t) =
+       -> Rpcs.Get_transition_chain.response Deferred.t)
+    ~(get_transition_knowledge :
+          Rpcs.Get_transition_knowledge.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_knowledge.response Deferred.t) =
   let logger = config.logger in
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
@@ -979,16 +1031,6 @@ let create (config : Config.t)
           result
         else None
   in
-  let get_telemetry_data_rpc conn ~version:_ query =
-    [%log debug] "Sending telemetry data to $peer" ~metadata:(md conn) ;
-    let action_msg = "Telemetry_data" in
-    let msg_args = [] in
-    (* if peer doesn't return telemetry data, don't change trust score *)
-    let%map result, _sender =
-      run_for_rpc_result conn query ~f:get_telemetry_data action_msg msg_args
-    in
-    result
-  in
   let get_transition_chain_proof_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain_proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
@@ -1000,6 +1042,16 @@ let create (config : Config.t)
         msg_args
     in
     record_unknown_item result sender action_msg msg_args
+  in
+  let get_transition_knowledge_rpc conn ~version:_ query =
+    [%log info] "Sending transition_knowledge to $peer" ~metadata:(md conn) ;
+    let action_msg = "Get_transition_knowledge query: $query" in
+    let msg_args =
+      [("query", Rpcs.Get_transition_knowledge.query_to_yojson query)]
+    in
+    run_for_rpc_result conn query ~f:get_transition_knowledge action_msg
+      msg_args
+    >>| fst
   in
   let get_transition_chain_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain to $peer" ~metadata:(md conn) ;
@@ -1061,14 +1113,14 @@ let create (config : Config.t)
         ; budget= (3, `Per minute)
         ; cost= unit }
     ; Rpc_handler
-        { rpc= Get_telemetry_data
-        ; f= get_telemetry_data_rpc
-        ; budget= (12, `Per minute)
-        ; cost= unit }
-    ; Rpc_handler
         { rpc= Get_ancestry
         ; f= get_ancestry_rpc
         ; budget= (5, `Per minute)
+        ; cost= unit }
+    ; Rpc_handler
+        { rpc= Get_transition_knowledge
+        ; f= get_transition_knowledge_rpc
+        ; budget= (1, `Per minute)
         ; cost= unit }
     ; Rpc_handler
         { rpc= Get_transition_chain
@@ -1097,6 +1149,21 @@ let create (config : Config.t)
   let%map gossip_net =
     Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
   in
+  (* The telemetry data RPC is implemented directly in go, serving a string which
+     is periodically updated. This is so that one can make this RPC on a node even
+     if that node is at its connection limit. *)
+  let fake_time = Time.now () in
+  Clock.every' (Time.Span.of_min 1.) (fun () ->
+      match%bind
+        get_telemetry_data {data= (); sender= Local; received_at= fake_time}
+      with
+      | Error _ ->
+          Deferred.unit
+      | Ok data ->
+          Gossip_net.Any.set_telemetry_data gossip_net
+            ( Rpcs.Get_telemetry_data.Telemetry_data.to_yojson data
+            |> Yojson.Safe.to_string )
+          >>| ignore ) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
@@ -1178,6 +1245,20 @@ include struct
 
   let peers = lift peers
 
+  let get_peer_telemetry_data t peer =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind s = get_peer_telemetry_data t.gossip_net peer in
+    Or_error.try_with (fun () ->
+        match
+          Rpcs.Get_telemetry_data.Telemetry_data.of_yojson
+            (Yojson.Safe.from_string s)
+        with
+        | Ok x ->
+            x
+        | Error e ->
+            failwith e )
+    |> Deferred.return
+
   let add_peer = lift add_peer
 
   let initial_peers = lift initial_peers
@@ -1186,9 +1267,13 @@ include struct
 
   let random_peers = lift random_peers
 
-  let random_peers_except = lift random_peers_except
+  let query_peer ?heartbeat_timeout ?timeout {gossip_net; _} =
+    query_peer ?heartbeat_timeout ?timeout gossip_net
 
-  let query_peer ?timeout {gossip_net; _} = query_peer ?timeout gossip_net
+  let query_peer' ?how ?heartbeat_timeout ?timeout {gossip_net; _} =
+    query_peer' ?how ?heartbeat_timeout ?timeout gossip_net
+
+  let restart_helper {gossip_net; _} = restart_helper gossip_net
 
   (* these cannot be directly lifted due to the value restriction *)
   let on_first_connect t = lift on_first_connect t
@@ -1236,20 +1321,6 @@ let broadcast_snark_pool_diff t diff =
              Option.value_exn (Snark_pool.Resource_pool.Diff.to_compact diff)
          })
 
-(* TODO: This is kinda inefficient *)
-let find_map xs ~f =
-  let open Async in
-  let ds = List.map xs ~f in
-  let filter ~f =
-    Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-  in
-  let none_worked =
-    Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-        if List.for_all ds ~f:Option.is_none then return None
-        else Deferred.never () )
-  in
-  Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
-
 (* TODO: Don't copy and paste *)
 let find_map' xs ~f =
   let open Async in
@@ -1268,9 +1339,11 @@ let find_map' xs ~f =
 
 let online_status t = t.online_status
 
-let make_rpc_request ?timeout ~rpc ~label t peer input =
+let make_rpc_request ?heartbeat_timeout ?timeout ~rpc ~label t peer input =
   let open Deferred.Let_syntax in
-  match%map query_peer ?timeout t peer.Peer.peer_id rpc input with
+  match%map
+    query_peer ?heartbeat_timeout ?timeout t peer.Peer.peer_id rpc input
+  with
   | Connected {data= Ok (Some response); _} ->
       Ok response
   | Connected {data= Ok None; _} ->
@@ -1282,16 +1355,17 @@ let make_rpc_request ?timeout ~rpc ~label t peer input =
   | Failed_to_connect e ->
       Error (Error.tag e ~tag:"failed-to-connect")
 
-let get_transition_chain_proof t =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain_proof
-    ~label:"transition chain proof" t
+let get_transition_chain_proof ?heartbeat_timeout ?timeout t =
+  make_rpc_request ?heartbeat_timeout ?timeout
+    ~rpc:Rpcs.Get_transition_chain_proof ~label:"transition chain proof" t
 
-let get_transition_chain t =
-  make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
-    t
+let get_transition_chain ?heartbeat_timeout ?timeout t =
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_transition_chain
+    ~label:"chain of transitions" t
 
-let get_best_tip ?timeout t peer =
-  make_rpc_request ?timeout ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
+let get_best_tip ?heartbeat_timeout ?timeout t peer =
+  make_rpc_request ?heartbeat_timeout ?timeout ~rpc:Rpcs.Get_best_tip
+    ~label:"best tip" t peer ()
 
 let ban_notify t peer banned_until =
   query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
@@ -1391,8 +1465,41 @@ let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
 let get_ancestry t inet_addr input =
   rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
 
+module Sl_downloader = struct
+  module Key = struct
+    module T = struct
+      type t = Ledger_hash.t * Sync_ledger.Query.t
+      [@@deriving hash, compare, sexp, to_yojson]
+    end
+
+    include T
+    include Comparable.Make (T)
+    include Hashable.Make (T)
+  end
+
+  include Downloader.Make
+            (Key)
+            (struct
+              type t = unit [@@deriving to_yojson]
+
+              let download : t = ()
+
+              let worth_retrying () = true
+            end)
+            (struct
+              type t =
+                (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
+                * Mina_base.Sync_ledger.Answer.t
+              [@@deriving to_yojson]
+
+              let key = fst
+            end)
+            (Ledger_hash)
+end
+
 let glue_sync_ledger :
        t
+    -> preferred:Peer.t list
     -> (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
        Pipe_lib.Linear_pipe.Reader.t
     -> ( Mina_base.Ledger_hash.t
@@ -1400,72 +1507,66 @@ let glue_sync_ledger :
        * Mina_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit =
- fun t query_reader response_writer ->
-  (* We attempt to query 3 random peers, retry_max times. We keep track of the
-          peers that couldn't answer a particular query and won't try them
-          again. *)
-  let retry_max = 6 in
-  let retry_interval = Core.Time.Span.of_ms 200. in
-  let rec answer_query ctr peers_tried query =
-    O1trace.trace_event "ask sync ledger query" ;
-    let%bind peers = random_peers_except t 3 ~except:peers_tried in
-    [%log' trace t.logger]
-      !"SL: Querying the following peers %{sexp: Peer.t list}"
-      peers ;
-    match%bind
-      find_map peers ~f:(fun peer ->
-          [%log' trace t.logger]
-            !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
-              Ledger_hash.t}"
-            peer (fst query) ;
-          match%map
-            query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
-          with
-          | Connected {data= Ok (Ok answer); sender; _} ->
-              [%log' trace t.logger]
-                !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
-                  %{sexp: Ledger_hash.t}"
-                peer (fst query) ;
-              (* TODO : here is a place where an envelope could contain
-                a Peer.t, and not just an IP address, if desired
-            *)
-              Some (Envelope.Incoming.wrap ~data:answer ~sender)
-          | Connected {data= Ok (Error e); _} ->
-              [%log' info t.logger]
-                "Peer $peer didn't have enough information to answer \
-                 ledger_hash query. See error for more details: $error"
-                ~metadata:
-                  [ ("error", Error_json.error_to_yojson e)
-                  ; ("peer", Peer.to_yojson peer) ] ;
-              Hash_set.add peers_tried peer ;
-              None
-          | Connected {data= Error e; _} ->
-              [%log' info t.logger]
-                "RPC error during ledger_hash query See error for more \
-                 details: $error"
-                ~metadata:[("error", Error_json.error_to_yojson e)] ;
-              Hash_set.add peers_tried peer ;
-              None
-          | Failed_to_connect err ->
-              [%log' warn t.logger] "Network error: %s"
-                (Error.to_string_mach err) ;
-              None )
-    with
-    | Some answer ->
-        [%log' trace t.logger]
-          !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-          (fst query) ;
-        (* TODO *)
-        Linear_pipe.write_if_open response_writer (fst query, snd query, answer)
-    | None ->
-        [%log' info t.logger]
-          !"None of the peers contacted were able to answer ledger_hash query \
-            -- trying more" ;
-        if ctr > retry_max then Deferred.unit
-        else
-          let%bind () = Clock.after retry_interval in
-          answer_query (ctr + 1) peers_tried query
+ fun t ~preferred query_reader response_writer ->
+  let downloader =
+    let heartbeat_timeout = Time_ns.Span.of_sec 20. in
+    let global_stop = Pipe_lib.Linear_pipe.closed query_reader in
+    let knowledge h peer =
+      match%map
+        query_peer ~heartbeat_timeout ~timeout:(Time.Span.of_sec 10.) t
+          peer.Peer.peer_id Rpcs.Answer_sync_ledger_query (h, Num_accounts)
+      with
+      | Connected {data= Ok _; _} ->
+          `Call (fun (h', _) -> Ledger_hash.equal h' h)
+      | Failed_to_connect _ | Connected {data= Error _; _} ->
+          `Some []
+    in
+    let%bind _ = Linear_pipe.values_available query_reader in
+    let root_hash_r, root_hash_w =
+      Broadcast_pipe.create
+        (Option.value_exn (Linear_pipe.peek query_reader) |> fst)
+    in
+    Sl_downloader.create ~preferred ~max_batch_size:100
+      ~peers:(fun () -> peers t)
+      ~knowledge_context:root_hash_r ~knowledge ~stop:global_stop
+      ~trust_system:t.trust_system
+      ~get:(fun (peer : Peer.t) qs ->
+        List.iter qs ~f:(fun (h, _) ->
+            if
+              not
+                (Ledger_hash.equal h (Broadcast_pipe.Reader.peek root_hash_r))
+            then don't_wait_for (Broadcast_pipe.Writer.write root_hash_w h) ) ;
+        let%map rs =
+          query_peer' ~how:`Parallel ~heartbeat_timeout
+            ~timeout:(Time.Span.of_sec (Float.of_int (List.length qs) *. 2.))
+            t peer.peer_id Rpcs.Answer_sync_ledger_query qs
+        in
+        match rs with
+        | Failed_to_connect e ->
+            Error e
+        | Connected res -> (
+          match res.data with
+          | Error e ->
+              Error e
+          | Ok rs -> (
+            match List.zip qs rs with
+            | Unequal_lengths ->
+                Or_error.error_string "mismatched lengths"
+            | Ok ps ->
+                Ok
+                  (List.filter_map ps ~f:(fun (q, r) ->
+                       match r with Ok r -> Some (q, r) | Error _ -> None )) )
+          ) )
   in
-  Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
-    ~f:(answer_query 0 (Peer.Hash_set.of_list []))
-  |> don't_wait_for
+  don't_wait_for
+    (let%bind downloader = downloader in
+     Linear_pipe.iter_unordered ~max_concurrency:400 query_reader ~f:(fun q ->
+         match%bind
+           Sl_downloader.Job.result
+             (Sl_downloader.download downloader ~key:q ~attempts:Peer.Map.empty)
+         with
+         | Error _ ->
+             Deferred.unit
+         | Ok (a, _) ->
+             Linear_pipe.write_if_open response_writer
+               (fst q, snd q, {a with data= snd a.data}) ))

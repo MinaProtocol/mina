@@ -1,4 +1,4 @@
-// K8s Cluster Vars
+# K8s Cluster Vars
 
 variable "cluster_name" {
   type = string
@@ -16,6 +16,11 @@ variable "k8s_context" {
 }
 
 # Global Vars
+
+variable "use_local_charts" {
+  type    = bool
+  default = false
+}
 
 variable "coda_image" {
   type    = string
@@ -52,6 +57,11 @@ variable "coda_points_image" {
   default = ""
 }
 
+variable "watchdog_image" {
+  type = string
+  default = "gcr.io/o1labs-192920/watchdog:latest"
+}
+
 # this must be a string to avoid scientific notation truncation
 variable "coda_faucet_amount" {
   type    = string
@@ -69,7 +79,7 @@ variable "testnet_name" {
   default = "coda-testnet"
 }
 
-variable "additional_seed_peers" {
+variable "additional_peers" {
   type    = list
   default = []
 }
@@ -77,6 +87,11 @@ variable "additional_seed_peers" {
 variable "archive_node_count" {
   type    = number
   default = 0
+}
+
+variable "runtime_config" {
+  type    = string
+  default = ""
 }
 
 # Seed Vars
@@ -106,16 +121,6 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
-variable "whale_count" {
-  type    = number
-  default = 1
-}
-
-variable "fish_count" {
-  type    = number
-  default = 1
-}
-
 variable "log_level" {
   type    = string
   default = "Trace"
@@ -135,23 +140,33 @@ variable "block_producer_key_pass" {
   type = string
 }
 
-variable "block_producer_starting_host_port" {
-  type    = number
-  default = 10000
-}
-
 variable "block_producer_configs" {
   type = list(
     object({
       name = string,
       class = string,
       private_key_secret = string,
+      external_port = number,
       libp2p_secret = string,
       enable_gossip_flooding = bool,
       enable_peer_exchange = bool,
       isolated = bool,
       run_with_user_agent = bool,
       run_with_bots = bool
+    })
+  )
+  default = []
+}
+
+variable "seed_configs" {
+  type = list(
+    object({
+      name = string,
+      class = string
+      libp2p_secret = string
+      external_port = number
+      external_ip   = string
+      private_key_secret = string
     })
   )
   default = []
@@ -276,4 +291,9 @@ variable "archive_persistence_size" {
 variable "upload_blocks_to_gcloud" {
   type    = bool
   default = false
+}
+
+variable "seed_peers_url" {
+  type = string
+  default = ""
 }

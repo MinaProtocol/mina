@@ -40,7 +40,10 @@ mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
 cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
-
+cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
+cp ./_build/default/src/app/missing_subchain/missing_subchain.exe "${BUILD_DIR}/usr/local/bin/mina-missing-subchain"
+cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
+chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -63,8 +66,8 @@ ls -lh mina*.deb
 #>> Repository is locked by another user:  at host dc7eaad3c537
 #>> Attempting to obtain a lock
 #/var/lib/gems/2.3.0/gems/deb-s3-0.10.0/lib/deb/s3/lock.rb:24:in `throw': uncaught throw #"Unable to obtain a lock after 60, giving up."
-DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions 
---lock 
+DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions
+--lock
 --cache-control=max-age=120'
 
 # check for AWS Creds
@@ -109,7 +112,7 @@ if [ -n "${BUILDKITE+x}" ]; then
 
     set +x
 else
-    mkdir docker_build 
+    mkdir docker_build
     mv mina-*.deb docker_build/.
 
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin

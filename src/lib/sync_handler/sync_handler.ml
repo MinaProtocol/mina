@@ -150,18 +150,35 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.max_catchup_chunk_length ;
         None )
     in
-    Option.all
-    @@ List.map hashes ~f:(fun hash ->
-           let%map validated_transition =
-             Option.merge
-               Transition_frontier.(
-                 find frontier hash >>| Breadcrumb.validated_transition)
-               ( find_in_root_history frontier hash
-               >>| fun x -> Root_data.Historical.transition x )
-               ~f:Fn.const
-           in
-           External_transition.Validation.forget_validation
-             validated_transition )
+    let get hash =
+      let%map validated_transition =
+        Option.merge
+          Transition_frontier.(
+            find frontier hash >>| Breadcrumb.validated_transition)
+          ( find_in_root_history frontier hash
+          >>| fun x -> Root_data.Historical.transition x )
+          ~f:Fn.const
+      in
+      External_transition.Validation.forget_validation validated_transition
+    in
+    match Transition_frontier.catchup_tree frontier with
+    | Full _ ->
+        (* Super catchup *)
+        Option.return @@ List.filter_map hashes ~f:get
+    | Hash _ ->
+        (* Normal catchup *)
+        Option.all @@ List.map hashes ~f:get
+
+  let best_tip_path ~frontier =
+    let rec go acc b =
+      let acc = Breadcrumb.state_hash b :: acc in
+      match Transition_frontier.find frontier (Breadcrumb.parent_hash b) with
+      | None ->
+          acc
+      | Some b' ->
+          go acc b'
+    in
+    go [] (Transition_frontier.best_tip frontier)
 
   module Root = struct
     let prove ~logger ~consensus_constants ~frontier seen_consensus_state =

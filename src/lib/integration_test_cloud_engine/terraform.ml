@@ -4,12 +4,6 @@ open Core
 let cons (type a) (key : string) (body : a) (to_yojson : a -> Yojson.Safe.t) =
   `Assoc [(key, to_yojson body)]
 
-type provider = string * string
-
-let provider_to_yojson (provider, alias) = `String (provider ^ "." ^ alias)
-
-type depends_on = provider list [@@deriving to_yojson]
-
 module Backend = struct
   module S3 = struct
     type t =
@@ -54,7 +48,7 @@ module Block = struct
   module Module = struct
     type t =
       { local_name: string
-      ; providers: (string * provider) list
+      ; providers: (string * string) list
       ; source: string
       ; args: (string * Yojson.Safe.t) list }
 
@@ -62,9 +56,8 @@ module Block = struct
       cons local_name () (fun () ->
           let const_fields =
             [ ( "providers"
-              , `Assoc
-                  (List.map providers ~f:(fun (k, v) ->
-                       (k, provider_to_yojson v) )) )
+              , `Assoc (List.map providers ~f:(fun (k, v) -> (k, `String v)))
+              )
             ; ("source", `String source) ]
           in
           `Assoc (const_fields @ args) )

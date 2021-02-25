@@ -103,8 +103,10 @@ end
  *  ensure the code does not accidentally attach the same
  *  consumer multiple times. *)
 module Consumer_registry : sig
+  type id = string
+
   val register :
-    id:string -> processor:Processor.t -> transport:Transport.t -> unit
+    id:id -> processor:Processor.t -> transport:Transport.t -> unit
 end
 
 type 'a log_function =

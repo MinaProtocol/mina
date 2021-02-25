@@ -238,6 +238,8 @@ module type Sync_handler_intf = sig
     -> State_hash.t sexp_list
     -> External_transition.t sexp_list option
 
+  val best_tip_path : frontier:transition_frontier -> State_hash.t sexp_list
+
   (** Allows a peer to prove to a node that they can bootstrap from transition
       that they have gossiped to the network *)
   module Root :
@@ -374,6 +376,7 @@ module type Transition_router_intf = sig
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
     -> precomputed_values:Precomputed_values.t
+    -> catchup_mode:[`Normal | `Super]
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
        Strict_pipe.Reader.t

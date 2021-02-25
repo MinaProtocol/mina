@@ -66,7 +66,16 @@ let coinbase_merkle_tree =
 
 let vrf_message = salt vrf_message
 
-let signature = salt signature
+[%%if
+mainnet]
+
+let signature = salt signature_mainnet
+
+[%%else]
+
+let signature = salt signature_testnet
+
+[%%endif]
 
 let vrf_output = salt vrf_output
 

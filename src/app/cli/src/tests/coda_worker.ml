@@ -416,6 +416,7 @@ module T = struct
               ; conf_dir
               ; chain_id
               ; logger
+              ; seed_peer_list_url= None
               ; unsafe_no_trust_ip= true
               ; isolate= false
               ; trust_system
@@ -424,6 +425,7 @@ module T = struct
               ; max_connections= 50
               ; validation_queue_size= 150
               ; peer_exchange= true
+              ; mina_peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
           let net_config =
@@ -452,7 +454,7 @@ module T = struct
           let coda_deferred () =
             Mina_lib.create
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~disable_telemetry:true
+                 ~chain_id ~is_seed ~disable_telemetry:true ~super_catchup:true
                  ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None

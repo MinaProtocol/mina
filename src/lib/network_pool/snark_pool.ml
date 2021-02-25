@@ -353,9 +353,12 @@ struct
             Hashtbl.remove t.snark_tables.rebroadcastable work ;
           (*when snark work is added to the pool*)
           Mina_metrics.(
+            Gauge.set Snark_work.useful_snark_work_received_time_sec
+              Time.(
+                let x = now () |> to_span_since_epoch |> Span.to_sec in
+                x -. Mina_metrics.time_offset_sec) ;
             Gauge.set Snark_work.snark_pool_size
-              (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
-          Mina_metrics.(
+              (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
               ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
@@ -443,18 +446,33 @@ struct
                     ~data:(One_or_two.map proofs ~f:fst, message)
                     ~sender
                 in
-                match%bind Batcher.Snark_pool.verify t.batcher proof_env with
-                | Ok true ->
-                    return true
-                | Ok false ->
-                    (* if this proof is in the set of invalid proofs*)
-                    let e = Error.of_string "Invalid proof" in
-                    let%map () = log e in
-                    false
-                | Error e ->
-                    (* Verifier crashed or other errors at our end. Don't punish the peer*)
-                    let%map () = log ~punish:false e in
-                    false )
+                match Signature_lib.Public_key.decompress prover with
+                | None ->
+                    (* We may need to decompress the key when paying the fee
+                 transfer, so check that we can do it now.
+              *)
+                    [%log' error t.logger]
+                      "Proof had an invalid key: $public_key"
+                      ~metadata:
+                        [ ( "public_key"
+                          , Signature_lib.Public_key.Compressed.to_yojson
+                              prover ) ] ;
+                    Deferred.return false
+                | Some _ -> (
+                    match%bind
+                      Batcher.Snark_pool.verify t.batcher proof_env
+                    with
+                    | Ok true ->
+                        return true
+                    | Ok false ->
+                        (* if this proof is in the set of invalid proofs*)
+                        let e = Error.of_string "Invalid proof" in
+                        let%map () = log e in
+                        false
+                    | Error e ->
+                        (* Verifier crashed or other errors at our end. Don't punish the peer*)
+                        let%map () = log ~punish:false e in
+                        false ) )
         in
         match One_or_two.zip proofs statements with
         | Ok pairs ->

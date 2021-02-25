@@ -14,9 +14,9 @@ module Make_numeric (Input : sig
 end) : sig
   type t = Input.t
 
-  val serialize : t -> Yojson.Basic.json
+  val serialize : t -> Yojson.Basic.t
 
-  val deserialize : Yojson.Basic.json -> t
+  val deserialize : Yojson.Basic.t -> t
 end = struct
   open Input
 
