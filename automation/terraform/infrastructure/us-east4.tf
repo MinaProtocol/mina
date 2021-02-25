@@ -166,7 +166,7 @@ resource "google_container_node_pool" "east4_compute_nodes" {
   node_count = 5
   autoscaling {
     min_node_count = 2
-    max_node_count = 5
+    max_node_count = 10
   }
   node_config {
     preemptible  = true
@@ -291,13 +291,13 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
           spec {
             container {
               name    = "integration-test-janitor"
-              image   = "gcr.io/o1labs-192920/watchdog:0.1.0"
+              image   = "gcr.io/o1labs-192920/watchdog:0.3.8"
               args = [
                 "/scripts/network-utilities.py",
                 "janitor",
                 "cleanup-namespace-resources",
                 "--namespace-pattern",
-                ".*integration.*",
+                ".*integration|auto|ci-net.*",
                 "--k8s-context",
                 "gke_o1labs-192920_us-west1_mina-integration-west1",
                 "--kube-config-file",
