@@ -187,6 +187,7 @@ resource "google_container_node_pool" "east1_compute_nodes" {
 
 ## Data Persistence
 
+# TODO: deprecate below region based storage classes once OK to do so (i.e. all testnets have migrated to new classes)
 resource "kubernetes_storage_class" "east1_ssd" {
   provider = kubernetes.k8s_east1
 
@@ -210,6 +211,42 @@ resource "kubernetes_storage_class" "east1_standard" {
 
   metadata {
     name = "${local.east1_region}-standard-${lower(local.storage_reclaim_policies[count.index])}"
+  }
+
+  storage_provisioner = "kubernetes.io/gce-pd"
+  reclaim_policy      = local.storage_reclaim_policies[count.index]
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "pd-standard"
+  }
+}
+
+# ---
+
+resource "kubernetes_storage_class" "east1_infra_ssd" {
+  provider = kubernetes.k8s_east1
+
+  count = length(local.storage_reclaim_policies)
+
+  metadata {
+    name = "ssd-${lower(local.storage_reclaim_policies[count.index])}"
+  }
+
+  storage_provisioner = "kubernetes.io/gce-pd"
+  reclaim_policy      = local.storage_reclaim_policies[count.index]
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "pd-ssd"
+  }
+}
+
+resource "kubernetes_storage_class" "east1_infra_standard" {
+  provider = kubernetes.k8s_east1
+
+  count = length(local.storage_reclaim_policies)
+
+  metadata {
+    name = "standard-${lower(local.storage_reclaim_policies[count.index])}"
   }
 
   storage_provisioner = "kubernetes.io/gce-pd"
