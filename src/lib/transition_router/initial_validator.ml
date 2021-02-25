@@ -280,5 +280,20 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                         ~delta:genesis_constants.protocol.delta error
              in
              Interruptible.force computation >>| ignore )
-           else Deferred.unit )
+           else
+             let state_hash =
+               Envelope.Incoming.data transition_env
+               |> External_transition.state_hash
+             in
+             let metadata =
+               [ ("state_hash", State_hash.to_yojson state_hash)
+               ; ( "time_received"
+                 , `String
+                     (Time.to_string_abs
+                        (Block_time.to_time time_received)
+                        ~zone:Time.Zone.utc) ) ]
+             in
+             [%log error] ~metadata
+               "Dropping blocks because libp2p validation expired" ;
+             Deferred.unit )
          else Deferred.unit ))
