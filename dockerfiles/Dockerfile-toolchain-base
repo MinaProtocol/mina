@@ -24,5 +24,3 @@ ADD buildkite /buildkite
 WORKDIR /buildkite
 RUN mkdir -p ${cacheHome} && XDG_CACHE_HOME=${cacheHome} make check
 ENV XDG_CACHE_HOME=${cacheHome}
-
-ENTRYPOINT ["bash", "-c"]
