@@ -9,4 +9,6 @@ locals {
     secret = "seed-discovery-keys",
     port = 10401
   }
+
+  base_graphql_dns = "${var.testnet_name}.graphql.o1test.net"
 }

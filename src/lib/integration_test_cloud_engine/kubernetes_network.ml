@@ -43,10 +43,11 @@ module Node = struct
 
   module Graphql = struct
     let ingress_uri node =
-      Uri.make
-        ~host:(Printf.sprintf "%s.graphql.o1test.net" node.testnet_name)
-        ~path:(Printf.sprintf "%s/graphql" node.pod_id)
-        ~port:3085 ()
+      Uri.make ~scheme:"http"
+        ~host:
+          (Printf.sprintf "%s.%s.graphql.o1test.net" node.pod_id
+             node.testnet_name)
+        ~path:"/graphql" ~port:80 ()
 
     let get_pod_name t : string Malleable_error.t =
       let args =
@@ -146,53 +147,56 @@ module Node = struct
       ?(initial_delay_sec = 30.0) ~logger ~node
       ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
-    [%log info]
-      "exec_graphql_request, Will now attempt to make GraphQL request: %s"
-      query_name ;
-    let err_str str = sprintf "%s: %s" query_name str in
+    let uri = Graphql.ingress_uri node in
+    let metadata =
+      [("query", `String query_name); ("uri", `String (Uri.to_string uri))]
+    in
+    [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\""
+      ~metadata ;
     let rec retry n =
       if n <= 0 then (
-        let err_str = err_str "too many tries" in
-        [%log fatal] "%s" err_str ;
-        Malleable_error.of_string_hard_error err_str )
+        [%log error]
+          "GraphQL request \"$query\" to \"$uri\" failed too many times"
+          ~metadata ;
+        Malleable_error.of_string_hard_error_format
+          "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
+          (Uri.to_string uri) )
       else
         match%bind
           Deferred.bind ~f:Malleable_error.return
-            ((Graphql.Client.query query_obj) (Graphql.ingress_uri node))
+            ((Graphql.Client.query query_obj) uri)
         with
         | Ok result ->
-            let err_str = err_str "succeeded" in
-            [%log info] "exec_graphql_request %s" err_str ;
+            [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
+              ~metadata ;
             return result
         | Error (`Failed_request err_string) ->
-            let err_str =
-              err_str
-                (sprintf
-                   "exec_graphql_request, Failed GraphQL request: %s, %d \
-                    tries left"
-                   err_string (n - 1))
-            in
-            [%log warn] "%s" err_str ;
+            [%log warn]
+              "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
+               ($num_tries attempts left)"
+              ~metadata:
+                ( metadata
+                @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
+                ) ;
             let%bind () =
               Deferred.bind ~f:Malleable_error.return
                 (after (Time.Span.of_sec retry_delay_sec))
             in
             retry (n - 1)
         | Error (`Graphql_error err_string) ->
-            let err_str =
-              err_str
-                (sprintf "exec_graphql_request, GraphQL error: %s" err_string)
-            in
-            [%log error] "%s" err_str ;
-            if retry_on_graphql_error then (
+            [%log error]
+              "GraphQL request \"$query\" to \"$uri\" returned an error: \
+               \"$error\" ($num_tries attempts left)"
+              ~metadata:
+                ( metadata
+                @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
+                ) ;
+            if retry_on_graphql_error then
               let%bind () =
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
-              [%log debug]
-                "exec_graphql_request, After GraphQL error, %d tries left"
-                (n - 1) ;
-              retry (n - 1) )
+              retry (n - 1)
             else Malleable_error.of_string_hard_error err_string
     in
     let%bind () =

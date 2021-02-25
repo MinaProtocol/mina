@@ -1,5 +1,9 @@
 resource "kubernetes_ingress" "testnet_graphql_ingress" {
-  depends_on = [module.kubernetes_testnet.testnet_namespace]
+  depends_on = [
+    module.kubernetes_testnet.testnet_namespace,
+    # module.kubernetes_testnet.seeds_release,
+    module.kubernetes_testnet.block_producers_release
+  ]
 
   metadata {
     name = "${var.testnet_name}-graphql-ingress"
@@ -15,6 +19,7 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
       for_each = var.block_producer_configs
 
       content {
+        host = "${rule.value.name}.${local.base_graphql_dns}"
         http {
           path {
             backend {
@@ -22,7 +27,7 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
               service_port = 3085
             }
 
-            path = "/${rule.value.name}/*"
+            path = "/graphql"
           }
         }
       }
@@ -36,7 +41,7 @@ resource "aws_route53_record" "testnet_graphql_dns" {
   depends_on = [kubernetes_ingress.testnet_graphql_ingress]
 
   zone_id = var.aws_route53_zone_id
-  name    = "${var.testnet_name}.graphql.o1test.net"
+  name    = "*.${local.base_graphql_dns}"
   type    = "A"
   ttl     = "300"
   records = [kubernetes_ingress.testnet_graphql_ingress.status[0].load_balancer[0].ingress[0].ip]

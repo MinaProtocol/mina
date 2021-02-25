@@ -356,14 +356,12 @@ metadata:
   name: {{ $config.name }}-graphql
 spec:
   type: NodePort
-  # We want all pods to have their addresses published for the sake of the
-  # other testnet pods even before they're ready, since they
-  # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
     app: {{ $config.name }}
   ports:
   - name: http-graphql
+    protocol: TCP
     port: {{ $.Values.coda.ports.graphql }}
 ---
 {{ end }}
