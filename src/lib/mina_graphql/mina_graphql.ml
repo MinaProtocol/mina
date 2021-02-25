@@ -451,21 +451,21 @@ module Types = struct
       let snappState_vector ?doc ~typ name :
           (_, (_, Pickles_types.Nat.N8.n) Pickles_types.Vector.t option) typ =
         obj name ?doc ~fields:(fun _ ->
-            [ field "0" ~typ ~args:[] ~resolve:(fun _ v ->
+            [ field "x_0" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 0 )
-            ; field "1" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_1" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 1 )
-            ; field "2" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_2" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 2 )
-            ; field "3" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_3" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 3 )
-            ; field "4" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_4" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 4 )
-            ; field "5" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_5" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 5 )
-            ; field "6" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_6" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 6 )
-            ; field "7" ~typ ~args:[] ~resolve:(fun _ v ->
+            ; field "x_7" ~typ ~args:[] ~resolve:(fun _ v ->
                   List.nth_exn (Pickles_types.Vector.to_list v) 7 ) ] )
 
       let snappState :
@@ -2723,14 +2723,14 @@ module Types = struct
                 ~f:(Option.value_map ~f:coerce ~default)
                 [x0; x1; x2; x3; x4; x5; x6; x7] )
             ~fields:
-              [ arg "0" ~typ
-              ; arg "1" ~typ
-              ; arg "2" ~typ
-              ; arg "3" ~typ
-              ; arg "4" ~typ
-              ; arg "5" ~typ
-              ; arg "6" ~typ
-              ; arg "7" ~typ ]
+              [ arg "x_0" ~typ
+              ; arg "x_1" ~typ
+              ; arg "x_2" ~typ
+              ; arg "x_3" ~typ
+              ; arg "x_4" ~typ
+              ; arg "x_5" ~typ
+              ; arg "x_6" ~typ
+              ; arg "x_7" ~typ ]
 
         let snappState =
           snappState_vector "InputSnappState" ~doc:"The state for the snapp account"
