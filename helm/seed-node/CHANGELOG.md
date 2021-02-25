@@ -13,6 +13,6 @@
 - enable multiple seed-node deployment configurations
 - add peers list URL chart value
 
-0.6.2:
+1.0.0:
 ------
 - coda -> mina
