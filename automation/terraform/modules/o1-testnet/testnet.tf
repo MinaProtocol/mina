@@ -101,7 +101,6 @@ module "kubernetes_testnet" {
         class                  = "seed"
         id                     = i + 1
         external_port          = local.static_peers[local.seed_names[i]].port
-        node_port              = i + 30000
         external_ip            = google_compute_address.seed_static_ip[i].address
         private_key_secret     = "online-seeds-account-${i + 1}-key"
         libp2p_secret          = "online-seeds-libp2p-${i + 1}-key"
