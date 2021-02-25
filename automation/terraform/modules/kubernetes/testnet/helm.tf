@@ -42,14 +42,13 @@ locals {
     }
 
     seedConfigs = [
-      for index, config in var.seed_configs : {
-        name             = config.name
-        class            = config.class
-        libp2pSecret     = config.libp2p_secret
-        privateKeySecret = config.private_key_secret
-        externalPort     = config.external_port
-        externalIp       = config.external_ip
-        nodePort         = config.node_port
+      for index, config in var.seed_configs: {
+        name                 = config.name
+        class                = config.class
+        libp2pSecret         = config.libp2p_secret
+        privateKeySecret     = config.private_key_secret
+        externalPort         = config.external_port
+        externalIp           = config.external_ip
       }
     ]
   }

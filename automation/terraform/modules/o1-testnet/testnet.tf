@@ -119,17 +119,16 @@ module "kubernetes_testnet" {
   )
 
   seed_configs = [
-    for i in range(var.seed_count) : {
-      name               = local.seed_names[i]
-      class              = "seed"
-      id                 = i + 1
-      external_port      = local.static_peers[local.seed_names[i]].port
-      node_port          = i + 30000
-      external_ip        = google_compute_address.seed_static_ip[i].address
-      private_key_secret = "online-seeds-account-${i + 1}-key"
-      libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
-    }
-  ]
+      for i in range(var.seed_count): {
+        name                   = local.seed_names[i]
+        class                  = "seed"
+        id                     = i + 1
+        external_port          = local.static_peers[local.seed_names[i]].port
+        external_ip            = google_compute_address.seed_static_ip[i].address
+        private_key_secret     = "online-seeds-account-${i + 1}-key"
+        libp2p_secret          = "online-seeds-libp2p-${i + 1}-key"
+      }
+    ]
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes

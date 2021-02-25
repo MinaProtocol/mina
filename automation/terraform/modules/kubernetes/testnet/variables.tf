@@ -162,12 +162,11 @@ variable "block_producer_configs" {
 variable "seed_configs" {
   type = list(
     object({
-      name               = string,
-      class              = string
-      libp2p_secret      = string
-      external_port      = number
-      external_ip        = string
-      node_port          = number
+      name = string,
+      class = string
+      libp2p_secret = string
+      external_port = number
+      external_ip   = string
       private_key_secret = string
     })
   )

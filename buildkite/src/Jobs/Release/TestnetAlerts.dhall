@@ -16,23 +16,23 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.strictlyEnd (S.contains "Chart.yaml"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
-        S.exactly "buildkite/scripts/helm-ci" "sh"
+        S.exactly "automation/terraform/infrastructure/templates/testnet-alerts.yml" "tpl",
+        S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
       path = "Release",
-      name = "HelmRelease"
+      name = "TestnetAlerts"
     },
     steps = [
       Command.build
         Command.Config::{
-          commands = [ Cmd.run "HELM_RELEASE=true AUTO_DEPLOY=true buildkite/scripts/helm-ci.sh" ]
-          , label = "Helm chart release"
-          , key = "release-helm-chart"
+          commands = [
+              Cmd.run "cd automation/terraform/infrastructure && terraform init",
+              Cmd.run "terraform apply -auto-approve -target docker_container.sync_alert_rules" ]
+          , label = "Deploy Testnet alert rules"
+          , key = "deploy-testnet-alerts"
           , target = Size.Medium
           , docker = None Docker.Type
-          , artifact_paths = [ S.contains "updates/*" ]
-          , depends_on = [ { name = "HelmChart", key = "lint-helm-chart" } ]
+          , depends_on = [ { name = "TestnetAlerts", key = "lint-testnet-alerts" } ]
         }
     ]
   }
