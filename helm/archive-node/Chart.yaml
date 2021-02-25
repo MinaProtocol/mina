@@ -6,7 +6,7 @@ version: 0.4.10
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - fix peer-list-url flag
+    - coda -> mina
 dependencies:
   - name: postgresql
     version: "*"
