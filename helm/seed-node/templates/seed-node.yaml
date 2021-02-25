@@ -184,6 +184,5 @@ spec:
   - name: tcp-p2p
     port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
-    nodePort: {{ $config.nodePort }}
 ---
 {{ end }}

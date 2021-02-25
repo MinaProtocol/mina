@@ -166,7 +166,6 @@ variable "seed_configs" {
       libp2p_secret = string
       external_port = number
       external_ip   = string
-      node_port     = number
       private_key_secret = string
     })
   )

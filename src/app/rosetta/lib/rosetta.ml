@@ -3,8 +3,15 @@ open Async
 open Rosetta_lib
 
 let router ~graphql_uri ~pool ~logger route body =
+  let open Deferred.Result.Let_syntax in
+  let get_graphql_uri_or_error () =
+    match graphql_uri with
+    | None ->
+        Deferred.Result.fail (`App (Errors.create `Graphql_uri_not_set))
+    | Some graphql_uri ->
+        Deferred.Result.return graphql_uri
+  in
   let with_db f =
-    let open Deferred.Result.Let_syntax in
     let%bind pool = Lazy.force pool in
     Caqti_async.Pool.use (fun db -> f ~db) pool
     |> Deferred.Result.map_error ~f:(function
@@ -24,15 +31,19 @@ let router ~graphql_uri ~pool ~logger route body =
   try
     match route with
     | "network" :: tl ->
+        let%bind graphql_uri = get_graphql_uri_or_error () in
         Network.router tl body ~graphql_uri ~logger ~with_db
     | "account" :: tl ->
+        let%bind graphql_uri = get_graphql_uri_or_error () in
         Account.router tl body ~graphql_uri ~logger ~with_db
     | "mempool" :: tl ->
+        let%bind graphql_uri = get_graphql_uri_or_error () in
         Mempool.router tl body ~graphql_uri ~logger
     | "block" :: tl ->
+        let%bind graphql_uri = get_graphql_uri_or_error () in
         Block.router tl body ~graphql_uri ~logger ~with_db
     | "construction" :: tl ->
-        Construction.router tl body ~graphql_uri ~logger
+        Construction.router tl body ~get_graphql_uri_or_error ~logger
     | _ ->
         Deferred.return (Error `Page_not_found)
   with exn -> Deferred.return (Error (`Exception exn))
@@ -89,7 +100,7 @@ let command =
       Cli.optional_uri
   and graphql_uri =
     flag "--graphql-uri" ~aliases:["graphql-uri"]
-      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
+      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.optional_uri
   and log_json =
     flag "--log-json" ~aliases:["log-json"]
       ~doc:"Print log output as JSON (default: plain text)" no_arg
