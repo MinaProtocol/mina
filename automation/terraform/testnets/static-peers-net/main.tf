@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 0.13.0"
+  required_version = ">= 0.13.0"
   backend "s3" {
     key     = "terraform-beansqa.tfstate"
     encrypt = true
