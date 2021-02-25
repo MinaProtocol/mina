@@ -32,7 +32,7 @@ Pipeline.build
         S.strictlyStart (S.contains "src/lib"),
         S.strictlyStart (S.contains "src/nonconsensus"),
         S.strictly (S.contains "Makefile"),
-        S.strictlyStart (S.contains "buildkite/src/Jobs/Test/UnitTest"),
+        S.exactly "buildkite/src/Jobs/Test/DaemonUnitTest" "dhall",
         S.exactly "scripts/link-coredumps" "sh",
         S.exactly "buildkite/scripts/unit-test" "sh"
       ]
@@ -42,7 +42,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = unitDirtyWhen,
         path = "Test",
-        name = "UnitTest"
+        name = "DaemonUnitTest"
       },
     steps = [
       buildTestCmd "dev" "src/lib" Size.XLarge,

@@ -49,15 +49,16 @@ variable "fish_count" {
   default     = 2
 }
 
+variable "seed_count" {
+  default     = 1
+}
+
 locals {
   testnet_name = "watchdog-test"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.2.11-compatible-a5fa443-watchdog-test-feb43ca"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.2.11-compatible-a5fa443"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-watchdog-test-88a86bc"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
-  seed_discovery_keypairs = [
-  "CAESQBEHe2zCcQDHcSaeIydGggamzmTapdCS8SP0hb5FWvYhe9XEygmlUGV4zNu2P8zAIba4X84Gm4usQFLamjRywA8=,CAESIHvVxMoJpVBleMzbtj/MwCG2uF/OBpuLrEBS2po0csAP,12D3KooWJ9mNdbUXUpUNeMnejRumKzmQF15YeWwAPAhTAWB6dhiv",
-  "CAESQO+8qvMqTaQEX9uh4NnNoyOy4Xwv3U80jAsWweQ1J37AVgx7kgs4pPVSBzlP7NDANP1qvSvEPOTh2atbMMUO8EQ=,CAESIFYMe5ILOKT1Ugc5T+zQwDT9ar0rxDzk4dmrWzDFDvBE,12D3KooWFcGGeUmbmCNq51NBdGvCWjiyefdNZbDXADMK5CDwNRm5" ]
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -65,16 +66,17 @@ locals {
   EOT
 
   # replace with `make_report_accounts = ""` if not in use (will fail if file not present)
-  make_report_accounts = <<EOT
-    ${file("../../../${local.testnet_name}-accounts.csv")}
-  EOT
+  # make_report_accounts = <<EOT
+  #   ${file("../../../${local.testnet_name}-accounts.csv")}
+  # EOT
+  make_report_accounts = ""
 }
 
 module "testnet_east" {
   providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
-  artifact_path = "./"
+  artifact_path = abspath(path.module)
 
   cluster_name   = "coda-infra-east4"
   cluster_region = "us-east4"
@@ -86,7 +88,7 @@ module "testnet_east" {
   coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
   coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.7"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
 
   coda_faucet_amount = "10000000000"
   coda_faucet_fee    = "100000000"
@@ -98,7 +100,7 @@ module "testnet_east" {
   agent_send_every_mins = "1"
 
   archive_node_count  = 0
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/10fcc9bc4b5aca13a00b80d92507ca21f0f20106/src/app/archive/create_schema.sql" 
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/474e314bf6a35adb4976ed7c5b1b68f5c776ad78/src/app/archive/create_schema.sql" 
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
@@ -115,6 +117,7 @@ module "testnet_east" {
   snark_worker_host_port = 10401
   whale_count           = var.whale_count
   fish_count            = var.fish_count
+  seed_count            = var.seed_count
 
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
@@ -123,5 +126,5 @@ module "testnet_east" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/watchdog-test_seeds.txt"
 }
