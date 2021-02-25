@@ -58,7 +58,7 @@ of the repo.
 
 - Pull down developer container image (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171`
+`docker pull codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c`
 
 - Create local builder image
 
@@ -79,11 +79,6 @@ of the repo.
 <a href="#dev-env"></a>
 
 #### Customizing your dev environment for autocomplete/merlin
-
-- If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
-  build
-
-`make USEDOCKER=TRUE merlin-fixup`
 
 - If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 

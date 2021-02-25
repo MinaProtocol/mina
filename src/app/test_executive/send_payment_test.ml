@@ -1,12 +1,16 @@
 (* open Async *)
 open Integration_test_lib
 
-module Make (Engine : Engine_intf) = struct
+module Make (Inputs : Intf.Test.Inputs_intf) = struct
+  open Inputs
   open Engine
+  open Dsl
 
   type network = Network.t
 
-  type log_engine = Log_engine.t
+  type node = Network.Node.t
+
+  type dsl = Dsl.t
 
   let config =
     let open Test_config in
@@ -17,18 +21,17 @@ module Make (Engine : Engine_intf) = struct
 
   let expected_error_event_reprs = []
 
-  let run network log_engine =
+  let run network t =
     let open Malleable_error.Let_syntax in
-    let block_producer = Caml.List.nth network.Network.block_producers 0 in
-    let%bind () = Log_engine.wait_for_init block_producer log_engine in
-    let node = Core_kernel.List.nth_exn network.block_producers 0 in
+    let block_producer = Caml.List.nth (Network.block_producers network) 0 in
+    let%bind () =
+      wait_for t (Wait_condition.node_to_initialize block_producer)
+    in
+    let node = Core_kernel.List.nth_exn (Network.block_producers network) 0 in
     let logger = Logger.create () in
     (* wait for initialization *)
-    let%bind () = Log_engine.wait_for_init node log_engine in
+    let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
     [%log info] "send_payment_test: done waiting for initialization" ;
-    let graphql_port = block_producer.node_graphql_port in
-    Async_kernel.Deferred.don't_wait_for
-      (Node.set_port_forwarding_exn ~logger block_producer graphql_port) ;
     (* same keypairs used by Coda_automation to populate the ledger *)
     let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs in
     (* send the payment *)
@@ -37,12 +40,13 @@ module Make (Engine : Engine_intf) = struct
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
-      Node.send_payment ~logger node ~sender ~receiver ~amount ~fee
+      Network.Node.send_payment ~logger node ~sender ~receiver ~amount ~fee
     in
     (* confirm payment *)
     let%map () =
-      Log_engine.wait_for_payment log_engine ~logger ~sender ~receiver ~amount
-        ()
+      wait_for t
+        (Wait_condition.payment_to_be_included_in_frontier ~sender ~receiver
+           ~amount)
     in
     [%log info] "send_payment_test: succesfully completed"
 end

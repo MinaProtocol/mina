@@ -287,6 +287,7 @@ let negative_one ~genesis_ledger ~genesis_epoch_data ~constraint_constants
   ; body=
       { Body.Poly.blockchain_state=
           Blockchain_state.negative_one ~constraint_constants
+            ~consensus_constants
             ~genesis_ledger_hash:
               (Mina_base.Ledger.merkle_root (Lazy.force genesis_ledger))
             ~snarked_next_available_token:

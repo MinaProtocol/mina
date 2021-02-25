@@ -10,7 +10,7 @@ export OPAMYES=1
 # Set term to xterm if not set
 export TERM=${TERM:-xterm}
 
-SWITCH='4.07.1'
+SWITCH='ocaml-variants.4.07.1+logoom'
 
 if [[ -d ~/.opam ]]; then
   # ocaml environment
@@ -34,10 +34,14 @@ fi
 pushd /home/opam/opam-repository && git pull && popd
 
 if [ "$SWITCH_FOUND" = true ]; then
+  # Add the o1-labs opam repository
+  opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
   opam switch set $SWITCH
 else
   # Build opam from scratch
   opam init
+  # Add the o1-labs opam repository
+  opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git
   opam update
   opam switch create $SWITCH || true
   opam switch $SWITCH

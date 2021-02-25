@@ -11,12 +11,15 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyri
 RUN apt-get update && apt-get install -y google-cloud-sdk
 
 ARG COMMIT_HASH=master
-ARG TESTNET_NAME=turbo-pickles
+ARG TESTNET_NAME=testworld
 ARG CONFIG_FILE="/root/daemon.json"
 
 RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
 
 RUN head ${CONFIG_FILE}
+
+# Create the defautl config dir and an empty config
+RUN mkdir -p /root/.coda-config && echo "{}" > /root/.coda-config/daemon.json
 
 RUN coda daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
   mv ~/.coda-config/genesis/genesis_* /var/lib/coda/

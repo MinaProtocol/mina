@@ -13,7 +13,10 @@ module T = struct
   let notify t state_hash =
     State_hash.Table.change t state_hash ~f:(function
       | Some ls ->
-          List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
+          List.iter ls ~f:(fun ivar ->
+              if Ivar.is_full ivar then
+                [%log' error (Logger.create ())] "Ivar.fill bug is here!" ;
+              Ivar.fill ivar () ) ;
           None
       | None ->
           None )

@@ -112,13 +112,22 @@ end
     - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
 *)
 module Multiaddr : sig
-  type t [@@deriving compare]
+  type t [@@deriving compare, bin_io]
 
   val to_string : t -> string
 
   val of_string : string -> t
 
   val to_peer : t -> Network_peer.Peer.t option
+
+  (** can a multiaddr plausibly be used as a Peer.t?
+      a syntactic check only; a return value of
+       true does not guarantee that the multiaddress can
+       be used as a peer by libp2p
+  *)
+  val valid_as_peer : t -> bool
+
+  val of_file_contents : contents:string -> t list
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -241,6 +250,7 @@ val configure :
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
   -> peer_exchange:bool
+  -> mina_peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> max_connections:int
@@ -255,6 +265,12 @@ val me : net -> Keypair.t Deferred.t
 
 (** List of all peers we know about. *)
 val peers : net -> Peer.t list Deferred.t
+
+(** Set telemetry data to be served to peers requesting telemetry data. *)
+val set_telemetry_data : net -> string -> unit Deferred.Or_error.t
+
+(** Get telemetry data from given peer. *)
+val get_peer_telemetry_data : net -> Peer.t -> string Deferred.Or_error.t
 
 (** Try to connect to a peer ID, returning a [Peer.t]. *)
 val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t
@@ -359,7 +375,7 @@ val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
 (** Connect to a peer, ensuring it enters our peerbook and DHT.
 
     This can fail if the connection fails. *)
-val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
+val add_peer : net -> Multiaddr.t -> seed:bool -> unit Deferred.Or_error.t
 
 (** Join the DHT and announce our existence.
 
@@ -369,7 +385,7 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
 
-(** Configure the connection gateway. 
+(** Configure the connection gateway.
 
     This will fail if any of the trusted or banned peers are on IPv6. *)
 val set_connection_gating_config :

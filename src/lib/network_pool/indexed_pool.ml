@@ -112,29 +112,45 @@ let currency_consumed_unchecked :
         let open Snapp_command.Party in
         let f (x1 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t)
             (x2 : ((Body.t, _) Predicated.Poly.t, _) Authorized.Poly.t option)
-            =
+            token_id (fee_payment : Mina_base.Other_fee_payer.t option) =
+          let fee_payer =
+            match fee_payment with
+            | Some {payload= {pk; token_id; _}; _} ->
+                Some (Account_id.create pk token_id)
+            | None ->
+                None
+          in
           let ps =
             x1.data.body
             :: Option.(to_list (map x2 ~f:(fun x2 -> x2.data.body)))
           in
-          List.find_map_exn ps ~f:(fun p ->
-              match p.delta.sgn with
-              | Pos ->
+          List.find_map ps ~f:(fun p ->
+              match fee_payer with
+              | Some fee_payer
+                when not
+                       (Account_id.equal fee_payer
+                          (Account_id.create p.pk token_id)) ->
+                  (* Fee payer is distinct from this account. *)
                   None
-              | Neg ->
-                  Some p.delta.magnitude )
+              | _ -> (
+                match p.delta.sgn with
+                | Pos ->
+                    None
+                | Neg ->
+                    Some p.delta.magnitude ) )
+          |> Option.value ~default:Currency.Amount.zero
         in
         match c with
         | Proved_proved r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Proved_signed r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Signed_signed r ->
-            f r.one (Some r.two)
+            f r.one (Some r.two) r.token_id r.fee_payment
         | Proved_empty r ->
-            f r.one r.two
+            f r.one r.two r.token_id r.fee_payment
         | Signed_empty r ->
-            f r.one r.two )
+            f r.one r.two r.token_id r.fee_payment )
   in
   fee_amt + amt
 
@@ -779,7 +795,7 @@ let rec add_from_gossip_exn :
         ; consensus_constants
         ; time_controller }
       , Sequence.empty )
-  | Some (queued_cmds, reserved_currency) -> (
+  | Some (queued_cmds, reserved_currency) ->
       (* commands queued for this sender *)
       assert (not @@ F_sequence.is_empty queued_cmds) ;
       let last_queued_nonce =
@@ -860,20 +876,6 @@ let rec add_from_gossip_exn :
             ~error:(Insufficient_replace_fee (`Replace_fee replace_fee, fee))
           (* C3 *)
         in
-        let increment =
-          Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
-        in
-        let%bind () =
-          let replace_fee =
-            Option.value_exn
-              (Currency.Fee.scale replace_fee (F_sequence.length drop_queue))
-          in
-          Result.ok_if_true
-            Currency.Fee.(increment >= replace_fee)
-            ~error:
-              (Insufficient_replace_fee (`Replace_fee replace_fee, increment))
-          (* C3 *)
-        in
         let dropped, t' =
           remove_with_dependents_exn t @@ F_sequence.head_exn drop_queue
         in
@@ -882,15 +884,72 @@ let rec add_from_gossip_exn :
           Transaction_hash.User_command_with_valid_signature.t Sequence.t]
           dropped
           (F_sequence.to_seq drop_queue) ;
-        match add_from_gossip_exn t' ~verify cmd0 current_nonce balance with
-        | Ok (v, t'', dropped') ->
-            (* We've already removed them, so this should always be empty. *)
-            assert (Sequence.is_empty dropped') ;
-            Result.Ok (v, t'', dropped)
-        | Error (Insufficient_funds _ as err) ->
-            Error err (* C2 *)
-        | _ ->
-            failwith "recursive add_exn failed" )
+        let%bind cmd = verified () in
+        (* Add the new transaction *)
+        let%bind cmd, t'', _ =
+          match
+            add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce balance
+          with
+          | Ok (v, t'', dropped') ->
+              (* We've already removed them, so this should always be empty. *)
+              assert (Sequence.is_empty dropped') ;
+              Result.Ok (v, t'', dropped)
+          | Error err ->
+              Error err
+        in
+        let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
+        let increment =
+          Option.value_exn Currency.Fee.(fee - User_command.fee_exn to_drop)
+        in
+        (* Re-add all of the transactions we dropped until there are none left,
+           or until the fees from dropped transactions exceed the fee increase
+           over the first transaction.
+        *)
+        let%bind t'', increment, dropped' =
+          let rec go t' increment dropped dropped' current_nonce =
+            match (Sequence.next dropped, dropped') with
+            | None, Some dropped' ->
+                Ok (t', increment, dropped')
+            | None, None ->
+                Ok (t', increment, Sequence.empty)
+            | Some (cmd, dropped), Some _ -> (
+                let cmd_unchecked =
+                  Transaction_hash.User_command_with_valid_signature.command
+                    cmd
+                in
+                let replace_fee = User_command.fee_exn cmd_unchecked in
+                match Currency.Fee.(increment - replace_fee) with
+                | Some increment ->
+                    go t' increment dropped dropped' current_nonce
+                | None ->
+                    Error
+                      (Insufficient_replace_fee
+                         (`Replace_fee replace_fee, increment)) )
+            | Some (cmd, dropped'), None -> (
+                let current_nonce = Account_nonce.succ current_nonce in
+                match
+                  add_from_gossip_exn t' ~verify (`Checked cmd) current_nonce
+                    balance
+                with
+                | Ok (_v, t', dropped_) ->
+                    assert (Sequence.is_empty dropped_) ;
+                    go t' increment dropped' None current_nonce
+                | Error _err ->
+                    (* Re-evaluate with the same [dropped] to calculate the new
+                       fee increment.
+                    *)
+                    go t' increment dropped (Some dropped') current_nonce )
+          in
+          go t'' increment drop_tail None current_nonce
+        in
+        let%map () =
+          Result.ok_if_true
+            Currency.Fee.(increment >= replace_fee)
+            ~error:
+              (Insufficient_replace_fee (`Replace_fee replace_fee, increment))
+          (* C3 *)
+        in
+        (cmd, t'', Sequence.(append (return drop_head) dropped'))
 
 let add_from_backtrack :
        t

@@ -31,6 +31,12 @@ let receiver_pk t = t.receiver
 
 let receiver t = Account_id.create t.receiver Token_id.default
 
+(* This must match [Transaction_union].
+   TODO: enforce this.
+*)
+let fee_payer_pk cb =
+  match cb.fee_transfer with None -> cb.receiver | Some ft -> ft.receiver_pk
+
 let amount t = t.amount
 
 let fee_transfer t = t.fee_transfer

@@ -14,4 +14,5 @@ end)
 
 let verify ~target_hash ~transition_chain_proof:(init_state_hash, merkle_list)
     =
+  (* TODO: Should we check the length here too? *)
   Merkle_list_verifier.verify ~init:init_state_hash merkle_list target_hash

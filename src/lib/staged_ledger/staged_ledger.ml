@@ -31,6 +31,7 @@ module T = struct
       | Insufficient_work of string
       | Mismatched_statuses of
           Transaction.t With_status.t * Transaction_status.t
+      | Invalid_public_key of Public_key.Compressed.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -66,6 +67,11 @@ module T = struct
             !"Got a different status %{sexp: Transaction_status.t} when \
               applying the transaction %{sexp: Transaction.t With_status.t}"
             status transaction
+      | Invalid_public_key pk ->
+          Format.asprintf
+            !"A transaction contained an invalid public key %{sexp: \
+              Public_key.Compressed.t}"
+            pk
       | Unexpected e ->
           Error.to_string_hum e
 
@@ -578,6 +584,16 @@ module T = struct
               let%map () = Async.Scheduler.yield () in
               List.fold ts ~init:(acc, pending_coinbase_stack_state)
                 ~f:(fun (acc, pending_coinbase_stack_state) t ->
+                  ( match
+                      List.find (Transaction.public_keys t.With_status.data)
+                        ~f:(fun pk ->
+                          Option.is_none
+                            (Signature_lib.Public_key.decompress pk) )
+                    with
+                  | None ->
+                      ()
+                  | Some pk ->
+                      raise (Exit (Invalid_public_key pk)) ) ;
                   match
                     apply_transaction_and_get_witness ~constraint_constants
                       ledger pending_coinbase_stack_state t.With_status.data

@@ -244,15 +244,16 @@ module Make (Inputs : Intf.Inputs_intf) :
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
-        flag "daemon-address"
+        flag "--daemon-address" ~aliases:["daemon-address"]
           (required (Arg_type.create Host_and_port.of_string))
           ~doc:"HOST-AND-PORT address daemon is listening on"
       and proof_level =
-        flag "proof-level"
+        flag "--proof-level" ~aliases:["proof-level"]
           (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
           ~doc:"full|check|none"
       and shutdown_on_disconnect =
-        flag "shutdown-on-disconnect" (optional bool)
+        flag "--shutdown-on-disconnect" ~aliases:["shutdown-on-disconnect"]
+          (optional bool)
           ~doc:
             "true|false Shutdown when disconnected from daemon (default:true)"
       in

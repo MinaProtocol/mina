@@ -1,0 +1,7 @@
+(library
+ (name downloader)
+ (public_name downloader)
+ (libraries core async trust_system pipe_lib mina_base network_peer)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_jane ppx_coda ppx_version ppx_deriving.std ppx_deriving_yojson)))
+

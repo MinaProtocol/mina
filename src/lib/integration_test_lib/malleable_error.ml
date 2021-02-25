@@ -54,6 +54,12 @@ end)
 
 include T
 
+let is_ok = function
+  | Ok {Accumulator.computation_result= _; soft_errors= []} ->
+      true
+  | _ ->
+      false
+
 let ok_unit = return ()
 
 let ok_exn (res : 'a t) : 'a Deferred.t =
@@ -160,6 +166,14 @@ let lift_error_set (type a) (m : a t) :
       Ok (computation_result, internal_error_set [] soft_errors)
   | Error {Hard_fail.hard_error; soft_errors} ->
       Error (internal_error_set [hard_error] soft_errors)
+
+let lift_error_set_unit (m : unit t) : Test_error.Set.t Deferred.t =
+  let open Deferred.Let_syntax in
+  match%map lift_error_set m with
+  | Ok ((), errors) ->
+      errors
+  | Error errors ->
+      errors
 
 module List = struct
   let rec iter ls ~f =

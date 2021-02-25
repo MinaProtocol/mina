@@ -97,7 +97,9 @@ required_excludes = [
 ]
 
 # these extra jobs are not filters, they are full status check names
-extra_required_status_checks = ['buildkite/mina/pr']
+extra_required_status_checks = [
+    'buildkite/mina/pr', 'buildkite/mina-pr-gating'
+]
 
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [

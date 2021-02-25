@@ -38,6 +38,8 @@ module Reader : sig
   (** Read a single value from the pipe or fail if the pipe is closed *)
   val read : 't t -> [`Eof | `Ok of 't] Deferred.t
 
+  val read' : 't t -> [`Eof | `Ok of 't Base.Queue.t] Deferred.t
+
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
   val of_linear_pipe : ?name:string -> 't Linear_pipe.Reader.t -> 't t
@@ -71,6 +73,8 @@ module Reader : sig
   (** This is a specialization of a fold for the common case of accumulating
    * unit. See [fold reader ~init ~f] *)
   val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
+
+  val iter' : 'a t -> f:('a Base.Queue.t -> unit Deferred.t) -> unit Deferred.t
 
   (** See [fold_without_pushback reader ~init ~f] *)
   val iter_without_pushback :
@@ -125,6 +129,7 @@ end
 
 val create :
      ?name:string
+  -> ?warn_on_drop:bool
   -> ('t, 'type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 

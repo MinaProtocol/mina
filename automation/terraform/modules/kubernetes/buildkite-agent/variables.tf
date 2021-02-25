@@ -21,6 +21,13 @@ variable "k8s_context" {
   default     = "minikube"
 }
 
+variable "testnet_k8s_ctx" {
+  type = string
+
+  description = "Default k8s resource provider context for deploying testnets"
+  default     = "gke_o1labs-192920_us-west1_mina-integration-west1"
+}
+
 # Module Vars: Agent
 
 variable "cluster_name" {

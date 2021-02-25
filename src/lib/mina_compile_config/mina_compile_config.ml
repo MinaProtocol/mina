@@ -29,6 +29,20 @@ module Currency = Currency_nonconsensus.Currency
 [%%inject
 "minimum_user_command_fee_string", minimum_user_command_fee]
 
+[%%ifndef
+compaction_interval]
+
+let compaction_interval_ms = None
+
+[%%else]
+
+[%%inject
+"compaction_interval", compaction_interval]
+
+let compaction_interval_ms = Some compaction_interval
+
+[%%endif]
+
 let minimum_user_command_fee =
   Currency.Fee.of_formatted_string minimum_user_command_fee_string
 

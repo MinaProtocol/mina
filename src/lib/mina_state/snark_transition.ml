@@ -53,10 +53,11 @@ let create_value ~blockchain_state ~consensus_transition
     ~pending_coinbase_update () : Value.t =
   {blockchain_state; consensus_transition; pending_coinbase_update}
 
-let genesis ~constraint_constants ~genesis_ledger : value =
+let genesis ~constraint_constants ~consensus_constants ~genesis_ledger : value
+    =
   let genesis_ledger = Lazy.force genesis_ledger in
   { Poly.blockchain_state=
-      Blockchain_state.genesis ~constraint_constants
+      Blockchain_state.genesis ~constraint_constants ~consensus_constants
         ~genesis_ledger_hash:(Ledger.merkle_root genesis_ledger)
         ~snarked_next_available_token:
           (Ledger.next_available_token genesis_ledger)

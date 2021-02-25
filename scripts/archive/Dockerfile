@@ -33,5 +33,3 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
   && apt-get install -y "mina-archive=$coda_deb_version"
-
-ENTRYPOINT ["bash", "-c"]

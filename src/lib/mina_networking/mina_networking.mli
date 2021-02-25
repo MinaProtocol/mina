@@ -48,6 +48,12 @@ module Rpcs : sig
     type response = External_transition.t list option
   end
 
+  module Get_transition_knowledge : sig
+    type query = unit
+
+    type response = State_hash.t list
+  end
+
   module Get_transition_chain_proof : sig
     type query = State_hash.t
 
@@ -130,6 +136,10 @@ module Rpcs : sig
           rpc
     | Get_transition_chain
         : (Get_transition_chain.query, Get_transition_chain.response) rpc
+    | Get_transition_knowledge
+        : ( Get_transition_knowledge.query
+          , Get_transition_knowledge.response )
+          rpc
     | Get_transition_chain_proof
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
@@ -137,8 +147,6 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_telemetry_data
-        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -175,7 +183,13 @@ val states :
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val add_peer : t -> Network_peer.Peer.t -> unit Deferred.Or_error.t
+val get_peer_telemetry_data :
+     t
+  -> Network_peer.Peer.t
+  -> Rpcs.Get_telemetry_data.Telemetry_data.t Deferred.Or_error.t
+
+val add_peer :
+  t -> Network_peer.Peer.t -> seed:bool -> unit Deferred.Or_error.t
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -200,7 +214,8 @@ val get_ancestry :
      Deferred.Or_error.t
 
 val get_best_tip :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.t
   -> ( External_transition.t
@@ -209,13 +224,17 @@ val get_best_tip :
      Deferred.Or_error.t
 
 val get_transition_chain_proof :
-     t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> State_hash.t
   -> (State_hash.t * State_body_hash.t List.t) Deferred.Or_error.t
 
 val get_transition_chain :
-     t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
+  -> t
   -> Network_peer.Peer.t
   -> State_hash.t list
   -> External_transition.t list Deferred.Or_error.t
@@ -254,6 +273,7 @@ val broadcast_transaction_pool_diff :
 
 val glue_sync_ledger :
      t
+  -> preferred:Peer.t list
   -> (Ledger_hash.t * Sync_ledger.Query.t) Linear_pipe.Reader.t
   -> ( Ledger_hash.t
      * Sync_ledger.Query.t
@@ -262,12 +282,15 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-     ?timeout:Time.Span.t
+     ?heartbeat_timeout:Time_ns.Span.t
+  -> ?timeout:Time.Span.t
   -> t
   -> Network_peer.Peer.Id.t
   -> ('q, 'r) Rpcs.rpc
   -> 'q
   -> 'r Mina_base.Rpc_intf.rpc_response Deferred.t
+
+val restart_helper : t -> unit
 
 val ip_for_peer :
   t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
@@ -313,4 +336,8 @@ val create :
   -> get_transition_chain:(   Rpcs.Get_transition_chain.query
                               Envelope.Incoming.t
                            -> Rpcs.Get_transition_chain.response Deferred.t)
+  -> get_transition_knowledge:(   Rpcs.Get_transition_knowledge.query
+                                  Envelope.Incoming.t
+                               -> Rpcs.Get_transition_knowledge.response
+                                  Deferred.t)
   -> t Deferred.t

@@ -1,1 +1,1 @@
-include Integration_test_lib.Engine_intf
+include Integration_test_lib.Intf.Engine.S
