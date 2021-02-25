@@ -1,5 +1,5 @@
 locals {
-  west1_region = "us-west1"
+  west1_region      = "us-west1"
   west1_k8s_context = "gke_o1labs-192920_us-west1_mina-integration-west1"
 
   west1_prometheus_helm_values = {
@@ -21,9 +21,9 @@ locals {
           }
           write_relabel_configs = [
             {
-              source_labels: ["__name__"]
-              regex: "(buildkite.*|container.*|Coda.*|watchdog.*)"
-              action: "keep"
+              source_labels : ["__name__"]
+              regex : "(buildkite.*|container.*|Coda.*|watchdog.*)"
+              action : "keep"
             }
           ]
         }
@@ -43,22 +43,22 @@ provider "google" {
 }
 
 provider "kubernetes" {
-  alias   = "k8s_west1"
+  alias          = "k8s_west1"
   config_context = local.west1_k8s_context
 }
 
 data "google_compute_zones" "west1_available" {
   project = local.gcp_project
-  region = local.west1_region
-  status = "UP"
+  region  = local.west1_region
+  status  = "UP"
 }
 
 ### Testnets
 
 resource "google_container_cluster" "mina_integration_west1" {
-  provider = google.google_west1
-  name     = "mina-integration-west1"
-  location = local.west1_region
+  provider           = google.google_west1
+  name               = "mina-integration-west1"
+  location           = local.west1_region
   min_master_version = "1.16"
 
   node_locations = data.google_compute_zones.west1_available.names
@@ -80,7 +80,7 @@ resource "google_container_cluster" "mina_integration_west1" {
 }
 
 resource "google_container_node_pool" "west1_integration_primary" {
-  provider = google.google_west1
+  provider   = google.google_west1
   name       = "mina-integration-primary"
   location   = local.west1_region
   cluster    = google_container_cluster.mina_integration_west1.name
@@ -106,7 +106,7 @@ resource "google_container_node_pool" "west1_integration_primary" {
 }
 
 resource "google_container_node_pool" "west1_integration_preemptible" {
-  provider = google.google_west1
+  provider   = google.google_west1
   name       = "mina-integration-preemptible"
   location   = local.west1_region
   cluster    = google_container_cluster.mina_integration_west1.name
@@ -221,7 +221,7 @@ resource "helm_release" "west1_prometheus" {
   values = [
     yamlencode(local.west1_prometheus_helm_values)
   ]
-  wait       = true
-  depends_on = [google_container_cluster.mina_integration_west1]
-  force_update  = true
+  wait         = true
+  depends_on   = [google_container_cluster.mina_integration_west1]
+  force_update = true
 }
