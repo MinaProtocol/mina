@@ -1,8 +1,5 @@
 let Prelude = ../External/Prelude.dhall
 
-let B = ../External/Buildkite.dhall
-let B/Skip = B.definitions/commandStep/properties/skip/Type
-
 let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
@@ -36,8 +33,7 @@ in
             ],
         label = "Build test-executive",
         key = "build-test-executive",
-        target = Size.XLarge,
-        skip = Some (B/Skip.String "https://github.com/MinaProtocol/mina/issues/7945")
+        target = Size.XLarge
       },
 
   execute = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
@@ -61,7 +57,6 @@ in
         label = "Execute integration test: ${testName}",
         key = "integration-test-${testName}",
         target = Size.Medium,
-        depends_on = dependsOn,
-        skip = Some (B/Skip.String "https://github.com/MinaProtocol/mina/issues/7945")
+        depends_on = dependsOn
       }
 }

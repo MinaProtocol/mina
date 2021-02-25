@@ -72,3 +72,5 @@ automation/*-accounts.csv
 automation/block_tree.gv.png
 automation/gcloud-keyfile.json
 automation/services/watchdog/check_libp2p/check_libp2p
+
+*.backup
