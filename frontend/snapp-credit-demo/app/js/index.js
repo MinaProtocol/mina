@@ -62,14 +62,15 @@ ipcRenderer.on("status:web-scrape", () => {
   progressSpinner.classList.add("active");
   let progressLoader = document.getElementById("progress-container");
   progressLoader.classList.remove("hide");
-  status.innerText = "Attempting to log in...";
+  status.innerText =
+    "Attempting to log in, please do not close the application...";
 });
 
 ipcRenderer.on("status:valid-login", () => {
   document.getElementById("progress-container").classList.remove("hide");
   document.getElementById("progress-status-spinner").classList.add("active");
   document.getElementById("progress-status-text").innerText =
-    "Login successful. Generating Proof...";
+    "Login successful. Generating SNAPP proof...";
 });
 
 ipcRenderer.on("status:invalid-login", () => {
@@ -77,20 +78,25 @@ ipcRenderer.on("status:invalid-login", () => {
   document.getElementById("progress-status-spinner").classList.remove("active");
   document.getElementById("progress-status-text").innerText =
     "Login unsuccessful. Please check your credentials or restart the application and try again.";
+  localStorage.setItem("loading", false);
 });
 
 ipcRenderer.on("status:proof-gen", () => {
-  document.getElementById("progress-status-spinner").classList.remove("active");
   const outputPath = localStorage.getItem("output-path", true);
   document.getElementById(
     "progress-status-text"
-  ).innerText = `Proof generated to: ${outputPath}`;
+  ).innerText = `SNAPP proof generated to: ${outputPath}`;
+
+  document.getElementById("progress-status-spinner").classList.remove("active");
+  localStorage.setItem("loading", false);
 });
 
 ipcRenderer.on("status:proof-fail", () => {
-  document.getElementById("progress-status-spinner").classList.remove("active");
   const outputPath = localStorage.getItem("output-path", true);
   document.getElementById(
     "progress-status-text"
   ).innerText = `Failed to generate proof to: ${outputPath}`;
+
+  document.getElementById("progress-status-spinner").classList.remove("active");
+  localStorage.setItem("loading", false);
 });

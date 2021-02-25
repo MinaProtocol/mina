@@ -1,7 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
-const { exec } = require("child_process");
-const puppeteer = require("./app/js/puppeteer");
-const { execPath } = require("./app/js/binaries");
+const { scrape } = require("./app/js/puppeteer");
+const { generateSnapp } = require("./app/js/snapp");
 
 process.env.NODE_ENV = "production";
 
@@ -62,40 +61,12 @@ app.on("activate", async () => {
   }
 });
 
-let generateSnapp = async (ethAddress, creditScore) => {
-  await mainWindow.webContents.executeJavaScript(
-    'localStorage.setItem("loading", false);'
-  );
-
-  let outputPath = await mainWindow.webContents.executeJavaScript(
-    'localStorage.getItem("output-path");',
-    true
-  );
-
-  if (!outputPath || !creditScore) {
-    mainWindow.webContents.send("status:proof-fail");
-    return;
-  }
-
-  exec(
-    `${execPath} -version | sed 's/$/ ${creditScore}/' > ${outputPath}`,
-    (error) => {
-      if (error) {
-        mainWindow.webContents.send("status:proof-fail");
-      } else {
-        mainWindow.webContents.send("status:proof-gen");
-      }
-    }
-  );
-};
-
 ipcMain.on("button:gen-snapp", (_, { ethAddress, email, password }) => {
   mainWindow.webContents.send("status:web-scrape");
-  puppeteer
-    .scrape(email, password)
+  scrape(email, password)
     .then((creditScore) => {
       mainWindow.webContents.send("status:valid-login");
-      generateSnapp(ethAddress, creditScore);
+      generateSnapp(mainWindow, ethAddress, creditScore);
     })
     .catch((err) => {
       mainWindow.webContents.send("status:invalid-login");
