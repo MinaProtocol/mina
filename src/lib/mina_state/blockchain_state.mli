@@ -65,12 +65,14 @@ val create_value :
 
 val negative_one :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger_hash:Ledger_hash.t
   -> snarked_next_available_token:Token_id.t
   -> Value.t
 
 val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger_hash:Ledger_hash.t
   -> snarked_next_available_token:Token_id.t
   -> Value.t

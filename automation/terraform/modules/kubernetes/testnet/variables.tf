@@ -17,6 +17,11 @@ variable "k8s_context" {
 
 # Global Vars
 
+variable "use_local_charts" {
+  type    = bool
+  default = false
+}
+
 variable "coda_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
@@ -161,7 +166,6 @@ variable "seed_configs" {
       libp2p_secret = string
       external_port = number
       external_ip   = string
-      node_port     = number
       private_key_secret = string
     })
   )
