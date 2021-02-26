@@ -12,6 +12,14 @@ data "aws_secretsmanager_secret_version" "current_prometheus_remote_write_config
   secret_id = "${data.aws_secretsmanager_secret.prometheus_remote_write_config.id}"
 }
 
+data "aws_secretsmanager_secret" "prometheus_api_auth_metadata" {
+  name = "mina-services/prometheus/api_auth"
+}
+
+data "aws_secretsmanager_secret_version" "prometheus_api_auth" {
+  secret_id = "${data.aws_secretsmanager_secret.prometheus_api_auth_metadata.id}"
+}
+
 data "aws_secretsmanager_secret" "alertmanager_api_auth_metadata" {
   name = "mina-services/alertmanager/api_auth"
 }

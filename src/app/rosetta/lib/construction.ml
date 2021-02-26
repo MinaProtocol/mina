@@ -824,7 +824,7 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router ~graphql_uri ~logger (route : string list) body =
+let router ~get_graphql_uri_or_error ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   let open Deferred.Result.Let_syntax in
@@ -855,6 +855,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         @@ Construction_metadata_request.of_yojson body
         |> Errors.Lift.wrap
       in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Metadata.Real.handle ~env:(Metadata.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
@@ -886,6 +887,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         @@ Construction_parse_request.of_yojson body
         |> Errors.Lift.wrap
       in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Parse.Real.handle ~env:(Parse.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
@@ -907,6 +909,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         @@ Construction_submit_request.of_yojson body
         |> Errors.Lift.wrap
       in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap

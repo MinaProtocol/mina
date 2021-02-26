@@ -265,13 +265,13 @@ locals {
         set -euo pipefail
 
         apt install -y unzip
-        curl -sL https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip -o terraform.zip
+        curl -sL https://releases.hashicorp.com/terraform/0.14.7/terraform_0.14.7_linux_amd64.zip -o terraform.zip
         unzip terraform.zip && mv terraform /usr/bin
 
         # Install custom versions of terraform in Buildkite shared DIR
-        curl -sL https://releases.hashicorp.com/terraform/0.14.7/terraform_0.14.7_linux_amd64.zip -o terraform-0_14_7.zip
-        mkdir -p /var/buildkite/shared/terraform/0.14.7
-        unzip terraform-0_14_7.zip && mv terraform /var/buildkite/shared/terraform/0.14.7/terraform
+        curl -sL https://releases.hashicorp.com/terraform/0.12.29/terraform_0.12.29_linux_amd64.zip -o terraform-0_12_29.zip
+        mkdir -p /var/buildkite/shared/terraform/0.12.29
+        unzip terraform-0_12_29.zip && mv terraform /var/buildkite/shared/terraform/0.12.29/terraform
       EOF
 
       "02-install-coda-network-tools" = <<-EOF

@@ -58,7 +58,7 @@ of the repo.
 
 - Pull down developer container image (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171`
+`docker pull codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c`
 
 - Create local builder image
 
@@ -250,4 +250,4 @@ To do this, pass a json file to the daemon using the flag `genesis-constants` wi
 }
 ```
 
-The daemon logs should reflect these changes. Also, `coda client status` displays some of the constants.
+The daemon logs should reflect these changes. Also, `mina client status` displays some of the constants.

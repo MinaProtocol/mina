@@ -24,15 +24,47 @@ module G = struct
   end]
 end
 
-include Pickles_base.Side_loaded_verification_key.Make
-          (G.Stable.V1)
-          (struct
-            type t = unit [@@deriving yojson]
+module R = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        G.Stable.V1.t
+        Pickles_base.Side_loaded_verification_key.Repr.Stable.V1.t
 
-            include (Unit : module type of Unit with type t := t)
+      let to_latest = Fn.id
+    end
+  end]
+end
 
-            let of_repr = ignore
-          end)
+[%%versioned_binable
+module Stable = struct
+  module V1 = struct
+    type t =
+      ( G.Stable.V1.t
+      , unit )
+      Pickles_base.Side_loaded_verification_key.Poly.Stable.V1.t
+    [@@deriving sexp, compare, equal, hash, yojson]
+
+    open Pickles_base.Side_loaded_verification_key
+
+    let to_latest = Fn.id
+
+    include Binable.Of_binable
+              (R.Stable.V1)
+              (struct
+                type nonrec t = t
+
+                let to_binable
+                    {Poly.step_data; max_width; wrap_index; wrap_vk= _} =
+                  {Repr.Stable.V1.step_data; max_width; wrap_index}
+
+                let of_binable
+                    {Repr.Stable.V1.step_data; max_width; wrap_index= c} =
+                  {Poly.step_data; max_width; wrap_index= c; wrap_vk= Some ()}
+              end)
+  end
+end]
 
 let to_input = Pickles_base.Side_loaded_verification_key.to_input
 

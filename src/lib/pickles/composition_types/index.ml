@@ -4,7 +4,7 @@ open Pickles_types
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = char [@@deriving sexp, sexp, compare, yojson, hash, eq]
+    type t = char [@@deriving sexp, sexp, compare, yojson, hash, equal]
 
     let to_latest = Fn.id
   end

@@ -3,7 +3,7 @@ open Pickles_types
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp, sexp, compare, yojson, hash, eq]
+    type t [@@deriving sexp, sexp, compare, yojson, hash, equal]
   end
 end]
 

@@ -16,7 +16,7 @@ For more details on the `docker run` command, see the [Docker Docs](https://docs
 
 Now, lets break down that command a little bit: 
 - `--publish 8302:8302 --publish 8303:8303` By default, the Coda Daemon exposes two ports (8302 TCP, 8303 UDP) used for Network communication
-- `daemon` specifies that we should run a coda daemon
+- `daemon` specifies that we should run a mina daemon
 - `-peer` specifies an initial seed to query during the peer discovery process, more than one peer may be specified
 - `-external-port` specifies a non-default
 

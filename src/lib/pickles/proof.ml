@@ -30,40 +30,66 @@ module Base = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, eq]
+        type 'a t = 'a * 'a [@@deriving compare, sexp, yojson, hash, equal]
       end
     end]
   end
 
   module Dlog_based = struct
-    [%%versioned_asserted
+    [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type ('dlog_me_only, 'pairing_me_only) t =
           { statement:
-              ( Challenge.Constant.t
-              , Challenge.Constant.t Scalar_challenge.Stable.V1.t
-              , Tick.Field.t Shifted_value.Stable.V1.t
+              ( Limb_vector.Constant.Hex64.Stable.V1.t
+                Vector.Vector_2.Stable.V1.t
+              , Limb_vector.Constant.Hex64.Stable.V1.t
+                Vector.Vector_2.Stable.V1.t
+                Scalar_challenge.Stable.V1.t
+              , Tick.Field.Stable.V1.t Shifted_value.Stable.V1.t
               , Tock.Field.Stable.V1.t
               , 'dlog_me_only
-              , Digest.Constant.t
+              , Digest.Constant.Stable.V1.t
               , 'pairing_me_only
-              , Challenge.Constant.t Scalar_challenge.Stable.V1.t
+              , Limb_vector.Constant.Hex64.Stable.V1.t
+                Vector.Vector_2.Stable.V1.t
+                Scalar_challenge.Stable.V1.t
                 Bulletproof_challenge.Stable.V1.t
                 Step_bp_vec.Stable.V1.t
               , Index.Stable.V1.t )
-              Types.Dlog_based.Statement.Minimal.t
+              Types.Dlog_based.Statement.Minimal.Stable.V1.t
           ; prev_evals:
               Tick.Field.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t
               Dlog_plonk_types.Evals.Stable.V1.t
               Double.Stable.V1.t
           ; prev_x_hat: Tick.Field.Stable.V1.t Double.Stable.V1.t
           ; proof: Tock.Proof.Stable.V1.t }
-        [@@deriving compare, sexp, yojson, hash, eq]
+        [@@deriving compare, sexp, yojson, hash, equal]
       end
-
-      module Tests = struct end
     end]
+
+    type ('dlog_me_only, 'pairing_me_only) t =
+          ('dlog_me_only, 'pairing_me_only) Stable.Latest.t =
+      { statement:
+          ( Challenge.Constant.t
+          , Challenge.Constant.t Scalar_challenge.t
+          , Tick.Field.t Shifted_value.t
+          , Tock.Field.t
+          , 'dlog_me_only
+          , Digest.Constant.t
+          , 'pairing_me_only
+          , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+            Step_bp_vec.t
+          , Index.t )
+          Types.Dlog_based.Statement.Minimal.t
+      ; prev_evals:
+          Tick.Field.t Dlog_plonk_types.Pc_array.t Dlog_plonk_types.Evals.t
+          Double.t
+      ; prev_x_hat: Tick.Field.t Double.t
+      ; proof: Tock.Proof.t }
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 end
 
@@ -158,29 +184,18 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   module MLMB_vec = Nvector (MLMB)
 
   module Repr = struct
-    [%%versioned_asserted
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( ( Tock.Inner_curve.Affine.Stable.V1.t
-            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
-              MLMB_vec.Stable.V1.t )
-            Dlog_based.Proof_state.Me_only.t
-          , ( unit
-            , Tock.Curve.Affine.t Max_branching_at_most.t
-            , Challenge.Constant.t Scalar_challenge.Stable.V1.t
-              Bulletproof_challenge.Stable.V1.t
-              Step_bp_vec.Stable.V1.t
-              Max_branching_at_most.Stable.V1.t )
-            Base.Me_only.Pairing_based.Stable.V1.t )
-          Base.Dlog_based.Stable.V1.t
-        [@@deriving compare, sexp, yojson, hash, eq]
-
-        let to_latest = Fn.id
-      end
-
-      module Tests = struct end
-    end]
+    type t =
+      ( ( Tock.Inner_curve.Affine.t
+        , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
+        Dlog_based.Proof_state.Me_only.t
+      , ( unit
+        , Tock.Curve.Affine.t Max_branching_at_most.t
+        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+          Step_bp_vec.t
+          Max_branching_at_most.t )
+        Base.Me_only.Pairing_based.t )
+      Base.Dlog_based.t
+    [@@deriving compare, sexp, yojson, hash, equal]
   end
 
   type nonrec t = (W.n, MLMB.n) t
@@ -222,16 +237,6 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
 
   let hash t = Repr.hash (to_repr t)
 
-  include Binable.Of_binable
-            (Repr.Stable.V1)
-            (struct
-              type nonrec t = t
-
-              let to_binable = to_repr
-
-              let of_binable = of_repr
-            end)
-
   include Sexpable.Of_sexpable
             (Repr)
             (struct
@@ -245,4 +250,140 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
   let to_yojson x = Repr.to_yojson (to_repr x)
 
   let of_yojson x = Result.map ~f:of_repr (Repr.of_yojson x)
+end
+
+module Branching_2 = struct
+  module T = Make (Nat.N2) (Nat.N2)
+
+  module Repr = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type t =
+          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
+              Vector.Vector_2.Stable.V1.t )
+            Dlog_based.Proof_state.Me_only.Stable.V1.t
+          , ( unit
+            , Tock.Curve.Affine.t At_most.At_most_2.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t
+              Vector.Vector_2.Stable.V1.t
+              Scalar_challenge.Stable.V1.t
+              Bulletproof_challenge.Stable.V1.t
+              Step_bp_vec.Stable.V1.t
+              At_most.At_most_2.Stable.V1.t )
+            Base.Me_only.Pairing_based.Stable.V1.t )
+          Base.Dlog_based.Stable.V1.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    include T.Repr
+
+    (* Force the typechecker to verify that these types are equal. *)
+    let _ =
+      let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
+       fun () -> Type_equal.T
+      in
+      ()
+  end
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = T.t
+
+      let to_latest = Fn.id
+
+      include (T : module type of T with type t := t with module Repr := T.Repr)
+
+      include Binable.Of_binable
+                (Repr.Stable.V1)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = to_repr
+
+                  let of_binable = of_repr
+                end)
+    end
+  end]
+
+  include (T : module type of T with module Repr := T.Repr)
+end
+
+module Branching_max = struct
+  module T =
+    Make
+      (Side_loaded_verification_key.Width.Max)
+      (Side_loaded_verification_key.Width.Max)
+
+  module Repr = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type t =
+          ( ( Tock.Inner_curve.Affine.Stable.V1.t
+            , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
+              Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
+            Dlog_based.Proof_state.Me_only.Stable.V1.t
+          , ( unit
+            , Tock.Curve.Affine.t
+              Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
+            , Limb_vector.Constant.Hex64.Stable.V1.t
+              Vector.Vector_2.Stable.V1.t
+              Scalar_challenge.Stable.V1.t
+              Bulletproof_challenge.Stable.V1.t
+              Step_bp_vec.Stable.V1.t
+              Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
+            Base.Me_only.Pairing_based.Stable.V1.t )
+          Base.Dlog_based.Stable.V1.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    include T.Repr
+
+    (* Force the typechecker to verify that these types are equal. *)
+    let _ =
+      let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
+       fun () -> Type_equal.T
+      in
+      ()
+  end
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = T.t
+
+      let to_latest = Fn.id
+
+      include (T : module type of T with type t := t with module Repr := T.Repr)
+
+      include Binable.Of_binable
+                (Repr.Stable.V1)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = to_repr
+
+                  let of_binable = of_repr
+                end)
+    end
+  end]
+
+  include (T : module type of T with module Repr := T.Repr)
 end

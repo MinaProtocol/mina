@@ -7,7 +7,7 @@ This is a simple node service that listens for transactions to a specific addres
 First you'll need to have a `coda` daemon running on your machine. See the docs [here](https://codaprotocol.com/docs/getting-started/) for instructions on getting a node, then run the following command:
 
 ```
-$ coda daemon -rest-port 49370 -peer beta.o1test.net:8303
+$ mina daemon -rest-port 49370 -peer beta.o1test.net:8303
 ```
 
 This process must be running for this service to work. Open a new terminal session before you continue.

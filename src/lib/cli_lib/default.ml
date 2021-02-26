@@ -5,4 +5,4 @@ let max_connections = 50
 
 let validation_queue_size = 150
 
-let conf_dir_name = ".coda-config"
+let conf_dir_name = ".mina-config"
