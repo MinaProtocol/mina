@@ -2,8 +2,6 @@ let Prelude = ../../External/Prelude.dhall
 
 let B = ../../External/Buildkite.dhall
 
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
-
 let S = ../../Lib/SelectFiles.dhall
 
 let Pipeline = ../../Pipeline/Dsl.dhall
