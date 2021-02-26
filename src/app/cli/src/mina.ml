@@ -222,7 +222,7 @@ let setup_daemon logger =
   and libp2p_keypair =
     flag "--discovery-keypair" ~aliases:["discovery-keypair"] (optional string)
       ~doc:
-        "KEYFILE Keypair (generated from `coda advanced \
+        "KEYFILE Keypair (generated from `mina advanced \
          generate-libp2p-keypair`) to use with libp2p discovery (default: \
          generate per-run temporary keypair)"
   and is_seed =
@@ -358,7 +358,7 @@ let setup_daemon logger =
     let%bind () = File_system.create_dir conf_dir in
     let () =
       if is_background then (
-        Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
+        Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
           conf_dir ;
         Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
           ~redirect_stderr:`Dev_null () )
@@ -372,7 +372,7 @@ let setup_daemon logger =
       ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
         (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-           ~log_filename:"coda.log" ~max_size:logrotate_max_size
+           ~log_filename:"mina.log" ~max_size:logrotate_max_size
            ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
@@ -446,7 +446,7 @@ let setup_daemon logger =
             |> Deferred.map ~f:Option.some )
     in
     let%bind () =
-      let version_filename = conf_dir ^/ "coda.version" in
+      let version_filename = conf_dir ^/ "mina.version" in
       let make_version () =
         let%map () =
           (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
@@ -1124,7 +1124,7 @@ let replay_blocks logger =
     flag "--format" ~aliases:["-format"] (optional string)
       ~doc:"json|sexp The format to read lines of the file in (default: json)"
   in
-  Command.async ~summary:"Start coda daemon with blocks replayed from a file"
+  Command.async ~summary:"Start mina daemon with blocks replayed from a file"
     (Command.Param.map3 replay_flag read_kind (setup_daemon logger)
        ~f:(fun blocks_filename read_kind setup_daemon () ->
          (* Enable updating the time offset. *)
@@ -1266,7 +1266,7 @@ let internal_commands logger =
              Parallel.init_master () ;
              match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
              | `Ok sexp ->
-                 let%bind conf_dir = Unix.mkdtemp "/tmp/coda-prover" in
+                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
                  [%log info] "Prover state being logged to %s" conf_dir ;
                  let%bind prover =
                    Prover.create ~logger
@@ -1293,7 +1293,7 @@ let internal_commands logger =
           let open Async in
           let logger = Logger.create () in
           Parallel.init_master () ;
-          let%bind conf_dir = Unix.mkdtemp "/tmp/coda-verifier" in
+          let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
           let mode =
             match mode with
             | "transaction" ->

@@ -187,7 +187,7 @@ ii. Add a new subcommand `show-public-key` which takes the private key file as i
 
 c. Change coda cli
 
-i. Add a new subcommand `show-public-key` as a subcommand to `coda accounts` (reuse the implementation in (b.ii)
+i. Add a new subcommand `show-public-key` as a subcommand to `mina accounts` (reuse the implementation in (b.ii)
 
 #### Derivation endpoint
 
