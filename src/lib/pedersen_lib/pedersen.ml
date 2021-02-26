@@ -6,8 +6,7 @@ module type S = sig
   type curve
 
   module Digest : sig
-    (* TODO: version *)
-    type t [@@deriving bin_io, sexp, eq, compare, yojson]
+    type t [@@deriving sexp, eq, compare, yojson]
 
     val fold_bits : t -> bool Fold.t
 
@@ -38,7 +37,7 @@ module type S = sig
 end
 
 module Make (Field : sig
-  type t [@@deriving sexp, bin_io, eq, compare]
+  type t [@@deriving sexp, eq, compare]
 
   include Stringable.S with type t := t
 
@@ -57,7 +56,7 @@ end) (Curve : sig
   val negate : t -> t
 end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module Digest = struct
-    type t = Field.t [@@deriving sexp, bin_io, eq, compare]
+    type t = Field.t [@@deriving sexp, eq, compare]
 
     let to_yojson t = `String (Field.to_string t)
 
