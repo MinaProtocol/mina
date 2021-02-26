@@ -2,7 +2,8 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
   depends_on = [
     module.kubernetes_testnet.testnet_namespace,
     # module.kubernetes_testnet.seeds_release,
-    module.kubernetes_testnet.block_producers_release
+    module.kubernetes_testnet.block_producers_release,
+    module.kubernetes_testnet.seed_release
   ]
 
   metadata {
@@ -12,18 +13,21 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
 
   spec {
     dynamic "rule" {
-      # for_each = concat(
-      #   [helm_release.seed],
-      #   var.block_producer_configs
-      # )
-      for_each = var.block_producer_configs
+      for_each = concat(
+        # [helm_release.seed],
+        # var.block_producer_configs, 
+        ["seed"],
+        [for config in var.block_producer_configs : config.name],
+        # local.snark_coord_names
+      )
+      # for_each = var.block_producer_configs
 
       content {
-        host = "${rule.value.name}.${local.base_graphql_dns}"
+        host = "${rule.value}.${local.base_graphql_dns}"
         http {
           path {
             backend {
-              service_name = "${rule.value.name}-graphql"
+              service_name = "${rule.value}-graphql"
               service_port = 3085
             }
 

@@ -368,7 +368,14 @@ module Network_manager = struct
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
     let seed_nodes = [cons_node "seed"] in
-    let snark_coordinator_nodes = [cons_node "snark-coordinator-1"] in
+    let snark_coordinator_name =
+      "snark-coordinator"
+      ^ String.sub network_config.terraform.snark_worker_public_key
+          ~pos:
+            (String.length network_config.terraform.snark_worker_public_key - 6)
+          ~len:6
+    in
+    let snark_coordinator_nodes = [cons_node snark_coordinator_name] in
     let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->

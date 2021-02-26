@@ -56,6 +56,8 @@ variable "snark_worker_fee" {
 
 variable "snark_worker_public_key" {
   type = string
+  default = "4vsRCVadXwWMSGA9q81reJRX3BZ5ZKRtgZU7PtGsNq11w2V9tUNf4urZAGncZLUiP4SfWqur7AZsyhJKD41Ke7rJJ8yDibL41ePBeATLUnwNtMTojPDeiBfvTfgHzbAVFktD65vzxMNCvvAJ"
+
 }
 
 variable "block_producer_configs" {

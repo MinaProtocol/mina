@@ -1,10 +1,8 @@
-{{- if .Values.coordinator.active }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ tpl .Values.coordinator.fullname . }}
-  labels:
-    app: {{ tpl .Values.coordinator.fullname . }}
+  name: {{ tpl .Values.seed.fullname . }}
 spec:
   type: ClusterIP
   # We want all pods to have their addresses published for the sake of the
@@ -12,27 +10,23 @@ spec:
   # have to be able to talk to each other in order to become ready.
   publishNotReadyAddresses: true
   selector:
-    app: {{ tpl .Values.coordinator.fullname . }}
+    app: {{ tpl .Values.seed.fullname . }}
   ports:
   - name: tcp-p2p
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
-  - name: tcp-client
-    port: {{ .Values.coda.ports.client }}
-    targetPort: client-port
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.coordinator.fullname }}-graphql
+  name: {{ .Values.seed.fullname }}-graphql
 spec:
   type: NodePort
   publishNotReadyAddresses: true
   selector:
-    app: {{ .Values.coordinator.fullname }}
+    app: {{ .Values.seed.fullname }}
   ports:
   - name: http-graphql
     protocol: TCP
     port: {{ .Values.coda.ports.graphql }}
 ---
-{{ end }}

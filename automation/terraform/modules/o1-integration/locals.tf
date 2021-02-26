@@ -11,4 +11,7 @@ locals {
   }
 
   base_graphql_dns = "${var.testnet_name}.graphql.o1test.net"
+
+  snark_coord_names = var.snark_worker_replicas > 0 ? ["snark-coordinator-${substr(var.snark_worker_public_key, length(var.snark_worker_public_key) -6, 6 )  }"] : []
+
 }
