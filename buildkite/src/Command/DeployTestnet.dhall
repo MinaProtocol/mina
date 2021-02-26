@@ -35,19 +35,19 @@ in
       Command.Config::{
         commands = [
           Cmd.run "cd ${spec.testnetDir}",
-          Cmd.run "/var/buildkite/shared/terraform/0.14.7/terraform init",
+          Cmd.run "terraform init",
           -- create separate workspace based on build branch to isolate infrastructure states
-          Cmd.run "/var/buildkite/shared/terraform/0.14.7/terraform workspace select ${spec.workspace} || /var/buildkite/shared/terraform/0.14.7/terraform workspace new ${spec.workspace}",
+          Cmd.run "terraform workspace select ${spec.workspace} || terraform workspace new ${spec.workspace}",
           -- download deployment dependencies and ensure artifact DIR exists
           Cmd.run "mkdir -p ${spec.artifactPath}",
           Cmd.run "artifact-cache-helper.sh ${spec.deployEnvFile}",
           -- launch testnet based on deploy ENV and ensure auto-cleanup on `apply` failures
           Cmd.run "source ${spec.deployEnvFile}",
           Cmd.run (
-            "/var/buildkite/shared/terraform/0.14.7/terraform apply -auto-approve" ++
+            "terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
               " -var ci_artifact_path=${spec.artifactPath}" ++
-              " || (/var/buildkite/shared/terraform/0.14.7/terraform destroy -auto-approve && exit 1)"
+              " || (terraform destroy -auto-approve && exit 1)"
           ),
           -- upload/cache testnet genesis_ledger
           Cmd.run "artifact-cache-helper.sh ${spec.artifactPath}/genesis_ledger.json --upload",
