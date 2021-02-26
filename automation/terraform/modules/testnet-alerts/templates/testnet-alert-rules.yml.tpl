@@ -132,4 +132,3 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 block without transactions at the tip"
       description: "At least 5 blocks without transactions on tip of network {{ $labels.testnet }} within ${alerting_timeframe}."
-
