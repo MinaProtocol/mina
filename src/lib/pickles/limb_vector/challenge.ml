@@ -12,7 +12,7 @@ module type S = sig
   type nonrec t = field t
 
   module Constant : sig
-    type t = Constant.t [@@deriving bin_io, sexp_of]
+    type t = Constant.t [@@deriving sexp_of]
 
     val to_bits : t -> bool list
 

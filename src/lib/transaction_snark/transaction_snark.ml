@@ -401,12 +401,10 @@ module Statement = struct
 end
 
 module Proof = struct
-  module T = Pickles.Proof.Make (Nat.N2) (Nat.N2)
-
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = T.t
+      type t = Pickles.Proof.Branching_2.Stable.V1.t
       [@@deriving version {asserted}, yojson, bin_io, compare, sexp]
 
       let to_latest = Fn.id
@@ -3796,7 +3794,7 @@ let%test_module "transaction_snark" =
       let acct2 = wallets.(j) in
       let open Snapp_command in
       let open Snapp_basic in
-      let new_state : _ Snapp_state.t =
+      let new_state : _ Snapp_state.V.t =
         Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
       in
       let data1 : Party.Predicated.Signed.t =
