@@ -4,6 +4,7 @@ set -eou pipefail
 
 PK=B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV
 SNARK_PK=B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL
+TIMELOCKED_PK=B62qpJDprqj1zjNLf4wSpFC6dqmLzyokMy6KtMLSvkU8wfdL1midEb4
 
 mkdir -p /tmp/s3_cache_dir/
 
@@ -16,5 +17,5 @@ mkdir -p /tmp/keys \
   && echo "$PK" >  ~/.coda-config/wallets/store/$PK.pub \
   && cp /tmp/keys/demo-block-producer ~/.coda-config/wallets/store/$PK \
   && rm -rf ~/.coda-config/genesis* \
-  && echo '{"ledger":{"accounts":[{"pk":"'$PK'","balance":"66000","sk":null,"delegate":null}, {"pk":"'$SNARK_PK'","balance":"0.000000001","sk":null,"delegate":null}]}}' > /tmp/config.json \
+  && echo '{"ledger":{"accounts":[{"pk":"'$PK'","balance":"66000","sk":null,"delegate":null}, {"pk":"'$SNARK_PK'","balance":"0.000000001","sk":null,"delegate":null}, {"pk":"'$TIMELOCKED_PK'","balance":"10000","sk":null,"delegate":null,"timing":{"initial_minimum_balance":"5000","cliff_time":"20","cliff_amount":"2000","vesting_period":"5","vesting_increment":"10"}}]}}' > /tmp/config.json \
   && ../../../_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe --config-file /tmp/config.json
