@@ -73,11 +73,11 @@ let get_snapp_status ~frontier_broadcast_pipe ~transaction_pool cmd =
        snapp command is valid here, but the behavior of the pool needs to be
        fixed first and then this should match that.
     *)
-    (*Snapp_command.check cmd
+    return ()
+    (*Snapp_command.check cmd*)
     |> Result.map ~f:(fun () ->
            Transaction_hash.User_command_with_valid_signature.create
-             (Snapp_command cmd) )*)
-    return ()
+             (Snapp_command cmd) )
   in
   let resource_pool = Transaction_pool.resource_pool transaction_pool in
   match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
