@@ -224,7 +224,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
            in
            Mina_metrics.Transition_frontier
            .update_max_unvalidated_blocklength_observed blockchain_length ;
-           if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
+           ( if not (Mina_net2.Validation_callback.is_expired valid_cb) then (
              let transition_with_hash =
                Envelope.Incoming.data transition_env
                |> With_hash.of_data
@@ -279,21 +279,24 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                         ~transition_with_hash
                         ~delta:genesis_constants.protocol.delta error
              in
-             Interruptible.force computation >>| ignore )
-           else
-             let state_hash =
-               Envelope.Incoming.data transition_env
-               |> External_transition.state_hash
-             in
-             let metadata =
-               [ ("state_hash", State_hash.to_yojson state_hash)
-               ; ( "time_received"
-                 , `String
-                     (Time.to_string_abs
-                        (Block_time.to_time time_received)
-                        ~zone:Time.Zone.utc) ) ]
-             in
-             [%log error] ~metadata
-               "Dropping blocks because libp2p validation expired" ;
-             Deferred.unit )
+             Interruptible.force computation )
+           else Deferred.Result.fail () )
+           >>| function
+           | Ok () ->
+               ()
+           | Error () ->
+               let state_hash =
+                 Envelope.Incoming.data transition_env
+                 |> External_transition.state_hash
+               in
+               let metadata =
+                 [ ("state_hash", State_hash.to_yojson state_hash)
+                 ; ( "time_received"
+                   , `String
+                       (Time.to_string_abs
+                          (Block_time.to_time time_received)
+                          ~zone:Time.Zone.utc) ) ]
+               in
+               [%log error] ~metadata
+                 "Dropping blocks because libp2p validation expired" )
          else Deferred.unit ))
