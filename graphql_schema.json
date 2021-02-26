@@ -5555,7 +5555,20 @@
           "kind": "OBJECT",
           "name": "protocolStateProof",
           "description": null,
-          "fields": [],
+          "fields": [
+            {
+              "name": "base64",
+              "description": "Base-64 encoded proof",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "inputFields": null,
           "interfaces": [],
           "enumValues": null,

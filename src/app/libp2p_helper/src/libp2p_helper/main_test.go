@@ -614,10 +614,12 @@ func TestOpenStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -648,10 +650,12 @@ func TestCloseStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -693,10 +697,12 @@ func TestResetStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -738,10 +744,12 @@ func TestSendStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -794,10 +802,12 @@ func TestAddStreamHandlerMsg(t *testing.T) {
 	ret, err = msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -899,10 +909,12 @@ func TestFindPeerMsg(t *testing.T) {
 		PeerID: appA.P2p.Host.ID().String(),
 	}
 
+	expectedHost, err := appA.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
@@ -929,10 +941,12 @@ func TestListPeersMsg(t *testing.T) {
 	addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
 	require.NotEqual(t, 0, len(addrs))
 
+	expectedHost, err := appA.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 

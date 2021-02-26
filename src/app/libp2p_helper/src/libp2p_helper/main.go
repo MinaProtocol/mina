@@ -707,7 +707,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 
 			// TODO: this doesn't properly take into account messages > 4096, since it's currently impossible to
 			// know the entire size of a message if it's larger than 4096. will be fixed with stream length prefix PR
-			msg.UpdateMetrics(len)
+			msg.UpdateMetrics(uint64(len))
 
 			if err == io.EOF {
 				break
@@ -1254,10 +1254,10 @@ func (app *app) checkMessageStats(id peer.ID) {
 	}
 
 	for {
-		msgStats := app.P2p.MsgStats
-		msgMinGauge.Set(float64(msgStats.GetMin()))
-		msgAvgGauge.Set(float64(msgStats.GetAvg()))
-		msgMaxGauge.Set(float64(msgStats.GetMax()))
+		msgStats := app.P2p.MsgStats.GetStats()
+		msgMinGauge.Set(msgStats.Min)
+		msgAvgGauge.Set(msgStats.Avg)
+		msgMaxGauge.Set(msgStats.Max)
 
 		time.Sleep(app.MetricsRefreshTime)
 	}

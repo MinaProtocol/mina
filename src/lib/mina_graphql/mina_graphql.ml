@@ -554,6 +554,25 @@ module Types = struct
             ~resolve:
               (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
               Frozen_ledger_hash.to_string snarked_ledger_hash )
+        ; field "stagedLedgerProofEmitted" ~typ:bool
+            ~doc:
+              "Block finished a staged ledger, and a proof was emitted from \
+               it and included into this block's proof. If there is no \
+               transition frontier available, this will return null."
+            ~args:Arg.[]
+            ~resolve:
+              (fun {ctx= coda; _}
+                   {Mina_state.Blockchain_state.Poly.state_hash; _} ->
+              let open Option.Let_syntax in
+              let%bind frontier =
+                Mina_lib.transition_frontier coda
+                |> Pipe_lib.Broadcast_pipe.Reader.peek
+              in
+              match Transition_frontier.find frontier state_hash with
+              | None ->
+                  None
+              | Some b ->
+                  Some (Breadcrumb.just_emitted_a_proof b) )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
@@ -1376,8 +1395,14 @@ module Types = struct
                 coinbase_receiver ) ] )
 
   let protocol_state_proof : (Mina_lib.t, Proof.t option) typ =
-    (* TODO *)
-    obj "protocolStateProof" ~fields:(fun _ -> [])
+    obj "protocolStateProof" ~fields:(fun _ ->
+        [ field "base64" ~typ:string ~doc:"Base-64 encoded proof"
+            ~args:Arg.[]
+            ~resolve:(fun _ proof ->
+              (* Use the precomputed block proof encoding, for consistency. *)
+              Some
+                (Mina_transition.External_transition.Precomputed_block.Proof
+                 .to_bin_string proof) ) ] )
 
   let block :
       ( Mina_lib.t
@@ -3231,3 +3256,8 @@ let schema =
   Graphql_async.Schema.(
     schema Queries.commands ~mutations:Mutations.commands
       ~subscriptions:Subscriptions.commands)
+
+let schema_limited =
+  (*including version because that's the default query*)
+  Graphql_async.Schema.(
+    schema [Queries.block; Queries.version] ~mutations:[] ~subscriptions:[])

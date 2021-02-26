@@ -24,12 +24,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p-kad-dht/dual"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-peerstore/pstoreds"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	record "github.com/libp2p/go-libp2p-record"
@@ -267,23 +267,40 @@ func (ms *MessageStats) UpdateMetrics(val uint64) {
 	}
 }
 
-func (ms *MessageStats) GetMin() uint64 {
-	ms.RLock()
-	defer ms.RUnlock()
-	return ms.min
+type safeStats struct {
+	Min float64
+	Max float64
+	Avg float64
 }
 
-func (ms *MessageStats) GetMax() uint64 {
+func (ms *MessageStats) GetStats() *safeStats {
 	ms.RLock()
 	defer ms.RUnlock()
-	return ms.max
+
+	return &safeStats{
+		Min: float64(ms.min),
+		Max: float64(ms.max),
+		Avg: float64(ms.avg),
+	}
 }
 
-func (ms *MessageStats) GetAvg() uint64 {
-	ms.RLock()
-	defer ms.RUnlock()
-	return ms.avg
-}
+// func (ms *MessageStats) GetMin() uint64 {
+// 	ms.RLock()
+// 	defer ms.RUnlock()
+// 	return ms.min
+// }
+
+// func (ms *MessageStats) GetMax() uint64 {
+// 	ms.RLock()
+// 	defer ms.RUnlock()
+// 	return ms.max
+// }
+
+// func (ms *MessageStats) GetAvg() uint64 {
+// 	ms.RLock()
+// 	defer ms.RUnlock()
+// 	return ms.avg
+// }
 
 // this type implements the ConnectionGating interface
 // https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnectionGating
