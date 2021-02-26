@@ -29,7 +29,7 @@ let commands =
 
 in  Pipeline.build
       Pipeline.Config::{
-      , spec = JobSpec::{
+        spec = JobSpec::{
         , dirtyWhen = [ S.strictlyStart (S.contains "src/") ]
         , path = "Lint"
         , name = "Fast"
@@ -37,7 +37,7 @@ in  Pipeline.build
       , steps =
         [ Command.build
             Command.Config::{
-            , commands
+            , commands = commands
             , label =
                 "Fast lint steps; CODEOWNERs, RFCs, Check Snarky Submodule, Preprocessor Deps"
             , key = "lint"
