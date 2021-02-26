@@ -64,6 +64,7 @@ val create_value :
 
 val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
+  -> consensus_constants:Consensus.Constants.t
   -> genesis_ledger:Ledger.t Lazy.t
   -> Value.t
 

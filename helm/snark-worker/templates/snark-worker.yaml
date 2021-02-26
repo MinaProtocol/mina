@@ -32,7 +32,7 @@ spec:
             cpu: 4
         image: {{ .Values.coda.image }}
         command: ["bash", "-c"]
-        args: [ "sleep 120 && coda internal snark-worker -proof-level full -daemon-address '{{ tpl $.Values.worker.remoteCoordinatorHost . }}:{{ $.Values.worker.remoteCoordinatorPort }}'" ]
+        args: [ "sleep 120 && mina internal snark-worker -proof-level full -daemon-address '{{ tpl $.Values.worker.remoteCoordinatorHost . }}:{{ $.Values.worker.remoteCoordinatorPort }}'" ]
         env:
           - name: "RAYON_NUM_THREADS"
             value: "4"

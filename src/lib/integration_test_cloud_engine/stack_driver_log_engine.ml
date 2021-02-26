@@ -134,8 +134,6 @@ module Subscription = struct
 
   let create ~name ~filter ~logger =
     let open Deferred.Or_error.Let_syntax in
-    let uuid = Uuid_unix.create () in
-    let name = name ^ "_" ^ Uuid.to_string uuid in
     let gcloud_key_file_env = "GCLOUD_API_KEY" in
     let%bind key =
       match Sys.getenv gcloud_key_file_env with
@@ -282,8 +280,7 @@ let create ~logger ~(network : Kubernetes_network.t) =
     String.concat filters ~sep:"\n"
   in
   let%map subscription =
-    Subscription.create ~logger ~name:"integration_test_events"
-      ~filter:log_filter
+    Subscription.create ~logger ~name:network.namespace ~filter:log_filter
   in
   [%log info] "Event subscription created" ;
   let event_reader, event_writer = Pipe.create () in

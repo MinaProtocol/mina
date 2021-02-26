@@ -38,7 +38,7 @@ type ('app_state, 'vk) t_ = ('app_state, 'vk) Poly.t =
 module Stable = struct
   module V1 = struct
     type t =
-      ( F.Stable.V1.t Snapp_state.Stable.V1.t
+      ( Snapp_state.Value.Stable.V1.t
       , ( Side_loaded_verification_key.Stable.V1.t
         , F.Stable.V1.t )
         With_hash.Stable.V1.t
@@ -62,7 +62,7 @@ consensus_mechanism]
 
 module Checked = struct
   type t =
-    ( Pickles.Impls.Step.Field.t Snapp_state.t
+    ( Pickles.Impls.Step.Field.t Snapp_state.V.t
     , ( Pickles.Side_loaded.Verification_key.Checked.t
       , Pickles.Impls.Step.Field.t Lazy.t )
       With_hash.t )

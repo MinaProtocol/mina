@@ -7,8 +7,8 @@ function cleanup
   CODE=${1:-0}
   echo "Killing archive.exe"
   kill $(ps aux | egrep '/mina-bin/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
-  echo "Killing coda.exe"
-  kill $(ps aux | egrep '/mina-bin/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
+  echo "Killing mina.exe"
+  kill $(ps aux | egrep '/mina-bin/.*mina.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"
   kill $(ps aux | egrep '/mina-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
   exit $CODE
@@ -47,11 +47,11 @@ export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export CODA_PRIVKEY_PASS=""
 export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
-MINA_CONFIG_DIR=/root/.coda-config
+MINA_CONFIG_DIR=/root/.mina-config
 
 # MINA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 echo "========================= STARTING DAEMON ==========================="
-/mina-bin/cli/src/coda.exe daemon \
+/mina-bin/cli/src/mina.exe daemon \
   -archive-address 3086 \
   -background \
   -block-producer-key "$MINA_CONFIG_DIR/wallets/store/$PK" \

@@ -6,7 +6,6 @@ provider helm {
 }
 
 locals {
-  use_local_charts = false
   mina_helm_repo   = "https://coda-charts.storage.googleapis.com"
 
   peers = var.additional_peers
@@ -50,7 +49,6 @@ locals {
         privateKeySecret     = config.private_key_secret
         externalPort         = config.external_port
         externalIp           = config.external_ip
-        nodePort             = config.node_port
       }
     ]
   }
@@ -196,9 +194,9 @@ resource "helm_release" "seeds" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-seeds"
-  repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version     = "0.6.1"
+  repository  = var.use_local_charts ? "" : local.mina_helm_repo
+  chart       = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
+  version     = "0.6.2"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -217,9 +215,9 @@ resource "helm_release" "block_producers" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-block-producers"
-  repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version     = "0.5.2"
+  repository  = var.use_local_charts ? "" : local.mina_helm_repo
+  chart       = var.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
+  version     = "0.5.3"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -235,9 +233,9 @@ resource "helm_release" "snark_workers" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-snark-worker"
-  repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version     = "0.4.8"
+  repository  = var.use_local_charts ? "" : local.mina_helm_repo
+  chart       = var.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
+  version     = "0.4.9"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
@@ -255,9 +253,9 @@ resource "helm_release" "archive_node" {
   count       = var.archive_node_count
   
   name        = "archive-node-${count.index + 1}"
-  repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version     = "0.4.9"
+  repository  = var.use_local_charts ? "" : local.mina_helm_repo
+  chart       = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
+  version     = "0.4.10"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [
     yamlencode(local.archive_node_vars)
@@ -274,8 +272,8 @@ resource "helm_release" "watchdog" {
   provider   = helm.testnet_deploy
 
   name        = "${var.testnet_name}-watchdog"
-  repository  = local.use_local_charts ? "" : local.mina_helm_repo
-  chart       = local.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
+  repository  = var.use_local_charts ? "" : local.mina_helm_repo
+  chart       = var.use_local_charts ? "../../../../helm/watchdog" : "watchdog"
   version     = "0.1.0"
   namespace   = kubernetes_namespace.testnet_namespace.metadata[0].name
   values      = [

@@ -29,7 +29,8 @@ module Width : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = V.Width.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+      type t = V.Width.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -54,6 +55,18 @@ module Width : sig
   val typ : (Checked.t, t) Typ.t
 
   module Max : Nat.Add.Intf_transparent
+
+  module Max_vector : Vector.With_version(Max).S
+
+  module Max_at_most : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'a t = ('a, Max.n) At_most.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+      end
+    end]
+  end
 
   module Length : Nat.Add.Intf_transparent
 end = struct
@@ -136,32 +149,72 @@ module Vk = struct
   let compare _ _ = 0
 end
 
-include Make
-          (Backend.Tock.Curve.Affine)
-          (struct
-            include Vk
+module R = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Backend.Tock.Curve.Affine.Stable.V1.t Repr.Stable.V1.t
 
-            let of_repr {Repr.Stable.V1.step_data; max_width; wrap_index= c} :
-                Impls.Wrap.Verification_key.t =
-              let d = Common.wrap_domains.h in
-              let log2_size = Import.Domain.log2_size d in
-              let max_quot_size =
-                Common.max_quot_size_int (Import.Domain.size d)
-              in
-              { domain=
-                  { log_size_of_group= log2_size
-                  ; group_gen= Backend.Tock.Field.domain_generator log2_size }
-              ; max_poly_size= 1 lsl Nat.to_int Backend.Tock.Rounds.n
-              ; max_quot_size
-              ; urs= Backend.Tock.Keypair.load_urs ()
-              ; evals=
-                  Plonk_verification_key_evals.map c ~f:(fun unshifted ->
-                      { Marlin_plonk_bindings.Types.Poly_comm.shifted= None
-                      ; unshifted=
-                          Array.of_list_map unshifted ~f:(fun x ->
-                              Or_infinity.Finite x ) } )
-              ; shifts= Common.tock_shifts ~log2_size }
-          end)
+      let to_latest = Fn.id
+    end
+  end]
+end
+
+[%%versioned_binable
+module Stable = struct
+  module V1 = struct
+    type t = (Backend.Tock.Curve.Affine.t, Vk.t) Poly.Stable.V1.t
+    [@@deriving sexp, equal, compare, hash, yojson]
+
+    let to_latest = Fn.id
+
+    include Binable.Of_binable
+              (R.Stable.V1)
+              (struct
+                type nonrec t = t
+
+                module Repr_conv = struct
+                  include Vk
+
+                  let of_repr
+                      {Repr.Stable.V1.step_data; max_width; wrap_index= c} :
+                      Impls.Wrap.Verification_key.t =
+                    let d = Common.wrap_domains.h in
+                    let log2_size = Import.Domain.log2_size d in
+                    let max_quot_size =
+                      Common.max_quot_size_int (Import.Domain.size d)
+                    in
+                    { domain=
+                        { log_size_of_group= log2_size
+                        ; group_gen=
+                            Backend.Tock.Field.domain_generator log2_size }
+                    ; max_poly_size= 1 lsl Nat.to_int Backend.Tock.Rounds.n
+                    ; max_quot_size
+                    ; urs= Backend.Tock.Keypair.load_urs ()
+                    ; evals=
+                        Plonk_verification_key_evals.map c ~f:(fun unshifted ->
+                            { Marlin_plonk_bindings.Types.Poly_comm.shifted=
+                                None
+                            ; unshifted=
+                                Array.of_list_map unshifted ~f:(fun x ->
+                                    Or_infinity.Finite x ) } )
+                    ; shifts= Common.tock_shifts ~log2_size }
+                end
+
+                let to_binable
+                    {Poly.step_data; max_width; wrap_index; wrap_vk= _} =
+                  {Repr.Stable.V1.step_data; max_width; wrap_index}
+
+                let of_binable
+                    ({Repr.Stable.V1.step_data; max_width; wrap_index= c} as t)
+                    =
+                  { Poly.step_data
+                  ; max_width
+                  ; wrap_index= c
+                  ; wrap_vk= Some (Repr_conv.of_repr t) }
+              end)
+  end
+end]
 
 let dummy : t =
   { step_data= At_most.[]
