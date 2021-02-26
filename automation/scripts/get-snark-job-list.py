@@ -23,11 +23,11 @@ except IOError as error:
     print('Error opening secrets config:', error)
     sys.exit(1)
 
-status = cli('coda client status -json')
+status = cli('mina client status -json')
 block = json.loads(status)['blockchain_length']
 print('Block:', block)
 
-snark_job_list = json.loads(cli('coda advanced snark-job-list'))
+snark_job_list = json.loads(cli('mina advanced snark-job-list'))
 
 leavestotal= Counter()
 

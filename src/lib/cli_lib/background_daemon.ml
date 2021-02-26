@@ -19,8 +19,8 @@ let run ~f (t : Host_and_port.t Flag.Types.with_name) arg =
         Print.printf
           !"Error: Unable to connect to Coda daemon.\n\
             - The daemon might not be running. See logs (in \
-            `~/.coda-config/coda.log`) for details under the host:%s.\n\
-           \  Run `coda daemon -help` to see how to start daemon.\n\
+            `~/.mina-config/mina.log`) for details under the host:%s.\n\
+           \  Run `mina daemon -help` to see how to start daemon.\n\
             - If you just started the daemon, wait a minute for the RPC \
             server to start.\n\
             - Alternatively, the daemon may not be running the RPC server on \
