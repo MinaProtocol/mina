@@ -6,7 +6,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   let num_rotate = 1 in
   let logger = Logger.create () ~id:"test" in
   let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
-  let log_filename = "coda.log" in
+  let log_filename = "mina.log" in
   let exists name =
     Result.is_ok (Unix.access (Filename.concat directory name) [`Exists])
   in
@@ -15,11 +15,11 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   in
   let rec run_test ~last_size ~rotations ~rotation_expected =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "test" ;
-    let curr_size = get_size "coda.log" in
+    let curr_size = get_size "mina.log" in
     if curr_size < last_size then (
       assert rotation_expected ;
-      assert (exists "coda.log.0") ;
-      assert (get_size "coda.log.0" = last_size) ;
+      assert (exists "mina.log.0") ;
+      assert (get_size "mina.log.0" = last_size) ;
       if rotations <= 2 then
         run_test ~last_size:curr_size ~rotations:(rotations + 1)
           ~rotation_expected:false )

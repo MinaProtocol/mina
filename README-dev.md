@@ -250,4 +250,4 @@ To do this, pass a json file to the daemon using the flag `genesis-constants` wi
 }
 ```
 
-The daemon logs should reflect these changes. Also, `coda client status` displays some of the constants.
+The daemon logs should reflect these changes. Also, `mina client status` displays some of the constants.

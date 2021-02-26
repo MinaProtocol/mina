@@ -2,7 +2,7 @@
 
 set -e
 
-BIN=../../../_build/default/src/app/cli/src/coda.exe
+BIN=../../../_build/default/src/app/cli/src/mina.exe
 PK=B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV
 SNARK_PK=B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL
 

@@ -13,7 +13,7 @@ variable "subnetwork" {
 variable "seed_peers" {
   type        = string
   default     = ""
-  description = "An Optional space-separated list of -peer <peer-string> arguments for the coda daemon"
+  description = "An Optional space-separated list of -peer <peer-string> arguments for the mina daemon"
 }
 
 variable "instance_name" {

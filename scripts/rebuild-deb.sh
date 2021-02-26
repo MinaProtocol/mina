@@ -14,7 +14,7 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
-PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
@@ -106,7 +106,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
 cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -185,7 +185,7 @@ for f in /tmp/s3_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp ../genesis_ledgers/zenith.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -193,7 +193,7 @@ cp ../genesis_ledgers/zenith.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CON
 mkdir -p "${BUILDDIR}/etc/bash_completion.d"
 cwd=$(pwd)
 export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
-env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > "${BUILDDIR}/etc/bash_completion.d/coda"
+env COMMAND_OUTPUT_INSTALLATION_BASH=1 mina  > "${BUILDDIR}/etc/bash_completion.d/mina"
 
 # echo contents of deb
 echo "------------------------------------------------------------"

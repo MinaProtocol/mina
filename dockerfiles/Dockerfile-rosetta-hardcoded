@@ -252,7 +252,7 @@ RUN git pull \
 RUN eval $(opam config env) \
   && dune build --profile=${DUNE_PROFILE} \
     src/app/generate_keypair/generate_keypair.exe \
-    src/app/cli/src/coda.exe \
+    src/app/cli/src/mina.exe \
     src/app/archive/archive.exe \
     src/app/rosetta/rosetta.exe \
     src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
@@ -277,7 +277,7 @@ FROM debian@sha256:b527bec3708ee1fe2ffb4625d742a60bb45b06064e7c64a81b16550fe4271
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG CODA_DAEMON_PORT=10101
-ARG CODA_CONFIG_DIR=/root/.coda-config
+ARG CODA_CONFIG_DIR=/root/.mina-config
 # Sample public key for use in dev profile / demo mode genesis block
 ARG PK=B62qrPN5Y5yq8kGE3FbVKbGTdTAJNdtNtB5sNVpxyRwWGcDEhpMzc8g
 

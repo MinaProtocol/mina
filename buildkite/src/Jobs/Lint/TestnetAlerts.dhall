@@ -1,4 +1,7 @@
 let Prelude = ../../External/Prelude.dhall
+let B = ../../External/Buildkite.dhall
+
+let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
@@ -32,6 +35,7 @@ Pipeline.build
           , label = "Lint Testnet alert rules"
           , key = "lint-testnet-alerts"
           , target = Size.Small
+          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]
