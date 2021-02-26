@@ -11,6 +11,12 @@ provider "aws" {
   region = "us-west-2"
 }
 
+variable "rule_namespace" {
+  type        = string
+  description = "Grafanacloud namespace for grouping rule sets"
+  default     = "testnet-alerts"
+}
+
 variable "rule_filter" {
   type        = string
   description = "Filter to apply to monitoring search space for managing the scope of alert rule checks"

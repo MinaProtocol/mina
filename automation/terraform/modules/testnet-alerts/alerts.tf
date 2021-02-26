@@ -3,6 +3,7 @@
 data "template_file" "testnet_alerts" {
   template = file("${path.module}/templates/testnet-alert-rules.yml.tpl")
   vars = {
+    rule_namespace     = var.rule_namespace
     rule_filter        = var.rule_filter
     alerting_timeframe = var.rule_timeframe
   }

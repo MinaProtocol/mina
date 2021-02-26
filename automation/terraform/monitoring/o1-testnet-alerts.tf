@@ -22,6 +22,6 @@ output "testnet_alert_rules" {
 }
 
 output "testnet_alert_receivers" {
-  value = module.o1testnet_alerts.rendered_receivers_config
+  value     = module.o1testnet_alerts.rendered_receivers_config
   sensitive = true
 }
