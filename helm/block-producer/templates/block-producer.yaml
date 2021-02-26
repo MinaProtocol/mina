@@ -208,7 +208,10 @@ spec:
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end -}}
-          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }}
+          {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"

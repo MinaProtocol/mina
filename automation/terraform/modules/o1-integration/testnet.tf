@@ -36,8 +36,6 @@ module "kubernetes_testnet" {
     }
   ]
 
-  archive_node_count  = 0
-
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
   snark_worker_public_key = var.snark_worker_public_key
