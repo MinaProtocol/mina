@@ -150,7 +150,7 @@ module Accounts = struct
                   !"Snap account state has invalid length %{sexp: \
                     Runtime_config.Accounts.Single.t} length: %d"
                   t (List.length state)
-              else Ok (Snapp_state.of_list_exn state)
+              else Ok (Snapp_state.V.of_list_exn state)
             in
             let%map verification_key =
               (* Use a URI-safe alphabet to make life easier for maintaining json
@@ -264,7 +264,7 @@ module Accounts = struct
       in
       let snapp =
         Option.map account.snapp ~f:(fun {app_state; verification_key} ->
-            let state = Snapp_state.to_list app_state in
+            let state = Snapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:(fun vk ->
                   With_hash.data vk

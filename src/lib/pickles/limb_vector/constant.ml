@@ -9,12 +9,8 @@ let to_bits t =
          let test_bit i = Int64.(shift_right n i land one = one) in
          List.init 64 ~f:test_bit )
 
-module Make (N : Vector.Nat_intf) = struct
-  module A = Vector.With_length (N)
-
-  let length = 64 * Nat.to_int N.n
-
-  module Hex64 = struct
+module Hex64 = struct
+  module T = struct
     type t = Int64.t [@@deriving yojson]
 
     (* Modify the [of_yojson] handler to add a case for [`String].
@@ -55,7 +51,33 @@ module Make (N : Vector.Nat_intf) = struct
     let t_of_sexp = Fn.compose of_hex String.t_of_sexp
   end
 
-  type t = Hex64.t A.t [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+  include T
+
+  [%%versioned_asserted
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type t = T.t [@@deriving compare, sexp, yojson, hash, equal]
+
+      let to_latest = Fn.id
+    end
+
+    module Tests = struct
+      (* TODO: Add serialization tests here to make sure that Core doesn't
+         change it out from under us between versions.
+      *)
+    
+    end
+  end]
+end
+
+module Make (N : Vector.Nat_intf) = struct
+  module A = Vector.With_length (N)
+
+  let length = 64 * Nat.to_int N.n
+
+  type t = Hex64.t A.t [@@deriving sexp, compare, yojson, hash, equal]
 
   let to_bits = to_bits
 

@@ -346,7 +346,7 @@ module Account = struct
           ; receipt_chain_hash: 'receipt_chain_hash
           ; public_key: 'pk
           ; delegate: 'pk
-          ; state: 'field Snapp_state.Stable.V1.t }
+          ; state: 'field Snapp_state.V.Stable.V1.t }
         [@@deriving hlist, sexp, eq, yojson, hash, compare]
       end
     end]
