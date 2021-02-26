@@ -2,6 +2,18 @@ const path = require("path");
 const { ipcRenderer, remote } = require("electron");
 const { dialog } = remote;
 
+const hideProgressSpinner = () => {
+  document.getElementById("progress-status-spinner").classList.remove("active");
+};
+
+const showProgressSpinner = () => {
+  document.getElementById("progress-status-spinner").classList.add("active");
+};
+
+const setProgressStatusText = (status) => {
+  document.getElementById("progress-status-text").innerText = status;
+};
+
 const outputPathInput = document.getElementById("output-path-input");
 outputPathInput.addEventListener("click", async (e) => {
   e.preventDefault();
@@ -33,9 +45,9 @@ form.addEventListener("submit", (e) => {
       password,
     });
   } else {
-    document.getElementById("progress-container").classList.remove("hide");
-    document.getElementById("progress-status-text").innerText =
-      "All fields are required, please fill them before continuing";
+    setProgressStatusText(
+      "All fields are required, please fill them before continuing"
+    );
   }
 });
 
@@ -57,46 +69,35 @@ const chooseFolder = () => {
 };
 
 ipcRenderer.on("status:web-scrape", () => {
-  let status = document.getElementById("progress-status-text");
-  let progressSpinner = document.getElementById("progress-status-spinner");
-  progressSpinner.classList.add("active");
-  let progressLoader = document.getElementById("progress-container");
-  progressLoader.classList.remove("hide");
-  status.innerText =
-    "Attempting to log in, please do not close the application...";
+  showProgressSpinner();
+  setProgressStatusText(
+    "Attempting to log in, please do not close the application..."
+  );
 });
 
 ipcRenderer.on("status:valid-login", () => {
-  document.getElementById("progress-container").classList.remove("hide");
-  document.getElementById("progress-status-spinner").classList.add("active");
-  document.getElementById("progress-status-text").innerText =
-    "Login successful. Generating SNAPP proof...";
+  showProgressSpinner();
+  setProgressStatusText("Login successful. Generating SNAPP proof...");
 });
 
 ipcRenderer.on("status:invalid-login", () => {
-  document.getElementById("progress-container").classList.remove("hide");
-  document.getElementById("progress-status-spinner").classList.remove("active");
-  document.getElementById("progress-status-text").innerText =
-    "Login unsuccessful. Please check your credentials or restart the application and try again.";
+  hideProgressSpinner();
+  setProgressStatusText(
+    "Login unsuccessful. Please check your credentials or restart the application and try again."
+  );
   localStorage.setItem("loading", false);
 });
 
 ipcRenderer.on("status:proof-gen", () => {
-  const outputPath = localStorage.getItem("output-path", true);
-  document.getElementById(
-    "progress-status-text"
-  ).innerText = `SNAPP proof generated to: ${outputPath}`;
-
-  document.getElementById("progress-status-spinner").classList.remove("active");
+  const outputPath = localStorage.getItem("output-path");
+  setProgressStatusText(`SNAPP proof saved to: ${outputPath}`);
+  hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
 
 ipcRenderer.on("status:proof-fail", () => {
-  const outputPath = localStorage.getItem("output-path", true);
-  document.getElementById(
-    "progress-status-text"
-  ).innerText = `Failed to generate proof to: ${outputPath}`;
-
-  document.getElementById("progress-status-spinner").classList.remove("active");
+  const outputPath = localStorage.getItem("output-path");
+  setProgressStatusText(`Failed to generate proof to: ${outputPath}`);
+  hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
