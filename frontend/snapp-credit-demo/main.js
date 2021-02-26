@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
-const { scrape } = require("./app/js/puppeteer");
-const { generateSnapp } = require("./app/js/snapp");
+const { scrape } = require("./src/puppeteer");
+const { generateSnapp } = require("./src/snapp");
+const { WEBSCRAPE, LOGIN, VALID_LOGIN, INVALID_LOGIN } = require("./constants");
 
 process.env.NODE_ENV = "production";
 
@@ -61,15 +62,15 @@ app.on("activate", async () => {
   }
 });
 
-ipcMain.on("button:gen-snapp", (_, { ethAddress, email, password }) => {
-  mainWindow.webContents.send("status:web-scrape");
+ipcMain.on(LOGIN, (_, { ethAddress, email, password }) => {
+  mainWindow.webContents.send(WEBSCRAPE);
   scrape(email, password)
     .then((creditScore) => {
-      mainWindow.webContents.send("status:valid-login");
+      mainWindow.webContents.send(VALID_LOGIN);
       generateSnapp(mainWindow, ethAddress, creditScore);
     })
     .catch((err) => {
-      mainWindow.webContents.send("status:invalid-login");
+      mainWindow.webContents.send(INVALID_LOGIN);
       console.error(err);
     });
 });

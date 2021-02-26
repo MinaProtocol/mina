@@ -1,6 +1,14 @@
 const path = require("path");
 const { ipcRenderer, remote } = require("electron");
 const { dialog } = remote;
+const {
+  WEBSCRAPE,
+  LOGIN,
+  VALID_LOGIN,
+  INVALID_LOGIN,
+  PROOF_SUCCESS,
+  PROOF_FAIL,
+} = require("../constants");
 
 const hideProgressSpinner = () => {
   document.getElementById("progress-status-spinner").classList.remove("active");
@@ -12,6 +20,23 @@ const showProgressSpinner = () => {
 
 const setProgressStatusText = (status) => {
   document.getElementById("progress-status-text").innerText = status;
+};
+
+const chooseFolder = () => {
+  return new Promise(function (resolve) {
+    dialog
+      .showOpenDialog(remote.getCurrentWindow(), {
+        properties: ["openDirectory"],
+      })
+      .then((result) => {
+        if (result.canceled === false) {
+          resolve(result.filePaths[0]);
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+  });
 };
 
 const outputPathInput = document.getElementById("output-path-input");
@@ -39,7 +64,7 @@ form.addEventListener("submit", (e) => {
   localStorage.setItem("loading", true);
 
   if (ethAddress && email && password && outputPath) {
-    ipcRenderer.send("button:gen-snapp", {
+    ipcRenderer.send(LOGIN, {
       ethAddress,
       email,
       password,
@@ -51,36 +76,19 @@ form.addEventListener("submit", (e) => {
   }
 });
 
-const chooseFolder = () => {
-  return new Promise(function (resolve) {
-    dialog
-      .showOpenDialog(remote.getCurrentWindow(), {
-        properties: ["openDirectory"],
-      })
-      .then((result) => {
-        if (result.canceled === false) {
-          resolve(result.filePaths[0]);
-        }
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  });
-};
-
-ipcRenderer.on("status:web-scrape", () => {
+ipcRenderer.on(WEBSCRAPE, () => {
   showProgressSpinner();
   setProgressStatusText(
     "Attempting to log in, please do not close the application..."
   );
 });
 
-ipcRenderer.on("status:valid-login", () => {
+ipcRenderer.on(VALID_LOGIN, () => {
   showProgressSpinner();
   setProgressStatusText("Login successful. Generating SNAPP proof...");
 });
 
-ipcRenderer.on("status:invalid-login", () => {
+ipcRenderer.on(INVALID_LOGIN, () => {
   hideProgressSpinner();
   setProgressStatusText(
     "Login unsuccessful. Please check your credentials or restart the application and try again."
@@ -88,14 +96,14 @@ ipcRenderer.on("status:invalid-login", () => {
   localStorage.setItem("loading", false);
 });
 
-ipcRenderer.on("status:proof-gen", () => {
+ipcRenderer.on(PROOF_SUCCESS, () => {
   const outputPath = localStorage.getItem("output-path");
   setProgressStatusText(`SNAPP proof saved to: ${outputPath}`);
   hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
 
-ipcRenderer.on("status:proof-fail", () => {
+ipcRenderer.on(PROOF_FAIL, () => {
   const outputPath = localStorage.getItem("output-path");
   setProgressStatusText(`Failed to generate proof to: ${outputPath}`);
   hideProgressSpinner();
