@@ -33,7 +33,7 @@ spec:
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-log-snark-work-gossip", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
