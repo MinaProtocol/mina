@@ -24,12 +24,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.coordinator.fullname }}-graphql
+  name: {{ tpl .Values.coordinator.fullname . }}-graphql
 spec:
   type: NodePort
   publishNotReadyAddresses: true
   selector:
-    app: {{ .Values.coordinator.fullname }}
+    app: {{ tpl .Values.coordinator.fullname . }}
   ports:
   - name: http-graphql
     protocol: TCP

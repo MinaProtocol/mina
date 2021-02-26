@@ -16,17 +16,3 @@ spec:
     port: {{ .Values.coda.ports.p2p }}
     targetPort: external-port
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ .Values.seed.fullname }}-graphql
-spec:
-  type: NodePort
-  publishNotReadyAddresses: true
-  selector:
-    app: {{ .Values.seed.fullname }}
-  ports:
-  - name: http-graphql
-    protocol: TCP
-    port: {{ .Values.coda.ports.graphql }}
----

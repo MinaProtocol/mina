@@ -1,4 +1,5 @@
 locals {
+  base_graphql_dns = "${var.testnet_name}.graphql.o1test.net"
   snark_worker_host_port            = 10001
   block_producer_starting_host_port = 10010
 
@@ -10,8 +11,15 @@ locals {
     port = 10401
   }
 
-  base_graphql_dns = "${var.testnet_name}.graphql.o1test.net"
+  seed_config = {
+    name               = "seed",
+    class              = "seed",
+    libp2p_secret      = local.seed_peer.secret,
+    external_port      = 10401,
+    node_port          = null,
+    external_ip        = null,
+    private_key_secret = null
+  }
 
-  snark_coord_names = var.snark_worker_replicas > 0 ? ["snark-coordinator-${substr(var.snark_worker_public_key, length(var.snark_worker_public_key) -6, 6 )  }"] : []
-
+  snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, length(var.snark_worker_public_key) - 6, 6))}"
 }

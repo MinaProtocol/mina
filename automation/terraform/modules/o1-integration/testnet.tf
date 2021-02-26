@@ -24,17 +24,7 @@ module "kubernetes_testnet" {
 
   seed_zone   = "us-west1-a"
   seed_region = "us-west1"
-  seed_configs = [
-    {
-      name               = "seed",
-      class              = "seed",
-      libp2p_secret      = local.seed_peer.secret,
-      external_port      = 10401,
-      node_port          = null,
-      external_ip        = null,
-      private_key_secret = null
-    }
-  ]
+  seed_configs = [local.seed_config]
 
   archive_node_count  = 0
 
