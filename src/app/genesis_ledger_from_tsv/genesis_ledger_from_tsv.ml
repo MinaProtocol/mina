@@ -29,7 +29,7 @@ let add_account pk =
 let valid_pk pk = Or_error.is_ok @@ Public_key.Compressed.of_base58_check pk
 
 let is_pending pk =
-  List.mem ["pending"; "finoa"; "secret"] pk ~equal:String.Caseless.equal
+  List.mem ["pending"; "finoa"; "topsecret"] pk ~equal:String.Caseless.equal
 
 let no_delegatee pk = String.is_empty pk || String.equal pk "0"
 
@@ -142,6 +142,8 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
 
 let account_of_tsv ~logger tsv dummy_pks =
   match String.split tsv ~on:'\t' with
+  | "skip" :: _ ->
+      None
   | [ wallet_pk
     ; amount
     ; initial_min_balance
@@ -150,9 +152,10 @@ let account_of_tsv ~logger tsv dummy_pks =
     ; unlock_frequency
     ; unlock_amount
     ; delegatee_pk ] ->
-      runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
-        ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
-        ~delegatee_pk ~dummy_pks
+      Some
+        (runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
+           ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
+           ~delegatee_pk ~dummy_pks)
   | _ ->
       (* should not occur, we've already validated the record *)
       failwithf "TSV line does not contain expected number of fields: %s" tsv
@@ -205,6 +208,8 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
 
 let validate_record tsv =
   match String.split tsv ~on:'\t' with
+  | "skip" :: _ ->
+      None
   | [ wallet_pk
     ; amount
     ; initial_min_balance
@@ -264,12 +269,13 @@ let main ~tsv_file ~output_file () =
           ~metadata:[("tsv_file", `String tsv_file)] ;
         let rec go accounts num_accounts dummy_pks =
           match In_channel.input_line in_channel with
-          | Some line ->
+          | Some line -> (
               let underscored_line = remove_commas line in
-              let account, dummy_pks' =
-                account_of_tsv ~logger underscored_line dummy_pks
-              in
-              go (account :: accounts) (num_accounts + 1) dummy_pks'
+              match account_of_tsv ~logger underscored_line dummy_pks with
+              | Some (account, dummy_pks') ->
+                  go (account :: accounts) (num_accounts + 1) dummy_pks'
+              | None ->
+                  go accounts num_accounts dummy_pks )
           | None ->
               (List.rev accounts, num_accounts)
         in
