@@ -247,7 +247,7 @@ def main():
 
     print ('Gathering telemetry from daemon peers')
 
-    seed_status = exec_command("coda client status")
+    seed_status = exec_command("mina client status")
     if seed_status == '':
       raise Exception("unable to connect to seed node within " + str(request_timeout_seconds) + " seconds" )
 
@@ -271,7 +271,7 @@ def main():
 
       print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
 
-      resp = exec_on_seed("coda advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
+      resp = exec_on_seed("mina advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
       add_resp(resp, peers_to_query)
 
       requests += 1

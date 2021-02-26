@@ -127,7 +127,7 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
     for p in queried_peers:
         del unqueried_peers[p]
 
-  cmd = "coda advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
+  cmd = "mina advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
   resp = util.exec_on_pod(v1, namespace, seed, 'seed', cmd)
   add_resp(resp, [])
 
@@ -139,7 +139,7 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
 
     print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
 
-    util.exec_on_pod(v1, namespace, seed, 'seed', "coda advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
+    util.exec_on_pod(v1, namespace, seed, 'seed', "mina advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
     add_resp(resp, peers_to_query)
 
     requests += 1

@@ -7,8 +7,8 @@ function cleanup
   CODE=${1:-0}
   echo "Killing archive.exe"
   kill $(ps aux | egrep '_build/default/src/app/.*archive.exe' | grep -v grep | awk '{ print $2 }') || true
-  echo "Killing coda.exe"
-  kill $(ps aux | egrep '_build/default/src/app/.*coda.exe'    | grep -v grep | awk '{ print $2 }') || true
+  echo "Killing mina.exe"
+  kill $(ps aux | egrep '_build/default/src/app/.*mina.exe'    | grep -v grep | awk '{ print $2 }') || true
   echo "Killing agent.exe"
   kill $(ps aux | egrep '_build/default/src/app/rosetta/test-agent/agent.exe'       | grep -v grep | awk '{ print $2 }') || true
   echo "Killing rosetta.exe"
@@ -23,7 +23,7 @@ PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # rebuild
 pushd ../../../
-PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/coda.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe src/app/rosetta/ocaml-signer/signer.exe
+PATH=/usr/local/bin:$PATH dune b src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/cli/src/mina.exe src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/test-agent/agent.exe src/app/rosetta/ocaml-signer/signer.exe
 popd
 
 # make genesis (synchronously)

@@ -80,7 +80,7 @@ def yes_or_no(question):
 
 
 if __name__ == "__main__":
-    crashdirs = glob('test-coda-CRASH-*/coda.log')
+    crashdirs = glob('test-coda-CRASH-*/mina.log')
 
     seen_exns = []
     for crashdir in crashdirs:
