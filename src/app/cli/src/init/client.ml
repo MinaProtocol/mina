@@ -1221,7 +1221,7 @@ let set_staking_graphql =
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
          print_message
-           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+           "❌ Failed to start staking with keys (try `mina accounts unlock` \
             first)"
            (result#setStaking)#lockedPublicKeys ;
          print_message "Started staking with"
@@ -1424,7 +1424,7 @@ let list_accounts =
          | [||] ->
              printf
                "😢 You have no tracked accounts!\n\
-                You can make a new one using `coda accounts create`\n"
+                You can make a new one using `mina accounts create`\n"
          | accounts ->
              Array.iteri accounts ~f:(fun i w ->
                  printf

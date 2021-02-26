@@ -204,7 +204,7 @@ module Worker = struct
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
                  ~directory:(Option.value_exn conf_dir)
-                 ~log_filename:"coda-verifier.log" ~max_size ~num_rotate) ) ;
+                 ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
         Worker_state.create {conf_dir; logger; proof_level}
 

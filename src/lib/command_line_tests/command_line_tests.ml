@@ -2,7 +2,7 @@ open Core
 open Async
 
 (**
- * Test the basic functionality of the coda daemon and client through the CLI
+ * Test the basic functionality of the mina daemon and client through the CLI
  *)
 
 let%test_module "Command line tests" =
@@ -16,11 +16,11 @@ let%test_module "Command line tests" =
        dune won't allow running it via "dune exec", because it's outside its
        workspace, so we invoke the executable directly
 
-       the coda.exe executable must have been built before running the test
+       the mina.exe executable must have been built before running the test
        here, else it will fail
 
      *)
-    let coda_exe = "../../app/cli/src/coda.exe"
+    let coda_exe = "../../app/cli/src/mina.exe"
 
     let start_daemon config_dir genesis_ledger_dir port =
       let%bind working_dir = Sys.getcwd () in
@@ -81,7 +81,7 @@ let%test_module "Command line tests" =
           ( if !test_failed then
             let contents =
               Core.In_channel.(
-                with_file (config_dir ^/ "coda.log") ~f:input_all)
+                with_file (config_dir ^/ "mina.log") ~f:input_all)
             in
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
@@ -107,11 +107,11 @@ let%test_module "Command line tests" =
               test_failed := true ;
               Error.raise err )
 
-    let%test "The coda daemon works in background mode" =
+    let%test "The mina daemon works in background mode" =
       match Core.Sys.is_file coda_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | _ ->
-          printf !"Please build coda.exe in order to run this test\n%!" ;
+          printf !"Please build mina.exe in order to run this test\n%!" ;
           false
   end )

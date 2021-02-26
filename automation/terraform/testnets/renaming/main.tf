@@ -1,7 +1,7 @@
 terraform {
-  required_version = ">= 0.12.0"
+  required_version = "~> 0.13.4"
   backend "s3" {
-    key     = "terraform-ci-net.tfstate"
+    key     = "terraform-renaming.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -14,34 +14,34 @@ provider "aws" {
 }
 
 provider "google" {
-  alias   = "google-us-east4"
+  alias   = "google-us-west1"
   project = "o1labs-192920"
-  region  = "us-east4"
-  zone    = "us-east4-b"
+  region  = "us-west1"
+  zone    = "us-west1-a"
 }
 
 variable "coda_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-daemon:0.2.11-develop"
+  default     = "gcr.io/o1labs-192920/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-87e6365"
 }
 
 variable "coda_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
-  default     = "gcr.io/o1labs-192920/coda-archive:0.2.11-develop"
+  default     = "gcr.io/o1labs-192920/coda-archive:0.4.2-renaming-mina-binary-and-mina-config-87e6365"
 }
 
 variable "whale_count" {
   type    = number
-  default = 1
+  default = 5
 }
 
 variable "fish_count" {
   type    = number
-  default = 1
+  default = 5
 }
 
 variable "archive_count" {
@@ -76,16 +76,16 @@ locals {
 
 
 module "ci_testnet" {
-  providers = { google.gke = google.google-us-east4 }
+  providers = { google.gke = google.google-us-west1 }
   source    = "../../modules/o1-testnet"
 
-  artifact_path = var.ci_artifact_path
+  artifact_path = abspath(path.module)
 
   # TODO: remove obsolete cluster_name var + cluster region
   cluster_name          = "mina-integration-west1"
   cluster_region        = var.ci_cluster_region
   k8s_context           = var.ci_k8s_ctx
-  testnet_name          = "ci-net-${substr(sha256(terraform.workspace), 0, 7)}"
+  testnet_name          = "renaming"
 
   coda_image            = var.coda_image
   coda_archive_image    = var.coda_archive_image
