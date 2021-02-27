@@ -369,7 +369,7 @@ module Network_manager = struct
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
     let seed_nodes = [cons_node "seed"] in
     let snark_coordinator_name =
-      "snark-coordinator"
+      "snark-coordinator-"
       ^ String.sub network_config.terraform.snark_worker_public_key
           ~pos:
             (String.length network_config.terraform.snark_worker_public_key - 6)
@@ -429,6 +429,7 @@ module Network_manager = struct
         (List.map ~f:Kubernetes_network.Node.id)
     in
     [%log' info t.logger] "Network deployed" ;
+    [%log' info t.logger] "testnet namespace: %s" t.namespace ;
     [%log' info t.logger] "snark coordinators: %s"
       (nodes_to_string result.snark_coordinators) ;
     [%log' info t.logger] "block producers: %s"
