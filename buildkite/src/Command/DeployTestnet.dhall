@@ -41,9 +41,8 @@ in
           -- download deployment dependencies and ensure artifact DIR exists
           Cmd.run "mkdir -p ${spec.artifactPath}",
           Cmd.run "artifact-cache-helper.sh ${spec.deployEnvFile}",
-          -- launch testnet based on deploy ENV
+          -- launch testnet based on deploy ENV and ensure auto-cleanup on `apply` failures
           Cmd.run "source ${spec.deployEnvFile}",
-          -- ensure auto-cleanup on `apply` failures
           Cmd.run (
             "terraform apply -auto-approve" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++

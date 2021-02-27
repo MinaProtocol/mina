@@ -72,6 +72,9 @@ spec:
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }},
+          {{- end }}
           "-seed"
         ]
         env:

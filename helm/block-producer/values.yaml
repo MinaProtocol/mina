@@ -45,6 +45,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     libp2pSecret: "libp2pYolo"
+    enableArchive: true
+    archiveAddress: archive-1:3086
   - name: "test-2"
     runWithUserAgent: true
     runWithBots: false
@@ -53,6 +55,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     libp2pSecret: "libp2pYolo"
+    enableArchive: false
+    archiveAddress: archive-1:3086
   - name: "test-3"
     runWithUserAgent: false
     runWithBots: true
@@ -61,6 +65,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     libp2pSecret: "libp2pYolo"
+    enableArchive: false
+    archiveAddress: archive-1:3086
   - name: "test-4"
     runWithUserAgent: true
     runWithBots: true
@@ -69,6 +75,8 @@ blockProducerConfigs:
     enableGossipFlooding: false
     enablePeerExchange: false
     libp2pSecret: "libp2pYolo"
+    enableArchive: false
+    archiveAddress: archive-1:3086
 
 healthcheck:
   enabled: true

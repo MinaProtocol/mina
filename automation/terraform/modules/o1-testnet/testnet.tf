@@ -11,7 +11,7 @@ data "aws_route53_zone" "selected" {
 }
 
 resource "aws_route53_record" "seed_record" {
-  count        = var.seed_count
+  count   = var.seed_count
   zone_id = data.aws_route53_zone.selected.zone_id
   name    = "seed-${count.index + 1}.${var.testnet_name}.${data.aws_route53_zone.selected.name}"
   type    = "A"
@@ -28,6 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
+  use_local_charts   = true
   coda_image         = var.coda_image
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
@@ -53,8 +54,26 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_node_count  = var.archive_node_count
+  archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
+    # by default, deploy a single local daemon and associated PostgresDB enabled archive server
+    [
+      {
+        name              = "archive-1"
+        enableLocalDaemon = true
+        enablePostgresDB  = true
+      }
+    ],
+    # in addition to stand-alone archive servers upto the input archive node count
+    [
+      for i in range(2, var.archive_node_count + 1) : {
+        name              = "archive-${i}"
+        enableLocalDaemon = false
+        enablePostgresDB  = false
+      }
+    ]
+  )
   mina_archive_schema = var.mina_archive_schema
+  persistence_config  = var.postgres_persistence_config
 
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
@@ -62,9 +81,9 @@ module "kubernetes_testnet" {
   snark_worker_host_port  = var.snark_worker_host_port
 
   block_producer_key_pass = var.block_producer_key_pass
-  block_producer_configs  = concat(
+  block_producer_configs = concat(
     [
-      for i in range(var.whale_count): {
+      for i in range(var.whale_count) : {
         name                   = local.whale_block_producer_names[i]
         class                  = "whale"
         id                     = i + 1
@@ -76,10 +95,12 @@ module "kubernetes_testnet" {
         run_with_bots          = false
         enable_peer_exchange   = true
         isolated               = false
+        enableArchive          = false
+        archiveAddress         = "archive-1:3086"
       }
     ],
     [
-      for i in range(var.fish_count): {
+      for i in range(var.fish_count) : {
         name                   = local.fish_block_producer_names[i]
         class                  = "fish"
         id                     = i + 1
@@ -91,21 +112,25 @@ module "kubernetes_testnet" {
         run_with_bots          = false
         enable_peer_exchange   = true
         isolated               = false
+        enableArchive          = false
+        archiveAddress         = "archive-1:3086"
       }
     ]
   )
 
   seed_configs = [
-      for i in range(var.seed_count): {
-        name                   = local.seed_names[i]
-        class                  = "seed"
-        id                     = i + 1
-        external_port          = local.static_peers[local.seed_names[i]].port
-        external_ip            = google_compute_address.seed_static_ip[i].address
-        private_key_secret     = "online-seeds-account-${i + 1}-key"
-        libp2p_secret          = "online-seeds-libp2p-${i + 1}-key"
-      }
-    ]
+    for i in range(var.seed_count) : {
+      name               = local.seed_names[i]
+      class              = "seed"
+      id                 = i + 1
+      external_port      = local.static_peers[local.seed_names[i]].port
+      external_ip        = google_compute_address.seed_static_ip[i].address
+      private_key_secret = "online-seeds-account-${i + 1}-key"
+      libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
+      enableArchive      = false
+      archiveAddress     = "archive-1:3086"
+    }
+  ]
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = var.restart_nodes

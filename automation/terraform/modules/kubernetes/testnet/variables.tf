@@ -1,3 +1,7 @@
+terraform {
+  experiments = [module_variable_optional_attrs]
+}
+
 # K8s Cluster Vars
 
 variable "cluster_name" {
@@ -33,7 +37,7 @@ variable "coda_archive_image" {
 }
 
 variable "mina_archive_schema" {
-  type = string
+  type    = string
   default = ""
 }
 
@@ -58,7 +62,7 @@ variable "coda_points_image" {
 }
 
 variable "watchdog_image" {
-  type = string
+  type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
@@ -80,13 +84,8 @@ variable "testnet_name" {
 }
 
 variable "additional_peers" {
-  type    = list
+  type    = list(any)
   default = []
-}
-
-variable "archive_node_count" {
-  type    = number
-  default = 0
 }
 
 variable "runtime_config" {
@@ -112,7 +111,7 @@ variable "seed_zone" {
 }
 
 variable "seed_discovery_keypairs" {
-  type = list
+  type = list(any)
   default = [
     "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr",
     "CAESQKtOnmYHQacRpNvBZDrGLFw/tVB7V4I14Y2xtGcp1sEsEyfcsNoFi7NnUX0T2lQDGQ31KvJRXJ+u/f9JQhJmLsI=,CAESIBMn3LDaBYuzZ1F9E9pUAxkN9SryUVyfrv3/SUISZi7C,12D3KooWB79AmjiywL1kMGeKHizFNQE9naThM2ooHgwFcUzt6Yt1"
@@ -143,16 +142,18 @@ variable "block_producer_key_pass" {
 variable "block_producer_configs" {
   type = list(
     object({
-      name = string,
-      class = string,
-      private_key_secret = string,
-      external_port = number,
-      libp2p_secret = string,
+      name                   = string,
+      class                  = string,
+      private_key_secret     = string,
+      external_port          = number,
+      libp2p_secret          = string,
       enable_gossip_flooding = bool,
-      enable_peer_exchange = bool,
-      isolated = bool,
-      run_with_user_agent = bool,
-      run_with_bots = bool
+      enable_peer_exchange   = bool,
+      isolated               = bool,
+      run_with_user_agent    = bool,
+      run_with_bots          = bool,
+      enableArchive          = bool,
+      archiveAddress         = string
     })
   )
   default = []
@@ -161,12 +162,14 @@ variable "block_producer_configs" {
 variable "seed_configs" {
   type = list(
     object({
-      name = string,
-      class = string
-      libp2p_secret = string
-      external_port = number
-      external_ip   = string
-      private_key_secret = string
+      name               = string,
+      class              = string,
+      libp2p_secret      = string,
+      external_port      = number,
+      external_ip        = string,
+      private_key_secret = string,
+      enableArchive      = bool,
+      archiveAddress     = string
     })
   )
   default = []
@@ -225,7 +228,7 @@ variable "agent_send_every_mins" {
 }
 
 variable "gcloud_seeds" {
-  type    = list
+  type    = list(any)
   default = []
 }
 
@@ -237,12 +240,12 @@ variable "restart_nodes" {
 }
 
 variable "restart_nodes_every_mins" {
-  type = string
+  type    = string
   default = "60"
 }
 
 variable "make_report_every_mins" {
-  type = string
+  type    = string
   default = "30"
 }
 
@@ -261,31 +264,43 @@ variable "make_report_accounts" {
   default = ""
 }
 
-# Archive-Postgres Vars
+# Archive | Postgres Vars
 
-variable "archive_persistence_enabled" {
-  type    = bool
-  default = true
+variable "archive_configs" {
+  type = list(
+    object({
+      name               = string
+      image              = optional(string)
+      serverPort         = optional(string)
+      externalPort       = optional(string)
+      postgresHost       = optional(string)
+      postgresPort       = optional(string)
+      postgresDB         = optional(string)
+      postgresqlUsername = optional(string)
+      postgresqlPassword = optional(string)
+      remoteSchemaFile   = optional(string)
+      enableLocalDaemon  = optional(bool)
+      enablePostgresDB   = optional(bool)
+    })
+  )
+  default = []
 }
 
-variable "archive_persistence_class" {
-  type    = string
-  default = "ssd"
-}
-
-variable "archive_persistence_reclaim_policy" {
-  type    = string
-  default = "retain"
-}
-
-variable "archive_persistence_access_modes" {
-  type    = list
-  default = ["ReadWriteOnce"]
-}
-
-variable "archive_persistence_size" {
-  type    = string
-  default = "8Gi"
+variable "persistence_config" {
+  type = object({
+    enabled       = optional(bool)
+    size          = optional(string)
+    reclaimPolicy = optional(string)
+    storageClass  = optional(string)
+    accessModes   = optional(list(string))
+  })
+  default = {
+    enabled       = true
+    size          = "8Gi"
+    reclaimPolicy = "retain"
+    storageClass  = "ssd-retain"
+    accessModes   = ["ReadWriteOnce"]
+  }
 }
 
 variable "upload_blocks_to_gcloud" {
@@ -294,6 +309,6 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
-  type = string
+  type    = string
   default = ""
 }
