@@ -19,7 +19,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.exactly "automation/terraform/infrastructure/templates/testnet-alerts.yml" "tpl",
+        S.exactly "automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml" "tpl",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
       path = "Release",
@@ -29,7 +29,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-              Cmd.run "cd automation/terraform/infrastructure && terraform init",
+              Cmd.run "cd automation/terraform/monitoring && terraform init",
               Cmd.run "terraform apply -auto-approve -target docker_container.sync_alert_rules" ]
           , label = "Deploy Testnet alert rules"
           , key = "deploy-testnet-alerts"
