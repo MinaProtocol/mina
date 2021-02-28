@@ -52,7 +52,7 @@ module Make (A : T0) (A_value : T0) = struct
     let dummy_step_domains =
       Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains)
     in
-    let dummy_step_widths =
+    let dummy_rules_num_parents =
       Vector.init num_rules ~f:(fun _ -> Nat.to_int (Nat.Add.n max_num_parents))
     in
     let dummy_step_keys =
@@ -72,7 +72,7 @@ module Make (A : T0) (A_value : T0) = struct
     Timer.clock __LOC__ ;
     let _, main =
       Wrap_main.wrap_main full_signature rules_length dummy_step_keys
-        dummy_step_widths dummy_step_domains prev_domains max_num_parents
+        dummy_rules_num_parents dummy_step_domains prev_domains max_num_parents
     in
     Timer.clock __LOC__ ;
     let t =

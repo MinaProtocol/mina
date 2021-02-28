@@ -806,7 +806,7 @@ struct
            ( Field.t Side_loaded_verification_key.Domain.t
              Side_loaded_verification_key.Domains.t
            , num_rules )
-           Vector.t ]) ~step_widths
+           Vector.t ]) ~rules_num_parents
       ~(* TODO: Add "actual branching" so that proofs don't
    carry around dummy "old bulletproof challenges" *)
       sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
@@ -839,7 +839,7 @@ struct
                     (Side_loaded_verification_key.Width.Checked.to_field
                        (Option.value_exn max_width)) ) )
     in
-    let actual_width = Pseudo.choose (which_rule, step_widths) ~f:Fn.id in
+    let actual_width = Pseudo.choose (which_rule, rules_num_parents) ~f:Fn.id in
     let (evals1, x_hat1), (evals2, x_hat2) =
       with_label __LOC__ (fun () ->
           let lengths =

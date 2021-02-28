@@ -247,7 +247,7 @@ module Checked = struct
 
   type t =
     { step_domains: (Field.t Domain.t Domains.t, Max_num_rules.n) Vector.t
-    ; step_widths: (Width.Checked.t, Max_num_rules.n) Vector.t
+    ; rules_num_parents: (Width.Checked.t, Max_num_rules.n) Vector.t
     ; max_width: Width.Checked.t
     ; wrap_index: Inner_curve.t array Plonk_verification_key_evals.t
     ; num_rules: (Boolean.var, Max_num_rules.Log2.n) Vector.t }
@@ -256,12 +256,12 @@ module Checked = struct
   let to_input =
     let open Random_oracle_input in
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-    fun {step_domains; step_widths; max_width; wrap_index; num_rules} ->
+    fun {step_domains; rules_num_parents; max_width; wrap_index; num_rules} ->
       ( List.reduce_exn ~f:append
           [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
                 map_reduce [|h|] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
                     bitstring (Field.unpack x ~length:max_log2_degree) ) )
-          ; Array.map (Vector.to_array step_widths) ~f:Width.Checked.to_bits
+          ; Array.map (Vector.to_array rules_num_parents) ~f:Width.Checked.to_bits
             |> bitstrings
           ; bitstring (Width.Checked.to_bits max_width)
           ; wrap_index_to_input

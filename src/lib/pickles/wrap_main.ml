@@ -137,7 +137,7 @@ let wrap_main
     (pi_num_rules : (prev_varss, num_rules) Hlist.Length.t)
     (step_keys :
       (Wrap_main_inputs.Inner_curve.Constant.t index, num_rules) Vector.t
-      Lazy.t) (step_widths : (int, num_rules) Vector.t)
+      Lazy.t) (rules_num_parents : (int, num_rules) Vector.t)
     (step_domains : (Domains.t, num_rules) Vector.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
@@ -410,7 +410,7 @@ let wrap_main
       with_label __LOC__ (fun () ->
           incrementally_verify_proof
             (module Max_num_parents)
-            ~step_widths ~step_domains ~verification_key:pairing_plonk_index
+            ~rules_num_parents ~step_domains ~verification_key:pairing_plonk_index
             ~xi ~sponge
             ~public_input:(pack_statement Max_num_parents.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}

@@ -472,7 +472,7 @@ struct
         Field.Assert.equal t1 (Field.project t2) )
 
   let incrementally_verify_proof (type b)
-      (module Max_num_parents : Nat.Add.Intf with type n = b) ~step_widths
+      (module Max_num_parents : Nat.Add.Intf with type n = b) ~rules_num_parents
       ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t)
       ~xi ~sponge ~public_input ~(sg_old : (_, Max_num_parents.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.t) ~advice
@@ -493,7 +493,7 @@ struct
     let sg_old =
       with_label __LOC__ (fun () ->
           let actual_width =
-            Pseudo.choose (which_rule, step_widths) ~f:Field.of_int
+            Pseudo.choose (which_rule, rules_num_parents) ~f:Field.of_int
           in
           Vector.map2
             (ones_vector

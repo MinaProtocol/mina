@@ -467,7 +467,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         , 'm )
         Step_branch_data.t
     end in
-    let step_widths =
+    let rules_num_parents =
       let module M =
         H4.Map
           (IR)
@@ -499,7 +499,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                     Step_branch_data.create ~index:(Index.of_int_exn !i)
                       ~max_num_parents:Max_num_parents.n ~num_rules:Num_rules.n
                       ~self ~typ A.to_field_elements A_value.to_field_elements
-                      rule ~wrap_domains ~rules_num_parents:step_widths )
+                      rule ~wrap_domains ~rules_num_parents )
               in
               Timer.clock __LOC__ ; incr i ; res
           end)
@@ -626,7 +626,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         M.f rules
       in
       Timer.clock __LOC__ ;
-      Wrap_main.wrap_main full_signature prev_varss_length step_vks step_widths
+      Wrap_main.wrap_main full_signature prev_varss_length step_vks rules_num_parents
         step_domains prev_wrap_domains
         (module Max_num_parents)
     in
@@ -766,7 +766,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
       { num_rules= Num_rules.n
-      ; rules_num_parents= step_widths
+      ; rules_num_parents= rules_num_parents
       ; max_num_parents= (module Max_num_parents)
       ; typ
       ; value_to_field_elements= A_value.to_field_elements

@@ -233,7 +233,7 @@ let to_input : _ Poly.t -> _ =
       let num_rules =
         bits ~len:(Nat.to_int Max_num_rules.Log2.n) (At_most.length step_data)
       in
-      let step_domains, step_widths =
+      let step_domains, rules_num_parents =
         At_most.extend_to_vector step_data
           (dummy_domains, dummy_width)
           Max_num_rules.n
@@ -243,7 +243,7 @@ let to_input : _ Poly.t -> _ =
         [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
               map_reduce [|h|] ~f:(fun (Pow_2_roots_of_unity x) ->
                   bits ~len:max_log2_degree x ) )
-        ; Array.map (Vector.to_array step_widths) ~f:Width.to_bits
+        ; Array.map (Vector.to_array rules_num_parents) ~f:Width.to_bits
           |> bitstrings
         ; bitstring (Width.to_bits max_width)
         ; wrap_index_to_input

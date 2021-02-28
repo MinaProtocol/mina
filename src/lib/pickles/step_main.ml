@@ -267,7 +267,7 @@ let step_main
                           in
                           finalize_other_proof d.max_num_parents
                             ~max_width:d.max_width
-                            ~step_widths:d.rules_num_parents
+                            ~rules_num_parents:d.rules_num_parents
                             ~step_domains:d.step_domains ~sponge
                             ~old_bulletproof_challenges state.deferred_values
                             prev_evals )

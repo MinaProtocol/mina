@@ -179,7 +179,7 @@ module For_step = struct
     { num_rules
     ; max_num_parents
     ; rules_num_parents=
-        Vector.map index.step_widths
+        Vector.map index.rules_num_parents
           ~f:Side_loaded_verification_key.Width.Checked.to_field
     ; typ
     ; value_to_field_elements
