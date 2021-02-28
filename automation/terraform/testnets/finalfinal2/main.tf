@@ -129,5 +129,5 @@ module "finalfinal2" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/final_final2_seeds.txt?123"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/finalfinal2_seeds.txt?123"
 }
