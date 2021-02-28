@@ -46,14 +46,14 @@ module Make (A : T0) (A_value : T0) = struct
        in
        {Common.wrap_domains with x})
 
-  let f_debug full_signature num_rules rules_length ~self ~rules ~max_branching
-      =
+  let f_debug full_signature num_rules rules_length ~self ~rules
+      ~max_num_parents =
     let num_rules = Hlist.Length.to_nat rules_length in
     let dummy_step_domains =
       Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains)
     in
     let dummy_step_widths =
-      Vector.init num_rules ~f:(fun _ -> Nat.to_int (Nat.Add.n max_branching))
+      Vector.init num_rules ~f:(fun _ -> Nat.to_int (Nat.Add.n max_num_parents))
     in
     let dummy_step_keys =
       lazy
@@ -72,7 +72,7 @@ module Make (A : T0) (A_value : T0) = struct
     Timer.clock __LOC__ ;
     let _, main =
       Wrap_main.wrap_main full_signature rules_length dummy_step_keys
-        dummy_step_widths dummy_step_domains prev_domains max_branching
+        dummy_step_widths dummy_step_domains prev_domains max_num_parents
     in
     Timer.clock __LOC__ ;
     let t =
@@ -80,12 +80,12 @@ module Make (A : T0) (A_value : T0) = struct
     in
     Timer.clock __LOC__ ; t
 
-  let f full_signature num_rules rules_length ~self ~rules ~max_branching =
+  let f full_signature num_rules rules_length ~self ~rules ~max_num_parents =
     let res = Lazy.force result in
     ( if debug then
       let res' =
         f_debug full_signature num_rules rules_length ~self ~rules
-          ~max_branching
+          ~max_num_parents
       in
       [%test_eq: Domains.t] res res' ) ;
     res

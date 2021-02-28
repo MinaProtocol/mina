@@ -377,7 +377,7 @@ end) : S = struct
       (module Statement)
       ~typ
       ~num_rules:(module Nat.N1)
-      ~max_branching:(module Nat.N2)
+      ~max_num_parents:(module Nat.N2)
       ~name:"blockchain-snark"
       ~constraint_constants:
         (Genesis_constants.Constraint_constants.to_snark_keys_header

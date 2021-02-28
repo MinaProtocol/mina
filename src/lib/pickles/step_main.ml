@@ -10,14 +10,14 @@ module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type branching self_num_rules prev_vars prev_values a_var a_value max_branching local_branches local_signature.
+    : type branching self_num_rules prev_vars prev_values a_var a_value max_num_parents local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
-           and type max_branching = max_branching)
-    -> (module Nat.Add.Intf with type n = max_branching)
+           and type max_num_parents = max_num_parents)
+    -> (module Nat.Add.Intf with type n = max_num_parents)
     -> self_num_rules:self_num_rules Nat.t
     -> local_signature:local_signature H1.T(Nat).t
     -> local_signature_length:(local_signature, branching) Hlist.Length.t
@@ -25,13 +25,13 @@ let step_main
        local_branches H1.T(Nat).t
     -> local_branches_length:(local_branches, branching) Hlist.Length.t
     -> branching:(prev_vars, branching) Hlist.Length.t
-    -> lte:(branching, max_branching) Nat.Lte.t
+    -> lte:(branching, max_num_parents) Nat.Lte.t
     -> basic:( a_var
              , a_value
-             , max_branching
+             , max_num_parents
              , self_num_rules )
              Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_branching, self_num_rules) Tag.t
+    -> self:(a_var, a_value, max_num_parents, self_num_rules) Tag.t
     -> ( prev_vars
        , prev_values
        , local_signature
@@ -39,19 +39,19 @@ let step_main
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (   ( (Unfinalized.t, max_branching) Vector.t
+    -> (   ( (Unfinalized.t, max_num_parents) Vector.t
            , Field.t
-           , (Field.t, max_branching) Vector.t )
+           , (Field.t, max_num_parents) Vector.t )
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
- fun (module Req) (module Max_branching) ~self_num_rules ~local_signature
+ fun (module Req) (module Max_num_parents) ~self_num_rules ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_branching, self_num_rules) t
+      | Self : (a_var, a_value, max_num_parents, self_num_rules) t
   end in
   let module Typ_with_max_branching = struct
     type ('var, 'value, 'local_max_branching, 'local_branches) t =
@@ -120,7 +120,7 @@ let step_main
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
-        let T = Max_branching.eq in
+        let T = Max_num_parents.eq in
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
@@ -152,13 +152,13 @@ let step_main
           let self_data :
               ( a_var
               , a_value
-              , max_branching
+              , max_num_parents
               , self_num_rules )
               Types_map.For_step.t =
             { num_rules= self_num_rules
             ; rules_num_parents=
                 Vector.map basic.rules_num_parents ~f:Field.of_int
-            ; max_branching= (module Max_branching)
+            ; max_num_parents= (module Max_num_parents)
             ; max_width= None
             ; typ= basic.typ
             ; var_to_field_elements= basic.var_to_field_elements
@@ -265,7 +265,7 @@ let step_main
                             sponge |> Opt_sponge.Underlying.of_sponge
                             |> S.Bit_sponge.make
                           in
-                          finalize_other_proof d.max_branching
+                          finalize_other_proof d.max_num_parents
                             ~max_width:d.max_width
                             ~step_widths:d.rules_num_parents
                             ~step_domains:d.step_domains ~sponge
@@ -296,7 +296,7 @@ let step_main
                                    d.var_to_field_elements)
                             in
                             hash ~widths:d.rules_num_parents
-                              ~max_width:(Nat.Add.n d.max_branching)
+                              ~max_width:(Nat.Add.n d.max_num_parents)
                               ~which_rule
                               (* Use opt sponge for cutting off the bulletproof challenges early *)
                               { app_state
@@ -309,7 +309,7 @@ let step_main
                     in
                     let verified =
                       with_label __LOC__ (fun () ->
-                          verify ~branching:d.max_branching
+                          verify ~branching:d.max_num_parents
                             ~wrap_domain:d.wrap_domains.h
                             ~is_base_case:should_verify ~sg_old ~opening
                             ~messages ~wrap_verification_key:d.wrap_key

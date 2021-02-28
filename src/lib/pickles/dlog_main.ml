@@ -472,14 +472,14 @@ struct
         Field.Assert.equal t1 (Field.project t2) )
 
   let incrementally_verify_proof (type b)
-      (module Max_branching : Nat.Add.Intf with type n = b) ~step_widths
+      (module Max_num_parents : Nat.Add.Intf with type n = b) ~step_widths
       ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t)
-      ~xi ~sponge ~public_input ~(sg_old : (_, Max_branching.n) Vector.t)
+      ~xi ~sponge ~public_input ~(sg_old : (_, Max_num_parents.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.t) ~advice
       ~(messages : (_, Boolean.var * _) Messages.t) ~which_rule ~openings_proof
       ~(plonk :
          _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
-    let T = Max_branching.eq in
+    let T = Max_num_parents.eq in
     let messages =
       with_label __LOC__ (fun () ->
           let open Vector in
@@ -496,7 +496,9 @@ struct
             Pseudo.choose (which_rule, step_widths) ~f:Field.of_int
           in
           Vector.map2
-            (ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
+            (ones_vector
+               (module Impl)
+               ~first_zero:actual_width Max_num_parents.n)
             sg_old
             ~f:(fun keep sg -> [|(keep, sg)|]) )
     in
@@ -643,12 +645,12 @@ struct
               ; f_comm
               ; [|(Boolean.true_, m.sigma_comm_0)|]
               ; [|(Boolean.true_, m.sigma_comm_1)|] ]
-              (snd (Max_branching.add Nat.N8.n))
+              (snd (Max_num_parents.add Nat.N8.n))
           in
           check_bulletproof
             ~pcs_batch:
               (Common.dlog_pcs_batch
-                 (Max_branching.add Nat.N8.n)
+                 (Max_num_parents.add Nat.N8.n)
                  ~max_quot_size:())
             ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
             ~advice ~openings_proof
@@ -907,7 +909,7 @@ struct
    that we compute when verifying the previous proof. That is a commitment
    to them. *)
 
-  let hash_me_only (type n) (_max_branching : n Nat.t)
+  let hash_me_only (type n) (_max_num_parents : n Nat.t)
       (t : (_, (_, n) Vector.t) Types.Dlog_based.Proof_state.Me_only.t) =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)

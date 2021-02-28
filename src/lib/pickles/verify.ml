@@ -38,7 +38,7 @@ let verify_heterogenous (ts : Instance.t list) =
   let in_circuit_plonks =
     List.map ts
       ~f:(fun (T
-                ( _max_branching
+                ( _max_num_parents
                 , _statement
                 , key
                 , app_state
@@ -182,7 +182,7 @@ let verify_heterogenous (ts : Instance.t list) =
             (List.map2_exn ts in_circuit_plonks
                ~f:(fun (T
                          ( ( module
-                         Max_branching )
+                         Max_num_parents )
                          , ( module
                          A_value )
                          , key
@@ -203,7 +203,7 @@ let verify_heterogenous (ts : Instance.t list) =
                          deferred_values=
                            {t.statement.proof_state.deferred_values with plonk}
                        ; me_only=
-                           Common.hash_dlog_me_only Max_branching.n
+                           Common.hash_dlog_me_only Max_num_parents.n
                              (Reduced_me_only.Dlog_based.prepare
                                 t.statement.proof_state.me_only) } }
                  in
@@ -222,7 +222,7 @@ let verify_heterogenous (ts : Instance.t list) =
                                    (Ipa.Wrap.compute_challenges cs)
                              ; commitment= g } )
                            (Vector.extend_exn t.statement.pass_through.sg
-                              Max_branching.n
+                              Max_num_parents.n
                               (Lazy.force Dummy.Ipa.Wrap.sg))
                            t.statement.proof_state.me_only
                              .old_bulletproof_challenges)) ) )) ) ) ;
@@ -233,9 +233,9 @@ let verify_heterogenous (ts : Instance.t list) =
       eprintf !"bad verify: %s\n%!" e ;
       false
 
-let verify (type a n) (max_branching : (module Nat.Intf with type n = n))
+let verify (type a n) (max_num_parents : (module Nat.Intf with type n = n))
     (a_value : (module Intf.Statement_value with type t = a))
     (key : Verification_key.t) (ts : (a * (n, n) Proof.t) list) =
   verify_heterogenous
     (List.map ts ~f:(fun (x, p) ->
-         Instance.T (max_branching, a_value, key, x, p) ))
+         Instance.T (max_num_parents, a_value, key, x, p) ))

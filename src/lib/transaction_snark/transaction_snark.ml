@@ -1034,7 +1034,7 @@ module Base = struct
   let side_loaded i =
     let open Snapp_statement in
     Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
-      ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
+      ~max_num_parents:(module Pickles.Side_loaded.Verification_key.Max_width)
       ~value_to_field_elements:to_field_elements
       ~var_to_field_elements:Checked.to_field_elements
 
@@ -2972,7 +2972,7 @@ let system ~constraint_constants =
         (module Statement.With_sok)
         ~typ:Statement.With_sok.typ
         ~num_rules:(module Nat.N2)
-        ~max_branching:(module Nat.N2)
+        ~max_num_parents:(module Nat.N2)
         ~name:"transaction-snark"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header

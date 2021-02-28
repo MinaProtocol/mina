@@ -55,16 +55,16 @@ let check_wrap_domains ds =
    are the same, but it will be useful when switch to the dlog-dlog system.
 
    The input is a list of Domains.t's [ ds_1; ...; ds_num_rules ].
-   It pads each list with "dummy domains" to have length equal to Max_branching.n.
+   It pads each list with "dummy domains" to have length equal to Max_num_parents.n.
    Then it transposes that matrix.
 *)
 let pad_domains (type prev_varss prev_valuess num_rules n)
-    (module Max_branching : Nat.Intf with type n = n)
+    (module Max_num_parents : Nat.Intf with type n = n)
     (pi_num_rules : (prev_varss, num_rules) Length.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t) =
   let module Ds = struct
-    type t = (Domains.t, Max_branching.n) Vector.t
+    type t = (Domains.t, Max_num_parents.n) Vector.t
   end in
   let ds : (prev_varss, prev_valuess, _, _) H4.T(E04(Ds)).t =
     let dummy_domains =
@@ -86,7 +86,7 @@ let pad_domains (type prev_varss prev_valuess num_rules n)
                  fun domains ->
                   let (T (len, pi)) = H.length domains in
                   let module V = H4.To_vector (Domains) in
-                  Vector.extend_exn (V.f pi domains) Max_branching.n
+                  Vector.extend_exn (V.f pi domains) Max_num_parents.n
                     dummy_domains
               end)
     in
@@ -106,7 +106,7 @@ module Old_bulletproof_chals = struct
         -> t
 end
 
-let pack_statement max_branching =
+let pack_statement max_num_parents =
   let pack_fq (Shifted_value.Shifted_value (x : Field.t)) =
     with_label __LOC__ (fun () ->
         let lo, hi = Util.split_last (Unsafe.unpack_unboolean x) in
@@ -117,7 +117,7 @@ let pack_statement max_branching =
         Spec.pack
           (module Impl)
           pack_fq
-          (Types.Pairing_based.Statement.spec max_branching
+          (Types.Pairing_based.Statement.spec max_num_parents
              Backend.Tock.Rounds.n)
           (Types.Pairing_based.Statement.to_data t) )
 
@@ -130,10 +130,10 @@ let domain_generator ~log2_size =
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
-    (type max_branching num_rules prev_varss prev_valuess env
+    (type max_num_parents num_rules prev_varss prev_valuess env
     max_local_max_branchings)
     (full_signature :
-      (max_branching, num_rules, max_local_max_branchings) Full_signature.t)
+      (max_num_parents, num_rules, max_local_max_branchings) Full_signature.t)
     (pi_num_rules : (prev_varss, num_rules) Hlist.Length.t)
     (step_keys :
       (Wrap_main_inputs.Inner_curve.Constant.t index, num_rules) Vector.t
@@ -141,8 +141,8 @@ let wrap_main
     (step_domains : (Domains.t, num_rules) Vector.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
-    (module Max_branching : Nat.Add.Intf with type n = max_branching) :
-    (max_branching, max_local_max_branchings) Requests.Wrap.t
+    (module Max_num_parents : Nat.Add.Intf with type n = max_num_parents) :
+    (max_num_parents, max_local_max_branchings) Requests.Wrap.t
     * (   ( _
           , _
           , _ Shifted_value.t
@@ -160,11 +160,11 @@ let wrap_main
     Common.wrap_domains
   in
   Timer.clock __LOC__ ;
-  let T = Max_branching.eq in
+  let T = Max_num_parents.eq in
   let num_rules = Hlist.Length.to_nat pi_num_rules in
   Timer.clock __LOC__ ;
   let (module Req) =
-    Requests.Wrap.((create () : (max_branching, max_local_max_branchings) t))
+    Requests.Wrap.((create () : (max_num_parents, max_local_max_branchings) t))
   in
   Timer.clock __LOC__ ;
   let {Full_signature.padded; maxes= (module Max_widths_by_slot)} =
@@ -198,7 +198,7 @@ let wrap_main
       with_label __LOC__ (fun () ->
           let open Types.Pairing_based.Proof_state in
           let typ =
-            typ (module Impl) Max_branching.n (Shifted_value.typ Field.typ)
+            typ (module Impl) Max_num_parents.n (Shifted_value.typ Field.typ)
           in
           exists typ ~request:(fun () -> Req.Proof_state) )
     in
@@ -216,7 +216,7 @@ let wrap_main
     in
     let prev_step_accs =
       with_label __LOC__ (fun () ->
-          exists (Vector.typ Inner_curve.typ Max_branching.n)
+          exists (Vector.typ Inner_curve.typ Max_num_parents.n)
             ~request:(fun () -> Req.Step_accs) )
     in
     let old_bp_chals =
@@ -251,7 +251,8 @@ let wrap_main
     in
     let domainses =
       with_label __LOC__ (fun () ->
-          pad_domains (module Max_branching) pi_num_rules prev_wrap_domains )
+          pad_domains (module Max_num_parents) pi_num_rules prev_wrap_domains
+      )
     in
     let eval_lengths =
       with_label __LOC__ (fun () ->
@@ -271,13 +272,13 @@ let wrap_main
                      Field.typ)
                   Field.typ
               in
-              Vector.typ (Typ.tuple2 ty ty) Max_branching.n
+              Vector.typ (Typ.tuple2 ty ty) Max_num_parents.n
             in
             exists ty ~request:(fun () -> Req.Evals)
           in
           let chals =
-            let (wrap_domains : (_, Max_branching.n) Vector.t), max_quot_sizes
-                =
+            let ( (wrap_domains : (_, Max_num_parents.n) Vector.t)
+                , max_quot_sizes ) =
               Vector.map domainses ~f:(fun ds ->
                   let h =
                     Plonk_checks.domain
@@ -298,7 +299,7 @@ let wrap_main
                        ~f:Field.of_int )
             in
             Vector.mapn
-              [ (* This is padded to max_branching for the benefit of wrapping with dummy unfinalized proofs *)
+              [ (* This is padded to max_num_parents for the benefit of wrapping with dummy unfinalized proofs *)
                 prev_proof_state.unfinalized_proofs
               ; old_bp_chals
               ; actual_branchings
@@ -323,7 +324,7 @@ let wrap_main
                 in
                 (* the type of the local max branching depends on
                which kind of step proof we are wrapping. *)
-                (* For each i in [0..max_branching-1], we have 
+                (* For each i in [0..max_num_parents-1], we have 
                Max_local_max_branching, which is the largest
                Local_max_branching which is the i^th inner proof of a step proof.
             
@@ -353,8 +354,8 @@ let wrap_main
             (* This is a hack. Assuming that the max number of recursive verifications for
                  every rule is exactly 2 simplified the implementation. In the future we
                  will have to fix this. *)
-            let T = Nat.eq_exn max_local_max_branching Max_branching.n in
-            hash_me_only Max_branching.n
+            let T = Nat.eq_exn max_local_max_branching Max_num_parents.n in
+            hash_me_only Max_num_parents.n
               {sg= sacc; old_bulletproof_challenges= chals} )
       in
       { Types.Pairing_based.Statement.pass_through= prev_me_onlys
@@ -408,10 +409,10 @@ let wrap_main
       in
       with_label __LOC__ (fun () ->
           incrementally_verify_proof
-            (module Max_branching)
+            (module Max_num_parents)
             ~step_widths ~step_domains ~verification_key:pairing_plonk_index
             ~xi ~sponge
-            ~public_input:(pack_statement Max_branching.n prev_statement)
+            ~public_input:(pack_statement Max_num_parents.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
             ~messages ~which_rule ~openings_proof
             ~plonk:
@@ -428,7 +429,7 @@ let wrap_main
     in
     Boolean.Assert.is_true bulletproof_success ;
     Field.Assert.equal me_only_digest
-      (hash_me_only Max_branching.n
+      (hash_me_only Max_num_parents.n
          { Types.Dlog_based.Proof_state.Me_only.sg= openings_proof.sg
          ; old_bulletproof_challenges= new_bulletproof_challenges }) ;
     Field.Assert.equal sponge_digest_before_evaluations

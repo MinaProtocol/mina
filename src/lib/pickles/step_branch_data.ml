@@ -7,7 +7,7 @@ open Import
 (* The data obtained from "compiling" an inductive rule into a circuit. *)
 type ( 'a_var
      , 'a_value
-     , 'max_branching
+     , 'max_num_parents
      , 'num_rules
      , 'prev_vars
      , 'prev_values
@@ -17,7 +17,7 @@ type ( 'a_var
   | T :
       { branching: 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
       ; index: Types.Index.t
-      ; lte: ('branching, 'max_branching) Nat.Lte.t
+      ; lte: ('branching, 'max_num_parents) Nat.Lte.t
       ; domains: Domains.t
       ; rule:
           ( 'prev_vars
@@ -29,21 +29,21 @@ type ( 'a_var
           Inductive_rule.t
       ; main:
              step_domains:(Domains.t, 'num_rules) Vector.t
-          -> ( (Unfinalized.t, 'max_branching) Vector.t
+          -> ( (Unfinalized.t, 'max_num_parents) Vector.t
              , Impls.Step.Field.t
-             , (Impls.Step.Field.t, 'max_branching) Vector.t )
+             , (Impls.Step.Field.t, 'max_num_parents) Vector.t )
              Types.Pairing_based.Statement.t
           -> unit
       ; requests:
           (module Requests.Step.S
              with type statement = 'a_value
-              and type max_branching = 'max_branching
+              and type max_num_parents = 'max_num_parents
               and type prev_values = 'prev_values
               and type local_signature = 'local_widths
               and type local_branches = 'local_heights) }
       -> ( 'a_var
          , 'a_value
-         , 'max_branching
+         , 'max_num_parents
          , 'num_rules
          , 'prev_vars
          , 'prev_values
@@ -53,10 +53,10 @@ type ( 'a_var
 
 (* Compile an inductive rule. *)
 let create
-    (type num_rules max_branching local_signature local_branches a_var a_value
-    prev_vars prev_values) ~index
-    ~(self : (a_var, a_value, max_branching, num_rules) Tag.t) ~wrap_domains
-    ~(max_branching : max_branching Nat.t)
+    (type num_rules max_num_parents local_signature local_branches a_var
+    a_value prev_vars prev_values) ~index
+    ~(self : (a_var, a_value, max_num_parents, num_rules) Tag.t) ~wrap_domains
+    ~(max_num_parents : max_num_parents Nat.t)
     ~(rules_num_parents : (int, num_rules) Vector.t)
     ~(num_rules : num_rules Nat.t) ~typ var_to_field_elements
     value_to_field_elements (rule : _ Inductive_rule.t) =
@@ -75,16 +75,16 @@ let create
         let ns, ms, len_ns, len_ms = extract_lengths ts len in
         match Type_equal.Id.same_witness self.id t.id with
         | Some T ->
-            (max_branching :: ns, num_rules :: ms, S len_ns, S len_ms)
+            (max_num_parents :: ns, num_rules :: ms, S len_ns, S len_ms)
         | None ->
             let (module M), num_rules =
               match t.kind with
               | Compiled ->
                   let d = Types_map.lookup_compiled t.id in
-                  (d.max_branching, d.num_rules)
+                  (d.max_num_parents, d.num_rules)
               | Side_loaded ->
                   let d = Types_map.lookup_side_loaded t.id in
-                  (d.permanent.max_branching, d.permanent.num_rules)
+                  (d.permanent.max_num_parents, d.permanent.num_rules)
             in
             let T = M.eq in
             (M.n :: ns, num_rules :: ms, S len_ns, S len_ms) )
@@ -93,12 +93,12 @@ let create
   let widths, heights, local_signature_length, local_branches_length =
     extract_lengths rule.prevs branching
   in
-  let lte = Nat.lte_exn self_width max_branching in
+  let lte = Nat.lte_exn self_width max_num_parents in
   let requests = Requests.Step.create () in
   Timer.clock __LOC__ ;
   let step ~step_domains =
     Step_main.step_main requests
-      (Nat.Add.create max_branching)
+      (Nat.Add.create max_num_parents)
       rule
       ~basic:
         { typ
@@ -120,7 +120,7 @@ let create
           (Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Step.input ~branching:max_branching
+      Impls.Step.input ~num_parents:max_num_parents
         ~wrap_rounds:Backend.Tock.Rounds.n
     in
     Fix_domains.domains (module Impls.Step) etyp main

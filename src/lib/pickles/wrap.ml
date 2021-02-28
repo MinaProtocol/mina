@@ -58,12 +58,14 @@ let combined_inner_product (type actual_branching)
 module Pairing_acc = Tock.Inner_curve.Affine
 
 (* The prover for wrapping a proof *)
-let wrap (type actual_branching max_branching max_local_max_branchings)
-    ~(max_branching : max_branching Nat.t)
+let wrap (type actual_branching max_num_parents max_local_max_branchings)
+    ~(max_num_parents : max_num_parents Nat.t)
     (module Max_local_max_branchings : Hlist.Maxes.S
       with type ns = max_local_max_branchings
-       and type length = max_branching)
-    ((module Req) : (max_branching, max_local_max_branchings) Requests.Wrap.t)
+       and type length = max_num_parents)
+    (( module
+      Req ) :
+      (max_num_parents, max_local_max_branchings) Requests.Wrap.t)
     ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk ~step_domains
     ~wrap_domains ~pairing_plonk_indices pk
     ({statement= prev_statement; prev_evals; proof; index= which_index} :
@@ -73,7 +75,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
       , (_, actual_branching) Vector.t
       , max_local_max_branchings H1.T(P.Base.Me_only.Dlog_based).t
       , ( (Tock.Field.t array Dlog_plonk_types.Evals.t * Tock.Field.t) Double.t
-        , max_branching )
+        , max_num_parents )
         Vector.t )
       P.Base.Pairing_based.t) =
   (*
@@ -108,10 +110,10 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
              (struct
                let f (type n) (m : n P.Base.Me_only.Dlog_based.Prepared.t) =
                  let T =
-                   Nat.eq_exn max_branching
+                   Nat.eq_exn max_num_parents
                      (Vector.length m.old_bulletproof_challenges)
                  in
-                 Common.hash_dlog_me_only max_branching m
+                 Common.hash_dlog_me_only max_num_parents m
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
@@ -158,7 +160,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
   in
   let module O = Tick.Oracles in
   let public_input =
-    tick_public_input_of_statement ~max_branching prev_statement_with_hashes
+    tick_public_input_of_statement ~max_num_parents prev_statement_with_hashes
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
@@ -318,7 +320,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
               ~message:
                 ( Vector.map2
                     (Vector.extend_exn prev_statement.proof_state.me_only.sg
-                       max_branching
+                       max_num_parents
                        (Lazy.force Dummy.Ipa.Wrap.sg))
                     me_only_prepared.old_bulletproof_challenges
                     ~f:(fun sg chals ->
@@ -334,8 +336,8 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
           ; proof_state=
               { next_statement.proof_state with
                 me_only=
-                  Common.hash_dlog_me_only max_branching me_only_prepared } }
-    )
+                  Common.hash_dlog_me_only max_num_parents me_only_prepared }
+          } )
   in
   ( { proof= next_proof
     ; statement= Types.Dlog_based.Statement.to_minimal next_statement

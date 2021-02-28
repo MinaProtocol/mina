@@ -42,7 +42,7 @@ let hash_pairing_me_only ~app_state
          Array.concat_map x ~f:(Fn.compose Array.of_list g) )
        ~app_state)
 
-let hash_dlog_me_only (type n) (_max_branching : n Nat.t)
+let hash_dlog_me_only (type n) (_max_num_parents : n Nat.t)
     (t :
       ( Tick.Curve.Affine.t
       , (_, n) Vector.t )
@@ -193,11 +193,11 @@ let tock_unpadded_public_input_of_statement prev_statement =
 let tock_public_input_of_statement s =
   tock_unpadded_public_input_of_statement s
 
-let tick_public_input_of_statement ~max_branching
+let tick_public_input_of_statement ~max_num_parents
     (prev_statement : _ Types.Pairing_based.Statement.t) =
   let input =
     let (T (input, _conv)) =
-      Impls.Step.input ~branching:max_branching ~wrap_rounds:Tock.Rounds.n
+      Impls.Step.input ~num_parents:max_num_parents ~wrap_rounds:Tock.Rounds.n
     in
     Impls.Step.generate_public_input [input] prev_statement
   in

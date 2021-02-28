@@ -3,8 +3,6 @@ open Pickles_types
 open Import
 open Backend
 
-(* TODO: max_branching is a terrible name. It should be max_width. *)
-
 (* We maintain a global hash table which stores for each inductive proof system some
    data.
 *)
@@ -13,8 +11,8 @@ type inner_curve_var =
   * Tick.Field.t Snarky_backendless.Cvar.t
 
 module Basic = struct
-  type ('var, 'value, 'max_branching, 'num_rules) t =
-    { max_branching: (module Nat.Add.Intf with type n = 'max_branching)
+  type ('var, 'value, 'max_num_parents, 'num_rules) t =
+    { max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
     ; value_to_field_elements: 'value -> Impls.Step.Field.Constant.t array
     ; var_to_field_elements: 'var -> Impls.Step.Field.t array
     ; typ: ('var, 'value) Impls.Step.Typ.t
@@ -36,8 +34,8 @@ module Side_loaded = struct
   end
 
   module Permanent = struct
-    type ('var, 'value, 'max_branching, 'num_rules) t =
-      { max_branching: (module Nat.Add.Intf with type n = 'max_branching)
+    type ('var, 'value, 'max_num_parents, 'num_rules) t =
+      { max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
       ; value_to_field_elements: 'value -> Impls.Step.Field.Constant.t array
       ; var_to_field_elements: 'var -> Impls.Step.Field.t array
       ; typ: ('var, 'value) Impls.Step.Typ.t
@@ -55,7 +53,7 @@ module Side_loaded = struct
 
   let to_basic
       { permanent=
-          { max_branching
+          { max_num_parents
           ; value_to_field_elements
           ; var_to_field_elements
           ; typ
@@ -69,7 +67,7 @@ module Side_loaded = struct
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
     in
     let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
-    { Basic.max_branching
+    { Basic.max_num_parents
     ; wrap_vk
     ; value_to_field_elements
     ; var_to_field_elements
@@ -82,7 +80,7 @@ end
 module Compiled = struct
   type f = Impls.Wrap.field
 
-  type ('a_var, 'a_value, 'max_branching, 'num_rules) basic =
+  type ('a_var, 'a_value, 'max_num_parents, 'num_rules) basic =
     { typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; rules_num_parents: (int, 'num_rules) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
@@ -93,10 +91,10 @@ module Compiled = struct
 
   (* This is the data associated to an inductive proof system with statement type
    ['a_var], which has ['num_rules] many "variants" each of which depends on at most
-   ['max_branching] many previous statements. *)
-  type ('a_var, 'a_value, 'max_branching, 'num_rules) t =
+   ['max_num_parents] many previous statements. *)
+  type ('a_var, 'a_value, 'max_num_parents, 'num_rules) t =
     { num_rules: 'num_rules Nat.t
-    ; max_branching: (module Nat.Add.Intf with type n = 'max_branching)
+    ; max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
     ; rules_num_parents: (int, 'num_rules) Vector.t
           (* For each branch in this rule, how many predecessor proofs does it have? *)
     ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
@@ -118,7 +116,7 @@ module Compiled = struct
 
   let to_basic
       { num_rules
-      ; max_branching
+      ; max_num_parents
       ; rules_num_parents
       ; typ
       ; value_to_field_elements
@@ -127,7 +125,7 @@ module Compiled = struct
       ; wrap_domains
       ; step_domains
       ; wrap_key } =
-    { Basic.max_branching
+    { Basic.max_num_parents
     ; wrap_domains
     ; value_to_field_elements
     ; var_to_field_elements
@@ -138,9 +136,9 @@ module Compiled = struct
 end
 
 module For_step = struct
-  type ('a_var, 'a_value, 'max_branching, 'num_rules) t =
+  type ('a_var, 'a_value, 'max_num_parents, 'num_rules) t =
     { num_rules: 'num_rules Nat.t
-    ; max_branching: (module Nat.Add.Intf with type n = 'max_branching)
+    ; max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
     ; rules_num_parents: (Impls.Step.Field.t, 'num_rules) Vector.t
     ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
@@ -162,7 +160,7 @@ module For_step = struct
       ({ ephemeral
        ; permanent=
            { num_rules
-           ; max_branching
+           ; max_num_parents
            ; typ
            ; value_to_field_elements
            ; var_to_field_elements } } :
@@ -179,7 +177,7 @@ module For_step = struct
       Nat.eq_exn num_rules Side_loaded_verification_key.Max_num_rules.n
     in
     { num_rules
-    ; max_branching
+    ; max_num_parents
     ; rules_num_parents=
         Vector.map index.step_widths
           ~f:Side_loaded_verification_key.Width.Checked.to_field
@@ -193,7 +191,7 @@ module For_step = struct
 
   let of_compiled
       ({ num_rules
-       ; max_branching
+       ; max_num_parents
        ; rules_num_parents
        ; typ
        ; value_to_field_elements
@@ -204,7 +202,7 @@ module For_step = struct
         _ Compiled.t) =
     { num_rules
     ; max_width= None
-    ; max_branching
+    ; max_num_parents
     ; rules_num_parents=
         Vector.map rules_num_parents ~f:Impls.Step.Field.of_int
     ; typ
@@ -269,14 +267,14 @@ let lookup_step_domains : type a b n m.
           Vector.init t.permanent.num_rules ~f:(fun i ->
               try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0 ) )
 
-let max_branching : type n1.
+let max_num_parents : type n1.
     (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
  fun tag ->
   match tag.kind with
   | Compiled ->
-      (lookup_compiled tag.id).max_branching
+      (lookup_compiled tag.id).max_num_parents
   | Side_loaded ->
-      (lookup_side_loaded tag.id).permanent.max_branching
+      (lookup_side_loaded tag.id).permanent.max_num_parents
 
 let typ : type var value.
     (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =

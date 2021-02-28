@@ -9,7 +9,7 @@ open Backend
 
 module Wrap = struct
   module type S = sig
-    type max_branching
+    type max_num_parents
 
     type max_local_max_branchings
 
@@ -21,10 +21,10 @@ module Wrap = struct
       | Evals :
           ( (Field.Constant.t array Dlog_plonk_types.Evals.t * Field.Constant.t)
             Tuple_lib.Double.t
-          , max_branching )
+          , max_num_parents )
           Vector.t
           t
-      | Step_accs : (Tock.Inner_curve.Affine.t, max_branching) Vector.t t
+      | Step_accs : (Tock.Inner_curve.Affine.t, max_num_parents) Vector.t t
       | Old_bulletproof_challenges :
           max_local_max_branchings H1.T(Challenges_vector.Constant).t t
       | Proof_state :
@@ -38,7 +38,7 @@ module Wrap = struct
               , Digest.Constant.t
               , bool )
               Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
-            , max_branching )
+            , max_num_parents )
             Vector.t
           , Digest.Constant.t )
           Types.Pairing_based.Proof_state.t
@@ -55,21 +55,21 @@ module Wrap = struct
           t
   end
 
-  type ('mb, 'ml) t =
+  type ('max_num_parents, 'ml) t =
     (module S
-       with type max_branching = 'mb
+       with type max_num_parents = 'max_num_parents
         and type max_local_max_branchings = 'ml)
 
-  let create : type mb ml. unit -> (mb, ml) t =
+  let create : type max_num_parents ml. unit -> (max_num_parents, ml) t =
    fun () ->
     let module R = struct
-      type nonrec max_branching = mb
+      type nonrec max_num_parents = max_num_parents
 
       type nonrec max_local_max_branchings = ml
 
       open Snarky_backendless.Request
 
-      type 'a vec = ('a, max_branching) Vector.t
+      type 'a vec = ('a, max_num_parents) Vector.t
 
       type _ t +=
         | Evals :
@@ -91,7 +91,7 @@ module Wrap = struct
                 , Digest.Constant.t
                 , bool )
                 Types.Pairing_based.Proof_state.Per_proof.In_circuit.t
-              , max_branching )
+              , max_num_parents )
               Vector.t
             , Digest.Constant.t )
             Types.Pairing_based.Proof_state.t
@@ -119,7 +119,7 @@ module Step = struct
     type prev_values
 
     (* TODO: As an optimization this can be the local branching size *)
-    type max_branching
+    type max_num_parents
 
     type local_signature
 
@@ -137,17 +137,17 @@ module Step = struct
   end
 
   let create
-      : type local_signature local_branches statement prev_values max_branching.
+      : type local_signature local_branches statement prev_values max_num_parents.
          unit
       -> (module S
             with type local_signature = local_signature
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
-             and type max_branching = max_branching) =
+             and type max_num_parents = max_num_parents) =
    fun () ->
     let module R = struct
-      type nonrec max_branching = max_branching
+      type nonrec max_num_parents = max_num_parents
 
       type nonrec statement = statement
 

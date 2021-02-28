@@ -17,7 +17,7 @@ module Make
 
         val to_field_elements : t -> Tick.Field.t array
     end)
-    (Max_branching : Nat.Add.Intf_transparent) =
+    (Max_num_parents : Nat.Add.Intf_transparent) =
 struct
   let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
@@ -32,7 +32,7 @@ struct
       (T branch_data :
         ( A.t
         , A_value.t
-        , Max_branching.n
+        , Max_num_parents.n
         , self_num_rules
         , prev_vars
         , prev_values
@@ -40,18 +40,18 @@ struct
         , local_heights )
         Step_branch_data.t) (next_state : A_value.t)
       ~maxes:(module Maxes : Pickles_types.Hlist.Maxes.S
-        with type length = Max_branching.n
+        with type length = Max_num_parents.n
          and type ns = max_local_max_branchings)
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~self_dlog_plonk_index pk self_dlog_vk
       (prev_with_proofs :
         (prev_values, local_widths, local_heights) H3.T(P.With_data).t) :
       ( A_value.t
-      , (_, Max_branching.n) Vector.t
+      , (_, Max_num_parents.n) Vector.t
       , (_, prevs_length) Vector.t
       , (_, prevs_length) Vector.t
       , _
-      , (_, Max_branching.n) Vector.t )
+      , (_, Max_num_parents.n) Vector.t )
       P.Base.Pairing_based.t
       Async.Deferred.t =
     let _, prev_vars_length = branch_data.branching in
@@ -150,7 +150,7 @@ struct
               |> fst )
         in
         let data = Types_map.lookup_basic tag in
-        let (module Local_max_branching) = data.max_branching in
+        let (module Local_max_branching) = data.max_num_parents in
         let T = Local_max_branching.eq in
         let statement = t.statement in
         let prev_challenges =
@@ -175,10 +175,10 @@ struct
                       ; beta= plonk0.beta
                       ; gamma= plonk0.gamma } }
               ; me_only=
-                  Common.hash_dlog_me_only Max_branching.n
+                  Common.hash_dlog_me_only Max_num_parents.n
                     { old_bulletproof_challenges=
                         (* TODO: Get rid of this padding *)
-                        Vector.extend_exn prev_challenges Max_branching.n
+                        Vector.extend_exn prev_challenges Max_num_parents.n
                           Dummy.Ipa.Wrap.challenges_computed
                     ; sg= statement.proof_state.me_only.sg } } }
         in
@@ -193,7 +193,7 @@ struct
                 (Vector.extend_exn statement.pass_through.sg
                    Local_max_branching.n
                    (Lazy.force Dummy.Ipa.Wrap.sg))
-                (* This should indeed have length max_branching... No! It should have type max_branching_a. That is, the max_branching specific to a proof of this type...*)
+                (* This should indeed have length max_num_parents... No! It should have type max_num_parents_a. That is, the max_num_parents specific to a proof of this type...*)
                 prev_challenges
                 ~f:(fun commitment chals ->
                   { Tock.Proof.Challenge_polynomial.commitment
@@ -384,7 +384,7 @@ struct
     in
     let next_statement : _ Types.Pairing_based.Statement.t =
       let unfinalized_proofs_extended =
-        Vector.extend unfinalized_proofs lte Max_branching.n
+        Vector.extend unfinalized_proofs lte Max_num_parents.n
           Unfinalized.Constant.dummy
       in
       let pass_through =
@@ -446,7 +446,8 @@ struct
     in
     let%map.Async (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
-        Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
+        Impls.Step.input ~num_parents:Max_num_parents.n
+          ~wrap_rounds:Tock.Rounds.n
       in
       let rec pad : type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -465,10 +466,10 @@ struct
             let t : _ Types.Dlog_based.Proof_state.Me_only.t =
               { sg= Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges=
-                  Vector.init Max_branching.n ~f:(fun _ ->
+                  Vector.init Max_num_parents.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed ) }
             in
-            Common.hash_dlog_me_only Max_branching.n t :: pad [] ms n
+            Common.hash_dlog_me_only Max_num_parents.n t :: pad [] ms n
       in
       let {Domains.h; x} =
         List.nth_exn
@@ -545,5 +546,5 @@ struct
         Vector.extend
           (Vector.map2 prev_evals x_hats ~f:(fun es x_hat ->
                double_zip es x_hat ))
-          lte Max_branching.n Dummy.evals }
+          lte Max_num_parents.n Dummy.evals }
 end
