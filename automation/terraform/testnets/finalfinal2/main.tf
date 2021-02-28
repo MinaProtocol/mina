@@ -88,7 +88,7 @@ module "finalfinal2" {
   coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
 
-  block_producer_key_pass = "no password for no block producers"
+  block_producer_key_pass = "naughty blue worm"
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/5e78a42b8e6abd0534300d9b9540360e0d67fed0/src/app/archive/create_schema.sql" 
@@ -122,12 +122,12 @@ module "finalfinal2" {
   fish_count            = var.fish_count
   seed_count            = var.seed_count
 
-  upload_blocks_to_gcloud         = true
+  upload_blocks_to_gcloud         = false
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
-  make_reports                    = true
+  make_reports                    = false
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/final_final_2_(3)_seeds.txt?123"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/final_final2_seeds.txt?123"
 }
