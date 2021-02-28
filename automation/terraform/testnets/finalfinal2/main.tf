@@ -55,7 +55,7 @@ variable "seed_count" {
 
 locals {
   testnet_name = "finalfinal2"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon:0.4.3-compatible-5e78a42"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.3-compatible-5e78a42-finalfinal2-4131ed5"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.3-compatible-5e78a42"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
