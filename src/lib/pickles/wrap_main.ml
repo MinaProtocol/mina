@@ -54,13 +54,13 @@ let check_wrap_domains ds =
 (* This function is kinda pointless since right now we're assuming all wrap domains
    are the same, but it will be useful when switch to the dlog-dlog system.
 
-   The input is a list of Domains.t's [ ds_1; ...; ds_branches ].
+   The input is a list of Domains.t's [ ds_1; ...; ds_num_rules ].
    It pads each list with "dummy domains" to have length equal to Max_branching.n.
    Then it transposes that matrix.
 *)
-let pad_domains (type prev_varss prev_valuess branches n)
+let pad_domains (type prev_varss prev_valuess num_rules n)
     (module Max_branching : Nat.Intf with type n = n)
-    (pi_branches : (prev_varss, branches) Length.t)
+    (pi_num_rules : (prev_varss, num_rules) Length.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t) =
   let module Ds = struct
@@ -94,7 +94,7 @@ let pad_domains (type prev_varss prev_valuess branches n)
   in
   let ds =
     let module V = H4.To_vector (Ds) in
-    V.f pi_branches ds
+    V.f pi_num_rules ds
   in
   Vector.transpose ds
 
@@ -130,15 +130,15 @@ let domain_generator ~log2_size =
 
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
-    (type max_branching branches prev_varss prev_valuess env
+    (type max_branching num_rules prev_varss prev_valuess env
     max_local_max_branchings)
     (full_signature :
-      (max_branching, branches, max_local_max_branchings) Full_signature.t)
-    (pi_branches : (prev_varss, branches) Hlist.Length.t)
+      (max_branching, num_rules, max_local_max_branchings) Full_signature.t)
+    (pi_num_rules : (prev_varss, num_rules) Hlist.Length.t)
     (step_keys :
-      (Wrap_main_inputs.Inner_curve.Constant.t index, branches) Vector.t Lazy.t)
-    (step_widths : (int, branches) Vector.t)
-    (step_domains : (Domains.t, branches) Vector.t)
+      (Wrap_main_inputs.Inner_curve.Constant.t index, num_rules) Vector.t
+      Lazy.t) (step_widths : (int, num_rules) Vector.t)
+    (step_domains : (Domains.t, num_rules) Vector.t)
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
     (module Max_branching : Nat.Add.Intf with type n = max_branching) :
@@ -161,7 +161,7 @@ let wrap_main
   in
   Timer.clock __LOC__ ;
   let T = Max_branching.eq in
-  let branches = Hlist.Length.to_nat pi_branches in
+  let num_rules = Hlist.Length.to_nat pi_num_rules in
   Timer.clock __LOC__ ;
   let (module Req) =
     Requests.Wrap.((create () : (max_branching, max_local_max_branchings) t))
@@ -178,7 +178,7 @@ let wrap_main
                ; xi
                ; combined_inner_product
                ; b
-               ; which_branch
+               ; which_rule
                ; bulletproof_challenges }
            ; sponge_digest_before_evaluations
            ; me_only= me_only_digest }
@@ -193,7 +193,7 @@ let wrap_main
         , _
         , _ )
         Types.Dlog_based.Statement.In_circuit.t) =
-    let which_branch = One_hot_vector.of_index which_branch ~length:branches in
+    let which_rule = One_hot_vector.of_index which_rule ~length:num_rules in
     let prev_proof_state =
       with_label __LOC__ (fun () ->
           let open Types.Pairing_based.Proof_state in
@@ -204,7 +204,7 @@ let wrap_main
     in
     let pairing_plonk_index =
       with_label __LOC__ (fun () ->
-          choose_key which_branch
+          choose_key which_rule
             (Vector.map (Lazy.force step_keys)
                ~f:
                  (Plonk_verification_key_evals.map ~f:(function
@@ -251,7 +251,7 @@ let wrap_main
     in
     let domainses =
       with_label __LOC__ (fun () ->
-          pad_domains (module Max_branching) pi_branches prev_wrap_domains )
+          pad_domains (module Max_branching) pi_num_rules prev_wrap_domains )
     in
     let eval_lengths =
       with_label __LOC__ (fun () ->
@@ -285,7 +285,7 @@ let wrap_main
                       ~shifts ~domain_generator wrap_domains.h
                   in
                   ( h
-                  , ( which_branch
+                  , ( which_rule
                     , Vector.map ds ~f:(fun d ->
                           Common.max_quot_size_int (Domain.size d.h) ) ) ) )
               |> Vector.unzip
@@ -294,7 +294,7 @@ let wrap_main
               padded
               |> Vector.map ~f:(fun branchings_in_slot ->
                      Pseudo.choose
-                       (which_branch, branchings_in_slot)
+                       (which_rule, branchings_in_slot)
                        ~f:Field.of_int )
             in
             Vector.mapn
@@ -327,7 +327,7 @@ let wrap_main
                Max_local_max_branching, which is the largest
                Local_max_branching which is the i^th inner proof of a step proof.
             
-               Need to compute this value from the which_branch.
+               Need to compute this value from the which_rule.
             *)
                 let (T (max_local_max_branching, old_bulletproof_challenges)) =
                   old_bulletproof_challenges
@@ -413,7 +413,7 @@ let wrap_main
             ~xi ~sponge
             ~public_input:(pack_statement Max_branching.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
-            ~messages ~which_branch ~openings_proof
+            ~messages ~which_rule ~openings_proof
             ~plonk:
               (with_label __LOC__ (fun () ->
                    Types.Dlog_based.Proof_state.Deferred_values.Plonk

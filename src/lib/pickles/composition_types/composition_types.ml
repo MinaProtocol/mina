@@ -157,7 +157,7 @@ module Dlog_based = struct
             ; b: 'fp
             ; xi: 'scalar_challenge
             ; bulletproof_challenges: 'bulletproof_challenges
-            ; which_branch: 'index }
+            ; which_rule: 'index }
           [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
           let to_latest = Fn.id
@@ -183,7 +183,7 @@ module Dlog_based = struct
         ; b: 'fp
         ; xi: 'scalar_challenge
         ; bulletproof_challenges: 'bulletproof_challenges
-        ; which_branch: 'index }
+        ; which_rule: 'index }
       [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
@@ -210,13 +210,13 @@ module Dlog_based = struct
           ; b: 'fp
           ; xi
           ; bulletproof_challenges
-          ; which_branch } ~f ~scalar =
+          ; which_rule } ~f ~scalar =
         { xi= scalar xi
         ; combined_inner_product
         ; b
         ; plonk
         ; bulletproof_challenges
-        ; which_branch }
+        ; which_rule }
 
       module In_circuit = struct
         type ( 'challenge
@@ -520,7 +520,7 @@ module Dlog_based = struct
                    { xi
                    ; combined_inner_product
                    ; b
-                   ; which_branch
+                   ; which_rule
                    ; bulletproof_challenges
                    ; plonk=
                        { alpha
@@ -565,7 +565,7 @@ module Dlog_based = struct
         let digest =
           [sponge_digest_before_evaluations; me_only; pass_through]
         in
-        let index = [which_branch] in
+        let index = [which_rule] in
         Hlist.HlistId.
           [ fp
           ; challenge
@@ -604,13 +604,13 @@ module Dlog_based = struct
         let [sponge_digest_before_evaluations; me_only; pass_through] =
           digest
         in
-        let [which_branch] = index in
+        let [which_rule] = index in
         { proof_state=
             { deferred_values=
                 { xi
                 ; combined_inner_product
                 ; b
-                ; which_branch
+                ; which_rule
                 ; bulletproof_challenges
                 ; plonk=
                     { alpha

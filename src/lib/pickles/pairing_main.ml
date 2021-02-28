@@ -526,13 +526,13 @@ struct
         method vanishing_polynomial = vp
       end
 
-  let side_loaded_domains (type branches) =
+  let side_loaded_domains (type num_rules) =
     let open Side_loaded_verification_key in
-    fun (domains : (Field.t Domain.t Domains.t, branches) Vector.t)
-        (branch : branches One_hot_vector.T(Impl).t) ->
+    fun (domains : (Field.t Domain.t Domains.t, num_rules) Vector.t)
+        (which_rule : num_rules One_hot_vector.T(Impl).t) ->
       let domain v ~max =
         let (T max_n) = Nat.of_int max in
-        let log2_size = Pseudo.choose ~f:Domain.log2_size (branch, v) in
+        let log2_size = Pseudo.choose ~f:Domain.log2_size (which_rule, v) in
         let mask = ones_vector (module Impl) max_n ~first_zero:log2_size in
         let log2_sizes =
           (O.of_index log2_size ~length:max_n, Vector.init max_n ~f:Fn.id)
@@ -603,7 +603,7 @@ struct
       let%test_unit "side loaded domains" =
         let module O = One_hot_vector.Make (Impl) in
         let open Side_loaded_verification_key in
-        let branches = Nat.N2.n in
+        let num_rules = Nat.N2.n in
         let domains = Vector.[{Domains.h= 10}; {h= 15}] in
         let pt = Field.Constant.random () in
         List.iteri (Vector.to_list domains) ~f:(fun i ds ->
@@ -621,7 +621,7 @@ struct
                      ~f:
                        (Domains.map ~f:(fun x ->
                             Domain.Pow_2_roots_of_unity (Field.of_int x) )))
-                  (O.of_index (Field.of_int i) ~length:branches)
+                  (O.of_index (Field.of_int i) ~length:num_rules)
                 |> field2
               in
               [%test_eq: Field.Constant.t] d_unchecked#size
@@ -798,14 +798,14 @@ struct
    4. Perform the arithmetic checks from marlin. *)
   (* TODO: This needs to handle the fact of variable length evaluations.
    Meaning it needs opt sponge. *)
-  let finalize_other_proof (type b branches)
+  let finalize_other_proof (type b num_rules)
       (module Branching : Nat.Add.Intf with type n = b) ~max_width
       ~(step_domains :
-         [ `Known of (Domains.t, branches) Vector.t
+         [ `Known of (Domains.t, num_rules) Vector.t
          | `Side_loaded of
            ( Field.t Side_loaded_verification_key.Domain.t
              Side_loaded_verification_key.Domains.t
-           , branches )
+           , num_rules )
            Vector.t ]) ~step_widths
       ~(* TODO: Add "actual branching" so that proofs don't
    carry around dummy "old bulletproof challenges" *)
@@ -813,7 +813,7 @@ struct
       ({ xi
        ; combined_inner_product
        ; bulletproof_challenges
-       ; which_branch
+       ; which_rule
        ; b
        ; plonk } :
         ( _
@@ -830,16 +830,16 @@ struct
           | `Known domains ->
               ( `Known domains
               , Pseudo.Domain.to_domain ~shifts ~domain_generator
-                  (which_branch, Vector.map domains ~f:Domains.x) )
+                  (which_rule, Vector.map domains ~f:Domains.x) )
           | `Side_loaded ds ->
-              ( `Side_loaded (side_loaded_domains ds which_branch)
+              ( `Side_loaded (side_loaded_domains ds which_rule)
               , (* This has to be the max_width of this proof system rather than actual width *)
                 side_loaded_input_domain
                   ~width:
                     (Side_loaded_verification_key.Width.Checked.to_field
                        (Option.value_exn max_width)) ) )
     in
-    let actual_width = Pseudo.choose (which_branch, step_widths) ~f:Fn.id in
+    let actual_width = Pseudo.choose (which_rule, step_widths) ~f:Fn.id in
     let (evals1, x_hat1), (evals2, x_hat2) =
       with_label __LOC__ (fun () ->
           let lengths =
@@ -849,7 +849,7 @@ struct
                 Commitment_lengths.generic map ~h:(map hs ~f:Domain.size)
                   ~max_degree:Max_degree.step
                 |> Evals.map ~f:(fun lengths ->
-                       Bounded.of_pseudo (which_branch, lengths) )
+                       Bounded.of_pseudo (which_rule, lengths) )
                 |> Evals.map ~f:Split_evaluations.mask'
             | `Side_loaded {h} ->
                 side_loaded_commitment_lengths ~h
@@ -890,7 +890,7 @@ struct
       match step_domains with
       | `Known ds ->
           let hs = map ds ~f:(fun {Domains.h; _} -> h) in
-          Pseudo.Domain.to_domain (which_branch, hs) ~shifts ~domain_generator
+          Pseudo.Domain.to_domain (which_rule, hs) ~shifts ~domain_generator
       | `Side_loaded {h} ->
           (h :> _ Plonk_checks.plonk_domain)
     in
@@ -909,7 +909,7 @@ struct
           | `Known step_domains ->
               let open Int in
               `Known
-                ( which_branch
+                ( which_rule
                 , Vector.map step_domains ~f:(fun x ->
                       Common.max_quot_size_int (Domain.size x.Domains.h) ) )
           | `Side_loaded domains ->
@@ -1024,12 +1024,12 @@ struct
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
-    stage (fun t ~widths ~max_width ~which_branch ->
+    stage (fun t ~widths ~max_width ~which_rule ->
         let mask =
           ones_vector
             (module Impl)
             max_width
-            ~first_zero:(Pseudo.choose ~f:Fn.id (which_branch, widths))
+            ~first_zero:(Pseudo.choose ~f:Fn.id (which_rule, widths))
         in
         let sponge = Sponge.copy after_index in
         let t =

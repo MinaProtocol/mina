@@ -27,13 +27,13 @@ struct
 
   (* The prover corresponding to the given inductive rule. *)
   let f
-      (type max_local_max_branchings self_branches prev_vars prev_values
+      (type max_local_max_branchings self_num_rules prev_vars prev_values
       local_widths local_heights prevs_length) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
         , Max_branching.n
-        , self_branches
+        , self_num_rules
         , prev_vars
         , prev_values
         , local_widths
@@ -116,7 +116,7 @@ struct
                                                                        .statement
                                                                        .proof_state
                                                                        .deferred_values
-                                                                       .which_branch)
+                                                                       .which_rule)
           in
           let to_field =
             SC.to_field_constant

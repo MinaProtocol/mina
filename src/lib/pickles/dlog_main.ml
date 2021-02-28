@@ -208,7 +208,7 @@ struct
       |> map ~f:(fun g -> Double.map ~f:(Util.seal (module Impl)) g)
 
   let lagrange (type n)
-      ~domain:( (which_branch : n One_hot_vector.t)
+      ~domain:( (which_rule : n One_hot_vector.t)
               , (domains : (Domains.t, n) Vector.t) ) i =
     Vector.map domains ~f:(fun d ->
         let d =
@@ -222,12 +222,12 @@ struct
         | _ ->
             assert false )
     |> Vector.map2
-         (which_branch :> (Boolean.var, n) Vector.t)
+         (which_rule :> (Boolean.var, n) Vector.t)
          ~f:(fun b (x, y) -> Field.((b :> t) * x, (b :> t) * y))
     |> Vector.reduce_exn ~f:(Double.map2 ~f:Field.( + ))
 
   let lagrange_with_correction (type n) ~input_length
-      ~domain:( (which_branch : n One_hot_vector.t)
+      ~domain:( (which_rule : n One_hot_vector.t)
               , (domains : (Domains.t, n) Vector.t) ) i =
     let rec pow2pow x i =
       if i = 0 then x else pow2pow Inner_curve.Constant.(x + x) (i - 1)
@@ -247,7 +247,7 @@ struct
             failwithf "expected commitment to have length 1. got %d"
               (Array.length xs) () )
     |> Vector.map2
-         (which_branch :> (Boolean.var, n) Vector.t)
+         (which_rule :> (Boolean.var, n) Vector.t)
          ~f:(fun b pr ->
            Double.map pr ~f:(fun (x, y) -> Field.((b :> t) * x, (b :> t) * y))
            )
@@ -325,7 +325,7 @@ struct
                        ~then_:
                          (Point.add p (Scalar_challenge.endo acc.point xi))
                        ~else_:
-                         ((* In this branch, the accumulator was zero, so there is no harm in
+                         ((* In this rule, the accumulator was zero, so there is no harm in
                             putting the potentially junk underlying point here. *)
                           Point.underlying p))
                   ~else_:acc.point)
@@ -476,8 +476,7 @@ struct
       ~step_domains ~verification_key:(m : _ Plonk_verification_key_evals.t)
       ~xi ~sponge ~public_input ~(sg_old : (_, Max_branching.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.t) ~advice
-      ~(messages : (_, Boolean.var * _) Messages.t) ~which_branch
-      ~openings_proof
+      ~(messages : (_, Boolean.var * _) Messages.t) ~which_rule ~openings_proof
       ~(plonk :
          _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
     let T = Max_branching.eq in
@@ -489,12 +488,12 @@ struct
             Commitment_lengths.generic map ~h:(f Domains.h)
               ~max_degree:Common.Max_degree.step
           in
-          mask_messages ~lengths which_branch messages )
+          mask_messages ~lengths which_rule messages )
     in
     let sg_old =
       with_label __LOC__ (fun () ->
           let actual_width =
-            Pseudo.choose (which_branch, step_widths) ~f:Field.of_int
+            Pseudo.choose (which_rule, step_widths) ~f:Field.of_int
           in
           Vector.map2
             (ones_vector (module Impl) ~first_zero:actual_width Max_branching.n)
@@ -519,7 +518,7 @@ struct
         let open Dlog_plonk_types.Messages in
         let x_hat =
           with_label __LOC__ (fun () ->
-              let domain = (which_branch, step_domains) in
+              let domain = (which_rule, step_domains) in
               let terms =
                 Array.mapi public_input ~f:(fun i x ->
                     match Array.of_list x with

@@ -2971,14 +2971,14 @@ let system ~constraint_constants =
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
         ~typ:Statement.With_sok.typ
-        ~branches:(module Nat.N2)
+        ~num_rules:(module Nat.N2)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants)
-        ~choices:(fun ~self ->
-          [Base.rule ~constraint_constants; Merge.rule self] ) )
+        ~rules:(fun ~self -> [Base.rule ~constraint_constants; Merge.rule self])
+  )
 
 module Verification = struct
   module type S = sig

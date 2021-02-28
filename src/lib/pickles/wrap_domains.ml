@@ -7,7 +7,7 @@ open Hlist
 module Make (A : T0) (A_value : T0) = struct
   module I = Inductive_rule.T (A) (A_value)
 
-  let prev (type xs ys ws hs) ~self ~(choices : (xs, ys, ws, hs) H4.T(I).t) =
+  let prev (type xs ys ws hs) ~self ~(rules : (xs, ys, ws, hs) H4.T(I).t) =
     let module M_inner =
       H4.Map
         (Tag)
@@ -35,7 +35,7 @@ module Make (A : T0) (A_value : T0) = struct
               fun rule -> M_inner.f rule.prevs
            end)
     in
-    M.f choices
+    M.f rules
 
   let result =
     lazy
@@ -46,18 +46,18 @@ module Make (A : T0) (A_value : T0) = struct
        in
        {Common.wrap_domains with x})
 
-  let f_debug full_signature num_choices choices_length ~self ~choices
-      ~max_branching =
-    let num_choices = Hlist.Length.to_nat choices_length in
+  let f_debug full_signature num_rules rules_length ~self ~rules ~max_branching
+      =
+    let num_rules = Hlist.Length.to_nat rules_length in
     let dummy_step_domains =
-      Vector.init num_choices ~f:(fun _ -> Fix_domains.rough_domains)
+      Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains)
     in
     let dummy_step_widths =
-      Vector.init num_choices ~f:(fun _ -> Nat.to_int (Nat.Add.n max_branching))
+      Vector.init num_rules ~f:(fun _ -> Nat.to_int (Nat.Add.n max_branching))
     in
     let dummy_step_keys =
       lazy
-        (Vector.init num_choices ~f:(fun _ ->
+        (Vector.init num_rules ~f:(fun _ ->
              let g = Backend.Tock.Inner_curve.(to_affine_exn one) in
              let g =
                Array.create g
@@ -68,10 +68,10 @@ module Make (A : T0) (A_value : T0) = struct
              in
              Verification_key.dummy_commitments g ))
     in
-    let prev_domains = prev ~self ~choices in
+    let prev_domains = prev ~self ~rules in
     Timer.clock __LOC__ ;
     let _, main =
-      Wrap_main.wrap_main full_signature choices_length dummy_step_keys
+      Wrap_main.wrap_main full_signature rules_length dummy_step_keys
         dummy_step_widths dummy_step_domains prev_domains max_branching
     in
     Timer.clock __LOC__ ;
@@ -80,12 +80,11 @@ module Make (A : T0) (A_value : T0) = struct
     in
     Timer.clock __LOC__ ; t
 
-  let f full_signature num_choices choices_length ~self ~choices ~max_branching
-      =
+  let f full_signature num_rules rules_length ~self ~rules ~max_branching =
     let res = Lazy.force result in
     ( if debug then
       let res' =
-        f_debug full_signature num_choices choices_length ~self ~choices
+        f_debug full_signature num_rules rules_length ~self ~rules
           ~max_branching
       in
       [%test_eq: Domains.t] res res' ) ;

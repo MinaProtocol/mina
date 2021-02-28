@@ -8,7 +8,7 @@ open Import
 type ( 'a_var
      , 'a_value
      , 'max_branching
-     , 'branches
+     , 'num_rules
      , 'prev_vars
      , 'prev_values
      , 'local_widths
@@ -28,7 +28,7 @@ type ( 'a_var
           , 'a_value )
           Inductive_rule.t
       ; main:
-             step_domains:(Domains.t, 'branches) Vector.t
+             step_domains:(Domains.t, 'num_rules) Vector.t
           -> ( (Unfinalized.t, 'max_branching) Vector.t
              , Impls.Step.Field.t
              , (Impls.Step.Field.t, 'max_branching) Vector.t )
@@ -44,7 +44,7 @@ type ( 'a_var
       -> ( 'a_var
          , 'a_value
          , 'max_branching
-         , 'branches
+         , 'num_rules
          , 'prev_vars
          , 'prev_values
          , 'local_widths
@@ -53,12 +53,13 @@ type ( 'a_var
 
 (* Compile an inductive rule. *)
 let create
-    (type branches max_branching local_signature local_branches a_var a_value
+    (type num_rules max_branching local_signature local_branches a_var a_value
     prev_vars prev_values) ~index
-    ~(self : (a_var, a_value, max_branching, branches) Tag.t) ~wrap_domains
+    ~(self : (a_var, a_value, max_branching, num_rules) Tag.t) ~wrap_domains
     ~(max_branching : max_branching Nat.t)
-    ~(branchings : (int, branches) Vector.t) ~(branches : branches Nat.t) ~typ
-    var_to_field_elements value_to_field_elements (rule : _ Inductive_rule.t) =
+    ~(rules_num_parents : (int, num_rules) Vector.t)
+    ~(num_rules : num_rules Nat.t) ~typ var_to_field_elements
+    value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let (T (self_width, branching)) = HT.length rule.prevs in
@@ -74,19 +75,19 @@ let create
         let ns, ms, len_ns, len_ms = extract_lengths ts len in
         match Type_equal.Id.same_witness self.id t.id with
         | Some T ->
-            (max_branching :: ns, branches :: ms, S len_ns, S len_ms)
+            (max_branching :: ns, num_rules :: ms, S len_ns, S len_ms)
         | None ->
-            let (module M), branches =
+            let (module M), num_rules =
               match t.kind with
               | Compiled ->
                   let d = Types_map.lookup_compiled t.id in
-                  (d.max_branching, d.branches)
+                  (d.max_branching, d.num_rules)
               | Side_loaded ->
                   let d = Types_map.lookup_side_loaded t.id in
-                  (d.permanent.max_branching, d.permanent.branches)
+                  (d.permanent.max_branching, d.permanent.num_rules)
             in
             let T = M.eq in
-            (M.n :: ns, branches :: ms, S len_ns, S len_ms) )
+            (M.n :: ns, num_rules :: ms, S len_ns, S len_ms) )
   in
   Timer.clock __LOC__ ;
   let widths, heights, local_signature_length, local_branches_length =
@@ -101,12 +102,12 @@ let create
       rule
       ~basic:
         { typ
-        ; branchings
+        ; rules_num_parents
         ; var_to_field_elements
         ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
-      ~self_branches:branches ~branching ~local_signature:widths
+      ~self_num_rules:num_rules ~branching ~local_signature:widths
       ~local_signature_length ~local_branches:heights ~local_branches_length
       ~lte ~self
     |> unstage
@@ -116,7 +117,7 @@ let create
     let main =
       step
         ~step_domains:
-          (Vector.init branches ~f:(fun _ -> Fix_domains.rough_domains))
+          (Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
       Impls.Step.input ~branching:max_branching

@@ -246,17 +246,17 @@ module Checked = struct
   open Impl
 
   type t =
-    { step_domains: (Field.t Domain.t Domains.t, Max_branches.n) Vector.t
-    ; step_widths: (Width.Checked.t, Max_branches.n) Vector.t
+    { step_domains: (Field.t Domain.t Domains.t, Max_num_rules.n) Vector.t
+    ; step_widths: (Width.Checked.t, Max_num_rules.n) Vector.t
     ; max_width: Width.Checked.t
     ; wrap_index: Inner_curve.t array Plonk_verification_key_evals.t
-    ; num_branches: (Boolean.var, Max_branches.Log2.n) Vector.t }
+    ; num_rules: (Boolean.var, Max_num_rules.Log2.n) Vector.t }
   [@@deriving hlist, fields]
 
   let to_input =
     let open Random_oracle_input in
     let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-    fun {step_domains; step_widths; max_width; wrap_index; num_branches} ->
+    fun {step_domains; step_widths; max_width; wrap_index; num_rules} ->
       ( List.reduce_exn ~f:append
           [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
                 map_reduce [|h|] ~f:(fun (Domain.Pow_2_roots_of_unity x) ->
@@ -268,7 +268,7 @@ module Checked = struct
               (Array.concat_map
                  ~f:(Fn.compose Array.of_list Inner_curve.to_field_elements))
               wrap_index
-          ; bitstring (Vector.to_list num_branches) ]
+          ; bitstring (Vector.to_list num_rules) ]
         : _ Random_oracle_input.t )
 end
 
@@ -288,27 +288,27 @@ let typ : (Checked.t, t) Impls.Step.Typ.t =
   let open Step_main_inputs in
   let open Impl in
   Typ.of_hlistable
-    [ Vector.typ Domains.typ Max_branches.n
-    ; Vector.typ Width.typ Max_branches.n
+    [ Vector.typ Domains.typ Max_num_rules.n
+    ; Vector.typ Width.typ Max_num_rules.n
     ; Width.typ
     ; Plonk_verification_key_evals.typ
         (Typ.array Inner_curve.typ
            ~length:
              (index_commitment_length ~max_degree:Max_degree.wrap
                 Common.wrap_domains.h))
-    ; Vector.typ Boolean.typ Max_branches.Log2.n ]
+    ; Vector.typ Boolean.typ Max_num_rules.Log2.n ]
     ~var_to_hlist:Checked.to_hlist ~var_of_hlist:Checked.of_hlist
     ~value_of_hlist:(fun _ ->
       failwith "Side_loaded_verification_key: value_of_hlist" )
     ~value_to_hlist:(fun {Poly.step_data; wrap_index; max_width; _} ->
       [ At_most.extend_to_vector
           (At_most.map step_data ~f:fst)
-          dummy_domains Max_branches.n
+          dummy_domains Max_num_rules.n
       ; At_most.extend_to_vector
           (At_most.map step_data ~f:snd)
-          dummy_width Max_branches.n
+          dummy_width Max_num_rules.n
       ; max_width
       ; Plonk_verification_key_evals.map ~f:Array.of_list wrap_index
       ; (let n = At_most.length step_data in
-         Vector.init Max_branches.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1)) ]
-      )
+         Vector.init Max_num_rules.Log2.n ~f:(fun i -> (n lsr i) land 1 = 1))
+      ] )

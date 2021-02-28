@@ -293,7 +293,7 @@ let wrap (type actual_branching max_branching max_local_max_branchings)
                 Vector.of_array_and_length_exn new_bulletproof_challenges
                   Tick.Rounds.n
             ; combined_inner_product= shift_value combined_inner_product
-            ; which_branch= which_index
+            ; which_rule= which_index
             ; plonk=
                 { plonk with
                   zeta= plonk0.zeta

@@ -106,14 +106,14 @@ end = struct
       Char.of_int_exn n
 end
 
-module Max_branches = struct
+module Max_num_rules = struct
   include Nat.N8
   module Log2 = Nat.N3
 
-  let%test "check max_branches" = Nat.to_int n = 1 lsl Nat.to_int Log2.n
+  let%test "check max_num_rules" = Nat.to_int n = 1 lsl Nat.to_int Log2.n
 end
 
-module Max_branches_vec = struct
+module Max_num_rules_vec = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -123,7 +123,7 @@ module Max_branches_vec = struct
   end]
 
   let _ =
-    let _f : type a. unit -> (a t, (a, Max_branches.n) At_most.t) Type_equal.t
+    let _f : type a. unit -> (a t, (a, Max_num_rules.n) At_most.t) Type_equal.t
         =
      fun () -> Type_equal.T
     in
@@ -151,7 +151,7 @@ module Repr = struct
       type 'g t =
         { step_data:
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
+            Max_num_rules_vec.Stable.V1.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t }
 
@@ -167,7 +167,7 @@ module Poly = struct
       type ('g, 'vk) t =
         { step_data:
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.Stable.V1.t
+            Max_num_rules_vec.Stable.V1.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t
         ; wrap_vk: 'vk option }
@@ -230,13 +230,13 @@ let to_input : _ Poly.t -> _ =
   let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
   fun {step_data; max_width; wrap_index} ->
     ( let bits ~len n = bitstring (bits ~len n) in
-      let num_branches =
-        bits ~len:(Nat.to_int Max_branches.Log2.n) (At_most.length step_data)
+      let num_rules =
+        bits ~len:(Nat.to_int Max_num_rules.Log2.n) (At_most.length step_data)
       in
       let step_domains, step_widths =
         At_most.extend_to_vector step_data
           (dummy_domains, dummy_width)
-          Max_branches.n
+          Max_num_rules.n
         |> Vector.unzip
       in
       List.reduce_exn ~f:append
@@ -250,5 +250,5 @@ let to_input : _ Poly.t -> _ =
             (Fn.compose Array.of_list
                (List.concat_map ~f:(fun (x, y) -> [x; y])))
             wrap_index
-        ; num_branches ]
+        ; num_rules ]
       : _ Random_oracle_input.t )

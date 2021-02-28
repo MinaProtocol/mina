@@ -60,14 +60,14 @@ let verify_heterogenous (ts : Instance.t list) =
         let { Deferred_values.xi
             ; plonk= plonk0
             ; combined_inner_product
-            ; which_branch
+            ; which_rule
             ; bulletproof_challenges } =
           Deferred_values.map_challenges ~f:Challenge.Constant.to_tick_field
             ~scalar:sc statement.proof_state.deferred_values
         in
         let zeta = sc plonk0.zeta in
         let alpha = sc plonk0.alpha in
-        let step_domains = key.step_domains.(Index.to_int which_branch) in
+        let step_domains = key.step_domains.(Index.to_int which_rule) in
         let w =
           Tick.Field.domain_generator
             ~log2_size:(Domain.log2_size step_domains.h)

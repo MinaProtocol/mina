@@ -140,7 +140,7 @@ module Side_loaded : sig
 
     val typ : (Checked.t, t) Impls.Step.Typ.t
 
-    module Max_branches : Nat.Add.Intf
+    module Max_num_rules : Nat.Add.Intf
 
     module Max_width : Nat.Add.Intf
   end
@@ -163,7 +163,7 @@ module Side_loaded : sig
     -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
-    -> ('var, 'value, 'n1, Verification_key.Max_branches.n) Tag.t
+    -> ('var, 'value, 'n1, Verification_key.Max_num_rules.n) Tag.t
 
   val verify :
        value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
@@ -184,26 +184,26 @@ end
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile :
-     ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+     ?self:('a_var, 'a_value, 'max_branching, 'num_rules) Tag.t
   -> ?cache:Key_cache.Spec.t list
-  -> ?disk_keys:(Cache.Step.Key.Verification.t, 'branches) Vector.t
+  -> ?disk_keys:(Cache.Step.Key.Verification.t, 'num_rules) Vector.t
                 * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
-  -> branches:(module Nat.Intf with type n = 'branches)
+  -> num_rules:(module Nat.Intf with type n = 'num_rules)
   -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
-  -> choices:(   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
-              -> ( 'prev_varss
-                 , 'prev_valuess
-                 , 'widthss
-                 , 'heightss
-                 , 'a_var
-                 , 'a_value )
-                 H4_2.T(Inductive_rule).t)
-  -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+  -> rules:(   self:('a_var, 'a_value, 'max_branching, 'num_rules) Tag.t
+            -> ( 'prev_varss
+               , 'prev_valuess
+               , 'widthss
+               , 'heightss
+               , 'a_var
+               , 'a_value )
+               H4_2.T(Inductive_rule).t)
+  -> ('a_var, 'a_value, 'max_branching, 'num_rules) Tag.t
      * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_branching, 'max_branching) Proof.t

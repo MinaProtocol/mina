@@ -10,7 +10,7 @@ module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type branching self_branches prev_vars prev_values a_var a_value max_branching local_branches local_signature.
+    : type branching self_num_rules prev_vars prev_values a_var a_value max_branching local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
            and type local_branches = local_branches
@@ -18,7 +18,7 @@ let step_main
            and type prev_values = prev_values
            and type max_branching = max_branching)
     -> (module Nat.Add.Intf with type n = max_branching)
-    -> self_branches:self_branches Nat.t
+    -> self_num_rules:self_num_rules Nat.t
     -> local_signature:local_signature H1.T(Nat).t
     -> local_signature_length:(local_signature, branching) Hlist.Length.t
     -> local_branches:(* For each inner proof of type T , the number of branches that type T has. *)
@@ -29,9 +29,9 @@ let step_main
     -> basic:( a_var
              , a_value
              , max_branching
-             , self_branches )
+             , self_num_rules )
              Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_branching, self_branches) Tag.t
+    -> self:(a_var, a_value, max_branching, self_num_rules) Tag.t
     -> ( prev_vars
        , prev_values
        , local_signature
@@ -45,13 +45,13 @@ let step_main
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
- fun (module Req) (module Max_branching) ~self_branches ~local_signature
+ fun (module Req) (module Max_branching) ~self_num_rules ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_branching, self_branches) t
+      | Self : (a_var, a_value, max_branching, self_num_rules) t
   end in
   let module Typ_with_max_branching = struct
     type ('var, 'value, 'local_max_branching, 'local_branches) t =
@@ -92,7 +92,7 @@ let step_main
                       let d = Types_map.lookup_side_loaded d.id in
                       (* TODO: This replication to please the type checker is
                        pointless... *)
-                      ( Vector.init d.permanent.branches ~f:(fun _ ->
+                      ( Vector.init d.permanent.num_rules ~f:(fun _ ->
                             Side_loaded_verification_key.max_domains_with_x )
                       , d.permanent.typ ) )
               in
@@ -153,10 +153,11 @@ let step_main
               ( a_var
               , a_value
               , max_branching
-              , self_branches )
+              , self_num_rules )
               Types_map.For_step.t =
-            { branches= self_branches
-            ; branchings= Vector.map basic.branchings ~f:Field.of_int
+            { num_rules= self_num_rules
+            ; rules_num_parents=
+                Vector.map basic.rules_num_parents ~f:Field.of_int
             ; max_branching= (module Max_branching)
             ; max_width= None
             ; typ= basic.typ
@@ -265,21 +266,23 @@ let step_main
                             |> S.Bit_sponge.make
                           in
                           finalize_other_proof d.max_branching
-                            ~max_width:d.max_width ~step_widths:d.branchings
+                            ~max_width:d.max_width
+                            ~step_widths:d.rules_num_parents
                             ~step_domains:d.step_domains ~sponge
                             ~old_bulletproof_challenges state.deferred_values
                             prev_evals )
                     in
-                    let which_branch = state.deferred_values.which_branch in
+                    let which_rule = state.deferred_values.which_rule in
                     let state =
                       with_label __LOC__ (fun () ->
                           { state with
                             deferred_values=
                               { state.deferred_values with
-                                which_branch=
+                                which_rule=
                                   Pseudo.choose
-                                    ( state.deferred_values.which_branch
-                                    , Vector.init d.branches ~f:Field.of_int )
+                                    ( state.deferred_values.which_rule
+                                    , Vector.init d.num_rules ~f:Field.of_int
+                                    )
                                     ~f:Fn.id
                                   |> Types.Index.of_field (module Impl) } } )
                     in
@@ -292,9 +295,9 @@ let step_main
                                 (hash_me_only_opt ~index:d.wrap_key
                                    d.var_to_field_elements)
                             in
-                            hash ~widths:d.branchings
+                            hash ~widths:d.rules_num_parents
                               ~max_width:(Nat.Add.n d.max_branching)
-                              ~which_branch
+                              ~which_rule
                               (* Use opt sponge for cutting off the bulletproof challenges early *)
                               { app_state
                               ; dlog_plonk_index= d.wrap_key

@@ -115,12 +115,12 @@ let verify = Verify.verify
 *)
 
 let pad_local_max_branchings
-    (type prev_varss prev_valuess env max_branching branches)
+    (type prev_varss prev_valuess env max_branching num_rules)
     (max_branching : max_branching Nat.t)
-    (length : (prev_varss, branches) Hlist.Length.t)
+    (length : (prev_varss, num_rules) Hlist.Length.t)
     (local_max_branchings :
       (prev_varss, prev_valuess, env) H2_1.T(H2_1.T(E03(Int))).t) :
-    ((int, max_branching) Vector.t, branches) Vector.t =
+    ((int, max_branching) Vector.t, num_rules) Vector.t =
   let module Vec = struct
     type t = (int, max_branching) Vector.t
   end in
@@ -263,13 +263,13 @@ module Proof_system = struct
   type ( 'a_var
        , 'a_value
        , 'max_branching
-       , 'branches
+       , 'num_rules
        , 'prev_valuess
        , 'widthss
        , 'heightss )
        t =
     | T :
-        ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+        ('a_var, 'a_value, 'max_branching, 'num_rules) Tag.t
         * (module Proof_intf with type t = 'proof
                               and type statement = 'a_value)
         * ( 'prev_valuess
@@ -281,7 +281,7 @@ module Proof_system = struct
         -> ( 'a_var
            , 'a_value
            , 'max_branching
-           , 'branches
+           , 'num_rules
            , 'prev_valuess
            , 'widthss
            , 'heightss )
@@ -293,7 +293,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module HIR = H4.T (IR)
 
   let max_local_max_branchings ~self (type n)
-      (module Max_branching : Nat.Intf with type n = n) branches choices =
+      (module Max_branching : Nat.Intf with type n = n) num_rules rules =
     let module Local_max_branchings = struct
       type t = (int, Max_branching.n) Vector.t
     end in
@@ -325,7 +325,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         end)
     in
     let module V = H4.To_vector (Local_max_branchings) in
-    let padded = V.f branches (M.f choices) |> Vector.transpose in
+    let padded = V.f num_rules (M.f rules) |> Vector.transpose in
     (padded, Maxes.m padded)
 
   module Lazy_ (A : T0) = struct
@@ -393,18 +393,18 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       log
 
   let compile
-      : type prev_varss prev_valuess widthss heightss max_branching branches.
-         self:(A.t, A_value.t, max_branching, branches) Tag.t
+      : type prev_varss prev_valuess widthss heightss max_branching num_rules.
+         self:(A.t, A_value.t, max_branching, num_rules) Tag.t
       -> cache:Key_cache.Spec.t list
-      -> ?disk_keys:(Cache.Step.Key.Verification.t, branches) Vector.t
+      -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
                     * Cache.Wrap.Key.Verification.t
-      -> branches:(module Nat.Intf with type n = branches)
+      -> num_rules:(module Nat.Intf with type n = num_rules)
       -> max_branching:(module Nat.Add.Intf with type n = max_branching)
       -> name:string
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
       -> typ:(A.t, A_value.t) Impls.Step.Typ.t
-      -> choices:(   self:(A.t, A_value.t, max_branching, branches) Tag.t
-                  -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t)
+      -> rules:(   self:(A.t, A_value.t, max_branching, num_rules) Tag.t
+                -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t)
       -> ( prev_valuess
          , widthss
          , heightss
@@ -414,9 +414,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
          * _
          * _
          * _ =
-   fun ~self ~cache ?disk_keys ~branches:(module Branches)
+   fun ~self ~cache ?disk_keys ~num_rules:(module Num_rules)
        ~max_branching:(module Max_branching) ~name ~constraint_constants ~typ
-       ~choices ->
+       ~rules ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version= Snark_keys_header.header_version
       ; kind
@@ -432,13 +432,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     Timer.start __LOC__ ;
     let T = Max_branching.eq in
-    let choices = choices ~self in
-    let (T (prev_varss_n, prev_varss_length)) = HIR.length choices in
-    let T = Nat.eq_exn prev_varss_n Branches.n in
+    let rules = rules ~self in
+    let (T (prev_varss_n, prev_varss_length)) = HIR.length rules in
+    let T = Nat.eq_exn prev_varss_n Num_rules.n in
     let padded, (module Maxes) =
       max_local_max_branchings
         (module Max_branching)
-        prev_varss_length choices ~self:self.id
+        prev_varss_length rules ~self:self.id
     in
     let full_signature = {Full_signature.padded; maxes= (module Maxes)} in
     Timer.clock __LOC__ ;
@@ -451,8 +451,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         | x :: xs ->
             x :: f xs
       in
-      M.f full_signature prev_varss_n prev_varss_length ~self
-        ~choices:(f choices)
+      M.f full_signature prev_varss_n prev_varss_length ~self ~rules:(f rules)
         ~max_branching:(module Max_branching)
     in
     Timer.clock __LOC__ ;
@@ -461,7 +460,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         ( A.t
         , A_value.t
         , Max_branching.n
-        , Branches.n
+        , Num_rules.n
         , 'vars
         , 'vals
         , 'n
@@ -483,7 +482,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           end)
       in
       let module V = H4.To_vector (Int) in
-      V.f prev_varss_length (M.f choices)
+      V.f prev_varss_length (M.f rules)
     in
     let step_data =
       let i = ref 0 in
@@ -498,14 +497,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
               let res =
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:(Index.of_int_exn !i)
-                      ~max_branching:Max_branching.n ~branches:Branches.n ~self
-                      ~typ A.to_field_elements A_value.to_field_elements rule
-                      ~wrap_domains ~branchings:step_widths )
+                      ~max_branching:Max_branching.n ~num_rules:Num_rules.n
+                      ~self ~typ A.to_field_elements A_value.to_field_elements
+                      rule ~wrap_domains ~rules_num_parents:step_widths )
               in
               Timer.clock __LOC__ ; incr i ; res
           end)
       in
-      M.f choices
+      M.f rules
     in
     Timer.clock __LOC__ ;
     let step_domains =
@@ -624,7 +623,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                    M.f rule.Inductive_rule.prevs
                end)
         in
-        M.f choices
+        M.f rules
       in
       Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks step_widths
@@ -766,8 +765,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     in
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
-      { branches= Branches.n
-      ; branchings= step_widths
+      { num_rules= Num_rules.n
+      ; rules_num_parents= step_widths
       ; max_branching= (module Max_branching)
       ; typ
       ; value_to_field_elements= A_value.to_field_elements
@@ -797,9 +796,9 @@ module Side_loaded = struct
       ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_branching))
       ; step_data=
           At_most.of_vector
-            (Vector.map2 d.branchings d.step_domains ~f:(fun width ds ->
+            (Vector.map2 d.rules_num_parents d.step_domains ~f:(fun width ds ->
                  ({Domains.h= ds.h}, Width.of_int_exn width) ))
-            (Nat.lte_exn (Vector.length d.step_domains) Max_branches.n) }
+            (Nat.lte_exn (Vector.length d.step_domains) Max_num_rules.n) }
 
     module Max_width = Width.Max
   end
@@ -815,7 +814,7 @@ module Side_loaded = struct
       ; value_to_field_elements
       ; var_to_field_elements
       ; typ
-      ; branches= Verification_key.Max_branches.n }
+      ; num_rules= Verification_key.Max_num_rules.n }
 
   module Proof = Proof.Branching_max
 
@@ -863,27 +862,27 @@ module Side_loaded = struct
 end
 
 let compile
-    : type a_var a_value prev_varss prev_valuess widthss heightss max_branching branches.
-       ?self:(a_var, a_value, max_branching, branches) Tag.t
+    : type a_var a_value prev_varss prev_valuess widthss heightss max_branching num_rules.
+       ?self:(a_var, a_value, max_branching, num_rules) Tag.t
     -> ?cache:Key_cache.Spec.t list
-    -> ?disk_keys:(Cache.Step.Key.Verification.t, branches) Vector.t
+    -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
                   * Cache.Wrap.Key.Verification.t
     -> (module Statement_var_intf with type t = a_var)
     -> (module Statement_value_intf with type t = a_value)
     -> typ:(a_var, a_value) Impls.Step.Typ.t
-    -> branches:(module Nat.Intf with type n = branches)
+    -> num_rules:(module Nat.Intf with type n = num_rules)
     -> max_branching:(module Nat.Add.Intf with type n = max_branching)
     -> name:string
     -> constraint_constants:Snark_keys_header.Constraint_constants.t
-    -> choices:(   self:(a_var, a_value, max_branching, branches) Tag.t
-                -> ( prev_varss
-                   , prev_valuess
-                   , widthss
-                   , heightss
-                   , a_var
-                   , a_value )
-                   H4_2.T(Inductive_rule).t)
-    -> (a_var, a_value, max_branching, branches) Tag.t
+    -> rules:(   self:(a_var, a_value, max_branching, num_rules) Tag.t
+              -> ( prev_varss
+                 , prev_valuess
+                 , widthss
+                 , heightss
+                 , a_var
+                 , a_value )
+                 H4_2.T(Inductive_rule).t)
+    -> (a_var, a_value, max_branching, num_rules) Tag.t
        * Cache_handle.t
        * (module Proof_intf
             with type t = (max_branching, max_branching) Proof.t
@@ -895,7 +894,7 @@ let compile
          , (max_branching, max_branching) Proof.t Async.Deferred.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~branches ~max_branching ~name ~constraint_constants ~choices ->
+     ~num_rules ~max_branching ~name ~constraint_constants ~rules ->
   let self =
     match self with
     | None ->
@@ -913,8 +912,8 @@ let compile
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~cache ?disk_keys ~branches ~max_branching ~name ~typ
-      ~constraint_constants ~choices:(fun ~self -> conv_irs (choices ~self))
+    M.compile ~self ~cache ?disk_keys ~num_rules ~max_branching ~name ~typ
+      ~constraint_constants ~rules:(fun ~self -> conv_irs (rules ~self))
   in
   let (module Max_branching) = max_branching in
   let T = Max_branching.eq in
@@ -978,7 +977,7 @@ let%test_module "test no side-loaded" =
               (module Statement)
               (module Statement.Constant)
               ~typ:Field.typ
-              ~branches:(module Nat.N1)
+              ~num_rules:(module Nat.N1)
               ~max_branching:(module Nat.N2)
               ~name:"blockchain-snark"
               ~constraint_constants:
@@ -993,7 +992,7 @@ let%test_module "test no side-loaded" =
                 ; supercharged_coinbase_factor= 0
                 ; account_creation_fee= Unsigned.UInt64.of_int 0
                 ; fork= None }
-              ~choices:(fun ~self ->
+              ~rules:(fun ~self ->
                 [ { identifier= "main"
                   ; prevs= [self; self]
                   ; main=
@@ -1100,11 +1099,11 @@ let%test_module "test" =
             (module Statement)
             (module Statement.Constant)
             ~typ:Field.typ
-            ~branches:(module Nat.N2) (* Should be able to set to 1 *)
+            ~num_rules:(module Nat.N2) (* Should be able to set to 1 *)
             ~max_branching:
               (module Nat.N2) (* TODO: Should be able to set this to 0 *)
             ~name:"preimage"
-            ~choices:(fun ~self ->
+            ~rules:(fun ~self ->
               (* TODO: Make it possible to have a system that doesn't use its "self" *)
               [ { prevs= []
                 ; main_value= (fun [] _ -> [])
@@ -1151,10 +1150,10 @@ let%test_module "test" =
           (module Statement)
           (module Statement.Constant)
           ~typ:Field.typ
-          ~branches:(module Nat.N3)
+          ~num_rules:(module Nat.N3)
           ~max_branching:(module Nat.N2)
           ~name:"txn-snark"
-          ~choices:(fun ~self ->
+          ~rules:(fun ~self ->
             [ { prevs= []
               ; main=
                   (fun [] x ->
@@ -1255,10 +1254,10 @@ let%test_module "test" =
               (module Statement)
               (module Statement.Constant)
               ~typ:Field.typ
-              ~branches:(module Nat.N1)
+              ~num_rules:(module Nat.N1)
               ~max_branching:(module Nat.N2)
               ~name:"blockchain-snark"
-              ~choices:(fun ~self ->
+              ~rules:(fun ~self ->
                 [ { prevs= [self; Txn_snark.tag]
                   ; main=
                       (fun [prev; txn_snark] self ->

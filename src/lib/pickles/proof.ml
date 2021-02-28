@@ -130,7 +130,7 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
                 { xi= scalar_chal ()
                 ; combined_inner_product= Shifted_value (tick ())
                 ; b= Shifted_value (tick ())
-                ; which_branch= Option.value_exn (Index.of_int 0)
+                ; which_rule= Option.value_exn (Index.of_int 0)
                 ; bulletproof_challenges= Dummy.Ipa.Step.challenges
                 ; plonk=
                     { alpha= scalar_chal ()
