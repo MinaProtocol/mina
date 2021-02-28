@@ -54,7 +54,6 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  mina_archive_schema = var.mina_archive_schema
   archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
     # by default, deploy a single local daemon and associated PostgresDB enabled archive server
     [
@@ -62,6 +61,7 @@ module "kubernetes_testnet" {
         name              = "archive-1"
         enableLocalDaemon = true
         enablePostgresDB  = true
+        postgresHost      = "archive-1-postgresql"
       }
     ],
     # in addition to stand-alone archive servers upto the input archive node count
@@ -70,13 +70,12 @@ module "kubernetes_testnet" {
         name              = "archive-${i}"
         enableLocalDaemon = false
         enablePostgresDB  = false
+        postgresHost      = "archive-1-postgresql"
       }
     ]
   )
+  mina_archive_schema = var.mina_archive_schema
 
-  archive_addresses = [ for archive in var.archive_configs : "${archive.name}:3086" ]
-  
-  
   persistence_config  = var.postgres_persistence_config
 
   snark_worker_replicas   = var.snark_worker_replicas
@@ -100,7 +99,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = element(var.archive_addresses, i)
+        archiveAddress         = element(local.archive_node_names, i)
       }
     ],
     [
@@ -117,7 +116,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = element(var.archive_addresses, i)
+        archiveAddress         = element(local.archive_node_names, i)
       }
     ]
   )
@@ -132,7 +131,7 @@ module "kubernetes_testnet" {
       private_key_secret = "online-seeds-account-${i + 1}-key"
       libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
       enableArchive      = true
-      archiveAddress     = element(var.archive_addresses, i)
+      archiveAddress     = element(local.archive_node_names, i)
     }
   ]
 

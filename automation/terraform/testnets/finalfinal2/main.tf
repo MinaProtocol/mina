@@ -70,15 +70,15 @@ locals {
   make_report_accounts = ""
 }
 
-module "testnet_east" {
-  providers = { google.gke = google.google-us-central1 }
+module "finalfinal2" {
+  providers = { google.gke = google.google-us-east1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-central1"
-  cluster_region = "us-central1"
-  k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-central1"
+  cluster_name   = "coda-infra-east"
+  cluster_region = "us-east1"
+  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
   coda_image         = local.coda_image
@@ -87,6 +87,8 @@ module "testnet_east" {
   coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
+
+  block_producer_key_pass = "no password for no block producers"
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/5e78a42b8e6abd0534300d9b9540360e0d67fed0/src/app/archive/create_schema.sql" 
@@ -111,9 +113,6 @@ module "testnet_east" {
       postgresHost      = "archive-3-postgresql"
     }
   ]
-
-  seed_zone   = local.seed_zone
-  seed_region = local.seed_region
 
   log_level           = "Info"
   log_txn_pool_gossip = false
