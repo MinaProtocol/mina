@@ -54,6 +54,7 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
+  mina_archive_schema = var.mina_archive_schema
   archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
     # by default, deploy a single local daemon and associated PostgresDB enabled archive server
     [
@@ -72,7 +73,10 @@ module "kubernetes_testnet" {
       }
     ]
   )
-  mina_archive_schema = var.mina_archive_schema
+
+  archive_addresses = [ for archive in var.archive_configs : "${archive.name}:3086" ]
+  
+  
   persistence_config  = var.postgres_persistence_config
 
   snark_worker_replicas   = var.snark_worker_replicas
@@ -96,7 +100,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = "archive-1:3086"
+        archiveAddress         = element(var.archive_addresses, i)
       }
     ],
     [
@@ -113,7 +117,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = "archive-1:3086"
+        archiveAddress         = element(var.archive_addresses, i)
       }
     ]
   )
@@ -127,8 +131,8 @@ module "kubernetes_testnet" {
       external_ip        = google_compute_address.seed_static_ip[i].address
       private_key_secret = "online-seeds-account-${i + 1}-key"
       libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
-      enableArchive      = false
-      archiveAddress     = "archive-1:3086"
+      enableArchive      = true
+      archiveAddress     = element(var.archive_addresses, i)
     }
   ]
 
