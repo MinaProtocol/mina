@@ -355,8 +355,12 @@ let with_retry ~logger f =
 let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
-      Worker.Connection.run connection ~f:Worker.functions.verify_blockchains
-        ~arg:chains )
+      Deferred.any
+        [ ( after (Time.Span.of_min 3.)
+          >>| fun _ -> Or_error.error_string "verify_blockchain_snarks timeout"
+          )
+        ; Worker.Connection.run connection
+            ~f:Worker.functions.verify_blockchains ~arg:chains ] )
 
 module Id = Unique_id.Int ()
 
