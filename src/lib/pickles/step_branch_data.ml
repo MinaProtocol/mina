@@ -11,7 +11,7 @@ type ( 'a_var
      , 'num_rules
      , 'prev_vars
      , 'prev_values
-     , 'local_widths
+     , 'prev_num_parentss
      , 'local_heights )
      t =
   | T :
@@ -22,7 +22,7 @@ type ( 'a_var
       ; rule:
           ( 'prev_vars
           , 'prev_values
-          , 'local_widths
+          , 'prev_num_parentss
           , 'local_heights
           , 'a_avar
           , 'a_value )
@@ -39,7 +39,7 @@ type ( 'a_var
              with type statement = 'a_value
               and type max_num_parents = 'max_num_parents
               and type prev_values = 'prev_values
-              and type local_signature = 'local_widths
+              and type prev_num_parentss = 'prev_num_parentss
               and type local_branches = 'local_heights) }
       -> ( 'a_var
          , 'a_value
@@ -47,13 +47,13 @@ type ( 'a_var
          , 'num_rules
          , 'prev_vars
          , 'prev_values
-         , 'local_widths
+         , 'prev_num_parentss
          , 'local_heights )
          t
 
 (* Compile an inductive rule. *)
 let create
-    (type num_rules max_num_parents local_signature local_branches a_var
+    (type num_rules max_num_parents prev_num_parentss local_branches a_var
     a_value prev_vars prev_values) ~index
     ~(self : (a_var, a_value, max_num_parents, num_rules) Tag.t) ~wrap_domains
     ~(max_num_parents : max_num_parents Nat.t)
@@ -90,8 +90,10 @@ let create
             (M.n :: ns, num_rules :: ms, S len_ns, S len_ms) )
   in
   Timer.clock __LOC__ ;
-  let prevs_num_parents, heights, local_signature_length, local_branches_length
-      =
+  let ( prev_num_parentss
+      , heights
+      , prev_num_parentss_length
+      , local_branches_length ) =
     extract_lengths rule.prevs branching
   in
   let lte = Nat.lte_exn self_num_parents max_num_parents in
@@ -108,8 +110,8 @@ let create
         ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
-      ~self_num_rules:num_rules ~branching ~local_signature:prevs_num_parents
-      ~local_signature_length ~local_branches:heights ~local_branches_length
+      ~self_num_rules:num_rules ~branching ~prev_num_parentss
+      ~prev_num_parentss_length ~local_branches:heights ~local_branches_length
       ~lte ~self
     |> unstage
   in

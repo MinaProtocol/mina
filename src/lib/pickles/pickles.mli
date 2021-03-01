@@ -93,11 +93,11 @@ val verify :
   -> bool
 
 module Prover : sig
-  type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
+  type ('prev_values, 'prev_num_parentss, 'local_heights, 'a_value, 'proof) t =
        ?handler:(   Snarky_backendless.Request.request
                  -> Snarky_backendless.Request.response)
     -> ( 'prev_values
-       , 'local_widths
+       , 'prev_num_parentss
        , 'local_heights )
        H3.T(Statement_with_proof).t
     -> 'a_value

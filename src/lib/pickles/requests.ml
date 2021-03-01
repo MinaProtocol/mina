@@ -121,14 +121,14 @@ module Step = struct
     (* TODO: As an optimization this can be the local branching size *)
     type max_num_parents
 
-    type local_signature
+    type prev_num_parentss
 
     type local_branches
 
     type _ t +=
       | Proof_with_datas :
           ( prev_values
-          , local_signature
+          , prev_num_parentss
           , local_branches )
           H3.T(Per_proof_witness.Constant).t
           t
@@ -137,10 +137,10 @@ module Step = struct
   end
 
   let create
-      : type local_signature local_branches statement prev_values max_num_parents.
+      : type prev_num_parentss local_branches statement prev_values max_num_parents.
          unit
       -> (module S
-            with type local_signature = local_signature
+            with type prev_num_parentss = prev_num_parentss
              and type local_branches = local_branches
              and type statement = statement
              and type prev_values = prev_values
@@ -153,14 +153,14 @@ module Step = struct
 
       type nonrec prev_values = prev_values
 
-      type nonrec local_signature = local_signature
+      type nonrec prev_num_parentss = prev_num_parentss
 
       type nonrec local_branches = local_branches
 
       type _ t +=
         | Proof_with_datas :
             ( prev_values
-            , local_signature
+            , prev_num_parentss
             , local_branches )
             H3.T(Per_proof_witness.Constant).t
             t

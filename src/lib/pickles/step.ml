@@ -28,7 +28,7 @@ struct
   (* The prover corresponding to the given inductive rule. *)
   let f
       (type max_local_max_branchings self_num_rules prev_vars prev_values
-      local_widths local_heights prevs_length) ?handler
+      prev_num_parentss local_heights prevs_length) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
@@ -36,7 +36,7 @@ struct
         , self_num_rules
         , prev_vars
         , prev_values
-        , local_widths
+        , prev_num_parentss
         , local_heights )
         Step_branch_data.t) (next_state : A_value.t)
       ~maxes:(module Maxes : Pickles_types.Hlist.Maxes.S
@@ -45,7 +45,7 @@ struct
       ~(prevs_length : (prev_vars, prevs_length) Length.t) ~self ~step_domains
       ~self_dlog_plonk_index pk self_dlog_vk
       (prev_with_proofs :
-        (prev_values, local_widths, local_heights) H3.T(P.With_data).t) :
+        (prev_values, prev_num_parentss, local_heights) H3.T(P.With_data).t) :
       ( A_value.t
       , (_, Max_num_parents.n) Vector.t
       , (_, prevs_length) Vector.t

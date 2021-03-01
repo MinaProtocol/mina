@@ -248,11 +248,11 @@ module type Proof_intf = sig
 end
 
 module Prover = struct
-  type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
+  type ('prev_values, 'prev_num_parentss, 'local_heights, 'a_value, 'proof) t =
        ?handler:(   Snarky_backendless.Request.request
                  -> Snarky_backendless.Request.response)
     -> ( 'prev_values
-       , 'local_widths
+       , 'prev_num_parentss
        , 'local_heights )
        H3.T(Statement_with_proof).t
     -> 'a_value
@@ -265,7 +265,7 @@ module Proof_system = struct
        , 'max_num_parents
        , 'num_rules
        , 'prev_valuess
-       , 'num_parentss
+       , 'prev_num_parentss
        , 'heightss )
        t =
     | T :
@@ -273,7 +273,7 @@ module Proof_system = struct
         * (module Proof_intf with type t = 'proof
                               and type statement = 'a_value)
         * ( 'prev_valuess
-          , 'num_parentss
+          , 'prev_num_parentss
           , 'heightss
           , 'a_value
           , 'proof )
@@ -283,7 +283,7 @@ module Proof_system = struct
            , 'max_num_parents
            , 'num_rules
            , 'prev_valuess
-           , 'num_parentss
+           , 'prev_num_parentss
            , 'heightss )
            t
 end
@@ -680,13 +680,17 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let module S = Step.Make (A) (A_value) (Max_num_parents) in
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
-      let f : type prev_vars prev_values local_widths local_heights.
-             (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
+      let f : type prev_vars prev_values prev_num_parentss local_heights.
+             ( prev_vars
+             , prev_values
+             , prev_num_parentss
+             , local_heights )
+             Branch_data.t
           -> Lazy_keys.t
           -> ?handler:(   Snarky_backendless.Request.request
                        -> Snarky_backendless.Request.response)
           -> ( prev_values
-             , local_widths
+             , prev_num_parentss
              , local_heights )
              H3.T(Statement_with_proof).t
           -> A_value.t

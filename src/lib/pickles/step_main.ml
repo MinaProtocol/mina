@@ -10,17 +10,17 @@ module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type branching self_num_rules prev_vars prev_values a_var a_value max_num_parents local_branches local_signature.
+    : type branching self_num_rules prev_vars prev_values a_var a_value max_num_parents local_branches prev_num_parentss.
        (module Requests.Step.S
-          with type local_signature = local_signature
+          with type prev_num_parentss = prev_num_parentss
            and type local_branches = local_branches
            and type statement = a_value
            and type prev_values = prev_values
            and type max_num_parents = max_num_parents)
     -> (module Nat.Add.Intf with type n = max_num_parents)
     -> self_num_rules:self_num_rules Nat.t
-    -> local_signature:local_signature H1.T(Nat).t
-    -> local_signature_length:(local_signature, branching) Hlist.Length.t
+    -> prev_num_parentss:prev_num_parentss H1.T(Nat).t
+    -> prev_num_parentss_length:(prev_num_parentss, branching) Hlist.Length.t
     -> local_branches:(* For each inner proof of type T , the number of branches that type T has. *)
        local_branches H1.T(Nat).t
     -> local_branches_length:(local_branches, branching) Hlist.Length.t
@@ -34,7 +34,7 @@ let step_main
     -> self:(a_var, a_value, max_num_parents, self_num_rules) Tag.t
     -> ( prev_vars
        , prev_values
-       , local_signature
+       , prev_num_parentss
        , local_branches
        , a_var
        , a_value )
@@ -45,9 +45,9 @@ let step_main
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
- fun (module Req) (module Max_num_parents) ~self_num_rules ~local_signature
-     ~local_signature_length ~local_branches ~local_branches_length ~branching
-     ~lte ~basic ~self rule ->
+ fun (module Req) (module Max_num_parents) ~self_num_rules ~prev_num_parentss
+     ~prev_num_parentss_length ~local_branches ~local_branches_length
+     ~branching ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
@@ -106,8 +106,8 @@ let step_main
       | _ :: _, _, _, _, _, _ ->
           .
     in
-    join rule.prevs local_signature local_branches branching
-      local_signature_length local_branches_length
+    join rule.prevs prev_num_parentss local_branches branching
+      prev_num_parentss_length local_branches_length
   in
   let module Prev_typ =
     H4.Typ (Impls.Step) (Typ_with_max_branching) (Per_proof_witness)
