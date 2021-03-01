@@ -15,3 +15,7 @@
 ------
 - coda -> mina
 
+1.0.1:
+------
+- enable daemon blockchain archival capability
+ 

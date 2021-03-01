@@ -26,8 +26,6 @@ module "kubernetes_testnet" {
   seed_region = "us-west1"
   seed_configs = [local.seed_config]
 
-  archive_node_count  = 0
-
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
   snark_worker_public_key = var.snark_worker_public_key
@@ -47,6 +45,8 @@ module "kubernetes_testnet" {
       run_with_user_agent    = false
       run_with_bots          = false
       enable_peer_exchange   = true
+      enableArchive          = false
+      archiveAddress         = ""
     }
   ]
 }
