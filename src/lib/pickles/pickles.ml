@@ -248,12 +248,12 @@ module type Proof_intf = sig
 end
 
 module Prover = struct
-  type ('prev_values, 'prev_num_parentss, 'local_heights, 'a_value, 'proof) t =
+  type ('prev_values, 'prev_num_parentss, 'prev_num_ruless, 'a_value, 'proof) t =
        ?handler:(   Snarky_backendless.Request.request
                  -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'prev_num_parentss
-       , 'local_heights )
+       , 'prev_num_ruless )
        H3.T(Statement_with_proof).t
     -> 'a_value
     -> 'proof
@@ -266,7 +266,7 @@ module Proof_system = struct
        , 'num_rules
        , 'prev_valuess
        , 'prev_num_parentss
-       , 'heightss )
+       , 'prev_num_ruless )
        t =
     | T :
         ('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
@@ -274,7 +274,7 @@ module Proof_system = struct
                               and type statement = 'a_value)
         * ( 'prev_valuess
           , 'prev_num_parentss
-          , 'heightss
+          , 'prev_num_ruless
           , 'a_value
           , 'proof )
           H3_2.T(Prover).t
@@ -284,7 +284,7 @@ module Proof_system = struct
            , 'num_rules
            , 'prev_valuess
            , 'prev_num_parentss
-           , 'heightss )
+           , 'prev_num_ruless )
            t
 end
 
@@ -393,7 +393,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       log
 
   let compile
-      : type prev_varss prev_valuess num_parentss heightss max_num_parents num_rules.
+      : type prev_varss prev_valuess prev_num_parentss prev_num_ruless max_num_parents num_rules.
          self:(A.t, A_value.t, max_num_parents, num_rules) Tag.t
       -> cache:Key_cache.Spec.t list
       -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
@@ -406,12 +406,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       -> rules:(   self:(A.t, A_value.t, max_num_parents, num_rules) Tag.t
                 -> ( prev_varss
                    , prev_valuess
-                   , num_parentss
-                   , heightss )
+                   , prev_num_parentss
+                   , prev_num_ruless )
                    H4.T(IR).t)
       -> ( prev_valuess
-         , num_parentss
-         , heightss
+         , prev_num_parentss
+         , prev_num_ruless
          , A_value.t
          , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )
          H3_2.T(Prover).t
@@ -680,18 +680,18 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let module S = Step.Make (A) (A_value) (Max_num_parents) in
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Step.Keypair)) in
-      let f : type prev_vars prev_values prev_num_parentss local_heights.
+      let f : type prev_vars prev_values prev_num_parentss prev_num_ruless.
              ( prev_vars
              , prev_values
              , prev_num_parentss
-             , local_heights )
+             , prev_num_ruless )
              Branch_data.t
           -> Lazy_keys.t
           -> ?handler:(   Snarky_backendless.Request.request
                        -> Snarky_backendless.Request.response)
           -> ( prev_values
              , prev_num_parentss
-             , local_heights )
+             , prev_num_ruless )
              H3.T(Statement_with_proof).t
           -> A_value.t
           -> (Max_num_parents.n, Max_num_parents.n) Proof.t Async.Deferred.t =
@@ -872,7 +872,7 @@ module Side_loaded = struct
 end
 
 let compile
-    : type a_var a_value prev_varss prev_valuess num_parentss heightss max_num_parents num_rules.
+    : type a_var a_value prev_varss prev_valuess prev_num_parentss prev_num_ruless max_num_parents num_rules.
        ?self:(a_var, a_value, max_num_parents, num_rules) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
@@ -887,8 +887,8 @@ let compile
     -> rules:(   self:(a_var, a_value, max_num_parents, num_rules) Tag.t
               -> ( prev_varss
                  , prev_valuess
-                 , num_parentss
-                 , heightss
+                 , prev_num_parentss
+                 , prev_num_ruless
                  , a_var
                  , a_value )
                  H4_2.T(Inductive_rule).t)
@@ -898,8 +898,8 @@ let compile
             with type t = (max_num_parents, max_num_parents) Proof.t
              and type statement = a_value)
        * ( prev_valuess
-         , num_parentss
-         , heightss
+         , prev_num_parentss
+         , prev_num_ruless
          , a_value
          , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )
          H3_2.T(Prover).t =

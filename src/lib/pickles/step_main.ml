@@ -10,10 +10,10 @@ module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type branching self_num_rules prev_vars prev_values a_var a_value max_num_parents local_branches prev_num_parentss.
+    : type branching self_num_rules prev_vars prev_values a_var a_value max_num_parents prev_num_ruless prev_num_parentss.
        (module Requests.Step.S
           with type prev_num_parentss = prev_num_parentss
-           and type local_branches = local_branches
+           and type prev_num_ruless = prev_num_ruless
            and type statement = a_value
            and type prev_values = prev_values
            and type max_num_parents = max_num_parents)
@@ -21,9 +21,9 @@ let step_main
     -> self_num_rules:self_num_rules Nat.t
     -> prev_num_parentss:prev_num_parentss H1.T(Nat).t
     -> prev_num_parentss_length:(prev_num_parentss, branching) Hlist.Length.t
-    -> local_branches:(* For each inner proof of type T , the number of branches that type T has. *)
-       local_branches H1.T(Nat).t
-    -> local_branches_length:(local_branches, branching) Hlist.Length.t
+    -> prev_num_ruless:(* For each inner proof of type T , the number of branches that type T has. *)
+       prev_num_ruless H1.T(Nat).t
+    -> local_branches_length:(prev_num_ruless, branching) Hlist.Length.t
     -> branching:(prev_vars, branching) Hlist.Length.t
     -> lte:(branching, max_num_parents) Nat.Lte.t
     -> basic:( a_var
@@ -35,7 +35,7 @@ let step_main
     -> ( prev_vars
        , prev_values
        , prev_num_parentss
-       , local_branches
+       , prev_num_ruless
        , a_var
        , a_value )
        Inductive_rule.t
@@ -46,7 +46,7 @@ let step_main
         -> unit)
        Staged.t =
  fun (module Req) (module Max_num_parents) ~self_num_rules ~prev_num_parentss
-     ~prev_num_parentss_length ~local_branches ~local_branches_length
+     ~prev_num_parentss_length ~prev_num_ruless ~local_branches_length
      ~branching ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
@@ -106,7 +106,7 @@ let step_main
       | _ :: _, _, _, _, _, _ ->
           .
     in
-    join rule.prevs prev_num_parentss local_branches branching
+    join rule.prevs prev_num_parentss prev_num_ruless branching
       prev_num_parentss_length local_branches_length
   in
   let module Prev_typ =

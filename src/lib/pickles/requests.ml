@@ -123,13 +123,13 @@ module Step = struct
 
     type prev_num_parentss
 
-    type local_branches
+    type prev_num_ruless
 
     type _ t +=
       | Proof_with_datas :
           ( prev_values
           , prev_num_parentss
-          , local_branches )
+          , prev_num_ruless )
           H3.T(Per_proof_witness.Constant).t
           t
       | Wrap_index : Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
@@ -137,11 +137,11 @@ module Step = struct
   end
 
   let create
-      : type prev_num_parentss local_branches statement prev_values max_num_parents.
+      : type prev_num_parentss prev_num_ruless statement prev_values max_num_parents.
          unit
       -> (module S
             with type prev_num_parentss = prev_num_parentss
-             and type local_branches = local_branches
+             and type prev_num_ruless = prev_num_ruless
              and type statement = statement
              and type prev_values = prev_values
              and type max_num_parents = max_num_parents) =
@@ -155,13 +155,13 @@ module Step = struct
 
       type nonrec prev_num_parentss = prev_num_parentss
 
-      type nonrec local_branches = local_branches
+      type nonrec prev_num_ruless = prev_num_ruless
 
       type _ t +=
         | Proof_with_datas :
             ( prev_values
             , prev_num_parentss
-            , local_branches )
+            , prev_num_ruless )
             H3.T(Per_proof_witness.Constant).t
             t
         | Wrap_index :

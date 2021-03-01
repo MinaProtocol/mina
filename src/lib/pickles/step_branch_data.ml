@@ -12,7 +12,7 @@ type ( 'a_var
      , 'prev_vars
      , 'prev_values
      , 'prev_num_parentss
-     , 'local_heights )
+     , 'prev_num_ruless )
      t =
   | T :
       { branching: 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
@@ -23,7 +23,7 @@ type ( 'a_var
           ( 'prev_vars
           , 'prev_values
           , 'prev_num_parentss
-          , 'local_heights
+          , 'prev_num_ruless
           , 'a_avar
           , 'a_value )
           Inductive_rule.t
@@ -40,7 +40,7 @@ type ( 'a_var
               and type max_num_parents = 'max_num_parents
               and type prev_values = 'prev_values
               and type prev_num_parentss = 'prev_num_parentss
-              and type local_branches = 'local_heights) }
+              and type prev_num_ruless = 'prev_num_ruless) }
       -> ( 'a_var
          , 'a_value
          , 'max_num_parents
@@ -48,12 +48,12 @@ type ( 'a_var
          , 'prev_vars
          , 'prev_values
          , 'prev_num_parentss
-         , 'local_heights )
+         , 'prev_num_ruless )
          t
 
 (* Compile an inductive rule. *)
 let create
-    (type num_rules max_num_parents prev_num_parentss local_branches a_var
+    (type num_rules max_num_parents prev_num_parentss prev_num_ruless a_var
     a_value prev_vars prev_values) ~index
     ~(self : (a_var, a_value, max_num_parents, num_rules) Tag.t) ~wrap_domains
     ~(max_num_parents : max_num_parents Nat.t)
@@ -91,7 +91,7 @@ let create
   in
   Timer.clock __LOC__ ;
   let ( prev_num_parentss
-      , heights
+      , prev_num_ruless
       , prev_num_parentss_length
       , local_branches_length ) =
     extract_lengths rule.prevs branching
@@ -111,8 +111,8 @@ let create
         ; wrap_domains
         ; step_domains }
       ~self_num_rules:num_rules ~branching ~prev_num_parentss
-      ~prev_num_parentss_length ~local_branches:heights ~local_branches_length
-      ~lte ~self
+      ~prev_num_parentss_length ~prev_num_ruless ~local_branches_length ~lte
+      ~self
     |> unstage
   in
   Timer.clock __LOC__ ;

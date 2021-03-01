@@ -29,10 +29,13 @@ module Make (A : T0) (A_value : T0) = struct
         (H4.T
            (E04 (Domains)))
            (struct
-             let f : type vars values env num_parentss heights.
-                    (vars, values, num_parentss, heights) I.t
-                 -> (vars, values, num_parentss, heights) H4.T(E04(Domains)).t
-                 =
+             let f : type vars values env num_parentss num_ruless.
+                    (vars, values, num_parentss, num_ruless) I.t
+                 -> ( vars
+                    , values
+                    , num_parentss
+                    , num_ruless )
+                    H4.T(E04(Domains)).t =
               fun rule -> M_inner.f rule.prevs
            end)
     in

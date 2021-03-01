@@ -93,12 +93,12 @@ val verify :
   -> bool
 
 module Prover : sig
-  type ('prev_values, 'prev_num_parentss, 'local_heights, 'a_value, 'proof) t =
+  type ('prev_values, 'prev_num_parentss, 'prev_num_ruless, 'a_value, 'proof) t =
        ?handler:(   Snarky_backendless.Request.request
                  -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'prev_num_parentss
-       , 'local_heights )
+       , 'prev_num_ruless )
        H3.T(Statement_with_proof).t
     -> 'a_value
     -> 'proof
@@ -202,8 +202,8 @@ val compile :
   -> rules:(   self:('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
             -> ( 'prev_varss
                , 'prev_valuess
-               , 'num_parentss
-               , 'heightss
+               , 'prev_num_parentss
+               , 'prev_num_ruless
                , 'a_var
                , 'a_value )
                H4_2.T(Inductive_rule).t)
@@ -213,8 +213,8 @@ val compile :
           with type t = ('max_num_parents, 'max_num_parents) Proof.t
            and type statement = 'a_value)
      * ( 'prev_valuess
-       , 'num_parentss
-       , 'heightss
+       , 'prev_num_parentss
+       , 'prev_num_ruless
        , 'a_value
        , ('max_num_parents, 'max_num_parents) Proof.t Async.Deferred.t )
        H3_2.T(Prover).t
