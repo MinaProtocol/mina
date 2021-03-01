@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-finalfinal2.tfstate"
+    key     = "terraform-finalfinal2-new.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -122,10 +122,10 @@ module "finalfinal2" {
   fish_count            = var.fish_count
   seed_count            = var.seed_count
 
-  upload_blocks_to_gcloud         = false
+  upload_blocks_to_gcloud         = true
   restart_nodes                   = false
   restart_nodes_every_mins        = "60"
-  make_reports                    = false
+  make_reports                    = true
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
