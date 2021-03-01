@@ -54,26 +54,12 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
-    # by default, deploy a single local daemon and associated PostgresDB enabled archive server
-    [
-      {
-        name              = "archive-1"
-        enableLocalDaemon = true
-        enablePostgresDB  = true
-        postgresHost      = "archive-1-postgresql"
-      }
-    ],
-    # in addition to stand-alone archive servers upto the input archive node count
-    [
-      for i in range(2, var.archive_node_count + 1) : {
+  archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : [
+      for i in range(1, var.archive_node_count + 1) : {
         name              = "archive-${i}"
-        enableLocalDaemon = false
-        enablePostgresDB  = false
-        postgresHost      = "archive-1-postgresql"
+        postgresHost      = "archive-${i}-postgresql"
       }
     ]
-  )
   mina_archive_schema = var.mina_archive_schema
 
   persistence_config  = var.postgres_persistence_config

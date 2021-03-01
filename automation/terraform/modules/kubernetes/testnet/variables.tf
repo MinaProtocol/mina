@@ -290,14 +290,12 @@ variable "persistence_config" {
   type = object({
     enabled       = optional(bool)
     size          = optional(string)
-    reclaimPolicy = optional(string)
     storageClass  = optional(string)
     accessModes   = optional(list(string))
   })
   default = {
     enabled       = true
     size          = "8Gi"
-    reclaimPolicy = "retain"
     storageClass  = "ssd-retain"
     accessModes   = ["ReadWriteOnce"]
   }

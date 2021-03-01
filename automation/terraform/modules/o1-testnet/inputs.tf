@@ -269,7 +269,6 @@ variable "postgres_persistence_config" {
   default = {
     enabled       = true
     size          = "8Gi"
-    reclaimPolicy = "retain"
     storageClass  = "ssd-retain"
     accessModes   = ["ReadWriteOnce"]
   }
