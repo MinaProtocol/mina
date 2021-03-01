@@ -128,8 +128,6 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
       if p in unqueried_peers:
         del unqueried_peers[p]
 
-<<<<<<< HEAD
-
   cmd = "mina advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
   resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
   add_resp(resp, [])
