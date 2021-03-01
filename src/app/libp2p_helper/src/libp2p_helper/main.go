@@ -95,6 +95,7 @@ const (
 )
 
 const validationTimeout = 5 * time.Minute
+const maxMsgSize =  1 << 23 // 8 MB
 
 type codaPeerInfo struct {
 	Libp2pPort int    `json:"libp2p_port"`
@@ -681,6 +682,11 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			if length == 0 {
 				continue
 			}
+
+			if length >= maxMsgSize {
+                app.P2p.Logger.Error("Received large message from peer: ", stream.Conn().RemotePeer().String())
+			    continue
+            }
 
 			msgBytes = make([]byte, length)
 			n, err := io.ReadFull(r, msgBytes)
