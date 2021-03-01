@@ -688,7 +688,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 		for {
 			length, err := readLEB128ToUint64(r)
 			if err == io.EOF {
-				continue
+				break
 			} else if err != nil {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
