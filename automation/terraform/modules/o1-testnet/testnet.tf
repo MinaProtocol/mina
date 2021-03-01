@@ -61,6 +61,7 @@ module "kubernetes_testnet" {
         name              = "archive-1"
         enableLocalDaemon = true
         enablePostgresDB  = true
+        postgresHost      = "archive-1-postgresql"
       }
     ],
     # in addition to stand-alone archive servers upto the input archive node count
@@ -69,10 +70,12 @@ module "kubernetes_testnet" {
         name              = "archive-${i}"
         enableLocalDaemon = false
         enablePostgresDB  = false
+        postgresHost      = "archive-1-postgresql"
       }
     ]
   )
   mina_archive_schema = var.mina_archive_schema
+
   persistence_config  = var.postgres_persistence_config
 
   snark_worker_replicas   = var.snark_worker_replicas
@@ -96,7 +99,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = "archive-1:3086"
+        archiveAddress         = element(local.archive_node_names, i)
       }
     ],
     [
@@ -113,7 +116,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = "archive-1:3086"
+        archiveAddress         = element(local.archive_node_names, i)
       }
     ]
   )
@@ -127,8 +130,8 @@ module "kubernetes_testnet" {
       external_ip        = google_compute_address.seed_static_ip[i].address
       private_key_secret = "online-seeds-account-${i + 1}-key"
       libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
-      enableArchive      = false
-      archiveAddress     = "archive-1:3086"
+      enableArchive      = true
+      archiveAddress     = element(local.archive_node_names, i)
     }
   ]
 

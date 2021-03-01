@@ -20,4 +20,5 @@ locals {
   whale_block_producer_names = [for i in range(var.whale_count) : "whale-block-producer-${i + 1}"]
   fish_block_producer_names  = [for i in range(var.fish_count) : "fish-block-producer-${i + 1}"]
   seed_names                 = [for i in range(var.seed_count) : "seed-${i + 1}"]
+  archive_node_names         = var.archive_node_count == 0 ? [ "" ] : [for i in range(var.archive_node_count) : "archive-${i + 1}:3086"]
 }
