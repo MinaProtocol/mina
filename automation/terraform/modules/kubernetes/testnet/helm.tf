@@ -187,6 +187,7 @@ resource "helm_release" "seeds" {
 
 resource "helm_release" "block_producers" {
   provider = helm.testnet_deploy
+  count    = length(local.block_producer_vars.blockProducerConfigs) > 1 ? 1 : 0
 
   name       = "${var.testnet_name}-block-producers"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
@@ -205,6 +206,7 @@ resource "helm_release" "block_producers" {
 
 resource "helm_release" "snark_workers" {
   provider = helm.testnet_deploy
+  count    = local.snark_worker_vars.coordinator.active ? 1 : 0
 
   name       = "${var.testnet_name}-snark-worker"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
