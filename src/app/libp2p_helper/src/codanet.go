@@ -7,9 +7,11 @@ import (
 	"fmt"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
+	"math"
 	"math/rand"
 	gonet "net"
 	"path"
+	"sync"
 	"time"
 
 	dsb "github.com/ipfs/go-ds-badger"
@@ -234,7 +236,56 @@ type Helper struct {
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	Seeds             []peer.AddrInfo
+	MsgStats          *MessageStats
 	TelemetryData     string
+}
+
+type MessageStats struct {
+	min      uint64
+	sum      uint64
+	max      uint64
+	totalMsg uint64
+	sync.RWMutex
+}
+
+func (ms *MessageStats) UpdateMetrics(val uint64) {
+	ms.Lock()
+	defer ms.Unlock()
+	if ms.max < val {
+		ms.max = val
+	}
+
+	if ms.min > val {
+		ms.min = val
+	}
+
+	ms.totalMsg++
+	if ms.sum == 0 {
+		ms.sum = val
+	} else {
+		ms.sum += val
+	}
+}
+
+func (ms *MessageStats) GetMin() uint64 {
+	ms.RLock()
+	defer ms.RUnlock()
+	return ms.min
+}
+
+func (ms *MessageStats) GetMax() uint64 {
+	ms.RLock()
+	defer ms.RUnlock()
+	return ms.max
+}
+
+func (ms *MessageStats) GetAvg() uint64 {
+	ms.RLock()
+	defer ms.RUnlock()
+	if ms.totalMsg == 0 {
+		return 0
+	}
+	return ms.sum / ms.totalMsg
 }
 
 // this type implements the ConnectionGating interface
@@ -626,6 +677,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
 		Seeds:             seeds,
+		MsgStats:          &MessageStats{min: math.MaxUint64},
 	}
 
 	if !minaPeerExchange {

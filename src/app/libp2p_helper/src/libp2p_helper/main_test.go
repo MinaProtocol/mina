@@ -1,35 +1,44 @@
 package main
 
 import (
-	"bufio"
-	"codanet"
 	"context"
 	crand "crypto/rand"
+	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"codanet"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	net "github.com/libp2p/go-libp2p-core/network"
-	peer "github.com/libp2p/go-libp2p-core/peer"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
-	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testTimeout  = 10 * time.Second
+	testTimeout  = 20 * time.Second
 	testProtocol = protocol.ID("/mina/")
+)
+
+const (
+	maxStatsMsg = 1 << 20
+	minStatsMsg = 1 << 6
 )
 
 var port = 7000
@@ -84,15 +93,17 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *
 	})
 
 	return &app{
-		P2p:            helper,
-		Ctx:            context.Background(),
-		Subs:           make(map[int]subscription),
-		Topics:         make(map[string]*pubsub.Topic),
-		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]*validationStatus),
-		Streams:        make(map[int]net.Stream),
-		AddedPeers:     make([]peer.AddrInfo, 0, 512),
-		NoUpcalls:      true,
+		P2p:                helper,
+		Ctx:                context.Background(),
+		Subs:               make(map[int]subscription),
+		Topics:             make(map[string]*pubsub.Topic),
+		ValidatorMutex:     &sync.Mutex{},
+		Validators:         make(map[int]*validationStatus),
+		Streams:            make(map[int]net.Stream),
+		AddedPeers:         make([]peer.AddrInfo, 0, 512),
+		OutChan:            make(chan interface{}),
+		NoUpcalls:          true,
+		MetricsRefreshTime: time.Second * 2,
 	}
 }
 
@@ -240,17 +251,19 @@ func TestMDNSDiscovery(t *testing.T) {
 	time.Sleep(time.Second * 3)
 }
 
-func createLargeMessage() []byte {
-	return make([]byte, (1 << 30))
+func createMessage(size uint64) []byte {
+	return make([]byte, size)
 }
 
 func TestMplex_SendLargeMessage(t *testing.T) {
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
+	appA.NoUpcalls = false
 
 	appB := newTestApp(t, nil)
 	appB.NoDHT = true
+	appB.NoUpcalls = false
 
 	// connect the two nodes
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -259,44 +272,61 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
+	// send large message from A to B
+	expectedMessage := createMessage(maxStatsMsg)
+
 	// create handler that reads 1<<30 bytes
 	done := make(chan struct{})
 	handler := func(stream net.Stream) {
-		r := bufio.NewReader(stream)
-		i := 0
+		handleStreamReads(appB, stream, 0)
 
+		var actualMessage []byte
 		for {
-			_, err := r.ReadByte()
-			if err == io.EOF {
-				break
-			}
+			data := <-appB.OutChan
+			require.NotEmpty(t, data)
 
-			i++
-			if i == 1<<30 {
+			bytes, err := json.Marshal(data)
+			require.NoError(t, err)
+
+			var result map[string]interface{}
+			err = json.Unmarshal(bytes, &result)
+			require.NoError(t, err)
+
+			upCall, ok := result["upcall"]
+			require.True(t, ok)
+
+			if upCall == "incomingStreamMsg" {
+				data, ok = result["data"]
+				require.True(t, ok)
+
+				msg, err := codaDecode(data.(string))
+				require.NoError(t, err)
+
+				actualMessage = append(actualMessage, msg...)
+			} else if upCall == "streamReadComplete" {
+				require.Equal(t, actualMessage, actualMessage)
 				close(done)
-				return
 			}
 		}
+
 	}
 
 	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
 
-	// send large message from A to B
-	msg := createLargeMessage()
-
 	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
 	require.NoError(t, err)
 
-	_, err = stream.Write(msg)
+	_, err = stream.Write(expectedMessage)
 	require.NoError(t, err)
 
+	require.NoError(t, stream.Close())
+
 	select {
-	case <-time.After(testTimeout):
+	case <-time.After(70 * time.Second):
 		t.Fatal("B did not receive a large message from A")
 	case <-done:
 	}
 }
-
 func TestConfigurationMsg(t *testing.T) {
 	testApp := newApp()
 
@@ -311,7 +341,7 @@ func TestConfigurationMsg(t *testing.T) {
 
 	external := "/ip4/0.0.0.0/tcp/7000"
 
-	msg := &configureMsg{
+	msg := configureMsg{
 		Statedir:            dir,
 		Privk:               keyEnc,
 		NetworkID:           string(testProtocol),
@@ -327,7 +357,7 @@ func TestConfigurationMsg(t *testing.T) {
 }
 
 func TestListenMsg(t *testing.T) {
-	addrStr := "/ip4/127.0.0.2/tcp/8000"
+	addrStr := "/ip4/127.0.0.1/tcp/8000"
 
 	addr, err := ma.NewMultiaddr(addrStr)
 	require.NoError(t, err)
@@ -492,19 +522,18 @@ func TestOpenStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
-	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
 	res, ok := ret.(openStreamResult)
 	require.True(t, ok)
 	require.Equal(t, res.StreamIdx, 1)
-	require.Equal(t, res.Peer, expected)
+	require.Equal(t, expected.PeerID, res.Peer.PeerID)
+	require.Equal(t, expected.Libp2pPort, res.Peer.Libp2pPort)
 }
 
 func TestCloseStreamMsg(t *testing.T) {
@@ -528,19 +557,18 @@ func TestCloseStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
-	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
 	res, ok := ret.(openStreamResult)
 	require.True(t, ok)
 	require.Equal(t, res.StreamIdx, 1)
-	require.Equal(t, res.Peer, expected)
+	require.Equal(t, expected.PeerID, res.Peer.PeerID)
+	require.Equal(t, expected.Libp2pPort, res.Peer.Libp2pPort)
 
 	closeMsg := &closeStreamMsg{
 		StreamIdx: 1,
@@ -575,19 +603,18 @@ func TestResetStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
-	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
 	res, ok := ret.(openStreamResult)
 	require.True(t, ok)
 	require.Equal(t, res.StreamIdx, 1)
-	require.Equal(t, res.Peer, expected)
+	require.Equal(t, expected.PeerID, res.Peer.PeerID)
+	require.Equal(t, expected.Libp2pPort, res.Peer.Libp2pPort)
 
 	resetMsg := &resetStreamMsg{
 		StreamIdx: 1,
@@ -622,19 +649,18 @@ func TestSendStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
-	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
 	res, ok := ret.(openStreamResult)
 	require.True(t, ok)
 	require.Equal(t, res.StreamIdx, 1)
-	require.Equal(t, res.Peer, expected)
+	require.Equal(t, expected.PeerID, res.Peer.PeerID)
+	require.Equal(t, expected.Libp2pPort, res.Peer.Libp2pPort)
 
 	sendMsg := &sendStreamMsgMsg{
 		StreamIdx: 1,
@@ -680,19 +706,18 @@ func TestAddStreamHandlerMsg(t *testing.T) {
 	ret, err = msg.run(appA)
 	require.NoError(t, err)
 
-	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
 	res, ok := ret.(openStreamResult)
 	require.True(t, ok)
 	require.Equal(t, res.StreamIdx, 1)
-	require.Equal(t, res.Peer, expected)
+	require.Equal(t, expected.PeerID, res.Peer.PeerID)
+	require.Equal(t, expected.Libp2pPort, res.Peer.Libp2pPort)
 }
 
 func TestRemoveStreamHandlerMsg(t *testing.T) {
@@ -787,18 +812,19 @@ func TestFindPeerMsg(t *testing.T) {
 		PeerID: appA.P2p.Host.ID().String(),
 	}
 
-	expectedHost, err := appA.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
 	ret, err = findMsg.run(appB)
 	require.NoError(t, err)
-	require.Equal(t, expected, ret)
+
+	infos := ret.(codaPeerInfo)
+	require.Equal(t, expected.PeerID, infos.PeerID)
+	require.Equal(t, expected.Libp2pPort, infos.Libp2pPort)
 }
 
 func TestListPeersMsg(t *testing.T) {
@@ -819,12 +845,10 @@ func TestListPeersMsg(t *testing.T) {
 	addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
 	require.NotEqual(t, 0, len(addrs))
 
-	expectedHost, err := appA.P2p.Host.Addrs()[0].ValueForProtocol(4)
-	require.NoError(t, err)
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       expectedHost,
+		Host:       "192.168.0.100",
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
@@ -832,7 +856,8 @@ func TestListPeersMsg(t *testing.T) {
 	require.NoError(t, err)
 	infos := ret.([]codaPeerInfo)
 	require.Equal(t, 1, len(infos))
-	require.Equal(t, expected, infos[0])
+	require.Equal(t, expected.PeerID, infos[0].PeerID)
+	require.Equal(t, expected.Libp2pPort, infos[0].Libp2pPort)
 }
 
 func TestSetGatingConfigMsg(t *testing.T) {
@@ -879,7 +904,7 @@ func TestGetPeerMessage(t *testing.T) {
 		codanet.NoDHT = false
 	}()
 
-	// only allow peer count of 2 for node A
+	// only allow peer count of 1 for node A
 	maxCount := 2
 	appA := newTestAppWithMaxConns(t, nil, maxCount)
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -928,34 +953,207 @@ func TestGetPeerMessage(t *testing.T) {
 	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
 }
 
-func TestGetTelemetry(t *testing.T) {
-	codanet.NoDHT = true
-	defer func() {
-		codanet.NoDHT = false
-	}()
-
-	// only allow peer count of 1 for node A
-	maxCount := 1
-	appA := newTestAppWithMaxConns(t, nil, maxCount)
-	appAInfos, err := addrInfos(appA.P2p.Host)
-	require.NoError(t, err)
-	appA.P2p.TelemetryData = "testdata"
+func TestMplex_SendMultipleMessage(t *testing.T) {
+	// assert we are able to send and receive multiple messages with size up to 1 << 10 bytes
+	appA := newTestApp(t, nil)
+	appA.NoDHT = true
+	appA.NoUpcalls = false
+	defer appA.P2p.Host.Close()
 
 	appB := newTestApp(t, nil)
+	appB.NoDHT = true
+	appB.NoUpcalls = false
+	defer appB.P2p.Host.Close()
+
+	// connect the two nodes
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
 	require.NoError(t, err)
 
-	appC := newTestApp(t, nil)
-	appC.P2p.Host.Peerstore().AddAddrs(appA.P2p.Host.ID(), appAInfos[0].Addrs, peerstore.ConnectedAddrTTL)
+	// Send multiple messages from A to B
+	expectedMessage := createMessage(3 * minStatsMsg) // sending multiple messages of size minStatsMsg
 
-	maStrs := multiaddrs(appA.P2p.Host)
+	// create handler that reads 3 messages of size 1<<10 bytes
+	done := make(chan struct{})
+	handler := func(stream net.Stream) {
+		handleStreamReads(appB, stream, 0)
+		var actualMessage []byte
+		for {
+			data := <-appB.OutChan
+			require.NotEmpty(t, data)
 
-	// ensure we can receive data before being disconnected
-	msg := &getPeerTelemetryDataMsg{
-		PeerMultiaddr: maStrs[0].String(),
+			bytes, err := json.Marshal(data)
+			require.NoError(t, err)
+
+			var result map[string]interface{}
+			err = json.Unmarshal(bytes, &result)
+			require.NoError(t, err)
+
+			op, ok := result["upcall"]
+			require.True(t, ok)
+
+			if op == "incomingStreamMsg" {
+				data, ok = result["data"]
+				require.True(t, ok)
+
+				msg, err := codaDecode(data.(string))
+				require.NoError(t, err)
+
+				actualMessage = append(actualMessage, msg...)
+			} else if op == "streamReadComplete" {
+				require.Equal(t, expectedMessage, actualMessage)
+				close(done)
+			}
+		}
 	}
 
-	ret, err := msg.run(appC)
+	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+
+	// send large message from A to B
+	msg := createMessage(minStatsMsg)
+	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
 	require.NoError(t, err)
-	require.Equal(t, appA.P2p.TelemetryData, ret)
+
+	_, err = stream.Write(msg)
+	require.NoError(t, err)
+
+	_, err = stream.Write(msg)
+	require.NoError(t, err)
+
+	_, err = stream.Write(msg)
+	require.NoError(t, err)
+
+	require.NoError(t, stream.Close())
+
+	select {
+	case <-time.After(testTimeout):
+		t.Fatal("B did not receive a large message from A")
+	case <-done:
+	}
+}
+
+func TestLib2pMetrics(t *testing.T) {
+	const (
+		maxReadBuf  = 4096
+		avgMaxStats = 4080
+		minStats    = 92
+	)
+
+	// assert we are able to get the correct metrics of libp2p node
+	appA := newTestApp(t, nil)
+	appA.NoDHT = true
+	appA.NoUpcalls = false
+	defer appA.P2p.Host.Close()
+
+	appB := newTestApp(t, nil)
+	appB.NoDHT = true
+	appB.NoUpcalls = false
+	defer appB.P2p.Host.Close()
+
+	// connect the two nodes
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	//expectedMessage := createMessage(maxStatsMsg+ minStatsMsg)
+	done := make(chan struct{})
+	handler := func(stream net.Stream) {
+		handleStreamReads(appB, stream, 0)
+		// Wait for message to be read.
+		for {
+			data := <-appB.OutChan
+			require.NotEmpty(t, data)
+
+			bytes, err := json.Marshal(data)
+			require.NoError(t, err)
+
+			var result map[string]interface{}
+			err = json.Unmarshal(bytes, &result)
+			require.NoError(t, err)
+
+			op, ok := result["upcall"]
+			require.True(t, ok)
+
+			if op == "streamReadComplete" {
+				close(done)
+			}
+		}
+	}
+
+	appB.P2p.Host.SetStreamHandler(testProtocol, handler)
+
+	stream, err := appA.P2p.Host.NewStream(context.Background(), appB.P2p.Host.ID(), testProtocol)
+	require.NoError(t, err)
+
+	server := http.NewServeMux()
+	server.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":9001", server)
+
+	go appA.checkPeerCount(appA.P2p.Me)
+	go appA.checkMessageExchanged(appA.P2p.Me)
+	go appB.checkMessageStats(appB.P2p.Me)
+
+	// Send multiple messages from A to B
+	message := createMessage(maxStatsMsg)
+
+	_, err = stream.Write(message)
+	require.NoError(t, err)
+
+	smallMessage := createMessage(minStatsMsg)
+	_, err = stream.Write(smallMessage)
+	require.NoError(t, err)
+
+	require.NoError(t, stream.Close())
+
+	select {
+	case <-time.After(testTimeout):
+		t.Fatal("B did not receive a large message from A")
+	case <-done:
+	}
+
+	time.Sleep(5 * time.Second) // Wait for metrics to be reported.
+
+	expectedPeerCount := appA.P2p.Host.Network().Peers()
+	expectedCurrentConnCount := appA.P2p.ConnectionManager.GetInfo().ConnCount
+
+	resp, err := http.Get("http://localhost:9001/metrics")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	respBody := string(body)
+	peerCount := getMetricsValue(t, respBody, "\npeer_count_"+appA.P2p.Me.String())
+	require.Equal(t, strconv.Itoa(expectedCurrentConnCount), peerCount)
+
+	peerConn := getMetricsValue(t, respBody, "\nmessage_exchanged_"+appA.P2p.Me.String())
+	require.Equal(t, strconv.Itoa(len(expectedPeerCount)), peerConn)
+
+	maxStats := getMetricsValue(t, respBody, "\nmessage_max_stats_"+appB.P2p.Me.String())
+	require.Equal(t, strconv.Itoa(maxReadBuf), maxStats)
+
+	avgStats := getMetricsValue(t, respBody, "\nmessage_avg_stats_"+appB.P2p.Me.String())
+	require.Equal(t, strconv.Itoa(avgMaxStats), avgStats)
+
+	minSts := getMetricsValue(t, respBody, "\nmessage_min_stats_"+appB.P2p.Me.String())
+	require.Equal(t, strconv.Itoa(minStats), minSts)
+}
+
+func getMetricsValue(t *testing.T, str string, pattern string) string {
+	t.Helper()
+
+	indx := strings.Index(str, pattern)
+	endIdx := strings.Index(str[indx+len(pattern):], "\n")
+	endIdx = endIdx + indx + len(pattern)
+
+	u := str[indx+1 : endIdx]
+	metricsData := strings.Split(u, " ")
+	require.Len(t, metricsData, 2)
+
+	return metricsData[1]
 }
