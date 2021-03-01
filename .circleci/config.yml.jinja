@@ -86,7 +86,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -123,7 +123,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -171,7 +171,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -198,7 +198,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c './scripts/require-ppxs.py'
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -217,7 +217,7 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -226,7 +226,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && export PATH="$HOME/.cargo/bin:$PATH" && ./scripts/compare_test_signatures.sh'
     client-sdk-unit-tests:
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -364,7 +364,7 @@ jobs:
                     cp /tmp/s3_cache_dir/genesis_ledger_*.tar.gz package/keys/. ||:
                     cp /tmp/s3_cache_dir/genesis_proof_* package/keys/. ||:
                     echo 'coda'
-                    cp _build/default/src/app/cli/src/coda.exe package/coda
+                    cp _build/default/src/app/cli/src/mina.exe package/coda
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
@@ -414,7 +414,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             - run:
@@ -510,7 +510,7 @@ jobs:
     build-artifacts-docker--{{profile}}--{{docker_image_set['images'] | first}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             - restore_cache:
                 name: Restore cache - docker deploy env
@@ -546,7 +546,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -569,7 +569,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -591,7 +591,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -614,7 +614,7 @@ jobs:
     build-binaries--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             - run: ulimit -c unlimited
@@ -635,7 +635,7 @@ jobs:
                 key: {{profile}}-build-binaries-v1-{{'{{'}} .Revision {{'}}'}}
                 paths:
                     - "src/app/libp2p_helper/result"
-                    - "_build/default/src/app/cli/src/coda.exe"
+                    - "_build/default/src/app/cli/src/mina.exe"
                     - "_build/default/src/app/logproc/logproc.exe"
                     - "scripts"
                     - "should_run_tests"
@@ -644,7 +644,7 @@ jobs:
     test--{{profile}}--{{test.replace(' ','_')}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             - restore_cache:
                 name: Restore cache - opam
@@ -667,7 +667,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -687,7 +687,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9924f4c56a40d65d36440e8f70b93720f29ba171
+            - image: codaprotocol/coda:toolchain-14cb996cc7d8910a2ff6ae3ce132cea571bbb69c
         steps:
             {{ checkout_no_lfs }}
             {{ opam_init_linux }}
@@ -715,10 +715,10 @@ workflows:
               - true
               - << pipeline.parameters.run-ci >>
         jobs:
-            - lint
-            - lint-opt
-            - compare-test-signatures
-            - client-sdk-unit-tests
+            #- lint
+            #- lint-opt
+            #- compare-test-signatures
+            #- client-sdk-unit-tests
             #- update-branch-protection:
                 #filters:
                   #branches:
@@ -727,50 +727,50 @@ workflows:
                     #- master
                     #- develop-until-4.1-hardfork
                     #- develop-until-adversarial
-            - tracetool
-            - test-archive
-            - build-archive
-            {%- for profile in build_artifact_profiles %}
-            - build-artifacts--{{profile}}
-            {%- endfor %}
-            {%- for profile in build_artifact_profiles %}
-            {%- if profile in medium_curve_profiles %}
-            {%- for docker_image in ['coda-daemon', 'coda-demo'] %}
-            - build-artifacts-docker--{{profile}}--{{docker_image}}:
-                requires:
-                  - build-artifacts--{{profile}}
-            {%- endfor %}
-            {%- endif %}
-            {%- endfor %}
-            {%- for profile in unit_test_profiles %}
-            - test-unit--{{profile}}
-            {%- endfor %}
-            - test-unit--nonconsensus_medium_curves
-            {%- for profile in small_curves_tests.keys() | sort %}
-            - test--{{profile}}
-            {%- endfor %}
-            {%- for profile in compile_config_agnostic_profiles %}
-            - build-binaries--{{profile}}
-            {%- for test in compile_config_agnostic_tests %}
-            - test--{{profile}}--{{test.replace(' ','_')}}:
-                requires:
-                  - build-binaries--{{profile}}
-            {%- endfor %}
-            {%- endfor %}
+            #- tracetool
+            #- test-archive
+            #- build-archive
+            #{%- for profile in build_artifact_profiles %}
+            #- build-artifacts--{{profile}}
+            #{%- endfor %}
+            #{%- for profile in build_artifact_profiles %}
+            #{%- if profile in medium_curve_profiles %}
+            #{%- for docker_image in ['coda-daemon', 'coda-demo'] %}
+            #- build-artifacts-docker--{{profile}}--{{docker_image}}:
+                #requires:
+                  #- build-artifacts--{{profile}}
+            #{%- endfor %}
+            #{%- endif %}
+            #{%- endfor %}
+            #{%- for profile in unit_test_profiles %}
+            #- test-unit--{{profile}}
+            #{%- endfor %}
+            #- test-unit--nonconsensus_medium_curves
+            #{%- for profile in small_curves_tests.keys() | sort %}
+            #- test--{{profile}}
+            #{%- endfor %}
+            #{%- for profile in compile_config_agnostic_profiles %}
+            #- build-binaries--{{profile}}
+            #{%- for test in compile_config_agnostic_tests %}
+            #- test--{{profile}}--{{test.replace(' ','_')}}:
+                #requires:
+                  #- build-binaries--{{profile}}
+            #{%- endfor %}
+            #{%- endfor %}
 
-    daily:
-        triggers:
-          - schedule:
-              cron: "0 12 * * *"
-              filters:
-                branches:
-                  only:
-                    - develop
-                    - /release\/.*/
-        jobs:
-          {%- for profile in unit_test_profiles_medium_curves %}
-          - test-unit--{{profile}}
-          {%- endfor %}
-          {%- for profile in medium_curves_and_other_tests.keys() | sort %}
-          - test--{{profile}}
-          {%- endfor %}
+    #daily:
+        #triggers:
+          #- schedule:
+              #cron: "0 12 * * *"
+              #filters:
+                #branches:
+                  #only:
+                    #- develop
+                    #- /release\/.*/
+        #jobs:
+          #{%- for profile in unit_test_profiles_medium_curves %}
+          #- test-unit--{{profile}}
+          #{%- endfor %}
+          #{%- for profile in medium_curves_and_other_tests.keys() | sort %}
+          #- test--{{profile}}
+          #{%- endfor %}

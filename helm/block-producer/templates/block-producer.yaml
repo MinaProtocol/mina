@@ -51,15 +51,28 @@ spec:
         command:
         - bash
         - -c
-        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || coda accounts import -config-directory /root/.coda-config -privkey-path /root/wallet-keys/$key; done
+        - for key in key echo-key faucet-key; do [ ! -f /root/wallet-keys/$key ] || mina accounts import -config-directory /root/.mina-config -privkey-path /root/wallet-keys/$key; done
         volumeMounts:
         - name: wallet-keys
           mountPath: /root/wallet-keys
         - name: config-dir
-          mountPath: /root/.coda-config
+          mountPath: /root/.mina-config
         env: 
           - name: CODA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
+      {{ if $config.libp2pSecret -}}
+      - name: libp2p-perms
+        image: {{ $.Values.coda.image | quote }}
+        command:
+        - bash
+        - -c
+        - /bin/cp /libp2p-keys/* /root/libp2p-keys && /bin/chmod -R 0700 /root/libp2p-keys/
+        volumeMounts:
+        - name: libp2p-keys
+          mountPath: /libp2p-keys
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+      {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
@@ -173,10 +186,16 @@ spec:
           {{- if $config.enableGossipFlooding }}
           "-enable-flooding", "true",
           {{- end -}}
+          {{- if $config.libp2pSecret }}
+          "-discovery-keypair", "/root/libp2p-keys/key",
+          {{- end -}}
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
-          "-config-directory", "/root/.coda-config",
+          {{- if $.Values.coda.seedPeersURL }}
+          "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
+          {{- end -}}
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
@@ -189,7 +208,10 @@ spec:
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end -}}
-          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }}
+          {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
@@ -201,7 +223,7 @@ spec:
         - name: DAEMON_METRICS_PORT
           value: {{ $.Values.coda.ports.metrics | quote }}
         - name: DAEMON_EXTERNAL_PORT
-          value: {{ $.Values.coda.ports.p2p | quote }}
+          value: {{ default $.Values.coda.ports.p2p $config.externalPort | quote }}
         - name: GCLOUD_KEYFILE
           value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME
@@ -210,6 +232,10 @@ spec:
           value: "mina_network_block_data"
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
+        {{- if $config.libp2pSecret }}
+        - name: CODA_LIBP2P_PASS
+          value: {{ $.Values.coda.privkeyPass | quote }}
+        {{- end }}
         - name: CODA_CLIENT_TRUSTLIST
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
@@ -226,15 +252,19 @@ spec:
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
           protocol: TCP 
-          containerPort: {{ $.Values.coda.ports.p2p }}
-          hostPort: {{ $.Values.coda.ports.external }}
+          containerPort: {{ default $.Values.coda.ports.p2p $config.externalPort }}
+          hostPort: {{ default $.Values.coda.ports.external $config.externalPort }}
 {{- include "healthcheck.daemon.allChecks" $.Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         - name: wallet-keys
           mountPath: /root/wallet-keys
         - name: config-dir
-          mountPath: /root/.coda-config
+          mountPath: /root/.mina-config
+        {{- if $config.libp2pSecret }}
+        - name: actual-libp2p
+          mountPath: /root/libp2p-keys
+        {{- end }}
         {{- if $.Values.coda.uploadBlocksToGCloud }}
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
@@ -254,6 +284,17 @@ spec:
             path: key
           - key: pub
             path: key.pub
+      {{- if $config.libp2pSecret }}
+      - name: libp2p-keys
+        secret:
+          secretName: {{ $config.libp2pSecret }}
+          defaultMode: 0700
+          items:
+          - key: key
+            path: key
+          - key: pub
+            path: key.pub
+      {{- end }}
       {{ if $config.runWithBots }}
       - name: echo-service-key
         secret:
@@ -277,6 +318,8 @@ spec:
       - name: wallet-keys
         emptyDir: {}
       - name: config-dir
+        emptyDir: {}
+      - name: actual-libp2p
         emptyDir: {}
       {{- if $.Values.coda.runtimeConfig }}
       - name: daemon-config
@@ -307,7 +350,7 @@ spec:
     app: {{ $config.name }}
   ports:
   - name: tcp-p2p
-    port: {{ $.Values.coda.ports.p2p }}
+    port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
 ---
 {{ end }}

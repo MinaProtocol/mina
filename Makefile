@@ -78,7 +78,7 @@ genesis_ledger:
 
 build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
@@ -141,6 +141,11 @@ archive_blocks :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
+genesis_ledger_from_tsv :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/genesis_ledger_from_tsv/genesis_ledger_from_tsv.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
@@ -150,7 +155,7 @@ update-opam:
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
-	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
+	@./scripts/macos-portable.sh _build/default/src/app/cli/src/mina.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
 	@cp -a package/keys/. _build/coda-daemon-macos/keys/
 	@cd _build/coda-daemon-macos && zip -r ../coda-daemon-macos.zip .
 	@echo Find coda-daemon-macos.zip inside _build/
@@ -350,9 +355,9 @@ ml-docs:
 	$(WRAPAPP) dune build --profile=$(DUNE_PROFILE) @doc
 
 ########################################
-# To avoid unintended conflicts with file names, always add to .PHONY
+# To avoid unintended conflicts with file names, always add new targets to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper
+.PHONY: all build check-format clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor missing_subchain archive_blocks genesis_ledger_from_tsv

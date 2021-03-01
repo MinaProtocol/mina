@@ -2,10 +2,13 @@ open Core
 open Async
 
 let run_cmd dir prog args =
+  [%log' spam (Logger.create ())]
+    "Running command (from %s): %s" dir
+    (String.concat (prog :: args) ~sep:" ") ;
   Process.create_exn ~working_dir:dir ~prog ~args ()
   >>= Process.collect_output_and_wait
 
-let run_cmd_exn dir prog args =
+let run_cmd_or_error dir prog args =
   let open Process.Output in
   let%bind output = run_cmd dir prog args in
   let print_output () =
@@ -28,12 +31,18 @@ let run_cmd_exn dir prog args =
   in
   match output.exit_status with
   | Ok () ->
-      return ()
+      return (Ok output.stdout)
   | Error (`Exit_non_zero status) ->
       let%map () = print_output () in
-      failwithf "command exited with status code %d" status ()
+      Or_error.errorf "command exited with status code %d" status
   | Error (`Signal signal) ->
       let%map () = print_output () in
-      failwithf "command exited prematurely due to signal %d"
+      Or_error.errorf "command exited prematurely due to signal %d"
         (Signal.to_system_int signal)
-        ()
+
+let run_cmd_exn dir prog args =
+  match%map run_cmd_or_error dir prog args with
+  | Ok output ->
+      output
+  | Error error ->
+      Error.raise error

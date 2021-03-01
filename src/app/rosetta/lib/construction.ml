@@ -290,8 +290,7 @@ module Metadata = struct
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
-          (* TODO: Set this to our default fee, assuming it is fixed when we launch *)
-      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 2_000_000_000)]
+      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 1_000_000_000)]
       }
   end
 
@@ -825,7 +824,7 @@ module Submit = struct
   module Mock = Impl (Result)
 end
 
-let router ~graphql_uri ~logger (route : string list) body =
+let router ~get_graphql_uri_or_error ~logger (route : string list) body =
   [%log debug] "Handling /construction/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   let open Deferred.Result.Let_syntax in
@@ -856,6 +855,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         @@ Construction_metadata_request.of_yojson body
         |> Errors.Lift.wrap
       in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Metadata.Real.handle ~env:(Metadata.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
@@ -887,6 +887,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         @@ Construction_parse_request.of_yojson body
         |> Errors.Lift.wrap
       in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Parse.Real.handle ~env:(Parse.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
@@ -908,6 +909,7 @@ let router ~graphql_uri ~logger (route : string list) body =
         @@ Construction_submit_request.of_yojson body
         |> Errors.Lift.wrap
       in
+      let%bind graphql_uri = get_graphql_uri_or_error () in
       let%map res =
         Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap

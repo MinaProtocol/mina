@@ -61,6 +61,7 @@ let with_lagranges f (vks : Verification_key.t array) =
   in
   f lgrs vks
 
+module Rounds_vector = Rounds.Step_vector
 module Rounds = Rounds.Step
 
 module Keypair = Dlog_plonk_based_keypair.Make (struct

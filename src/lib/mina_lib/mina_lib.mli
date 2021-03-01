@@ -35,13 +35,17 @@ val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 val replace_block_production_keypairs :
   t -> Keypair.And_compressed_pk.Set.t -> unit
 
-val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
+val next_producer_timing :
+  t -> Daemon_rpcs.Types.Status.Next_producer_timing.t option
 
 val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val next_epoch_ledger :
-  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     t
+  -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     | `Notfinalized ]
+     option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option

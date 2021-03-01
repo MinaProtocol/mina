@@ -65,6 +65,7 @@ module Staged_ledger_error : sig
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
     | Mismatched_statuses of Transaction.t With_status.t * Transaction_status.t
+    | Invalid_public_key of Public_key.Compressed.t
     | Unexpected of Error.t
   [@@deriving sexp]
 

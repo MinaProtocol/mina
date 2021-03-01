@@ -53,12 +53,13 @@ let stop_daemon =
 let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Get balance associated with a public key"
@@ -86,7 +87,7 @@ let get_balance_graphql =
 let get_tokens_graphql =
   let open Command.Param in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key for which you want to find accounts"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
@@ -161,7 +162,7 @@ let get_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:
         "IP An IPv4 or IPv6 address for which you want to query the trust \
          status"
@@ -199,7 +200,7 @@ let get_trust_status_all =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let nonzero_flag =
-    flag "nonzero-only" no_arg
+    flag "--nonzero-only" ~aliases:["nonzero-only"] no_arg
       ~doc:"Only show trust statuses whose trust score is nonzero"
   in
   let json_flag = Cli_lib.Flag.json in
@@ -233,7 +234,7 @@ let reset_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:
         "IP An IPv4 or IPv6 address for which you want to reset the trust \
          status"
@@ -258,7 +259,7 @@ let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
   let with_details_flag =
-    flag "with-details" no_arg
+    flag "--with-details" ~aliases:["with-details"] no_arg
       ~doc:"Show extra details (eg. balance, nonce) in addition to public keys"
   in
   let error_ctx = "Failed to get public-keys" in
@@ -296,21 +297,23 @@ let verify_receipt =
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let proof_path_flag =
-    flag "proof-path"
+    flag "--proof-path" ~aliases:["proof-path"]
       ~doc:"PROOFFILE File to read json version of payment receipt"
       (required string)
   in
   let payment_path_flag =
-    flag "payment-path"
+    flag "--payment-path" ~aliases:["payment-path"]
       ~doc:"PAYMENTPATH File to read json version of verifying payment"
       (required string)
   in
   let address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+    flag "--address" ~aliases:["address"]
+      ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   Command.async ~summary:"Verify a receipt of a sent payment"
@@ -373,11 +376,13 @@ let get_nonce_cmd =
   let open Command.Param in
   (* Ignores deprecation of public_key type for backwards compatibility *)
   let[@warning "-3"] address_flag =
-    flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
+    flag "--address" ~aliases:["address"]
+      ~doc:"PUBLICKEY Public-key address you want the nonce for"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The token ID for the account"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The token ID for the account"
       (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
   in
   let flags = Args.zip2 address_flag token_flag in
@@ -507,16 +512,17 @@ let send_payment_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Payment amount you want to send"
-      (required txn_amount)
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to transfer"
-      (optional token_id)
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to transfer" (optional token_id)
   in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
@@ -546,7 +552,7 @@ let delegate_stake_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver"
+    flag "--receiver" ~aliases:["receiver"]
       ~doc:"PUBLICKEY Public key to which you want to delegate your stake"
       (required public_key_compressed)
   in
@@ -574,7 +580,8 @@ let create_new_token_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to create the new token for"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to create the new token for"
       (optional public_key_compressed)
   in
   let args = Args.zip2 Cli_lib.Flag.signed_command_common receiver_flag in
@@ -602,15 +609,18 @@ let create_new_account_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to create the new account for"
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to create the new account for"
       (required public_key_compressed)
   in
   let token_owner_flag =
-    flag "token-owner" ~doc:"PUBLICKEY Public key for the owner of the token"
+    flag "--token-owner" ~aliases:["token-owner"]
+      ~doc:"PUBLICKEY Public key for the owner of the token"
       (optional public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to create the account for"
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to create the account for"
       (required token_id)
   in
   let args =
@@ -670,19 +680,19 @@ let mint_tokens_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let receiver_flag =
-    flag "receiver"
+    flag "--receiver" ~aliases:["receiver"]
       ~doc:
         "PUBLICKEY Public key of the account to create new tokens in \
          (defaults to the sender)"
       (optional public_key_compressed)
   in
   let token_flag =
-    flag "token" ~doc:"TOKEN_ID The ID of the token to mint"
-      (required token_id)
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to mint" (required token_id)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Number of new tokens to create"
-      (required txn_amount)
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Number of new tokens to create" (required txn_amount)
   in
   let args =
     Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag token_flag
@@ -710,7 +720,7 @@ let mint_tokens_graphql =
 let cancel_transaction_graphql =
   let txn_id_flag =
     Command.Param.(
-      flag "id" ~doc:"ID Transaction ID to be cancelled"
+      flag "--id" ~aliases:["id"] ~doc:"ID Transaction ID to be cancelled"
         (required Cli_lib.Arg_type.user_command))
   in
   Command.async
@@ -758,7 +768,7 @@ module Export_logs = struct
 
   let tarfile_flag =
     let open Command.Param in
-    flag "tarfile"
+    flag "--tarfile" ~aliases:["tarfile"]
       ~doc:"STRING Basename of the tar archive (default: date_time)"
       (optional string)
 
@@ -842,7 +852,7 @@ let dump_keypair =
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
 
-let handle_dump_ledger_response ~json = function
+let handle_export_ledger_response ~json = function
   | Error e ->
       Daemon_rpcs.Client.print_rpc_error e
   | Ok (Error e) ->
@@ -856,36 +866,176 @@ let handle_dump_ledger_response ~json = function
         printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts
 
-let dump_ledger =
-  let sl_hash_flag =
+let export_ledger =
+  let state_hash_flag =
     Command.Param.(
-      flag "state-hash (default: best state hash)" ~doc:"STATE-HASH State hash"
+      flag "--state-hash" ~aliases:["state-hash"]
+        ~doc:
+          "STATE-HASH State hash, if printing a staged ledger (default: state \
+           hash for the best tip)"
         (optional string))
   in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 sl_hash_flag json_flag in
-  Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
-         (* TODO: allow input in Base58Check format: issue #3036 *)
-         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
-         >>| handle_dump_ledger_response ~json ))
-
-let dump_staking_ledger =
-  let which =
+  let ledger_kind =
     let t =
       Command.Param.Arg_type.of_alist_exn
-        [("current", Daemon_rpcs.Get_staking_ledger.Current); ("next", Next)]
+        (List.map
+           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
+           ~f:(fun s -> (s, s)))
     in
-    Command.Param.(anon ("current|next" %: t))
+    Command.Param.(
+      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
   in
-  Command.async ~summary:"Print either the staking or next epoch ledger"
-    (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)
-       ~f:(fun port (which, json) ->
-         (* TODO: allow input in Base58Check format: issue #3036 *)
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
-           port
-         >>| handle_dump_ledger_response ~json ))
+  let plaintext_flag = Cli_lib.Flag.plaintext in
+  let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
+  Command.async
+    ~summary:
+      "Print the specified ledger (default: staged ledger at the best tip)"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (state_hash, plaintext, ledger_kind) ->
+         let check_for_state_hash () =
+           if Option.is_some state_hash then (
+             Format.eprintf "A state hash should not be given for %s@."
+               ledger_kind ;
+             Core_kernel.exit 1 )
+         in
+         let response =
+           match ledger_kind with
+           | "staged-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
+               in
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+                 state_hash port
+           | "staking-epoch-ledger" ->
+               check_for_state_hash () ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
+                 Daemon_rpcs.Get_staking_ledger.Current port
+           | "next-epoch-ledger" ->
+               check_for_state_hash () ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
+                 Daemon_rpcs.Get_staking_ledger.Next port
+           | _ ->
+               (* unreachable *)
+               failwithf "Unknown ledger kind: %s" ledger_kind ()
+         in
+         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+
+let hash_ledger =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Print the Merkle root of the ledger contained in the specified file"
+    (let%map ledger_file =
+       Command.Param.(
+         flag "--ledger-file"
+           ~doc:"LEDGER-FILE File containing an exported ledger"
+           (required string))
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let process_accounts accounts =
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
+         let packed_ledger =
+           Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+             ~depth:constraint_constants.ledger_depth accounts
+         in
+         let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+         Format.printf "%s@."
+           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+       in
+       Deferred.return
+       @@
+       if plaintext then
+         In_channel.with_file ledger_file ~f:(fun in_channel ->
+             let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+             let accounts =
+               lazy
+                 (List.map
+                    ([%of_sexp: Account.t list] sexp)
+                    ~f:(fun acct -> (None, acct)))
+             in
+             process_accounts accounts )
+       else
+         let json = Yojson.Safe.from_file ledger_file in
+         match Runtime_config.Accounts.of_yojson json with
+         | Ok runtime_accounts ->
+             let accounts =
+               lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
+             in
+             process_accounts accounts
+         | Error err ->
+             Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
+               err ;
+             ignore (exit 1))
+
+let currency_in_ledger =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Print the total currency for each token present in the ledger \
+       contained in the specified file"
+    (let%map ledger_file =
+       Command.Param.(
+         flag "--ledger-file"
+           ~doc:"LEDGER-FILE File containing an exported ledger"
+           (required string))
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let process_accounts accounts =
+         (* track currency total for each token
+            use uint64 to make arithmetic simple
+         *)
+         let currency_tbl : Unsigned.UInt64.t Token_id.Table.t =
+           Token_id.Table.create ()
+         in
+         List.iter accounts ~f:(fun (acct : Account.t) ->
+             let token_id = Account.token acct in
+             let balance = acct.balance |> Currency.Balance.to_uint64 in
+             match Token_id.Table.find currency_tbl token_id with
+             | None ->
+                 Token_id.Table.add_exn currency_tbl ~key:token_id
+                   ~data:balance
+             | Some total ->
+                 let new_total = Unsigned.UInt64.add total balance in
+                 Token_id.Table.set currency_tbl ~key:token_id ~data:new_total
+         ) ;
+         let tokens =
+           Token_id.Table.keys currency_tbl
+           |> List.dedup_and_sort ~compare:Token_id.compare
+         in
+         List.iter tokens ~f:(fun token ->
+             let total =
+               Token_id.Table.find_exn currency_tbl token
+               |> Currency.Balance.of_uint64
+               |> Currency.Balance.to_formatted_string
+             in
+             if Token_id.equal token Token_id.default then
+               Format.printf "MINA: %s@." total
+             else
+               Format.printf "TOKEN %s: %s@." (Token_id.to_string token) total
+         )
+       in
+       Deferred.return
+       @@
+       if plaintext then
+         In_channel.with_file ledger_file ~f:(fun in_channel ->
+             let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+             let accounts = [%of_sexp: Account.t list] sexp in
+             process_accounts accounts )
+       else
+         let json = Yojson.Safe.from_file ledger_file in
+         match Runtime_config.Accounts.of_yojson json with
+         | Ok runtime_accounts ->
+             let accounts =
+               Genesis_ledger_helper.Accounts.to_full runtime_accounts
+               |> List.map ~f:(fun (_sk_opt, acct) -> acct)
+             in
+             process_accounts accounts
+         | Error err ->
+             Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
+               err ;
+             ignore (exit 1))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1049,7 +1199,7 @@ let set_staking_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let pk_flag =
-    flag "public-key"
+    flag "--public-key" ~aliases:["public-key"]
       ~doc:"PUBLICKEY Public key of account with which to produce blocks"
       (required public_key_compressed)
   in
@@ -1071,7 +1221,7 @@ let set_staking_graphql =
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
          print_message
-           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+           "❌ Failed to start staking with keys (try `mina accounts unlock` \
             first)"
            (result#setStaking)#lockedPublicKeys ;
          print_message "Started staking with"
@@ -1080,7 +1230,7 @@ let set_staking_graphql =
 let set_snark_worker =
   let open Command.Param in
   let public_key_flag =
-    flag "address"
+    flag "--address" ~aliases:["address"]
       ~doc:
         "PUBLICKEY Public-key address you wish to start snark-working on; \
          null to stop doing any snark work"
@@ -1184,7 +1334,8 @@ let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   let pk_flag =
     let open Command.Param in
-    flag "public-key" ~doc:"PUBLICKEY Public key of account to be exported"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   let conf_dir = Cli_lib.Flag.conf_dir in
@@ -1273,7 +1424,7 @@ let list_accounts =
          | [||] ->
              printf
                "😢 You have no tracked accounts!\n\
-                You can make a new one using `coda accounts create`\n"
+                You can make a new one using `mina accounts create`\n"
          | accounts ->
              Array.iteri accounts ~f:(fun i w ->
                  printf
@@ -1331,7 +1482,8 @@ let create_hd_account =
 let unlock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"PUBLICKEY Public key to be unlocked"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key to be unlocked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
@@ -1365,7 +1517,8 @@ let unlock_account =
 let lock_account =
   let open Command.Param in
   let pk_flag =
-    flag "public-key" ~doc:"PUBLICKEY Public key of account to be locked"
+    flag "--public-key" ~aliases:["public-key"]
+      ~doc:"PUBLICKEY Public key of account to be locked"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
@@ -1417,7 +1570,7 @@ let generate_libp2p_keypair =
 
 let trustlist_ip_flag =
   Command.Param.(
-    flag "ip-address"
+    flag "--ip-address" ~aliases:["ip-address"]
       ~doc:"CIDR An IPv4 CIDR mask for the client trustlist (eg, 10.0.0.0/8)"
       (required Cli_lib.Arg_type.cidr_mask))
 
@@ -1490,6 +1643,14 @@ let get_peers_graphql =
 
 let add_peers_graphql =
   let open Command in
+  let seed =
+    Param.(
+      flag "--seed" ~aliases:["-seed"]
+        ~doc:
+          "true/false Whether to add these peers as 'seed' peers, which may \
+           perform peer exchange. Default: true"
+        (optional bool))
+  in
   let peers =
     Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
   in
@@ -1497,8 +1658,8 @@ let add_peers_graphql =
     ~summary:
       "Add peers to the daemon\n\n\
        Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
-    (Cli_lib.Background_daemon.graphql_init peers
-       ~f:(fun graphql_endpoint input_peers ->
+    (Cli_lib.Background_daemon.graphql_init (Param.both peers seed)
+       ~f:(fun graphql_endpoint (input_peers, seed) ->
          let open Deferred.Let_syntax in
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
@@ -1522,9 +1683,10 @@ let add_peers_graphql =
                      peer ;
                    Core.exit 1 )
          in
+         let seed = Option.value ~default:true seed in
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Add_peers.make ~peers ())
+             (Graphql_queries.Add_peers.make ~peers ~seed ())
              graphql_endpoint
          in
          printf "Requested to add peers:\n" ;
@@ -1606,31 +1768,32 @@ let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
-    flag "daemon-peers" no_arg
+    flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
       ~doc:"Get telemetry data for peers known to the daemon"
   in
-  let peer_ids_flag =
-    flag "peer-ids"
+  let peers_flag =
+    flag "--peers" ~aliases:["peers"]
       (optional (Arg_type.comma_separated string))
-      ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
+      ~doc:"CSV-LIST Peer multiaddrs for obtaining telemetry data"
   in
   let show_errors_flag =
-    flag "show-errors" no_arg ~doc:"Include error responses in output"
+    flag "--show-errors" ~aliases:["show-errors"] no_arg
+      ~doc:"Include error responses in output"
   in
-  let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
+  let flags = Args.zip3 daemon_peers_flag peers_flag show_errors_flag in
   Command.async ~summary:"Get telemetry data for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
+       ~f:(fun port (daemon_peers, peers, show_errors) ->
          if
-           (Option.is_none peer_ids && not daemon_peers)
-           || (Option.is_some peer_ids && daemon_peers)
+           (Option.is_none peers && not daemon_peers)
+           || (Option.is_some peers && daemon_peers)
          then (
            eprintf
              "Must provide exactly one of daemon-peers or peer-ids flags\n%!" ;
            don't_wait_for (exit 33) ) ;
          let peer_ids_opt =
-           Option.map peer_ids ~f:(fun peer_ids ->
-               List.map peer_ids ~f:Network_peer.Peer.Id.unsafe_of_string )
+           Option.map peers ~f:(fun peers ->
+               List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
          match%map
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc
@@ -1688,25 +1851,25 @@ let archive_blocks =
       Command.Param.anon
         Command.Anons.(sequence ("FILES" %: Command.Param.string))
     and success_file =
-      Command.Param.flag "successful-files"
+      Command.Param.flag "--successful-files" ~aliases:["successful-files"]
         ~doc:"PATH Appends the list of files that were processed successfully"
         (Command.Flag.optional Command.Param.string)
     and failure_file =
-      Command.Param.flag "failed-files"
+      Command.Param.flag "--failed-files" ~aliases:["failed-files"]
         ~doc:"PATH Appends the list of files that failed to be processed"
         (Command.Flag.optional Command.Param.string)
     and log_successes =
-      Command.Param.flag "log-successful"
+      Command.Param.flag "--log-successful" ~aliases:["log-successful"]
         ~doc:
           "true/false Whether to log messages for files that were processed \
            successfully"
         (Command.Flag.optional_with_default true Command.Param.bool)
     and archive_process_location = Cli_lib.Flag.Host_and_port.Daemon.archive
     and precomputed_flag =
-      Command.Param.flag "precomputed" no_arg
+      Command.Param.flag "--precomputed" ~aliases:["precomputed"] no_arg
         ~doc:"Blocks are in precomputed JSON format"
     and extensional_flag =
-      Command.Param.flag "extensional" no_arg
+      Command.Param.flag "--extensional" ~aliases:["extensional"] no_arg
         ~doc:"Blocks are in extensional JSON format"
     in
     ( files
@@ -1844,6 +2007,35 @@ let archive_blocks =
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ))
 
+let receipt_chain_hash =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:
+      "Compute the next receipt chain hash from the previous hash and \
+       transaction ID"
+    (let%map_open previous_hash =
+       flag "--previous-hash"
+         ~doc:"Previous receipt chain hash, base58check encoded"
+         (required string)
+     and transaction_id =
+       flag "--transaction-id" ~doc:"Transaction ID, base58check encoded"
+         (required string)
+     in
+     fun () ->
+       let previous_hash =
+         Receipt.Chain_hash.of_base58_check_exn previous_hash
+       in
+       (* What we call transation IDs in GraphQL are just base58_check-encoded
+         transactions. It's easy to handle, and we return it from the
+         transaction commands above, so lets use this format.
+      *)
+       let transaction = Signed_command.of_base58_check_exn transaction_id in
+       let hash =
+         Receipt.Chain_hash.cons (Signed_command transaction.payload)
+           previous_hash
+       in
+       printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1936,8 +2128,6 @@ let advanced =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
-    ; ("dump-ledger", dump_ledger)
-    ; ("dump-staking-ledger", dump_staking_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
@@ -1952,9 +2142,17 @@ let advanced =
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
+    ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-blocks", archive_blocks) ]
+    ; ("archive-blocks", archive_blocks)
+    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
+
+let ledger =
+  Command.group ~summary:"Ledger commands"
+    [ ("export", export_ledger)
+    ; ("hash", hash_ledger)
+    ; ("currency", currency_in_ledger) ]

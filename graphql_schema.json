@@ -3003,6 +3003,16 @@
               "description": "Connect to the given peers",
               "args": [
                 {
+                  "name": "seed",
+                  "description": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "peers",
                   "description": null,
                   "type": {
@@ -5545,7 +5555,20 @@
           "kind": "OBJECT",
           "name": "protocolStateProof",
           "description": null,
-          "fields": [],
+          "fields": [
+            {
+              "name": "base64",
+              "description": "Base-64 encoded proof",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "inputFields": null,
           "interfaces": [],
           "enumValues": null,
@@ -6583,6 +6606,77 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "AccountTiming",
+          "description": null,
+          "fields": [
+            {
+              "name": "initial_mininum_balance",
+              "description": "The initial minimum balance for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_time",
+              "description": "The cliff time for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_amount",
+              "description": "The cliff amount for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_period",
+              "description": "The vesting period for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_increment",
+              "description": "The vesting increment for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "TokenId",
           "description": "String representation of a token's UInt64 identifier",
@@ -6633,6 +6727,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "timing",
+              "description": "The timing associated with this account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountTiming",
                   "ofType": null
                 }
               },
@@ -7065,12 +7175,55 @@
         },
         {
           "kind": "OBJECT",
+          "name": "ConsensusTimeGlobalSlot",
+          "description": "Consensus time and the corresponding global slot since genesis",
+          "fields": [
+            {
+              "name": "consensusTime",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ConsensusTime",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlotSinceGenesis",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "BlockProducerTimings",
           "description": null,
           "fields": [
             {
               "name": "times",
-              "description": null,
+              "description": "Next block production time",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7087,6 +7240,46 @@
                       "ofType": null
                     }
                   }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlotSinceGenesis",
+              "description": "Next block production global-slot-since-genesis ",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "generatedFromConsensusAt",
+              "description": "Consensus time of the block that was used to determine the next block production time",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ConsensusTimeGlobalSlot",
+                  "ofType": null
                 }
               },
               "isDeprecated": false,

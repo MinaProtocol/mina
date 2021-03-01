@@ -116,17 +116,25 @@ end
 module Block = struct
   open Deferred.Result.Let_syntax
 
-  let newest_block ~rosetta_uri ~network_response ~logger =
+  let request_block ~block_identifier ~rosetta_uri ~network_response ~logger =
     let%map res =
       post ~rosetta_uri ~logger
         ~body:
           Block_request.(
-            create (net_id network_response)
-              (Partial_block_identifier.create ())
-            |> to_yojson)
+            create (net_id network_response) block_identifier |> to_yojson)
         ~path:"block/"
     in
     Lift.res ~logger res ~of_yojson:Block_response.of_yojson
+
+  let newest_block ~rosetta_uri ~network_response ~logger =
+    request_block
+      ~block_identifier:(Partial_block_identifier.create ())
+      ~rosetta_uri ~network_response ~logger
+
+  let block_at_index ~index ~rosetta_uri ~network_response ~logger =
+    request_block
+      ~block_identifier:{index= Some index; hash= None}
+      ~rosetta_uri ~network_response ~logger
 end
 
 module Construction = struct
@@ -158,4 +166,34 @@ module Construction = struct
     in
     Lift.res ~logger res ~of_yojson:Construction_submit_response.of_yojson
     |> Lift.successfully
+end
+
+module Account_balance = struct
+  open Deferred.Result.Let_syntax
+
+  let request_balance ~account_identifier ~block_identifier ~rosetta_uri
+      ~network_response ~logger =
+    let request : Account_balance_request.t =
+      { network_identifier= net_id network_response
+      ; account_identifier
+      ; block_identifier
+      ; currencies= [] }
+    in
+    let%map res =
+      post ~rosetta_uri ~logger
+        ~body:(request |> Account_balance_request.to_yojson)
+        ~path:"account/balance"
+    in
+    Lift.res ~logger res ~of_yojson:Account_balance_response.of_yojson
+
+  let current_balance ~account_identifier ~rosetta_uri ~network_response
+      ~logger =
+    request_balance ~account_identifier ~block_identifier:None ~rosetta_uri
+      ~network_response ~logger
+
+  let balance_at_index ~account_identifier ~(index : int64) ~rosetta_uri
+      ~network_response ~logger =
+    request_balance ~account_identifier
+      ~block_identifier:(Some {index= Some index; hash= None})
+      ~rosetta_uri ~network_response ~logger
 end
