@@ -154,7 +154,7 @@ module For_step = struct
             Side_loaded_verification_key.Domains.t
           , 'num_rules )
           Vector.t ]
-    ; max_width: Side_loaded_verification_key.Width.Checked.t option }
+    ; num_parents: Side_loaded_verification_key.Num_parents.Checked.t option }
 
   let of_side_loaded (type a b c d)
       ({ ephemeral
@@ -180,14 +180,14 @@ module For_step = struct
     ; max_num_parents
     ; rules_num_parents=
         Vector.map index.rules_num_parents
-          ~f:Side_loaded_verification_key.Width.Checked.to_field
+          ~f:Side_loaded_verification_key.Num_parents.Checked.to_field
     ; typ
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key= index.wrap_index
     ; wrap_domains= Common.wrap_domains
     ; step_domains= `Side_loaded index.step_domains
-    ; max_width= Some index.max_width }
+    ; num_parents= Some index.num_parents }
 
   let of_compiled
       ({ num_rules
@@ -201,7 +201,7 @@ module For_step = struct
        ; step_domains } :
         _ Compiled.t) =
     { num_rules
-    ; max_width= None
+    ; num_parents= None
     ; max_num_parents
     ; rules_num_parents=
         Vector.map rules_num_parents ~f:Impls.Step.Field.of_int

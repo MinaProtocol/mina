@@ -167,7 +167,7 @@ let wrap_main
     Requests.Wrap.((create () : (max_num_parents, max_local_max_branchings) t))
   in
   Timer.clock __LOC__ ;
-  let {Full_signature.padded; maxes= (module Max_widths_by_slot)} =
+  let {Full_signature.padded; maxes= (module Max_num_parents_by_slot)} =
     full_signature
   in
   Timer.clock __LOC__ ;
@@ -230,7 +230,7 @@ let wrap_main
                     Vector.typ (Vector.typ Field.typ Backend.Tock.Rounds.n) n
                 end)
             in
-            T.f Max_widths_by_slot.maxes
+            T.f Max_num_parents_by_slot.maxes
           in
           let module Z = H1.Zip (Nat) (Challenges_vector) in
           let module M =
@@ -244,10 +244,10 @@ let wrap_main
                  end)
           in
           let module V = H1.To_vector (Old_bulletproof_chals) in
-          Z.f Max_widths_by_slot.maxes
+          Z.f Max_num_parents_by_slot.maxes
             (exists typ ~request:(fun () -> Req.Old_bulletproof_challenges))
           |> M.f
-          |> V.f Max_widths_by_slot.length )
+          |> V.f Max_num_parents_by_slot.length )
     in
     let domainses =
       with_label __LOC__ (fun () ->
@@ -410,8 +410,8 @@ let wrap_main
       with_label __LOC__ (fun () ->
           incrementally_verify_proof
             (module Max_num_parents)
-            ~rules_num_parents ~step_domains ~verification_key:pairing_plonk_index
-            ~xi ~sponge
+            ~rules_num_parents ~step_domains
+            ~verification_key:pairing_plonk_index ~xi ~sponge
             ~public_input:(pack_statement Max_num_parents.n prev_statement)
             ~sg_old:prev_step_accs ~combined_inner_product ~advice:{b}
             ~messages ~which_rule ~openings_proof

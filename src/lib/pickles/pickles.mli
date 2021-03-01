@@ -62,7 +62,7 @@ module type Proof_intf = sig
 end
 
 module Proof : sig
-  type ('max_width, 'mlmb) t
+  type ('max_num_parents, 'mlmb) t
 
   val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
 
@@ -81,7 +81,8 @@ module Proof : sig
 end
 
 module Statement_with_proof : sig
-  type ('s, 'max_width, _) t = 's * ('max_width, 'max_width) Proof.t
+  type ('s, 'max_num_parents, _) t =
+    's * ('max_num_parents, 'max_num_parents) Proof.t
 end
 
 val verify :
@@ -142,16 +143,19 @@ module Side_loaded : sig
 
     module Max_num_rules : Nat.Add.Intf
 
-    module Max_width : Nat.Add.Intf
+    module Max_num_parents : Nat.Add.Intf
   end
 
   module Proof : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        (* TODO: This should really be able to be any width up to the max width... *)
+        (* TODO: This should really be able to be any number up to the max
+           number of parents... *)
         type t =
-          (Verification_key.Max_width.n, Verification_key.Max_width.n) Proof.t
+          ( Verification_key.Max_num_parents.n
+          , Verification_key.Max_num_parents.n )
+          Proof.t
         [@@deriving sexp, equal, yojson, hash, compare]
       end
     end]
@@ -198,7 +202,7 @@ val compile :
   -> rules:(   self:('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
             -> ( 'prev_varss
                , 'prev_valuess
-               , 'widthss
+               , 'num_parentss
                , 'heightss
                , 'a_var
                , 'a_value )
@@ -209,7 +213,7 @@ val compile :
           with type t = ('max_num_parents, 'max_num_parents) Proof.t
            and type statement = 'a_value)
      * ( 'prev_valuess
-       , 'widthss
+       , 'num_parentss
        , 'heightss
        , 'a_value
        , ('max_num_parents, 'max_num_parents) Proof.t Async.Deferred.t )

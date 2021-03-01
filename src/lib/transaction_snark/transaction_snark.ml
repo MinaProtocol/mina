@@ -1034,7 +1034,8 @@ module Base = struct
   let side_loaded i =
     let open Snapp_statement in
     Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
-      ~max_num_parents:(module Pickles.Side_loaded.Verification_key.Max_width)
+      ~max_num_parents:
+        (module Pickles.Side_loaded.Verification_key.Max_num_parents)
       ~value_to_field_elements:to_field_elements
       ~var_to_field_elements:Checked.to_field_elements
 

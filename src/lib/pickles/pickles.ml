@@ -155,9 +155,9 @@ module Proof_ = P.Base
 module Proof = P
 
 module Statement_with_proof = struct
-  type ('s, 'max_width, _) t =
-    (* TODO: use Max local max branching instead of max_width *)
-    's * ('max_width, 'max_width) Proof.t
+  type ('s, 'max_num_parents, _) t =
+    (* TODO: use Max local max branching instead of max_num_parents *)
+    's * ('max_num_parents, 'max_num_parents) Proof.t
 end
 
 let pad_pass_throughs
@@ -265,7 +265,7 @@ module Proof_system = struct
        , 'max_num_parents
        , 'num_rules
        , 'prev_valuess
-       , 'widthss
+       , 'num_parentss
        , 'heightss )
        t =
     | T :
@@ -273,7 +273,7 @@ module Proof_system = struct
         * (module Proof_intf with type t = 'proof
                               and type statement = 'a_value)
         * ( 'prev_valuess
-          , 'widthss
+          , 'num_parentss
           , 'heightss
           , 'a_value
           , 'proof )
@@ -283,7 +283,7 @@ module Proof_system = struct
            , 'max_num_parents
            , 'num_rules
            , 'prev_valuess
-           , 'widthss
+           , 'num_parentss
            , 'heightss )
            t
 end
@@ -393,7 +393,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       log
 
   let compile
-      : type prev_varss prev_valuess widthss heightss max_num_parents num_rules.
+      : type prev_varss prev_valuess num_parentss heightss max_num_parents num_rules.
          self:(A.t, A_value.t, max_num_parents, num_rules) Tag.t
       -> cache:Key_cache.Spec.t list
       -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
@@ -404,9 +404,13 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
       -> typ:(A.t, A_value.t) Impls.Step.Typ.t
       -> rules:(   self:(A.t, A_value.t, max_num_parents, num_rules) Tag.t
-                -> (prev_varss, prev_valuess, widthss, heightss) H4.T(IR).t)
+                -> ( prev_varss
+                   , prev_valuess
+                   , num_parentss
+                   , heightss )
+                   H4.T(IR).t)
       -> ( prev_valuess
-         , widthss
+         , num_parentss
          , heightss
          , A_value.t
          , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )
@@ -626,8 +630,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         M.f rules
       in
       Timer.clock __LOC__ ;
-      Wrap_main.wrap_main full_signature prev_varss_length step_vks rules_num_parents
-        step_domains prev_wrap_domains
+      Wrap_main.wrap_main full_signature prev_varss_length step_vks
+        rules_num_parents step_domains prev_wrap_domains
         (module Max_num_parents)
     in
     Timer.clock __LOC__ ;
@@ -766,7 +770,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
       { num_rules= Num_rules.n
-      ; rules_num_parents= rules_num_parents
+      ; rules_num_parents
       ; max_num_parents= (module Max_num_parents)
       ; typ
       ; value_to_field_elements= A_value.to_field_elements
@@ -793,14 +797,16 @@ module Side_loaded = struct
       ; wrap_index=
           Lazy.force d.wrap_key
           |> Plonk_verification_key_evals.map ~f:Array.to_list
-      ; max_width= Width.of_int_exn (Nat.to_int (Nat.Add.n d.max_num_parents))
+      ; num_parents=
+          Num_parents.of_int_exn (Nat.to_int (Nat.Add.n d.max_num_parents))
       ; step_data=
           At_most.of_vector
-            (Vector.map2 d.rules_num_parents d.step_domains ~f:(fun width ds ->
-                 ({Domains.h= ds.h}, Width.of_int_exn width) ))
+            (Vector.map2 d.rules_num_parents d.step_domains
+               ~f:(fun num_parents ds ->
+                 ({Domains.h= ds.h}, Num_parents.of_int_exn num_parents) ))
             (Nat.lte_exn (Vector.length d.step_domains) Max_num_rules.n) }
 
-    module Max_width = Width.Max
+    module Max_num_parents = Num_parents.Max
   end
 
   let in_circuit tag vk = Types_map.set_ephemeral tag {index= `In_circuit vk}
@@ -829,11 +835,11 @@ module Side_loaded = struct
       : Intf.Statement_value
         with type t = t )
     in
-    (* TODO: This should be the actual max width on a per proof basis *)
+    (* TODO: This should be the actual max number of parents on a per proof basis *)
     let max_num_parents =
-      (module Verification_key.Max_width
+      (module Verification_key.Max_num_parents
       : Nat.Intf
-        with type n = Verification_key.Max_width.n )
+        with type n = Verification_key.Max_num_parents.n )
     in
     with_return (fun {return} ->
         List.map ts ~f:(fun (vk, x, p) ->
@@ -846,7 +852,7 @@ module Side_loaded = struct
                       let input_size =
                         Side_loaded_verification_key.(
                           input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-                            (Width.to_int vk.max_width))
+                            (Num_parents.to_int vk.num_parents))
                       in
                       { Domains.x=
                           Pow_2_roots_of_unity (Int.ceil_log2 input_size)
@@ -862,7 +868,7 @@ module Side_loaded = struct
 end
 
 let compile
-    : type a_var a_value prev_varss prev_valuess widthss heightss max_num_parents num_rules.
+    : type a_var a_value prev_varss prev_valuess num_parentss heightss max_num_parents num_rules.
        ?self:(a_var, a_value, max_num_parents, num_rules) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
@@ -877,7 +883,7 @@ let compile
     -> rules:(   self:(a_var, a_value, max_num_parents, num_rules) Tag.t
               -> ( prev_varss
                  , prev_valuess
-                 , widthss
+                 , num_parentss
                  , heightss
                  , a_var
                  , a_value )
@@ -888,7 +894,7 @@ let compile
             with type t = (max_num_parents, max_num_parents) Proof.t
              and type statement = a_value)
        * ( prev_valuess
-         , widthss
+         , num_parentss
          , heightss
          , a_value
          , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )

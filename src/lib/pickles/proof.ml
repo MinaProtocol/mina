@@ -97,11 +97,11 @@ type ('s, 'mlmb, _) with_data =
   | T :
       ( 'mlmb Base.Me_only.Dlog_based.t
       , ( 's
-        , (Tock.Curve.Affine.t, 'most_recent_width) Vector.t
+        , (Tock.Curve.Affine.t, 'most_recent_num_parents) Vector.t
         , ( Challenge.Constant.t Scalar_challenge.Stable.Latest.t
             Bulletproof_challenge.t
             Step_bp_vec.t
-          , 'most_recent_width )
+          , 'most_recent_num_parents )
           Vector.t )
         Base.Me_only.Pairing_based.t )
       Base.Dlog_based.t
@@ -111,10 +111,10 @@ module With_data = struct
   type ('s, 'mlmb, 'w) t = ('s, 'mlmb, 'w) with_data
 end
 
-type ('max_width, 'mlmb) t = (unit, 'mlmb, 'max_width) With_data.t
+type ('max_num_parents, 'mlmb) t = (unit, 'mlmb, 'max_num_parents) With_data.t
 
 let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
-    (most_recent_width : r Nat.t) : (w, h) t =
+    (most_recent_num_parents : r Nat.t) : (w, h) t =
   let open Ro in
   let g0 = Tock.Curve.(to_affine_exn one) in
   let g len = Array.create ~len g0 in
@@ -147,11 +147,11 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
             { app_state= ()
             ; old_bulletproof_challenges=
                 (* Not sure if this should be w or h honestly ...*)
-                Vector.init most_recent_width ~f:(fun _ ->
+                Vector.init most_recent_num_parents ~f:(fun _ ->
                     Dummy.Ipa.Step.challenges )
                 (* TODO: Should this be wrap? *)
             ; sg=
-                Vector.init most_recent_width ~f:(fun _ ->
+                Vector.init most_recent_num_parents ~f:(fun _ ->
                     Lazy.force Dummy.Ipa.Wrap.sg ) } }
     ; proof=
         { messages=
@@ -321,8 +321,8 @@ end
 module Branching_max = struct
   module T =
     Make
-      (Side_loaded_verification_key.Width.Max)
-      (Side_loaded_verification_key.Width.Max)
+      (Side_loaded_verification_key.Num_parents.Max)
+      (Side_loaded_verification_key.Num_parents.Max)
 
   module Repr = struct
     [%%versioned
@@ -333,17 +333,19 @@ module Branching_max = struct
         type t =
           ( ( Tock.Inner_curve.Affine.Stable.V1.t
             , Reduced_me_only.Dlog_based.Challenges_vector.Stable.V1.t
-              Side_loaded_verification_key.Width.Max_vector.Stable.V1.t )
+              Side_loaded_verification_key.Num_parents.Max_vector.Stable.V1.t
+            )
             Dlog_based.Proof_state.Me_only.Stable.V1.t
           , ( unit
             , Tock.Curve.Affine.t
-              Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t
+              Side_loaded_verification_key.Num_parents.Max_at_most.Stable.V1.t
             , Limb_vector.Constant.Hex64.Stable.V1.t
               Vector.Vector_2.Stable.V1.t
               Scalar_challenge.Stable.V1.t
               Bulletproof_challenge.Stable.V1.t
               Step_bp_vec.Stable.V1.t
-              Side_loaded_verification_key.Width.Max_at_most.Stable.V1.t )
+              Side_loaded_verification_key.Num_parents.Max_at_most.Stable.V1.t
+            )
             Base.Me_only.Pairing_based.Stable.V1.t )
           Base.Dlog_based.Stable.V1.t
         [@@deriving compare, sexp, yojson, hash, equal]

@@ -159,7 +159,7 @@ let step_main
             ; rules_num_parents=
                 Vector.map basic.rules_num_parents ~f:Field.of_int
             ; max_num_parents= (module Max_num_parents)
-            ; max_width= None
+            ; num_parents= None
             ; typ= basic.typ
             ; var_to_field_elements= basic.var_to_field_elements
             ; value_to_field_elements= basic.value_to_field_elements
@@ -266,7 +266,7 @@ let step_main
                             |> S.Bit_sponge.make
                           in
                           finalize_other_proof d.max_num_parents
-                            ~max_width:d.max_width
+                            ~num_parents:d.num_parents
                             ~rules_num_parents:d.rules_num_parents
                             ~step_domains:d.step_domains ~sponge
                             ~old_bulletproof_challenges state.deferred_values
@@ -295,8 +295,8 @@ let step_main
                                 (hash_me_only_opt ~index:d.wrap_key
                                    d.var_to_field_elements)
                             in
-                            hash ~widths:d.rules_num_parents
-                              ~max_width:(Nat.Add.n d.max_num_parents)
+                            hash ~num_parents:d.rules_num_parents
+                              ~max_num_parents:(Nat.Add.n d.max_num_parents)
                               ~which_rule
                               (* Use opt sponge for cutting off the bulletproof challenges early *)
                               { app_state

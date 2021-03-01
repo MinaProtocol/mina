@@ -71,7 +71,7 @@ let to_input = Pickles_base.Side_loaded_verification_key.to_input
 let dummy : t =
   let open Pickles_types in
   { step_data= At_most.[]
-  ; max_width= Pickles_base.Side_loaded_verification_key.Width.zero
+  ; max_width= Pickles_base.Side_loaded_verification_key.Num_parents.zero
   ; wrap_index=
       (let g = [Snarkette.Pasta.Pallas.(to_affine_exn one)] in
        { sigma_comm_0= g

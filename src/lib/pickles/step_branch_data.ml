@@ -62,7 +62,7 @@ let create
     value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
-  let (T (self_width, branching)) = HT.length rule.prevs in
+  let (T (self_num_parents, branching)) = HT.length rule.prevs in
   let rec extract_lengths : type a b n m k.
          (a, b, n, m) HT.t
       -> (a, k) Length.t
@@ -90,10 +90,11 @@ let create
             (M.n :: ns, num_rules :: ms, S len_ns, S len_ms) )
   in
   Timer.clock __LOC__ ;
-  let widths, heights, local_signature_length, local_branches_length =
+  let prevs_num_parents, heights, local_signature_length, local_branches_length
+      =
     extract_lengths rule.prevs branching
   in
-  let lte = Nat.lte_exn self_width max_num_parents in
+  let lte = Nat.lte_exn self_num_parents max_num_parents in
   let requests = Requests.Step.create () in
   Timer.clock __LOC__ ;
   let step ~step_domains =
@@ -107,7 +108,7 @@ let create
         ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
-      ~self_num_rules:num_rules ~branching ~local_signature:widths
+      ~self_num_rules:num_rules ~branching ~local_signature:prevs_num_parents
       ~local_signature_length ~local_branches:heights ~local_branches_length
       ~lte ~self
     |> unstage
@@ -127,7 +128,7 @@ let create
   in
   Timer.clock __LOC__ ;
   T
-    { branching= (self_width, branching)
+    { branching= (self_num_parents, branching)
     ; index
     ; lte
     ; rule

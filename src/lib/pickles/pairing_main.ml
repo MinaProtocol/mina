@@ -493,17 +493,17 @@ struct
   let side_loaded_input_domain =
     let open Side_loaded_verification_key in
     let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
-    let max_width = Width.Max.n in
+    let max_num_parents = Num_parents.Max.n in
     let domain_log2s =
-      Vector.init (S max_width) ~f:(fun w -> Int.ceil_log2 (input_size w))
+      Vector.init (S max_num_parents) ~f:(fun w -> Int.ceil_log2 (input_size w))
     in
     let (T max_log2_size) =
-      let n = Int.ceil_log2 (input_size (Nat.to_int max_width)) in
+      let n = Int.ceil_log2 (input_size (Nat.to_int max_num_parents)) in
       assert (List.last_exn (Vector.to_list domain_log2s) = n) ;
       Nat.of_int n
     in
-    fun ~width ->
-      let mask = O.of_index width ~length:(S max_width) in
+    fun ~num_parents ->
+      let mask = O.of_index num_parents ~length:(S max_num_parents) in
       let shifts = lazy (Pseudo.Domain.shifts (mask, domain_log2s) ~shifts) in
       let generator =
         lazy (Pseudo.Domain.generator (mask, domain_log2s) ~domain_generator)
@@ -581,7 +581,8 @@ struct
         let open Side_loaded_verification_key in
         let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
         let possibilities =
-          Vector.init (S Width.Max.n) ~f:(fun w -> Int.ceil_log2 (input_size w))
+          Vector.init (S Num_parents.Max.n) ~f:(fun w ->
+              Int.ceil_log2 (input_size w) )
         in
         let pt = Field.Constant.random () in
         List.iteri (Vector.to_list possibilities) ~f:(fun i d ->
@@ -592,7 +593,7 @@ struct
                 ~domain_generator:Backend.Tick.Field.domain_generator
             in
             let checked_domain () =
-              side_loaded_input_domain ~width:(Field.of_int i)
+              side_loaded_input_domain ~num_parents:(Field.of_int i)
             in
             [%test_eq: Field.Constant.t]
               (d_unchecked#vanishing_polynomial pt)
@@ -799,7 +800,7 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
    Meaning it needs opt sponge. *)
   let finalize_other_proof (type b num_rules)
-      (module Branching : Nat.Add.Intf with type n = b) ~max_width
+      (module Branching : Nat.Add.Intf with type n = b) ~num_parents
       ~(step_domains :
          [ `Known of (Domains.t, num_rules) Vector.t
          | `Side_loaded of
@@ -833,13 +834,15 @@ struct
                   (which_rule, Vector.map domains ~f:Domains.x) )
           | `Side_loaded ds ->
               ( `Side_loaded (side_loaded_domains ds which_rule)
-              , (* This has to be the max_width of this proof system rather than actual width *)
+              , (* This has to be the num_parents of this proof system rather than actual num_parents *)
                 side_loaded_input_domain
-                  ~width:
-                    (Side_loaded_verification_key.Width.Checked.to_field
-                       (Option.value_exn max_width)) ) )
+                  ~num_parents:
+                    (Side_loaded_verification_key.Num_parents.Checked.to_field
+                       (Option.value_exn num_parents)) ) )
     in
-    let actual_width = Pseudo.choose (which_rule, rules_num_parents) ~f:Fn.id in
+    let actual_num_parents =
+      Pseudo.choose (which_rule, rules_num_parents) ~f:Fn.id
+    in
     let (evals1, x_hat1), (evals2, x_hat2) =
       with_label __LOC__ (fun () ->
           let lengths =
@@ -931,7 +934,9 @@ struct
           in
           let sg_evals =
             Vector.map2
-              (ones_vector (module Impl) ~first_zero:actual_width Branching.n)
+              (ones_vector
+                 (module Impl)
+                 ~first_zero:actual_num_parents Branching.n)
               sg_olds
               ~f:(fun keep f -> [|(keep, f pt)|])
           in
@@ -1024,12 +1029,12 @@ struct
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
-    stage (fun t ~widths ~max_width ~which_rule ->
+    stage (fun t ~num_parents ~max_num_parents ~which_rule ->
         let mask =
           ones_vector
             (module Impl)
-            max_width
-            ~first_zero:(Pseudo.choose ~f:Fn.id (which_rule, widths))
+            max_num_parents
+            ~first_zero:(Pseudo.choose ~f:Fn.id (which_rule, num_parents))
         in
         let sponge = Sponge.copy after_index in
         let t =
