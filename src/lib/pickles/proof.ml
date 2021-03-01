@@ -179,26 +179,27 @@ let dummy (type w h r) (_w : w Nat.t) (h : h Nat.t)
          (e (), e ()))
     ; prev_x_hat= (tick (), tick ()) }
 
-module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
-  module Max_branching_at_most = At_most.With_length (W)
-  module MLMB_vec = Nvector (MLMB)
+module Make (W : Nat.Intf) (Prev_max_num_parents : Nat.Intf) = struct
+  module Max_num_rules_at_most = At_most.With_length (W)
+  module Prev_max_num_parents_vec = Nvector (Prev_max_num_parents)
 
   module Repr = struct
     type t =
       ( ( Tock.Inner_curve.Affine.t
-        , Reduced_me_only.Dlog_based.Challenges_vector.t MLMB_vec.t )
+        , Reduced_me_only.Dlog_based.Challenges_vector.t
+          Prev_max_num_parents_vec.t )
         Dlog_based.Proof_state.Me_only.t
       , ( unit
-        , Tock.Curve.Affine.t Max_branching_at_most.t
+        , Tock.Curve.Affine.t Max_num_rules_at_most.t
         , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
           Step_bp_vec.t
-          Max_branching_at_most.t )
+          Max_num_rules_at_most.t )
         Base.Me_only.Pairing_based.t )
       Base.Dlog_based.t
     [@@deriving compare, sexp, yojson, hash, equal]
   end
 
-  type nonrec t = (W.n, MLMB.n) t
+  type nonrec t = (W.n, Prev_max_num_parents.n) t
 
   let to_repr (T t) : Repr.t =
     let lte = Nat.lte_exn (Vector.length t.statement.pass_through.sg) W.n in

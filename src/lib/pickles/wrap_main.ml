@@ -101,8 +101,7 @@ let pad_domains (type prev_varss prev_valuess num_rules n)
 module Old_bulletproof_chals = struct
   type t =
     | T :
-        'max_local_max_branching Nat.t
-        * 'max_local_max_branching Challenges_vector.t
+        'prev_max_num_parents Nat.t * 'prev_max_num_parents Challenges_vector.t
         -> t
 end
 
@@ -131,9 +130,9 @@ let domain_generator ~log2_size =
 (* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_num_parents num_rules prev_varss prev_valuess env
-    max_local_max_branchings)
+    prev_max_num_parentss)
     (full_signature :
-      (max_num_parents, num_rules, max_local_max_branchings) Full_signature.t)
+      (max_num_parents, num_rules, prev_max_num_parentss) Full_signature.t)
     (pi_num_rules : (prev_varss, num_rules) Hlist.Length.t)
     (step_keys :
       (Wrap_main_inputs.Inner_curve.Constant.t index, num_rules) Vector.t
@@ -142,7 +141,7 @@ let wrap_main
     (prev_wrap_domains :
       (prev_varss, prev_valuess, _, _) H4.T(H4.T(E04(Domains))).t)
     (module Max_num_parents : Nat.Add.Intf with type n = max_num_parents) :
-    (max_num_parents, max_local_max_branchings) Requests.Wrap.t
+    (max_num_parents, prev_max_num_parentss) Requests.Wrap.t
     * (   ( _
           , _
           , _ Shifted_value.t
@@ -164,10 +163,11 @@ let wrap_main
   let num_rules = Hlist.Length.to_nat pi_num_rules in
   Timer.clock __LOC__ ;
   let (module Req) =
-    Requests.Wrap.((create () : (max_num_parents, max_local_max_branchings) t))
+    Requests.Wrap.((create () : (max_num_parents, prev_max_num_parentss) t))
   in
   Timer.clock __LOC__ ;
-  let {Full_signature.padded; maxes= (module Max_num_parents_by_slot)} =
+  let { Full_signature.prev_num_parentss_per_slot
+      ; maxes= (module Max_num_parents_by_slot) } =
     full_signature
   in
   Timer.clock __LOC__ ;
@@ -291,18 +291,18 @@ let wrap_main
                           Common.max_quot_size_int (Domain.size d.h) ) ) ) )
               |> Vector.unzip
             in
-            let actual_branchings =
-              padded
-              |> Vector.map ~f:(fun branchings_in_slot ->
+            let prev_num_parentss =
+              prev_num_parentss_per_slot
+              |> Vector.map ~f:(fun num_parents_in_slot ->
                      Pseudo.choose
-                       (which_rule, branchings_in_slot)
+                       (which_rule, num_parents_in_slot)
                        ~f:Field.of_int )
             in
             Vector.mapn
               [ (* This is padded to max_num_parents for the benefit of wrapping with dummy unfinalized proofs *)
                 prev_proof_state.unfinalized_proofs
               ; old_bp_chals
-              ; actual_branchings
+              ; prev_num_parentss
               ; evals
               ; eval_lengths
               ; wrap_domains
@@ -311,7 +311,7 @@ let wrap_main
                         ; sponge_digest_before_evaluations
                         ; should_finalize }
                       ; old_bulletproof_challenges
-                      ; actual_branching
+                      ; actual_num_parents
                       ; evals
                       ; eval_lengths
                       ; domain
@@ -322,22 +322,23 @@ let wrap_main
                   Sponge.absorb s sponge_digest_before_evaluations ;
                   s
                 in
-                (* the type of the local max branching depends on
+                (* the type of the local max num rules depends on
                which kind of step proof we are wrapping. *)
                 (* For each i in [0..max_num_parents-1], we have 
-               Max_local_max_branching, which is the largest
-               Local_max_branching which is the i^th inner proof of a step proof.
+               Prev_max_num_parents, which is the largest
+               prev_num_parents_per_slot which is the i^th inner proof of a
+               step proof.
             
                Need to compute this value from the which_rule.
             *)
-                let (T (max_local_max_branching, old_bulletproof_challenges)) =
+                let (T (prev_max_num_parents, old_bulletproof_challenges)) =
                   old_bulletproof_challenges
                 in
                 let finalized, chals =
                   with_label __LOC__ (fun () ->
                       finalize_other_proof
-                        (Nat.Add.create max_local_max_branching)
-                        ~max_quot_size ~actual_branching
+                        (Nat.Add.create prev_max_num_parents)
+                        ~max_quot_size ~actual_num_parents
                         ~domain:(domain :> _ Plonk_checks.plonk_domain)
                         ~sponge deferred_values ~old_bulletproof_challenges
                         evals )
@@ -350,11 +351,11 @@ let wrap_main
     let prev_statement =
       let prev_me_onlys =
         Vector.map2 prev_step_accs old_bp_chals
-          ~f:(fun sacc (T (max_local_max_branching, chals)) ->
+          ~f:(fun sacc (T (prev_max_num_parents, chals)) ->
             (* This is a hack. Assuming that the max number of recursive verifications for
                  every rule is exactly 2 simplified the implementation. In the future we
                  will have to fix this. *)
-            let T = Nat.eq_exn max_local_max_branching Max_num_parents.n in
+            let T = Nat.eq_exn prev_max_num_parents Max_num_parents.n in
             hash_me_only Max_num_parents.n
               {sg= sacc; old_bulletproof_challenges= chals} )
       in

@@ -11,7 +11,7 @@ module Wrap = struct
   module type S = sig
     type max_num_parents
 
-    type max_local_max_branchings
+    type prev_max_num_parentss
 
     open Impls.Wrap
     open Wrap_main_inputs
@@ -26,7 +26,7 @@ module Wrap = struct
           t
       | Step_accs : (Tock.Inner_curve.Affine.t, max_num_parents) Vector.t t
       | Old_bulletproof_challenges :
-          max_local_max_branchings H1.T(Challenges_vector.Constant).t t
+          prev_max_num_parentss H1.T(Challenges_vector.Constant).t t
       | Proof_state :
           ( ( ( Challenge.Constant.t
               , Challenge.Constant.t Scalar_challenge.t
@@ -55,17 +55,18 @@ module Wrap = struct
           t
   end
 
-  type ('max_num_parents, 'ml) t =
+  type ('max_num_parents, 'prev_max_num_parentss) t =
     (module S
        with type max_num_parents = 'max_num_parents
-        and type max_local_max_branchings = 'ml)
+        and type prev_max_num_parentss = 'prev_max_num_parentss)
 
-  let create : type max_num_parents ml. unit -> (max_num_parents, ml) t =
+  let create : type max_num_parents prev_max_num_parentss.
+      unit -> (max_num_parents, prev_max_num_parentss) t =
    fun () ->
     let module R = struct
       type nonrec max_num_parents = max_num_parents
 
-      type nonrec max_local_max_branchings = ml
+      type nonrec prev_max_num_parentss = prev_max_num_parentss
 
       open Snarky_backendless.Request
 
@@ -79,7 +80,7 @@ module Wrap = struct
             t
         | Step_accs : Tock.Inner_curve.Affine.t vec t
         | Old_bulletproof_challenges :
-            max_local_max_branchings H1.T(Challenges_vector.Constant).t t
+            prev_max_num_parentss H1.T(Challenges_vector.Constant).t t
         | Proof_state :
             ( ( ( Challenge.Constant.t
                 , Challenge.Constant.t Scalar_challenge.t

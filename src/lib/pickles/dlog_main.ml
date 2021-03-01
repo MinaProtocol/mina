@@ -764,7 +764,7 @@ struct
    3. Check that the "b" value was computed correctly.
    4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
+      (module Num_parents : Nat.Add.Intf with type n = b) ?actual_num_parents
       ~domain ~max_quot_size ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; combined_inner_product; bulletproof_challenges; b; plonk} :
@@ -774,7 +774,7 @@ struct
         , _ )
         Types.Pairing_based.Proof_state.Deferred_values.In_circuit.t)
       ((evals1, x_hat1), (evals2, x_hat2)) =
-    let T = Branching.eq in
+    let T = Num_parents.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
@@ -827,17 +827,17 @@ struct
                   unstage (b_poly (Vector.to_array chals)) )
             in
             let combine pt x_hat e =
-              let pi = Branching.add Nat.N8.n in
+              let pi = Num_parents.add Nat.N8.n in
               let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
               let sg_evals =
-                match actual_branching with
+                match actual_num_parents with
                 | None ->
                     Vector.map sg_olds ~f:(fun f -> [|f pt|])
-                | Some branching ->
+                | Some num_parents ->
                     let mask =
                       ones_vector
                         (module Impl)
-                        ~first_zero:branching (Vector.length sg_olds)
+                        ~first_zero:num_parents (Vector.length sg_olds)
                     in
                     Vector.map2 mask sg_olds ~f:(fun b f ->
                         [|Field.((b :> t) * f pt)|] )

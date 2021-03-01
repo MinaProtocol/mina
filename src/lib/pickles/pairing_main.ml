@@ -301,9 +301,9 @@ struct
         assert false
 
   let incrementally_verify_proof (type b)
-      (module Branching : Nat.Add.Intf with type n = b) ~domain
+      (module Num_parents : Nat.Add.Intf with type n = b) ~domain
       ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~xi
-      ~sponge ~public_input ~(sg_old : (_, Branching.n) Vector.t)
+      ~sponge ~public_input ~(sg_old : (_, Num_parents.n) Vector.t)
       ~combined_inner_product ~advice
       ~(messages : (_, Boolean.var * _) Dlog_plonk_types.Messages.t)
       ~openings_proof
@@ -415,7 +415,7 @@ struct
          the combined inner product.
       *)
           let without_degree_bound =
-            let T = Branching.eq in
+            let T = Num_parents.eq in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [|g|]))
               [ [|x_hat|]
@@ -426,12 +426,12 @@ struct
               ; f_comm
               ; [|m.sigma_comm_0|]
               ; [|m.sigma_comm_1|] ]
-              (snd (Branching.add Nat.N8.n))
+              (snd (Num_parents.add Nat.N8.n))
           in
           with_label __LOC__ (fun () ->
               check_bulletproof
                 ~pcs_batch:
-                  (Common.dlog_pcs_batch (Branching.add Nat.N8.n)
+                  (Common.dlog_pcs_batch (Num_parents.add Nat.N8.n)
                      ~max_quot_size:
                        (Common.max_quot_size_int (Domain.size domain)))
                 ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
@@ -800,7 +800,7 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
    Meaning it needs opt sponge. *)
   let finalize_other_proof (type b num_rules)
-      (module Branching : Nat.Add.Intf with type n = b) ~num_parents
+      (module Num_parents : Nat.Add.Intf with type n = b) ~num_parents
       ~(step_domains :
          [ `Known of (Domains.t, num_rules) Vector.t
          | `Side_loaded of
@@ -808,7 +808,7 @@ struct
              Side_loaded_verification_key.Domains.t
            , num_rules )
            Vector.t ]) ~rules_num_parents
-      ~(* TODO: Add "actual branching" so that proofs don't
+      ~(* TODO: Add "actual num parents" so that proofs don't
    carry around dummy "old bulletproof challenges" *)
       sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi
@@ -860,7 +860,7 @@ struct
           Tuple_lib.Double.map es ~f:(fun (e, x) ->
               (Evals.map2 lengths e ~f:Array.zip_exn, x) ) )
     in
-    let T = Branching.eq in
+    let T = Num_parents.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     let absorb_evals x_hat e =
@@ -928,7 +928,7 @@ struct
               `Side_loaded (conv domains.h)
         in
         let combine pt x_hat e =
-          let pi = Branching.add Nat.N8.n in
+          let pi = Num_parents.add Nat.N8.n in
           let a, b =
             Evals.to_vectors (e : (Boolean.var * Field.t) array Evals.t)
           in
@@ -936,7 +936,7 @@ struct
             Vector.map2
               (ones_vector
                  (module Impl)
-                 ~first_zero:actual_num_parents Branching.n)
+                 ~first_zero:actual_num_parents Num_parents.n)
               sg_olds
               ~f:(fun keep f -> [|(keep, f pt)|])
           in
@@ -1079,7 +1079,7 @@ struct
   let pack_scalar_challenge (Scalar_challenge c : Scalar_challenge.t) =
     Field.pack (Challenge.to_bits c)
 
-  let verify ~branching ~is_base_case ~sg_old
+  let verify ~num_parents ~is_base_case ~sg_old
       ~(opening : _ Pickles_types.Dlog_plonk_types.Openings.Bulletproof.t)
       ~messages ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
@@ -1112,7 +1112,7 @@ struct
         Pickles_types.Scalar_challenge.map xi
           ~f:(Field.unpack ~length:Challenge.length)
       in
-      incrementally_verify_proof branching ~domain:wrap_domain ~xi
+      incrementally_verify_proof num_parents ~domain:wrap_domain ~xi
         ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
         ~combined_inner_product ~advice:{b} ~messages ~openings_proof:opening
         ~plonk:

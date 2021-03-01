@@ -51,9 +51,9 @@ let hash_dlog_me_only (type n) (_max_num_parents : n Nat.t)
     (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
        ~g1:(fun ((x, y) : Tick.Curve.Affine.t) -> [x; y]))
 
-let dlog_pcs_batch (type n_branching total)
+let dlog_pcs_batch (type num_parents total)
     ((without_degree_bound, _pi) :
-      total Nat.t * (n_branching, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
+      total Nat.t * (num_parents, Nat.N8.n, total) Nat.Adds.t) ~max_quot_size =
   Pcs_batch.create ~without_degree_bound ~with_degree_bound:[max_quot_size]
 
 module Pairing_pcs_batch = struct

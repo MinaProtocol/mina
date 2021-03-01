@@ -410,9 +410,12 @@ module Dlog_based = struct
           (unit, _) t) =
       {app_state; dlog_plonk_index; sg; old_bulletproof_challenges}
 
-    let typ comm g s chal branching =
+    let typ comm g s chal num_parents =
       Snarky_backendless.Typ.of_hlistable
-        [s; Plonk_verification_key_evals.typ comm; Vector.typ g branching; chal]
+        [ s
+        ; Plonk_verification_key_evals.typ comm
+        ; Vector.typ g num_parents
+        ; chal ]
         (* TODO: Should this really just be a vector typ of length Rounds.n ?*)
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
@@ -898,14 +901,14 @@ module Pairing_based = struct
         ; me_only }
     end
 
-    let typ impl branching fq :
+    let typ impl num_parents fq :
         ( ((_, _) Vector.t, _) t
         , ((_, _) Vector.t, _) t
         , _ )
         Snarky_backendless.Typ.t =
       let unfinalized_proofs =
         let open Spec in
-        Vector (Per_proof.In_circuit.spec Backend.Tock.Rounds.n, branching)
+        Vector (Per_proof.In_circuit.spec Backend.Tock.Rounds.n, num_parents)
       in
       spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq ~challenge:`Constrained
@@ -935,11 +938,13 @@ module Pairing_based = struct
           ; me_only }
       ; pass_through }
 
-    let spec branching bp_log2 =
+    let spec num_parents bp_log2 =
       let open Spec in
       let per_proof = Proof_state.Per_proof.In_circuit.spec bp_log2 in
       Struct
-        [Vector (per_proof, branching); B Digest; Vector (B Digest, branching)]
+        [ Vector (per_proof, num_parents)
+        ; B Digest
+        ; Vector (B Digest, num_parents) ]
   end
 end
 

@@ -130,13 +130,13 @@ let verify_heterogenous (ts : Instance.t list) =
         Timer.clock __LOC__ ;
         (* TODO: The deferred values "bulletproof_challenges" should get routed
            into a "batch dlog Tick acc verifier" *)
-        let actual_branching =
+        let actual_num_parents =
           Vector.length statement.pass_through.old_bulletproof_challenges
         in
         Timer.clock __LOC__ ;
         let combined_inner_product_actual =
           Wrap.combined_inner_product
-            ~actual_branching:(Nat.Add.create actual_branching)
+            ~actual_num_parents:(Nat.Add.create actual_num_parents)
             evals ~x_hat:prev_x_hat
             ~old_bulletproof_challenges:
               (Vector.map ~f:Ipa.Step.compute_challenges

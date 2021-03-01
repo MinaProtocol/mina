@@ -83,7 +83,7 @@ module Compiled = struct
   type ('a_var, 'a_value, 'max_num_parents, 'num_rules) basic =
     { typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; rules_num_parents: (int, 'num_rules) Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
+          (* For each rule, how many predecessor proofs does it have? *)
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
     ; wrap_domains: Domains.t
@@ -96,7 +96,7 @@ module Compiled = struct
     { num_rules: 'num_rules Nat.t
     ; max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
     ; rules_num_parents: (int, 'num_rules) Vector.t
-          (* For each branch in this rule, how many predecessor proofs does it have? *)
+          (* For each rule, how many predecessor proofs does it have? *)
     ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array

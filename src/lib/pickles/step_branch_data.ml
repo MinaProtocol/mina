@@ -15,9 +15,10 @@ type ( 'a_var
      , 'prev_num_ruless )
      t =
   | T :
-      { branching: 'branching Nat.t * ('prev_vars, 'branching) Hlist.Length.t
+      { num_parents:
+          'num_parents Nat.t * ('prev_vars, 'num_parents) Hlist.Length.t
       ; index: Types.Index.t
-      ; lte: ('branching, 'max_num_parents) Nat.Lte.t
+      ; lte: ('num_parents, 'max_num_parents) Nat.Lte.t
       ; domains: Domains.t
       ; rule:
           ( 'prev_vars
@@ -62,7 +63,7 @@ let create
     value_to_field_elements (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
-  let (T (self_num_parents, branching)) = HT.length rule.prevs in
+  let (T (num_parents, prevs_length)) = HT.length rule.prevs in
   let rec extract_lengths : type a b n m k.
          (a, b, n, m) HT.t
       -> (a, k) Length.t
@@ -93,10 +94,10 @@ let create
   let ( prev_num_parentss
       , prev_num_ruless
       , prev_num_parentss_length
-      , local_branches_length ) =
-    extract_lengths rule.prevs branching
+      , prev_num_ruless_length ) =
+    extract_lengths rule.prevs prevs_length
   in
-  let lte = Nat.lte_exn self_num_parents max_num_parents in
+  let lte = Nat.lte_exn num_parents max_num_parents in
   let requests = Requests.Step.create () in
   Timer.clock __LOC__ ;
   let step ~step_domains =
@@ -110,9 +111,8 @@ let create
         ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
-      ~self_num_rules:num_rules ~branching ~prev_num_parentss
-      ~prev_num_parentss_length ~prev_num_ruless ~local_branches_length ~lte
-      ~self
+      ~num_rules ~prevs_length ~prev_num_parentss ~prev_num_parentss_length
+      ~prev_num_ruless ~prev_num_ruless_length ~lte ~self
     |> unstage
   in
   Timer.clock __LOC__ ;
@@ -130,7 +130,7 @@ let create
   in
   Timer.clock __LOC__ ;
   T
-    { branching= (self_num_parents, branching)
+    { num_parents= (num_parents, prevs_length)
     ; index
     ; lte
     ; rule

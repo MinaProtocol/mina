@@ -114,11 +114,11 @@ let verify = Verify.verify
       and use *that* in the "verifies" computation.
 *)
 
-let pad_local_max_branchings
+let pad_local_max_num_parents
     (type prev_varss prev_valuess env max_num_parents num_rules)
     (max_num_parents : max_num_parents Nat.t)
     (length : (prev_varss, num_rules) Hlist.Length.t)
-    (local_max_branchings :
+    (prev_max_num_parentss :
       (prev_varss, prev_valuess, env) H2_1.T(H2_1.T(E03(Int))).t) :
     ((int, max_num_parents) Vector.t, num_rules) Vector.t =
   let module Vec = struct
@@ -135,14 +135,14 @@ let pad_local_max_branchings
 
               let f : type a b e. (a, b, e) H2_1.T(E03(Int)).t -> Vec.t =
                fun xs ->
-                let (T (branching, pi)) = HI.length xs in
+                let (T (_num_prev_rules, pi)) = HI.length xs in
                 let module V = H2_1.To_vector (Int) in
                 let v = V.f pi xs in
                 Vector.extend_exn v max_num_parents 0
             end)
   in
   let module V = H2_1.To_vector (Vec) in
-  V.f length (M.f local_max_branchings)
+  V.f length (M.f prev_max_num_parentss)
 
 open Zexe_backend
 
@@ -155,17 +155,17 @@ module Proof_ = P.Base
 module Proof = P
 
 module Statement_with_proof = struct
-  type ('s, 'max_num_parents, _) t =
-    (* TODO: use Max local max branching instead of max_num_parents *)
+  type ('s, 'max_num_parents, 'prev_max_num_parentss) t =
+    (* TODO: use prev_max_num_parentss instead of max_num_parents *)
     's * ('max_num_parents, 'max_num_parents) Proof.t
 end
 
 let pad_pass_throughs
-    (type local_max_branchings max_local_max_branchings max_num_parents)
+    (type max_num_parentss prev_max_num_parentss max_num_parents)
     (module M : Hlist.Maxes.S
-      with type ns = max_local_max_branchings
+      with type ns = prev_max_num_parentss
        and type length = max_num_parents)
-    (pass_throughs : local_max_branchings H1.T(Proof_.Me_only.Dlog_based).t) =
+    (pass_throughs : max_num_parentss H1.T(Proof_.Me_only.Dlog_based).t) =
   let dummy_chals = Dummy.Ipa.Wrap.challenges in
   let rec go : type len ms ns.
          ms H1.T(Nat).t
@@ -292,41 +292,66 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module IR = Inductive_rule.T (A) (A_value)
   module HIR = H4.T (IR)
 
-  let max_local_max_branchings ~self (type n)
-      (module Max_num_parents : Nat.Intf with type n = n) num_rules rules =
-    let module Local_max_branchings = struct
-      type t = (int, Max_num_parents.n) Vector.t
-    end in
-    let module M =
-      H4.Map
-        (IR)
-        (E04 (Local_max_branchings))
-        (struct
-          module V = H4.To_vector (Int)
-          module HT = H4.T (Tag)
+  let prev_num_parentss_per_slot :
+        'max_num_parents 'num_rules 'prev_varss 'prev_valuess
+        'prev_num_parentsss 'prev_num_rulesss.    self:( 'var
+                                                       , 'value
+                                                       , 'max_num_parents
+                                                       , 'num_rules )
+                                                       Tag.tag
+        -> (module Nat.Intf with type n = 'max_num_parents)
+        -> ('prev_varss, 'num_rules) Length.t
+        -> ( 'prev_varss
+           , 'prev_valuess
+           , 'prev_num_parentsss
+           , 'prev_num_rulesss )
+           H4.T(IR).t
+        -> ((int, 'num_rules) Vector.t, 'max_num_parents) Vector.t
+           * (module Maxes.S with type length = 'max_num_parents) =
+    fun (type var value max_num_parents max_num_rules num_rules)
+        ~(self : (var, value, max_num_parents, num_rules) Tag.tag)
+        (module Max_num_parents : Nat.Intf with type n = max_num_parents)
+        num_rules rules ->
+     let module Local_max_num_parents = struct
+       type t = (int, Max_num_parents.n) Vector.t
+     end in
+     let module M =
+       H4.Map
+         (IR)
+         (E04 (Local_max_num_parents))
+         (struct
+           module V = H4.To_vector (Int)
+           module HT = H4.T (Tag)
 
-          module M =
-            H4.Map
-              (Tag)
-              (E04 (Int))
-              (struct
-                let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
-                  if Type_equal.Id.same t.id self then
-                    Nat.to_int Max_num_parents.n
-                  else
-                    let (module M) = Types_map.max_num_parents t in
-                    Nat.to_int M.n
-              end)
+           module M =
+             H4.Map
+               (Tag)
+               (E04 (Int))
+               (struct
+                 let f (type a b c d) (t : (a, b, c, d) Tag.t) : int =
+                   let (n : c Nat.t) =
+                     match Type_equal.Id.same_witness t.id self with
+                     | None ->
+                         let (module Max_num_parents) =
+                           Types_map.max_num_parents t
+                         in
+                         let T = Max_num_parents.eq in
+                         Max_num_parents.n
+                     | Some T ->
+                         Max_num_parents.n
+                   in
+                   Nat.to_int n
+               end)
 
-          let f : type a b c d. (a, b, c, d) IR.t -> Local_max_branchings.t =
-           fun rule ->
-            let (T (_, l)) = HT.length rule.prevs in
-            Vector.extend_exn (V.f l (M.f rule.prevs)) Max_num_parents.n 0
-        end)
-    in
-    let module V = H4.To_vector (Local_max_branchings) in
-    let padded = V.f num_rules (M.f rules) |> Vector.transpose in
-    (padded, Maxes.m padded)
+           let f : type a b c d. (a, b, c, d) IR.t -> Local_max_num_parents.t =
+            fun rule ->
+             let (T (_, l)) = HT.length rule.prevs in
+             Vector.extend_exn (V.f l (M.f rule.prevs)) Max_num_parents.n 0
+         end)
+     in
+     let module V = H4.To_vector (Local_max_num_parents) in
+     let padded = V.f num_rules (M.f rules) |> Vector.transpose in
+     (padded, Maxes.m padded)
 
   module Lazy_ (A : T0) = struct
     type t = A.t Lazy.t
@@ -439,12 +464,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let rules = rules ~self in
     let (T (prev_varss_n, prev_varss_length)) = HIR.length rules in
     let T = Nat.eq_exn prev_varss_n Num_rules.n in
-    let padded, (module Maxes) =
-      max_local_max_branchings
+    let prev_num_parentss_per_slot, (module Maxes) =
+      prev_num_parentss_per_slot
         (module Max_num_parents)
         prev_varss_length rules ~self:self.id
     in
-    let full_signature = {Full_signature.padded; maxes= (module Maxes)} in
+    let full_signature =
+      {Full_signature.prev_num_parentss_per_slot; maxes= (module Maxes)}
+    in
     Timer.clock __LOC__ ;
     let wrap_domains =
       let module M = Wrap_domains.Make (A) (A_value) in
@@ -697,7 +724,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           -> (Max_num_parents.n, Max_num_parents.n) Proof.t Async.Deferred.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
-        let _, prev_vars_length = b.branching in
+        let _, prev_vars_length = b.num_parents in
         let step handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length:prev_vars_length
@@ -930,9 +957,9 @@ let compile
   let module P = struct
     type statement = A_value.t
 
-    module Max_local_max_branching = Max_num_parents
+    module Prev_max_num_parents = Max_num_parents
     module Max_num_parents_vec = Nvector (Max_num_parents)
-    include Proof.Make (Max_num_parents) (Max_local_max_branching)
+    include Proof.Make (Max_num_parents) (Prev_max_num_parents)
 
     let id = wrap_disk_key
 

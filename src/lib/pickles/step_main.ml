@@ -10,7 +10,7 @@ module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type branching self_num_rules prev_vars prev_values a_var a_value max_num_parents prev_num_ruless prev_num_parentss.
+    : type num_parents num_rules prev_vars prev_values a_var a_value max_num_parents prev_num_ruless prev_num_parentss.
        (module Requests.Step.S
           with type prev_num_parentss = prev_num_parentss
            and type prev_num_ruless = prev_num_ruless
@@ -18,20 +18,20 @@ let step_main
            and type prev_values = prev_values
            and type max_num_parents = max_num_parents)
     -> (module Nat.Add.Intf with type n = max_num_parents)
-    -> self_num_rules:self_num_rules Nat.t
+    -> num_rules:num_rules Nat.t
     -> prev_num_parentss:prev_num_parentss H1.T(Nat).t
-    -> prev_num_parentss_length:(prev_num_parentss, branching) Hlist.Length.t
-    -> prev_num_ruless:(* For each inner proof of type T , the number of branches that type T has. *)
+    -> prev_num_parentss_length:(prev_num_parentss, num_parents) Hlist.Length.t
+    -> prev_num_ruless:(* For each inner proof of type T , the number of rules that type T has. *)
        prev_num_ruless H1.T(Nat).t
-    -> local_branches_length:(prev_num_ruless, branching) Hlist.Length.t
-    -> branching:(prev_vars, branching) Hlist.Length.t
-    -> lte:(branching, max_num_parents) Nat.Lte.t
+    -> prev_num_ruless_length:(prev_num_ruless, num_parents) Hlist.Length.t
+    -> prevs_length:(prev_vars, num_parents) Hlist.Length.t
+    -> lte:(num_parents, max_num_parents) Nat.Lte.t
     -> basic:( a_var
              , a_value
              , max_num_parents
-             , self_num_rules )
+             , num_rules )
              Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_num_parents, self_num_rules) Tag.t
+    -> self:(a_var, a_value, max_num_parents, num_rules) Tag.t
     -> ( prev_vars
        , prev_values
        , prev_num_parentss
@@ -45,20 +45,20 @@ let step_main
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
- fun (module Req) (module Max_num_parents) ~self_num_rules ~prev_num_parentss
-     ~prev_num_parentss_length ~prev_num_ruless ~local_branches_length
-     ~branching ~lte ~basic ~self rule ->
+ fun (module Req) (module Max_num_parents) ~num_rules ~prev_num_parentss
+     ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length
+     ~prevs_length ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_num_parents, self_num_rules) t
+      | Self : (a_var, a_value, max_num_parents, num_rules) t
   end in
-  let module Typ_with_max_branching = struct
-    type ('var, 'value, 'local_max_branching, 'local_branches) t =
-      ( ('var, 'local_max_branching, 'local_branches) Per_proof_witness.t
+  let module Typ_with_max_num_parents = struct
+    type ('var, 'value, 'local_max_num_parents, 'local_num_rules) t =
+      ( ('var, 'local_max_num_parents, 'local_num_rules) Per_proof_witness.t
       , ( 'value
-        , 'local_max_branching
-        , 'local_branches )
+        , 'local_max_num_parents
+        , 'local_num_rules )
         Per_proof_witness.Constant.t )
       Typ.t
   end in
@@ -70,7 +70,7 @@ let step_main
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_branching).t =
+        -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_num_parents).t =
      fun ds ns1 ns2 ld ln1 ln2 ->
       match (ds, ns1, ns2, ld, ln1, ln2) with
       | [], [], [], Z, Z, Z ->
@@ -106,11 +106,11 @@ let step_main
       | _ :: _, _, _, _, _, _ ->
           .
     in
-    join rule.prevs prev_num_parentss prev_num_ruless branching
-      prev_num_parentss_length local_branches_length
+    join rule.prevs prev_num_parentss prev_num_ruless prevs_length
+      prev_num_parentss_length prev_num_ruless_length
   in
   let module Prev_typ =
-    H4.Typ (Impls.Step) (Typ_with_max_branching) (Per_proof_witness)
+    H4.Typ (Impls.Step) (Typ_with_max_num_parents) (Per_proof_witness)
       (Per_proof_witness.Constant)
       (struct
         let f = Fn.id
@@ -150,12 +150,9 @@ let step_main
         in
         let datas =
           let self_data :
-              ( a_var
-              , a_value
-              , max_num_parents
-              , self_num_rules )
-              Types_map.For_step.t =
-            { num_rules= self_num_rules
+              (a_var, a_value, max_num_parents, num_rules) Types_map.For_step.t
+              =
+            { num_rules
             ; rules_num_parents=
                 Vector.map basic.rules_num_parents ~f:Field.of_int
             ; max_num_parents= (module Max_num_parents)
@@ -190,7 +187,8 @@ let step_main
         in
         let unfinalized_proofs =
           let module H = H1.Of_vector (Unfinalized) in
-          H.f branching (Vector.trim stmt.proof_state.unfinalized_proofs lte)
+          H.f prevs_length
+            (Vector.trim stmt.proof_state.unfinalized_proofs lte)
         in
         let module Packed_digest = Field in
         let module Proof = struct
@@ -200,7 +198,7 @@ let step_main
         let pass_throughs =
           with_label "pass_throughs" (fun () ->
               let module V = H1.Of_vector (Digest) in
-              V.f branching (Vector.trim stmt.pass_through lte) )
+              V.f prevs_length (Vector.trim stmt.pass_through lte) )
         in
         let sgs =
           let module M =
@@ -214,7 +212,7 @@ let step_main
               end)
           in
           let module V = H3.To_vector (Inner_curve) in
-          V.f branching (M.f prevs)
+          V.f prevs_length (M.f prevs)
         in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
@@ -309,7 +307,7 @@ let step_main
                     in
                     let verified =
                       with_label __LOC__ (fun () ->
-                          verify ~branching:d.max_num_parents
+                          verify ~num_parents:d.max_num_parents
                             ~wrap_domain:d.wrap_domains.h
                             ~is_base_case:should_verify ~sg_old ~opening
                             ~messages ~wrap_verification_key:d.wrap_key
@@ -337,7 +335,7 @@ let step_main
               in
               let chalss, vs =
                 go prevs datas pass_throughs unfinalized_proofs
-                  proofs_should_verify branching
+                  proofs_should_verify prevs_length
               in
               Boolean.Assert.all vs ; chalss )
         in

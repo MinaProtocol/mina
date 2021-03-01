@@ -20,11 +20,11 @@ let vector_of_list (type a t)
 
 let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~one)
 
-let combined_inner_product (type actual_branching)
-    ~actual_branching:(module AB : Nat.Add.Intf with type n = actual_branching)
-    (e1, e2) ~(old_bulletproof_challenges : (_, actual_branching) Vector.t) ~r
-    ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2)
-    ~(step_branch_domains : Domains.t) =
+let combined_inner_product (type actual_num_parents)
+    ~actual_num_parents:(module AB : Nat.Add.Intf
+      with type n = actual_num_parents) (e1, e2)
+    ~(old_bulletproof_challenges : (_, actual_num_parents) Vector.t) ~r ~xi
+    ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2) ~(step_branch_domains : Domains.t) =
   let T = AB.eq in
   let b_polys =
     Vector.map
@@ -58,22 +58,20 @@ let combined_inner_product (type actual_branching)
 module Pairing_acc = Tock.Inner_curve.Affine
 
 (* The prover for wrapping a proof *)
-let wrap (type actual_branching max_num_parents max_local_max_branchings)
+let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
     ~(max_num_parents : max_num_parents Nat.t)
-    (module Max_local_max_branchings : Hlist.Maxes.S
-      with type ns = max_local_max_branchings
+    (module Prev_max_num_parents : Hlist.Maxes.S
+      with type ns = prev_max_num_parentss
        and type length = max_num_parents)
-    (( module
-      Req ) :
-      (max_num_parents, max_local_max_branchings) Requests.Wrap.t)
+    ((module Req) : (max_num_parents, prev_max_num_parentss) Requests.Wrap.t)
     ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk ~step_domains
     ~wrap_domains ~pairing_plonk_indices pk
     ({statement= prev_statement; prev_evals; proof; index= which_index} :
       ( _
       , _
-      , (_, actual_branching) Vector.t
-      , (_, actual_branching) Vector.t
-      , max_local_max_branchings H1.T(P.Base.Me_only.Dlog_based).t
+      , (_, actual_num_parents) Vector.t
+      , (_, actual_num_parents) Vector.t
+      , prev_max_num_parentss H1.T(P.Base.Me_only.Dlog_based).t
       , ( (Tock.Field.t array Dlog_plonk_types.Evals.t * Tock.Field.t) Double.t
         , max_num_parents )
         Vector.t )
@@ -117,7 +115,7 @@ let wrap (type actual_branching max_num_parents max_local_max_branchings)
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
-        V.f Max_local_max_branchings.length (M.f prev_me_only)) }
+        V.f Prev_max_num_parents.length (M.f prev_me_only)) }
   in
   let handler (Snarky_backendless.Request.With {request; respond}) =
     let open Req in
@@ -137,7 +135,7 @@ let wrap (type actual_branching max_num_parents max_local_max_branchings)
             end)
         in
         let module V = H1.To_vector (Pairing_acc) in
-        k (V.f Max_local_max_branchings.length (M.f prev_me_only))
+        k (V.f Prev_max_num_parents.length (M.f prev_me_only))
     | Old_bulletproof_challenges ->
         let module M =
           H1.Map
@@ -166,10 +164,9 @@ let wrap (type actual_branching max_num_parents max_local_max_branchings)
     Vector.map ~f:Ipa.Step.compute_challenges
       prev_statement.proof_state.me_only.old_bulletproof_challenges
   in
-  let actual_branching = Vector.length prev_challenges in
+  let actual_num_parents = Vector.length prev_challenges in
   let lte =
-    Nat.lte_exn actual_branching
-      (Length.to_nat Max_local_max_branchings.length)
+    Nat.lte_exn actual_num_parents (Length.to_nat Prev_max_num_parents.length)
   in
   let o =
     let sgs =
@@ -183,7 +180,7 @@ let wrap (type actual_branching max_num_parents max_local_max_branchings)
           end)
       in
       let module V = H1.To_vector (Tick.Curve.Affine) in
-      V.f Max_local_max_branchings.length (M.f prev_me_only)
+      V.f Prev_max_num_parents.length (M.f prev_me_only)
     in
     O.create pairing_vk
       Vector.(
@@ -233,7 +230,7 @@ let wrap (type actual_branching max_num_parents max_local_max_branchings)
     let combined_inner_product =
       let open As_field in
       combined_inner_product (* Note: We do not pad here. *)
-        ~actual_branching:(Nat.Add.create actual_branching)
+        ~actual_num_parents:(Nat.Add.create actual_num_parents)
         proof.openings.evals ~x_hat ~r ~xi ~zeta ~zetaw
         ~step_branch_domains:step_domains
         ~old_bulletproof_challenges:prev_challenges
