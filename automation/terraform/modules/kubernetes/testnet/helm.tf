@@ -121,8 +121,6 @@ locals {
       runtimeConfig = local.coda_vars.runtimeConfig
       seedPeersURL  = var.seed_peers_url
     }
-    node_configs = defaults(var.archive_configs, local.default_archive_node)
-    postgresql   = { persistence = var.persistence_config }
   }
 
   watchdog_vars = {
@@ -225,7 +223,7 @@ resource "helm_release" "snark_workers" {
 
 resource "helm_release" "archive_node" {
   provider = helm.testnet_deploy
-  count    = length(local.archive_node_vars.node_configs)
+  count    = length(var.archive_configs)
 
   name       = "archive-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
@@ -236,8 +234,8 @@ resource "helm_release" "archive_node" {
     yamlencode({
       testnetName = var.testnet_name
       coda        = local.archive_node_vars.coda
-      archive     = local.archive_node_vars.node_configs[count.index]
-      postgresql  = local.archive_node_vars.postgresql
+      archive     = var.archive_configs[count.index]
+      postgresql  = { persistence = lookup(var.archive_configs[count.index], "postgresPersistence", {}) }
     })
   ]
 
