@@ -248,9 +248,11 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	// assert we are able to send and receive a message with size up to 1 << 30 bytes
 	appA := newTestApp(t, nil)
 	appA.NoDHT = true
+	appA.NoUpcalls = false
 
 	appB := newTestApp(t, nil)
 	appB.NoDHT = true
+	appB.NoUpcalls = false
 
 	// connect the two nodes
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -260,9 +262,9 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// send large message from A to B
-	actualMessage := createMessage(1 << 30)
+	actualMessage := createMessage(1 << 20)
 
-	// create handler that reads 1<<30 bytes
+	// create handler that reads 1<<20 bytes
 	done := make(chan struct{})
 	handler := func(stream net.Stream) {
 		handleStreamReads(appB, stream, 0)
@@ -309,11 +311,13 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 func TestMplex_SendMultipleMessage(t *testing.T) {
 	// assert we are able to send and receive multiple messages with size up to 1 << 10 bytes
 	appA := newTestApp(t, nil)
+	appA.NoUpcalls = false
 	appA.NoDHT = true
 	defer appA.P2p.Host.Close()
 
 	appB := newTestApp(t, nil)
 	appB.NoDHT = true
+	appB.NoUpcalls = false
 	defer appB.P2p.Host.Close()
 
 	// connect the two nodes
@@ -414,7 +418,7 @@ func TestConfigurationMsg(t *testing.T) {
 }
 
 func TestListenMsg(t *testing.T) {
-	addrStr := "/ip4/127.0.0.2/tcp/8000"
+	addrStr := "/ip4/127.0.0.1/tcp/8000"
 
 	addr, err := ma.NewMultiaddr(addrStr)
 	require.NoError(t, err)
