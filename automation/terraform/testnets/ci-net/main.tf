@@ -1,7 +1,7 @@
 terraform {
-  required_version = "~> 0.12.0"
+  required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-ci-net.tfstate"
+    key     = "ci-net.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -11,13 +11,6 @@ terraform {
 
 provider "aws" {
   region = "us-west-2"
-}
-
-provider "google" {
-  alias   = "google-us-east4"
-  project = "o1labs-192920"
-  region  = "us-east4"
-  zone    = "us-east4-b"
 }
 
 variable "coda_image" {
@@ -71,54 +64,53 @@ variable "ci_artifact_path" {
 
 locals {
   seed_region = "us-west1"
-  seed_zone = "us-west1-b"
+  seed_zone   = "us-west1-b"
 }
 
 
 module "ci_testnet" {
-  providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = var.ci_artifact_path
 
   # TODO: remove obsolete cluster_name var + cluster region
-  cluster_name          = "mina-integration-west1"
-  cluster_region        = var.ci_cluster_region
-  k8s_context           = var.ci_k8s_ctx
-  testnet_name          = "ci-net-${substr(sha256(terraform.workspace), 0, 7)}"
+  cluster_name   = "mina-integration-west1"
+  cluster_region = var.ci_cluster_region
+  k8s_context    = var.ci_k8s_ctx
+  testnet_name   = "ci-net-${substr(sha256(terraform.workspace), 0, 7)}"
 
-  coda_image            = var.coda_image
-  coda_archive_image    = var.coda_archive_image
-  coda_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image       = "codaprotocol/bots:1.0.0"
-  coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
+  coda_image         = var.coda_image
+  coda_archive_image = var.coda_archive_image
+  coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
+  coda_bots_image    = "codaprotocol/bots:1.0.0"
+  coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
 
-  coda_faucet_amount    = "10000000000"
-  coda_faucet_fee       = "100000000"
+  coda_faucet_amount = "10000000000"
+  coda_faucet_fee    = "100000000"
 
-  agent_min_fee = "0.05"
-  agent_max_fee = "0.1"
-  agent_min_tx = "0.0015"
-  agent_max_tx = "0.0015"
+  agent_min_fee         = "0.05"
+  agent_max_fee         = "0.1"
+  agent_min_tx          = "0.0015"
+  agent_max_tx          = "0.0015"
   agent_send_every_mins = "1"
 
-  archive_node_count    = var.archive_count
-  mina_archive_schema   = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+  archive_node_count  = var.archive_count
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
 
-  seed_zone = local.seed_zone
+  seed_zone   = local.seed_zone
   seed_region = local.seed_region
 
-  log_level              = "Info"
-  log_txn_pool_gossip    = false
+  log_level           = "Info"
+  log_txn_pool_gossip = false
 
-  block_producer_key_pass = "naughty blue worm"
+  block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
-  snark_worker_replicas = var.snark_worker_count
-  snark_worker_fee      = "0.025"
+  snark_worker_replicas   = var.snark_worker_count
+  snark_worker_fee        = "0.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
-  snark_worker_host_port = 10401
+  snark_worker_host_port  = 10401
 
   whale_count = var.whale_count
-  fish_count = var.fish_count
+  fish_count  = var.fish_count
 }

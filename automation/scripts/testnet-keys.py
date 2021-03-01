@@ -88,7 +88,7 @@ def generate_service_keys(output_dir, privkey_pass):
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
-                "CODA_PRIVKEY_PASS='{}' coda advanced generate-keypair -privkey-path /keys/{}_service"
+                "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/{}_service"
                 .format(privkey_pass, service)
             ],
             volumes={output_dir: {
@@ -121,7 +121,7 @@ def generate_online_whale_keys(count, output_dir, privkey_pass):
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
-                "CODA_PRIVKEY_PASS='{}' coda advanced generate-keypair -privkey-path /keys/online_whale_account_{}"
+                "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/online_whale_account_{}"
                 .format(privkey_pass, whale_key)
             ],
             volumes={output_dir: {
@@ -154,7 +154,7 @@ def generate_offline_whale_keys(count, output_dir, privkey_pass):
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
-                "CODA_PRIVKEY_PASS='{}' coda advanced generate-keypair -privkey-path /keys/offline_whale_account_{}"
+                "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/offline_whale_account_{}"
                 .format(privkey_pass, i + 1)
             ],
             volumes={output_dir: {
@@ -187,7 +187,7 @@ def generate_offline_fish_keys(count, output_dir, privkey_pass):
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
-                "CODA_PRIVKEY_PASS='{}' coda advanced generate-keypair -privkey-path /keys/offline_fish_account_{}"
+                "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/offline_fish_account_{}"
                 .format(privkey_pass, fish_number)
             ],
             volumes={output_dir: {
@@ -221,7 +221,7 @@ def generate_online_fish_keys(count, output_dir, privkey_pass):
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
-                "CODA_PRIVKEY_PASS='{}' coda advanced generate-keypair -privkey-path /keys/online_fish_account_{}"
+                "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/online_fish_account_{}"
                 .format(privkey_pass, fish_number)
             ],
             volumes={output_dir: {
@@ -257,7 +257,7 @@ def generate_seed_keys(count, output_dir):
         key_raw = client.containers.run(
             CODA_DAEMON_IMAGE,
             entrypoint="bash -c",
-            command=["coda advanced generate-libp2p-keypair"])
+            command=["mina advanced generate-libp2p-keypair"])
         key_parsed = str(key_raw).split("\\n")[1]
         all_key_file = open(
             SEED_KEYS_DIR / "seed_{}_libp2p.txt".format(seed_number), "w")

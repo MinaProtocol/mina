@@ -4,7 +4,7 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'challenge t = {prechallenge: 'challenge}
-    [@@deriving sexp, compare, yojson, hash, eq]
+    [@@deriving sexp, compare, yojson, hash, equal]
   end
 end]
 

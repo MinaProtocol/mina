@@ -50,7 +50,7 @@ spec:
           "-log-precomputed-blocks", "true",
           "-log-json",
           "-log-snark-work-gossip", "true",
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
@@ -71,6 +71,9 @@ spec:
           "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
+          {{- end }}
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }},
           {{- end }}
           "-seed"
         ]
@@ -128,6 +131,7 @@ spec:
         configMap:
           name: seed-daemon-config
       {{- end }}
+      {{- if $config.privateKeySecret }}
       - name: private-keys
         secret:
           secretName: {{ $config.privateKeySecret }}
@@ -137,6 +141,7 @@ spec:
             path: key
           - key: pub
             path: key.pub
+      {{- end }}
       {{- if $config.libp2pSecret }}
       - name: libp2p-keys
         secret:
@@ -182,6 +187,5 @@ spec:
   - name: tcp-p2p
     port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
-    nodePort: {{ $config.nodePort }}
 ---
 {{ end }}

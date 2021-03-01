@@ -422,22 +422,22 @@ module Balance = struct
     end )
 end
 
-let router ~graphql_uri ~logger ~db (route : string list) body =
-  let (module Db : Caqti_async.CONNECTION) = db in
+let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /account/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | ["balance"] ->
-      let%bind req =
-        Errors.Lift.parse ~context:"Request"
-        @@ Account_balance_request.of_yojson body
-        |> Errors.Lift.wrap
-      in
-      let%map res =
-        Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
-        |> Errors.Lift.wrap
-      in
-      Account_balance_response.to_yojson res
+      with_db (fun ~db ->
+          let%bind req =
+            Errors.Lift.parse ~context:"Request"
+            @@ Account_balance_request.of_yojson body
+            |> Errors.Lift.wrap
+          in
+          let%map res =
+            Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
+            |> Errors.Lift.wrap
+          in
+          Account_balance_response.to_yojson res )
   | _ ->
       Deferred.Result.fail `Page_not_found

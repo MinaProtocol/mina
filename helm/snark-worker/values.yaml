@@ -2,6 +2,8 @@ testnetName: "coda-testnet"
 coda:
   runtimeConfig:
   generateGenesisProof: true
+  enableArchive: false
+  archiveAddress: archive-1:3086
   genesis:
     active: true
     k: 10

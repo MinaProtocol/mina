@@ -33,7 +33,7 @@ spec:
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-log-snark-work-gossip", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -52,7 +52,10 @@ spec:
           {{- if $.Values.coda.seedPeersURL }}
           "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }},
+          {{- if $.Values.coda.enableArchive }}
+          "-archive-address", {{ $.Values.coda.archiveAddress }}
+          {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"

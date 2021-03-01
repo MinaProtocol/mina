@@ -13,3 +13,10 @@
 - enable multiple seed-node deployment configurations
 - add peers list URL chart value
 
+1.0.0:
+------
+- coda -> mina
+
+1.0.1:
+------
+- enable daemon blockchain archival capability
