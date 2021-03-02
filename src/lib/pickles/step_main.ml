@@ -82,6 +82,30 @@ module Proof_system = struct
           end)
       in
       Prev_typ.f typs
+
+    let get_step_data
+        (type self_var self_value self_max_num_parents self_num_rules var value
+        max_num_parents num_rules)
+        (self_data :
+          ( self_var
+          , self_value
+          , self_max_num_parents
+          , self_num_rules )
+          Types_map.For_step.t)
+        (self_tag :
+          (self_var, self_value, self_max_num_parents, self_num_rules) Tag.tag)
+        (tag : (var, value, max_num_parents, num_rules) Tag.t) :
+        (var, value, max_num_parents, num_rules) Types_map.For_step.t =
+      match Type_equal.Id.same_witness self_tag tag.id with
+      | Some T ->
+          self_data
+      | None -> (
+        match tag.kind with
+        | Compiled ->
+            Types_map.For_step.of_compiled (Types_map.lookup_compiled tag.id)
+        | Side_loaded ->
+            Types_map.For_step.of_side_loaded
+              (Types_map.lookup_side_loaded tag.id) )
   end
 end
 
@@ -130,8 +154,9 @@ let step_main
       | Other of ('a, 'b, 'n, 'm) F.t
       | Self : (a_var, a_value, max_num_parents, num_rules) t
   end in
+  let module Step_proof_system = Proof_system.Step in
   let prev_typ =
-    Proof_system.Step.per_proof_witness_typ basic self.id rule.prevs
+    Step_proof_system.per_proof_witness_typ basic self.id rule.prevs
       prev_num_parentss prev_num_ruless prevs_length prev_num_parentss_length
       prev_num_ruless_length
   in
@@ -166,43 +191,6 @@ let step_main
         let proofs_should_verify =
           with_label "rule_main" (fun () -> rule.main prev_statements app_state)
         in
-        let datas =
-          let self_data :
-              (a_var, a_value, max_num_parents, num_rules) Types_map.For_step.t
-              =
-            { num_rules
-            ; rules_num_parents=
-                Vector.map basic.rules_num_parents ~f:Field.of_int
-            ; max_num_parents= (module Max_num_parents)
-            ; num_parents= None
-            ; typ= basic.typ
-            ; var_to_field_elements= basic.var_to_field_elements
-            ; value_to_field_elements= basic.value_to_field_elements
-            ; wrap_domains= basic.wrap_domains
-            ; step_domains= `Known basic.step_domains
-            ; wrap_key= dlog_plonk_index }
-          in
-          let module M =
-            H4.Map (Tag) (Types_map.For_step)
-              (struct
-                let f : type a b n m.
-                    (a, b, n, m) Tag.t -> (a, b, n, m) Types_map.For_step.t =
-                 fun tag ->
-                  match Type_equal.Id.same_witness self.id tag.id with
-                  | Some T ->
-                      self_data
-                  | None -> (
-                    match tag.kind with
-                    | Compiled ->
-                        Types_map.For_step.of_compiled
-                          (Types_map.lookup_compiled tag.id)
-                    | Side_loaded ->
-                        Types_map.For_step.of_side_loaded
-                          (Types_map.lookup_side_loaded tag.id) )
-              end)
-          in
-          M.f rule.prevs
-        in
         let unfinalized_proofs =
           let module H = H1.Of_vector (Unfinalized) in
           H.f prevs_length
@@ -217,6 +205,20 @@ let step_main
           with_label "pass_throughs" (fun () ->
               let module V = H1.Of_vector (Digest) in
               V.f prevs_length (Vector.trim stmt.pass_through lte) )
+        in
+        let self_data :
+            (a_var, a_value, max_num_parents, num_rules) Types_map.For_step.t =
+          { num_rules
+          ; rules_num_parents=
+              Vector.map basic.rules_num_parents ~f:Field.of_int
+          ; max_num_parents= (module Max_num_parents)
+          ; num_parents= None
+          ; typ= basic.typ
+          ; var_to_field_elements= basic.var_to_field_elements
+          ; value_to_field_elements= basic.value_to_field_elements
+          ; wrap_domains= basic.wrap_domains
+          ; step_domains= `Known basic.step_domains
+          ; wrap_key= dlog_plonk_index }
         in
         let sgs =
           let module M =
@@ -236,16 +238,16 @@ let step_main
           with_label "prevs_verified" (fun () ->
               let rec go : type vars vals ns1 ns2 n.
                      (vars, ns1, ns2) H3.T(Per_proof_witness).t
-                  -> (vars, vals, ns1, ns2) H4.T(Types_map.For_step).t
+                  -> (vars, vals, ns1, ns2) H4.T(Tag).t
                   -> vars H1.T(E01(Digest)).t
                   -> vars H1.T(E01(Unfinalized)).t
                   -> vars H1.T(E01(B)).t
                   -> (vars, n) Length.t
                   -> (_, n) Vector.t * B.t list =
-               fun proofs datas pass_throughs unfinalizeds should_verifys pi ->
+               fun proofs tags pass_throughs unfinalizeds should_verifys pi ->
                 match
                   ( proofs
-                  , datas
+                  , tags
                   , pass_throughs
                   , unfinalizeds
                   , should_verifys
@@ -254,7 +256,7 @@ let step_main
                 | [], [], [], [], [], Z ->
                     ([], [])
                 | ( p :: proofs
-                  , d :: datas
+                  , tag :: tags
                   , pass_through :: pass_throughs
                   , unfinalized :: unfinalizeds
                   , should_verify :: should_verifys
@@ -268,6 +270,9 @@ let step_main
                         , old_bulletproof_challenges
                         , (opening, messages) ) =
                       p
+                    in
+                    let d =
+                      Step_proof_system.get_step_data self_data self.id tag
                     in
                     let finalized, chals =
                       with_label __LOC__ (fun () ->
@@ -344,7 +349,7 @@ let step_main
                             printf "verified: %b\n%!" verified ;
                             printf "should_verify: %b\n\n%!" should_verify) ;
                     let chalss, vs =
-                      go proofs datas pass_throughs unfinalizeds should_verifys
+                      go proofs tags pass_throughs unfinalizeds should_verifys
                         pi
                     in
                     ( chals :: chalss
@@ -352,7 +357,7 @@ let step_main
                       :: vs )
               in
               let chalss, vs =
-                go prevs datas pass_throughs unfinalized_proofs
+                go prevs rule.prevs pass_throughs unfinalized_proofs
                   proofs_should_verify prevs_length
               in
               Boolean.Assert.all vs ; chalss )
