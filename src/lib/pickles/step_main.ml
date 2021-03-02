@@ -450,7 +450,7 @@ let build_combined_typ basic self_id proof_systems tagss ns1 ns2 ld ln1 ln2 =
         typ :: typs
     | (module PS_) :: _, [], [], [], [], [], [] ->
         failwith "build_combined_typ"
-    | [], (_ :: _), _, _, _, _, _ ->
+    | [], _ :: _, _, _, _, _, _ ->
         failwith "build_combined_typ"
   in
   let module M =
@@ -483,55 +483,53 @@ let rec h2_vec_to_h2_h1_1 : type length params actual_length carrying.
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type num_parents total_num_parents num_rules prev_vars prev_values a_var a_value max_num_parents prev_num_ruless prev_num_parentss per_proof_witness per_proof_witness_constant unfinalized unfinalized_constant.
+    : type num_parents total_num_parents num_rules prev_vars prev_values a_var a_value max_num_parents max_total_num_parents prev_num_ruless prev_num_parentss per_proof_witness per_proof_witness_constant unfinalized unfinalized_constant.
        (module Requests.Step.S
-          with type prev_num_parentss = prev_num_parentss * unit
-           and type prev_num_ruless = prev_num_ruless * unit
+          with type prev_num_parentss = prev_num_parentss
+           and type prev_num_ruless = prev_num_ruless
            and type statement = a_value
-           and type prev_values = prev_values * unit
-           and type max_num_parents = max_num_parents * unit
-           and type per_proof_witnesses = per_proof_witness_constant * unit)
-    -> (module Nat.Add.Intf with type n = max_num_parents)
+           and type prev_values = prev_values
+           and type max_num_parents = max_num_parents
+           and type per_proof_witnesses = per_proof_witness_constant)
+    -> (module Nat.Add.Intf with type n = max_total_num_parents)
     -> num_rules:num_rules Nat.t
-    -> prev_num_parentss:(prev_num_parentss * unit) H1.T(H1.T(Nat)).t
-    -> prev_num_parentss_length:( prev_num_parentss * unit
-                                , num_parents * unit )
-                                H2.T(Length).t
+    -> prev_num_parentss:prev_num_parentss H1.T(H1.T(Nat)).t
+    -> prev_num_parentss_length:(prev_num_parentss, num_parents) H2.T(Length).t
     -> prev_num_ruless:(* For each inner proof of type T , the number of rules that type T has. *)
-       (prev_num_ruless * unit) H1.T(H1.T(Nat)).t
-    -> prev_num_ruless_length:( prev_num_ruless * unit
-                              , num_parents * unit )
-                              H2.T(Length).t
-    -> prevs_lengths:(prev_vars * unit, num_parents * unit) H2.T(Length).t
-    -> prevs_length:(num_parents * unit, total_num_parents) Nat.Sum.t
-    -> ltes:(num_parents * unit, max_num_parents * unit) H2.T(Nat.Lte).t
-    -> proof_systems:( per_proof_witness * unit
-                     , per_proof_witness_constant * unit
-                     , unfinalized * unit
-                     , unfinalized_constant * unit )
+       prev_num_ruless H1.T(H1.T(Nat)).t
+    -> prev_num_ruless_length:(prev_num_ruless, num_parents) H2.T(Length).t
+    -> prevs_lengths:(prev_vars, num_parents) H2.T(Length).t
+    -> prevs_length:(num_parents, total_num_parents) Nat.Sum.t
+    -> ltes:(num_parents, max_num_parents) H2.T(Nat.Lte).t
+    -> max_lengths:(max_num_parents, max_total_num_parents) Nat.Sum.t
+    -> proof_systems:( per_proof_witness
+                     , per_proof_witness_constant
+                     , unfinalized
+                     , unfinalized_constant )
                      H4.T(PS).t
     -> basic:( a_var
              , a_value
-             , max_num_parents
+             , max_total_num_parents
              , num_rules )
              Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_num_parents, num_rules) Tag.t
-    -> ( prev_vars * unit
-       , prev_values * unit
-       , prev_num_parentss * unit
-       , prev_num_ruless * unit
+    -> self:(a_var, a_value, max_total_num_parents, num_rules) Tag.t
+    -> ( prev_vars
+       , prev_values
+       , prev_num_parentss
+       , prev_num_ruless
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (   ( (unfinalized * unit, max_num_parents * unit) H2.T(Vector).t
+    -> (   ( (unfinalized, max_num_parents) H2.T(Vector).t
            , Field.t
-           , (max_num_parents * unit) H1.T(Vector.Carrying(Digest)).t )
+           , max_num_parents H1.T(Vector.Carrying(Digest)).t )
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
  fun (module Req) (module Max_num_parents) ~num_rules ~prev_num_parentss
      ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length
-     ~prevs_lengths ~prevs_length ~ltes ~proof_systems ~basic ~self rule ->
+     ~prevs_lengths ~prevs_length ~ltes ~max_lengths ~proof_systems ~basic
+     ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
@@ -544,9 +542,9 @@ let step_main
   in
   let main
       (stmt :
-        ( (unfinalized * unit, max_num_parents * unit) H2.T(Vector).t
+        ( (unfinalized, max_num_parents) H2.T(Vector).t
         , Field.t
-        , (max_num_parents * unit) H1.T(Vector.Carrying(Digest)).t )
+        , max_num_parents H1.T(Vector.Carrying(Digest)).t )
         Types.Pairing_based.Statement.t) =
     let open Requests.Step in
     let open Impls.Step in
@@ -635,7 +633,11 @@ let step_main
               f stmt.pass_through prevs_lengths ltes )
         in
         let self_data :
-            (a_var, a_value, max_num_parents, num_rules) Types_map.For_step.t =
+            ( a_var
+            , a_value
+            , max_total_num_parents
+            , num_rules )
+            Types_map.For_step.t =
           { num_rules
           ; rules_num_parents=
               Vector.map basic.rules_num_parents ~f:Field.of_int

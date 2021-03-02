@@ -144,6 +144,7 @@ let create
   in
   let lte = Nat.lte_exn total_num_parents max_num_parents in
   let ltes = sum_ltes_exn prevs_length max_num_parentss in
+  let max_lengths = Nat.Sum.[Nat.Adds.add_zr max_num_parents] in
   let requests = Requests.Step.create () in
   Timer.clock __LOC__ ;
   let step ~step_domains =
@@ -158,7 +159,7 @@ let create
         ; wrap_domains
         ; step_domains }
       ~proof_systems:[(module Step_main.Proof_system)]
-      ~num_rules ~prevs_lengths ~prevs_length ~prev_num_parentss
+      ~num_rules ~prevs_lengths ~prevs_length ~prev_num_parentss ~max_lengths
       ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length ~ltes
       ~self
     |> unstage
