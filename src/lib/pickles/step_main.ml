@@ -9,6 +9,82 @@ open Impls.Step
 open Step_main_inputs
 module B = Inductive_rule.B
 
+module Proof_system = struct
+  module Step = struct
+    let per_proof_witness_typ (type a_var a_value max_num_parents num_rules)
+        (basic :
+          (a_var, a_value, max_num_parents, num_rules) Types_map.Compiled.basic)
+        (tag : (a_var, a_value, max_num_parents, num_rules) Tag.tag) prevs
+        prev_num_parentss prev_num_ruless prevs_length prev_num_parentss_length
+        prev_num_ruless_length =
+      let module Typ_with_max_num_parents = struct
+        type ('var, 'value, 'local_max_num_parents, 'local_num_rules) t =
+          ( ('var, 'local_max_num_parents, 'local_num_rules) Per_proof_witness.t
+          , ( 'value
+            , 'local_max_num_parents
+            , 'local_num_rules )
+            Per_proof_witness.Constant.t )
+          Typ.t
+      end in
+      let rec join : type e pvars pvals ns1 ns2 br.
+             (pvars, pvals, ns1, ns2) H4.T(Tag).t
+          -> ns1 H1.T(Nat).t
+          -> ns2 H1.T(Nat).t
+          -> (pvars, br) Length.t
+          -> (ns1, br) Length.t
+          -> (ns2, br) Length.t
+          -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_num_parents).t =
+       fun ds ns1 ns2 ld ln1 ln2 ->
+        match (ds, ns1, ns2, ld, ln1, ln2) with
+        | [], [], [], Z, Z, Z ->
+            []
+        | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
+            let step_domains, typ =
+              (fun (type var value n m) (d : (var, value, n, m) Tag.t) ->
+                let typ : (_, m) Vector.t * (var, value) Typ.t =
+                  match Type_equal.Id.same_witness tag d.id with
+                  | Some T ->
+                      (basic.step_domains, basic.typ)
+                  | None -> (
+                    (* TODO: Abstract this into a function in Types_map *)
+                    match d.kind with
+                    | Compiled ->
+                        let d = Types_map.lookup_compiled d.id in
+                        (d.step_domains, d.typ)
+                    | Side_loaded ->
+                        let d = Types_map.lookup_side_loaded d.id in
+                        (* TODO: This replication to please the type checker is
+                       pointless... *)
+                        ( Vector.init d.permanent.num_rules ~f:(fun _ ->
+                              Side_loaded_verification_key.max_domains_with_x
+                          )
+                        , d.permanent.typ ) )
+                in
+                typ )
+                d
+            in
+            let t = Per_proof_witness.typ ~step_domains typ n1 n2 in
+            t :: join ds ns1 ns2 ld ln1 ln2
+        | [], _, _, _, _, _ ->
+            .
+        | _ :: _, _, _, _, _, _ ->
+            .
+      in
+      let typs =
+        join prevs prev_num_parentss prev_num_ruless prevs_length
+          prev_num_parentss_length prev_num_ruless_length
+      in
+      let module Prev_typ =
+        H4.Typ (Impls.Step) (Typ_with_max_num_parents) (Per_proof_witness)
+          (Per_proof_witness.Constant)
+          (struct
+            let f = Fn.id
+          end)
+      in
+      Prev_typ.f typs
+  end
+end
+
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
     : type num_parents num_rules prev_vars prev_values a_var a_value max_num_parents prev_num_ruless prev_num_parentss.
@@ -54,68 +130,10 @@ let step_main
       | Other of ('a, 'b, 'n, 'm) F.t
       | Self : (a_var, a_value, max_num_parents, num_rules) t
   end in
-  let module Typ_with_max_num_parents = struct
-    type ('var, 'value, 'local_max_num_parents, 'local_num_rules) t =
-      ( ('var, 'local_max_num_parents, 'local_num_rules) Per_proof_witness.t
-      , ( 'value
-        , 'local_max_num_parents
-        , 'local_num_rules )
-        Per_proof_witness.Constant.t )
-      Typ.t
-  end in
-  let prev_typs =
-    let rec join : type e pvars pvals ns1 ns2 br.
-           (pvars, pvals, ns1, ns2) H4.T(Tag).t
-        -> ns1 H1.T(Nat).t
-        -> ns2 H1.T(Nat).t
-        -> (pvars, br) Length.t
-        -> (ns1, br) Length.t
-        -> (ns2, br) Length.t
-        -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_num_parents).t =
-     fun ds ns1 ns2 ld ln1 ln2 ->
-      match (ds, ns1, ns2, ld, ln1, ln2) with
-      | [], [], [], Z, Z, Z ->
-          []
-      | d :: ds, n1 :: ns1, n2 :: ns2, S ld, S ln1, S ln2 ->
-          let step_domains, typ =
-            (fun (type var value n m) (d : (var, value, n, m) Tag.t) ->
-              let typ : (_, m) Vector.t * (var, value) Typ.t =
-                match Type_equal.Id.same_witness self.id d.id with
-                | Some T ->
-                    (basic.step_domains, basic.typ)
-                | None -> (
-                  (* TODO: Abstract this into a function in Types_map *)
-                  match d.kind with
-                  | Compiled ->
-                      let d = Types_map.lookup_compiled d.id in
-                      (d.step_domains, d.typ)
-                  | Side_loaded ->
-                      let d = Types_map.lookup_side_loaded d.id in
-                      (* TODO: This replication to please the type checker is
-                       pointless... *)
-                      ( Vector.init d.permanent.num_rules ~f:(fun _ ->
-                            Side_loaded_verification_key.max_domains_with_x )
-                      , d.permanent.typ ) )
-              in
-              typ )
-              d
-          in
-          let t = Per_proof_witness.typ ~step_domains typ n1 n2 in
-          t :: join ds ns1 ns2 ld ln1 ln2
-      | [], _, _, _, _, _ ->
-          .
-      | _ :: _, _, _, _, _, _ ->
-          .
-    in
-    join rule.prevs prev_num_parentss prev_num_ruless prevs_length
-      prev_num_parentss_length prev_num_ruless_length
-  in
-  let module Prev_typ =
-    H4.Typ (Impls.Step) (Typ_with_max_num_parents) (Per_proof_witness)
-      (Per_proof_witness.Constant)
-      (struct
-        let f = Fn.id
-      end)
+  let prev_typ =
+    Proof_system.Step.per_proof_witness_typ basic self.id rule.prevs
+      prev_num_parentss prev_num_ruless prevs_length prev_num_parentss_length
+      prev_num_ruless_length
   in
   let main (stmt : _ Types.Pairing_based.Statement.t) =
     let open Requests.Step in
@@ -133,8 +151,7 @@ let step_main
         in
         let app_state = exists basic.typ ~request:(fun () -> Req.App_state) in
         let prevs =
-          exists (Prev_typ.f prev_typs) ~request:(fun () ->
-              Req.Proof_with_datas )
+          exists prev_typ ~request:(fun () -> Req.Proof_with_datas)
         in
         let prev_statements =
           let module M =
