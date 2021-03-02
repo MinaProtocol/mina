@@ -83,6 +83,10 @@ module Proof_system = struct
       in
       Prev_typ.f typs
 
+    let get_opening_sg ((_, _, _, _, _, (opening, _)) : _ Per_proof_witness.t)
+        : Inner_curve.t =
+      opening.sg
+
     let get_step_data
         (type self_var self_value self_max_num_parents self_num_rules var value
         max_num_parents num_rules)
@@ -317,9 +321,7 @@ let step_main
               (Per_proof_witness)
               (E03 (Inner_curve))
               (struct
-                let f : type a b c.
-                    (a, b, c) Per_proof_witness.t -> Inner_curve.t =
-                 fun (_, _, _, _, _, (opening, _)) -> opening.sg
+                let f = Step_proof_system.get_opening_sg
               end)
           in
           let module V = H3.To_vector (Inner_curve) in
