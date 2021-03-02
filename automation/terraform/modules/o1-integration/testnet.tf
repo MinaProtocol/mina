@@ -34,7 +34,7 @@ module "kubernetes_testnet" {
       external_ip        = null,
       private_key_secret = null,
       enableArchive      = false,
-      archiveAddress     = ""
+      archiveAddress     = null
     }
   ]
 
@@ -58,7 +58,7 @@ module "kubernetes_testnet" {
       run_with_bots          = false
       enable_peer_exchange   = true
       enableArchive          = false
-      archiveAddress         = ""
+      archiveAddress         = null
     }
   ]
 }
