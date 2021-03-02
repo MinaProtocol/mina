@@ -28,7 +28,7 @@ locals {
     postgresqlUsername      = "postgres"
     postgresqlPassword      = "foobar"
     remoteSchemaFile        = var.mina_archive_schema
-    
+
     persistenceEnabled      = true
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"
@@ -41,5 +41,11 @@ locals {
   whale_block_producer_names = [for i in range(var.whale_count) : "whale-block-producer-${i + 1}"]
   fish_block_producer_names  = [for i in range(var.fish_count) : "fish-block-producer-${i + 1}"]
   seed_names                 = [for i in range(var.seed_count) : "seed-${i + 1}"]
-  archive_node_names         = var.archive_node_count == 0 ? [""] : [for i in range(var.archive_node_count) : "archive-${i + 1}:3086"]
+
+  archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [
+    for i in range(1, var.archive_node_count + 1) : merge(local.default_archive_node, {
+      name              = "archive-${i}"
+      postgresHost      = "archive-${i}-postgresql"
+    })
+  ]
 }

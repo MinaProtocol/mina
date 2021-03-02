@@ -54,7 +54,7 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_configs = [for item in var.archive_configs : merge(local.default_archive_node, item)]
+  archive_configs = local.archive_node_configs
 
   mina_archive_schema = var.mina_archive_schema
 
@@ -79,7 +79,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = element(local.archive_node_names, i)
+        archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
       }
     ],
     [
@@ -96,7 +96,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = element(local.archive_node_names, i)
+        archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
       }
     ]
   )
@@ -110,8 +110,8 @@ module "kubernetes_testnet" {
       external_ip        = google_compute_address.seed_static_ip[i].address
       private_key_secret = "online-seeds-account-${i + 1}-key"
       libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
-      enableArchive      = true
-      archiveAddress     = element(local.archive_node_names, i)
+      enableArchive      = length(local.archive_node_configs) > 0
+      archiveAddress     = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
     }
   ]
 

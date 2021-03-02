@@ -254,22 +254,8 @@ variable "archive_node_count" {
 }
 
 variable "archive_configs" {
-}
-
-variable "postgres_persistence_config" {
-  type = object({
-    enabled       = optional(bool)
-    size          = optional(string)
-    reclaimPolicy = optional(string)
-    storageClass  = optional(string)
-    accessModes   = optional(list(string))
-  })
-  default = {
-    enabled      = true
-    size         = "8Gi"
-    storageClass = "ssd-retain"
-    accessModes  = ["ReadWriteOnce"]
-  }
+  description = "individual archive-node deployment configurations"
+  default = null
 }
 
 variable "upload_blocks_to_gcloud" {

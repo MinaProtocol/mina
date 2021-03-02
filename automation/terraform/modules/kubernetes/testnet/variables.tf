@@ -273,14 +273,16 @@ variable "archive_configs" {
       image                   = string
       serverPort              = string
       externalPort            = string
+      enableLocalDaemon       = bool
+      enablePostgresDB        = bool
+
       postgresHost            = string
       postgresPort            = string
       postgresqlUsername      = string
       postgresqlPassword      = string
       postgresDB              = string
       remoteSchemaFile        = string
-      enableLocalDaemon       = bool
-      enablePostgresDB        = bool
+
       persistenceEnabled      = bool
       persistenceSize         = string
       persistenceStorageClass = string
