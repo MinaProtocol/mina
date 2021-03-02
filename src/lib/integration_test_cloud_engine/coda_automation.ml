@@ -5,7 +5,6 @@ open Signature_lib
 open Mina_base
 open Cmd_util
 open Integration_test_lib
-open Unix
 
 let aws_region = "us-west-2"
 
