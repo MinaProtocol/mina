@@ -353,4 +353,18 @@ spec:
     port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-graphql
+spec:
+  type: NodePort
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: {{ $.Values.coda.ports.graphql }}
+---
 {{ end }}

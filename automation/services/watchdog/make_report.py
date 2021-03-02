@@ -46,7 +46,7 @@ def main():
     parser.add_argument("-d", "--discord_webhook_url", help="discord webhook url", required=False, type=str, dest="discord_webhook_url")
     parser.add_argument("-a", "--accounts", help="community accounts csv", required=False, type=str, dest="accounts_csv")
     parser.add_argument("-l", "--local", help="run with a local node", required=False, type=bool, default=False)
-    parser.add_argument("-c", "--coda", help="local coda binary", required=False, type=str, default="coda")
+    parser.add_argument("-b", "--bin", help="local mina binary", required=False, type=str, default="mina", dest="binary")
 
     # ==========================================
 
@@ -85,7 +85,7 @@ def main():
     request_timeout_seconds = 600
 
     def exec_locally(command):
-      command = command.replace('coda', args.coda)
+      command = command.replace('mina', args.binary)
       print(command)
       import subprocess
       subprocess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
@@ -260,7 +260,7 @@ def main():
     slots_per_epoch = int(get_status_value('Slots per epoch'))
     global_slot = epoch*slots_per_epoch + slot
 
-    resp = exec_command("coda advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors")
+    resp = exec_command("mina advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors")
     add_resp(resp, [])
 
     requests = 0
