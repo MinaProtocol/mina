@@ -269,26 +269,22 @@ variable "make_report_accounts" {
 variable "archive_configs" {
   type = list(
     object({
-      name               = string
-      image              = string
-      serverPort         = string
-      externalPort       = string
-      postgresHost       = string
-      postgresPort       = string
-      postgresqlUsername = string
-      postgresqlPassword = string
-      postgresDB         = string
-      remoteSchemaFile   = string
-      enableLocalDaemon  = bool
-      enablePostgresDB   = bool
-      postgresPersistence = object(
-        {
-          enabled      = bool
-          size         = string
-          storageClass = string
-          accessModes  = list(string)
-        }
-      )
+      name                    = string
+      image                   = string
+      serverPort              = string
+      externalPort            = string
+      postgresHost            = string
+      postgresPort            = string
+      postgresqlUsername      = string
+      postgresqlPassword      = string
+      postgresDB              = string
+      remoteSchemaFile        = string
+      enableLocalDaemon       = bool
+      enablePostgresDB        = bool
+      persistenceEnabled      = bool
+      persistenceSize         = string
+      persistenceStorageClass = string
+      persistenceAccessModes  = list(string)
     })
   )
   default = []

@@ -54,12 +54,7 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_configs = length(var.archive_configs) != 0 ? [ for item in var.archive_configs: merge(local.default_archive_node, item) ] : [
-      for i in range(2, var.archive_node_count + 1) : merge(local.default_archive_node, {
-        name              = "archive-${i}"
-        postgresHost      = "archive-${i}-postgresql"
-      })
-    ]
+  archive_configs = [for item in var.archive_configs : merge(local.default_archive_node, item)]
 
   mina_archive_schema = var.mina_archive_schema
 

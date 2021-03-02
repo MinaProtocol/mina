@@ -235,7 +235,14 @@ resource "helm_release" "archive_node" {
       testnetName = var.testnet_name
       coda        = local.archive_node_vars.coda
       archive     = var.archive_configs[count.index]
-      postgresql  = { persistence = lookup(var.archive_configs[count.index], "postgresPersistence", {}) }
+      postgresql = {
+        persistence = {
+          enabled      = var.archive_configs[count.index]["persistenceEnabled"]
+          size         = var.archive_configs[count.index]["persistenceSize"]
+          storageClass = var.archive_configs[count.index]["persistenceStorageClass"]
+          accessModes  = var.archive_configs[count.index]["persistenceAccessModes"]
+        }
+      }
     })
   ]
 

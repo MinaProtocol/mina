@@ -254,8 +254,6 @@ variable "archive_node_count" {
 }
 
 variable "archive_configs" {
-  type    = list(any)
-  default = []
 }
 
 variable "postgres_persistence_config" {
@@ -267,10 +265,10 @@ variable "postgres_persistence_config" {
     accessModes   = optional(list(string))
   })
   default = {
-    enabled       = true
-    size          = "8Gi"
-    storageClass  = "ssd-retain"
-    accessModes   = ["ReadWriteOnce"]
+    enabled      = true
+    size         = "8Gi"
+    storageClass = "ssd-retain"
+    accessModes  = ["ReadWriteOnce"]
   }
 }
 
