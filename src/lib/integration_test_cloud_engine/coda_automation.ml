@@ -109,16 +109,8 @@ module Network_config = struct
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let git_commit = Mina_version.commit_id_short in
-    let time_now = Unix.gmtime (Unix.gettimeofday ()) in
-    let timestr =
-      string_of_int time_now.tm_mday
-      ^ string_of_int time_now.tm_hour
-      ^ string_of_int time_now.tm_min
-    in
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
-    let testnet_name =
-      user ^ "-" ^ git_commit ^ "-" ^ test_name ^ "-" ^ timestr
-    in
+    let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =

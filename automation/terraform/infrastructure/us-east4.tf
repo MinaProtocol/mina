@@ -336,7 +336,7 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
                 "janitor",
                 "cleanup-namespace-resources",
                 "--namespace-pattern",
-                "integration|it-|auto|ci-net.*",
+                "^it-.*",
                 "--cleanup-older-than",
                 "10800", # 60 * 60 * 3 seconds (3hrs)
                 "--k8s-context",
