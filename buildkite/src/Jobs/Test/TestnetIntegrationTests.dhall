@@ -22,11 +22,10 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     TestExecutive.build "integration_tests",
-
-    TestExecutive.execute "block-prod" dependsOn
-    -- TestExecutive.execute "bootstrap" dependsOn,
-    -- TestExecutive.execute "peers" dependsOn,
-    -- TestExecutive.execute "pmt-timed-accts" dependsOn,
-    -- TestExecutive.execute "send-payment" dependsOn
+    TestExecutive.execute "block-prod" dependsOn,
+    TestExecutive.execute "bootstrap" dependsOn,
+    TestExecutive.execute "peers" dependsOn,
+    TestExecutive.execute "pmt-timed-accts" dependsOn,
+    TestExecutive.execute "send-payment" dependsOn
   ]
 }
