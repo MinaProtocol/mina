@@ -67,10 +67,6 @@ coda-demo)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   ;;
 coda-rosetta)
-  if [[ "$BUILD_ROSETTA" != "true" ]]; then
-    echo "BUILD_ROSETTA env var not set, short-circuiting to avoid slow builds."
-    exit 0
-  fi
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
   ;;
 leaderboard)
