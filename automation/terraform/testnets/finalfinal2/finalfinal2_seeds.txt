@@ -11,6 +11,7 @@
 /dns4/mina-seed-1.nodeasy.com/tcp/10001/p2p/12D3KooWRMXtoYktAqkNFd9LkT1XpAJWryqje88owWf9v9SpaayN
 /dns4/mina-seed-1.zkvalidator.com/tcp/8302/p2p/12D3KooWSR7LMBSfEk3LQUudmsX27yuRHe9NUxwLumurGF5P1MNS
 /dns4/mina-seed-2.zkvalidator.com/tcp/8302/p2p/12D3KooWHPAqBh4rF2K94p7ucW2pyQvpYstRRSZZZAn1ib1TU3v6
+/dns4/mina-seed.bitcat365.com/tcp/10001/p2p/12D3KooWQzozNTDKL7MqUh6Nh11GMA4pQhRCAsNTRWxCAzAi4VbE
 /dns4/mina-seed.dsrvlabs.net/tcp/8302/p2p/12D3KooWJQAvnn3dcQgpiMXBczkKQs58rVVbakZHJEvCvQC9XubE
 /dns4/mina-seed.genesislab.net/tcp/8302/p2p/12D3KooWRcHiFQsbYgjPSxtMg4Y9ifrvmCFtJQ8Qztqd3z4L9buU
 /dns4/mina-seed.hashquark.io/tcp/8302/p2p/12D3KooWRqdbJszoX6AB2E47KR45Kex1RptichA2MDkNSCqX5eb4
