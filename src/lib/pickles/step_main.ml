@@ -106,6 +106,97 @@ module Proof_system = struct
         | Side_loaded ->
             Types_map.For_step.of_side_loaded
               (Types_map.lookup_side_loaded tag.id) )
+
+    let finalize_and_verify
+        (type self_var self_value self_max_num_parents self_num_rules var value
+        max_num_parents num_rules)
+        (self_data :
+          ( self_var
+          , self_value
+          , self_max_num_parents
+          , self_num_rules )
+          Types_map.For_step.t)
+        (self_tag :
+          (self_var, self_value, self_max_num_parents, self_num_rules) Tag.tag)
+        (proof : (var, max_num_parents, num_rules) Per_proof_witness.t)
+        (tag : (var, value, max_num_parents, num_rules) Tag.t)
+        (pass_through : Digest.t) (unfinalized : Unfinalized.t)
+        (should_verify : Boolean.var) =
+      let open Pairing_main in
+      Boolean.Assert.( = ) unfinalized.should_finalize should_verify ;
+      let ( app_state
+          , state
+          , prev_evals
+          , sg_old
+          , old_bulletproof_challenges
+          , (opening, messages) ) =
+        proof
+      in
+      let d = get_step_data self_data self_tag tag in
+      let finalized, chals =
+        with_label __LOC__ (fun () ->
+            let sponge_digest = state.sponge_digest_before_evaluations in
+            let sponge =
+              let open Step_main_inputs in
+              let sponge = Sponge.create sponge_params in
+              Sponge.absorb sponge (`Field sponge_digest) ;
+              sponge |> Opt_sponge.Underlying.of_sponge |> S.Bit_sponge.make
+            in
+            finalize_other_proof d.max_num_parents ~num_parents:d.num_parents
+              ~rules_num_parents:d.rules_num_parents
+              ~step_domains:d.step_domains ~sponge ~old_bulletproof_challenges
+              state.deferred_values prev_evals )
+      in
+      let which_rule = state.deferred_values.which_rule in
+      let state =
+        with_label __LOC__ (fun () ->
+            { state with
+              deferred_values=
+                { state.deferred_values with
+                  which_rule=
+                    Pseudo.choose
+                      ( state.deferred_values.which_rule
+                      , Vector.init d.num_rules ~f:Field.of_int )
+                      ~f:Fn.id
+                    |> Types.Index.of_field (module Impl) } } )
+      in
+      let statement =
+        let prev_me_only =
+          with_label __LOC__ (fun () ->
+              let hash =
+                (* TODO: Don't rehash when it's not necessary *)
+                unstage
+                  (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements)
+              in
+              hash ~num_parents:d.rules_num_parents
+                ~max_num_parents:(Nat.Add.n d.max_num_parents)
+                ~which_rule
+                (* Use opt sponge for cutting off the bulletproof challenges early *)
+                { app_state
+                ; dlog_plonk_index= d.wrap_key
+                ; sg= sg_old
+                ; old_bulletproof_challenges } )
+        in
+        { Types.Dlog_based.Statement.pass_through= prev_me_only
+        ; proof_state= {state with me_only= pass_through} }
+      in
+      let verified =
+        with_label __LOC__ (fun () ->
+            verify ~num_parents:d.max_num_parents ~wrap_domain:d.wrap_domains.h
+              ~is_base_case:should_verify ~sg_old ~opening ~messages
+              ~wrap_verification_key:d.wrap_key statement unfinalized )
+      in
+      if debug then
+        as_prover
+          As_prover.(
+            fun () ->
+              let finalized = read Boolean.typ finalized in
+              let verified = read Boolean.typ verified in
+              let should_verify = read Boolean.typ should_verify in
+              printf "finalized: %b\n%!" finalized ;
+              printf "verified: %b\n%!" verified ;
+              printf "should_verify: %b\n\n%!" should_verify) ;
+      (chals, Boolean.(verified &&& finalized ||| not should_verify))
   end
 end
 
@@ -261,100 +352,15 @@ let step_main
                   , unfinalized :: unfinalizeds
                   , should_verify :: should_verifys
                   , S pi ) ->
-                    Boolean.Assert.( = ) unfinalized.should_finalize
-                      should_verify ;
-                    let ( app_state
-                        , state
-                        , prev_evals
-                        , sg_old
-                        , old_bulletproof_challenges
-                        , (opening, messages) ) =
-                      p
+                    let chals, verified =
+                      Step_proof_system.finalize_and_verify self_data self.id p
+                        tag pass_through unfinalized should_verify
                     in
-                    let d =
-                      Step_proof_system.get_step_data self_data self.id tag
-                    in
-                    let finalized, chals =
-                      with_label __LOC__ (fun () ->
-                          let sponge_digest =
-                            state.sponge_digest_before_evaluations
-                          in
-                          let sponge =
-                            let open Step_main_inputs in
-                            let sponge = Sponge.create sponge_params in
-                            Sponge.absorb sponge (`Field sponge_digest) ;
-                            sponge |> Opt_sponge.Underlying.of_sponge
-                            |> S.Bit_sponge.make
-                          in
-                          finalize_other_proof d.max_num_parents
-                            ~num_parents:d.num_parents
-                            ~rules_num_parents:d.rules_num_parents
-                            ~step_domains:d.step_domains ~sponge
-                            ~old_bulletproof_challenges state.deferred_values
-                            prev_evals )
-                    in
-                    let which_rule = state.deferred_values.which_rule in
-                    let state =
-                      with_label __LOC__ (fun () ->
-                          { state with
-                            deferred_values=
-                              { state.deferred_values with
-                                which_rule=
-                                  Pseudo.choose
-                                    ( state.deferred_values.which_rule
-                                    , Vector.init d.num_rules ~f:Field.of_int
-                                    )
-                                    ~f:Fn.id
-                                  |> Types.Index.of_field (module Impl) } } )
-                    in
-                    let statement =
-                      let prev_me_only =
-                        with_label __LOC__ (fun () ->
-                            let hash =
-                              (* TODO: Don't rehash when it's not necessary *)
-                              unstage
-                                (hash_me_only_opt ~index:d.wrap_key
-                                   d.var_to_field_elements)
-                            in
-                            hash ~num_parents:d.rules_num_parents
-                              ~max_num_parents:(Nat.Add.n d.max_num_parents)
-                              ~which_rule
-                              (* Use opt sponge for cutting off the bulletproof challenges early *)
-                              { app_state
-                              ; dlog_plonk_index= d.wrap_key
-                              ; sg= sg_old
-                              ; old_bulletproof_challenges } )
-                      in
-                      { Types.Dlog_based.Statement.pass_through= prev_me_only
-                      ; proof_state= {state with me_only= pass_through} }
-                    in
-                    let verified =
-                      with_label __LOC__ (fun () ->
-                          verify ~num_parents:d.max_num_parents
-                            ~wrap_domain:d.wrap_domains.h
-                            ~is_base_case:should_verify ~sg_old ~opening
-                            ~messages ~wrap_verification_key:d.wrap_key
-                            statement unfinalized )
-                    in
-                    if debug then
-                      as_prover
-                        As_prover.(
-                          fun () ->
-                            let finalized = read Boolean.typ finalized in
-                            let verified = read Boolean.typ verified in
-                            let should_verify =
-                              read Boolean.typ should_verify
-                            in
-                            printf "finalized: %b\n%!" finalized ;
-                            printf "verified: %b\n%!" verified ;
-                            printf "should_verify: %b\n\n%!" should_verify) ;
                     let chalss, vs =
                       go proofs tags pass_throughs unfinalizeds should_verifys
                         pi
                     in
-                    ( chals :: chalss
-                    , Boolean.(verified &&& finalized ||| not should_verify)
-                      :: vs )
+                    (chals :: chalss, verified :: vs)
               in
               let chalss, vs =
                 go prevs rule.prevs pass_throughs unfinalized_proofs
