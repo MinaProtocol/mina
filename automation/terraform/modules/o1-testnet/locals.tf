@@ -21,12 +21,14 @@ locals {
     externalPort            = "11010"
     enableLocalDaemon       = true
     enablePostgresDB        = true
+
     postgresHost            = "archive-1-postgresql"
     postgresPort            = 5432
     postgresDB              = "archive"
     postgresqlUsername      = "postgres"
     postgresqlPassword      = "foobar"
     remoteSchemaFile        = var.mina_archive_schema
+    
     persistenceEnabled      = true
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"
