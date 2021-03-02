@@ -31,6 +31,7 @@ locals {
     persistenceSize         = "8Gi"
     persistenceStorageClass = "ssd-delete"
     persistenceAccessModes  = ["ReadWriteOnce"]
+    preemptibleAllowed      = "false"
   }
 
   static_peers = merge(local.block_producer_static_peers, local.seed_static_peers)

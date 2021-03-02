@@ -113,16 +113,6 @@ locals {
     }
   }
 
-  archive_node_vars = {
-    testnetName = var.testnet_name
-    coda = {
-      image         = var.coda_image
-      seedPeers     = local.peers
-      runtimeConfig = local.coda_vars.runtimeConfig
-      seedPeersURL  = var.seed_peers_url
-    }
-  }
-
   watchdog_vars = {
     testnetName = var.testnet_name
     image       = var.watchdog_image
@@ -233,7 +223,12 @@ resource "helm_release" "archive_node" {
   values = [
     yamlencode({
       testnetName = var.testnet_name
-      coda        = local.archive_node_vars.coda
+      coda        = {
+        image         = var.coda_image
+        seedPeers     = local.peers
+        runtimeConfig = local.coda_vars.runtimeConfig
+        seedPeersURL  = var.seed_peers_url
+      }
       archive     = var.archive_configs[count.index]
       postgresql = {
         persistence = {
@@ -241,6 +236,25 @@ resource "helm_release" "archive_node" {
           size         = var.archive_configs[count.index]["persistenceSize"]
           storageClass = var.archive_configs[count.index]["persistenceStorageClass"]
           accessModes  = var.archive_configs[count.index]["persistenceAccessModes"]
+        }
+        primary = {
+          affinity = {
+            nodeAffinity = {
+              requiredDuringSchedulingIgnoredDuringExecution = {
+                nodeSelectorTerms = [
+                  {
+                    matchExpressions = [
+                      {
+                        key = "cloud.google.com/gke-preemptible"
+                        operator = var.archive_configs[count.index]["preemptibleAllowed"] ? "In" : "NotIn"
+                        values = ["true"]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
         }
       }
     })
