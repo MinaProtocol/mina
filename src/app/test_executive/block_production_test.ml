@@ -1,5 +1,3 @@
-(* trigger integration tests *)
-
 open Core
 open Integration_test_lib
 
