@@ -30,9 +30,11 @@ type ( 'a_var
           Inductive_rule.t
       ; main:
              step_domains:(Domains.t, 'num_rules) Vector.t
-          -> ( (Unfinalized.t, 'max_num_parents) Vector.t
+          -> ( (Unfinalized.t * unit, 'max_num_parents * unit) H2.T(Vector).t
              , Impls.Step.Field.t
-             , (Impls.Step.Field.t, 'max_num_parents) Vector.t )
+             , ( 'max_num_parents * unit
+               , Impls.Step.Field.t )
+               H1_1.T(Vector.Flipped).t )
              Types.Pairing_based.Statement.t
           -> unit
       ; requests:
@@ -123,8 +125,10 @@ let create
           (Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains))
     in
     let etyp =
-      Impls.Step.input ~num_parents:max_num_parents
-        ~wrap_rounds:Backend.Tock.Rounds.n
+      Impls.Step.input_of_hlist ~num_parentss:[max_num_parents]
+        ~per_proof_specs:
+          [ Step_main.Proof_system.Step.per_proof_spec
+              ~wrap_rounds:Backend.Tock.Rounds.n ]
     in
     Fix_domains.domains (module Impls.Step) etyp main
   in

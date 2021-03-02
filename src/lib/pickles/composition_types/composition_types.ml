@@ -883,7 +883,7 @@ module Pairing_based = struct
 
     type ('unfinalized_proofs, 'me_only) t =
       {unfinalized_proofs: 'unfinalized_proofs; me_only: 'me_only}
-    [@@deriving sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson, hlist]
 
     let spec unfinalized_proofs me_only =
       let open Spec in
@@ -921,7 +921,7 @@ module Pairing_based = struct
     type ('unfinalized_proofs, 'me_only, 'pass_through) t =
       { proof_state: ('unfinalized_proofs, 'me_only) Proof_state.t
       ; pass_through: 'pass_through }
-    [@@deriving sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson, hlist]
 
     let to_data {proof_state= {unfinalized_proofs; me_only}; pass_through} =
       let open Hlist.HlistId in

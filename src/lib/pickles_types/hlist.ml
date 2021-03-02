@@ -1,6 +1,10 @@
 open Core_kernel
 open Poly_types
 
+module E12 (T : T1) = struct
+  type ('a, _) t = 'a T.t
+end
+
 module E13 (T : T1) = struct
   type ('a, _, _) t = 'a T.t
 end
@@ -184,6 +188,14 @@ module H1 = struct
             let there _ = () in
             transport (unit ()) ~there ~back:(fun () -> ([] : _ T(Val).t))
             |> transport_var ~there ~back:(fun () -> ([] : _ T(Var).t))
+  end
+end
+
+module H1_1 = struct
+  module T (F : T2) = struct
+    type (_, _) t =
+      | [] : (unit, _) t
+      | ( :: ) : ('a1, 's1) F.t * ('b1, 's1) t -> ('a1 * 'b1, 's1) t
   end
 end
 
@@ -554,6 +566,16 @@ module H3 = struct
       | x :: xs ->
           let y = C.f x in
           y :: f xs
+  end
+end
+
+module H3_1 = struct
+  module T (F : T4) = struct
+    type (_, _, _, 's) t =
+      | [] : (unit, unit, unit, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 's) F.t * ('b1, 'b2, 'b3, 's) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 's) t
   end
 end
 

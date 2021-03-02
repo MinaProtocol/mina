@@ -449,8 +449,10 @@ struct
     in
     let%map.Async (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
-        Impls.Step.input ~num_parents:Max_num_parents.n
-          ~wrap_rounds:Tock.Rounds.n
+        Impls.Step.input_of_hlist ~num_parentss:[Max_num_parents.n]
+          ~per_proof_specs:
+            [ Step_main.Proof_system.Step.per_proof_spec
+                ~wrap_rounds:Tock.Rounds.n ]
       in
       let rec pad : type n k maxes pvals lws lhs.
              (Digest.Constant.t, k) Vector.t
@@ -518,17 +520,18 @@ struct
                 : unit ) )
             ()
             { proof_state=
-                { next_statement.proof_state with
-                  me_only=
+                { unfinalized_proofs=
+                    [next_statement.proof_state.unfinalized_proofs]
+                ; me_only=
                     Common.hash_pairing_me_only
                       ~app_state:A_value.to_field_elements
                       next_me_only_prepared }
             ; pass_through=
                 (* TODO: Use the same pad_pass_through function as in wrap *)
-                pad
-                  (Vector.map statements_with_hashes ~f:(fun s ->
-                       s.proof_state.me_only ))
-                  Maxes.maxes Maxes.length } )
+                [ pad
+                    (Vector.map statements_with_hashes ~f:(fun s ->
+                         s.proof_state.me_only ))
+                    Maxes.maxes Maxes.length ] } )
     in
     let prev_evals =
       let module M =

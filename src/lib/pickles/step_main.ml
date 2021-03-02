@@ -201,6 +201,11 @@ module Proof_system = struct
               printf "verified: %b\n%!" verified ;
               printf "should_verify: %b\n\n%!" should_verify) ;
       (chals, Boolean.(verified &&& finalized ||| not should_verify))
+
+    let per_proof_spec ~wrap_rounds =
+      let open Composition_types.Spec in
+      let open Composition_types.Pairing_based.Proof_state.Per_proof.In_circuit in
+      Map_var (Map_value (spec wrap_rounds, to_data, of_data), to_data, of_data)
   end
 end
 
@@ -235,9 +240,9 @@ let step_main
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (   ( (Unfinalized.t, max_num_parents) Vector.t
+    -> (   ( (Unfinalized.t * unit, max_num_parents * unit) H2.T(Vector).t
            , Field.t
-           , (Field.t, max_num_parents) Vector.t )
+           , (max_num_parents * unit, Digest.t) H1_1.T(Vector.Flipped).t )
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
@@ -255,7 +260,12 @@ let step_main
       prev_num_parentss prev_num_ruless prevs_length prev_num_parentss_length
       prev_num_ruless_length
   in
-  let main (stmt : _ Types.Pairing_based.Statement.t) =
+  let main
+      (stmt :
+        ( (Unfinalized.t * unit, max_num_parents * unit) H2.T(Vector).t
+        , Field.t
+        , (max_num_parents * unit, Digest.t) H1_1.T(Vector.Flipped).t )
+        Types.Pairing_based.Statement.t) =
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
@@ -288,8 +298,8 @@ let step_main
         in
         let unfinalized_proofs =
           let module H = H1.Of_vector (Unfinalized) in
-          H.f prevs_length
-            (Vector.trim stmt.proof_state.unfinalized_proofs lte)
+          let [unfinalized_proofs] = stmt.proof_state.unfinalized_proofs in
+          H.f prevs_length (Vector.trim unfinalized_proofs lte)
         in
         let module Packed_digest = Field in
         let module Proof = struct
@@ -299,7 +309,8 @@ let step_main
         let pass_throughs =
           with_label "pass_throughs" (fun () ->
               let module V = H1.Of_vector (Digest) in
-              V.f prevs_length (Vector.trim stmt.pass_through lte) )
+              let [pass_throughs] = stmt.pass_through in
+              V.f prevs_length (Vector.trim pass_throughs lte) )
         in
         let self_data :
             (a_var, a_value, max_num_parents, num_rules) Types_map.For_step.t =

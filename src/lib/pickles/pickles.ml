@@ -563,8 +563,10 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           (E04 (Lazy_keys))
           (struct
             let etyp =
-              Impls.Step.input ~num_parents:Max_num_parents.n
-                ~wrap_rounds:Tock.Rounds.n
+              Impls.Step.input_of_hlist ~num_parentss:[Max_num_parents.n]
+                ~per_proof_specs:
+                  [ Step_main.Proof_system.Step.per_proof_spec
+                      ~wrap_rounds:Tock.Rounds.n ]
 
             let f (T b : _ Branch_data.t) =
               let (T (typ, conv)) = etyp in
