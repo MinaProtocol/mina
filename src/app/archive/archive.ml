@@ -9,6 +9,12 @@ let command_run =
     (let%map_open log_json = Flag.Log.json
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
+     and metrics_server_port =
+       flag "--metrics-port" ~aliases:["metrics-port"]
+         ~doc:
+           "PORT metrics server for scraping via Prometheus (default no \
+            metrics-server)"
+         (optional Cli_lib.Arg_type.int16)
      and postgres = Flag.Uri.Archive.postgres
      and runtime_config_file =
        flag "--config-file" ~aliases:["-config-file"] (optional string)
@@ -28,7 +34,7 @@ let command_run =
      fun () ->
        let logger = Logger.create () in
        Stdout_log.setup log_json log_level ;
-       Archive_lib.Processor.setup_server ~logger
+       Archive_lib.Processor.setup_server ~metrics_server_port ~logger
          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
          ~postgres_address:postgres.value
          ~server_port:
