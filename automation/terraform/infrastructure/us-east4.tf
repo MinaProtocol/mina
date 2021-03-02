@@ -330,13 +330,15 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
           spec {
             container {
               name  = "integration-test-janitor"
-              image = "gcr.io/o1labs-192920/watchdog:0.3.8"
+              image = "gcr.io/o1labs-192920/watchdog:0.3.9"
               args = [
                 "/scripts/network-utilities.py",
                 "janitor",
                 "cleanup-namespace-resources",
                 "--namespace-pattern",
-                ".*integration|auto|ci-net.*",
+                "integration|it-|auto|ci-net.*",
+                "--cleanup-older-than",
+                "10800", # 60 * 60 * 3 seconds (3hrs)
                 "--k8s-context",
                 "gke_o1labs-192920_us-west1_mina-integration-west1",
                 "--kube-config-file",
