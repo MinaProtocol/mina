@@ -157,6 +157,7 @@ let create
         ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
+      ~proof_systems:[(module Step_main.Proof_system)]
       ~num_rules ~prevs_lengths ~prevs_length ~prev_num_parentss
       ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length ~ltes
       ~self
