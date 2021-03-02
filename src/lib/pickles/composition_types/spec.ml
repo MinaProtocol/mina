@@ -1,6 +1,7 @@
 module D = Digest
 open Core_kernel
 open Pickles_types
+open Higher_kinded_poly
 open Hlist
 module Sc = Pickles_types.Scalar_challenge
 

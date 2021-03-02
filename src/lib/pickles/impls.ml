@@ -97,11 +97,11 @@ module Step = struct
       ~(per_proof_specs : (values, vars, _) H2_1.T(Spec).t) :
       ( ( (vars, num_parentss) H2.T(Vector).t
         , Field.t
-        , (num_parentss, Field.t) H1_1.T(Vector.Flipped).t )
+        , num_parentss H1.T(Vector.Carrying(Digest)).t )
         Types.Pairing_based.Statement.t
       , ( (values, num_parentss) H2.T(Vector).t
         , Digest.Constant.t
-        , (num_parentss, Digest.Constant.t) H1_1.T(Vector.Flipped).t )
+        , num_parentss H1.T(Vector.Carrying(Digest.Constant)).t )
         Types.Pairing_based.Statement.t
       , _ )
       Spec.ETyp.t =
@@ -123,8 +123,8 @@ module Step = struct
            , (values, num_parentss) H2.T(Vector).t
            , _ )
            Spec.ETyp.t
-           * ( (num_parentss, Digest.t) H1_1.T(Vector.Flipped).t
-             , (num_parentss, Digest.Constant.t) H1_1.T(Vector.Flipped).t
+           * ( num_parentss H1.T(Vector.Carrying(Digest)).t
+             , num_parentss H1.T(Vector.Carrying(Digest.Constant)).t
              , _ )
              Spec.ETyp.t =
      fun num_parentss specs ->
@@ -139,10 +139,11 @@ module Step = struct
           in
           let digest_typ =
             let open Snarky_backendless.Typ in
-            let module M = H1_1.T (Vector.Flipped) in
+            let module M = H1.T (Vector.Carrying (Digest.Constant)) in
+            let module N = H1.T (Vector.Carrying (Digest)) in
             let open M in
             transport (unit ()) ~there:(fun [] -> ()) ~back:(fun () -> [])
-            |> transport_var ~there:(fun [] -> ()) ~back:(fun () -> [])
+            |> transport_var ~there:N.(fun [] -> ()) ~back:N.(fun () -> [])
           in
           (Spec.ETyp.T (per_proof_typ, Fn.id), Spec.ETyp.T (digest_typ, Fn.id))
       | [], _ ->
@@ -173,12 +174,13 @@ module Step = struct
           in
           let digest_typ =
             let open Snarky_backendless.Typ in
-            let module M = H1_1.T (Vector.Flipped) in
-            let open M in
+            let module M = H1.T (Vector.Carrying (Digest.Constant)) in
+            let module N = H1.T (Vector.Carrying (Digest)) in
+            let open N in
             let typ =
               transport
                 (tuple2 digest_typ digests_typ)
-                ~there:(fun (x :: y) -> (x, y))
+                ~there:M.(fun (x :: y) -> (x, y))
                 ~back:(fun (x, y) -> x :: y)
             in
             Spec.ETyp.T (typ, fun (x, y) -> digest_fn x :: digests_fn y)

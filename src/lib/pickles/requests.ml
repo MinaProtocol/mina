@@ -2,6 +2,7 @@ open Core
 open Import
 open Types
 open Pickles_types
+open Higher_kinded_poly
 open Hlist
 open Snarky_backendless.Request
 open Common
@@ -126,26 +127,30 @@ module Step = struct
 
     type prev_num_ruless
 
+    type per_proof_witnesses
+
     type _ t +=
       | Proof_with_datas :
           ( prev_values
           , prev_num_parentss
-          , prev_num_ruless )
-          H3.T(Per_proof_witness.Constant).t
+          , prev_num_ruless
+          , per_proof_witnesses )
+          H4.T(H3_1.T(P3)).t
           t
       | Wrap_index : Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
       | App_state : statement t
   end
 
   let create
-      : type prev_num_parentss prev_num_ruless statement prev_values max_num_parents.
+      : type prev_num_parentss prev_num_ruless statement prev_values max_num_parents per_proof_witnesses.
          unit
       -> (module S
             with type prev_num_parentss = prev_num_parentss
              and type prev_num_ruless = prev_num_ruless
              and type statement = statement
              and type prev_values = prev_values
-             and type max_num_parents = max_num_parents) =
+             and type max_num_parents = max_num_parents
+             and type per_proof_witnesses = per_proof_witnesses) =
    fun () ->
     let module R = struct
       type nonrec max_num_parents = max_num_parents
@@ -158,12 +163,15 @@ module Step = struct
 
       type nonrec prev_num_ruless = prev_num_ruless
 
+      type nonrec per_proof_witnesses = per_proof_witnesses
+
       type _ t +=
         | Proof_with_datas :
             ( prev_values
             , prev_num_parentss
-            , prev_num_ruless )
-            H3.T(Per_proof_witness.Constant).t
+            , prev_num_ruless
+            , per_proof_witnesses )
+            H4.T(H3_1.T(P3)).t
             t
         | Wrap_index :
             Tock.Curve.Affine.t array Plonk_verification_key_evals.t t
