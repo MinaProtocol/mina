@@ -395,7 +395,7 @@ module Typ_function = struct
        Typ.t
 end
 
-let build_combined_typ tagss ns1 ns2 ld ln1 ln2 polys =
+let build_combined_typ basic self_id proof_systems tagss ns1 ns2 ld ln1 ln2 =
   let module Typ_with_max_num_parents = struct
     type ( 'var
          , 'value
@@ -412,15 +412,13 @@ let build_combined_typ tagss ns1 ns2 ld ln1 ln2 polys =
         H3_1.T(P3).t )
       Typ.t
   end in
-  let rec join : type e pvars pvals ns1 ns2 poly_vars poly_values br.
-         ( pvars
-         , pvals
-         , ns1
-         , ns2
-         , br
-         , poly_vars
-         , poly_values )
-         H7.T(Typ_function).t
+  let rec join
+      : type e pvars pvals ns1 ns2 per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants br.
+         ( per_proof_witnesses
+         , per_proof_witness_constants
+         , unfinalizeds
+         , unfinalized_constants )
+         H4.T(PS).t
       -> (pvars, pvals, ns1, ns2) H4.T(H4.T(Tag)).t
       -> ns1 H1.T(H1.T(Nat)).t
       -> ns2 H1.T(H1.T(Nat)).t
@@ -431,23 +429,29 @@ let build_combined_typ tagss ns1 ns2 ld ln1 ln2 polys =
          , pvals
          , ns1
          , ns2
-         , poly_vars
-         , poly_values )
+         , per_proof_witnesses
+         , per_proof_witness_constants )
          H6.T(Typ_with_max_num_parents).t =
-   fun polys tagss ns1 ns2 ld ln1 ln2 ->
-    match (polys, tagss, ns1, ns2, ld, ln1, ln2) with
+   fun proof_systems tagss ns1 ns2 ld ln1 ln2 ->
+    match (proof_systems, tagss, ns1, ns2, ld, ln1, ln2) with
     | [], [], [], [], [], [], [] ->
         []
-    | ( f :: polys
+    | ( (module PS_) :: proof_systems
       , tag :: tags
       , n1 :: ns1
       , n2 :: ns2
       , l :: ld
       , l1 :: ln1
       , l2 :: ln2 ) ->
-        let typ = f tag n1 n2 l l1 l2 in
-        let typs = join polys tags ns1 ns2 ld ln1 ln2 in
+        let typ =
+          PS_.Step.per_proof_witness_typ basic self_id tag n1 n2 l l1 l2
+        in
+        let typs = join proof_systems tags ns1 ns2 ld ln1 ln2 in
         typ :: typs
+    | (module PS_) :: _, [], [], [], [], [], [] ->
+        failwith "build_combined_typ"
+    | [], (_ :: _), _, _, _, _, _ ->
+        failwith "build_combined_typ"
   in
   let module M =
     H6.Typ_split (Impls.Step) (Typ_with_max_num_parents)
@@ -457,7 +461,7 @@ let build_combined_typ tagss ns1 ns2 ld ln1 ln2 polys =
         let f = Fn.id
       end)
   in
-  M.f (join tagss ns1 ns2 ld ln1 ln2 polys)
+  M.f (join proof_systems tagss ns1 ns2 ld ln1 ln2)
 
 let rec h2_vec_to_h2_h1_1 : type length params actual_length carrying.
        (carrying, length) H2.T(Vector).t
@@ -527,18 +531,16 @@ let step_main
        Staged.t =
  fun (module Req) (module Max_num_parents) ~num_rules ~prev_num_parentss
      ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length
-     ~prevs_lengths ~prevs_length ~ltes ~proof_systems:[(module PS_)] ~basic
-     ~self rule ->
+     ~prevs_lengths ~prevs_length ~ltes ~proof_systems ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
       | Self : (a_var, a_value, max_num_parents, num_rules) t
   end in
   let prev_typ =
-    build_combined_typ
-      [PS_.Step.per_proof_witness_typ basic self.id]
-      rule.prevs prev_num_parentss prev_num_ruless prevs_lengths
-      prev_num_parentss_length prev_num_ruless_length
+    build_combined_typ basic self.id proof_systems rule.prevs prev_num_parentss
+      prev_num_ruless prevs_lengths prev_num_parentss_length
+      prev_num_ruless_length
   in
   let main
       (stmt :
@@ -595,7 +597,7 @@ let step_main
                 let proofss = f proofss proof_systems in
                 proofs :: proofss
           in
-          f prevs [(module PS_)]
+          f prevs proof_systems
         in
         let proofs_should_verify =
           with_label "rule_main" (fun () -> rule.main prev_statements app_state)
@@ -687,7 +689,7 @@ let step_main
                 Vector.append sgs sgss add_length
           in
           let module V = H3.To_vector (Inner_curve) in
-          f prevs prevs_lengths prevs_length [(module PS_)]
+          f prevs prevs_lengths prevs_length proof_systems
         in
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
@@ -767,8 +769,7 @@ let step_main
               in
               let chalss, vs =
                 go prevs rule.prevs pass_throughs unfinalized_proofs
-                  proofs_should_verify prevs_lengths prevs_length
-                  [(module PS_)]
+                  proofs_should_verify prevs_lengths prevs_length proof_systems
               in
               Boolean.Assert.all vs ; chalss )
         in
