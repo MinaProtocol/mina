@@ -43,7 +43,7 @@ module Party = struct
       module Stable = struct
         module V1 = struct
           type ('state_element, 'pk, 'vk, 'perms) t =
-            { app_state: 'state_element Snapp_state.Stable.V1.t
+            { app_state: 'state_element Snapp_state.V.Stable.V1.t
             ; delegate: 'pk
             ; verification_key: 'vk
             ; permissions: 'perms }

@@ -1,3 +1,7 @@
+terraform {
+  experiments = [module_variable_optional_attrs]
+}
+
 provider "google" {
   alias = "gke"
 }
@@ -37,7 +41,7 @@ variable "coda_archive_image" {
 }
 
 variable "mina_archive_schema" {
-  type = string
+  type    = string
   default = ""
 }
 
@@ -62,7 +66,7 @@ variable "coda_points_image" {
 }
 
 variable "watchdog_image" {
-  type = string
+  type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
@@ -80,11 +84,6 @@ variable "coda_faucet_fee" {
 
 variable "testnet_name" {
   type = string
-}
-
-variable "archive_node_count" {
-  type    = number
-  default = 0
 }
 
 # Seed Vars
@@ -105,7 +104,7 @@ variable "seed_zone" {
 }
 
 variable "seed_discovery_keypairs" {
-  type = list
+  type = list(any)
   default = [
     "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr",
     "CAESQKtOnmYHQacRpNvBZDrGLFw/tVB7V4I14Y2xtGcp1sEsEyfcsNoFi7NnUX0T2lQDGQ31KvJRXJ+u/f9JQhJmLsI=,CAESIBMn3LDaBYuzZ1F9E9pUAxkN9SryUVyfrv3/SUISZi7C,12D3KooWB79AmjiywL1kMGeKHizFNQE9naThM2ooHgwFcUzt6Yt1"
@@ -211,7 +210,7 @@ variable "agent_send_every_mins" {
 }
 
 variable "gcloud_seeds" {
-  type    = list
+  type    = list(any)
   default = []
 }
 
@@ -223,12 +222,12 @@ variable "restart_nodes" {
 }
 
 variable "restart_nodes_every_mins" {
-  type = string
+  type    = string
   default = "60"
 }
 
 variable "make_report_every_mins" {
-  type = string
+  type    = string
   default = "30"
 }
 
@@ -249,29 +248,31 @@ variable "make_report_accounts" {
 
 # Archive-Postgres Vars
 
-variable "archive_persistence_enabled" {
-  type    = bool
-  default = true
+variable "archive_node_count" {
+  type    = number
+  default = 0
 }
 
-variable "archive_persistence_class" {
-  type    = string
-  default = "ssd"
+variable "archive_configs" {
+  type    = list(any)
+  default = []
 }
 
-variable "archive_persistence_reclaim_policy" {
-  type    = string
-  default = "retain"
-}
-
-variable "archive_persistence_access_modes" {
-  type    = list
-  default = ["ReadWriteOnce"]
-}
-
-variable "archive_persistence_size" {
-  type    = string
-  default = "8Gi"
+variable "postgres_persistence_config" {
+  type = object({
+    enabled       = optional(bool)
+    size          = optional(string)
+    reclaimPolicy = optional(string)
+    storageClass  = optional(string)
+    accessModes   = optional(list(string))
+  })
+  default = {
+    enabled       = true
+    size          = "8Gi"
+    reclaimPolicy = "retain"
+    storageClass  = "ssd-retain"
+    accessModes   = ["ReadWriteOnce"]
+  }
 }
 
 variable "upload_blocks_to_gcloud" {
@@ -280,6 +281,6 @@ variable "upload_blocks_to_gcloud" {
 }
 
 variable "seed_peers_url" {
-  type = string
+  type    = string
   default = ""
 }
