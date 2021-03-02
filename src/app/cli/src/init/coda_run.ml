@@ -461,6 +461,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           in
           let lift x = `Response x in
           match Uri.path uri with
+          | "/" ->
+              let body =
+                "This page is intentionally left blank. The graphql endpoint \
+                 can be found at `/graphql`."
+              in
+              Server.respond_string ~status:`OK body >>| lift
           | "/graphql" ->
               [%log debug] "Received graphql request. Uri: $uri"
                 ~metadata:
