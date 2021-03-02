@@ -74,7 +74,7 @@ def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_s
     return max(children_and_depths, key=lambda x: x[1])
 
   best_protocol_states = [ get_deepest_child(root) for root in roots ]
-  best_protocol_state = max(best_protocol_states, key=lambda x: x[1])[0]
+  best_protocol_state = max(best_protocol_states, key=lambda x: x[1], default=[ None ])[0]
 
   n = 3
   last_n_protocol_states = [ best_protocol_state ]
@@ -121,25 +121,26 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
         peer_table[k] = v
 
     queried_peers.update([ p['node_peer_id'] for p in peers ])
-    queried_peers.update([p['peer_id'] for p in direct_queried_peers])
+    queried_peers.update([ p['peer_id'] for p in direct_queried_peers ])
     for p in itertools.chain(*[ p['peers'] for p in peers ]):
-        unqueried_peers[p['peer_id']] = p
+      unqueried_peers[p['peer_id']] = p
     for p in queried_peers:
+      if p in unqueried_peers:
         del unqueried_peers[p]
 
   cmd = "mina advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
-  resp = util.exec_on_pod(v1, namespace, seed, 'seed', cmd)
+  resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
   add_resp(resp, [])
 
   requests = 0
 
   while len(unqueried_peers) > 0 and requests < max_crawl_requests:
     peers_to_query = list(unqueried_peers.values())
-    peers = ','.join(to_multiaddr_string(p) for p in peers_to_query)
+    peers = ','.join(peer_to_multiaddr(p) for p in peers_to_query)
 
     print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
 
-    util.exec_on_pod(v1, namespace, seed, 'seed', "mina advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
+    resp = util.exec_on_pod(v1, namespace, seed, 'coda', "mina advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
     add_resp(resp, peers_to_query)
 
     requests += 1

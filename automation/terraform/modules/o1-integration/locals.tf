@@ -20,7 +20,7 @@ locals {
     external_ip        = null,
     private_key_secret = null,
     enableArchive      = false,
-    archiveAddress     = ""
+    archiveAddress     = null
   }
 
   snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, length(var.snark_worker_public_key) - 6, 6))}"
