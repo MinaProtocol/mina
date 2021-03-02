@@ -354,7 +354,9 @@ let with_retry ~logger f =
 
 let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
+      [%log debug] "Before wait for the verifier process" ;
       let%bind {connection; _} = !worker in
+      [%log debug] "After wait for the verifier process" ;
       Deferred.any
         [ ( after (Time.Span.of_min 3.)
           >>| fun _ -> Or_error.error_string "verify_blockchain_snarks timeout"
