@@ -13,7 +13,8 @@ type ( 'a_var
      , 'prev_vars
      , 'prev_values
      , 'prev_num_parentss
-     , 'prev_num_ruless )
+     , 'prev_num_ruless
+     , 'prev_proof_systems )
      t =
   | T :
       { num_parents:
@@ -33,7 +34,7 @@ type ( 'a_var
           Inductive_rule.t
       ; main:
              step_domains:(Domains.t, 'num_rules) Vector.t
-          -> ( (Unfinalized.t * unit, 'max_num_parents * unit) H2.T(Vector).t
+          -> ( ('unfinalizeds, 'max_num_parents * unit) H2.T(Vector).t
              , Impls.Step.Field.t
              , ('max_num_parents * unit)
                H1.T(Vector.Carrying(Impls.Step.Digest)).t )
@@ -46,8 +47,7 @@ type ( 'a_var
               and type prev_values = 'prev_values
               and type prev_num_parentss = 'prev_num_parentss
               and type prev_num_ruless = 'prev_num_ruless
-              and type per_proof_witnesses = P3.W(Per_proof_witness.Constant).t
-                                             * unit) }
+              and type per_proof_witnesses = 'per_proof_witness_constants) }
       -> ( 'a_var
          , 'a_value
          , 'max_num_parents
@@ -55,7 +55,14 @@ type ( 'a_var
          , 'prev_vars
          , 'prev_values
          , 'prev_num_parentss
-         , 'prev_num_ruless )
+         , 'prev_num_ruless
+         , ( 'per_proof_witnesses
+           , 'per_proof_witness_constants
+           , 'unfinalizeds
+           , 'unfinalized_constants
+           , 'proof_with_data
+           , 'evals )
+           H6.T(Step_main.PS).t )
          t
 
 let rec sum_ltes_exn : type terms1 terms2 total1 total2.
@@ -81,13 +88,22 @@ let rec sum_ltes_exn : type terms1 terms2 total1 total2.
 (* Compile an inductive rule. *)
 let create
     (type num_rules max_num_parents prev_num_parentss prev_num_ruless a_var
-    a_value prev_vars prev_values) ~index
+    a_value prev_vars prev_values per_proof_witness per_proof_witness_constant
+    unfinalized unfinalized_constant proof_with_data evals) ~index
     ~(self : (a_var, a_value, max_num_parents, num_rules) Tag.t) ~wrap_domains
     ~(max_num_parents : max_num_parents Nat.t)
     ~(max_num_parentss : (max_num_parents * unit, max_num_parents) Nat.Sum.t)
     ~(rules_num_parents : (int, num_rules) Vector.t)
     ~(num_rules : num_rules Nat.t) ~typ var_to_field_elements
-    value_to_field_elements (rule : _ Inductive_rule.t) =
+    value_to_field_elements
+    ~proof_systems:([(module PS_)] as proof_systems :
+                     ( per_proof_witness * unit
+                     , per_proof_witness_constant * unit
+                     , unfinalized * unit
+                     , unfinalized_constant * unit
+                     , proof_with_data * unit
+                     , evals * unit )
+                     H6.T(Step_main.PS).t) (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let module HHT = H4.Sum_length (H4.T (Tag)) (HT) in
@@ -158,10 +174,9 @@ let create
         ; value_to_field_elements
         ; wrap_domains
         ; step_domains }
-      ~proof_systems:[(module Step_main.Proof_system)]
-      ~num_rules ~prevs_lengths ~prevs_length ~prev_num_parentss ~max_lengths
-      ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length ~ltes
-      ~self
+      ~proof_systems ~num_rules ~prevs_lengths ~prevs_length ~prev_num_parentss
+      ~max_lengths ~prev_num_parentss_length ~prev_num_ruless
+      ~prev_num_ruless_length ~ltes ~self
     |> unstage
   in
   Timer.clock __LOC__ ;
@@ -174,8 +189,7 @@ let create
     let etyp =
       Impls.Step.input_of_hlist ~num_parentss:[max_num_parents]
         ~per_proof_specs:
-          [ Step_main.Proof_system.Step.per_proof_spec
-              ~wrap_rounds:Backend.Tock.Rounds.n ]
+          [PS_.Step.per_proof_spec ~wrap_rounds:Backend.Tock.Rounds.n]
     in
     Fix_domains.domains (module Impls.Step) etyp main
   in
