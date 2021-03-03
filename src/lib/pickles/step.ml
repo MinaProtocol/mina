@@ -11,26 +11,6 @@ open Import
 open Types
 open Common
 
-(* This contains the "step" prover *)
-module Statement_with_hashes = struct
-  type t =
-    ( Challenge.Constant.t
-    , Challenge.Constant.t Scalar_challenge.t
-    , Tick.Field.t Shifted_value.t
-    , Tock.Field.t
-    , Digest.Constant.t
-    , Digest.Constant.t
-    , Digest.Constant.t
-    , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-      Step_bp_vec.t
-    , Index.t )
-    Dlog_based.Statement.In_circuit.t
-end
-
-module X_hat = struct
-  type t = Tock.Field.t Double.t
-end
-
 let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~one)
 
 let step_one : type var value max max_num_parents m.
@@ -42,8 +22,8 @@ let step_one : type var value max max_num_parents m.
     -> must_verify:bool
     -> [`Sg of Tock.Curve.Affine.t]
        * Unfinalized.Constant.t
-       * Statement_with_hashes.t
-       * X_hat.t
+       * [`Me_only of Digest.Constant.t]
+       * [`X_hat of Tock.Field.t Double.t]
        * (value, max_num_parents, m, P3.W(Per_proof_witness.Constant).t) P3.t =
  fun max dlog_vk dlog_index (T t) tag ~must_verify ->
   let plonk0 = t.statement.proof_state.deferred_values.plonk in
@@ -278,8 +258,8 @@ let step_one : type var value max max_num_parents m.
     ; should_finalize= must_verify
     ; sponge_digest_before_evaluations=
         Digest.Constant.of_tock_field sponge_digest_before_evaluations }
-  , prev_statement_with_hashes
-  , x_hat
+  , `Me_only prev_statement_with_hashes.proof_state.me_only
+  , `X_hat x_hat
   , M.to_poly witness )
 
 module Make
@@ -373,7 +353,7 @@ struct
     let [prevs] = branch_data.rule.prevs in
     let [prev_vars_lengths] = prev_vars_lengths in
     let [prev_values_length] = prev_values_length in
-    let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
+    let sgs, unfinalized_proofs, me_onlys, x_hats, witnesses =
       let rec go : type vars values ns ms maxes k.
              (values, ns, ms) H3.T(P.With_data).t
           -> maxes H1.T(Nat).t
@@ -382,8 +362,8 @@ struct
           -> (vars, k) Length.t
           -> (Tock.Curve.Affine.t, k) Vector.t
              * (Unfinalized.Constant.t, k) Vector.t
-             * (Statement_with_hashes.t, k) Vector.t
-             * (X_hat.t, k) Vector.t
+             * (Digest.Constant.t, k) Vector.t
+             * (Tock.Field.t Double.t, k) Vector.t
              * ( values
                , ns
                , ms
@@ -401,10 +381,10 @@ struct
                 let d = Types_map.lookup_basic t in
                 (d.wrap_vk, d.wrap_key)
             in
-            let `Sg sg, u, s, x, w =
+            let `Sg sg, u, `Me_only me_only, `X_hat x, w =
               step_one max dlog_vk dlog_index p t ~must_verify
-            and sgs, us, ss, xs, ws = go ps maxes ts must_verifys l in
-            (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
+            and sgs, us, me_onlys, xs, ws = go ps maxes ts must_verifys l in
+            (sg :: sgs, u :: us, me_only :: me_onlys, x :: xs, w :: ws)
         | _ :: _, [], _, _, _ ->
             assert false
       in
@@ -554,10 +534,7 @@ struct
                       next_me_only_prepared }
             ; pass_through=
                 (* TODO: Use the same pad_pass_through function as in wrap *)
-                [ pad
-                    (Vector.map statements_with_hashes ~f:(fun s ->
-                         s.proof_state.me_only ))
-                    Maxes.maxes Maxes.length ] } )
+                [pad me_onlys Maxes.maxes Maxes.length] } )
     in
     let prev_evals =
       let module M =
