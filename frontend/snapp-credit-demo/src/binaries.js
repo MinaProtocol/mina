@@ -1,16 +1,14 @@
+/* Modified from: https://stackoverflow.com/a/52991116/4160498 */
+
 const path = require("path");
 const { app } = require("electron");
-const { rootPath } = require("electron-root-path");
 
-const IS_PROD = process.env.NODE_ENV === "production";
-const root = rootPath;
-const { getAppPath } = app;
-const isPackaged = process.mainModule.filename.indexOf("app.asar") !== -1;
+const { isPackaged } = app;
+const root = process.cwd();
 
-const binariesPath =
-  IS_PROD && isPackaged
-    ? path.join(path.dirname(getAppPath()), "..", "./Resources", "./bin")
-    : path.join(root, "./resources", "./bin");
+const binariesPath = isPackaged
+  ? path.join(path.dirname(app.getAppPath()), "../", "./Resources", "./bin")
+  : path.join(root, "./resources", "./bin");
 
 const execPath = path.resolve(
   path.join(binariesPath, "./credit_score_demo.exe")

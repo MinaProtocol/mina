@@ -13,7 +13,7 @@ let scrape = (username, password) => {
       await page.waitForSelector("[type=submit]");
       await page.type("[type=email]", username);
       await page.type("[type=password]", password);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(750);
       await page.click("[type=submit]");
 
       await page.waitForSelector(".score-dial", { timeout: 8000 });

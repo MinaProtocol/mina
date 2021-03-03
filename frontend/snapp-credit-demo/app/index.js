@@ -98,14 +98,18 @@ ipcRenderer.on(INVALID_LOGIN, () => {
 
 ipcRenderer.on(PROOF_SUCCESS, () => {
   const outputPath = localStorage.getItem("output-path");
-  setProgressStatusText(`SNAPP proof saved to: ${outputPath}`);
+  //setProgressStatusText(`SNAPP proof saved to: ${outputPath}`);
   hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
 
 ipcRenderer.on(PROOF_FAIL, () => {
   const outputPath = localStorage.getItem("output-path");
-  setProgressStatusText(`Failed to generate proof to: ${outputPath}`);
+  //setProgressStatusText(`Failed to generate proof to: ${outputPath}`);
   hideProgressSpinner();
   localStorage.setItem("loading", false);
+});
+
+ipcRenderer.on("debug", (_, { execPath }) => {
+  setProgressStatusText(`Binary located at: ${execPath}`);
 });

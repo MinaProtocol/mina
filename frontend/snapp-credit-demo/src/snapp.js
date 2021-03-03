@@ -26,6 +26,7 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
     true
   );
 
+  mainWindow.webContents.send("debug", { execPath });
   if (!outputPath || !creditScore) {
     mainWindow.webContents.send(PROOF_FAIL);
     return;

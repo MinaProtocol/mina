@@ -1,17 +1,28 @@
 {
   "name": "snapp-credit-check",
-  "description": "An application that uses Mina Snapps to verify credit score",
+  "description": "",
   "version": "1.0.0",
-  "main": "main.js",
+  "author": "Mina Protocol <contact@minaprotocol.com>",
+  "url": "https://github.com/MinaProtocol/mina/issues",
+  "homepage": "https://github.com/MinaProtocol/mina#readme",
   "license": "Apache-2.0",
+  "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "nodemon --exec electron .",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "package-linux": "electron-packager . --overwrite --platform linux --arch x64 --out dist/",
-    "create-installer-linux": "electron-installer-debian --src dist/snapp-credit-check-linux-x64/ --dest dist/installers/ --arch amd64"
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "puppeteer": "^7.1.0"
+  },
+  "devDependencies": {
+    "electron": "^11.3.0",
+    "electron-builder": "^22.10.5",
+    "nodemon": "^2.0.7"
   },
   "build": {
+    "appId": "org.minaprotocol.snapp-credit-demo",
     "extraFiles": [
       {
         "from": "resources/bin",
@@ -20,16 +31,33 @@
           "**/*"
         ]
       }
-    ]
-  },
-  "dependencies": {
-    "electron-root-path": "^1.0.16",
-    "electron": "^11.3.0",
-    "puppeteer": "^7.1.0"
-  },
-  "devDependencies": {
-    "electron-packager": "^15.2.0",
-    "electron-installer-debian": "^3.1.0",
-    "nodemon": "^2.0.7"
+    ],
+    "extraResources": "node_modules",
+    "files": [
+      "!node_modules"
+    ],
+    "dmg": {
+      "contents": [
+        {
+          "x": 160,
+          "y": 220
+        },
+        {
+          "x": 370,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "sign": false
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    },
+    "win": {
+      "target": "NSIS"
+    }
   }
 }
