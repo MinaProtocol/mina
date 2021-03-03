@@ -311,6 +311,22 @@ module Network_manager = struct
   let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
+    let%bind all_namespaces =
+      Cmd_util.run_cmd_exn "/" "kubectl"
+        ["get"; "namespaces"; "--output='json'"]
+    in
+    let contains_substring str sub =
+      let re = Str.regexp_string sub in
+      Str.string_match re str 0
+    in
+    let%bind _ =
+      if
+        contains_substring all_namespaces network_config.terraform.testnet_name
+      then
+        Cmd_util.run_cmd_exn "/" "kubectl"
+          ["delete"; "namespace"; network_config.terraform.testnet_name]
+      else return ""
+    in
     let testnet_dir =
       network_config.coda_automation_location ^/ "terraform/testnets"
       ^/ network_config.terraform.testnet_name
@@ -318,24 +334,7 @@ module Network_manager = struct
     (* cleanup old deployment, if it exists; we will need to take good care of this logic when we put this in CI *)
     let%bind () =
       if%bind File_system.dir_exists testnet_dir then (
-        [%log warn]
-          "Old network deployment found; attempting to refresh and cleanup" ;
-        let%bind _ =
-          Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
-        in
-        let%bind _ =
-          let open Process.Output in
-          let%bind state_output =
-            Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
-          in
-          if not (String.is_empty state_output.stdout) then
-            let%map _ =
-              Cmd_util.run_cmd_exn testnet_dir "terraform"
-                ["destroy"; "-auto-approve"]
-            in
-            ()
-          else return ()
-        in
+        [%log warn] "Old network deployment found; removing to start clean" ;
         File_system.remove_dir testnet_dir )
       else return ()
     in
