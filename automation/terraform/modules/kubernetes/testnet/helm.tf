@@ -99,7 +99,8 @@ resource "helm_release" "archive_node" {
 # Watchdog
 
 resource "helm_release" "watchdog" {
-  provider = helm.testnet_deploy
+  provider   = helm.testnet_deploy
+  count      = var.deploy_watchdog ? 1 : 0
 
   name       = "${var.testnet_name}-watchdog"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
