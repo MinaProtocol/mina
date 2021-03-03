@@ -550,6 +550,9 @@ struct
         in
         f prev_with_proofs prev_values_length
       in
+      let [_] = branch_data.ltes in
+      let [add_max_num_parents] = branch_data.sum in
+      let T = Nat.Adds.add_zr_refl add_max_num_parents in
       ksprintf Common.time "step-prover %d (%d, %d)"
         (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
         (fun () ->

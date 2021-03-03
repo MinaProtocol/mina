@@ -599,13 +599,16 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           (E04 (Lazy_keys))
           (struct
             let etyp =
-              Impls.Step.input_of_hlist ~num_parentss:[Max_num_parents.n]
-                ~per_proof_specs:
-                  [ Step_main.Proof_system.Step.per_proof_spec
-                      ~wrap_rounds:Tock.Rounds.n ]
+              Step_branch_data.input_of_hlist
+                ~max_num_parentss:[Nat.Adds.add_zr Max_num_parents.n]
+                ~proof_systems:[(module Step.Proof_system)]
 
             let f (T b : _ Branch_data_.t) =
               let (T (typ, conv)) = etyp in
+              let _, [_], _ = b.num_parents in
+              let [_] = b.ltes in
+              let [add_max_num_parents] = b.sum in
+              let T = Nat.Adds.add_zr_refl add_max_num_parents in
               let main x () : unit =
                 b.main
                   (Impls.Step.with_label "conv" (fun () -> conv x))

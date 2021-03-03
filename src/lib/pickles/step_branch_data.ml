@@ -23,6 +23,8 @@ type ( 'a_var
           * ('num_parentss, 'num_parents) Nat.Sum.t
       ; index: Types.Index.t
       ; lte: ('num_parents, 'max_num_parents) Nat.Lte.t
+      ; ltes: ('num_parentss, 'max_num_parentss) H2.T(Nat.Lte).t
+      ; sum: ('max_num_parentss, 'max_num_parents) Nat.Sum.t
       ; domains: Domains.t
       ; rule:
           ( 'prev_vars
@@ -34,16 +36,15 @@ type ( 'a_var
           Inductive_rule.t
       ; main:
              step_domains:(Domains.t, 'num_rules) Vector.t
-          -> ( ('unfinalizeds, 'max_num_parents * unit) H2.T(Vector).t
+          -> ( ('unfinalizeds, 'max_num_parentss) H2.T(Vector).t
              , Impls.Step.Field.t
-             , ('max_num_parents * unit)
-               H1.T(Vector.Carrying(Impls.Step.Digest)).t )
+             , 'max_num_parentss H1.T(Vector.Carrying(Impls.Step.Digest)).t )
              Types.Pairing_based.Statement.t
           -> unit
       ; requests:
           (module Requests.Step.S
              with type statement = 'a_value
-              and type max_num_parents = 'max_num_parents * unit
+              and type max_num_parents = 'max_num_parentss
               and type prev_values = 'prev_values
               and type prev_num_parentss = 'prev_num_parentss
               and type prev_num_ruless = 'prev_num_ruless
@@ -85,25 +86,53 @@ let rec sum_ltes_exn : type terms1 terms2 total1 total2.
   | [], _ :: _ ->
       failwith "sum_ltes_exn"
 
+let input_of_hlist ~max_num_parentss ~proof_systems =
+  let open Impls.Step in
+  let rec f : type a b unfinalized unfinalized_constant e f ns tot.
+         (a, b, unfinalized, unfinalized_constant, e, f) H6.T(Step_main.PS).t
+      -> (ns, tot) Nat.Sum.t
+      -> ( unfinalized_constant
+         , unfinalized
+         , _ )
+         H2_1.T(Composition_types.Spec).t
+         * ns H1.T(Nat).t =
+   fun proof_systems maxes ->
+    match (proof_systems, maxes) with
+    | [], [] ->
+        ([], [])
+    | (module PS_) :: proof_systems, max_num_parents :: maxes ->
+        let per_proofs_spec, num_parentss = f proof_systems maxes in
+        ( PS_.Step.per_proof_spec ~wrap_rounds:Backend.Tock.Rounds.n
+          :: per_proofs_spec
+        , Nat.Adds.to_nat max_num_parents :: num_parentss )
+    | [], _ :: _ ->
+        failwith "input_of_hlist"
+    | _ :: _, [] ->
+        failwith "input_of_hlist"
+  in
+  let per_proof_specs, num_parentss = f proof_systems max_num_parentss in
+  Impls.Step.input_of_hlist ~num_parentss ~per_proof_specs
+
 (* Compile an inductive rule. *)
 let create
-    (type num_rules max_num_parents prev_num_parentss prev_num_ruless a_var
-    a_value prev_vars prev_values per_proof_witness per_proof_witness_constant
-    unfinalized unfinalized_constant proof_with_data evals) ~index
+    (type num_rules max_num_parentss max_num_parents prev_num_parentss
+    prev_num_ruless a_var a_value prev_vars prev_values per_proof_witnesses
+    per_proof_witness_constants unfinalizeds unfinalized_constants
+    proof_with_datas evalss) ~index
     ~(self : (a_var, a_value, max_num_parents, num_rules) Tag.t) ~wrap_domains
     ~(max_num_parents : max_num_parents Nat.t)
-    ~(max_num_parentss : (max_num_parents * unit, max_num_parents) Nat.Sum.t)
+    ~(max_num_parentss : (max_num_parentss, max_num_parents) Nat.Sum.t)
     ~(rules_num_parents : (int, num_rules) Vector.t)
     ~(num_rules : num_rules Nat.t) ~typ var_to_field_elements
     value_to_field_elements
-    ~proof_systems:([(module PS_)] as proof_systems :
-                     ( per_proof_witness * unit
-                     , per_proof_witness_constant * unit
-                     , unfinalized * unit
-                     , unfinalized_constant * unit
-                     , proof_with_data * unit
-                     , evals * unit )
-                     H6.T(Step_main.PS).t) (rule : _ Inductive_rule.t) =
+    ~(proof_systems :
+       ( per_proof_witnesses
+       , per_proof_witness_constants
+       , unfinalizeds
+       , unfinalized_constants
+       , proof_with_datas
+       , evalss )
+       H6.T(Step_main.PS).t) (rule : _ Inductive_rule.t) =
   Timer.clock __LOC__ ;
   let module HT = H4.T (Tag) in
   let module HHT = H4.Sum_length (H4.T (Tag)) (HT) in
@@ -160,7 +189,6 @@ let create
   in
   let lte = Nat.lte_exn total_num_parents max_num_parents in
   let ltes = sum_ltes_exn prevs_length max_num_parentss in
-  let max_lengths = Nat.Sum.[Nat.Adds.add_zr max_num_parents] in
   let requests = Requests.Step.create () in
   Timer.clock __LOC__ ;
   let step ~step_domains =
@@ -175,7 +203,7 @@ let create
         ; wrap_domains
         ; step_domains }
       ~proof_systems ~num_rules ~prevs_lengths ~prevs_length ~prev_num_parentss
-      ~max_lengths ~prev_num_parentss_length ~prev_num_ruless
+      ~max_lengths:max_num_parentss ~prev_num_parentss_length ~prev_num_ruless
       ~prev_num_ruless_length ~ltes ~self
     |> unstage
   in
@@ -186,11 +214,7 @@ let create
         ~step_domains:
           (Vector.init num_rules ~f:(fun _ -> Fix_domains.rough_domains))
     in
-    let etyp =
-      Impls.Step.input_of_hlist ~num_parentss:[max_num_parents]
-        ~per_proof_specs:
-          [PS_.Step.per_proof_spec ~wrap_rounds:Backend.Tock.Rounds.n]
-    in
+    let etyp = input_of_hlist ~max_num_parentss ~proof_systems in
     Fix_domains.domains (module Impls.Step) etyp main
   in
   Timer.clock __LOC__ ;
@@ -198,6 +222,8 @@ let create
     { num_parents= (total_num_parents, prevs_lengths, prevs_length)
     ; index
     ; lte
+    ; ltes
+    ; sum= max_num_parentss
     ; rule
     ; domains= own_domains
     ; main= step
