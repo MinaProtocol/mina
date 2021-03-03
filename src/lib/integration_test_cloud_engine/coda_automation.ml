@@ -79,6 +79,7 @@ module Network_config = struct
 
   type t =
     { coda_automation_location: string
+    ; debug_arg: bool
     ; keypairs: network_keypair list
     ; constants: Test_config.constants
     ; terraform: terraform_config }
@@ -90,7 +91,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let { Test_config.k
@@ -228,6 +229,7 @@ module Network_config = struct
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
+    ; debug_arg= debug
     ; keypairs= block_producer_keypairs
     ; constants
     ; terraform=
@@ -316,11 +318,25 @@ module Network_manager = struct
         ["get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}"]
     in
     let all_namespaces = String.split ~on:' ' all_namespaces_str in
+    let rec prompt_continue () =
+      print_string
+        "Existing namespace of same name detected, pausing startup. Enter \
+         [y/Y] to continue with test and replace existing namespace, Cntrl-C \
+         to quit out: " ;
+      let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
+      let c = Option.value_exn In_channel.(input_char stdin) in
+      print_newline () ;
+      if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue ()
+    in
     let%bind () =
       if
         List.mem all_namespaces network_config.terraform.testnet_name
           ~equal:String.equal
       then
+        let%bind () =
+          if network_config.debug_arg then prompt_continue ()
+          else Deferred.unit
+        in
         Cmd_util.run_cmd_exn "/" "kubectl"
           ["delete"; "namespace"; network_config.terraform.testnet_name]
         >>| Fn.const ()

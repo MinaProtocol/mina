@@ -222,7 +222,7 @@ let main inputs =
   in
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~test_config:T.config ~images
+      ~debug:inputs.debug ~test_config:T.config ~images
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
