@@ -12,6 +12,275 @@ open Types
 open Common
 
 (* This contains the "step" prover *)
+module Statement_with_hashes = struct
+  type t =
+    ( Challenge.Constant.t
+    , Challenge.Constant.t Scalar_challenge.t
+    , Tick.Field.t Shifted_value.t
+    , Tock.Field.t
+    , Digest.Constant.t
+    , Digest.Constant.t
+    , Digest.Constant.t
+    , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+      Step_bp_vec.t
+    , Index.t )
+    Dlog_based.Statement.In_circuit.t
+end
+
+module X_hat = struct
+  type t = Tock.Field.t Double.t
+end
+
+let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~one)
+
+let step_one : type var value max max_num_parents m.
+       max Nat.t
+    -> Impls.Wrap.Verification_key.t
+    -> 'a
+    -> (value, max_num_parents, m) P.With_data.t
+    -> (var, value, max_num_parents, m) Tag.t
+    -> must_verify:bool
+    -> [`Sg of Tock.Curve.Affine.t]
+       * Unfinalized.Constant.t
+       * Statement_with_hashes.t
+       * X_hat.t
+       * (value, max_num_parents, m, P3.W(Per_proof_witness.Constant).t) P3.t =
+ fun max dlog_vk dlog_index (T t) tag ~must_verify ->
+  let plonk0 = t.statement.proof_state.deferred_values.plonk in
+  let plonk =
+    let domain =
+      (Vector.to_array (Types_map.lookup_step_domains tag)).(Index.to_int
+                                                               t.statement
+                                                                 .proof_state
+                                                                 .deferred_values
+                                                                 .which_rule)
+    in
+    let to_field =
+      SC.to_field_constant
+        (module Tick.Field)
+        ~endo:Endo.Wrap_inner_curve.scalar
+    in
+    let alpha = to_field plonk0.alpha in
+    let zeta = to_field plonk0.zeta in
+    let zetaw =
+      Tick.Field.(zeta * domain_generator ~log2_size:(Domain.log2_size domain))
+    in
+    time "plonk_checks" (fun () ->
+        Plonk_checks.derive_plonk
+          (module Tick.Field)
+          ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
+          ~mds:Tick_field_sponge.params.mds
+          ~domain:
+            (Plonk_checks.domain
+               (module Tick.Field)
+               domain ~shifts:Common.tick_shifts
+               ~domain_generator:Backend.Tick.Field.domain_generator)
+          { zeta
+          ; alpha
+          ; beta= Challenge.Constant.to_tick_field plonk0.beta
+          ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
+          (Plonk_checks.evals_of_split_evals
+             (module Tick.Field)
+             t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
+          (fst t.prev_x_hat)
+        |> fst )
+  in
+  let data = Types_map.lookup_basic tag in
+  let (module Max_num_parents) = data.max_num_parents in
+  let T = Max_num_parents.eq in
+  let statement = t.statement in
+  let prev_challenges =
+    (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
+    Vector.map ~f:Ipa.Wrap.compute_challenges
+      statement.proof_state.me_only.old_bulletproof_challenges
+  in
+  let prev_statement_with_hashes : _ Dlog_based.Statement.In_circuit.t =
+    { pass_through=
+        Common.hash_pairing_me_only
+          (Reduced_me_only.Pairing_based.prepare ~dlog_plonk_index:dlog_index
+             statement.pass_through)
+          ~app_state:data.value_to_field_elements
+    ; proof_state=
+        { statement.proof_state with
+          deferred_values=
+            { statement.proof_state.deferred_values with
+              plonk=
+                { plonk with
+                  zeta= plonk0.zeta
+                ; alpha= plonk0.alpha
+                ; beta= plonk0.beta
+                ; gamma= plonk0.gamma } }
+        ; me_only=
+            Common.hash_dlog_me_only Max_num_parents.n
+              { old_bulletproof_challenges=
+                  (* TODO: Get rid of this padding *)
+                  Vector.extend_exn prev_challenges Max_num_parents.n
+                    Dummy.Ipa.Wrap.challenges_computed
+              ; sg= statement.proof_state.me_only.sg } } }
+  in
+  let module O = Tock.Oracles in
+  let o =
+    let public_input =
+      tock_public_input_of_statement prev_statement_with_hashes
+    in
+    O.create dlog_vk
+      Vector.(
+        map2
+          (Vector.extend_exn statement.pass_through.sg Max_num_parents.n
+             (Lazy.force Dummy.Ipa.Wrap.sg))
+          (* This should indeed have length max_num_parents... No! It should have type max_num_parents_a. That is, the max_num_parents specific to a proof of this type...*)
+          prev_challenges
+          ~f:(fun commitment chals ->
+            { Tock.Proof.Challenge_polynomial.commitment
+            ; challenges= Vector.to_array chals } )
+        |> to_list)
+      public_input t.proof
+  in
+  let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
+  let scalar_chal f =
+    Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
+  in
+  let plonk0 =
+    { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha=
+        scalar_chal O.alpha
+    ; beta= O.beta o
+    ; gamma= O.gamma o
+    ; zeta= scalar_chal O.zeta }
+  in
+  let xi = scalar_chal O.v in
+  let r = scalar_chal O.u in
+  let sponge_digest_before_evaluations = O.digest_before_evaluations o in
+  let to_field =
+    SC.to_field_constant (module Tock.Field) ~endo:Endo.Step_inner_curve.scalar
+  in
+  let module As_field = struct
+    let r = to_field r
+
+    let xi = to_field xi
+
+    let zeta = to_field plonk0.zeta
+
+    let alpha = to_field plonk0.alpha
+  end in
+  let w =
+    Tock.Field.domain_generator
+      ~log2_size:(Domain.log2_size data.wrap_domains.h)
+  in
+  let zetaw = Tock.Field.mul As_field.zeta w in
+  let new_bulletproof_challenges, b =
+    let prechals =
+      Array.map (O.opening_prechallenges o) ~f:(fun x ->
+          Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
+    in
+    let chals =
+      Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
+    in
+    let b_poly = unstage (b_poly chals) in
+    let open As_field in
+    let b =
+      let open Tock.Field in
+      b_poly zeta + (r * b_poly zetaw)
+    in
+    let prechals =
+      Vector.of_list_and_length_exn
+        ( Array.map prechals ~f:(fun x ->
+              {Bulletproof_challenge.prechallenge= x} )
+        |> Array.to_list )
+        Tock.Rounds.n
+    in
+    (prechals, b)
+  in
+  let sg =
+    if not must_verify then Ipa.Wrap.compute_sg new_bulletproof_challenges
+    else t.proof.openings.proof.sg
+  in
+  let witness : _ Per_proof_witness.Constant.t =
+    ( t.P.Base.Dlog_based.statement.pass_through.app_state
+    , {prev_statement_with_hashes.proof_state with me_only= ()}
+    , Double.map2 t.prev_evals t.prev_x_hat ~f:Tuple.T2.create
+    , Vector.extend_exn t.statement.pass_through.sg Max_num_parents.n
+        (Lazy.force Dummy.Ipa.Wrap.sg)
+      (* TODO: This computation is also redone elsewhere. *)
+    , Vector.extend_exn
+        (Vector.map t.statement.pass_through.old_bulletproof_challenges
+           ~f:Ipa.Step.compute_challenges)
+        Max_num_parents.n Dummy.Ipa.Step.challenges_computed
+    , ({t.proof.openings.proof with sg}, t.proof.messages) )
+  in
+  let combined_inner_product =
+    let e1, e2 = t.proof.openings.evals in
+    let b_polys =
+      Vector.map
+        ~f:(fun chals -> unstage (b_poly (Vector.to_array chals)))
+        prev_challenges
+    in
+    let open As_field in
+    let combine (x_hat : Tock.Field.t) pt e =
+      let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
+      let v : (Tock.Field.t array, _) Vector.t =
+        Vector.append
+          (Vector.map b_polys ~f:(fun f -> [|f pt|]))
+          ([|x_hat|] :: a)
+          (snd (Max_num_parents.add Nat.N8.n))
+      in
+      let open Tock.Field in
+      let domains = data.wrap_domains in
+      Pcs_batch.combine_split_evaluations
+        (Common.dlog_pcs_batch
+           (Max_num_parents.add Nat.N8.n)
+           ~max_quot_size:(Common.max_quot_size_int (Domain.size domains.h)))
+        ~xi ~init:Fn.id ~mul ~last:Array.last
+        ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
+        ~evaluation_point:pt
+        ~shifted_pow:(fun deg x ->
+          Pcs_batch.pow ~one ~mul x
+            Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
+        v b
+    in
+    let open Tock.Field in
+    combine x_hat_1 As_field.zeta e1 + (r * combine x_hat_2 zetaw e2)
+  in
+  let chal = Challenge.Constant.of_tock_field in
+  let plonk =
+    Plonk_checks.derive_plonk
+      (module Tock.Field)
+      ~shift:Shifts.tock ~endo:Endo.Wrap_inner_curve.base
+      ~mds:Tock_field_sponge.params.mds
+      ~domain:
+        (Plonk_checks.domain
+           (module Tock.Field)
+           data.wrap_domains.h ~shifts:Common.tock_shifts
+           ~domain_generator:Backend.Tock.Field.domain_generator)
+      {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
+      (Plonk_checks.evals_of_split_evals
+         (module Tock.Field)
+         t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
+         ~zeta:As_field.zeta ~zetaw)
+      x_hat_1
+    |> fst
+  in
+  let shifted_value =
+    Shifted_value.of_field (module Tock.Field) ~shift:Shifts.tock
+  in
+  let module M = P3.T (Per_proof_witness.Constant) in
+  ( `Sg sg
+  , { Types.Pairing_based.Proof_state.Per_proof.deferred_values=
+        { plonk=
+            { plonk with
+              zeta= plonk0.zeta
+            ; alpha= plonk0.alpha
+            ; beta= chal plonk0.beta
+            ; gamma= chal plonk0.gamma }
+        ; combined_inner_product= shifted_value combined_inner_product
+        ; xi
+        ; bulletproof_challenges= new_bulletproof_challenges
+        ; b= shifted_value b }
+    ; should_finalize= must_verify
+    ; sponge_digest_before_evaluations=
+        Digest.Constant.of_tock_field sponge_digest_before_evaluations }
+  , prev_statement_with_hashes
+  , x_hat
+  , M.to_poly witness )
 
 module Make
     (A : T0) (A_value : sig
@@ -104,284 +373,7 @@ struct
     let [prevs] = branch_data.rule.prevs in
     let [prev_vars_lengths] = prev_vars_lengths in
     let [prev_values_length] = prev_values_length in
-    let module X_hat = struct
-      type t = Tock.Field.t Double.t
-    end in
-    let module Statement_with_hashes = struct
-      type t =
-        ( Challenge.Constant.t
-        , Challenge.Constant.t Scalar_challenge.t
-        , Tick.Field.t Shifted_value.t
-        , Tock.Field.t
-        , Digest.Constant.t
-        , Digest.Constant.t
-        , Digest.Constant.t
-        , Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
-          Step_bp_vec.t
-        , Index.t )
-        Dlog_based.Statement.In_circuit.t
-    end in
-    let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~one) in
     let sgs, unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
-      let f : type var value max max_num_parents m.
-             max Nat.t
-          -> Impls.Wrap.Verification_key.t
-          -> 'a
-          -> (value, max_num_parents, m) P.With_data.t
-          -> (var, value, max_num_parents, m) Tag.t
-          -> must_verify:bool
-          -> [`Sg of Tock.Curve.Affine.t]
-             * Unfinalized.Constant.t
-             * Statement_with_hashes.t
-             * X_hat.t
-             * ( value
-               , max_num_parents
-               , m
-               , P3.W(Per_proof_witness.Constant).t )
-               P3.t =
-       fun max dlog_vk dlog_index (T t) tag ~must_verify ->
-        let plonk0 = t.statement.proof_state.deferred_values.plonk in
-        let plonk =
-          let domain =
-            (Vector.to_array (Types_map.lookup_step_domains tag)).(Index.to_int
-                                                                     t
-                                                                       .statement
-                                                                       .proof_state
-                                                                       .deferred_values
-                                                                       .which_rule)
-          in
-          let to_field =
-            SC.to_field_constant
-              (module Tick.Field)
-              ~endo:Endo.Wrap_inner_curve.scalar
-          in
-          let alpha = to_field plonk0.alpha in
-          let zeta = to_field plonk0.zeta in
-          let zetaw =
-            Tick.Field.(
-              zeta * domain_generator ~log2_size:(Domain.log2_size domain))
-          in
-          time "plonk_checks" (fun () ->
-              Plonk_checks.derive_plonk
-                (module Tick.Field)
-                ~endo:Endo.Step_inner_curve.base ~shift:Shifts.tick
-                ~mds:Tick_field_sponge.params.mds
-                ~domain:
-                  (Plonk_checks.domain
-                     (module Tick.Field)
-                     domain ~shifts:Common.tick_shifts
-                     ~domain_generator:Backend.Tick.Field.domain_generator)
-                { zeta
-                ; alpha
-                ; beta= Challenge.Constant.to_tick_field plonk0.beta
-                ; gamma= Challenge.Constant.to_tick_field plonk0.gamma }
-                (Plonk_checks.evals_of_split_evals
-                   (module Tick.Field)
-                   t.prev_evals ~rounds:(Nat.to_int Tick.Rounds.n) ~zeta ~zetaw)
-                (fst t.prev_x_hat)
-              |> fst )
-        in
-        let data = Types_map.lookup_basic tag in
-        let (module Max_num_parents) = data.max_num_parents in
-        let T = Max_num_parents.eq in
-        let statement = t.statement in
-        let prev_challenges =
-          (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
-          Vector.map ~f:Ipa.Wrap.compute_challenges
-            statement.proof_state.me_only.old_bulletproof_challenges
-        in
-        let prev_statement_with_hashes : _ Dlog_based.Statement.In_circuit.t =
-          { pass_through=
-              Common.hash_pairing_me_only
-                (Reduced_me_only.Pairing_based.prepare
-                   ~dlog_plonk_index:dlog_index statement.pass_through)
-                ~app_state:data.value_to_field_elements
-          ; proof_state=
-              { statement.proof_state with
-                deferred_values=
-                  { statement.proof_state.deferred_values with
-                    plonk=
-                      { plonk with
-                        zeta= plonk0.zeta
-                      ; alpha= plonk0.alpha
-                      ; beta= plonk0.beta
-                      ; gamma= plonk0.gamma } }
-              ; me_only=
-                  Common.hash_dlog_me_only Max_num_parents.n
-                    { old_bulletproof_challenges=
-                        (* TODO: Get rid of this padding *)
-                        Vector.extend_exn prev_challenges Max_num_parents.n
-                          Dummy.Ipa.Wrap.challenges_computed
-                    ; sg= statement.proof_state.me_only.sg } } }
-        in
-        let module O = Tock.Oracles in
-        let o =
-          let public_input =
-            tock_public_input_of_statement prev_statement_with_hashes
-          in
-          O.create dlog_vk
-            Vector.(
-              map2
-                (Vector.extend_exn statement.pass_through.sg Max_num_parents.n
-                   (Lazy.force Dummy.Ipa.Wrap.sg))
-                (* This should indeed have length max_num_parents... No! It should have type max_num_parents_a. That is, the max_num_parents specific to a proof of this type...*)
-                prev_challenges
-                ~f:(fun commitment chals ->
-                  { Tock.Proof.Challenge_polynomial.commitment
-                  ; challenges= Vector.to_array chals } )
-              |> to_list)
-            public_input t.proof
-        in
-        let ((x_hat_1, x_hat_2) as x_hat) = O.(p_eval_1 o, p_eval_2 o) in
-        let scalar_chal f =
-          Scalar_challenge.map ~f:Challenge.Constant.of_tock_field (f o)
-        in
-        let plonk0 =
-          { Types.Dlog_based.Proof_state.Deferred_values.Plonk.Minimal.alpha=
-              scalar_chal O.alpha
-          ; beta= O.beta o
-          ; gamma= O.gamma o
-          ; zeta= scalar_chal O.zeta }
-        in
-        let xi = scalar_chal O.v in
-        let r = scalar_chal O.u in
-        let sponge_digest_before_evaluations = O.digest_before_evaluations o in
-        let to_field =
-          SC.to_field_constant
-            (module Tock.Field)
-            ~endo:Endo.Step_inner_curve.scalar
-        in
-        let module As_field = struct
-          let r = to_field r
-
-          let xi = to_field xi
-
-          let zeta = to_field plonk0.zeta
-
-          let alpha = to_field plonk0.alpha
-        end in
-        let w =
-          Tock.Field.domain_generator
-            ~log2_size:(Domain.log2_size data.wrap_domains.h)
-        in
-        let zetaw = Tock.Field.mul As_field.zeta w in
-        let new_bulletproof_challenges, b =
-          let prechals =
-            Array.map (O.opening_prechallenges o) ~f:(fun x ->
-                Scalar_challenge.map ~f:Challenge.Constant.of_tock_field x )
-          in
-          let chals =
-            Array.map prechals ~f:(fun x -> Ipa.Wrap.compute_challenge x)
-          in
-          let b_poly = unstage (b_poly chals) in
-          let open As_field in
-          let b =
-            let open Tock.Field in
-            b_poly zeta + (r * b_poly zetaw)
-          in
-          let prechals =
-            Vector.of_list_and_length_exn
-              ( Array.map prechals ~f:(fun x ->
-                    {Bulletproof_challenge.prechallenge= x} )
-              |> Array.to_list )
-              Tock.Rounds.n
-          in
-          (prechals, b)
-        in
-        let sg =
-          if not must_verify then
-            Ipa.Wrap.compute_sg new_bulletproof_challenges
-          else t.proof.openings.proof.sg
-        in
-        let witness : _ Per_proof_witness.Constant.t =
-          ( t.P.Base.Dlog_based.statement.pass_through.app_state
-          , {prev_statement_with_hashes.proof_state with me_only= ()}
-          , Double.map2 t.prev_evals t.prev_x_hat ~f:Tuple.T2.create
-          , Vector.extend_exn t.statement.pass_through.sg Max_num_parents.n
-              (Lazy.force Dummy.Ipa.Wrap.sg)
-            (* TODO: This computation is also redone elsewhere. *)
-          , Vector.extend_exn
-              (Vector.map t.statement.pass_through.old_bulletproof_challenges
-                 ~f:Ipa.Step.compute_challenges)
-              Max_num_parents.n Dummy.Ipa.Step.challenges_computed
-          , ({t.proof.openings.proof with sg}, t.proof.messages) )
-        in
-        let combined_inner_product =
-          let e1, e2 = t.proof.openings.evals in
-          let b_polys =
-            Vector.map
-              ~f:(fun chals -> unstage (b_poly (Vector.to_array chals)))
-              prev_challenges
-          in
-          let open As_field in
-          let combine (x_hat : Tock.Field.t) pt e =
-            let a, b = Dlog_plonk_types.Evals.(to_vectors (e : _ array t)) in
-            let v : (Tock.Field.t array, _) Vector.t =
-              Vector.append
-                (Vector.map b_polys ~f:(fun f -> [|f pt|]))
-                ([|x_hat|] :: a)
-                (snd (Max_num_parents.add Nat.N8.n))
-            in
-            let open Tock.Field in
-            let domains = data.wrap_domains in
-            Pcs_batch.combine_split_evaluations
-              (Common.dlog_pcs_batch
-                 (Max_num_parents.add Nat.N8.n)
-                 ~max_quot_size:
-                   (Common.max_quot_size_int (Domain.size domains.h)))
-              ~xi ~init:Fn.id ~mul ~last:Array.last
-              ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
-              ~evaluation_point:pt
-              ~shifted_pow:(fun deg x ->
-                Pcs_batch.pow ~one ~mul x
-                  Int.(Max_degree.wrap - (deg mod Max_degree.wrap)) )
-              v b
-          in
-          let open Tock.Field in
-          combine x_hat_1 As_field.zeta e1 + (r * combine x_hat_2 zetaw e2)
-        in
-        let chal = Challenge.Constant.of_tock_field in
-        let plonk =
-          Plonk_checks.derive_plonk
-            (module Tock.Field)
-            ~shift:Shifts.tock ~endo:Endo.Wrap_inner_curve.base
-            ~mds:Tock_field_sponge.params.mds
-            ~domain:
-              (Plonk_checks.domain
-                 (module Tock.Field)
-                 data.wrap_domains.h ~shifts:Common.tock_shifts
-                 ~domain_generator:Backend.Tock.Field.domain_generator)
-            {plonk0 with zeta= As_field.zeta; alpha= As_field.alpha}
-            (Plonk_checks.evals_of_split_evals
-               (module Tock.Field)
-               t.proof.openings.evals ~rounds:(Nat.to_int Tock.Rounds.n)
-               ~zeta:As_field.zeta ~zetaw)
-            x_hat_1
-          |> fst
-        in
-        let shifted_value =
-          Shifted_value.of_field (module Tock.Field) ~shift:Shifts.tock
-        in
-        let module M = P3.T (Per_proof_witness.Constant) in
-        ( `Sg sg
-        , { Types.Pairing_based.Proof_state.Per_proof.deferred_values=
-              { plonk=
-                  { plonk with
-                    zeta= plonk0.zeta
-                  ; alpha= plonk0.alpha
-                  ; beta= chal plonk0.beta
-                  ; gamma= chal plonk0.gamma }
-              ; combined_inner_product= shifted_value combined_inner_product
-              ; xi
-              ; bulletproof_challenges= new_bulletproof_challenges
-              ; b= shifted_value b }
-          ; should_finalize= must_verify
-          ; sponge_digest_before_evaluations=
-              Digest.Constant.of_tock_field sponge_digest_before_evaluations }
-        , prev_statement_with_hashes
-        , x_hat
-        , M.to_poly witness )
-      in
       let rec go : type vars values ns ms maxes k.
              (values, ns, ms) H3.T(P.With_data).t
           -> maxes H1.T(Nat).t
@@ -409,7 +401,8 @@ struct
                 let d = Types_map.lookup_basic t in
                 (d.wrap_vk, d.wrap_key)
             in
-            let `Sg sg, u, s, x, w = f max dlog_vk dlog_index p t ~must_verify
+            let `Sg sg, u, s, x, w =
+              step_one max dlog_vk dlog_index p t ~must_verify
             and sgs, us, ss, xs, ws = go ps maxes ts must_verifys l in
             (sg :: sgs, u :: us, s :: ss, x :: xs, w :: ws)
         | _ :: _, [], _, _, _ ->
