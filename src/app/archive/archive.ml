@@ -10,7 +10,7 @@ let command_run =
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
      and metrics_server_port =
-       flag "--metrics-port" ~aliases:["metrics-port"]
+       flag "--metrics-port" ~aliases:["-metrics-port"]
          ~doc:
            "PORT metrics server for scraping via Prometheus (default no \
             metrics-server)"
