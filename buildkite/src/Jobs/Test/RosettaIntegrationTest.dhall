@@ -34,8 +34,9 @@ Pipeline.build
       [ Command.build
           Command.Config::
             { commands =
-              [ Cmd.runInDocker
-                  Cmd.Docker::{image = "codaprotocol/coda:rosetta-\\\${BUILDKITE_COMMIT}"}
+              [ Cmd.run "echo export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD | sed 's!/!-!g; s!!-!g') && echo export GITTAG=$(git describe --abbrev=0 | sed 's!/!-!g; s!!-!g')"
+              , Cmd.runInDocker
+                  Cmd.Docker::{image = "codaprotocol/coda-rosetta:\\\${GITBRANCH}-\\\${GITTAG}"}
                     -- [ "USER=${user}"
                     -- , "POSTGRES_PASSWORD=${password}"
                     -- , "POSTGRES_USER=${user}"
