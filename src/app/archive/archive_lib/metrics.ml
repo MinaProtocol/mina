@@ -16,13 +16,13 @@ module Max_block_height = struct
 end
 
 module Missing_blocks = struct
-  (*A block is missing if there is no entry for a specific height. However, if there is an entry then it doesn't necessarily mean that it is part of the main chain. Unparented_blocks will show value > 1 in that case*)
+  (*A block is missing if there is no entry for a specific height. However, if there is an entry then it doesn't necessarily mean that it is part of the main chain. Unparented_blocks will show value > 1 in that case. Look for the last 2000 blocks*)
   let query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
       (Core_kernel.sprintf
          {sql| 
         SELECT count(*) 
-        FROM (SELECT h::int from generate_series(1, (select max(height) from blocks)) h
+        FROM (SELECT h::int FROM generate_series(GREATEST(1, (select max(height) from blocks)-2000) , (select max(height) from blocks)) h
         LEFT JOIN blocks b 
         ON h = b.height where b.height is null) as v
       |sql})
