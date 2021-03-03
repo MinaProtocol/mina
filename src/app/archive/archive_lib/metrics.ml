@@ -49,7 +49,6 @@ module Unparented_blocks = struct
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
     let open Deferred.Result.Let_syntax in
     let%map unparented_block_count = Conn.find query () in
-    Core.printf "updating unparented blocks %!\n" ;
     Mina_metrics.(
       Gauge.set
         (Archive.unparented_blocks metric_server)
