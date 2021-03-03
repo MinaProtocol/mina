@@ -3,7 +3,6 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
-open Cmd_util
 open Integration_test_lib
 open Unix
 
@@ -308,36 +307,30 @@ module Network_manager = struct
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
-  let run_cmd t prog args = run_cmd t.testnet_dir prog args
+  let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
+  let run_cmd_exn t prog args = Util.run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
     let%bind all_namespaces_str =
-      Cmd_util.run_cmd_exn "/" "kubectl"
+      Util.run_cmd_exn "/" "kubectl"
         ["get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}"]
     in
     let all_namespaces = String.split ~on:' ' all_namespaces_str in
-    let rec prompt_continue () =
-      print_string
-        "Existing namespace of same name detected, pausing startup. Enter \
-         [y/Y] to continue with test and replace existing namespace, Cntrl-C \
-         to quit out: " ;
-      let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
-      let c = Option.value_exn In_channel.(input_char stdin) in
-      print_newline () ;
-      if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue ()
-    in
     let%bind () =
       if
         List.mem all_namespaces network_config.terraform.testnet_name
           ~equal:String.equal
       then
         let%bind () =
-          if network_config.debug_arg then prompt_continue ()
+          if network_config.debug_arg then
+            Util.prompt_continue
+              "Existing namespace of same name detected, pausing startup. \
+               Enter [y/Y] to continue with test and replace existing \
+               namespace, Cntrl-C to quit out: "
           else Deferred.unit
         in
-        Cmd_util.run_cmd_exn "/" "kubectl"
+        Util.run_cmd_exn "/" "kubectl"
           ["delete"; "namespace"; network_config.terraform.testnet_name]
         >>| Fn.const ()
       else return ()

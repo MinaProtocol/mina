@@ -22,7 +22,7 @@ module Node = struct
         base_kube_cmd base_kube_cmd node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
-    let%map _ = Cmd_util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
+    let%map _ = Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
     ()
 
   let start ~fresh_state node : unit Malleable_error.t =

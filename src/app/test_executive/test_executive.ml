@@ -231,15 +231,10 @@ let main inputs =
   let network_state_writer_ref = ref None in
   let cleanup_deferred_ref = ref None in
   let f_dispatch_cleanup =
-    let rec prompt_continue () =
-      print_string "Pausing cleanup. Enter [y/Y] to continue: " ;
-      let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
-      let c = Option.value_exn In_channel.(input_char stdin) in
-      print_newline () ;
-      if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue ()
-    in
     let init_cleanup_func () =
-      if inputs.debug then prompt_continue () else Deferred.unit
+      if inputs.debug then
+        Util.prompt_continue "Pausing cleanup. Enter [y/Y] to continue: "
+      else Deferred.unit
     in
     let lift_accumulated_errors_func () =
       Option.value_map !error_accumulator_ref ~default:Test_error.Set.empty

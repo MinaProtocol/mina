@@ -1,6 +1,6 @@
 open Async
 open Core
-open Cmd_util
+open Integration_test_lib.Util
 open Integration_test_lib
 module Timeout = Timeout_lib.Core_time
 module Node = Kubernetes_network.Node
