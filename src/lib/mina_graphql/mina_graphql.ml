@@ -660,8 +660,13 @@ module Types = struct
                 ~resolve:(fun _ (b : t) ->
                   Option.map (min_balance b) ~f:(fun min_balance ->
                       let total_balance : uint64 = Balance.to_uint64 b.total in
-                      Unsigned.UInt64.sub total_balance
-                        (Balance.to_uint64 min_balance) ) )
+                      let min_balance_uint64 = Balance.to_uint64 min_balance in
+                      if
+                        Unsigned.UInt64.compare total_balance
+                          min_balance_uint64
+                        > 0
+                      then Unsigned.UInt64.sub total_balance min_balance_uint64
+                      else Unsigned.UInt64.zero ) )
             ; field "locked" ~typ:uint64
                 ~doc:
                   "The amount of coda owned by the account which is currently \
