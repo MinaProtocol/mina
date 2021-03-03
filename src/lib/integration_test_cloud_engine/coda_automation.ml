@@ -311,21 +311,20 @@ module Network_manager = struct
   let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
-    let%bind all_namespaces =
+    let%bind all_namespaces_str =
       Cmd_util.run_cmd_exn "/" "kubectl"
-        ["get"; "namespaces"; "--output='json'"]
+        ["get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}"]
     in
-    let contains_substring str sub =
-      let re = Str.regexp_string sub in
-      Str.string_match re str 0
-    in
-    let%bind _ =
+    let all_namespaces = String.split ~on:' ' all_namespaces_str in
+    let%bind () =
       if
-        contains_substring all_namespaces network_config.terraform.testnet_name
+        List.mem all_namespaces network_config.terraform.testnet_name
+          ~equal:String.equal
       then
         Cmd_util.run_cmd_exn "/" "kubectl"
           ["delete"; "namespace"; network_config.terraform.testnet_name]
-      else return ""
+        >>| Fn.const ()
+      else return ()
     in
     let testnet_dir =
       network_config.coda_automation_location ^/ "terraform/testnets"
