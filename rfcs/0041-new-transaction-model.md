@@ -167,13 +167,17 @@ The main benefit of this approach is that we can have a small number of base cir
 
 Another benefit is the simplified and unified implementation for transaction application logic (both inside and outside the SNARK).
 
-## Eliminating all other transaction types
+## Eliminating all other user-command types
 
-Ideally, for simplicity, we will replace the implementation of transaction logic and transaction SNARK for the existing "special case" transactions (of payments and stake delegations) into sequences of "parties" as above. We can still keep the special case variants in the transaction type if desired.
+Ideally, eventually, for simplicity, we will replace the implementation of transaction logic and transaction SNARK for the existing "special case" transactions (of payments and stake delegations) into sequences of "parties" as above. We can still keep the special case variants in the transaction type if desired.
+
+If we do this in the most straightforward way, a payment would go from occupying one leaf in the scan state to either 2 or 3 (if there is a separate fee payer). However, the proofs corresponding to these leaves would be correspondingly simpler. That said, there probably would be some efficiency loss and so if we want to avoid that, we can make circuits that "unroll the loop" and execute several parties per circuit.
+
+Specifically, for any sequence of authorization types, we can make a corresponding circuit to execute a sequence of parties with those authorization types. For example, it might be worth having a special circuit for the authorization type sequence `[ Signature; None ]` for a simple payment transaction that executes one party with a Signature authorization (the sender), and then one with no authorization (the receiver).
 
 ## Potential issues
 
-- Backwards compatibility(?)
+- Backwards compatibility
 	+ Before changing the special case transactions into the above, we will have to make sure all signers are updated as the signed payload will change.
 - Transaction pool sorting
 	+ Currently, transactions in the transaction pool are sorted by sender by nonce. If general sequences of parties are allowed as transactions, this will not work and we will have to figure out another way to order things.
