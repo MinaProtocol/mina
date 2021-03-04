@@ -21,26 +21,37 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let expected_error_event_reprs = []
 
+  let pk_of_keypair keypairs n =
+    let open Signature_lib in
+    let open Keypair in
+    let open Core_kernel in
+    let {public_key; _} = List.nth_exn keypairs n in
+    public_key |> Public_key.compress
+
   let run network t =
     let open Malleable_error.Let_syntax in
-    let block_producer = Caml.List.nth (Network.block_producers network) 0 in
-    let%bind () =
-      wait_for t (Wait_condition.node_to_initialize block_producer)
-    in
-    let node = Core_kernel.List.nth_exn (Network.block_producers network) 0 in
     let logger = Logger.create () in
+    [%log info] "send_payment_test: starting..." ;
+    let block_producer1 = Caml.List.nth (Network.block_producers network) 0 in
+    let receiver = pk_of_keypair (Network.keypairs network) 0 in
+    let block_producer2 =
+      Core_kernel.List.nth_exn (Network.block_producers network) 1
+    in
+    let sender = pk_of_keypair (Network.keypairs network) 1 in
     (* wait for initialization *)
-    let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
+    let%bind () =
+      wait_for t (Wait_condition.node_to_initialize block_producer1)
+    in
+    let%bind () =
+      wait_for t (Wait_condition.node_to_initialize block_producer2)
+    in
     [%log info] "send_payment_test: done waiting for initialization" ;
-    (* same keypairs used by Coda_automation to populate the ledger *)
-    let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs in
     (* send the payment *)
-    let sender, _sk1 = keypairs.(0) in
-    let receiver, _sk2 = keypairs.(1) in
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
-      Network.Node.send_payment ~logger node ~sender ~receiver ~amount ~fee
+      Network.Node.send_payment ~logger block_producer2 ~sender ~receiver
+        ~amount ~fee
     in
     (* confirm payment *)
     let%map () =
