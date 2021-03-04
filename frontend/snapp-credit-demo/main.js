@@ -6,6 +6,7 @@ const { WEBSCRAPE, LOGIN, VALID_LOGIN, INVALID_LOGIN } = require("./constants");
 process.env.NODE_ENV = "production";
 
 const isDev = process.env.NODE_ENV !== "production" ? true : false;
+const isMac = process.platform === "darwin" ? true : false;
 let mainWindow;
 
 const createMainWindow = async () => {
@@ -41,6 +42,24 @@ const menu = [
   {
     role: "fileMenu",
   },
+  ...(isMac
+    ? [
+        {
+          label: "Edit",
+          submenu: [
+            { role: "undo" },
+            { role: "redo" },
+            { type: "separator" },
+            { role: "cut" },
+            { role: "copy" },
+            { role: "paste" },
+            { role: "pasteandmatchstyle" },
+            { role: "delete" },
+            { role: "selectall" },
+          ],
+        },
+      ]
+    : []),
   ...(isDev
     ? [
         {
@@ -59,6 +78,12 @@ const menu = [
 app.on("activate", async () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createMainWindow();
+  }
+});
+
+app.on("window-all-closed", () => {
+  if (!isMac) {
+    app.quit();
   }
 });
 
