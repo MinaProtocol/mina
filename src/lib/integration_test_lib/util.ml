@@ -4,7 +4,7 @@ open Async
 let run_cmd dir prog args =
   [%log' spam (Logger.create ())]
     "Running command (from %s): $command" dir
-    ~metadata:[("command", `String (String.concat (prog :: args) ~sep:" "))];
+    ~metadata:[("command", `String (String.concat (prog :: args) ~sep:" "))] ;
   Process.create_exn ~working_dir:dir ~prog ~args ()
   >>= Process.collect_output_and_wait
 
