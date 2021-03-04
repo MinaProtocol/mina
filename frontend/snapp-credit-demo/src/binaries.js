@@ -18,7 +18,7 @@ const macPath = path.join(
   path.dirname(app.getAppPath()),
   "../",
   "./Contents",
-  "./resources",
+  "./Resources",
   "./Resources",
   "./bin"
 );
