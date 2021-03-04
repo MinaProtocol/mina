@@ -16,25 +16,19 @@ You will additionally need the `credit_score_demo.exe` binary to build SNAPPS.
 
 You can compile the `credit_score_demo.exe` binary by doing the following:
 
-1. Checkout to the `feature/snapp-demo` branch.
+1. Checkout to the `feature/snapp-demo-eth-addr` branch.
 
 ```
-git checkout feature/snapp-demo
+git checkout feature/snapp-demo-eth-addr
 ```
 
-2. Build the Mina daemon.
-
-```
-DUNE_PROFILE=testnet_postake_medium_curves make build
-```
-
-3.  Build the SNAPP demo client.
+2.  Build the SNAPP demo client.
 
 ```
 DUNE_PROFILE=testnet_postake_medium_curves dune build src/app/snapp_runner/examples/credit_score_demo/credit_score_demo.exe
 ```
 
-4.  Once the binary is made, place it in `resources/bin`
+3.  Once the binary is made, place it in `resources/bin`
 
 You can additionally see `src/app/snapp_runner/examples/credit_score_demo/README.md` for more details on the SNAPP binary.
 

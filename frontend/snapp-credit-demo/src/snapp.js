@@ -2,7 +2,7 @@ const { exec } = require("child_process");
 const { execPath } = require("./binaries");
 const { PROOF_SUCCESS, PROOF_FAIL } = require("../constants");
 
-const execSnappCommand = (execPath, outputPath, creditScore) => {
+const execSnappCommand = (execPath, outputPath, ethAddress, creditScore) => {
   // This is just for demo purposes. These values should change on launch.
   const snappPublicKey =
     "B62qiyajxvnfKKx3KfQQTLV8xcb7LEgLmmqrdTgWoo7F5dVNMP2YXto";
@@ -13,6 +13,7 @@ const execSnappCommand = (execPath, outputPath, creditScore) => {
 
   return `
     ${execPath} prove --score ${creditScore}\
+    --eth-address ${ethAddress}\
     --snapp-public-key ${snappPublicKey}\
     --receiver-public-key ${receiverPublicKey}\
     --fee ${fee}\
@@ -32,13 +33,16 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
     return;
   }
 
-  exec(execSnappCommand(execPath, outputPath, creditScore), (error) => {
-    if (error) {
-      mainWindow.webContents.send(PROOF_FAIL);
-    } else {
-      mainWindow.webContents.send(PROOF_SUCCESS);
+  exec(
+    execSnappCommand(execPath, outputPath, ethAddress, creditScore),
+    (error) => {
+      if (error) {
+        mainWindow.webContents.send(PROOF_FAIL);
+      } else {
+        mainWindow.webContents.send(PROOF_SUCCESS);
+      }
     }
-  });
+  );
 };
 
 exports.generateSnapp = generateSnapp;
