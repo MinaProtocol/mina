@@ -342,8 +342,10 @@ let with_retry ~logger f =
     [%log trace] "Verifier trying with $attempts_remaining"
       ~metadata:[("attempts_remaining", `Int attempts_remaining)] ;
     match%bind f () with
-    | Ok x ->
+    | Ok (`Continue x) ->
         return (Ok x)
+    | Ok (`Stop e) ->
+        return (Error e)
     | Error e ->
         if attempts_remaining = 0 then return (Error e)
         else
@@ -359,10 +361,12 @@ let verify_blockchain_snarks {worker; logger} chains =
       [%log debug] "After wait for the verifier process" ;
       Deferred.any
         [ ( after (Time.Span.of_min 3.)
-          >>| fun _ -> Or_error.error_string "verify_blockchain_snarks timeout"
-          )
+          >>| fun _ ->
+          Or_error.return
+          @@ `Stop (Error.of_string "verify_blockchain_snarks timeout") )
         ; Worker.Connection.run connection
-            ~f:Worker.functions.verify_blockchains ~arg:chains ] )
+            ~f:Worker.functions.verify_blockchains ~arg:chains
+          |> Deferred.Or_error.map ~f:(fun x -> `Continue x) ] )
 
 module Id = Unique_id.Int ()
 
@@ -379,7 +383,8 @@ let verify_transaction_snarks {worker; logger} ts =
     with_retry ~logger (fun () ->
         let%bind {connection; _} = !worker in
         Worker.Connection.run connection
-          ~f:Worker.functions.verify_transaction_snarks ~arg:ts )
+          ~f:Worker.functions.verify_transaction_snarks ~arg:ts
+        |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
   in
   upon res (fun x ->
       [%log trace] "verify $n transaction_snarks (after)"
@@ -392,4 +397,5 @@ let verify_commands {worker; logger} ts =
   with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
       Worker.Connection.run connection ~f:Worker.functions.verify_commands
-        ~arg:ts )
+        ~arg:ts
+      |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
