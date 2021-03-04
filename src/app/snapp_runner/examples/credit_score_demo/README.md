@@ -90,12 +90,12 @@
           , changes:
             { verificationKey: "VERIFICATION_KEY_HERE"
             , permissions:
-                { edit_state: "signature"
+                { edit_state: "proof"
                 , receive: "none"
                 , send: "either"
-                , set_delegate: "signature"
-                , set_permissions: "signature"
-                , set_verification_key: "signature"
+                , set_delegate: "either"
+                , set_permissions: "either"
+                , set_verification_key: "either"
                 , stake: true } }}
       , feePayment:
           { fee: "10000000"
