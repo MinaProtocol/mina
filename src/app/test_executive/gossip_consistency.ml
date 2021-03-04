@@ -63,8 +63,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () = wait_for_all_to_initialize ~logger network t in
     let sender = pk_of_keypair (Network.keypairs network) 1 in
     let receiver = pk_of_keypair (Network.keypairs network) 0 in
+    let num_payments = 10 in
     let%bind () =
-      let num_payments = 10 in
       send_payments ~logger ~sender ~receiver
         ~node:(List.nth_exn (Network.block_producers network) 1)
         num_payments
@@ -74,11 +74,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let%bind () = after (Time.Span.of_sec 30.) in
       Malleable_error.ok_unit
     in
+    let gossip_states = (network_state t).gossip_received in
     let ratio =
       Gossip_state.consistency_ratio Transactions_gossip
         (Map.data (network_state t).gossip_received)
     in
+    let num_transactions_seen =
+      let open Gossip_state in
+      let ss =
+        Map.data gossip_states
+        |> List.map ~f:(Fn.compose By_direction.received transactions)
+      in
+      Set.(size (union ss))
+    in
+    [%log info] "Transactions seen %d" num_transactions_seen ;
     [%log info] "Consistency ratio %f" ratio ;
+    let%bind () =
+      if num_transactions_seen < 9 then
+        Malleable_error.of_error_hard
+          (Error.createf "transactions seen = %d < 9" num_transactions_seen)
+      else Malleable_error.ok_unit
+    in
     let threshold = 0.95 in
     if ratio < threshold then
       Malleable_error.of_error_hard
