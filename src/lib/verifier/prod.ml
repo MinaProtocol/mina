@@ -329,7 +329,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
              ~metadata:
                ( ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
                :: exit_metadata ) ;
-           Child_process.Termination.remove pids pid ;
+           Child_processes.Termination.remove pids pid ;
            let%map worker = create_worker () in
            on_worker worker ;
            Ivar.fill new_worker worker )
