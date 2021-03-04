@@ -240,7 +240,7 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
   spec {
     concurrency_policy            = "Replace"
     failed_jobs_history_limit     = 5
-    schedule                      = "0 8 * * *"
+    schedule                      = "0 * * * *"
     starting_deadline_seconds     = 10
     successful_jobs_history_limit = 10
     job_template {
@@ -260,6 +260,8 @@ resource "kubernetes_cron_job" "integration-testnet-cleanup" {
                 "cleanup-namespace-resources",
                 "--namespace-pattern",
                 "^it-.*|^ci-net.*",
+                "--cleanup-older-than",
+                "10800", # 60 * 60 * 3 seconds (3 hours)
                 "--k8s-context",
                 "gke_o1labs-192920_us-west1_mina-integration-west1",
                 "--kube-config-file",
