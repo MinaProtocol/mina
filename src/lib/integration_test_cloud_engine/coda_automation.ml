@@ -9,6 +9,8 @@ open Unix
 
 let aws_region = "us-west-2"
 
+let aws_route53_zone_id = "ZJPR9NA6W9M7F"
+
 let project_id = "o1labs-192920"
 
 let cluster_id = "gke_o1labs-192920_us-west1_mina-integration-west1"
@@ -59,6 +61,7 @@ module Network_config = struct
     { k8s_context: string
     ; cluster_name: string
     ; cluster_region: string
+    ; aws_route53_zone_id: string
     ; testnet_name: string
     ; coda_image: string
     ; coda_agent_image: string
@@ -115,10 +118,7 @@ module Network_config = struct
       ^ string_of_int time_now.tm_hour
       ^ string_of_int time_now.tm_min
     in
-    (* append the first 5 chars of the local system username of the person running the test, short 7 char git hash, test name, and part of the timestamp onto the back of an integration test to disambiguate different test deployments. format is: *)
-    (* username-gitHash-testname-DayofmonthHrMin *)
-    (* ex: adalo-3a9f8ce-block-prod-151134 ; user is adalovelace, git commit 3a9f8ce, running block production test, 15th of a month, 11:34 AM, GMT time*)
-    (* GCP namespaces are limited to 53 characters.  this format uses up a fixed minimum of 22 characters, the longest release name for any resource is "-block-producers" which is another 16 characters. so the name of a test including dashes cannot exceed 15 characters*)
+    (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name =
       user ^ "-" ^ git_commit ^ "-" ^ test_name ^ "-" ^ timestr
     in
@@ -245,7 +245,8 @@ module Network_config = struct
             List.mapi block_producer_keypairs ~f:block_producer_config
         ; snark_worker_replicas= num_snark_workers
         ; snark_worker_public_key
-        ; snark_worker_fee } }
+        ; snark_worker_fee
+        ; aws_route53_zone_id } }
 
   let to_terraform network_config =
     let open Terraform in
@@ -359,21 +360,26 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id port =
-      { Kubernetes_network.Node.cluster= cluster_id
-      ; Kubernetes_network.Node.namespace=
-          network_config.terraform.testnet_name
-      ; Kubernetes_network.Node.pod_id
-      ; Kubernetes_network.Node.node_graphql_port= port }
+    let cons_node pod_id =
+      { testnet_name= network_config.terraform.testnet_name
+      ; Kubernetes_network.Node.cluster= cluster_id
+      ; namespace= network_config.terraform.testnet_name
+      ; pod_id }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_nodes = [cons_node "seed" 3085] in
-    let snark_coordinator_nodes = [cons_node "snark-coordinator-1" 3085] in
+    let seed_nodes = [cons_node "seed"] in
+    let snark_coordinator_name =
+      "snark-coordinator-"
+      ^ String.sub network_config.terraform.snark_worker_public_key
+          ~pos:
+            (String.length network_config.terraform.snark_worker_public_key - 6)
+          ~len:6
+    in
+    let snark_coordinator_nodes = [cons_node snark_coordinator_name] in
     let block_producer_nodes =
       List.init (List.length network_config.terraform.block_producer_configs)
         ~f:(fun i ->
-          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) (i + 3086)
-      )
+          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) )
     in
     let nodes_by_app_id =
       let all_nodes =
@@ -418,13 +424,18 @@ module Network_manager = struct
       ; testnet_log_filter= t.testnet_log_filter
       ; keypairs= t.keypairs }
     in
+    let nodes_to_string =
+      Fn.compose (String.concat ~sep:", ")
+        (List.map ~f:Kubernetes_network.Node.id)
+    in
     [%log' info t.logger] "Network deployed" ;
-    [%log' info t.logger] "snark_coordinators_list: %s"
-      (Kubernetes_network.Node.node_list_to_string result.snark_coordinators) ;
-    [%log' info t.logger] "block_producers_list: %s"
-      (Kubernetes_network.Node.node_list_to_string result.block_producers) ;
-    [%log' info t.logger] "archive_nodes_list: %s"
-      (Kubernetes_network.Node.node_list_to_string result.archive_nodes) ;
+    [%log' info t.logger] "testnet namespace: %s" t.namespace ;
+    [%log' info t.logger] "snark coordinators: %s"
+      (nodes_to_string result.snark_coordinators) ;
+    [%log' info t.logger] "block producers: %s"
+      (nodes_to_string result.block_producers) ;
+    [%log' info t.logger] "archive nodes: %s"
+      (nodes_to_string result.archive_nodes) ;
     result
 
   let destroy t =

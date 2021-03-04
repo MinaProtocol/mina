@@ -151,50 +151,6 @@ module H1 = struct
           f (C.map x) xs
   end
 
-  module Binable
-      (F : T1)
-      (G : T1) (C : sig
-          val f : 'a F.t -> 'a G.t Binable.m
-      end) =
-  struct
-    let rec f : type xs. xs T(F).t -> xs T(G).t Binable.m =
-     fun ts ->
-      match ts with
-      | [] ->
-          let module M = struct
-            type t = xs T(G).t
-
-            include Binable.Of_binable
-                      (Unit)
-                      (struct
-                        type nonrec t = t
-
-                        let to_binable _ = ()
-
-                        let of_binable () : _ T(G).t = []
-                      end)
-          end in
-          (module M)
-      | t :: ts ->
-          let (module H) = C.f t in
-          let (module Tail) = f ts in
-          let module M = struct
-            type t = xs T(G).t
-
-            include Binable.Of_binable (struct
-                        type t = H.t * Tail.t [@@deriving bin_io]
-                      end)
-                      (struct
-                        type nonrec t = t
-
-                        let to_binable (x :: xs : _ T(G).t) = (x, xs)
-
-                        let of_binable (x, xs) : _ T(G).t = x :: xs
-                      end)
-          end in
-          (module M)
-  end
-
   module To_vector (X : T0) = struct
     let rec f : type xs length.
         (xs, length) Length.t -> xs T(E01(X)).t -> (X.t, length) Vector.t =

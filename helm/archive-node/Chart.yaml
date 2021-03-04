@@ -2,15 +2,16 @@ apiVersion: v2
 name: archive-node
 description: A Helm chart for Mina Protocol's archive node
 type: application
-version: 0.4.9
+version: 1.0.1
 appVersion: 1.16.0
 annotations:
   artifacthub.io/changes: |
-    - fix peer-list-url flag
+    - enable toggle of local daemon and associated postgresDB deployments
 dependencies:
   - name: postgresql
     version: "*"
     repository: "https://charts.bitnami.com/bitnami"
+    condition: archive.enablePostgresDB
   - name: common-utilities
     version: 0.0.8
     repository: "https://coda-charts.storage.googleapis.com"

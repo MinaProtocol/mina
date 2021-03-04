@@ -34,8 +34,8 @@ def fetch_peers(namespace="default", v1=client.CoreV1Api()):
 
   peer_addresses = []
   for i in peers:
-    # Run coda client status and get output
-    command = f"kubectl exec --namespace={namespace} -c coda {i.metadata.name} coda client status"
+    # Run mina client status and get output
+    command = f"kubectl exec --namespace={namespace} -c coda {i.metadata.name} mina client status"
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     if error:
@@ -62,7 +62,7 @@ def fetch_peers(namespace="default", v1=client.CoreV1Api()):
       peerid = peerid_matches.groups()[0]
       peer_addresses.append(f"/ip4/{ip_address}/tcp/{gossip_port}/ipfs/{peerid}")
     except IndexError:
-      print("The 'coda client status' output can't be parsed... \n\nSomething is Funky.")
+      print("The 'mina client status' output can't be parsed... \n\nSomething is Funky.")
       sys.exit(1)
   return peer_addresses
 
@@ -83,7 +83,7 @@ def run_docker(daemon_image, gossip_port, working_directory, peers):
 daemon \
   -external-port {gossip_port} \
   -generate-genesis-proof true \
-  -config-dir /root/.coda-config \
+  -config-dir /root/.mina-config \
   -config-file /tmp/daemon.json \
   -peer {peers[0]} \
   -peer {peers[2]} \
