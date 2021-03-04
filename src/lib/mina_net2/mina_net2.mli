@@ -266,11 +266,11 @@ val me : net -> Keypair.t Deferred.t
 (** List of all peers we know about. *)
 val peers : net -> Peer.t list Deferred.t
 
-(** Set telemetry data to be served to peers requesting telemetry data. *)
-val set_telemetry_data : net -> string -> unit Deferred.Or_error.t
+(** Set node status data to be served to peers requesting node status data. *)
+val set_node_status_data : net -> string -> unit Deferred.Or_error.t
 
-(** Get telemetry data from given peer. *)
-val get_peer_telemetry_data : net -> Peer.t -> string Deferred.Or_error.t
+(** Get node status data from given peer. *)
+val get_peer_node_status_data : net -> Peer.t -> string Deferred.Or_error.t
 
 (** Try to connect to a peer ID, returning a [Peer.t]. *)
 val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t

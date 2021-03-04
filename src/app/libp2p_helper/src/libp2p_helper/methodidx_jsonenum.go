@@ -28,8 +28,8 @@ var (
 		"findPeer":             findPeer,
 		"listPeers":            listPeers,
 		"setGatingConfig":      setGatingConfig,
-		"setTelemetryData":     setTelemetryData,
-		"getPeerTelemetryData": getPeerTelemetryData,
+		"setNodeStatusData":     setNodeStatusData,
+		"getPeerNodeStatusData": getPeerNodeStatusData,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -52,8 +52,8 @@ var (
 		findPeer:             "findPeer",
 		listPeers:            "listPeers",
 		setGatingConfig:      "setGatingConfig",
-		setTelemetryData:     "setTelemetryData",
-		getPeerTelemetryData: "getPeerTelemetryData",
+		setNodeStatusData:     "setNodeStatusData",
+		getPeerNodeStatusData: "getPeerNodeStatusData",
 	}
 )
 
@@ -80,8 +80,8 @@ func init() {
 			interface{}(findPeer).(fmt.Stringer).String():             findPeer,
 			interface{}(listPeers).(fmt.Stringer).String():            listPeers,
 			interface{}(setGatingConfig).(fmt.Stringer).String():      setGatingConfig,
-			interface{}(setTelemetryData).(fmt.Stringer).String():     setTelemetryData,
-			interface{}(getPeerTelemetryData).(fmt.Stringer).String(): getPeerTelemetryData,
+			interface{}(setNodeStatusData).(fmt.Stringer).String():     setNodeStatusData,
+			interface{}(getPeerNodeStatusData).(fmt.Stringer).String(): getPeerNodeStatusData,
 		}
 	}
 }
