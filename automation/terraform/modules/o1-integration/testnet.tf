@@ -24,19 +24,7 @@ module "kubernetes_testnet" {
 
   seed_zone   = "us-west1-a"
   seed_region = "us-west1"
-  seed_configs = [
-    {
-      name               = "seed",
-      class              = "seed",
-      libp2p_secret      = local.seed_peer.secret,
-      external_port      = 10401,
-      node_port          = null,
-      external_ip        = null,
-      private_key_secret = null,
-      enableArchive      = false,
-      archiveAddress     = ""
-    }
-  ]
+  seed_configs = [local.seed_config]
 
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
@@ -58,7 +46,7 @@ module "kubernetes_testnet" {
       run_with_bots          = false
       enable_peer_exchange   = true
       enableArchive          = false
-      archiveAddress         = ""
+      archiveAddress         = null
     }
   ]
 }
