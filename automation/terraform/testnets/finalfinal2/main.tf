@@ -56,7 +56,7 @@ variable "seed_count" {
 locals {
   testnet_name = "finalfinal2"
   coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.0-fd39808-finalfinal2-fd39808"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.0-fd39808"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.0-fix-archive-build-profile-e344c96"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -83,10 +83,7 @@ module "finalfinal2" {
 
   coda_image         = local.coda_image
   coda_archive_image = local.coda_archive_image
-  coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
-  coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.0"
 
   block_producer_key_pass = "naughty blue worm"
 
