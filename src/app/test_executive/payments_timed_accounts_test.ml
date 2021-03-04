@@ -45,12 +45,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network_pool.Transaction_pool in
     [rejecting_command_for_reason_structured_events_repr]
 
-  let pk_of_keypair keypairs n =
-    let open Signature_lib in
-    let open Keypair in
-    let {public_key; _} = List.nth_exn keypairs n in
-    public_key |> Public_key.compress
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -67,8 +61,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for t (Wait_condition.node_to_initialize block_producer2)
     in
     [%log info] "Block producer 2 (of 2) initialized" ;
-    let sender = pk_of_keypair (Network.keypairs network) 1 in
-    let receiver = pk_of_keypair (Network.keypairs network) 0 in
+    let sender = Util.pk_of_keypair (Network.keypairs network) 1 in
+    let receiver = Util.pk_of_keypair (Network.keypairs network) 0 in
     let fee = Currency.Fee.of_int 10_000_000 in
     [%log info] "Sending payment, should succeed" ;
     let amount = Currency.Amount.of_int 300_000_000_000 in

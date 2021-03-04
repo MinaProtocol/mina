@@ -53,3 +53,10 @@ let rec prompt_continue prompt_string =
   let c = Option.value_exn In_channel.(input_char stdin) in
   print_newline () ;
   if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue prompt_string
+
+let pk_of_keypair keypairs n =
+  let open Signature_lib in
+  let open Keypair in
+  let open Core_kernel in
+  let {public_key; _} = List.nth_exn keypairs n in
+  public_key |> Public_key.compress
