@@ -23,7 +23,8 @@
   },
   "build": {
     "appId": "org.minaprotocol.snapp-credit-demo",
-    "extraFiles": [
+    "extraResources": [
+      "node_modules",
       {
         "from": "resources/bin",
         "to": "Resources/bin",
@@ -32,7 +33,6 @@
         ]
       }
     ],
-    "extraResources": "node_modules",
     "files": [
       "!node_modules"
     ],

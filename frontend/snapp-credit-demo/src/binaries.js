@@ -6,9 +6,29 @@ const { app } = require("electron");
 const { isPackaged } = app;
 const root = process.cwd();
 
-const binariesPath = isPackaged
-  ? path.join(path.dirname(app.getAppPath()), "../", "./Resources", "./bin")
-  : path.join(root, "./resources", "./bin");
+const isMac = process.platform === "darwin" ? true : false;
+const linuxPath = path.join(
+  path.dirname(app.getAppPath()),
+  "../",
+  "./resources",
+  "./Resources",
+  "./bin"
+);
+const macPath = path.join(
+  path.dirname(app.getAppPath()),
+  "../",
+  "./Contents",
+  "./resources",
+  "./Resources",
+  "./bin"
+);
+
+let binariesPath;
+if (isPackaged) {
+  binariesPath = isMac ? macPath : linuxPath;
+} else {
+  binariesPath = path.join(root, "./resources", "./bin");
+}
 
 const execPath = path.resolve(
   path.join(binariesPath, "./credit_score_demo.exe")
