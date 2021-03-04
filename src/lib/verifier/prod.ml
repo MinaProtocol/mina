@@ -218,7 +218,7 @@ end
 
 type worker = {connection: Worker.Connection.t; process: Process.t}
 
-type t = {worker: worker Deferred.t ref; logger: Logger.Stable.Latest.t}
+type t = {worker: worker Ivar.t ref; logger: Logger.Stable.Latest.t}
 
 let plus_or_minus initial ~delta =
   initial +. (Random.float (2. *. delta) -. delta)
@@ -271,7 +271,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
     {connection; process}
   in
   let%map worker = create_worker () in
-  let worker_ref = ref (Deferred.return worker) in
+  let worker_ref = ref (Ivar.create_full worker) in
   let wait_safe process =
     Deferred.Or_error.try_with (fun () -> Process.wait process)
   in
@@ -313,25 +313,26 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
                   [%log info] "verifier successfully got sigkill"
                     ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] )
         in
-        let new_worker =
-          let%bind exit_metadata =
-            match%map wait_safe process with
-            | Ok res ->
-                [ ( "exit_status"
-                  , `String (Unix.Exit_or_signal.to_string_hum res) ) ]
-            | Error err ->
-                [ ("exit_status", `String "Unknown: wait threw an error")
-                ; ("exn", Error_json.error_to_yojson err) ]
-          in
-          [%log info] "verifier successfully stopped"
-            ~metadata:
-              ( ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
-              :: exit_metadata ) ;
-          Child_processes.Termination.remove pids pid ;
-          let%map worker = create_worker () in
-          on_worker worker ; worker
-        in
-        worker_ref := new_worker )
+        let new_worker = Ivar.create () in
+        worker_ref := new_worker ;
+        don't_wait_for
+        @@ let%bind exit_metadata =
+             match%map wait_safe process with
+             | Ok res ->
+                 [ ( "exit_status"
+                   , `String (Unix.Exit_or_signal.to_string_hum res) ) ]
+             | Error err ->
+                 [ ("exit_status", `String "Unknown: wait threw an error")
+                 ; ("exn", Error_json.error_to_yojson err) ]
+           in
+           [%log info] "verifier successfully stopped"
+             ~metadata:
+               ( ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
+               :: exit_metadata ) ;
+           Child_process.Termination.remove pids pid ;
+           let%map worker = create_worker () in
+           on_worker worker ;
+           Ivar.fill new_worker worker )
   in
   on_worker worker ;
   {worker= worker_ref; logger}
@@ -357,8 +358,17 @@ let with_retry ~logger f =
 let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
       [%log debug] "Before wait for the verifier process" ;
-      let%bind {connection; _} = !worker in
-      [%log debug] "After wait for the verifier process" ;
+      let%bind {connection; _} =
+        let ivar = !worker in
+        match Ivar.peek ivar with
+        | Some worker ->
+            Deferred.return worker
+        | None ->
+            [%log debug] "Waiting for the verifier process to restart" ;
+            let%map worker = Ivar.read ivar in
+            [%log debug] "Verifier process has restarted; finished waiting" ;
+            worker
+      in
       Deferred.any
         [ ( after (Time.Span.of_min 3.)
           >>| fun _ ->
@@ -381,7 +391,7 @@ let verify_transaction_snarks {worker; logger} ts =
   [%log trace] "verify $n transaction_snarks (before)" ~metadata:(metadata ()) ;
   let res =
     with_retry ~logger (fun () ->
-        let%bind {connection; _} = !worker in
+        let%bind {connection; _} = Ivar.read !worker in
         Worker.Connection.run connection
           ~f:Worker.functions.verify_transaction_snarks ~arg:ts
         |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
@@ -395,7 +405,7 @@ let verify_transaction_snarks {worker; logger} ts =
 
 let verify_commands {worker; logger} ts =
   with_retry ~logger (fun () ->
-      let%bind {connection; _} = !worker in
+      let%bind {connection; _} = Ivar.read !worker in
       Worker.Connection.run connection ~f:Worker.functions.verify_commands
         ~arg:ts
       |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
