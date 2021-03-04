@@ -2733,7 +2733,8 @@ module Types = struct
               ; arg "x_7" ~typ ]
 
         let snappState =
-          snappState_vector "InputSnappState" ~doc:"The state for the snapp account"
+          snappState_vector "InputSnappState"
+            ~doc:"The state for the snapp account"
             ~coerce:(fun x -> Snapp_basic.Set_or_keep.Set x)
             ~typ:fieldElement ~default:Snapp_basic.Set_or_keep.Keep
 
@@ -3191,7 +3192,8 @@ module Types = struct
                   ~typ:snappPredicate ]
 
         let feePayment =
-          obj "InputSnappFeePayment" ~doc:"Fee payment details for snapp commands"
+          obj "InputSnappFeePayment"
+            ~doc:"Fee payment details for snapp commands"
             ~coerce:(fun pk nonce fee signature ->
               ( { payload=
                     { pk
