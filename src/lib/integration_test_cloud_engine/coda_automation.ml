@@ -317,6 +317,10 @@ module Network_manager = struct
         ["get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}"]
     in
     let all_namespaces = String.split ~on:' ' all_namespaces_str in
+    let testnet_dir =
+      network_config.coda_automation_location ^/ "terraform/testnets"
+      ^/ network_config.terraform.testnet_name
+    in
     let%bind () =
       if
         List.mem all_namespaces network_config.terraform.testnet_name
@@ -326,24 +330,23 @@ module Network_manager = struct
           if network_config.debug_arg then
             Util.prompt_continue
               "Existing namespace of same name detected, pausing startup. \
-               Enter [y/Y] to continue with test and replace existing \
-               namespace, Cntrl-C to quit out: "
-          else Deferred.unit
+               Enter [y/Y] to continue on and remove existing namespace, \
+               start clean, and run the test; press Cntrl-C to quit out: "
+          else
+            Deferred.return
+              ([%log info]
+                 "Existing namespace of same name detected; removing to start \
+                  clean")
         in
-        Util.run_cmd_exn "/" "kubectl"
-          ["delete"; "namespace"; network_config.terraform.testnet_name]
-        >>| Fn.const ()
-      else return ()
-    in
-    let testnet_dir =
-      network_config.coda_automation_location ^/ "terraform/testnets"
-      ^/ network_config.terraform.testnet_name
-    in
-    (* cleanup old deployment, if it exists; we will need to take good care of this logic when we put this in CI *)
-    let%bind () =
-      if%bind File_system.dir_exists testnet_dir then (
-        [%log warn] "Old network deployment found; removing to start clean" ;
-        File_system.remove_dir testnet_dir )
+        let%bind () =
+          Util.run_cmd_exn "/" "kubectl"
+            ["delete"; "namespace"; network_config.terraform.testnet_name]
+          >>| Fn.const ()
+        in
+        if%bind File_system.dir_exists testnet_dir then (
+          [%log info] "Old terraform directory found; removing to start clean" ;
+          File_system.remove_dir testnet_dir )
+        else return ()
       else return ()
     in
     [%log info] "Writing network configuration" ;
