@@ -34,6 +34,9 @@ module Intf = struct
       val args : t Command.Spec.param
     end
 
+    val prove_main :
+      (input:Public_input.Value.t -> proof:string -> unit) option
+
     (*module Branches : Pickles_types.Nat.Intf*)
 
     val name : string
@@ -273,7 +276,11 @@ module Make_commands (X : Intf.S) : Intf.Commands = struct
                         "Could not convert verification key to base64: %s" msg )
                |> Or_error.ok_exn
          in
-         Format.printf "%s@." string)
+         match X.Input.prove_main with
+         | None ->
+             Format.printf "%s@." string
+         | Some f ->
+             f ~input:public_input ~proof:string)
 
   let commands = [("verification-key", verification_key); ("prove", prove)]
 
