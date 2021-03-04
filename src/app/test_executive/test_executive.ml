@@ -32,6 +32,10 @@ type inputs =
   ; coda_image: string
   ; debug: bool }
 
+let validate_inputs {coda_image; _} =
+  if String.is_empty coda_image then
+    failwith "Coda image cannot be an empt string"
+
 let engines : engine list =
   [("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))]
 
@@ -318,6 +322,7 @@ let main inputs =
   exit 0
 
 let start inputs =
+  validate_inputs inputs ;
   never_returns
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 
