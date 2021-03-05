@@ -102,7 +102,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; coinbase_receiver: Consensus.Coinbase_receiver.t
+  ; coinbase_receiver: Consensus.Coinbase_receiver.t ref
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t
@@ -136,6 +136,11 @@ let client_port t =
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
   let public_keys, _ = Agent.get t.block_production_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
+
+let coinbase_receiver t = !(t.coinbase_receiver)
+
+let replace_coinbase_receiver t coinbase_receiver =
+  t.coinbase_receiver := coinbase_receiver
 
 let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
@@ -1634,7 +1639,7 @@ let create ?wallets (config : Config.t) =
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
-            ; coinbase_receiver= config.coinbase_receiver
+            ; coinbase_receiver= ref config.coinbase_receiver
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status
