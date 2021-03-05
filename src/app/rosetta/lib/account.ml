@@ -27,6 +27,7 @@ module Get_balance =
           blockHeight @bsDecoder(fn: "Decoders.uint32")
           stateHash
           liquid @bsDecoder(fn: "Decoders.optional_uint64")
+          total @bsDecoder(fn: "Decoders.uint64")
         }
         nonce
       }
@@ -34,7 +35,7 @@ module Get_balance =
 |}]
 
 module Balance_info = struct
-  type t = {liquid_balance: int64}
+  type t = {liquid_balance: int64; total_balance: int64}
 end
 
 module Sql = struct
@@ -180,7 +181,7 @@ LIMIT 1
         ~cliff_time ~cliff_amount ~vesting_period ~vesting_increment
         ~initial_minimum_balance
     in
-    let%bind computed_balance =
+    let%bind liquid_balance =
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
@@ -224,7 +225,21 @@ LIMIT 1
                 + incremental_balance_between_slots)
             |> UInt64.to_int64 )
     in
-    let balance_info : Balance_info.t = {liquid_balance= computed_balance} in
+    let%bind total_balance =
+      match (last_relevant_command_info_opt, timing_info_opt) with
+      | None, None ->
+          (* We've never heard of this account, at least as of the block_identifier provided *)
+          (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
+          Deferred.Result.return 0L
+      | Some (_, last_relevant_command_balance), _ ->
+          (* This account was involved in a command and we don't care about its vesting, so just use the last known
+           * balance from the command *)
+          Deferred.Result.return last_relevant_command_balance
+      | None, Some timing_info ->
+          (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
+          Deferred.Result.return timing_info.initial_balance
+    in
+    let balance_info : Balance_info.t = {liquid_balance; total_balance} in
     Deferred.Result.return (requested_block_identifier, balance_info)
 end
 
@@ -297,6 +312,8 @@ module Balance = struct
 
                             method liquid =
                               Some (Unsigned.UInt64.of_int 66_000)
+
+                            method total = Unsigned.UInt64.of_int 66_000
                           end
 
                         method nonce = Some "2"
@@ -305,7 +322,9 @@ module Balance = struct
       ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             let () = ignore (block_query, address) in
-            let balance_info : Balance_info.t = {liquid_balance= 0L} in
+            let balance_info : Balance_info.t =
+              {liquid_balance= 0L; total_balance= 0L}
+            in
             Result.return @@ (dummy_block_identifier, balance_info) )
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
@@ -339,6 +358,27 @@ module Balance = struct
         | Some account ->
             M.return account
       in
+      let make_balance_amount ~liquid_balance ~total_balance =
+        let amount =
+          ( match token_id with
+          | None ->
+              Amount_of.coda
+          | Some token_id ->
+              Amount_of.token token_id )
+            liquid_balance
+        in
+        let locked_balance =
+          Unsigned.UInt64.sub total_balance liquid_balance
+        in
+        let metadata =
+          `Assoc
+            [ ( "locked_balance"
+              , `Intlit (Unsigned.UInt64.to_string locked_balance) )
+            ; ( "total_balance"
+              , `Intlit (Unsigned.UInt64.to_string total_balance) ) ]
+        in
+        {amount with metadata= Some metadata}
+      in
       let metadata =
         Option.map
           ~f:(fun nonce -> `Assoc [("nonce", `Intlit nonce)])
@@ -370,34 +410,26 @@ module Balance = struct
             | Some liquid_balance ->
                 M.return liquid_balance
           in
+          let total_balance = (account#balance)#total in
           { Account_balance_response.block_identifier=
               { Block_identifier.index=
                   Unsigned.UInt32.to_int64 (account#balance)#blockHeight
               ; hash= state_hash }
-          ; balances=
-              [ ( match token_id with
-                | None ->
-                    Amount_of.coda
-                | Some token_id ->
-                    Amount_of.token token_id )
-                  liquid_balance ]
+          ; balances= [make_balance_amount ~liquid_balance ~total_balance]
           ; metadata }
       | Some partial_identifier ->
           (* TODO: Once multiple token_ids are possible we may need to add handling for that here *)
           let%bind block_query =
             Query.of_partial_identifier partial_identifier
           in
-          let%map block_identifier, {liquid_balance} =
+          let%map block_identifier, {liquid_balance; total_balance} =
             env.db_block_identifier_and_balance_info ~block_query ~address
           in
           { Account_balance_response.block_identifier
           ; balances=
-              [ ( match token_id with
-                | None ->
-                    Amount_of.coda
-                | Some token_id ->
-                    Amount_of.token token_id )
-                  (Unsigned.UInt64.of_int64 liquid_balance) ]
+              [ make_balance_amount
+                  ~liquid_balance:(Unsigned.UInt64.of_int64 liquid_balance)
+                  ~total_balance:(Unsigned.UInt64.of_int64 total_balance) ]
           ; metadata }
   end
 
