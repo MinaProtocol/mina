@@ -2975,7 +2975,7 @@
               "deprecationReason": null
             },
             {
-              "name": "setCoinbaseReceiever",
+              "name": "setCoinbaseReceiver",
               "description": "Set the key to receive coinbases",
               "args": [
                 {

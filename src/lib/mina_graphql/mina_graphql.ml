@@ -2566,7 +2566,7 @@ module Mutations = struct
         , List.map ~f:Tuple.T2.get2 unlocked ) )
 
   let set_coinbase_receiver =
-    field "setCoinbaseReceiever" ~doc:"Set the key to receive coinbases"
+    field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_coinbase_receiver)]
       ~typ:(non_null Types.Payload.set_coinbase_receiver)
       ~resolve:(fun {ctx= mina; _} () coinbase_receiver ->
