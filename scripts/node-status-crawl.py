@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# script to gather and store all telemetry from peers reachable from the local daemon
+# script to gather and store all node status data from peers reachable from the local daemon
 
 import subprocess
 import sys
@@ -9,9 +9,9 @@ import argparse
 import json
 
 default_port=8301
-default_prog='coda'
+default_prog='mina'
 
-parser = argparse.ArgumentParser(description='Get telemetry data from all Mina nodes reachable from localhost daemon')
+parser = argparse.ArgumentParser(description='Get node status from all Mina nodes reachable from localhost daemon')
 parser.add_argument('--daemon-port',
                     help='daemon port on localhost (default: ' + str(default_port) + ')')
 parser.add_argument('--executable',
@@ -29,13 +29,13 @@ if args.executable is None :
 else :
     prog = args.executable
 
-# map from peer IDs to telemetry data
-telemetries = dict ()
+# map from peer IDs to node status
+node_statuses = dict ()
 
 # the peer ids we've already queried
 seen_peer_ids = set ()
 
-def add_telemetries (output) :
+def add_node_statuses (output) :
 
     lines = output.decode ('utf-8').split ('\n')
 
@@ -47,12 +47,12 @@ def add_telemetries (output) :
         if line == '' :
             continue
 
-        telem = json.loads (line)
+        status = json.loads (line)
 
         try :
-            telemetries[telem['node_peer_id']] = telem
+            node_statuses[status['node_peer_id']] = status
 
-            for peer in telem['peers'] :
+            for peer in status['peers'] :
                 peer_id = peer['peer_id']
                 peers_to_query[peer_id] = peer
                 # don't consider this peer_id again
@@ -61,14 +61,14 @@ def add_telemetries (output) :
 
         except :
 
-            print ('Error in telemetry response: ' + line)
+            print ('Error in node status response: ' + line)
 
     return peers_to_query.items()
 
-# get telemetry data from peers known to daemon
-output = subprocess.check_output([prog, 'advanced', 'telemetry', '-daemon-peers', '-daemon-port', daemon_port])
+# get node status from peers known to daemon
+output = subprocess.check_output([prog, 'advanced', 'node-status', '-daemon-peers', '-daemon-port', daemon_port])
 
-peers_to_query = add_telemetries (output)
+peers_to_query = add_node_statuses (output)
 
 done = False
 
@@ -78,7 +78,7 @@ def peer_to_multiaddr(peer):
         peer['libp2p_port'],
         peer['peer_id'] )
 
-# calculate fixpoint: add telemetries from peer ids until we see no new peer ids
+# calculate fixpoint: add node statuses from peer ids until we see no new peer ids
 while not done :
 
     done = True
@@ -100,20 +100,20 @@ while not done :
     if done :
         break
 
-    output = subprocess.check_output([prog, 'advanced', 'telemetry', '-peers', formatted_peers, '-daemon-port', daemon_port])
-    peers_to_query = add_telemetries (output)
+    output = subprocess.check_output([prog, 'advanced', 'node-status', '-peers', formatted_peers, '-daemon-port', daemon_port])
+    peers_to_query = add_node_statuses (output)
 
 
 
 print ('{ "peer_ids_queried": ' + str(len(seen_peer_ids)) + ',')
-print ('  "telemetries": [')
+print ('  "node_statuses": [')
 
-num_telemetries=len(telemetries)
+num_node_statuses=len(node_statuses)
 count = 0
 
-for telem in telemetries.values () :
-    s = str(telem).replace("'",'"')
-    if count < num_telemetries - 1:
+for status in node_statuses.values () :
+    s = str(status).replace("'",'"')
+    if count < num_node_statuses - 1:
         print ('  ' + s + ',')
     else :
         print ('  ' + s)
