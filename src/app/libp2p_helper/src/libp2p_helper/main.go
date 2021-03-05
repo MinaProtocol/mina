@@ -92,8 +92,8 @@ const (
 	findPeer
 	listPeers
 	setGatingConfig
-	setNodeStatusData
-	getPeerNodeStatusData
+	setNodeStatus
+	getPeerNodeStatus
 )
 
 const validationTimeout = 5 * time.Minute
@@ -1211,20 +1211,20 @@ func (ap *findPeerMsg) run(app *app) (interface{}, error) {
 	return *maybePeer, nil
 }
 
-type setNodeStatusDataMsg struct {
+type setNodeStatusMsg struct {
 	Data string `json:"data"`
 }
 
-func (m *setNodeStatusDataMsg) run(app *app) (interface{}, error) {
-	app.P2p.NodeStatusData = m.Data
-	return "setNodeStatusData success", nil
+func (m *setNodeStatusMsg) run(app *app) (interface{}, error) {
+	app.P2p.NodeStatus = m.Data
+	return "setNodeStatus success", nil
 }
 
-type getPeerNodeStatusDataMsg struct {
+type getPeerNodeStatusMsg struct {
 	PeerMultiaddr string `json:"peer_multiaddr"`
 }
 
-func (m *getPeerNodeStatusDataMsg) run(app *app) (interface{}, error) {
+func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
 	if err != nil {
 		return nil, err
@@ -1250,12 +1250,12 @@ func (m *getPeerNodeStatusDataMsg) run(app *app) (interface{}, error) {
 	data := make([]byte, size)
 	n, err := s.Read(data)
 	if err != nil && err != io.EOF {
-		app.P2p.Logger.Errorf("failed to decode node status data: err=%s", err)
+		app.P2p.Logger.Errorf("failed to decode node status: err=%s", err)
 		return nil, err
 	}
 
 	if n == size && err == nil {
-		return nil, fmt.Errorf("node status data was greater than %d bytes", size)
+		return nil, fmt.Errorf("node status was greater than %d bytes", size)
 	}
 
 	return string(data[:n]), nil
@@ -1388,8 +1388,8 @@ var msgHandlers = map[methodIdx]func() action{
 	findPeer:             func() action { return &findPeerMsg{} },
 	listPeers:            func() action { return &listPeersMsg{} },
 	setGatingConfig:      func() action { return &setGatingConfigMsg{} },
-	setNodeStatusData:     func() action { return &setNodeStatusDataMsg{} },
-	getPeerNodeStatusData: func() action { return &getPeerNodeStatusDataMsg{} },
+	setNodeStatus:        func() action { return &setNodeStatusMsg{} },
+	getPeerNodeStatus:    func() action { return &getPeerNodeStatusMsg{} },
 }
 
 type errorResult struct {

@@ -1084,7 +1084,7 @@ let create ?wallets (config : Config.t) =
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
-          let get_node_status_data _env =
+          let get_node_status _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
             in
@@ -1106,14 +1106,14 @@ let create ?wallets (config : Config.t) =
               | None ->
                   (* should be unreachable; without a network, we wouldn't receive this RPC call *)
                   [%log' info config.logger]
-                    "Network not instantiated when node status data requested" ;
+                    "Network not instantiated when node status requested" ;
                   Deferred.return
                   @@ Error
                        (Error.of_string
                           (sprintf
                              !"Node with IP address=%{sexp: \
                                Unix.Inet_addr.t}, peer ID=%s, network not \
-                               instantiated when node status data requested"
+                               instantiated when node status requested"
                              node_ip_addr node_peer_id))
               | Some net ->
                   let protocol_state_hash, k_block_hashes_and_timestamps =
@@ -1180,7 +1180,7 @@ let create ?wallets (config : Config.t) =
                       ~f:Fn.id
                       ~default:(Float.to_int minutes_float)
                   in
-                  Mina_networking.Rpcs.Get_node_status_data.Node_status_data.
+                  Mina_networking.Rpcs.Get_node_status.Node_status.
                     { node_ip_addr
                     ; node_peer_id
                     ; sync_status
@@ -1273,7 +1273,7 @@ let create ?wallets (config : Config.t) =
                      in
                      { proof_with_data with
                        data= With_hash.data proof_with_data.data } ))
-              ~get_node_status_data
+              ~get_node_status
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->

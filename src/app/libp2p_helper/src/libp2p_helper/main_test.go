@@ -939,7 +939,7 @@ func TestGetNodeStatus(t *testing.T) {
 	appA := newTestAppWithMaxConns(t, nil, maxCount)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
-	appA.P2p.NodeStatusData = "testdata"
+	appA.P2p.NodeStatus = "testdata"
 
 	appB := newTestApp(t, nil)
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
@@ -951,11 +951,11 @@ func TestGetNodeStatus(t *testing.T) {
 	maStrs := multiaddrs(appA.P2p.Host)
 
 	// ensure we can receive data before being disconnected
-	msg := &getPeerNodeStatusDataMsg{
+	msg := &getPeerNodeStatusMsg{
 		PeerMultiaddr: maStrs[0].String(),
 	}
 
 	ret, err := msg.run(appC)
 	require.NoError(t, err)
-	require.Equal(t, appA.P2p.NodeStatusData, ret)
+	require.Equal(t, appA.P2p.NodeStatus, ret)
 }

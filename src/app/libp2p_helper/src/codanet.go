@@ -234,7 +234,7 @@ type Helper struct {
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	Seeds             []peer.AddrInfo
-	NodeStatusData     string
+	NodeStatus        string
 }
 
 // this type implements the ConnectionGating interface
@@ -519,16 +519,16 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 		_ = s.Close()
 	}()
 
-	n, err := s.Write([]byte(h.NodeStatusData))
+	n, err := s.Write([]byte(h.NodeStatus))
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(h.NodeStatusData) {
+	} else if n != len(h.NodeStatus) {
 		logger.Error("failed to write all data to stream")
 		return
 	}
 
-	logger.Debugf("wrote node status data to stream %s", s.Protocol())
+	logger.Debugf("wrote node status to stream %s", s.Protocol())
 }
 
 // MakeHelper does all the initialization to run one host

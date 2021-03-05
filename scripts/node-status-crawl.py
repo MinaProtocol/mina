@@ -9,9 +9,9 @@ import argparse
 import json
 
 default_port=8301
-default_prog='coda'
+default_prog='mina'
 
-parser = argparse.ArgumentParser(description='Get node status data from all Mina nodes reachable from localhost daemon')
+parser = argparse.ArgumentParser(description='Get node status from all Mina nodes reachable from localhost daemon')
 parser.add_argument('--daemon-port',
                     help='daemon port on localhost (default: ' + str(default_port) + ')')
 parser.add_argument('--executable',
@@ -29,7 +29,7 @@ if args.executable is None :
 else :
     prog = args.executable
 
-# map from peer IDs to node status data
+# map from peer IDs to node status
 node_statuses = dict ()
 
 # the peer ids we've already queried
@@ -47,12 +47,12 @@ def add_node_statuses (output) :
         if line == '' :
             continue
 
-        telem = json.loads (line)
+        status = json.loads (line)
 
         try :
-            node_statuses[telem['node_peer_id']] = telem
+            node_statuses[status['node_peer_id']] = status
 
-            for peer in telem['peers'] :
+            for peer in status['peers'] :
                 peer_id = peer['peer_id']
                 peers_to_query[peer_id] = peer
                 # don't consider this peer_id again
@@ -65,7 +65,7 @@ def add_node_statuses (output) :
 
     return peers_to_query.items()
 
-# get telemetry data from peers known to daemon
+# get node status from peers known to daemon
 output = subprocess.check_output([prog, 'advanced', 'node-status', '-daemon-peers', '-daemon-port', daemon_port])
 
 peers_to_query = add_node_statuses (output)
@@ -111,8 +111,8 @@ print ('  "node_statuses": [')
 num_node_statuses=len(node_statuses)
 count = 0
 
-for telem in node_statuses.values () :
-    s = str(telem).replace("'",'"')
+for status in node_statuses.values () :
+    s = str(status).replace("'",'"')
     if count < num_node_statuses - 1:
         print ('  ' + s + ',')
     else :

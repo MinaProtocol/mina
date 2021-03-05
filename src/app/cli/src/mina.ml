@@ -328,7 +328,7 @@ let setup_daemon logger =
       (optional bool)
   and disable_node_status =
     flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
-      ~doc:"Disable reporting node status to other nodes"
+      ~doc:"Disable reporting node status to other nodes (default: enabled)"
   and proof_level =
     flag "--proof-level" ~aliases:["proof-level"]
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
