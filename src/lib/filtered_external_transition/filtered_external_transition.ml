@@ -3,6 +3,17 @@ open Mina_base
 open Mina_transition
 open Signature_lib
 
+module Fee_transfer_type = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Fee_transfer | Fee_transfer_via_coinbase
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
 module Transactions = struct
   [%%versioned
   module Stable = struct
@@ -13,7 +24,9 @@ module Transactions = struct
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
             list
-        ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
+        ; fee_transfers:
+            (Fee_transfer.Single.Stable.V1.t * Fee_transfer_type.Stable.V1.t)
+            list
         ; coinbase: Currency.Amount.Stable.V1.t
         ; coinbase_receiver: Public_key.Compressed.Stable.V1.t option }
 
@@ -65,7 +78,7 @@ let participants ~next_available_token
                  user_command.data ) ) )
   in
   let fee_transfer_participants =
-    List.fold fee_transfers ~init:empty ~f:(fun set ft ->
+    List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
         add set (Fee_transfer.Single.receiver ft) )
   in
   add
@@ -85,7 +98,7 @@ let participant_pks
              ~next_available_token:Token_id.invalid user_command.data )
   in
   let fee_transfer_participants =
-    List.fold fee_transfers ~init:empty ~f:(fun set ft ->
+    List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
         add set ft.receiver_pk )
   in
   add (add (union user_command_set fee_transfer_participants) creator) winner
@@ -159,7 +172,8 @@ let of_transition external_transition tracked_participants
                     next_available_token ) )
         | {data= Fee_transfer fee_transfer; _} ->
             let fee_transfer_list =
-              Mina_base.Fee_transfer.to_list fee_transfer
+              List.map (Mina_base.Fee_transfer.to_list fee_transfer)
+                ~f:(fun f -> (f, Fee_transfer_type.Fee_transfer))
             in
             let fee_transfers =
               match tracked_participants with
@@ -167,7 +181,7 @@ let of_transition external_transition tracked_participants
                   fee_transfer_list
               | `Some interested_participants ->
                   List.filter
-                    ~f:(fun {receiver_pk= pk; _} ->
+                    ~f:(fun ({receiver_pk= pk; _}, _) ->
                       Public_key.Compressed.Set.mem interested_participants pk
                       )
                     fee_transfer_list
@@ -178,7 +192,11 @@ let of_transition external_transition tracked_participants
             , next_available_token )
         | {data= Coinbase {Coinbase.amount; fee_transfer; receiver}; _} ->
             let fee_transfer =
-              Option.map ~f:Coinbase_fee_transfer.to_fee_transfer fee_transfer
+              Option.map
+                ~f:(fun ft ->
+                  ( Coinbase_fee_transfer.to_fee_transfer ft
+                  , Fee_transfer_type.Fee_transfer_via_coinbase ) )
+                fee_transfer
             in
             let fee_transfers =
               List.append

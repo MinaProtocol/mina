@@ -390,12 +390,26 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Public key of fee transfer recipient"
             ~typ:(non_null public_key)
-            ~resolve:(fun _ {Fee_transfer.receiver_pk= pk; _} -> pk)
+            ~resolve:(fun _ ({Fee_transfer.receiver_pk= pk; _}, _) -> pk)
         ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
             ~doc:"Amount that the recipient is paid in this fee transfer"
-            ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
-        ] )
+            ~resolve:(fun _ ({Fee_transfer.fee; _}, _) ->
+              Currency.Fee.to_uint64 fee )
+        ; field "type" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~doc:
+              "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees \
+               deducted from the coinbase amount are of type \
+               'Fee_transfer_via_coinbase', rest are deducted from \
+               transaction fees"
+            ~resolve:(fun _ (_, transfer_type) ->
+              match transfer_type with
+              | Filtered_external_transition.Fee_transfer_type
+                .Fee_transfer_via_coinbase ->
+                  "Fee_transfer_via_coinbase"
+              | Fee_transfer ->
+                  "Fee_transfer" ) ] )
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
@@ -3014,7 +3028,9 @@ module Queries = struct
         Arg.
           [ arg "stateHash" ~doc:"The state hash of the desired block"
               ~typ:string
-          ; arg "height" ~doc:"The height of the desired block" ~typ:int ]
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ]
       ~resolve:
         (fun {ctx= coda; _} () (state_hash_base58_opt : string option)
              (height_opt : int option) ->
@@ -3051,11 +3067,11 @@ module Queries = struct
             Unsigned.UInt32.of_int height
           in
           let%bind transition_frontier = get_transition_frontier () in
-          let breadcrumbs =
-            Transition_frontier.all_breadcrumbs transition_frontier
+          let best_chain_breadcrumbs =
+            Transition_frontier.best_tip_path transition_frontier
           in
           let%map desired_breadcrumb =
-            List.find breadcrumbs ~f:(fun bc ->
+            List.find best_chain_breadcrumbs ~f:(fun bc ->
                 let validated_transition =
                   Transition_frontier.Breadcrumb.validated_transition bc
                 in
