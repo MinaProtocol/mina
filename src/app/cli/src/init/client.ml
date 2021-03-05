@@ -1764,24 +1764,24 @@ let compile_time_constants =
          in
          Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
 
-let telemetry =
+let node_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
     flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
-      ~doc:"Get telemetry data for peers known to the daemon"
+      ~doc:"Get node statuses for peers known to the daemon"
   in
   let peers_flag =
     flag "--peers" ~aliases:["peers"]
       (optional (Arg_type.comma_separated string))
-      ~doc:"CSV-LIST Peer multiaddrs for obtaining telemetry data"
+      ~doc:"CSV-LIST Peer multiaddrs for obtaining node status"
   in
   let show_errors_flag =
     flag "--show-errors" ~aliases:["show-errors"] no_arg
       ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peers_flag show_errors_flag in
-  Command.async ~summary:"Get telemetry data for a set of peers"
+  Command.async ~summary:"Get node statuses for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (daemon_peers, peers, show_errors) ->
          if
@@ -1796,23 +1796,23 @@ let telemetry =
                List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
          match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_node_status.rpc
              peer_ids_opt port
          with
-         | Ok all_telem_data ->
-             let all_telem_data =
-               if show_errors then all_telem_data
+         | Ok all_status_data ->
+             let all_status_data =
+               if show_errors then all_status_data
                else
-                 List.filter all_telem_data ~f:(fun td ->
+                 List.filter all_status_data ~f:(fun td ->
                      match td with Ok _ -> true | Error _ -> false )
              in
-             List.iter all_telem_data ~f:(fun peer_telem_data ->
+             List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_telemetry_data
-                      .response_to_yojson peer_telem_data ) )
+                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                        peer_status_data ) )
          | Error err ->
-             printf "Failed to get telemetry data: %s\n%!"
+             printf "Failed to get node status: %s\n%!"
                (Error.to_string_hum err) ))
 
 let next_available_token_cmd =
@@ -2137,7 +2137,7 @@ let advanced =
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
-    ; ("telemetry", telemetry)
+    ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)

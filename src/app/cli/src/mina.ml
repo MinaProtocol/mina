@@ -326,9 +326,9 @@ let setup_daemon logger =
         "true|false Generate a new genesis proof for the current \
          configuration if none is found (default: false)"
       (optional bool)
-  and disable_telemetry =
-    flag "--disable-telemetry" ~aliases:["disable-telemetry"] no_arg
-      ~doc:"Disable reporting telemetry to other nodes"
+  and disable_node_status =
+    flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
+      ~doc:"Disable reporting node status to other nodes (default: enabled)"
   and proof_level =
     flag "--proof-level" ~aliases:["proof-level"]
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
@@ -1045,8 +1045,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       let%map coda =
         Mina_lib.create ~wallets
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
-             ~is_seed ~super_catchup:(not no_super_catchup) ~disable_telemetry
-             ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+             ~is_seed ~super_catchup:(not no_super_catchup)
+             ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
+             ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
              ~proposed_protocol_version_opt
              ~work_selection_method:

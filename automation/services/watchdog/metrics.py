@@ -48,7 +48,7 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
 
 # ========================================================================
 
-from telemetry_metrics import collect_telemetry_metrics
+from node_status_metrics import collect_node_status_metrics
 
 # ========================================================================
 
@@ -88,4 +88,3 @@ def check_seed_list_up(v1, namespace, seeds_reachable):
   seeds_reachable.set(fraction_up)
 
 # ========================================================================
-
