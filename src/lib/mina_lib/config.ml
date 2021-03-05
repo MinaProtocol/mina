@@ -20,7 +20,7 @@ type t =
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
   ; is_seed: bool
-  ; disable_telemetry: bool
+  ; disable_node_status: bool
   ; super_catchup: bool
   ; initial_block_production_keypairs: Keypair.Set.t
   ; coinbase_receiver: Consensus.Coinbase_receiver.t
