@@ -92,8 +92,8 @@ const (
 	findPeer
 	listPeers
 	setGatingConfig
-	setTelemetryData
-	getPeerTelemetryData
+	setNodeStatus
+	getPeerNodeStatus
 )
 
 const validationTimeout = 5 * time.Minute
@@ -1211,20 +1211,20 @@ func (ap *findPeerMsg) run(app *app) (interface{}, error) {
 	return *maybePeer, nil
 }
 
-type setTelemetryDataMsg struct {
+type setNodeStatusMsg struct {
 	Data string `json:"data"`
 }
 
-func (m *setTelemetryDataMsg) run(app *app) (interface{}, error) {
-	app.P2p.TelemetryData = m.Data
-	return "setTelemetryData success", nil
+func (m *setNodeStatusMsg) run(app *app) (interface{}, error) {
+	app.P2p.NodeStatus = m.Data
+	return "setNodeStatus success", nil
 }
 
-type getPeerTelemetryDataMsg struct {
+type getPeerNodeStatusMsg struct {
 	PeerMultiaddr string `json:"peer_multiaddr"`
 }
 
-func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
+func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
 	if err != nil {
 		return nil, err
@@ -1232,9 +1232,9 @@ func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
 
 	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
 
-	// Open a "get telemetry" stream on m.PeerID,
+	// Open a "get node status" stream on m.PeerID,
 	// block until you can read the response, return that.
-	s, err := app.P2p.Host.NewStream(app.Ctx, addrInfo.ID, codanet.TelemetryProtocolID)
+	s, err := app.P2p.Host.NewStream(app.Ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
 	if err != nil {
 		app.P2p.Logger.Error("failed to open stream: ", err)
 		return nil, err
@@ -1250,12 +1250,12 @@ func (m *getPeerTelemetryDataMsg) run(app *app) (interface{}, error) {
 	data := make([]byte, size)
 	n, err := s.Read(data)
 	if err != nil && err != io.EOF {
-		app.P2p.Logger.Errorf("failed to decode telemetry data: err=%s", err)
+		app.P2p.Logger.Errorf("failed to decode node status: err=%s", err)
 		return nil, err
 	}
 
 	if n == size && err == nil {
-		return nil, fmt.Errorf("telemetry data was greater than %d bytes", size)
+		return nil, fmt.Errorf("node status was greater than %d bytes", size)
 	}
 
 	return string(data[:n]), nil
@@ -1388,8 +1388,8 @@ var msgHandlers = map[methodIdx]func() action{
 	findPeer:             func() action { return &findPeerMsg{} },
 	listPeers:            func() action { return &listPeersMsg{} },
 	setGatingConfig:      func() action { return &setGatingConfigMsg{} },
-	setTelemetryData:     func() action { return &setTelemetryDataMsg{} },
-	getPeerTelemetryData: func() action { return &getPeerTelemetryDataMsg{} },
+	setNodeStatus:        func() action { return &setNodeStatusMsg{} },
+	getPeerNodeStatus:    func() action { return &getPeerNodeStatusMsg{} },
 }
 
 type errorResult struct {
