@@ -21,8 +21,8 @@ def peer_to_multiaddr(peer):
     peer['libp2p_port'],
     peer['peer_id'] )
 
-def collect_telemetry_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
-  print('collecting telemetry metrics')
+def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
+  print('collecting node status metrics')
 
   pods = v1.list_namespaced_pod(namespace, watch=False)
   pod_names = [ p['metadata']['name'] for p in pods.to_dict()['items'] ]
@@ -128,8 +128,8 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
       if p in unqueried_peers:
         del unqueried_peers[p]
 
-  cmd = "mina advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
-  resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
+  cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
+  resp = util.exec_on_pod(v1, namespace, seed, 'seed', cmd)
   add_resp(resp, [])
 
   requests = 0
@@ -138,9 +138,9 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
     peers_to_query = list(unqueried_peers.values())
     peers = ','.join(peer_to_multiaddr(p) for p in peers_to_query)
 
-    print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
+    print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering node status on %s unqueried peers'%(str(len(unqueried_peers))))
 
-    resp = util.exec_on_pod(v1, namespace, seed, 'coda', "mina advanced telemetry -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
+    resp = util.exec_on_pod(v1, namespace, seed, 'seed', "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
     add_resp(resp, peers_to_query)
 
     requests += 1
