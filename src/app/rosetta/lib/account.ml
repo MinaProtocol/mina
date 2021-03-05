@@ -33,6 +33,10 @@ module Get_balance =
     }
 |}]
 
+module Balance_info = struct
+  type t = {liquid_balance: int64}
+end
+
 module Sql = struct
   module Balance_from_last_relevant_command = struct
     let query =
@@ -220,7 +224,8 @@ LIMIT 1
                 + incremental_balance_between_slots)
             |> UInt64.to_int64 )
     in
-    Deferred.Result.return (requested_block_identifier, computed_balance)
+    let balance_info : Balance_info.t = {liquid_balance= computed_balance} in
+    Deferred.Result.return (requested_block_identifier, balance_info)
 end
 
 module Balance = struct
@@ -230,10 +235,10 @@ module Balance = struct
       type 'gql t =
         { gql:
             ?token_id:string -> address:string -> unit -> ('gql, Errors.t) M.t
-        ; db_block_identifier_and_balance:
+        ; db_block_identifier_and_balance_info:
                block_query:Block_query.t
             -> address:string
-            -> (Block_identifier.t * int64, Errors.t) M.t
+            -> (Block_identifier.t * Balance_info.t, Errors.t) M.t
         ; validate_network_choice: 'gql Network.Validate_choice.Impl(M).t }
     end
 
@@ -255,7 +260,7 @@ module Balance = struct
                    (match token_id with Some s -> `String s | None -> `Null)
                  ())
               graphql_uri )
-      ; db_block_identifier_and_balance=
+      ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             let (module Conn : Caqti_async.CONNECTION) = db in
             Sql.run (module Conn) block_query address )
@@ -297,10 +302,11 @@ module Balance = struct
                         method nonce = Some "2"
                      end)
                end )
-      ; db_block_identifier_and_balance=
+      ; db_block_identifier_and_balance_info=
           (fun ~block_query ~address ->
             let () = ignore (block_query, address) in
-            Result.return @@ (dummy_block_identifier, 0L) )
+            let balance_info : Balance_info.t = {liquid_balance= 0L} in
+            Result.return @@ (dummy_block_identifier, balance_info) )
       ; validate_network_choice= Network.Validate_choice.Mock.succeed }
   end
 
@@ -381,8 +387,8 @@ module Balance = struct
           let%bind block_query =
             Query.of_partial_identifier partial_identifier
           in
-          let%map block_identifier, balance =
-            env.db_block_identifier_and_balance ~block_query ~address
+          let%map block_identifier, {liquid_balance} =
+            env.db_block_identifier_and_balance_info ~block_query ~address
           in
           { Account_balance_response.block_identifier
           ; balances=
@@ -391,7 +397,7 @@ module Balance = struct
                     Amount_of.coda
                 | Some token_id ->
                     Amount_of.token token_id )
-                  (Unsigned.UInt64.of_int64 balance) ]
+                  (Unsigned.UInt64.of_int64 liquid_balance) ]
           ; metadata }
   end
 
