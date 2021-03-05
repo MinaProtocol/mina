@@ -1104,7 +1104,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
     return coda
 
 let daemon logger =
-  Command.async ~summary:"Coda daemon"
+  Command.async ~summary:"Mina daemon"
     (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
@@ -1215,7 +1215,7 @@ let rec ensure_testnet_id_still_good logger =
           eprintf
             "The version for the testnet has changed, and this client \
              (version %s) is no longer compatible. Please download the latest \
-             Coda software!\n\
+             Mina software!\n\
              Valid versions:\n\
              %s\n"
             ( local_id |> Option.map ~f:str
@@ -1511,6 +1511,6 @@ let () =
        print_version_help coda_exe version
    | _ ->
        Command.run
-         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger))) ;
   Core.exit 0
