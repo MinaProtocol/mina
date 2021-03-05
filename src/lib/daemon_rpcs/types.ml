@@ -250,7 +250,12 @@ module Status = struct
     let block_production_keys =
       list_string_entry "Block producers running" ~to_string:Fn.id
 
-    let coinbase_receiver = string_option_entry "coinbase receiver"
+    let coinbase_receiver =
+      map_entry "Coinbase_receiver" ~f:(function
+        | None ->
+            "Block producer"
+        | Some pk ->
+            pk )
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
