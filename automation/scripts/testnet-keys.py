@@ -13,7 +13,7 @@ import natsort
 client = docker.from_env()
 p = inflect.engine()
 
-MINA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:1.0.1-compatible-529f100"
+MINA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:1.0.0-fd39808"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # Default output folders for various kinds of keys
