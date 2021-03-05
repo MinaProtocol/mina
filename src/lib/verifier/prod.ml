@@ -357,7 +357,6 @@ let with_retry ~logger f =
 
 let verify_blockchain_snarks {worker; logger} chains =
   with_retry ~logger (fun () ->
-      [%log debug] "Before wait for the verifier process" ;
       let%bind {connection; _} =
         let ivar = !worker in
         match Ivar.peek ivar with
