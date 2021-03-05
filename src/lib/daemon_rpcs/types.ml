@@ -251,7 +251,7 @@ module Status = struct
       list_string_entry "Block producers running" ~to_string:Fn.id
 
     let coinbase_receiver =
-      map_entry "Coinbase_receiver" ~f:(function
+      map_entry "Coinbase receiver" ~f:(function
         | None ->
             "Block producer"
         | Some pk ->
