@@ -15,7 +15,7 @@ let Size = ../../Command/Size.dhall
 let buildToolCmd : Text -> Size -> Command.Type = \(tool : Text) -> \(cmd_target : Size) ->
   Command.build
     Command.Config::{
-      commands = OpamInit.andThenRunInDocker ([ "PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:\\\$PATH" ]) "eval \\\$(opam config env) && make ${tool}",
+      commands = OpamInit.andThenRunInDocker ([ "PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:\\\$PATH", "DUNE_PROFILE=testnet_postake_medium_curves"]) "eval \\\$(opam config env) && make ${tool}",
       label = "Build ${tool} tool",
       key = "archive-redundancy-${tool}",
       target = cmd_target,
