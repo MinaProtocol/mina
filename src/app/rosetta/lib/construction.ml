@@ -158,11 +158,18 @@ module Metadata_data = struct
   type t =
     { sender: string
     ; nonce: Unsigned_extended.UInt32.t
-    ; token_id: Unsigned_extended.UInt64.t }
+    ; token_id: Unsigned_extended.UInt64.t
+    ; minimum_fee: Amount.t list }
   [@@deriving yojson]
 
   let create ~nonce ~sender ~token_id =
-    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id}
+    { sender= Public_key.Compressed.to_base58_check sender
+    ; nonce
+    ; token_id
+    ; minimum_fee=
+        [ Amount_of.coda
+            (MinaCurrency.Fee.to_uint64
+               Mina_compile_config.minimum_user_command_fee) ] }
 
   let of_json r =
     of_yojson r
