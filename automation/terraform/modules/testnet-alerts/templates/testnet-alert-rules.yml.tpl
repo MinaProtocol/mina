@@ -70,7 +70,7 @@ groups:
       description: "< 90% of nodes that are synced are on the same best tip for  network {{ $labels.testnet }}."
 
   - alert: LowPeerCount
-    expr: avg by (testnet) (max_over_time(Coda_Network_peers ${rule_filter} [${alerting_timeframe}])) < 1
+    expr: min by (testnet) (Coda_Network_peers ${rule_filter}) < 3
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -79,7 +79,7 @@ groups:
       description: "Critically low peer count on network {{ $labels.testnet }}."
 
   - alert: LowMinWindowDensity
-    expr: max by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
+    expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -88,7 +88,7 @@ groups:
       description: "Critically low min density on network {{ $labels.testnet }}."
 
   - alert: LowFillRate
-    expr: max by (testnet) (Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
+    expr: min by (testnet) (Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -142,13 +142,13 @@ groups:
       description: "No node has received SNARK work in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
 
   - alert: NoNewTransactions
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec ${rule_filter}) >= 60 * 30
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec ${rule_filter}) >= 2 * 180
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }}: no new transactions seen for 30 minutes."
-      description: "No node has received transactions in their transaction pool in the last 30 minutes on network {{ $labels.testnet }}."
+      summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
+      description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
 
 - name: Warnings
   rules:
