@@ -1225,6 +1225,8 @@ type getPeerNodeStatusMsg struct {
 }
 
 func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
+	ctx, _ := context.WithTimeout(app.Ctx, 400*time.Millisecond)
+
 	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
 	if err != nil {
 		return nil, err
@@ -1234,7 +1236,7 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 
 	// Open a "get node status" stream on m.PeerID,
 	// block until you can read the response, return that.
-	s, err := app.P2p.Host.NewStream(app.Ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
+	s, err := app.P2p.Host.NewStream(ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
 	if err != nil {
 		app.P2p.Logger.Error("failed to open stream: ", err)
 		return nil, err
@@ -1244,21 +1246,38 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 		_ = s.Close()
 	}()
 
-	// 1 megabyte
-	size := 1048576
+	errCh := make(chan error)
+	responseCh := make(chan string)
 
-	data := make([]byte, size)
-	n, err := s.Read(data)
-	if err != nil && err != io.EOF {
-		app.P2p.Logger.Errorf("failed to decode node status: err=%s", err)
+	go func() {
+		// 1 megabyte
+		size := 1048576
+
+		data := make([]byte, size)
+		n, err := s.Read(data)
+		if err != nil && err != io.EOF {
+			app.P2p.Logger.Errorf("failed to decode node status data: err=%s", err)
+			errCh <- err
+			return
+		}
+
+		if n == size && err == nil {
+			errCh <- fmt.Errorf("node status data was greater than %d bytes", size)
+			return
+		}
+
+		responseCh <- string(data[:n])
+	}()
+
+	select {
+	case <-ctx.Done():
+		s.Reset()
+		return nil, errors.New("timed out requesting node status data from peer")
+	case err := <-errCh:
 		return nil, err
+	case response := <-responseCh:
+		return response, nil
 	}
-
-	if n == size && err == nil {
-		return nil, fmt.Errorf("node status was greater than %d bytes", size)
-	}
-
-	return string(data[:n]), nil
 }
 
 type listPeersMsg struct {
