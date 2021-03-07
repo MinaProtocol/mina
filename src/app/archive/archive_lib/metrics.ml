@@ -1,18 +1,28 @@
 open Core_kernel
 open Async
 
+let time ~label f =
+  let start = Time.now () in
+  let%map x = f () in
+  let stop = Time.now () in
+  [%log' info (Logger.create ())]
+    "%s took %s" label
+    (Time.Span.to_string_hum (Time.diff stop start)) ;
+  x
+
 module Max_block_height = struct
   let query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
       "SELECT max(height) FROM blocks"
 
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
-    let open Deferred.Result.Let_syntax in
-    let%map max_height = Conn.find query () in
-    Mina_metrics.(
-      Gauge.set
-        (Archive.max_block_height metric_server)
-        (Float.of_int max_height))
+    time ~label:"max_block_height" (fun () ->
+        let open Deferred.Result.Let_syntax in
+        let%map max_height = Conn.find query () in
+        Mina_metrics.(
+          Gauge.set
+            (Archive.max_block_height metric_server)
+            (Float.of_int max_height)) )
 end
 
 module Missing_blocks = struct
@@ -29,11 +39,12 @@ module Missing_blocks = struct
 
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
     let open Deferred.Result.Let_syntax in
-    let%map missing_blocks = Conn.find query () in
-    Mina_metrics.(
-      Gauge.set
-        (Archive.missing_blocks metric_server)
-        (Float.of_int missing_blocks))
+    time ~label:"missing_blocks" (fun () ->
+        let%map missing_blocks = Conn.find query () in
+        Mina_metrics.(
+          Gauge.set
+            (Archive.missing_blocks metric_server)
+            (Float.of_int missing_blocks)) )
 end
 
 module Unparented_blocks = struct
@@ -48,11 +59,12 @@ module Unparented_blocks = struct
 
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
     let open Deferred.Result.Let_syntax in
-    let%map unparented_block_count = Conn.find query () in
-    Mina_metrics.(
-      Gauge.set
-        (Archive.unparented_blocks metric_server)
-        (Float.of_int unparented_block_count))
+    time ~label:"unparented_blocks" (fun () ->
+        let%map unparented_block_count = Conn.find query () in
+        Mina_metrics.(
+          Gauge.set
+            (Archive.unparented_blocks metric_server)
+            (Float.of_int unparented_block_count)) )
 end
 
 let log_error ~logger pool metric_server
