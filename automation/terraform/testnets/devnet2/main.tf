@@ -85,7 +85,7 @@ module "testnet_east" {
 
   coda_image         = local.coda_image
   coda_archive_image = local.coda_archive_image
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.1"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.2"
 
   archive_node_count  = 3
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql" 
