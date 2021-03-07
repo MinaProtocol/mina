@@ -326,9 +326,9 @@ let setup_daemon logger =
         "true|false Generate a new genesis proof for the current \
          configuration if none is found (default: false)"
       (optional bool)
-  and disable_telemetry =
-    flag "--disable-telemetry" ~aliases:["disable-telemetry"] no_arg
-      ~doc:"Disable reporting telemetry to other nodes"
+  and disable_node_status =
+    flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
+      ~doc:"Disable reporting node status to other nodes (default: enabled)"
   and proof_level =
     flag "--proof-level" ~aliases:["proof-level"]
       (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
@@ -1045,8 +1045,9 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       let%map coda =
         Mina_lib.create ~wallets
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
-             ~is_seed ~super_catchup:(not no_super_catchup) ~disable_telemetry
-             ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+             ~is_seed ~super_catchup:(not no_super_catchup)
+             ~disable_node_status ~demo_mode ~coinbase_receiver ~net_config
+             ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
              ~proposed_protocol_version_opt
              ~work_selection_method:
@@ -1104,7 +1105,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
     return coda
 
 let daemon logger =
-  Command.async ~summary:"Coda daemon"
+  Command.async ~summary:"Mina daemon"
     (Command.Param.map (setup_daemon logger) ~f:(fun setup_daemon () ->
          (* Immediately disable updating the time offset. *)
          Block_time.Controller.disable_setting_offset () ;
@@ -1215,7 +1216,7 @@ let rec ensure_testnet_id_still_good logger =
           eprintf
             "The version for the testnet has changed, and this client \
              (version %s) is no longer compatible. Please download the latest \
-             Coda software!\n\
+             Mina software!\n\
              Valid versions:\n\
              %s\n"
             ( local_id |> Option.map ~f:str
@@ -1511,6 +1512,6 @@ let () =
        print_version_help coda_exe version
    | _ ->
        Command.run
-         (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+         (Command.group ~summary:"Mina" ~preserve_subcommand_order:()
             (mina_commands logger))) ;
   Core.exit 0

@@ -1,6 +1,9 @@
 open Core_kernel
 open Async
 open Rosetta_lib
+
+(* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
+module MinaCurrency = Currency
 open Rosetta_models
 module Signature = Mina_base.Signature
 module Transaction = Rosetta_lib.Transaction
@@ -290,8 +293,10 @@ module Metadata = struct
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
-      ; suggested_fee= [Amount_of.coda (Unsigned.UInt64.of_int 1_000_000_000)]
-      }
+      ; suggested_fee=
+          [ Amount_of.coda
+              (MinaCurrency.Fee.to_uint64
+                 Mina_compile_config.default_transaction_fee) ] }
   end
 
   module Real = Impl (Deferred.Result)
