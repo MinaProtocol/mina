@@ -56,6 +56,12 @@ spec:
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
+          {{- if $.Values.coda.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.coda.maxConnections }}
+          "--max-connections", {{ $.Values.coda.maxConnections | quote }},
+          {{- end -}}
           {{- if $.Values.coda.seedPeersURL }}
           "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end -}}
