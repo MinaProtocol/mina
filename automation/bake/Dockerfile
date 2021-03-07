@@ -14,14 +14,14 @@ ARG COMMIT_HASH=master
 ARG TESTNET_NAME=finalfinal2
 ARG CONFIG_FILE="/root/daemon.json"
 
-#RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
+RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/genesis_ledger.json -o "${CONFIG_FILE}"
 
-#RUN head ${CONFIG_FILE}
+RUN head ${CONFIG_FILE}
 
 # Create the defautl config dir and an empty config
 RUN mkdir -p /root/.mina-config && echo "{}" > /root/.mina-config/daemon.json
 
-RUN mina daemon -generate-genesis-proof true; \
+RUN mina daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
   mv ~/.mina-config/genesis/genesis_* /var/lib/coda/
 
 #RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt

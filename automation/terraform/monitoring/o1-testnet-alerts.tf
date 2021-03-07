@@ -14,7 +14,7 @@ module "o1testnet_alerts" {
 
   rule_filter            = "{testnet=~\".+\"}" # any non-empty testnet name
   rule_timeframe         = "1h"
-  pagerduty_alert_filter = "devnet|finalfinal2"
+  pagerduty_alert_filter = "devnet|finalfinal2|mainnet"
 }
 
 output "testnet_alert_rules" {
