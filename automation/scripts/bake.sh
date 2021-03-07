@@ -62,7 +62,7 @@ fi
 for i in $(seq 60); do
   docker_tag_exists && break
   [ "$i" != 30 ] || (echo "expected image never appeared in docker registry" && exit 1)
-  sleep 60
+  sleep 30
 done
 
 cat Dockerfile | docker build --no-cache \
