@@ -1,6 +1,8 @@
 open Core
 open Async
 
+(* module util with  *)
+
 let run_cmd dir prog args =
   [%log' spam (Logger.create ())]
     "Running command (from %s): %s" dir
@@ -54,9 +56,16 @@ let rec prompt_continue prompt_string =
   print_newline () ;
   if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue prompt_string
 
-let pk_of_keypair keypairs n =
-  let open Signature_lib in
-  let open Keypair in
-  let open Core_kernel in
-  let {public_key; _} = List.nth_exn keypairs n in
-  public_key |> Public_key.compress
+module Make (Engine : Intf.Engine.S) = struct
+  let pub_key_of_node node =
+    let open Signature_lib in
+    (* let n = Engine.Network.Node *)
+    match Engine.Network.Node.network_keypair node with
+    | Some nk ->
+        Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
+    | None ->
+        Malleable_error.of_string_hard_error_format
+          "Node '%s' did not have a network keypair, if node is a block \
+           producer this should not happen"
+          (Engine.Network.Node.id node)
+end
