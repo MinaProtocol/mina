@@ -48,6 +48,28 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
 
 # ========================================================================
 
+def pods_with_no_new_logs(v1, namespace, nodes_with_no_new_logs):
+  print('counting pods with no new logs')
+  pods = v1.list_namespaced_pod(namespace, watch=False)
+
+  ten_minutes = 10 * 60
+
+  count = 0
+  for pod in pods.items:
+    name = pod.metadata.name
+    recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=ten_minutes)
+    if len(recent_logs) == 0:
+      count += 1
+
+  total_count = len(pods.items)
+
+  fraction_no_new_logs = float(count) / float(total_count)
+  print(count, 'of', total_count, 'pods have no logs in the last 10 minutes')
+
+  nodes_with_no_new_logs.set(fraction_no_new_logs)
+
+# ========================================================================
+
 from node_status_metrics import collect_node_status_metrics
 
 # ========================================================================
