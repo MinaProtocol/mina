@@ -55,8 +55,10 @@ variable "seed_count" {
 
 locals {
   testnet_name = "mainnet"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.0-fd39808-finalfinal2-fd39808"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.0-fix-archive-build-profile-e344c96"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.2-devnet2-and-mainnet-master-01f869f-devnet2-31fb0f7" # TODO
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.2-devnet2-and-mainnet-master-01f869f" # TODO
+  seed_region = "us-east4"
+  seed_zone = "us-east4-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -71,14 +73,14 @@ locals {
 }
 
 module "mainnet" {
-  providers = { google.gke = google.google-us-east1 }
+  providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-east"
-  cluster_region = "us-east1"
-  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
+  cluster_name   = "coda-infra-east4"
+  cluster_region = "us-east4"
+  k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
   coda_image         = local.coda_image
@@ -126,6 +128,6 @@ module "mainnet" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"
+  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"  # TODO
 }
 
