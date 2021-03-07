@@ -28,7 +28,7 @@ module "kubernetes_testnet" {
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  use_local_charts   = false
+  use_local_charts   = true
   coda_image         = var.coda_image
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
@@ -54,9 +54,29 @@ module "kubernetes_testnet" {
   seed_zone   = var.seed_zone
   seed_region = var.seed_region
 
-  archive_configs = local.archive_node_configs
-
+  archive_configs = length(var.archive_configs) != 0 ? var.archive_configs : concat(
+    # by default, deploy a single local daemon and associated PostgresDB enabled archive server
+    [
+      {
+        name              = "archive-1"
+        enableLocalDaemon = true
+        enablePostgresDB  = true
+        postgresHost      = "archive-1-postgresql"
+      }
+    ],
+    # in addition to stand-alone archive servers upto the input archive node count
+    [
+      for i in range(2, var.archive_node_count + 1) : {
+        name              = "archive-${i}"
+        enableLocalDaemon = false
+        enablePostgresDB  = false
+        postgresHost      = "archive-1-postgresql"
+      }
+    ]
+  )
   mina_archive_schema = var.mina_archive_schema
+
+  persistence_config  = var.postgres_persistence_config
 
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
@@ -79,7 +99,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
+        archiveAddress         = element(local.archive_node_names, i)
       }
     ],
     [
@@ -96,7 +116,7 @@ module "kubernetes_testnet" {
         enable_peer_exchange   = true
         isolated               = false
         enableArchive          = false
-        archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
+        archiveAddress         = element(local.archive_node_names, i)
       }
     ]
   )
@@ -110,8 +130,8 @@ module "kubernetes_testnet" {
       external_ip        = google_compute_address.seed_static_ip[i].address
       private_key_secret = "online-seeds-account-${i + 1}-key"
       libp2p_secret      = "online-seeds-libp2p-${i + 1}-key"
-      enableArchive      = length(local.archive_node_configs) > 0
-      archiveAddress     = length(local.archive_node_configs) > 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
+      enableArchive      = true
+      archiveAddress     = element(local.archive_node_names, i)
     }
   ]
 

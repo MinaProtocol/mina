@@ -37,7 +37,7 @@ def start_daemon():
   global coda_process
   with open('mina.log', 'a') as f:
     coda_process = subprocess.Popen(
-        ['mina'] + daemon_args,
+        ['coda'] + daemon_args,
         stdout=f,
         stderr=subprocess.STDOUT
     )
