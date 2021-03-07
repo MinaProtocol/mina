@@ -74,7 +74,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
     return max(children_and_depths, key=lambda x: x[1])
 
   best_protocol_states = [ get_deepest_child(root) for root in roots ]
-  best_protocol_state = max(best_protocol_states, key=lambda x: x[1])[0]
+  best_protocol_state = max(best_protocol_states, key=lambda x: x[1], default=[ None ])[0]
 
   n = 3
   last_n_protocol_states = [ best_protocol_state ]
