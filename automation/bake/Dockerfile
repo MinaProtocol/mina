@@ -26,6 +26,8 @@ RUN mina daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
 
 #RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 
+RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/b6bc28bfb697b41ee0c51995f704f1292848980d/automation/scripts/auto-restart-node.sh
+
 RUN echo '#!/bin/bash -x\n\
 mkdir -p .mina-config\n\
 touch .mina-config/mina-prover.log\n\

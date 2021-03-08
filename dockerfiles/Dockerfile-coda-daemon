@@ -8,6 +8,8 @@ RUN echo "Building image with version $coda_deb_version"
 
 COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
 
+RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/b6bc28bfb697b41ee0c51995f704f1292848980d/automation/scripts/auto-restart-node.sh
+
 # Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
