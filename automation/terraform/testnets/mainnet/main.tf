@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "mainnet"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.2-devnet2-and-mainnet-master-01f869f-devnet2-31fb0f7" # TODO
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.2-devnet2-and-mainnet-master-01f869f" # TODO
+  coda_image = "TODO" # TODO
+  coda_archive_image = "TODO" # TODO
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
@@ -128,6 +128,6 @@ module "mainnet" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/mainnet_seeds.txt"  # TODO
+  seed_peers_url                  = "TODO"  # TODO
 }
 
