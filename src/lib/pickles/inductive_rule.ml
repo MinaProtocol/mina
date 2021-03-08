@@ -13,7 +13,7 @@ end
 *)
 type ( 'prev_vars
      , 'prev_values
-     , 'prev_num_parentss
+     , 'prev_num_input_proofss
      , 'prev_num_ruless
      , 'a_var
      , 'a_value )
@@ -22,7 +22,7 @@ type ( 'prev_vars
   ; prevs:
       ( 'prev_vars
       , 'prev_values
-      , 'prev_num_parentss
+      , 'prev_num_input_proofss
       , 'prev_num_ruless )
       H4.T(Tag).t
   ; main: 'prev_vars H1.T(Id).t -> 'a_var -> 'prev_vars H1.T(E01(B)).t
@@ -32,12 +32,12 @@ type ( 'prev_vars
 module T (Statement : T0) (Statement_value : T0) = struct
   type nonrec ( 'prev_vars
               , 'prev_values
-              , 'prev_num_parentss
+              , 'prev_num_input_proofss
               , 'prev_num_ruless )
               t =
     ( 'prev_vars
     , 'prev_values
-    , 'prev_num_parentss
+    , 'prev_num_input_proofss
     , 'prev_num_ruless
     , Statement.t
     , Statement_value.t )

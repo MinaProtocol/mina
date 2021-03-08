@@ -472,15 +472,15 @@ struct
         Field.Assert.equal t1 (Field.project t2) )
 
   let incrementally_verify_proof (type b)
-      (module Max_num_parents : Nat.Add.Intf with type n = b)
-      ~rules_num_parents ~step_domains
+      (module Max_num_input_proofs : Nat.Add.Intf with type n = b)
+      ~rules_num_input_proofs ~step_domains
       ~verification_key:(m : _ Plonk_verification_key_evals.t) ~xi ~sponge
-      ~public_input ~(sg_old : (_, Max_num_parents.n) Vector.t)
+      ~public_input ~(sg_old : (_, Max_num_input_proofs.n) Vector.t)
       ~(combined_inner_product : _ Shifted_value.t) ~advice
       ~(messages : (_, Boolean.var * _) Messages.t) ~which_rule ~openings_proof
       ~(plonk :
          _ Types.Dlog_based.Proof_state.Deferred_values.Plonk.In_circuit.t) =
-    let T = Max_num_parents.eq in
+    let T = Max_num_input_proofs.eq in
     let messages =
       with_label __LOC__ (fun () ->
           let open Vector in
@@ -493,13 +493,13 @@ struct
     in
     let sg_old =
       with_label __LOC__ (fun () ->
-          let actual_num_parents =
-            Pseudo.choose (which_rule, rules_num_parents) ~f:Field.of_int
+          let actual_num_input_proofs =
+            Pseudo.choose (which_rule, rules_num_input_proofs) ~f:Field.of_int
           in
           Vector.map2
             (ones_vector
                (module Impl)
-               ~first_zero:actual_num_parents Max_num_parents.n)
+               ~first_zero:actual_num_input_proofs Max_num_input_proofs.n)
             sg_old
             ~f:(fun keep sg -> [|(keep, sg)|]) )
     in
@@ -646,12 +646,12 @@ struct
               ; f_comm
               ; [|(Boolean.true_, m.sigma_comm_0)|]
               ; [|(Boolean.true_, m.sigma_comm_1)|] ]
-              (snd (Max_num_parents.add Nat.N8.n))
+              (snd (Max_num_input_proofs.add Nat.N8.n))
           in
           check_bulletproof
             ~pcs_batch:
               (Common.dlog_pcs_batch
-                 (Max_num_parents.add Nat.N8.n)
+                 (Max_num_input_proofs.add Nat.N8.n)
                  ~max_quot_size:())
             ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
             ~advice ~openings_proof
@@ -764,8 +764,8 @@ struct
    3. Check that the "b" value was computed correctly.
    4. Perform the arithmetic checks from marlin. *)
   let finalize_other_proof (type b)
-      (module Num_parents : Nat.Add.Intf with type n = b) ?actual_num_parents
-      ~domain ~max_quot_size ~sponge
+      (module Num_input_proofs : Nat.Add.Intf with type n = b)
+      ?actual_num_input_proofs ~domain ~max_quot_size ~sponge
       ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; combined_inner_product; bulletproof_challenges; b; plonk} :
         ( _
@@ -774,7 +774,7 @@ struct
         , _ )
         Types.Pairing_based.Proof_state.Deferred_values.In_circuit.t)
       ((evals1, x_hat1), (evals2, x_hat2)) =
-    let T = Num_parents.eq in
+    let T = Num_input_proofs.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
@@ -827,17 +827,17 @@ struct
                   unstage (b_poly (Vector.to_array chals)) )
             in
             let combine pt x_hat e =
-              let pi = Num_parents.add Nat.N8.n in
+              let pi = Num_input_proofs.add Nat.N8.n in
               let a, b = Evals.to_vectors (e : Field.t array Evals.t) in
               let sg_evals =
-                match actual_num_parents with
+                match actual_num_input_proofs with
                 | None ->
                     Vector.map sg_olds ~f:(fun f -> [|f pt|])
-                | Some num_parents ->
+                | Some num_input_proofs ->
                     let mask =
                       ones_vector
                         (module Impl)
-                        ~first_zero:num_parents (Vector.length sg_olds)
+                        ~first_zero:num_input_proofs (Vector.length sg_olds)
                     in
                     Vector.map2 mask sg_olds ~f:(fun b f ->
                         [|Field.((b :> t) * f pt)|] )
@@ -910,7 +910,7 @@ struct
    that we compute when verifying the previous proof. That is a commitment
    to them. *)
 
-  let hash_me_only (type n) (_max_num_parents : n Nat.t)
+  let hash_me_only (type n) (_max_num_input_proofs : n Nat.t)
       (t : (_, (_, n) Vector.t) Types.Dlog_based.Proof_state.Me_only.t) =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)
