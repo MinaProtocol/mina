@@ -14,7 +14,7 @@ end
 *)
 type ( 'prev_vars
      , 'prev_values
-     , 'prev_num_parentss
+     , 'prev_num_input_proofss
      , 'prev_num_ruless
      , 'a_var
      , 'a_value )
@@ -23,7 +23,7 @@ type ( 'prev_vars
   ; prevs:
       ( 'prev_vars
       , 'prev_values
-      , 'prev_num_parentss
+      , 'prev_num_input_proofss
       , 'prev_num_ruless )
       H4.T(H4.T(Tag)).t
   ; main:
@@ -36,14 +36,14 @@ type ( 'prev_vars
 module Singleton = struct
   type nonrec ( 'prev_vars
               , 'prev_values
-              , 'prev_num_parentss
+              , 'prev_num_input_proofss
               , 'prev_num_ruless
               , 'a_var
               , 'a_value )
               t =
     ( 'prev_vars * unit
     , 'prev_values * unit
-    , 'prev_num_parentss * unit
+    , 'prev_num_input_proofss * unit
     , 'prev_num_ruless * unit
     , 'a_var
     , 'a_value )
@@ -53,12 +53,12 @@ end
 module T (Statement : T0) (Statement_value : T0) = struct
   type nonrec ( 'prev_vars
               , 'prev_values
-              , 'prev_num_parentss
+              , 'prev_num_input_proofss
               , 'prev_num_ruless )
               t =
     ( 'prev_vars
     , 'prev_values
-    , 'prev_num_parentss
+    , 'prev_num_input_proofss
     , 'prev_num_ruless
     , Statement.t
     , Statement_value.t )

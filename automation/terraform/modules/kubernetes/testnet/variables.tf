@@ -269,38 +269,28 @@ variable "make_report_accounts" {
 variable "archive_configs" {
   type = list(
     object({
-      name               = string
-      image              = optional(string)
-      serverPort         = optional(string)
-      externalPort       = optional(string)
-      postgresHost       = optional(string)
-      postgresPort       = optional(string)
-      postgresDB         = optional(string)
-      postgresqlUsername = optional(string)
-      postgresqlPassword = optional(string)
-      remoteSchemaFile   = optional(string)
-      enableLocalDaemon  = optional(bool)
-      enablePostgresDB   = optional(bool)
+      name                    = string
+      image                   = string
+      serverPort              = string
+      externalPort            = string
+      enableLocalDaemon       = bool
+      enablePostgresDB        = bool
+
+      postgresHost            = string
+      postgresPort            = string
+      postgresqlUsername      = string
+      postgresqlPassword      = string
+      postgresDB              = string
+      remoteSchemaFile        = string
+
+      persistenceEnabled      = bool
+      persistenceSize         = string
+      persistenceStorageClass = string
+      persistenceAccessModes  = list(string)
+      preemptibleAllowed     = string
     })
   )
   default = []
-}
-
-variable "persistence_config" {
-  type = object({
-    enabled       = optional(bool)
-    size          = optional(string)
-    reclaimPolicy = optional(string)
-    storageClass  = optional(string)
-    accessModes   = optional(list(string))
-  })
-  default = {
-    enabled       = true
-    size          = "8Gi"
-    reclaimPolicy = "retain"
-    storageClass  = "ssd-retain"
-    accessModes   = ["ReadWriteOnce"]
-  }
 }
 
 variable "upload_blocks_to_gcloud" {

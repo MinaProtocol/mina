@@ -6,7 +6,7 @@ let bits ~len n = List.init len ~f:(fun i -> (n lsr i) land 1 = 1)
 
 let max_log2_degree = 32
 
-module Num_parents : sig
+module Num_input_proofs : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
@@ -150,9 +150,10 @@ module Repr = struct
     module V1 = struct
       type 'g t =
         { step_data:
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Num_parents.Stable.V1.t)
+            ( Domain.Stable.V1.t Domains.Stable.V1.t
+            * Num_input_proofs.Stable.V1.t )
             Max_num_rules_vec.Stable.V1.t
-        ; num_parents: Num_parents.Stable.V1.t
+        ; num_input_proofs: Num_input_proofs.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t }
 
       let to_latest = Fn.id
@@ -166,9 +167,10 @@ module Poly = struct
     module V1 = struct
       type ('g, 'vk) t =
         { step_data:
-            (Domain.Stable.V1.t Domains.Stable.V1.t * Num_parents.Stable.V1.t)
+            ( Domain.Stable.V1.t Domains.Stable.V1.t
+            * Num_input_proofs.Stable.V1.t )
             Max_num_rules_vec.Stable.V1.t
-        ; num_parents: Num_parents.Stable.V1.t
+        ; num_input_proofs: Num_input_proofs.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t
         ; wrap_vk: 'vk option }
       [@@deriving sexp, equal, compare, hash, yojson]
@@ -178,7 +180,7 @@ end
 
 let dummy_domains = {Domains.h= Domain.Pow_2_roots_of_unity 0}
 
-let dummy_num_parents = Num_parents.zero
+let dummy_num_input_proofs = Num_input_proofs.zero
 
 let wrap_index_to_input (type gs f) (g : gs -> f array) =
   let open Random_oracle_input in
@@ -228,14 +230,14 @@ let wrap_index_to_input (type gs f) (g : gs -> f array) =
 let to_input : _ Poly.t -> _ =
   let open Random_oracle_input in
   let map_reduce t ~f = Array.map t ~f |> Array.reduce_exn ~f:append in
-  fun {step_data; num_parents; wrap_index} ->
+  fun {step_data; num_input_proofs; wrap_index} ->
     ( let bits ~len n = bitstring (bits ~len n) in
       let num_rules =
         bits ~len:(Nat.to_int Max_num_rules.Log2.n) (At_most.length step_data)
       in
-      let step_domains, rules_num_parents =
+      let step_domains, rules_num_input_proofs =
         At_most.extend_to_vector step_data
-          (dummy_domains, dummy_num_parents)
+          (dummy_domains, dummy_num_input_proofs)
           Max_num_rules.n
         |> Vector.unzip
       in
@@ -243,9 +245,11 @@ let to_input : _ Poly.t -> _ =
         [ map_reduce (Vector.to_array step_domains) ~f:(fun {Domains.h} ->
               map_reduce [|h|] ~f:(fun (Pow_2_roots_of_unity x) ->
                   bits ~len:max_log2_degree x ) )
-        ; Array.map (Vector.to_array rules_num_parents) ~f:Num_parents.to_bits
+        ; Array.map
+            (Vector.to_array rules_num_input_proofs)
+            ~f:Num_input_proofs.to_bits
           |> bitstrings
-        ; bitstring (Num_parents.to_bits num_parents)
+        ; bitstring (Num_input_proofs.to_bits num_input_proofs)
         ; wrap_index_to_input
             (Fn.compose Array.of_list
                (List.concat_map ~f:(fun (x, y) -> [x; y])))

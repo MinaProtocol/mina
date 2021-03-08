@@ -20,11 +20,12 @@ let vector_of_list (type a t)
 
 let b_poly = Tick.Field.(Dlog_main.b_poly ~add ~mul ~one)
 
-let combined_inner_product (type actual_num_parents)
-    ~actual_num_parents:(module AB : Nat.Add.Intf
-      with type n = actual_num_parents) (e1, e2)
-    ~(old_bulletproof_challenges : (_, actual_num_parents) Vector.t) ~r ~xi
-    ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2) ~(step_branch_domains : Domains.t) =
+let combined_inner_product (type actual_num_input_proofs)
+    ~actual_num_input_proofs:(module AB : Nat.Add.Intf
+      with type n = actual_num_input_proofs) (e1, e2)
+    ~(old_bulletproof_challenges : (_, actual_num_input_proofs) Vector.t) ~r
+    ~xi ~zeta ~zetaw ~x_hat:(x_hat_1, x_hat_2)
+    ~(step_branch_domains : Domains.t) =
   let T = AB.eq in
   let b_polys =
     Vector.map
@@ -58,22 +59,26 @@ let combined_inner_product (type actual_num_parents)
 module Pairing_acc = Tock.Inner_curve.Affine
 
 (* The prover for wrapping a proof *)
-let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
-    ~(max_num_parents : max_num_parents Nat.t)
-    (module Prev_max_num_parents : Hlist.Maxes.S
-      with type ns = prev_max_num_parentss
-       and type length = max_num_parents)
-    ((module Req) : (max_num_parents, prev_max_num_parentss) Requests.Wrap.t)
+let wrap
+    (type actual_num_input_proofs max_num_input_proofs
+    prev_max_num_input_proofss)
+    ~(max_num_input_proofs : max_num_input_proofs Nat.t)
+    (module Prev_max_num_input_proofs : Hlist.Maxes.S
+      with type ns = prev_max_num_input_proofss
+       and type length = max_num_input_proofs)
+    (( module
+      Req ) :
+      (max_num_input_proofs, prev_max_num_input_proofss) Requests.Wrap.t)
     ~dlog_plonk_index wrap_main to_field_elements ~pairing_vk ~step_domains
     ~wrap_domains ~pairing_plonk_indices pk
     ({statement= prev_statement; prev_evals; proof; index= which_index} :
       ( _
       , _
-      , (_, actual_num_parents) Vector.t
-      , (_, actual_num_parents) Vector.t
-      , prev_max_num_parentss H1.T(P.Base.Me_only.Dlog_based).t
+      , (_, actual_num_input_proofs) Vector.t
+      , (_, actual_num_input_proofs) Vector.t
+      , prev_max_num_input_proofss H1.T(P.Base.Me_only.Dlog_based).t
       , ( (Tock.Field.t array Dlog_plonk_types.Evals.t * Tock.Field.t) Double.t
-        , max_num_parents )
+        , max_num_input_proofs )
         Vector.t )
       P.Base.Pairing_based.t) =
   (*
@@ -108,14 +113,14 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
              (struct
                let f (type n) (m : n P.Base.Me_only.Dlog_based.Prepared.t) =
                  let T =
-                   Nat.eq_exn max_num_parents
+                   Nat.eq_exn max_num_input_proofs
                      (Vector.length m.old_bulletproof_challenges)
                  in
-                 Common.hash_dlog_me_only max_num_parents m
+                 Common.hash_dlog_me_only max_num_input_proofs m
              end)
          in
         let module V = H1.To_vector (Digest.Constant) in
-        V.f Prev_max_num_parents.length (M.f prev_me_only)) }
+        V.f Prev_max_num_input_proofs.length (M.f prev_me_only)) }
   in
   let handler (Snarky_backendless.Request.With {request; respond}) =
     let open Req in
@@ -135,7 +140,7 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
             end)
         in
         let module V = H1.To_vector (Pairing_acc) in
-        k (V.f Prev_max_num_parents.length (M.f prev_me_only))
+        k (V.f Prev_max_num_input_proofs.length (M.f prev_me_only))
     | Old_bulletproof_challenges ->
         let module M =
           H1.Map
@@ -158,15 +163,17 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
   in
   let module O = Tick.Oracles in
   let public_input =
-    tick_public_input_of_statement ~max_num_parents prev_statement_with_hashes
+    tick_public_input_of_statement ~max_num_input_proofs
+      prev_statement_with_hashes
   in
   let prev_challenges =
     Vector.map ~f:Ipa.Step.compute_challenges
       prev_statement.proof_state.me_only.old_bulletproof_challenges
   in
-  let actual_num_parents = Vector.length prev_challenges in
+  let actual_num_input_proofs = Vector.length prev_challenges in
   let lte =
-    Nat.lte_exn actual_num_parents (Length.to_nat Prev_max_num_parents.length)
+    Nat.lte_exn actual_num_input_proofs
+      (Length.to_nat Prev_max_num_input_proofs.length)
   in
   let o =
     let sgs =
@@ -180,7 +187,7 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
           end)
       in
       let module V = H1.To_vector (Tick.Curve.Affine) in
-      V.f Prev_max_num_parents.length (M.f prev_me_only)
+      V.f Prev_max_num_input_proofs.length (M.f prev_me_only)
     in
     O.create pairing_vk
       Vector.(
@@ -230,7 +237,7 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
     let combined_inner_product =
       let open As_field in
       combined_inner_product (* Note: We do not pad here. *)
-        ~actual_num_parents:(Nat.Add.create actual_num_parents)
+        ~actual_num_input_proofs:(Nat.Add.create actual_num_input_proofs)
         proof.openings.evals ~x_hat ~r ~xi ~zeta ~zetaw
         ~step_branch_domains:step_domains
         ~old_bulletproof_challenges:prev_challenges
@@ -317,7 +324,7 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
               ~message:
                 ( Vector.map2
                     (Vector.extend_exn prev_statement.proof_state.me_only.sg
-                       max_num_parents
+                       max_num_input_proofs
                        (Lazy.force Dummy.Ipa.Wrap.sg))
                     me_only_prepared.old_bulletproof_challenges
                     ~f:(fun sg chals ->
@@ -333,8 +340,8 @@ let wrap (type actual_num_parents max_num_parents prev_max_num_parentss)
           ; proof_state=
               { next_statement.proof_state with
                 me_only=
-                  Common.hash_dlog_me_only max_num_parents me_only_prepared }
-          } )
+                  Common.hash_dlog_me_only max_num_input_proofs
+                    me_only_prepared } } )
   in
   ( { proof= next_proof
     ; statement= Types.Dlog_based.Statement.to_minimal next_statement

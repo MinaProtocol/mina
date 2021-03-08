@@ -130,8 +130,8 @@ let setup (type n) ?(logger = Logger.null ())
                        ~frontier
                        (Envelope.Incoming.data query_env)) )
                 ~get_best_tip:(fun _ -> failwith "Get_best_tip unimplemented")
-                ~get_telemetry_data:(fun _ ->
-                  failwith "Get_telemetry data unimplemented" )
+                ~get_node_status:(fun _ ->
+                  failwith "Get_node_status unimplemented" )
                 ~get_transition_knowledge:(fun _query ->
                   Deferred.return (Sync_handler.best_tip_path ~frontier) )
                 ~get_transition_chain_proof:(fun query_env ->

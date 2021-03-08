@@ -62,7 +62,7 @@ module type Proof_intf = sig
 end
 
 module Proof : sig
-  type ('max_num_parents, 'mlmb) t
+  type ('max_num_input_proofs, 'mlmb) t
 
   val dummy : 'w Nat.t -> 'm Nat.t -> _ Nat.t -> ('w, 'm) t
 
@@ -81,8 +81,8 @@ module Proof : sig
 end
 
 module Statement_with_proof : sig
-  type ('s, 'max_num_parents, _) t =
-    's * ('max_num_parents, 'max_num_parents) Proof.t
+  type ('s, 'max_num_input_proofs, _) t =
+    's * ('max_num_input_proofs, 'max_num_input_proofs) Proof.t
 end
 
 val verify :
@@ -93,11 +93,16 @@ val verify :
   -> bool
 
 module Prover : sig
-  type ('prev_values, 'prev_num_parentss, 'prev_num_ruless, 'a_value, 'proof) t =
+  type ( 'prev_values
+       , 'prev_num_input_proofss
+       , 'prev_num_ruless
+       , 'a_value
+       , 'proof )
+       t =
        ?handler:(   Snarky_backendless.Request.request
                  -> Snarky_backendless.Request.response)
     -> ( 'prev_values
-       , 'prev_num_parentss
+       , 'prev_num_input_proofss
        , 'prev_num_ruless )
        H3.T(Statement_with_proof).t
     -> 'a_value
@@ -143,7 +148,7 @@ module Side_loaded : sig
 
     module Max_num_rules : Nat.Add.Intf
 
-    module Max_num_parents : Nat.Add.Intf
+    module Max_num_input_proofs : Nat.Add.Intf
   end
 
   module Proof : sig
@@ -151,10 +156,10 @@ module Side_loaded : sig
     module Stable : sig
       module V1 : sig
         (* TODO: This should really be able to be any number up to the max
-           number of parents... *)
+           number of input_proofs... *)
         type t =
-          ( Verification_key.Max_num_parents.n
-          , Verification_key.Max_num_parents.n )
+          ( Verification_key.Max_num_input_proofs.n
+          , Verification_key.Max_num_input_proofs.n )
           Proof.t
         [@@deriving sexp, equal, yojson, hash, compare]
       end
@@ -163,7 +168,7 @@ module Side_loaded : sig
 
   val create :
        name:string
-    -> max_num_parents:(module Nat.Add.Intf with type n = 'n1)
+    -> max_num_input_proofs:(module Nat.Add.Intf with type n = 'n1)
     -> value_to_field_elements:('value -> Impls.Step.Field.Constant.t array)
     -> var_to_field_elements:('var -> Impls.Step.Field.t array)
     -> typ:('var, 'value) Impls.Step.Typ.t
@@ -188,7 +193,7 @@ end
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile :
-     ?self:('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
+     ?self:('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) Tag.t
   -> ?cache:Key_cache.Spec.t list
   -> ?disk_keys:(Cache.Step.Key.Verification.t, 'num_rules) Vector.t
                 * Cache.Wrap.Key.Verification.t
@@ -196,25 +201,27 @@ val compile :
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
   -> num_rules:(module Nat.Intf with type n = 'num_rules)
-  -> max_num_parents:(module Nat.Add.Intf with type n = 'max_num_parents)
+  -> max_num_input_proofs:(module Nat.Add.Intf
+                             with type n = 'max_num_input_proofs)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
-  -> rules:(   self:('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
+  -> rules:(   self:('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) Tag.t
             -> ( 'prev_varss
                , 'prev_valuess
-               , 'prev_num_parentss
+               , 'prev_num_input_proofss
                , 'prev_num_ruless
                , 'a_var
                , 'a_value )
                H4_2.T(Inductive_rule.Singleton).t)
-  -> ('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
+  -> ('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) Tag.t
      * Cache_handle.t
      * (module Proof_intf
-          with type t = ('max_num_parents, 'max_num_parents) Proof.t
+          with type t = ('max_num_input_proofs, 'max_num_input_proofs) Proof.t
            and type statement = 'a_value)
      * ( 'prev_valuess
-       , 'prev_num_parentss
+       , 'prev_num_input_proofss
        , 'prev_num_ruless
        , 'a_value
-       , ('max_num_parents, 'max_num_parents) Proof.t Async.Deferred.t )
+       , ('max_num_input_proofs, 'max_num_input_proofs) Proof.t
+         Async.Deferred.t )
        H3_2.T(Prover).t

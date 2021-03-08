@@ -76,9 +76,9 @@ module Step = struct
   module Digest = Digest.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input ~num_parents ~wrap_rounds =
+  let input ~num_input_proofs ~wrap_rounds =
     let open Types.Pairing_based.Statement in
-    let spec = spec num_parents wrap_rounds in
+    let spec = spec num_input_proofs wrap_rounds in
     let (T (typ, f)) =
       Spec.packed_typ
         (module Impl)
@@ -92,16 +92,16 @@ module Step = struct
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
     Spec.ETyp.T (typ, fun x -> of_data (f x))
 
-  let input_of_hlist (type num_parentss vars values)
-      ~(num_parentss : num_parentss H1.T(Nat).t)
+  let input_of_hlist (type num_input_proofss vars values)
+      ~(num_input_proofss : num_input_proofss H1.T(Nat).t)
       ~(per_proof_specs : (values, vars, _) H2_1.T(Spec).t) :
-      ( ( (vars, num_parentss) H2.T(Vector).t
+      ( ( (vars, num_input_proofss) H2.T(Vector).t
         , Field.t
-        , num_parentss H1.T(Vector.Carrying(Digest)).t )
+        , num_input_proofss H1.T(Vector.Carrying(Digest)).t )
         Types.Pairing_based.Statement.t
-      , ( (values, num_parentss) H2.T(Vector).t
+      , ( (values, num_input_proofss) H2.T(Vector).t
         , Digest.Constant.t
-        , num_parentss H1.T(Vector.Carrying(Digest.Constant)).t )
+        , num_input_proofss H1.T(Vector.Carrying(Digest.Constant)).t )
         Types.Pairing_based.Statement.t
       , _ )
       Spec.ETyp.t =
@@ -116,19 +116,19 @@ module Step = struct
                t ))
         spec
     in
-    let rec build_typs : type num_parentss vars values.
-           num_parentss H1.T(Nat).t
+    let rec build_typs : type num_input_proofss vars values.
+           num_input_proofss H1.T(Nat).t
         -> (values, vars, _) H2_1.T(Spec).t
-        -> ( (vars, num_parentss) H2.T(Vector).t
-           , (values, num_parentss) H2.T(Vector).t
+        -> ( (vars, num_input_proofss) H2.T(Vector).t
+           , (values, num_input_proofss) H2.T(Vector).t
            , _ )
            Spec.ETyp.t
-           * ( num_parentss H1.T(Vector.Carrying(Digest)).t
-             , num_parentss H1.T(Vector.Carrying(Digest.Constant)).t
+           * ( num_input_proofss H1.T(Vector.Carrying(Digest)).t
+             , num_input_proofss H1.T(Vector.Carrying(Digest.Constant)).t
              , _ )
              Spec.ETyp.t =
-     fun num_parentss specs ->
-      match (num_parentss, specs) with
+     fun num_input_proofss specs ->
+      match (num_input_proofss, specs) with
       | [], [] ->
           let per_proof_typ =
             let open Snarky_backendless.Typ in
@@ -149,16 +149,17 @@ module Step = struct
       | [], _ ->
           failwith "Pickles.Impls.Step.input_of_hlist: too many specs"
       | _, [] ->
-          failwith "Pickles.Impls.Step.input_of_hlist: too many num_parentss"
-      | num_parents :: num_parentss, spec :: specs ->
+          failwith
+            "Pickles.Impls.Step.input_of_hlist: too many num_input_proofss"
+      | num_input_proofs :: num_input_proofss, spec :: specs ->
           let T (per_proofs_typ, per_proofs_fn), T (digests_typ, digests_fn) =
-            build_typs num_parentss specs
+            build_typs num_input_proofss specs
           in
           let (T (per_proof_typ, per_proof_fn)) =
-            packed_typ (Vector (spec, num_parents))
+            packed_typ (Vector (spec, num_input_proofs))
           in
           let (T (digest_typ, digest_fn)) =
-            packed_typ (Vector (B Spec.Digest, num_parents))
+            packed_typ (Vector (B Spec.Digest, num_input_proofs))
           in
           let per_proof_typ =
             let open Snarky_backendless.Typ in
@@ -188,7 +189,7 @@ module Step = struct
           (per_proof_typ, digest_typ)
     in
     let T (per_proof_typ, per_proof_fn), T (digests_typ, digests_fn) =
-      build_typs num_parentss per_proof_specs
+      build_typs num_input_proofss per_proof_specs
     in
     let (T (me_only_typ, me_only_fn)) = packed_typ (B Spec.Digest) in
     let proof_state_typ =
