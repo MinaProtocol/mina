@@ -28,13 +28,7 @@ module Node = struct
         base_kube_cmd base_kube_cmd node.pod_id cmd
     in
     let%bind cwd = Unix.getcwd () in
-    let%map output = Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
-    [%log' info (Logger.create ())]
-      "Output from running \"$cmd\" on $node: \"$output\""
-      ~metadata:
-        [ ("node", `String node.pod_id)
-        ; ("cmd", `String kubectl_cmd)
-        ; ("output", `String output) ] ;
+    let%map _ = Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd] in
     ()
 
   let start ~fresh_state node : unit Malleable_error.t =
