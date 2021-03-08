@@ -6,17 +6,8 @@ namespace: ${rule_namespace}
 groups:
 - name: Critical Alerts
   rules:
-  - alert: BlockProductionStopped
-    expr: avg by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alerting_timeframe}])) < 1
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: critical
-    annotations:
-      summary: "{{ $labels.testnet }} block production is critically low"
-      description: "Zero blocks have been produced on network {{ $labels.testnet }}."
-
   - alert: WatchdogClusterCrashes
-    expr: max by (testnet) (max_over_time(Coda_watchdog_cluster_crashes ${rule_filter} [${alerting_timeframe}])) > 0
+    expr: max by (testnet) (max_over_time(Coda_watchdog_cluster_crashes ${rule_filter} [${alerting_timeframe}])) > 0.5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -162,7 +153,7 @@ groups:
 - name: Warnings
   rules:
   - alert: HighBlockGossipLatency
-    expr: avg by (testnet) (max_over_time(Coda_Block_latency_gossip_time ${rule_filter} [${alerting_timeframe}])) > 200
+    expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time ${rule_filter} [${alerting_timeframe}])) > 200
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -205,3 +196,12 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} seed list is degraded (less than 50% reachable)"
       description: "Seed list is degraded on network {{ $labels.testnet }}."
+
+  - alert: FewBlocksPerHour
+    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alerting_timeframe}])) < 1
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} block production is critically low (there has been less than 1 block in the last hour)"
+      description: "Zero blocks have been produced on network {{ $labels.testnet }} in the last hour (according to some node)."
