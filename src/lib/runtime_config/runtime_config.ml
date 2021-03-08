@@ -277,7 +277,8 @@ module Json_layout = struct
       ; coinbase_amount: (Currency.Amount.t option[@default None])
       ; supercharged_coinbase_factor: (int option[@default None])
       ; account_creation_fee: (Currency.Fee.t option[@default None])
-      ; fork: (Fork_config.t option[@default None]) }
+      ; fork: (Fork_config.t option[@default None])
+      ; mainnet: (bool option[@default None]) }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -289,7 +290,8 @@ module Json_layout = struct
        ; "transaction_capacity"
        ; "coinbase_amount"
        ; "supercharged_coinbase_factor"
-       ; "account_creation_fee" |]
+       ; "account_creation_fee"
+       ; "mainnet" |]
 
     let of_yojson json = of_yojson_generic ~fields of_yojson json
   end
@@ -628,7 +630,8 @@ module Proof_keys = struct
     ; coinbase_amount: Currency.Amount.Stable.Latest.t option
     ; supercharged_coinbase_factor: int option
     ; account_creation_fee: Currency.Fee.Stable.Latest.t option
-    ; fork: Fork_config.t option }
+    ; fork: Fork_config.t option
+    ; mainnet: bool option }
   [@@deriving bin_io_unversioned]
 
   let to_json_layout
@@ -641,7 +644,8 @@ module Proof_keys = struct
       ; coinbase_amount
       ; supercharged_coinbase_factor
       ; account_creation_fee
-      ; fork } =
+      ; fork
+      ; mainnet } =
     { Json_layout.Proof_keys.level= Option.map ~f:Level.to_json_layout level
     ; sub_windows_per_window
     ; ledger_depth
@@ -652,7 +656,8 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork }
+    ; fork
+    ; mainnet }
 
   let of_json_layout
       { Json_layout.Proof_keys.level
@@ -664,7 +669,8 @@ module Proof_keys = struct
       ; coinbase_amount
       ; supercharged_coinbase_factor
       ; account_creation_fee
-      ; fork } =
+      ; fork
+      ; mainnet } =
     let open Result.Let_syntax in
     let%map level = result_opt ~f:Level.of_json_layout level
     and transaction_capacity =
@@ -679,7 +685,8 @@ module Proof_keys = struct
     ; coinbase_amount
     ; supercharged_coinbase_factor
     ; account_creation_fee
-    ; fork }
+    ; fork
+    ; mainnet }
 
   let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
 
@@ -707,7 +714,8 @@ module Proof_keys = struct
     ; account_creation_fee=
         opt_fallthrough ~default:t1.account_creation_fee
           t2.account_creation_fee
-    ; fork= opt_fallthrough ~default:t1.fork t2.fork }
+    ; fork= opt_fallthrough ~default:t1.fork t2.fork
+    ; mainnet= opt_fallthrough ~default:t1.mainnet t2.mainnet }
 end
 
 module Genesis = struct
