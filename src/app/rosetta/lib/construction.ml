@@ -159,7 +159,7 @@ module Metadata_data = struct
     { sender: string
     ; nonce: Unsigned_extended.UInt32.t
     ; token_id: Unsigned_extended.UInt64.t
-    ; minimum_fee: Amount.t list }
+    ; minimum_fee: Amount.t list [@default []] }
   [@@deriving yojson]
 
   let create ~nonce ~sender ~token_id =
