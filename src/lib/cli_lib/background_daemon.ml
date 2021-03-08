@@ -17,7 +17,7 @@ let run ~f (t : Host_and_port.t Flag.Types.with_name) arg =
         if has_daemon then go Run_client else go No_daemon
     | No_daemon ->
         Print.printf
-          !"Error: Unable to connect to Coda daemon.\n\
+          !"Error: Unable to connect to Mina daemon.\n\
             - The daemon might not be running. See logs (in \
             `~/.mina-config/mina.log`) for details under the host:%s.\n\
            \  Run `mina daemon -help` to see how to start daemon.\n\

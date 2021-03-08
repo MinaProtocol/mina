@@ -928,7 +928,7 @@ func TestGetPeerMessage(t *testing.T) {
 	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
 }
 
-func TestGetTelemetry(t *testing.T) {
+func TestGetNodeStatus(t *testing.T) {
 	codanet.NoDHT = true
 	defer func() {
 		codanet.NoDHT = false
@@ -939,7 +939,7 @@ func TestGetTelemetry(t *testing.T) {
 	appA := newTestAppWithMaxConns(t, nil, maxCount)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
-	appA.P2p.TelemetryData = "testdata"
+	appA.P2p.NodeStatus = "testdata"
 
 	appB := newTestApp(t, nil)
 	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
@@ -951,11 +951,11 @@ func TestGetTelemetry(t *testing.T) {
 	maStrs := multiaddrs(appA.P2p.Host)
 
 	// ensure we can receive data before being disconnected
-	msg := &getPeerTelemetryDataMsg{
+	msg := &getPeerNodeStatusMsg{
 		PeerMultiaddr: maStrs[0].String(),
 	}
 
 	ret, err := msg.run(appC)
 	require.NoError(t, err)
-	require.Equal(t, appA.P2p.TelemetryData, ret)
+	require.Equal(t, appA.P2p.NodeStatus, ret)
 }

@@ -512,20 +512,20 @@ module Helper = struct
       let name = "listPeers"
     end
 
-    module Set_telemetry_data = struct
+    module Set_node_status = struct
       type input = {data: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
-      let name = "setTelemetryData"
+      let name = "setNodeStatus"
     end
 
-    module Get_peer_telemetry_data = struct
+    module Get_peer_node_status = struct
       type input = {peer_multiaddr: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
-      let name = "getPeerTelemetryData"
+      let name = "getPeerNodeStatus"
     end
 
     module Find_peer = struct
@@ -1325,20 +1325,18 @@ end
 
 let me (net : Helper.t) = Ivar.read net.me_keypair
 
-let set_telemetry_data net data =
-  match%map
-    Helper.do_rpc net (module Helper.Rpcs.Set_telemetry_data) {data}
-  with
-  | Ok "setTelemetryData success" ->
+let set_node_status net data =
+  match%map Helper.do_rpc net (module Helper.Rpcs.Set_node_status) {data} with
+  | Ok "setNodeStatus success" ->
       Ok ()
   | Ok v ->
-      failwithf "helper broke RPC protocol: setTelemetryData got %s" v ()
+      failwithf "helper broke RPC protocol: setNodeStatus got %s" v ()
   | Error e ->
       Error e
 
-let get_peer_telemetry_data net peer =
+let get_peer_node_status net peer =
   Helper.do_rpc net
-    (module Helper.Rpcs.Get_peer_telemetry_data)
+    (module Helper.Rpcs.Get_peer_node_status)
     {peer_multiaddr= Peer.to_multiaddr_string peer}
 
 let list_peers net =

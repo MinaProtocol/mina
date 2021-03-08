@@ -11,54 +11,61 @@ module B = Inductive_rule.B
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type num_parents num_rules prev_vars prev_values a_var a_value max_num_parents prev_num_ruless prev_num_parentss.
+    : type num_input_proofs num_rules prev_vars prev_values a_var a_value max_num_input_proofs prev_num_ruless prev_num_input_proofss.
        (module Requests.Step.S
-          with type prev_num_parentss = prev_num_parentss
+          with type prev_num_input_proofss = prev_num_input_proofss
            and type prev_num_ruless = prev_num_ruless
            and type statement = a_value
            and type prev_values = prev_values
-           and type max_num_parents = max_num_parents)
-    -> (module Nat.Add.Intf with type n = max_num_parents)
+           and type max_num_input_proofs = max_num_input_proofs)
+    -> (module Nat.Add.Intf with type n = max_num_input_proofs)
     -> num_rules:num_rules Nat.t
-    -> prev_num_parentss:prev_num_parentss H1.T(Nat).t
-    -> prev_num_parentss_length:(prev_num_parentss, num_parents) Hlist.Length.t
+    -> prev_num_input_proofss:prev_num_input_proofss H1.T(Nat).t
+    -> prev_num_input_proofss_length:( prev_num_input_proofss
+                                     , num_input_proofs )
+                                     Hlist.Length.t
     -> prev_num_ruless:(* For each inner proof of type T , the number of rules that type T has. *)
        prev_num_ruless H1.T(Nat).t
-    -> prev_num_ruless_length:(prev_num_ruless, num_parents) Hlist.Length.t
-    -> prevs_length:(prev_vars, num_parents) Hlist.Length.t
-    -> lte:(num_parents, max_num_parents) Nat.Lte.t
+    -> prev_num_ruless_length:( prev_num_ruless
+                              , num_input_proofs )
+                              Hlist.Length.t
+    -> prevs_length:(prev_vars, num_input_proofs) Hlist.Length.t
+    -> lte:(num_input_proofs, max_num_input_proofs) Nat.Lte.t
     -> basic:( a_var
              , a_value
-             , max_num_parents
+             , max_num_input_proofs
              , num_rules )
              Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_num_parents, num_rules) Tag.t
+    -> self:(a_var, a_value, max_num_input_proofs, num_rules) Tag.t
     -> ( prev_vars
        , prev_values
-       , prev_num_parentss
+       , prev_num_input_proofss
        , prev_num_ruless
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (   ( (Unfinalized.t, max_num_parents) Vector.t
+    -> (   ( (Unfinalized.t, max_num_input_proofs) Vector.t
            , Field.t
-           , (Field.t, max_num_parents) Vector.t )
+           , (Field.t, max_num_input_proofs) Vector.t )
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
- fun (module Req) (module Max_num_parents) ~num_rules ~prev_num_parentss
-     ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length
-     ~prevs_length ~lte ~basic ~self rule ->
+ fun (module Req) (module Max_num_input_proofs) ~num_rules
+     ~prev_num_input_proofss ~prev_num_input_proofss_length ~prev_num_ruless
+     ~prev_num_ruless_length ~prevs_length ~lte ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_num_parents, num_rules) t
+      | Self : (a_var, a_value, max_num_input_proofs, num_rules) t
   end in
-  let module Typ_with_max_num_parents = struct
-    type ('var, 'value, 'local_max_num_parents, 'local_num_rules) t =
-      ( ('var, 'local_max_num_parents, 'local_num_rules) Per_proof_witness.t
+  let module Typ_with_max_num_input_proofs = struct
+    type ('var, 'value, 'local_max_num_input_proofs, 'local_num_rules) t =
+      ( ( 'var
+        , 'local_max_num_input_proofs
+        , 'local_num_rules )
+        Per_proof_witness.t
       , ( 'value
-        , 'local_max_num_parents
+        , 'local_max_num_input_proofs
         , 'local_num_rules )
         Per_proof_witness.Constant.t )
       Typ.t
@@ -71,7 +78,7 @@ let step_main
         -> (pvars, br) Length.t
         -> (ns1, br) Length.t
         -> (ns2, br) Length.t
-        -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_num_parents).t =
+        -> (pvars, pvals, ns1, ns2) H4.T(Typ_with_max_num_input_proofs).t =
      fun ds ns1 ns2 ld ln1 ln2 ->
       match (ds, ns1, ns2, ld, ln1, ln2) with
       | [], [], [], Z, Z, Z ->
@@ -107,11 +114,11 @@ let step_main
       | _ :: _, _, _, _, _, _ ->
           .
     in
-    join rule.prevs prev_num_parentss prev_num_ruless prevs_length
-      prev_num_parentss_length prev_num_ruless_length
+    join rule.prevs prev_num_input_proofss prev_num_ruless prevs_length
+      prev_num_input_proofss_length prev_num_ruless_length
   in
   let module Prev_typ =
-    H4.Typ (Impls.Step) (Typ_with_max_num_parents) (Per_proof_witness)
+    H4.Typ (Impls.Step) (Typ_with_max_num_input_proofs) (Per_proof_witness)
       (Per_proof_witness.Constant)
       (struct
         let f = Fn.id
@@ -121,7 +128,7 @@ let step_main
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
-        let T = Max_num_parents.eq in
+        let T = Max_num_input_proofs.eq in
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
@@ -151,13 +158,16 @@ let step_main
         in
         let datas =
           let self_data :
-              (a_var, a_value, max_num_parents, num_rules) Types_map.For_step.t
-              =
+              ( a_var
+              , a_value
+              , max_num_input_proofs
+              , num_rules )
+              Types_map.For_step.t =
             { num_rules
-            ; rules_num_parents=
-                Vector.map basic.rules_num_parents ~f:Field.of_int
-            ; max_num_parents= (module Max_num_parents)
-            ; num_parents= None
+            ; rules_num_input_proofs=
+                Vector.map basic.rules_num_input_proofs ~f:Field.of_int
+            ; max_num_input_proofs= (module Max_num_input_proofs)
+            ; num_input_proofs= None
             ; typ= basic.typ
             ; var_to_field_elements= basic.var_to_field_elements
             ; value_to_field_elements= basic.value_to_field_elements
@@ -264,9 +274,9 @@ let step_main
                             sponge |> Opt_sponge.Underlying.of_sponge
                             |> S.Bit_sponge.make
                           in
-                          finalize_other_proof d.max_num_parents
-                            ~num_parents:d.num_parents
-                            ~rules_num_parents:d.rules_num_parents
+                          finalize_other_proof d.max_num_input_proofs
+                            ~num_input_proofs:d.num_input_proofs
+                            ~rules_num_input_proofs:d.rules_num_input_proofs
                             ~step_domains:d.step_domains ~sponge
                             ~old_bulletproof_challenges state.deferred_values
                             prev_evals )
@@ -294,8 +304,9 @@ let step_main
                                 (hash_me_only_opt ~index:d.wrap_key
                                    d.var_to_field_elements)
                             in
-                            hash ~num_parents:d.rules_num_parents
-                              ~max_num_parents:(Nat.Add.n d.max_num_parents)
+                            hash ~num_input_proofs:d.rules_num_input_proofs
+                              ~max_num_input_proofs:
+                                (Nat.Add.n d.max_num_input_proofs)
                               ~which_rule
                               (* Use opt sponge for cutting off the bulletproof challenges early *)
                               { app_state
@@ -308,7 +319,7 @@ let step_main
                     in
                     let verified =
                       with_label __LOC__ (fun () ->
-                          verify ~num_parents:d.max_num_parents
+                          verify ~num_input_proofs:d.max_num_input_proofs
                             ~wrap_domain:d.wrap_domains.h
                             ~is_base_case:should_verify ~sg_old ~opening
                             ~messages ~wrap_verification_key:d.wrap_key
