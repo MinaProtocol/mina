@@ -106,13 +106,20 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
           unlock_frequency ()
   in
   let vesting_increment = Currency.Amount.of_formatted_string unlock_amount in
+  let no_vesting =
+    Currency.Amount.equal cliff_amount Currency.Amount.zero
+    && Currency.Amount.equal vesting_increment Currency.Amount.zero
+  in
   let timing =
-    Some
-      { Runtime_config.Json_layout.Accounts.Single.Timed.initial_minimum_balance
-      ; cliff_time
-      ; cliff_amount
-      ; vesting_period
-      ; vesting_increment }
+    if no_vesting then None
+    else
+      Some
+        { Runtime_config.Json_layout.Accounts.Single.Timed
+          .initial_minimum_balance
+        ; cliff_time
+        ; cliff_amount
+        ; vesting_period
+        ; vesting_increment }
   in
   let delegate =
     (* 0 or empty string denotes "no delegation" *)
@@ -169,6 +176,24 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
     no_delegatee delegatee_pk
     || (add_delegate delegatee_pk ; valid_pk delegatee_pk)
   in
+  let valid_timing =
+    (* if cliff amount and unlock amount are zero, then
+       init min balance must also be zero, otherwise,
+       that min balance amount can never vest
+    *)
+    let initial_minimum_balance =
+      if String.is_empty initial_min_balance then
+        Currency.Balance.of_formatted_string amount
+      else Currency.Balance.of_formatted_string initial_min_balance
+    in
+    let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
+    let unlock_amount = Currency.Amount.of_formatted_string unlock_amount in
+    if
+      Currency.Amount.equal cliff_amount Currency.Amount.zero
+      && Currency.Amount.equal unlock_amount Currency.Amount.zero
+    then Currency.Balance.equal initial_minimum_balance Currency.Balance.zero
+    else true
+  in
   let valid_field_descs =
     [ ("wallet_pk", valid_wallet_pk)
     ; ("wallet_pk (duplicate)", not_duplicate_wallet_pk)
@@ -176,6 +201,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
     ; ("initial_minimum_balance", valid_init_min_balance)
     ; ("cliff_time_months", valid_cliff_time_months)
     ; ("cliff_amount", valid_cliff_amount)
+    ; ("timing", valid_timing)
     ; ("unlock_frequency", valid_unlock_frequency)
     ; ("unlock_amount", valid_unlock_amount)
     ; ("delegatee_pk", valid_delegatee_pk) ]
