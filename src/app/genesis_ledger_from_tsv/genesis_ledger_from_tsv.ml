@@ -8,7 +8,6 @@
 
 open Core_kernel
 open Async
-open Mina_numbers
 open Signature_lib
 
 (* populated during validation pass *)
@@ -79,41 +78,14 @@ let generate_missing_delegate_accounts ~logger =
   in
   (delegate_accounts, List.length delegate_accounts)
 
-let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
-    ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
+let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance:_
+    ~cliff_time_months:_ ~cliff_amount:_ ~unlock_frequency:_ ~unlock_amount:_
     ~delegatee_pk =
   [%log info] "Processing record for $wallet_pk"
     ~metadata:[("wallet_pk", `String wallet_pk)] ;
   let pk = Some wallet_pk in
   let balance = Currency.Balance.of_formatted_string amount in
-  let initial_minimum_balance =
-    (* if omitted in the TSV, use balance *)
-    if String.is_empty initial_min_balance then balance
-    else Currency.Balance.of_formatted_string initial_min_balance
-  in
-  let cliff_time =
-    Global_slot.of_int (Int.of_string cliff_time_months * slots_per_month)
-  in
-  let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
-  let vesting_period =
-    match Int.of_string unlock_frequency with
-    | 0 ->
-        Global_slot.of_int 1
-    | 1 ->
-        Global_slot.of_int slots_per_month
-    | _ ->
-        failwithf "Expected unlock frequency to be 0 or 1, got %s"
-          unlock_frequency ()
-  in
-  let vesting_increment = Currency.Amount.of_formatted_string unlock_amount in
-  let timing =
-    Some
-      { Runtime_config.Json_layout.Accounts.Single.Timed.initial_minimum_balance
-      ; cliff_time
-      ; cliff_amount
-      ; vesting_period
-      ; vesting_increment }
-  in
+  let timing = None in
   let delegate =
     (* 0 or empty string denotes "no delegation" *)
     if no_delegatee delegatee_pk then None else Some delegatee_pk
