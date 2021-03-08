@@ -28,7 +28,7 @@ def main():
   nodes_synced_near_best_tip = Gauge('Coda_watchdog_nodes_synced_near_best_tip', 'Description of gauge')
   nodes_synced = Gauge('Coda_watchdog_nodes_synced', 'Description of gauge')
   prover_errors = Counter('Coda_watchdog_prover_errors', 'Description of gauge')
-  pods_with_no_new_logs = Counter('Coda_watchdog_pods_with_no_new_logs', 'Number of nodes whose latest log is older than 10 minutes')
+  pods_with_no_new_logs = Gauge('Coda_watchdog_pods_with_no_new_logs', 'Number of nodes whose latest log is older than 10 minutes')
 
   recent_google_bucket_blocks = Gauge('Coda_watchdog_recent_google_bucket_blocks', 'Description of gauge')
   seeds_reachable = Gauge('Coda_watchdog_seeds_reachable', 'Description of gauge')
