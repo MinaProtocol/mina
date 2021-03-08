@@ -13,7 +13,7 @@ import natsort
 client = docker.from_env()
 p = inflect.engine()
 
-CODA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:0.2.6-5c08d6d"
+MINA_DAEMON_IMAGE = "gcr.io/o1labs-192920/coda-daemon:1.0.0-fd39808"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 
 # Default output folders for various kinds of keys
@@ -85,7 +85,7 @@ def generate_service_keys(output_dir, privkey_pass):
     for service in DEFAULT_SERVICES.keys():
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/{}_service"
@@ -118,7 +118,7 @@ def generate_online_whale_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/online_whale_account_{}"
@@ -151,7 +151,7 @@ def generate_offline_whale_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/offline_whale_account_{}"
@@ -184,7 +184,7 @@ def generate_offline_fish_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/offline_fish_account_{}"
@@ -218,7 +218,7 @@ def generate_online_fish_keys(count, output_dir, privkey_pass):
 
         # key outputted to file
         pubkey = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=[
                 "CODA_PRIVKEY_PASS='{}' mina advanced generate-keypair -privkey-path /keys/online_fish_account_{}"
@@ -255,7 +255,7 @@ def generate_seed_keys(count, output_dir):
 
         # Key outputted to stdout
         key_raw = client.containers.run(
-            CODA_DAEMON_IMAGE,
+            MINA_DAEMON_IMAGE,
             entrypoint="bash -c",
             command=["mina advanced generate-libp2p-keypair"])
         key_parsed = str(key_raw).split("\\n")[1]

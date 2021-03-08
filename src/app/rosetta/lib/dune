@@ -13,6 +13,7 @@
    cohttp-async
    core_kernel
    logger
+   mina_compile_config
    ppx_deriving_yojson.runtime
    rosetta_lib
    rosetta_models
