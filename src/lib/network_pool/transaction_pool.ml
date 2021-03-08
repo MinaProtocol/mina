@@ -640,7 +640,12 @@ struct
                        .Latest )
         ; config
         ; logger
-        ; batcher= Batcher.create config.verifier
+        ; batcher=
+            Batcher.create
+              ~mainnet:
+                constraint_constants
+                  .Genesis_constants.Constraint_constants.mainnet
+              config.verifier
         ; best_tip_diff_relay= None
         ; recently_seen= Lru_cache.Q.create ()
         ; best_tip_ledger= None }
@@ -1585,7 +1590,7 @@ let%test_module _ =
 
     let mk_payment' ?valid_until sender_idx fee nonce receiver_idx amount =
       let get_pk idx = Public_key.compress test_keys.(idx).public_key in
-      Signed_command.sign test_keys.(sender_idx)
+      Signed_command.sign ~mainnet:true test_keys.(sender_idx)
         (Signed_command_payload.create ~fee:(Currency.Fee.of_int fee)
            ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
            ~valid_until
@@ -1911,7 +1916,8 @@ let%test_module _ =
                 as body } ->
               {common= {common with fee_payer_pk= sender_pk}; body}
         in
-        User_command.Signed_command (Signed_command.sign sender_kp payload)
+        User_command.Signed_command
+          (Signed_command.sign ~mainnet:true sender_kp payload)
       in
       let txs0 =
         [ mk_payment' 0 1_000_000_000 0 9 20_000_000_000

@@ -42,7 +42,7 @@ module Transaction_pool : sig
 
   type t [@@deriving sexp]
 
-  val create : Verifier.t -> t
+  val create : mainnet:bool -> Verifier.t -> t
 
   val verify :
        t

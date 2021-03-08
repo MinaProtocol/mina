@@ -256,7 +256,7 @@ module Transaction_pool = struct
       (Array.to_list
          (Array.map a ~f:(function `Valid c -> Some c | _ -> None)))
 
-  let create verifier : t =
+  let create ~mainnet verifier : t =
     create ~compare_init:compare_envelope (fun (ds : input list) ->
         let open Deferred.Or_error.Let_syntax in
         let result = init_result ds in
@@ -278,7 +278,7 @@ module Transaction_pool = struct
         in
         let%map res =
           (* Verify the unknowns *)
-          Verifier.verify_commands verifier (List.map unknowns ~f:snd)
+          Verifier.verify_commands ~mainnet verifier (List.map unknowns ~f:snd)
         in
         (* We now iterate over the results of the unknown transactions and appropriately modify
            the verification result of the diff that it belongs to. *)

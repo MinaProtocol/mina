@@ -965,11 +965,11 @@ module Base = struct
           in
           ())
 
-  let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
-      ~signature =
+  let%snarkydef check_signature ~mainnet shifted ~payload ~is_user_command
+      ~signer ~signature =
     let%bind input = Transaction_union_payload.Checked.to_input payload in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature signer input
+      Schnorr.Checked.verifies ~mainnet shifted signature signer input
     in
     Boolean.Assert.any [Boolean.not is_user_command; verifies]
 
@@ -1329,7 +1329,7 @@ module Base = struct
       | `No ->
           Assert.is_true account_there
 
-    let signature_verifies ~shifted ~payload_digest req pk =
+    let signature_verifies ~mainnet ~shifted ~payload_digest req pk =
       let%bind signature =
         exists Schnorr.Signature.typ ~request:(As_prover.return req)
       in
@@ -1337,7 +1337,7 @@ module Base = struct
         Public_key.decompress_var pk
         (*           (Account_id.Checked.public_key fee_payer_id) *)
       in
-      Schnorr.Checked.verifies shifted signature pk
+      Schnorr.Checked.verifies ~mainnet shifted signature pk
         (Random_oracle.Input.field payload_digest)
 
     let pay_fee
@@ -1347,7 +1347,8 @@ module Base = struct
       let open Tick in
       let actual_fee_payer_nonce_and_rch = Set_once.create () in
       let%bind signature_verifies =
-        signature_verifies Fee_payer_signature
+        signature_verifies ~mainnet:constraint_constants.mainnet
+          Fee_payer_signature
           (Account_id.Checked.public_key fee_payer_id)
           ~payload_digest ~shifted
       in
@@ -1492,8 +1493,8 @@ module Base = struct
       let root =
         run_checked
           (let%bind signature_verifies =
-             signature_verifies (Account_signature which) public_key
-               ~payload_digest ~shifted
+             signature_verifies ~mainnet:constraint_constants.mainnet
+               (Account_signature which) public_key ~payload_digest ~shifted
            in
            Frozen_ledger_hash.modify_account root
              (Account_id.Checked.create public_key token_id)
@@ -2026,7 +2027,8 @@ module Base = struct
     let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
       [%with_label "Check transaction signature"]
-        (check_signature shifted ~payload ~is_user_command ~signer ~signature)
+        (check_signature ~mainnet:constraint_constants.mainnet shifted ~payload
+           ~is_user_command ~signer ~signature)
     in
     let%bind signer_pk = Public_key.compress_var signer in
     let%bind () =
@@ -3549,8 +3551,8 @@ let%test_module "transaction_snark" =
       in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let user_command ~fee_payer ~source_pk ~receiver_pk ~fee_token ~token amt
-        fee nonce memo =
+    let user_command ~mainnet ~fee_payer ~source_pk ~receiver_pk ~fee_token
+        ~token amt fee nonce memo =
       let payload : Signed_command.Payload.t =
         Signed_command.Payload.create ~fee ~fee_token
           ~fee_payer_pk:(Account.public_key fee_payer.account)
@@ -3563,7 +3565,7 @@ let%test_module "transaction_snark" =
                ; amount= Amount.of_int amt })
       in
       let signature =
-        Signed_command.sign_payload fee_payer.private_key payload
+        Signed_command.sign_payload ~mainnet fee_payer.private_key payload
       in
       Signed_command.check
         Signed_command.Poly.Stable.Latest.
@@ -3734,8 +3736,8 @@ let%test_module "transaction_snark" =
                     (Account.identifier account)
                     account ) ;
               let t1 =
-                user_command_with_wallet wallets ~sender:1 ~receiver:0
-                  8_000_000_000
+                user_command_with_wallet ~mainnet:true wallets ~sender:1
+                  ~receiver:0 8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
                   ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero
@@ -3837,7 +3839,7 @@ let%test_module "transaction_snark" =
                     account ) ;
               let t1 =
                 let i, j = (1, 2) in
-                signed_signed ~wallets i j
+                signed_signed ~mainnet:true ~wallets i j
               in
               let hash_pre = Ledger.merkle_root ledger in
               let _target, `Next_available_token _next_available_token_after =
@@ -3860,7 +3862,7 @@ let%test_module "transaction_snark" =
                     (Account.identifier account)
                     account ) ;
               let i, j = (1, 2) in
-              let t1 = signed_signed ~wallets i j in
+              let t1 = signed_signed ~mainnet:true ~wallets i j in
               let txn_state_view =
                 Mina_state.Protocol_state.Body.view state_body
               in
@@ -4012,7 +4014,7 @@ let%test_module "transaction_snark" =
                 List.fold receivers ~init:(Account.Nonce.zero, [])
                   ~f:(fun (nonce, txns) receiver ->
                     let uc =
-                      user_command ~fee_payer:sender
+                      user_command ~mainnet:true ~fee_payer:sender
                         ~source_pk:(Account.public_key sender.account)
                         ~receiver_pk:(Account.public_key receiver.account)
                         ~fee_token:Token_id.default ~token:Token_id.default
@@ -4146,15 +4148,15 @@ let%test_module "transaction_snark" =
                      ~len:Signed_command_memo.max_digestible_string_length)
               in
               let t1 =
-                user_command_with_wallet wallets ~sender:0 ~receiver:1
-                  8_000_000_000
+                user_command_with_wallet ~mainnet:true wallets ~sender:0
+                  ~receiver:1 8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
                   ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero memo
               in
               let t2 =
-                user_command_with_wallet wallets ~sender:1 ~receiver:2
-                  8_000_000_000
+                user_command_with_wallet ~mainnet:true wallets ~sender:1
+                  ~receiver:2 8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
                   ~fee_token:Token_id.default ~token:Token_id.default
                   Account.Nonce.zero memo
@@ -4377,7 +4379,7 @@ let%test_module "transaction_snark" =
           ~valid_until ~memo ~body
       in
       let signer = Signature_lib.Keypair.of_private_key_exn signer in
-      let user_command = Signed_command.sign signer payload in
+      let user_command = Signed_command.sign ~mainnet:true signer payload in
       let next_available_token = Ledger.next_available_token ledger in
       test_transaction ~constraint_constants ledger
         (Command (Signed_command user_command)) ;
@@ -4794,9 +4796,10 @@ let%test_module "transaction_snark" =
                 List.fold receivers ~init:(Account.Nonce.zero, [])
                   ~f:(fun (nonce, txns) receiver ->
                     let uc =
-                      user_command_with_wallet wallets ~sender:0 ~receiver
-                        amount (Fee.of_int txn_fee) ~fee_token:Token_id.default
-                        ~token:Token_id.default nonce memo
+                      user_command_with_wallet ~mainnet:true wallets ~sender:0
+                        ~receiver amount (Fee.of_int txn_fee)
+                        ~fee_token:Token_id.default ~token:Token_id.default
+                        nonce memo
                     in
                     (Account.Nonce.succ nonce, txns @ [uc]) )
               in

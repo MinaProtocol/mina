@@ -21,6 +21,9 @@ let snark_pk = "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
 
 let timelocked_pk = "B62qpJDprqj1zjNLf4wSpFC6dqmLzyokMy6KtMLSvkU8wfdL1midEb4"
 
+(* Use mainnet hashing for this network. *)
+let mainnet = true
+
 let wait span = Async.after span |> Deferred.map ~f:Result.return
 
 (* Keep trying to run `step` `retry_count` many times initially waiting for `initial_delay` and each time waiting `each_delay` *)
@@ -369,7 +372,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       "Construction_parse : Expected $expected, after payloads+parse $actual" ;
     failwith "Operations are not equal before and after payloads+parse" ) ;
   let%bind signature =
-    Signer.sign ~keys
+    Signer.sign ~mainnet ~keys
       ~unsigned_transaction_string:payloads_res.unsigned_transaction
     |> Deferred.return
   in
@@ -398,7 +401,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       ~signed_transaction:combine_res.signed_transaction
   in
   let%bind verified_bool =
-    Signer.verify ~public_key_hex_bytes:keys.public_key_hex_bytes
+    Signer.verify ~mainnet ~public_key_hex_bytes:keys.public_key_hex_bytes
       ~signed_transaction_string:combine_res.signed_transaction
     |> Deferred.return
   in

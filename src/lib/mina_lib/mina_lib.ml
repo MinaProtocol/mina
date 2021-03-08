@@ -1320,7 +1320,8 @@ let create ?wallets (config : Config.t) =
           Strict_pipe.Reader.iter user_command_input_reader
             ~f:(fun (input_list, result_cb, get_current_nonce) ->
               match%bind
-                User_command_input.to_user_commands ~get_current_nonce
+                User_command_input.to_user_commands
+                  ~mainnet:constraint_constants.mainnet ~get_current_nonce
                   input_list
               with
               | Ok user_commands ->

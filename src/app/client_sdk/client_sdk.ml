@@ -84,14 +84,14 @@ let _ =
              Mina_base_nonconsensus.Signed_command_payload.dummy
            in
            let signature =
-             Mina_base_nonconsensus.Signed_command.sign_payload sk
-               dummy_payload
+             Mina_base_nonconsensus.Signed_command.sign_payload ~mainnet:true
+               sk dummy_payload
            in
            let message =
              Mina_base_nonconsensus.Signed_command.to_input dummy_payload
            in
            let verified =
-             Schnorr.verify signature
+             Schnorr.verify ~mainnet:true signature
                (Snark_params_nonconsensus.Inner_curve.of_affine pk)
                message
            in
@@ -104,7 +104,8 @@ let _ =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let str = Js.to_string str_js in
-         String_sign.Schnorr.sign sk str |> signature_to_js_object
+         String_sign.Schnorr.sign ~mainnet:true sk str
+         |> signature_to_js_object
 
        (** verify signature of arbitrary string signed with signString *)
        method verifyStringSignature (signature_js : signature_js)
@@ -123,7 +124,8 @@ let _ =
            Snark_params_nonconsensus.Inner_curve.of_affine pk
          in
          let str = Js.to_string str_js in
-         if String_sign.Schnorr.verify signature inner_curve str then Js._true
+         if String_sign.Schnorr.verify ~mainnet:true signature inner_curve str
+         then Js._true
          else Js._false
 
        (** sign payment transaction payload with private key *)
@@ -133,7 +135,8 @@ let _ =
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_payment_js payment_js in
          let signature =
-           Signed_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload ~mainnet:true sk payload
+           |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -157,7 +160,8 @@ let _ =
          in
          let signature = signature_of_js_object signed_payment##.signature in
          let signed = Signed_command.Poly.{payload; signer; signature} in
-         if Signed_command.check_signature signed then Js._true else Js._false
+         if Signed_command.check_signature ~mainnet:true signed then Js._true
+         else Js._false
 
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
@@ -167,7 +171,8 @@ let _ =
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_stake_delegation_js stake_delegation_js in
          let signature =
-           Signed_command.sign_payload sk payload |> signature_to_js_object
+           Signed_command.sign_payload ~mainnet:true sk payload
+           |> signature_to_js_object
          in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -194,7 +199,8 @@ let _ =
            signature_of_js_object signed_stake_delegation##.signature
          in
          let signed = Signed_command.Poly.{payload; signer; signature} in
-         if Signed_command.check_signature signed then Js._true else Js._false
+         if Signed_command.check_signature ~mainnet:true signed then Js._true
+         else Js._false
 
        (** sign a transaction in Rosetta rendered format *)
        method signRosettaTransaction (sk_base58_check_js : string_js)
@@ -217,7 +223,8 @@ let _ =
            match payload_or_err with
            | Ok payload -> (
                let signature =
-                 Signed_command.sign_payload sk payload |> Signature.Raw.encode
+                 Signed_command.sign_payload ~mainnet:true sk payload
+                 |> Signature.Raw.encode
                in
                let signed_txn =
                  Transaction.Signed.{command; nonce; signature}

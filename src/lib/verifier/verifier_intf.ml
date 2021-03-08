@@ -8,7 +8,8 @@ module Base = struct
     type ledger_proof
 
     val verify_commands :
-         t
+         mainnet:bool
+      -> t
       -> Mina_base.User_command.Verifiable.t list
          (* The first level of error represents failure to verify, the second a failure in
    communicating with the verifier. *)

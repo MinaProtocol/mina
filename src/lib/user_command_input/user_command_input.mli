@@ -68,7 +68,8 @@ val create :
   -> t
 
 val to_user_command :
-     ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
+     mainnet:bool
+  -> ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
   -> get_current_nonce:(   Account_id.t
                         -> ( [`Min of Account_nonce.t] * Account_nonce.t
                            , string )
@@ -78,7 +79,8 @@ val to_user_command :
      Deferred.Or_error.t
 
 val to_user_commands :
-     ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
+     mainnet:bool
+  -> ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
   -> get_current_nonce:(   Account_id.t
                         -> ( [`Min of Account_nonce.t] * Account_nonce.t
                            , string )

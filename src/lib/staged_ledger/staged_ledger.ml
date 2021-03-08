@@ -980,7 +980,7 @@ module T = struct
   [%%if
   feature_snapps]
 
-  let check_commands ledger ~verifier (cs : User_command.t list) =
+  let check_commands ~mainnet ledger ~verifier (cs : User_command.t list) =
     match
       Or_error.try_with (fun () ->
           List.map cs
@@ -993,7 +993,7 @@ module T = struct
         Deferred.return (Error e)
     | Ok cs ->
         let open Deferred.Or_error.Let_syntax in
-        let%map xs = Verifier.verify_commands verifier cs in
+        let%map xs = Verifier.verify_commands ~mainnet verifier cs in
         Result.all
           (List.map xs ~f:(function
             | `Valid x ->
@@ -1052,7 +1052,12 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:
+          (check_commands
+             ~mainnet:
+               constraint_constants
+                 .Genesis_constants.Constraint_constants.mainnet t.ledger
+             ~verifier)
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->

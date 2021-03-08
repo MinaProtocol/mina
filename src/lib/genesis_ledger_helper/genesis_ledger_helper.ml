@@ -1156,7 +1156,8 @@ let make_constraint_constants
                 State_hash.of_base58_check_exn previous_state_hash
             ; previous_length= Mina_numbers.Length.of_int previous_length
             ; previous_global_slot=
-                Mina_numbers.Global_slot.of_int previous_global_slot } ) }
+                Mina_numbers.Global_slot.of_int previous_global_slot } )
+  ; mainnet= Option.value ~default:default.mainnet config.mainnet }
 
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
@@ -1293,6 +1294,31 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
                proof_level= Full. The 'proof' field in the configuration file \
                should be removed." ;
             return () )
+          else if
+            (* DO NOT DO THIS: Pretend that the constraint constants match. *)
+            Genesis_constants.Constraint_constants.(equal compiled)
+              { constraint_constants with
+                mainnet=
+                  Genesis_constants.Constraint_constants.compiled.mainnet }
+          then
+            (* TODO(mrmr1993): This is morally wrong.
+               The proving keys that this binary is distributed with are
+               useless for this configuration, and the daemon + subprocesses
+               will instead download or generate the multi-GB keys they need on
+               startup.  They'll also be downloaded to /tmp, so if the machine
+               containing them restarts or /tmp is cleared then they will need
+               to be re-downloaded.
+               There are other subtleties too, around stored data. Toggling the
+               mainnet flag here should be done alongside changes to the
+               version number etc. that cause all of this data to be purged
+               instead of loading it into the binary in this configuration.
+
+               Do not take this as an indication that we should do this for
+               other things. We shouldn't. This case is exceptional.
+               This should be removed and replaced with a proper solution as
+               soon as possible.
+              *)
+            return ()
           else (
             [%log fatal]
               "This binary only supports the compiled proof constants for \

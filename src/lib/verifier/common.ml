@@ -2,10 +2,12 @@ open Core_kernel
 open Mina_base
 
 let check :
-       User_command.Verifiable.t
+       mainnet:bool
+    -> User_command.Verifiable.t
     -> [ `Valid of User_command.Valid.t
        | `Invalid
-       | `Valid_assuming of User_command.Valid.t * _ list ] = function
+       | `Valid_assuming of User_command.Valid.t * _ list ] =
+ fun ~mainnet -> function
   | User_command.Signed_command c -> (
     match Signed_command.check c with
     | None ->
@@ -22,7 +24,7 @@ let check :
           let check_signature s pk =
             if
               not
-                (Signature_lib.Schnorr.verify s
+                (Signature_lib.Schnorr.verify ~mainnet s
                    (Backend.Tick.Inner_curve.of_affine
                       (Signature_lib.Public_key.decompress_exn pk))
                    (Random_oracle_input.field (Lazy.force payload)))

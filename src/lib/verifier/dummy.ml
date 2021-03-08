@@ -15,7 +15,7 @@ let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
 
 let verify_blockchain_snarks _ _ = Deferred.Or_error.return true
 
-let verify_commands _ (cs : User_command.Verifiable.t list) :
+let verify_commands ~mainnet _ (cs : User_command.Verifiable.t list) :
     [ `Valid of Mina_base.User_command.Valid.t
     | `Invalid
     | `Valid_assuming of
@@ -26,7 +26,7 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
     list
     Deferred.Or_error.t =
   List.map cs ~f:(fun c ->
-      match Common.check c with
+      match Common.check ~mainnet c with
       | `Valid c ->
           `Valid c
       | `Invalid ->

@@ -14,7 +14,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 open Random_oracle
 
-val signature : Field.t State.t
+val signature : mainnet:bool -> Field.t State.t
 
 (** [merkle_tree depth] gives the hash prefix for the given node depth.
 

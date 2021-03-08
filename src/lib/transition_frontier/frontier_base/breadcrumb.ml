@@ -282,7 +282,7 @@ module For_tests = struct
                  ; token_id= token
                  ; amount= send_amount })
         in
-        Signed_command.sign sender_keypair payload )
+        Signed_command.sign ~mainnet:true sender_keypair payload )
 
   let gen ?(logger = Logger.null ())
       ~(precomputed_values : Precomputed_values.t) ?verifier

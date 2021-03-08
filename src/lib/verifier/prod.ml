@@ -14,7 +14,8 @@ module Worker_state = struct
       (Protocol_state.Value.t * Proof.t) list -> bool
 
     val verify_commands :
-         Mina_base.User_command.Verifiable.t list
+         mainnet:bool
+      -> Mina_base.User_command.Verifiable.t list
       -> [ `Valid of Mina_base.User_command.Valid.t
          | `Invalid
          | `Valid_assuming of
@@ -45,9 +46,9 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (cs : User_command.Verifiable.t list) : _ list
-                 =
-               let cs = List.map cs ~f:Common.check in
+             let verify_commands ~mainnet (cs : User_command.Verifiable.t list)
+                 : _ list =
+               let cs = List.map cs ~f:(Common.check ~mainnet) in
                let to_verify =
                  List.concat_map cs ~f:(function
                    | `Valid _ ->
@@ -91,9 +92,9 @@ module Worker_state = struct
     | Check | None ->
         Deferred.return
         @@ ( module struct
-             let verify_commands cs =
+             let verify_commands ~mainnet cs =
                List.map cs ~f:(fun c ->
-                   match Common.check c with
+                   match Common.check ~mainnet c with
                    | `Valid c ->
                        `Valid c
                    | `Invalid ->
@@ -120,7 +121,7 @@ module Worker = struct
           ('w, (Transaction_snark.t * Sok_message.t) list, bool) F.t
       ; verify_commands:
           ( 'w
-          , User_command.Verifiable.t list
+          , User_command.Verifiable.t list * [`Mainnet of bool]
           , [ `Valid of User_command.Valid.t
             | `Invalid
             | `Valid_assuming of
@@ -158,9 +159,9 @@ module Worker = struct
         let (module M) = Worker_state.get w in
         Deferred.return (M.verify_transaction_snarks ts)
 
-      let verify_commands (w : Worker_state.t) ts =
+      let verify_commands (w : Worker_state.t) (ts, `Mainnet mainnet) =
         let (module M) = Worker_state.get w in
-        Deferred.return (M.verify_commands ts)
+        Deferred.return (M.verify_commands ~mainnet ts)
 
       let functions =
         let f (i, o, f) =
@@ -183,7 +184,9 @@ module Worker = struct
               , verify_transaction_snarks )
         ; verify_commands=
             f
-              ( [%bin_type_class: User_command.Verifiable.Stable.Latest.t list]
+              ( [%bin_type_class:
+                  User_command.Verifiable.Stable.Latest.t list
+                  * [`Mainnet of bool]]
               , [%bin_type_class:
                   [ `Valid of User_command.Valid.Stable.Latest.t
                   | `Invalid
@@ -382,8 +385,8 @@ let verify_transaction_snarks {worker; logger} ts =
           :: metadata () ) ) ;
   res
 
-let verify_commands {worker; logger} ts =
+let verify_commands ~mainnet {worker; logger} ts =
   with_retry ~logger (fun () ->
       let%bind {connection; _} = !worker in
       Worker.Connection.run connection ~f:Worker.functions.verify_commands
-        ~arg:ts )
+        ~arg:(ts, `Mainnet mainnet) )

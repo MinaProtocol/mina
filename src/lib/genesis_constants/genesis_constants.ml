@@ -69,7 +69,8 @@ module Constraint_constants = struct
         ; coinbase_amount: Currency.Amount.Stable.V1.t
         ; supercharged_coinbase_factor: int
         ; account_creation_fee: Currency.Fee.Stable.V1.t
-        ; fork: Fork_constants.Stable.V1.t option }
+        ; fork: Fork_constants.Stable.V1.t option
+        ; mainnet: bool }
       [@@deriving sexp, eq, yojson]
 
       let to_latest = Fn.id
@@ -210,6 +211,9 @@ module Constraint_constants = struct
 
         [%%endif]
 
+        [%%inject
+        "mainnet", mainnet]
+
         let compiled =
           { sub_windows_per_window
           ; ledger_depth
@@ -222,7 +226,8 @@ module Constraint_constants = struct
           ; supercharged_coinbase_factor
           ; account_creation_fee=
               Currency.Fee.of_formatted_string account_creation_fee_string
-          ; fork }
+          ; fork
+          ; mainnet }
       end :
       sig
         val compiled : t

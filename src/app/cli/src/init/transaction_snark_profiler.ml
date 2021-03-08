@@ -38,7 +38,7 @@ let create_ledger_and_transactions num_transitions =
              ; token_id= Token_id.default
              ; amount })
     in
-    Signed_command.sign from_kp payload
+    Signed_command.sign ~mainnet:true from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn

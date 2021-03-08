@@ -1236,8 +1236,8 @@ let to_payload (t : t) : Payload.t =
             Option.map fee_payment ~f:(fun {payload; signature= _} -> payload)
         }
 
-let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
-    =
+let signed_signed ~mainnet ?fee_payment ~token_id (signer1, data1)
+    (signer2, data2) : t =
   let r : _ Inner.t =
     { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
     ; two= {Party.Authorized.Poly.data= data2; authorization= Signature.dummy}
@@ -1252,7 +1252,7 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
       |> Payload.digested |> Payload.Digested.digest
       |> Random_oracle_input.field
     in
-    fun sk -> Schnorr.sign sk msg
+    fun sk -> Schnorr.sign ~mainnet sk msg
   in
   Signed_signed
     { r with
@@ -1262,7 +1262,7 @@ let signed_signed ?fee_payment ~token_id (signer1, data1) (signer2, data2) : t
         Option.map2 fee_payment r.fee_payment ~f:(fun (sk, _) x ->
             {x with signature= sign sk} ) }
 
-let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
+let signed_empty ~mainnet ?fee_payment ?data2 ~token_id (signer1, data1) : t =
   let r : _ Inner.t =
     { one= {Party.Authorized.Poly.data= data1; authorization= Signature.dummy}
     ; two=
@@ -1279,7 +1279,7 @@ let signed_empty ?fee_payment ?data2 ~token_id (signer1, data1) : t =
       |> Payload.digested |> Payload.Digested.digest
       |> Random_oracle_input.field
     in
-    fun sk -> Schnorr.sign sk msg
+    fun sk -> Schnorr.sign ~mainnet sk msg
   in
   Signed_empty
     { r with

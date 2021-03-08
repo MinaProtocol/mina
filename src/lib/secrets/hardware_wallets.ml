@@ -92,7 +92,7 @@ let compute_public_key ~hd_index =
   |> Deferred.Result.map_error ~f:report_process_error
   |> Deferred.map ~f:(Result.bind ~f:decode_public_key)
 
-let sign ~hd_index ~public_key ~user_command_payload :
+let sign ~mainnet ~hd_index ~public_key ~user_command_payload :
     (Signed_command.With_valid_signature.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let input =
@@ -120,7 +120,7 @@ let sign ~hd_index ~public_key ~user_command_payload :
     in
     let%bind signature = decode_signature signature_str |> Deferred.return in
     match
-      Signed_command.create_with_signature_checked signature
+      Signed_command.create_with_signature_checked ~mainnet signature
         (Public_key.compress public_key)
         user_command_payload
     with

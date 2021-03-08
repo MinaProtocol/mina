@@ -34,7 +34,7 @@ module Keys = struct
 end
 
 (* Returns signed_transaction_string *)
-let sign ~(keys : Keys.t) ~unsigned_transaction_string =
+let sign ~mainnet ~(keys : Keys.t) ~unsigned_transaction_string =
   let open Result.Let_syntax in
   let%bind json =
     try return (Yojson.Safe.from_string unsigned_transaction_string)
@@ -52,16 +52,17 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
     |> Result.ok |> Option.value_exn
   in
   let signature =
-    Schnorr.sign keys.keypair.private_key
+    Schnorr.sign ~mainnet keys.keypair.private_key
       unsigned_transaction.random_oracle_input
   in
   let signature' =
-    Signed_command.sign_payload keys.keypair.private_key user_command_payload
+    Signed_command.sign_payload ~mainnet keys.keypair.private_key
+      user_command_payload
   in
   [%test_eq: Signature.t] signature signature' ;
   signature |> Signature.Raw.encode
 
-let verify ~public_key_hex_bytes ~signed_transaction_string =
+let verify ~mainnet ~public_key_hex_bytes ~signed_transaction_string =
   let open Result.Let_syntax in
   let%bind json =
     try return (Yojson.Safe.from_string signed_transaction_string)
@@ -86,6 +87,6 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
     |> Result.ok |> Option.value_exn
   in
   let message = Signed_command.to_input user_command_payload in
-  Schnorr.verify signature
+  Schnorr.verify ~mainnet signature
     (Snark_params.Tick.Inner_curve.of_affine public_key)
     message

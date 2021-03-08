@@ -134,18 +134,19 @@ let create ?nonce ~fee ~fee_token ~fee_payer_pk ~valid_until ~memo ~body
   in
   {payload; signer; signature= sign_choice}
 
-let sign ~signer ~(user_command_payload : Signed_command_payload.t) = function
+let sign ~mainnet ~signer ~(user_command_payload : Signed_command_payload.t) =
+  function
   | Sign_choice.Signature signature ->
       Option.value_map
         ~default:(Deferred.return (Error "Invalid_signature"))
-        (Signed_command.create_with_signature_checked signature signer
+        (Signed_command.create_with_signature_checked ~mainnet signature signer
            user_command_payload)
         ~f:Deferred.Result.return
   | Keypair signer_kp ->
       Deferred.Result.return
-        (Signed_command.sign signer_kp user_command_payload)
+        (Signed_command.sign ~mainnet signer_kp user_command_payload)
   | Hd_index hd_index ->
-      Secrets.Hardware_wallets.sign ~hd_index
+      Secrets.Hardware_wallets.sign ~mainnet ~hd_index
         ~public_key:(Public_key.decompress_exn signer)
         ~user_command_payload
 
@@ -167,8 +168,8 @@ let inferred_nonce ~get_current_nonce ~(fee_payer : Account_id.t) ~nonce_map =
       in
       (min_nonce, txn_pool_or_account_nonce, updated_map)
 
-let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    (client_input : t) =
+let to_user_command ~mainnet ?(nonce_map = Account_id.Map.empty)
+    ~get_current_nonce (client_input : t) =
   Deferred.map
     ~f:
       (Result.map_error ~f:(fun str ->
@@ -187,13 +188,13 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     |> Deferred.return
   in
   let%map signed_user_command =
-    sign ~signer:client_input.signer ~user_command_payload
+    sign ~mainnet ~signer:client_input.signer ~user_command_payload
       client_input.signature
   in
   (Signed_command.forget_check signed_user_command, updated_nonce_map)
 
-let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
-    uc_inputs : Signed_command.t list Deferred.Or_error.t =
+let to_user_commands ~mainnet ?(nonce_map = Account_id.Map.empty)
+    ~get_current_nonce uc_inputs : Signed_command.t list Deferred.Or_error.t =
   (* When batching multiple user commands, keep track of the nonces and send
       all the user commands if they are valid or none if there is an error in
       one of them.
@@ -203,7 +204,7 @@ let to_user_commands ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     Deferred.Or_error.List.fold ~init:([], nonce_map) uc_inputs
       ~f:(fun (valid_user_commands, nonce_map) uc_input ->
         let%map res, updated_nonce_map =
-          to_user_command ~nonce_map ~get_current_nonce uc_input
+          to_user_command ~mainnet ~nonce_map ~get_current_nonce uc_input
         in
         (res :: valid_user_commands, updated_nonce_map) )
   in

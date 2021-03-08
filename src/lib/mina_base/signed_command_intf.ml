@@ -171,15 +171,22 @@ module type S = sig
   end
 
   val sign_payload :
-    Signature_lib.Private_key.t -> Signed_command_payload.t -> Signature.t
+       mainnet:bool
+    -> Signature_lib.Private_key.t
+    -> Signed_command_payload.t
+    -> Signature.t
 
   val sign :
-    Signature_keypair.t -> Signed_command_payload.t -> With_valid_signature.t
+       mainnet:bool
+    -> Signature_keypair.t
+    -> Signed_command_payload.t
+    -> With_valid_signature.t
 
-  val check_signature : t -> bool
+  val check_signature : mainnet:bool -> t -> bool
 
   val create_with_signature_checked :
-       Signature.t
+       mainnet:bool
+    -> Signature.t
     -> Public_key.Compressed.t
     -> Signed_command_payload.t
     -> With_valid_signature.t option

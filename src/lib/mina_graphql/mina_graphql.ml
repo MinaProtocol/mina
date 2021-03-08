@@ -3213,17 +3213,21 @@ module Queries = struct
           | None ->
               Deferred.Result.fail "Signature field is missing"
         in
+        let mainnet =
+          (Mina_lib.config mina).precomputed_values.constraint_constants
+            .mainnet
+        in
         let%bind user_command_input =
           Mutations.make_signed_user_command ~nonce_opt ~signer:from ~memo ~fee
             ~fee_token ~fee_payer_pk:from ~valid_until ~body ~signature
         in
         let%map user_command, _ =
-          User_command_input.to_user_command
+          User_command_input.to_user_command ~mainnet
             ~get_current_nonce:(Mina_lib.get_current_nonce mina)
             user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
-        Signed_command.check_signature user_command )
+        Signed_command.check_signature ~mainnet user_command )
 
   let commands =
     [ sync_state

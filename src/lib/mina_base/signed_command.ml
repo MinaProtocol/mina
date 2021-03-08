@@ -141,14 +141,14 @@ let check_tokens ({payload= {common= {fee_token; _}; body}; _} : t) =
       (not (Token_id.(equal invalid) token_id))
       && not (Token_id.(equal default) token_id)
 
-let sign_payload (private_key : Signature_lib.Private_key.t)
+let sign_payload ~mainnet (private_key : Signature_lib.Private_key.t)
     (payload : Payload.t) : Signature.t =
-  Signature_lib.Schnorr.sign private_key (to_input payload)
+  Signature_lib.Schnorr.sign ~mainnet private_key (to_input payload)
 
-let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+let sign ~mainnet (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; signer= kp.public_key
-  ; signature= sign_payload kp.private_key payload }
+  ; signature= sign_payload ~mainnet kp.private_key payload }
 
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
@@ -200,7 +200,7 @@ module Gen = struct
       | `Fake ->
           gen_inner For_tests.fake_sign
       | `Real ->
-          gen_inner sign
+          gen_inner (sign ~mainnet:true)
 
     let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
         ?fee_token ?payment_token ~fee_range =
@@ -336,7 +336,11 @@ module Gen = struct
                    ; amount })
           in
           let sign' =
-            match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign
+            match sign_type with
+            | `Fake ->
+                For_tests.fake_sign
+            | `Real ->
+                sign ~mainnet:true
           in
           return @@ sign' sender_pk payload )
 end
@@ -373,25 +377,25 @@ Base58_check.String_ops.(to_string, of_string)]
 [%%ifdef
 consensus_mechanism]
 
-let check_signature ({payload; signer; signature} : t) =
-  Signature_lib.Schnorr.verify signature
+let check_signature ~mainnet ({payload; signer; signature} : t) =
+  Signature_lib.Schnorr.verify ~mainnet signature
     (Snark_params.Tick.Inner_curve.of_affine signer)
     (to_input payload)
 
 [%%else]
 
-let check_signature ({payload; signer; signature} : t) =
-  Signature_lib_nonconsensus.Schnorr.verify signature
+let check_signature ~mainnet ({payload; signer; signature} : t) =
+  Signature_lib_nonconsensus.Schnorr.verify ~mainnet signature
     (Snark_params_nonconsensus.Inner_curve.of_affine signer)
     (to_input payload)
 
 [%%endif]
 
-let create_with_signature_checked signature signer payload =
+let create_with_signature_checked ~mainnet signature signer payload =
   let open Option.Let_syntax in
   let%bind signer = Public_key.decompress signer in
   let t = Poly.{payload; signature; signer} in
-  Option.some_if (check_signature t) t
+  Option.some_if (check_signature ~mainnet t) t
 
 let gen_test =
   let open Quickcheck.Let_syntax in
@@ -402,14 +406,15 @@ let gen_test =
     ~keys:(Array.of_list keys) ~max_amount:10000 ~fee_range:1000 ()
 
 let%test_unit "completeness" =
-  Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
+  Quickcheck.test ~trials:20 gen_test ~f:(fun t ->
+      assert (check_signature ~mainnet:true t) )
 
 let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
       assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t)
   )
 
-let check t = Option.some_if (check_signature t) t
+let check t = Option.some_if (check_signature ~mainnet:true t) t
 
 let forget_check t = t
 
