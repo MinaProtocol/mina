@@ -301,9 +301,9 @@ struct
         assert false
 
   let incrementally_verify_proof (type b)
-      (module Num_parents : Nat.Add.Intf with type n = b) ~domain
+      (module Num_input_proofs : Nat.Add.Intf with type n = b) ~domain
       ~verification_key:(m : _ array Plonk_verification_key_evals.t) ~xi
-      ~sponge ~public_input ~(sg_old : (_, Num_parents.n) Vector.t)
+      ~sponge ~public_input ~(sg_old : (_, Num_input_proofs.n) Vector.t)
       ~combined_inner_product ~advice
       ~(messages : (_, Boolean.var * _) Dlog_plonk_types.Messages.t)
       ~openings_proof
@@ -415,7 +415,7 @@ struct
          the combined inner product.
       *)
           let without_degree_bound =
-            let T = Num_parents.eq in
+            let T = Num_input_proofs.eq in
             Vector.append
               (Vector.map sg_old ~f:(fun g -> [|g|]))
               [ [|x_hat|]
@@ -426,12 +426,13 @@ struct
               ; f_comm
               ; [|m.sigma_comm_0|]
               ; [|m.sigma_comm_1|] ]
-              (snd (Num_parents.add Nat.N8.n))
+              (snd (Num_input_proofs.add Nat.N8.n))
           in
           with_label __LOC__ (fun () ->
               check_bulletproof
                 ~pcs_batch:
-                  (Common.dlog_pcs_batch (Num_parents.add Nat.N8.n)
+                  (Common.dlog_pcs_batch
+                     (Num_input_proofs.add Nat.N8.n)
                      ~max_quot_size:
                        (Common.max_quot_size_int (Domain.size domain)))
                 ~sponge:sponge_before_evaluations ~xi ~combined_inner_product
@@ -493,17 +494,20 @@ struct
   let side_loaded_input_domain =
     let open Side_loaded_verification_key in
     let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
-    let max_num_parents = Num_parents.Max.n in
+    let max_num_input_proofs = Num_input_proofs.Max.n in
     let domain_log2s =
-      Vector.init (S max_num_parents) ~f:(fun w -> Int.ceil_log2 (input_size w))
+      Vector.init (S max_num_input_proofs) ~f:(fun w ->
+          Int.ceil_log2 (input_size w) )
     in
     let (T max_log2_size) =
-      let n = Int.ceil_log2 (input_size (Nat.to_int max_num_parents)) in
+      let n = Int.ceil_log2 (input_size (Nat.to_int max_num_input_proofs)) in
       assert (List.last_exn (Vector.to_list domain_log2s) = n) ;
       Nat.of_int n
     in
-    fun ~num_parents ->
-      let mask = O.of_index num_parents ~length:(S max_num_parents) in
+    fun ~num_input_proofs ->
+      let mask =
+        O.of_index num_input_proofs ~length:(S max_num_input_proofs)
+      in
       let shifts = lazy (Pseudo.Domain.shifts (mask, domain_log2s) ~shifts) in
       let generator =
         lazy (Pseudo.Domain.generator (mask, domain_log2s) ~domain_generator)
@@ -581,7 +585,7 @@ struct
         let open Side_loaded_verification_key in
         let input_size = input_size ~of_int:Fn.id ~add:( + ) ~mul:( * ) in
         let possibilities =
-          Vector.init (S Num_parents.Max.n) ~f:(fun w ->
+          Vector.init (S Num_input_proofs.Max.n) ~f:(fun w ->
               Int.ceil_log2 (input_size w) )
         in
         let pt = Field.Constant.random () in
@@ -593,7 +597,7 @@ struct
                 ~domain_generator:Backend.Tick.Field.domain_generator
             in
             let checked_domain () =
-              side_loaded_input_domain ~num_parents:(Field.of_int i)
+              side_loaded_input_domain ~num_input_proofs:(Field.of_int i)
             in
             [%test_eq: Field.Constant.t]
               (d_unchecked#vanishing_polynomial pt)
@@ -800,15 +804,16 @@ struct
   (* TODO: This needs to handle the fact of variable length evaluations.
    Meaning it needs opt sponge. *)
   let finalize_other_proof (type b num_rules)
-      (module Num_parents : Nat.Add.Intf with type n = b) ~num_parents
+      (module Num_input_proofs : Nat.Add.Intf with type n = b)
+      ~num_input_proofs
       ~(step_domains :
          [ `Known of (Domains.t, num_rules) Vector.t
          | `Side_loaded of
            ( Field.t Side_loaded_verification_key.Domain.t
              Side_loaded_verification_key.Domains.t
            , num_rules )
-           Vector.t ]) ~rules_num_parents
-      ~(* TODO: Add "actual num parents" so that proofs don't
+           Vector.t ]) ~rules_num_input_proofs
+      ~(* TODO: Add "actual num input_proofs" so that proofs don't
    carry around dummy "old bulletproof challenges" *)
       sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({ xi
@@ -834,14 +839,15 @@ struct
                   (which_rule, Vector.map domains ~f:Domains.x) )
           | `Side_loaded ds ->
               ( `Side_loaded (side_loaded_domains ds which_rule)
-              , (* This has to be the num_parents of this proof system rather than actual num_parents *)
+              , (* This has to be the num_input_proofs of this proof system rather than actual num_input_proofs *)
                 side_loaded_input_domain
-                  ~num_parents:
-                    (Side_loaded_verification_key.Num_parents.Checked.to_field
-                       (Option.value_exn num_parents)) ) )
+                  ~num_input_proofs:
+                    (Side_loaded_verification_key.Num_input_proofs.Checked
+                     .to_field
+                       (Option.value_exn num_input_proofs)) ) )
     in
-    let actual_num_parents =
-      Pseudo.choose (which_rule, rules_num_parents) ~f:Fn.id
+    let actual_num_input_proofs =
+      Pseudo.choose (which_rule, rules_num_input_proofs) ~f:Fn.id
     in
     let (evals1, x_hat1), (evals2, x_hat2) =
       with_label __LOC__ (fun () ->
@@ -860,7 +866,7 @@ struct
           Tuple_lib.Double.map es ~f:(fun (e, x) ->
               (Evals.map2 lengths e ~f:Array.zip_exn, x) ) )
     in
-    let T = Num_parents.eq in
+    let T = Num_input_proofs.eq in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     let open Field in
     let absorb_evals x_hat e =
@@ -928,7 +934,7 @@ struct
               `Side_loaded (conv domains.h)
         in
         let combine pt x_hat e =
-          let pi = Num_parents.add Nat.N8.n in
+          let pi = Num_input_proofs.add Nat.N8.n in
           let a, b =
             Evals.to_vectors (e : (Boolean.var * Field.t) array Evals.t)
           in
@@ -936,7 +942,7 @@ struct
             Vector.map2
               (ones_vector
                  (module Impl)
-                 ~first_zero:actual_num_parents Num_parents.n)
+                 ~first_zero:actual_num_input_proofs Num_input_proofs.n)
               sg_olds
               ~f:(fun keep f -> [|(keep, f pt)|])
           in
@@ -1029,12 +1035,12 @@ struct
         ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
-    stage (fun t ~num_parents ~max_num_parents ~which_rule ->
+    stage (fun t ~num_input_proofs ~max_num_input_proofs ~which_rule ->
         let mask =
           ones_vector
             (module Impl)
-            max_num_parents
-            ~first_zero:(Pseudo.choose ~f:Fn.id (which_rule, num_parents))
+            max_num_input_proofs
+            ~first_zero:(Pseudo.choose ~f:Fn.id (which_rule, num_input_proofs))
         in
         let sponge = Sponge.copy after_index in
         let t =
@@ -1079,7 +1085,7 @@ struct
   let pack_scalar_challenge (Scalar_challenge c : Scalar_challenge.t) =
     Field.pack (Challenge.to_bits c)
 
-  let verify ~num_parents ~is_base_case ~sg_old
+  let verify ~num_input_proofs ~is_base_case ~sg_old
       ~(opening : _ Pickles_types.Dlog_plonk_types.Openings.Bulletproof.t)
       ~messages ~wrap_domain ~wrap_verification_key statement
       (unfinalized :
@@ -1112,7 +1118,7 @@ struct
         Pickles_types.Scalar_challenge.map xi
           ~f:(Field.unpack ~length:Challenge.length)
       in
-      incrementally_verify_proof num_parents ~domain:wrap_domain ~xi
+      incrementally_verify_proof num_input_proofs ~domain:wrap_domain ~xi
         ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
         ~combined_inner_product ~advice:{b} ~messages ~openings_proof:opening
         ~plonk:

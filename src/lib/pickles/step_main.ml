@@ -25,23 +25,32 @@ module Proof_system = struct
       end
     end
 
-    let per_proof_witness_typ (type a_var a_value max_num_parents num_rules)
+    let per_proof_witness_typ
+        (type a_var a_value max_num_input_proofs num_rules)
         (basic :
-          (a_var, a_value, max_num_parents, num_rules) Types_map.Compiled.basic)
-        (tag : (a_var, a_value, max_num_parents, num_rules) Tag.tag) prevs
-        prev_num_parentss prev_num_ruless prevs_length prev_num_parentss_length
-        prev_num_ruless_length =
-      let module Typ_with_max_num_parents = struct
+          ( a_var
+          , a_value
+          , max_num_input_proofs
+          , num_rules )
+          Types_map.Compiled.basic)
+        (tag : (a_var, a_value, max_num_input_proofs, num_rules) Tag.tag) prevs
+        prev_num_input_proofss prev_num_ruless prevs_length
+        prev_num_input_proofss_length prev_num_ruless_length =
+      let module Typ_with_max_num_input_proofs = struct
         type ( 'var
              , 'value
-             , 'local_max_num_parents
+             , 'local_max_num_input_proofs
              , 'local_num_rules
              , 'poly_var
              , 'poly_value )
              t =
-          ( ('var, 'local_max_num_parents, 'local_num_rules, 'poly_var) P3.t
+          ( ( 'var
+            , 'local_max_num_input_proofs
+            , 'local_num_rules
+            , 'poly_var )
+            P3.t
           , ( 'value
-            , 'local_max_num_parents
+            , 'local_max_num_input_proofs
             , 'local_num_rules
             , 'poly_value )
             P3.t )
@@ -62,7 +71,7 @@ module Proof_system = struct
              , ns2
              , PPW.witness
              , PPWC.witness )
-             H4_2.T(Typ_with_max_num_parents).t =
+             H4_2.T(Typ_with_max_num_input_proofs).t =
        fun ds ns1 ns2 ld ln1 ln2 ->
         match (ds, ns1, ns2, ld, ln1, ln2) with
         | [], [], [], Z, Z, Z ->
@@ -114,11 +123,11 @@ module Proof_system = struct
             .
       in
       let typs =
-        join prevs prev_num_parentss prev_num_ruless prevs_length
-          prev_num_parentss_length prev_num_ruless_length
+        join prevs prev_num_input_proofss prev_num_ruless prevs_length
+          prev_num_input_proofss_length prev_num_ruless_length
       in
       let module Prev_typ =
-        H4_2.Typ_split (Impls.Step) (Typ_with_max_num_parents) (P3) (P3)
+        H4_2.Typ_split (Impls.Step) (Typ_with_max_num_input_proofs) (P3) (P3)
           (struct
             let f = Fn.id
           end)
@@ -130,18 +139,21 @@ module Proof_system = struct
       opening.sg
 
     let get_step_data
-        (type self_var self_value self_max_num_parents self_num_rules var value
-        max_num_parents num_rules)
+        (type self_var self_value self_max_num_input_proofs self_num_rules var
+        value max_num_input_proofs num_rules)
         (self_data :
           ( self_var
           , self_value
-          , self_max_num_parents
+          , self_max_num_input_proofs
           , self_num_rules )
           Types_map.For_step.t)
         (self_tag :
-          (self_var, self_value, self_max_num_parents, self_num_rules) Tag.tag)
-        (tag : (var, value, max_num_parents, num_rules) Tag.t) :
-        (var, value, max_num_parents, num_rules) Types_map.For_step.t =
+          ( self_var
+          , self_value
+          , self_max_num_input_proofs
+          , self_num_rules )
+          Tag.tag) (tag : (var, value, max_num_input_proofs, num_rules) Tag.t)
+        : (var, value, max_num_input_proofs, num_rules) Types_map.For_step.t =
       match Type_equal.Id.same_witness self_tag tag.id with
       | Some T ->
           self_data
@@ -154,19 +166,23 @@ module Proof_system = struct
               (Types_map.lookup_side_loaded tag.id) )
 
     let finalize_and_verify
-        (type self_var self_value self_max_num_parents self_num_rules var value
-        max_num_parents num_rules)
+        (type self_var self_value self_max_num_input_proofs self_num_rules var
+        value max_num_input_proofs num_rules)
         (self_data :
           ( self_var
           , self_value
-          , self_max_num_parents
+          , self_max_num_input_proofs
           , self_num_rules )
           Types_map.For_step.t)
         (self_tag :
-          (self_var, self_value, self_max_num_parents, self_num_rules) Tag.tag)
+          ( self_var
+          , self_value
+          , self_max_num_input_proofs
+          , self_num_rules )
+          Tag.tag)
         (proof :
-          (var, max_num_parents, num_rules) Types.Per_proof_witness.poly)
-        (tag : (var, value, max_num_parents, num_rules) Tag.t)
+          (var, max_num_input_proofs, num_rules) Types.Per_proof_witness.poly)
+        (tag : (var, value, max_num_input_proofs, num_rules) Tag.t)
         (pass_through : Digest.t) (unfinalized : Unfinalized.t)
         (should_verify : Boolean.var) =
       let open Pairing_main in
@@ -189,8 +205,9 @@ module Proof_system = struct
               Sponge.absorb sponge (`Field sponge_digest) ;
               sponge |> Opt_sponge.Underlying.of_sponge |> S.Bit_sponge.make
             in
-            finalize_other_proof d.max_num_parents ~num_parents:d.num_parents
-              ~rules_num_parents:d.rules_num_parents
+            finalize_other_proof d.max_num_input_proofs
+              ~num_input_proofs:d.num_input_proofs
+              ~rules_num_input_proofs:d.rules_num_input_proofs
               ~step_domains:d.step_domains ~sponge ~old_bulletproof_challenges
               state.deferred_values prev_evals )
       in
@@ -215,8 +232,8 @@ module Proof_system = struct
                 unstage
                   (hash_me_only_opt ~index:d.wrap_key d.var_to_field_elements)
               in
-              hash ~num_parents:d.rules_num_parents
-                ~max_num_parents:(Nat.Add.n d.max_num_parents)
+              hash ~num_input_proofs:d.rules_num_input_proofs
+                ~max_num_input_proofs:(Nat.Add.n d.max_num_input_proofs)
                 ~which_rule
                 (* Use opt sponge for cutting off the bulletproof challenges early *)
                 { app_state
@@ -229,9 +246,10 @@ module Proof_system = struct
       in
       let verified =
         with_label __LOC__ (fun () ->
-            verify ~num_parents:d.max_num_parents ~wrap_domain:d.wrap_domains.h
-              ~is_base_case:should_verify ~sg_old ~opening ~messages
-              ~wrap_verification_key:d.wrap_key statement unfinalized )
+            verify ~num_input_proofs:d.max_num_input_proofs
+              ~wrap_domain:d.wrap_domains.h ~is_base_case:should_verify ~sg_old
+              ~opening ~messages ~wrap_verification_key:d.wrap_key statement
+              unfinalized )
       in
       if debug then
         as_prover
@@ -320,27 +338,27 @@ module type Proof_system = sig
     val per_proof_witness_typ :
          ( 'self_var
          , 'self_value
-         , 'self_max_num_parents
+         , 'self_max_num_input_proofs
          , 'self_num_rules )
          Types_map.Compiled.basic
       -> ( 'self_var
          , 'self_value
-         , 'self_max_num_parents
+         , 'self_max_num_input_proofs
          , 'self_num_rules )
          Tag.tag
-      -> ('vars, 'values, 'max_num_parentss, 'num_ruless) H4.T(Tag).t
-      -> 'max_num_parentss H1.T(Pickles_types.Nat).t
+      -> ('vars, 'values, 'max_num_input_proofss, 'num_ruless) H4.T(Tag).t
+      -> 'max_num_input_proofss H1.T(Pickles_types.Nat).t
       -> 'num_ruless H1.T(Pickles_types.Nat).t
       -> ('vars, 'length) Pickles_types.Hlist.Length.t
-      -> ('max_num_parentss, 'length) Pickles_types.Hlist.Length.t
+      -> ('max_num_input_proofss, 'length) Pickles_types.Hlist.Length.t
       -> ('num_ruless, 'length) Pickles_types.Hlist.Length.t
       -> ( ( 'vars
-           , 'max_num_parentss
+           , 'max_num_input_proofss
            , 'num_ruless
            , Types.Per_proof_witness.witness )
            H3_1.T(P3).t
          , ( 'values
-           , 'max_num_parentss
+           , 'max_num_input_proofss
            , 'num_ruless
            , Types.Per_proof_witness_constant.witness )
            H3_1.T(P3).t )
@@ -352,20 +370,20 @@ module type Proof_system = sig
     val finalize_and_verify :
          ( 'self_var
          , 'self_value
-         , 'self_max_num_parents
+         , 'self_max_num_input_proofs
          , 'self_num_rules )
          Types_map.For_step.t
       -> ( 'self_var
          , 'self_value
-         , 'self_max_num_parents
+         , 'self_max_num_input_proofs
          , 'self_num_rules )
          Tag.tag
       -> ( 'var
-         , 'max_num_parents
+         , 'max_num_input_proofs
          , 'num_rules
          , Types.Per_proof_witness.witness )
          P3.t
-      -> ('var, 'value, 'max_num_parents, 'num_rules) Tag.t
+      -> ('var, 'value, 'max_num_input_proofs, 'num_rules) Tag.t
       -> Digest.t
       -> Types.Unfinalized.t
       -> Boolean.var
@@ -400,18 +418,18 @@ module type Proof_system = sig
          Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
          Pickles_types.Plonk_verification_key_evals.t
       -> ( 'value
-         , 'max_num_parents
+         , 'max_num_input_proofs
          , 'num_rules
          , Types.Proof_with_data.witness )
          P3.t
-      -> ('var, 'value, 'max_num_parents, 'num_rules) Tag.t
+      -> ('var, 'value, 'max_num_input_proofs, 'num_rules) Tag.t
       -> must_verify:bool
       -> [`Sg of Backend.Tock.Curve.Affine.t]
          * Types.Unfinalized_constant.t
          * [`Me_only of Digest.Constant.t]
          * [`X_hat of Backend.Tock.Field.t Tuple_lib.Double.t]
          * ( 'value
-           , 'max_num_parents
+           , 'max_num_input_proofs
            , 'num_rules
            , Types.Per_proof_witness_constant.witness )
            P3.t
@@ -466,17 +484,21 @@ module Bulletproof_challenges = struct
 end
 
 let build_combined_typ basic self_id proof_systems tagss ns1 ns2 ld ln1 ln2 =
-  let module Typ_with_max_num_parents = struct
+  let module Typ_with_max_num_input_proofs = struct
     type ( 'var
          , 'value
-         , 'local_max_num_parents
+         , 'local_max_num_input_proofs
          , 'local_num_rules
          , 'poly_var
          , 'poly_value )
          t =
-      ( ('var, 'local_max_num_parents, 'local_num_rules, 'poly_var) H3_1.T(P3).t
+      ( ( 'var
+        , 'local_max_num_input_proofs
+        , 'local_num_rules
+        , 'poly_var )
+        H3_1.T(P3).t
       , ( 'value
-        , 'local_max_num_parents
+        , 'local_max_num_input_proofs
         , 'local_num_rules
         , 'poly_value )
         H3_1.T(P3).t )
@@ -503,7 +525,7 @@ let build_combined_typ basic self_id proof_systems tagss ns1 ns2 ld ln1 ln2 =
          , ns2
          , per_proof_witnesses
          , per_proof_witness_constants )
-         H6.T(Typ_with_max_num_parents).t =
+         H6.T(Typ_with_max_num_input_proofs).t =
    fun proof_systems tagss ns1 ns2 ld ln1 ln2 ->
     match (proof_systems, tagss, ns1, ns2, ld, ln1, ln2) with
     | [], [], [], [], [], [], [] ->
@@ -526,7 +548,7 @@ let build_combined_typ basic self_id proof_systems tagss ns1 ns2 ld ln1 ln2 =
         failwith "build_combined_typ"
   in
   let module M =
-    H6.Typ_split (Impls.Step) (Typ_with_max_num_parents)
+    H6.Typ_split (Impls.Step) (Typ_with_max_num_input_proofs)
       (H3_1.T (P3))
       (H3_1.T (P3))
       (struct
@@ -555,25 +577,29 @@ let rec h2_vec_to_h2_h1_1 : type length params actual_length carrying.
 
 (* The SNARK function corresponding to the input inductive rule. *)
 let step_main
-    : type num_parents total_num_parents num_rules prev_vars prev_values a_var a_value max_num_parents max_total_num_parents prev_num_ruless prev_num_parentss per_proof_witness per_proof_witness_constant unfinalized unfinalized_constant proof_with_data evals.
+    : type num_input_proofs total_num_input_proofs num_rules prev_vars prev_values a_var a_value max_num_input_proofs max_total_num_input_proofs prev_num_ruless prev_num_input_proofss per_proof_witness per_proof_witness_constant unfinalized unfinalized_constant proof_with_data evals.
        (module Requests.Step.S
-          with type prev_num_parentss = prev_num_parentss
+          with type prev_num_input_proofss = prev_num_input_proofss
            and type prev_num_ruless = prev_num_ruless
            and type statement = a_value
            and type prev_values = prev_values
-           and type max_num_parents = max_num_parents
+           and type max_num_input_proofs = max_num_input_proofs
            and type per_proof_witnesses = per_proof_witness_constant)
-    -> (module Nat.Add.Intf with type n = max_total_num_parents)
+    -> (module Nat.Add.Intf with type n = max_total_num_input_proofs)
     -> num_rules:num_rules Nat.t
-    -> prev_num_parentss:prev_num_parentss H1.T(H1.T(Nat)).t
-    -> prev_num_parentss_length:(prev_num_parentss, num_parents) H2.T(Length).t
+    -> prev_num_input_proofss:prev_num_input_proofss H1.T(H1.T(Nat)).t
+    -> prev_num_input_proofss_length:( prev_num_input_proofss
+                                     , num_input_proofs )
+                                     H2.T(Length).t
     -> prev_num_ruless:(* For each inner proof of type T , the number of rules that type T has. *)
        prev_num_ruless H1.T(H1.T(Nat)).t
-    -> prev_num_ruless_length:(prev_num_ruless, num_parents) H2.T(Length).t
-    -> prevs_lengths:(prev_vars, num_parents) H2.T(Length).t
-    -> prevs_length:(num_parents, total_num_parents) Nat.Sum.t
-    -> ltes:(num_parents, max_num_parents) H2.T(Nat.Lte).t
-    -> max_lengths:(max_num_parents, max_total_num_parents) Nat.Sum.t
+    -> prev_num_ruless_length:( prev_num_ruless
+                              , num_input_proofs )
+                              H2.T(Length).t
+    -> prevs_lengths:(prev_vars, num_input_proofs) H2.T(Length).t
+    -> prevs_length:(num_input_proofs, total_num_input_proofs) Nat.Sum.t
+    -> ltes:(num_input_proofs, max_num_input_proofs) H2.T(Nat.Lte).t
+    -> max_lengths:(max_num_input_proofs, max_total_num_input_proofs) Nat.Sum.t
     -> proof_systems:( per_proof_witness
                      , per_proof_witness_constant
                      , unfinalized
@@ -583,47 +609,47 @@ let step_main
                      H6.T(PS).t
     -> basic:( a_var
              , a_value
-             , max_total_num_parents
+             , max_total_num_input_proofs
              , num_rules )
              Types_map.Compiled.basic
-    -> self:(a_var, a_value, max_total_num_parents, num_rules) Tag.t
+    -> self:(a_var, a_value, max_total_num_input_proofs, num_rules) Tag.t
     -> ( prev_vars
        , prev_values
-       , prev_num_parentss
+       , prev_num_input_proofss
        , prev_num_ruless
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (   ( (unfinalized, max_num_parents) H2.T(Vector).t
+    -> (   ( (unfinalized, max_num_input_proofs) H2.T(Vector).t
            , Field.t
-           , max_num_parents H1.T(Vector.Carrying(Digest)).t )
+           , max_num_input_proofs H1.T(Vector.Carrying(Digest)).t )
            Types.Pairing_based.Statement.t
         -> unit)
        Staged.t =
- fun (module Req) (module Max_num_parents) ~num_rules ~prev_num_parentss
-     ~prev_num_parentss_length ~prev_num_ruless ~prev_num_ruless_length
-     ~prevs_lengths ~prevs_length ~ltes ~max_lengths ~proof_systems ~basic
-     ~self rule ->
+ fun (module Req) (module Max_num_input_proofs) ~num_rules
+     ~prev_num_input_proofss ~prev_num_input_proofss_length ~prev_num_ruless
+     ~prev_num_ruless_length ~prevs_lengths ~prevs_length ~ltes ~max_lengths
+     ~proof_systems ~basic ~self rule ->
   let module T (F : T4) = struct
     type ('a, 'b, 'n, 'm) t =
       | Other of ('a, 'b, 'n, 'm) F.t
-      | Self : (a_var, a_value, max_num_parents, num_rules) t
+      | Self : (a_var, a_value, max_num_input_proofs, num_rules) t
   end in
   let prev_typ =
-    build_combined_typ basic self.id proof_systems rule.prevs prev_num_parentss
-      prev_num_ruless prevs_lengths prev_num_parentss_length
-      prev_num_ruless_length
+    build_combined_typ basic self.id proof_systems rule.prevs
+      prev_num_input_proofss prev_num_ruless prevs_lengths
+      prev_num_input_proofss_length prev_num_ruless_length
   in
   let main
       (stmt :
-        ( (unfinalized, max_num_parents) H2.T(Vector).t
+        ( (unfinalized, max_num_input_proofs) H2.T(Vector).t
         , Field.t
-        , max_num_parents H1.T(Vector.Carrying(Digest)).t )
+        , max_num_input_proofs H1.T(Vector.Carrying(Digest)).t )
         Types.Pairing_based.Statement.t) =
     let open Requests.Step in
     let open Impls.Step in
     with_label "step_main" (fun () ->
-        let T = Max_num_parents.eq in
+        let T = Max_num_input_proofs.eq in
         let dlog_plonk_index =
           exists
             ~request:(fun () -> Req.Wrap_index)
@@ -639,9 +665,9 @@ let step_main
         in
         let prev_statements =
           let rec f
-              : type prev_varss prev_num_parentss prev_num_ruless per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants proof_with_data evals.
+              : type prev_varss prev_num_input_proofss prev_num_ruless per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants proof_with_data evals.
                  ( prev_varss
-                 , prev_num_parentss
+                 , prev_num_input_proofss
                  , prev_num_ruless
                  , per_proof_witnesses )
                  H4.T(H3_1.T(P3)).t
@@ -711,14 +737,14 @@ let step_main
         let self_data :
             ( a_var
             , a_value
-            , max_total_num_parents
+            , max_total_num_input_proofs
             , num_rules )
             Types_map.For_step.t =
           { num_rules
-          ; rules_num_parents=
-              Vector.map basic.rules_num_parents ~f:Field.of_int
-          ; max_num_parents= (module Max_num_parents)
-          ; num_parents= None
+          ; rules_num_input_proofs=
+              Vector.map basic.rules_num_input_proofs ~f:Field.of_int
+          ; max_num_input_proofs= (module Max_num_input_proofs)
+          ; num_input_proofs= None
           ; typ= basic.typ
           ; var_to_field_elements= basic.var_to_field_elements
           ; value_to_field_elements= basic.value_to_field_elements
@@ -728,14 +754,14 @@ let step_main
         in
         let sgs =
           let rec f
-              : type prev_varss prev_num_parentss prev_num_ruless num_parentss total_num_parents per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants proof_with_data evals.
+              : type prev_varss prev_num_input_proofss prev_num_ruless num_input_proofss total_num_input_proofs per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants proof_with_data evals.
                  ( prev_varss
-                 , prev_num_parentss
+                 , prev_num_input_proofss
                  , prev_num_ruless
                  , per_proof_witnesses )
                  H4.T(H3_1.T(P3)).t
-              -> (prev_varss, num_parentss) H2.T(Length).t
-              -> (num_parentss, total_num_parents) Nat.Sum.t
+              -> (prev_varss, num_input_proofss) H2.T(Length).t
+              -> (num_input_proofss, total_num_input_proofs) Nat.Sum.t
               -> ( per_proof_witnesses
                  , per_proof_witness_constants
                  , unfinalizeds
@@ -743,7 +769,7 @@ let step_main
                  , proof_with_data
                  , evals )
                  H6.T(PS).t
-              -> (Inner_curve.t, total_num_parents) Vector.t =
+              -> (Inner_curve.t, total_num_input_proofs) Vector.t =
            fun proofss lengths sum proof_systems ->
             match (proofss, lengths, sum, proof_systems) with
             | [], [], [], [] ->
@@ -774,15 +800,15 @@ let step_main
         let bulletproof_challenges =
           with_label "prevs_verified" (fun () ->
               let rec go
-                  : type prev_varss prev_valuess prev_num_parentss prev_num_ruless per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants lengths total_length proof_with_data evals.
+                  : type prev_varss prev_valuess prev_num_input_proofss prev_num_ruless per_proof_witnesses per_proof_witness_constants unfinalizeds unfinalized_constants lengths total_length proof_with_data evals.
                      ( prev_varss
-                     , prev_num_parentss
+                     , prev_num_input_proofss
                      , prev_num_ruless
                      , per_proof_witnesses )
                      H4.T(H3_1.T(P3)).t
                   -> ( prev_varss
                      , prev_valuess
-                     , prev_num_parentss
+                     , prev_num_input_proofss
                      , prev_num_ruless )
                      H4.T(H4.T(Tag)).t
                   -> prev_varss H1.T(H1.T(E01(Digest))).t

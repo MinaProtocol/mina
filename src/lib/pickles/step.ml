@@ -13,18 +13,22 @@ open Common
 
 let b_poly = Tock.Field.(Dlog_main.b_poly ~add ~mul ~one)
 
-let step_one : type var value max max_num_parents m.
+let step_one : type var value max max_num_input_proofs m.
        max Nat.t
     -> Impls.Wrap.Verification_key.t
     -> 'a
-    -> (value, max_num_parents, m, P3.W(P.With_data).t) P3.t
-    -> (var, value, max_num_parents, m) Tag.t
+    -> (value, max_num_input_proofs, m, P3.W(P.With_data).t) P3.t
+    -> (var, value, max_num_input_proofs, m) Tag.t
     -> must_verify:bool
     -> [`Sg of Tock.Curve.Affine.t]
        * Unfinalized.Constant.t
        * [`Me_only of Digest.Constant.t]
        * [`X_hat of Tock.Field.t Double.t]
-       * (value, max_num_parents, m, P3.W(Per_proof_witness.Constant).t) P3.t =
+       * ( value
+         , max_num_input_proofs
+         , m
+         , P3.W(Per_proof_witness.Constant).t )
+         P3.t =
  fun max dlog_vk dlog_index t tag ~must_verify ->
   let (T t) =
     let module M = P3.T (P.With_data) in
@@ -70,8 +74,8 @@ let step_one : type var value max max_num_parents m.
         |> fst )
   in
   let data = Types_map.lookup_basic tag in
-  let (module Max_num_parents) = data.max_num_parents in
-  let T = Max_num_parents.eq in
+  let (module Max_num_input_proofs) = data.max_num_input_proofs in
+  let T = Max_num_input_proofs.eq in
   let statement = t.statement in
   let prev_challenges =
     (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
@@ -95,10 +99,10 @@ let step_one : type var value max max_num_parents m.
                 ; beta= plonk0.beta
                 ; gamma= plonk0.gamma } }
         ; me_only=
-            Common.hash_dlog_me_only Max_num_parents.n
+            Common.hash_dlog_me_only Max_num_input_proofs.n
               { old_bulletproof_challenges=
                   (* TODO: Get rid of this padding *)
-                  Vector.extend_exn prev_challenges Max_num_parents.n
+                  Vector.extend_exn prev_challenges Max_num_input_proofs.n
                     Dummy.Ipa.Wrap.challenges_computed
               ; sg= statement.proof_state.me_only.sg } } }
   in
@@ -110,9 +114,9 @@ let step_one : type var value max max_num_parents m.
     O.create dlog_vk
       Vector.(
         map2
-          (Vector.extend_exn statement.pass_through.sg Max_num_parents.n
+          (Vector.extend_exn statement.pass_through.sg Max_num_input_proofs.n
              (Lazy.force Dummy.Ipa.Wrap.sg))
-          (* This should indeed have length max_num_parents... No! It should have type max_num_parents_a. That is, the max_num_parents specific to a proof of this type...*)
+          (* This should indeed have length max_num_input_proofs... No! It should have type max_num_input_proofs_a. That is, the max_num_input_proofs specific to a proof of this type...*)
           prev_challenges
           ~f:(fun commitment chals ->
             { Tock.Proof.Challenge_polynomial.commitment
@@ -182,13 +186,13 @@ let step_one : type var value max max_num_parents m.
     ( t.P.Base.Dlog_based.statement.pass_through.app_state
     , {prev_statement_with_hashes.proof_state with me_only= ()}
     , Double.map2 t.prev_evals t.prev_x_hat ~f:Tuple.T2.create
-    , Vector.extend_exn t.statement.pass_through.sg Max_num_parents.n
+    , Vector.extend_exn t.statement.pass_through.sg Max_num_input_proofs.n
         (Lazy.force Dummy.Ipa.Wrap.sg)
       (* TODO: This computation is also redone elsewhere. *)
     , Vector.extend_exn
         (Vector.map t.statement.pass_through.old_bulletproof_challenges
            ~f:Ipa.Step.compute_challenges)
-        Max_num_parents.n Dummy.Ipa.Step.challenges_computed
+        Max_num_input_proofs.n Dummy.Ipa.Step.challenges_computed
     , ({t.proof.openings.proof with sg}, t.proof.messages) )
   in
   let combined_inner_product =
@@ -205,13 +209,13 @@ let step_one : type var value max max_num_parents m.
         Vector.append
           (Vector.map b_polys ~f:(fun f -> [|f pt|]))
           ([|x_hat|] :: a)
-          (snd (Max_num_parents.add Nat.N8.n))
+          (snd (Max_num_input_proofs.add Nat.N8.n))
       in
       let open Tock.Field in
       let domains = data.wrap_domains in
       Pcs_batch.combine_split_evaluations
         (Common.dlog_pcs_batch
-           (Max_num_parents.add Nat.N8.n)
+           (Max_num_input_proofs.add Nat.N8.n)
            ~max_quot_size:(Common.max_quot_size_int (Domain.size domains.h)))
         ~xi ~init:Fn.id ~mul ~last:Array.last
         ~mul_and_add:(fun ~acc ~xi fx -> fx + (xi * acc))
@@ -277,18 +281,18 @@ module Proof_system = struct
            Pickles_types.Dlog_plonk_types.Poly_comm.Without_degree_bound.t
            Pickles_types.Plonk_verification_key_evals.t
         -> ( 'value
-           , 'max_num_parents
+           , 'max_num_input_proofs
            , 'num_rules
            , Types.Proof_with_data.witness )
            Pickles_types.Higher_kinded_poly.P3.t
-        -> ('var, 'value, 'max_num_parents, 'num_rules) Pickles__.Tag.t
+        -> ('var, 'value, 'max_num_input_proofs, 'num_rules) Pickles__.Tag.t
         -> must_verify:bool
         -> [`Sg of Backend.Tock.Curve.Affine.t]
            * Types.Unfinalized_constant.t
            * [`Me_only of Pickles__.Impls.Step.Digest.Constant.t]
            * [`X_hat of Backend.Tock.Field.t Tuple_lib.Double.t]
            * ( 'value
-             , 'max_num_parents
+             , 'max_num_input_proofs
              , 'num_rules
              , Types.Per_proof_witness_constant.witness )
              Pickles_types.Higher_kinded_poly.P3.t =
@@ -302,7 +306,7 @@ module Make
 
         val to_field_elements : t -> Tick.Field.t array
     end)
-    (Max_num_parents : Nat.Add.Intf_transparent) =
+    (Max_num_input_proofs : Nat.Add.Intf_transparent) =
 struct
   let double_zip = Double.map2 ~f:Core_kernel.Tuple2.create
 
@@ -312,18 +316,18 @@ struct
 
   (* The prover corresponding to the given inductive rule. *)
   let f
-      (type prev_max_num_parentss self_num_rules prev_vars prev_values
-      prev_num_parentss prev_num_ruless prevs_lengths prevs_length
+      (type prev_max_num_input_proofss self_num_rules prev_vars prev_values
+      prev_num_input_proofss prev_num_ruless prevs_lengths prevs_length
       per_proof_witness per_proof_witness_constant unfinalized
       unfinalized_constant proof_with_data evals) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
-        , Max_num_parents.n
+        , Max_num_input_proofs.n
         , self_num_rules
         , prev_vars * unit
         , prev_values * unit
-        , prev_num_parentss * unit
+        , prev_num_input_proofss * unit
         , prev_num_ruless * unit
         , ( per_proof_witness * unit
           , per_proof_witness_constant * unit
@@ -342,26 +346,28 @@ struct
                        , evals * unit )
                        H6.T(Step_main.PS).t)
       ~maxes:(module Maxes : Pickles_types.Hlist.Maxes.S
-        with type length = Max_num_parents.n
-         and type ns = prev_max_num_parentss)
+        with type length = Max_num_input_proofs.n
+         and type ns = prev_max_num_input_proofss)
       ~(prevs_lengths : (prev_vars * unit, prevs_lengths) H2.T(Length).t)
       ~(prevs_length : (prevs_lengths, prevs_length) Nat.Sum.t) ~self
       ~step_domains ~self_dlog_plonk_index pk self_dlog_vk
       (prev_with_proofs :
         ( prev_values
-        , prev_num_parentss
+        , prev_num_input_proofss
         , prev_num_ruless
         , proof_with_data )
         H3_1.T(P3).t) :
       ( A_value.t
-      , (_, Max_num_parents.n) Vector.t
+      , (_, Max_num_input_proofs.n) Vector.t
       , (_, prevs_length) Vector.t
       , (_, prevs_length) Vector.t
       , _
-      , (_, Max_num_parents.n) Vector.t )
+      , (_, Max_num_input_proofs.n) Vector.t )
       P.Base.Pairing_based.t
       Async.Deferred.t =
-    let _, prev_vars_lengths, prev_vars_length = branch_data.num_parents in
+    let _, prev_vars_lengths, prev_vars_length =
+      branch_data.num_input_proofs
+    in
     let lte = branch_data.lte in
     let T = Lengths.contr prev_vars_lengths prevs_lengths in
     let [_] = prev_vars_lengths in
@@ -440,7 +446,7 @@ struct
     in
     let next_statement : _ Types.Pairing_based.Statement.t =
       let unfinalized_proofs_extended =
-        Vector.extend unfinalized_proofs lte Max_num_parents.n
+        Vector.extend unfinalized_proofs lte Max_num_input_proofs.n
           PS_.Step.dummy_unfinalized
       in
       let pass_through =
@@ -505,7 +511,7 @@ struct
     in
     let%map.Async (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
-        Impls.Step.input_of_hlist ~num_parentss:[Max_num_parents.n]
+        Impls.Step.input_of_hlist ~num_input_proofss:[Max_num_input_proofs.n]
           ~per_proof_specs:[PS_.Step.per_proof_spec ~wrap_rounds:Tock.Rounds.n]
       in
       let rec pad : type n k maxes pvals lws lhs.
@@ -525,10 +531,10 @@ struct
             let t : _ Types.Dlog_based.Proof_state.Me_only.t =
               { sg= Lazy.force Dummy.Ipa.Step.sg
               ; old_bulletproof_challenges=
-                  Vector.init Max_num_parents.n ~f:(fun _ ->
+                  Vector.init Max_num_input_proofs.n ~f:(fun _ ->
                       Dummy.Ipa.Wrap.challenges_computed ) }
             in
-            Common.hash_dlog_me_only Max_num_parents.n t :: pad [] ms n
+            Common.hash_dlog_me_only Max_num_input_proofs.n t :: pad [] ms n
       in
       let {Domains.h; x} =
         List.nth_exn
@@ -551,8 +557,8 @@ struct
         f prev_with_proofs prev_values_length
       in
       let [_] = branch_data.ltes in
-      let [add_max_num_parents] = branch_data.sum in
-      let T = Nat.Adds.add_zr_refl add_max_num_parents in
+      let [add_max_num_input_proofs] = branch_data.sum in
+      let T = Nat.Adds.add_zr_refl add_max_num_input_proofs in
       ksprintf Common.time "step-prover %d (%d, %d)"
         (Index.to_int branch_data.index) (Domain.size h) (Domain.size x)
         (fun () ->
@@ -611,5 +617,5 @@ struct
         Vector.extend
           (Vector.map2 prev_evals x_hats ~f:(fun es x_hat ->
                double_zip es x_hat ))
-          lte Max_num_parents.n PS_.Step.dummy_evals }
+          lte Max_num_input_proofs.n PS_.Step.dummy_evals }
 end

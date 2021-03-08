@@ -61,15 +61,16 @@ module Dlog_based = struct
     end
   end
 
-  type 'prev_max_num_parentss t =
+  type 'prev_max_num_input_proofss t =
     ( Tock.Inner_curve.Affine.t
-    , (Challenges_vector.t, 'prev_max_num_parentss) Vector.t )
+    , (Challenges_vector.t, 'prev_max_num_input_proofss) Vector.t )
     Dlog_based.Proof_state.Me_only.t
 
   module Prepared = struct
-    type 'prev_max_num_parentss t =
+    type 'prev_max_num_input_proofss t =
       ( Tock.Inner_curve.Affine.t
-      , (Challenges_vector.Prepared.t, 'prev_max_num_parentss) Vector.t )
+      , (Challenges_vector.Prepared.t, 'prev_max_num_input_proofss) Vector.t
+      )
       Dlog_based.Proof_state.Me_only.t
   end
 

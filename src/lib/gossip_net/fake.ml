@@ -191,10 +191,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
-    let set_telemetry_data _ _ = Deferred.Or_error.ok_unit
+    let set_node_status _ _ = Deferred.Or_error.ok_unit
 
-    let get_peer_telemetry_data _ _ =
-      Deferred.Or_error.error_string "fake telemetry data: Not implemented"
+    let get_peer_node_status _ _ =
+      Deferred.Or_error.error_string "fake node status: Not implemented"
 
     let add_peer _ (_p : Peer.t) ~seed:_ = Deferred.return (Ok ())
 

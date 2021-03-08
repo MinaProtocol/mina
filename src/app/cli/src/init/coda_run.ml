@@ -396,8 +396,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
-    ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
-          Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda) peers )
+    ; implement Daemon_rpcs.Get_node_status.rpc (fun () peers ->
+          Node_status.get_node_status_from_peers (Mina_lib.net coda) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
@@ -461,6 +461,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           in
           let lift x = `Response x in
           match Uri.path uri with
+          | "/" ->
+              let body =
+                "This page is intentionally left blank. The graphql endpoint \
+                 can be found at `/graphql`."
+              in
+              Server.respond_string ~status:`OK body >>| lift
           | "/graphql" ->
               [%log debug] "Received graphql request. Uri: $uri"
                 ~metadata:

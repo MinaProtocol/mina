@@ -59,7 +59,7 @@ echo "========================= STARTING DAEMON ==========================="
   -config-file "$MINA_CONFIG_DIR/daemon.json" \
   -genesis-ledger-dir "$MINA_CONFIG_DIR/demo-genesis" \
   -demo-mode \
-  -disable-telemetry \
+  -disable-node-status \
   -external-ip 127.0.0.1 \
   -external-port "${MINA_DAEMON_PORT:-10101}" \
   -insecure-rest-server \

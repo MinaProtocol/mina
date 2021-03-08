@@ -11,8 +11,9 @@ type inner_curve_var =
   * Tick.Field.t Snarky_backendless.Cvar.t
 
 module Basic = struct
-  type ('var, 'value, 'max_num_parents, 'num_rules) t =
-    { max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
+  type ('var, 'value, 'max_num_input_proofs, 'num_rules) t =
+    { max_num_input_proofs:
+        (module Nat.Add.Intf with type n = 'max_num_input_proofs)
     ; value_to_field_elements: 'value -> Impls.Step.Field.Constant.t array
     ; var_to_field_elements: 'var -> Impls.Step.Field.t array
     ; typ: ('var, 'value) Impls.Step.Typ.t
@@ -34,8 +35,9 @@ module Side_loaded = struct
   end
 
   module Permanent = struct
-    type ('var, 'value, 'max_num_parents, 'num_rules) t =
-      { max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
+    type ('var, 'value, 'max_num_input_proofs, 'num_rules) t =
+      { max_num_input_proofs:
+          (module Nat.Add.Intf with type n = 'max_num_input_proofs)
       ; value_to_field_elements: 'value -> Impls.Step.Field.Constant.t array
       ; var_to_field_elements: 'var -> Impls.Step.Field.t array
       ; typ: ('var, 'value) Impls.Step.Typ.t
@@ -53,7 +55,7 @@ module Side_loaded = struct
 
   let to_basic
       { permanent=
-          { max_num_parents
+          { max_num_input_proofs
           ; value_to_field_elements
           ; var_to_field_elements
           ; typ
@@ -67,7 +69,7 @@ module Side_loaded = struct
           failwithf "Side_loaded.to_basic: Expected `In_prover (%s)" __LOC__ ()
     in
     let wrap_vk = Option.value_exn ~here:[%here] wrap_vk in
-    { Basic.max_num_parents
+    { Basic.max_num_input_proofs
     ; wrap_vk
     ; value_to_field_elements
     ; var_to_field_elements
@@ -80,9 +82,9 @@ end
 module Compiled = struct
   type f = Impls.Wrap.field
 
-  type ('a_var, 'a_value, 'max_num_parents, 'num_rules) basic =
+  type ('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) basic =
     { typ: ('a_var, 'a_value) Impls.Step.Typ.t
-    ; rules_num_parents: (int, 'num_rules) Vector.t
+    ; rules_num_input_proofs: (int, 'num_rules) Vector.t
           (* For each rule, how many predecessor proofs does it have? *)
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
@@ -91,11 +93,12 @@ module Compiled = struct
 
   (* This is the data associated to an inductive proof system with statement type
    ['a_var], which has ['num_rules] many "variants" each of which depends on at most
-   ['max_num_parents] many previous statements. *)
-  type ('a_var, 'a_value, 'max_num_parents, 'num_rules) t =
+   ['max_num_input_proofs] many previous statements. *)
+  type ('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) t =
     { num_rules: 'num_rules Nat.t
-    ; max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
-    ; rules_num_parents: (int, 'num_rules) Vector.t
+    ; max_num_input_proofs:
+        (module Nat.Add.Intf with type n = 'max_num_input_proofs)
+    ; rules_num_input_proofs: (int, 'num_rules) Vector.t
           (* For each rule, how many predecessor proofs does it have? *)
     ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
@@ -116,8 +119,8 @@ module Compiled = struct
 
   let to_basic
       { num_rules
-      ; max_num_parents
-      ; rules_num_parents
+      ; max_num_input_proofs
+      ; rules_num_input_proofs
       ; typ
       ; value_to_field_elements
       ; var_to_field_elements
@@ -125,7 +128,7 @@ module Compiled = struct
       ; wrap_domains
       ; step_domains
       ; wrap_key } =
-    { Basic.max_num_parents
+    { Basic.max_num_input_proofs
     ; wrap_domains
     ; value_to_field_elements
     ; var_to_field_elements
@@ -136,10 +139,11 @@ module Compiled = struct
 end
 
 module For_step = struct
-  type ('a_var, 'a_value, 'max_num_parents, 'num_rules) t =
+  type ('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) t =
     { num_rules: 'num_rules Nat.t
-    ; max_num_parents: (module Nat.Add.Intf with type n = 'max_num_parents)
-    ; rules_num_parents: (Impls.Step.Field.t, 'num_rules) Vector.t
+    ; max_num_input_proofs:
+        (module Nat.Add.Intf with type n = 'max_num_input_proofs)
+    ; rules_num_input_proofs: (Impls.Step.Field.t, 'num_rules) Vector.t
     ; typ: ('a_var, 'a_value) Impls.Step.Typ.t
     ; value_to_field_elements: 'a_value -> Tick.Field.t array
     ; var_to_field_elements: 'a_var -> Impls.Step.Field.t array
@@ -154,13 +158,14 @@ module For_step = struct
             Side_loaded_verification_key.Domains.t
           , 'num_rules )
           Vector.t ]
-    ; num_parents: Side_loaded_verification_key.Num_parents.Checked.t option }
+    ; num_input_proofs:
+        Side_loaded_verification_key.Num_input_proofs.Checked.t option }
 
   let of_side_loaded (type a b c d)
       ({ ephemeral
        ; permanent=
            { num_rules
-           ; max_num_parents
+           ; max_num_input_proofs
            ; typ
            ; value_to_field_elements
            ; var_to_field_elements } } :
@@ -177,22 +182,22 @@ module For_step = struct
       Nat.eq_exn num_rules Side_loaded_verification_key.Max_num_rules.n
     in
     { num_rules
-    ; max_num_parents
-    ; rules_num_parents=
-        Vector.map index.rules_num_parents
-          ~f:Side_loaded_verification_key.Num_parents.Checked.to_field
+    ; max_num_input_proofs
+    ; rules_num_input_proofs=
+        Vector.map index.rules_num_input_proofs
+          ~f:Side_loaded_verification_key.Num_input_proofs.Checked.to_field
     ; typ
     ; value_to_field_elements
     ; var_to_field_elements
     ; wrap_key= index.wrap_index
     ; wrap_domains= Common.wrap_domains
     ; step_domains= `Side_loaded index.step_domains
-    ; num_parents= Some index.num_parents }
+    ; num_input_proofs= Some index.num_input_proofs }
 
   let of_compiled
       ({ num_rules
-       ; max_num_parents
-       ; rules_num_parents
+       ; max_num_input_proofs
+       ; rules_num_input_proofs
        ; typ
        ; value_to_field_elements
        ; var_to_field_elements
@@ -201,10 +206,10 @@ module For_step = struct
        ; step_domains } :
         _ Compiled.t) =
     { num_rules
-    ; num_parents= None
-    ; max_num_parents
-    ; rules_num_parents=
-        Vector.map rules_num_parents ~f:Impls.Step.Field.of_int
+    ; num_input_proofs= None
+    ; max_num_input_proofs
+    ; rules_num_input_proofs=
+        Vector.map rules_num_input_proofs ~f:Impls.Step.Field.of_int
     ; typ
     ; value_to_field_elements
     ; var_to_field_elements
@@ -267,14 +272,14 @@ let lookup_step_domains : type a b n m.
           Vector.init t.permanent.num_rules ~f:(fun i ->
               try a.(i) with _ -> Domain.Pow_2_roots_of_unity 0 ) )
 
-let max_num_parents : type n1.
+let max_num_input_proofs : type n1.
     (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
  fun tag ->
   match tag.kind with
   | Compiled ->
-      (lookup_compiled tag.id).max_num_parents
+      (lookup_compiled tag.id).max_num_input_proofs
   | Side_loaded ->
-      (lookup_side_loaded tag.id).permanent.max_num_parents
+      (lookup_side_loaded tag.id).permanent.max_num_input_proofs
 
 let typ : type var value.
     (var, value, _, _) Tag.t -> (var, value) Impls.Step.Typ.t =

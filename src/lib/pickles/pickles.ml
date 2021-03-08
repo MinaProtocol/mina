@@ -115,15 +115,15 @@ let verify = Verify.verify
       and use *that* in the "verifies" computation.
 *)
 
-let pad_local_max_num_parents
-    (type prev_varss prev_valuess env max_num_parents num_rules)
-    (max_num_parents : max_num_parents Nat.t)
+let pad_local_max_num_input_proofs
+    (type prev_varss prev_valuess env max_num_input_proofs num_rules)
+    (max_num_input_proofs : max_num_input_proofs Nat.t)
     (length : (prev_varss, num_rules) Hlist.Length.t)
-    (prev_max_num_parentss :
+    (prev_max_num_input_proofss :
       (prev_varss, prev_valuess, env) H2_1.T(H2_1.T(E03(Int))).t) :
-    ((int, max_num_parents) Vector.t, num_rules) Vector.t =
+    ((int, max_num_input_proofs) Vector.t, num_rules) Vector.t =
   let module Vec = struct
-    type t = (int, max_num_parents) Vector.t
+    type t = (int, max_num_input_proofs) Vector.t
   end in
   let module M =
     H2_1.Map
@@ -139,11 +139,11 @@ let pad_local_max_num_parents
                 let (T (_num_prev_rules, pi)) = HI.length xs in
                 let module V = H2_1.To_vector (Int) in
                 let v = V.f pi xs in
-                Vector.extend_exn v max_num_parents 0
+                Vector.extend_exn v max_num_input_proofs 0
             end)
   in
   let module V = H2_1.To_vector (Vec) in
-  V.f length (M.f prev_max_num_parentss)
+  V.f length (M.f prev_max_num_input_proofss)
 
 open Zexe_backend
 
@@ -156,17 +156,18 @@ module Proof_ = P.Base
 module Proof = P
 
 module Statement_with_proof = struct
-  type ('s, 'max_num_parents, 'prev_max_num_parentss) t =
-    (* TODO: use prev_max_num_parentss instead of max_num_parents *)
-    's * ('max_num_parents, 'max_num_parents) Proof.t
+  type ('s, 'max_num_input_proofs, 'prev_max_num_input_proofss) t =
+    (* TODO: use prev_max_num_input_proofss instead of max_num_input_proofs *)
+    's * ('max_num_input_proofs, 'max_num_input_proofs) Proof.t
 end
 
 let pad_pass_throughs
-    (type max_num_parentss prev_max_num_parentss max_num_parents)
+    (type max_num_input_proofss prev_max_num_input_proofss
+    max_num_input_proofs)
     (module M : Hlist.Maxes.S
-      with type ns = prev_max_num_parentss
-       and type length = max_num_parents)
-    (pass_throughs : max_num_parentss H1.T(Proof_.Me_only.Dlog_based).t) =
+      with type ns = prev_max_num_input_proofss
+       and type length = max_num_input_proofs)
+    (pass_throughs : max_num_input_proofss H1.T(Proof_.Me_only.Dlog_based).t) =
   let dummy_chals = Dummy.Ipa.Wrap.challenges in
   let rec go : type len ms ns.
          ms H1.T(Nat).t
@@ -249,11 +250,16 @@ module type Proof_intf = sig
 end
 
 module Prover = struct
-  type ('prev_values, 'prev_num_parentss, 'prev_num_ruless, 'a_value, 'proof) t =
+  type ( 'prev_values
+       , 'prev_num_input_proofss
+       , 'prev_num_ruless
+       , 'a_value
+       , 'proof )
+       t =
        ?handler:(   Snarky_backendless.Request.request
                  -> Snarky_backendless.Request.response)
     -> ( 'prev_values
-       , 'prev_num_parentss
+       , 'prev_num_input_proofss
        , 'prev_num_ruless )
        H3.T(Statement_with_proof).t
     -> 'a_value
@@ -263,71 +269,75 @@ end
 module Proof_system = struct
   type ( 'a_var
        , 'a_value
-       , 'max_num_parents
+       , 'max_num_input_proofs
        , 'num_rules
        , 'prev_valuess
-       , 'prev_num_parentss
+       , 'prev_num_input_proofss
        , 'prev_num_ruless )
        t =
     | T :
-        ('a_var, 'a_value, 'max_num_parents, 'num_rules) Tag.t
+        ('a_var, 'a_value, 'max_num_input_proofs, 'num_rules) Tag.t
         * (module Proof_intf with type t = 'proof
                               and type statement = 'a_value)
         * ( 'prev_valuess
-          , 'prev_num_parentss
+          , 'prev_num_input_proofss
           , 'prev_num_ruless
           , 'a_value
           , 'proof )
           H3_2.T(Prover).t
         -> ( 'a_var
            , 'a_value
-           , 'max_num_parents
+           , 'max_num_input_proofs
            , 'num_rules
            , 'prev_valuess
-           , 'prev_num_parentss
+           , 'prev_num_input_proofss
            , 'prev_num_ruless )
            t
 end
 
 module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
   module IR = struct
-    type ('prev_vars, 'prev_values, 'prev_num_parentss, 'prev_num_ruless) t =
+    type ( 'prev_vars
+         , 'prev_values
+         , 'prev_num_input_proofss
+         , 'prev_num_ruless )
+         t =
       ( 'prev_vars * unit
       , 'prev_values * unit
-      , 'prev_num_parentss * unit
+      , 'prev_num_input_proofss * unit
       , 'prev_num_ruless * unit )
       Inductive_rule.T(A)(A_value).t
   end
 
   module HIR = H4.T (IR)
 
-  let prev_num_parentss_per_slot :
-        'max_num_parents 'num_rules 'prev_varss 'prev_valuess
-        'prev_num_parentsss 'prev_num_rulesss.    self:( 'var
-                                                       , 'value
-                                                       , 'max_num_parents
-                                                       , 'num_rules )
-                                                       Tag.tag
-        -> (module Nat.Intf with type n = 'max_num_parents)
+  let prev_num_input_proofss_per_slot :
+        'max_num_input_proofs 'num_rules 'prev_varss 'prev_valuess
+        'prev_num_input_proofsss 'prev_num_rulesss.    self:( 'var
+                                                            , 'value
+                                                            , 'max_num_input_proofs
+                                                            , 'num_rules )
+                                                            Tag.tag
+        -> (module Nat.Intf with type n = 'max_num_input_proofs)
         -> ('prev_varss, 'num_rules) Length.t
         -> ( 'prev_varss
            , 'prev_valuess
-           , 'prev_num_parentsss
+           , 'prev_num_input_proofsss
            , 'prev_num_rulesss )
            H4.T(IR).t
-        -> ((int, 'num_rules) Vector.t, 'max_num_parents) Vector.t
-           * (module Maxes.S with type length = 'max_num_parents) =
-    fun (type var value max_num_parents max_num_rules num_rules)
-        ~(self : (var, value, max_num_parents, num_rules) Tag.tag)
-        (module Max_num_parents : Nat.Intf with type n = max_num_parents)
-        num_rules rules ->
-     let module Local_max_num_parents = struct
-       type t = (int, Max_num_parents.n) Vector.t
+        -> ((int, 'num_rules) Vector.t, 'max_num_input_proofs) Vector.t
+           * (module Maxes.S with type length = 'max_num_input_proofs) =
+    fun (type var value max_num_input_proofs max_num_rules num_rules)
+        ~(self : (var, value, max_num_input_proofs, num_rules) Tag.tag)
+        (module Max_num_input_proofs : Nat.Intf
+          with type n = max_num_input_proofs) num_rules rules ->
+     let module Local_max_num_input_proofs = struct
+       type t = (int, Max_num_input_proofs.n) Vector.t
      end in
      let module M =
        H4.Map
          (IR)
-         (E04 (Local_max_num_parents))
+         (E04 (Local_max_num_input_proofs))
          (struct
            module V = H4.To_vector (Int)
            module HT = H4.T (Tag)
@@ -341,25 +351,26 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                    let (n : c Nat.t) =
                      match Type_equal.Id.same_witness t.id self with
                      | None ->
-                         let (module Max_num_parents) =
-                           Types_map.max_num_parents t
+                         let (module Max_num_input_proofs) =
+                           Types_map.max_num_input_proofs t
                          in
-                         let T = Max_num_parents.eq in
-                         Max_num_parents.n
+                         let T = Max_num_input_proofs.eq in
+                         Max_num_input_proofs.n
                      | Some T ->
-                         Max_num_parents.n
+                         Max_num_input_proofs.n
                    in
                    Nat.to_int n
                end)
 
-           let f : type a b c d. (a, b, c, d) IR.t -> Local_max_num_parents.t =
+           let f : type a b c d.
+               (a, b, c, d) IR.t -> Local_max_num_input_proofs.t =
             fun rule ->
              let [prevs] = rule.prevs in
              let (T (_, l)) = HT.length prevs in
-             Vector.extend_exn (V.f l (M.f prevs)) Max_num_parents.n 0
+             Vector.extend_exn (V.f l (M.f prevs)) Max_num_input_proofs.n 0
          end)
      in
-     let module V = H4.To_vector (Local_max_num_parents) in
+     let module V = H4.To_vector (Local_max_num_input_proofs) in
      let padded = V.f num_rules (M.f rules) |> Vector.transpose in
      (padded, Maxes.m padded)
 
@@ -428,34 +439,36 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       log
 
   let compile
-      : type prev_varss prev_valuess prev_num_parentss prev_num_ruless max_num_parents num_rules.
-         self:(A.t, A_value.t, max_num_parents, num_rules) Tag.t
+      : type prev_varss prev_valuess prev_num_input_proofss prev_num_ruless max_num_input_proofs num_rules.
+         self:(A.t, A_value.t, max_num_input_proofs, num_rules) Tag.t
       -> cache:Key_cache.Spec.t list
       -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
                     * Cache.Wrap.Key.Verification.t
       -> num_rules:(module Nat.Intf with type n = num_rules)
-      -> max_num_parents:(module Nat.Add.Intf with type n = max_num_parents)
+      -> max_num_input_proofs:(module Nat.Add.Intf
+                                 with type n = max_num_input_proofs)
       -> name:string
       -> constraint_constants:Snark_keys_header.Constraint_constants.t
       -> typ:(A.t, A_value.t) Impls.Step.Typ.t
-      -> rules:(   self:(A.t, A_value.t, max_num_parents, num_rules) Tag.t
+      -> rules:(   self:(A.t, A_value.t, max_num_input_proofs, num_rules) Tag.t
                 -> ( prev_varss
                    , prev_valuess
-                   , prev_num_parentss
+                   , prev_num_input_proofss
                    , prev_num_ruless )
                    H4.T(IR).t)
       -> ( prev_valuess
-         , prev_num_parentss
+         , prev_num_input_proofss
          , prev_num_ruless
          , A_value.t
-         , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )
+         , (max_num_input_proofs, max_num_input_proofs) Proof.t
+           Async.Deferred.t )
          H3_2.T(Prover).t
          * _
          * _
          * _ =
    fun ~self ~cache ?disk_keys ~num_rules:(module Num_rules)
-       ~max_num_parents:(module Max_num_parents) ~name ~constraint_constants
-       ~typ ~rules ->
+       ~max_num_input_proofs:(module Max_num_input_proofs) ~name
+       ~constraint_constants ~typ ~rules ->
     let snark_keys_header kind constraint_system_hash =
       { Snark_keys_header.header_version= Snark_keys_header.header_version
       ; kind
@@ -470,17 +483,17 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           constraint_system_hash }
     in
     Timer.start __LOC__ ;
-    let T = Max_num_parents.eq in
+    let T = Max_num_input_proofs.eq in
     let rules = rules ~self in
     let (T (prev_varss_n, prev_varss_length)) = HIR.length rules in
     let T = Nat.eq_exn prev_varss_n Num_rules.n in
-    let prev_num_parentss_per_slot, (module Maxes) =
-      prev_num_parentss_per_slot
-        (module Max_num_parents)
+    let prev_num_input_proofss_per_slot, (module Maxes) =
+      prev_num_input_proofss_per_slot
+        (module Max_num_input_proofs)
         prev_varss_length rules ~self:self.id
     in
     let full_signature =
-      {Full_signature.prev_num_parentss_per_slot; maxes= (module Maxes)}
+      {Full_signature.prev_num_input_proofss_per_slot; maxes= (module Maxes)}
     in
     Timer.clock __LOC__ ;
     let wrap_domains =
@@ -493,14 +506,14 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             x :: f xs
       in
       M.f full_signature prev_varss_n prev_varss_length ~self ~rules:(f rules)
-        ~max_num_parents:(module Max_num_parents)
+        ~max_num_input_proofs:(module Max_num_input_proofs)
     in
     Timer.clock __LOC__ ;
     let module Branch_data = struct
       type ('vars, 'vals, 'n, 'm, 'ps) t =
         ( A.t
         , A_value.t
-        , Max_num_parents.n
+        , Max_num_input_proofs.n
         , Num_rules.n
         , 'vars
         , 'vals
@@ -509,7 +522,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         , 'ps )
         Step_branch_data.t
     end in
-    let rules_num_parents =
+    let rules_num_input_proofs =
       let module M =
         H4.Map
           (IR)
@@ -562,11 +575,12 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                 Common.time "make step data" (fun () ->
                     Step_branch_data.create ~index:(Index.of_int_exn !i)
                       ~proof_systems:[(module Step.Proof_system)]
-                      ~max_num_parents:Max_num_parents.n
-                      ~max_num_parentss:[Nat.Adds.add_zr Max_num_parents.n]
+                      ~max_num_input_proofs:Max_num_input_proofs.n
+                      ~max_num_input_proofss:
+                        [Nat.Adds.add_zr Max_num_input_proofs.n]
                       ~num_rules:Num_rules.n ~self ~typ A.to_field_elements
                       A_value.to_field_elements rule ~wrap_domains
-                      ~rules_num_parents )
+                      ~rules_num_input_proofs )
               in
               Timer.clock __LOC__ ; incr i ; res
           end)
@@ -600,15 +614,15 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
           (struct
             let etyp =
               Step_branch_data.input_of_hlist
-                ~max_num_parentss:[Nat.Adds.add_zr Max_num_parents.n]
+                ~max_num_input_proofss:[Nat.Adds.add_zr Max_num_input_proofs.n]
                 ~proof_systems:[(module Step.Proof_system)]
 
             let f (T b : _ Branch_data_.t) =
               let (T (typ, conv)) = etyp in
-              let _, [_], _ = b.num_parents in
+              let _, [_], _ = b.num_input_proofs in
               let [_] = b.ltes in
-              let [add_max_num_parents] = b.sum in
-              let T = Nat.Adds.add_zr_refl add_max_num_parents in
+              let [add_max_num_input_proofs] = b.sum in
+              let T = Nat.Adds.add_zr_refl add_max_num_input_proofs in
               let main x () : unit =
                 b.main
                   (Impls.Step.with_label "conv" (fun () -> conv x))
@@ -700,8 +714,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       in
       Timer.clock __LOC__ ;
       Wrap_main.wrap_main full_signature prev_varss_length step_vks
-        rules_num_parents step_domains prev_wrap_domains
-        (module Max_num_parents)
+        rules_num_input_proofs step_domains prev_wrap_domains
+        (module Max_num_input_proofs)
     in
     Timer.clock __LOC__ ;
     let (wrap_pk, wrap_vk), disk_key =
@@ -746,27 +760,31 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     accum_dirty (Lazy.map wrap_pk ~f:snd) ;
     accum_dirty (Lazy.map wrap_vk ~f:snd) ;
     let wrap_vk = Lazy.map wrap_vk ~f:fst in
-    let module S = Step.Make (A) (A_value) (Max_num_parents) in
+    let module S = Step.Make (A) (A_value) (Max_num_input_proofs) in
     let provers =
       let module Z = H4.Zip (Branch_data_) (E04 (Impls.Step.Keypair)) in
-      let f : type prev_vars prev_values prev_num_parentss prev_num_ruless.
+      let f
+          : type prev_vars prev_values prev_num_input_proofss prev_num_ruless.
              ( prev_vars
              , prev_values
-             , prev_num_parentss
+             , prev_num_input_proofss
              , prev_num_ruless )
              Branch_data_.t
           -> Lazy_keys.t
           -> ?handler:(   Snarky_backendless.Request.request
                        -> Snarky_backendless.Request.response)
           -> ( prev_values
-             , prev_num_parentss
+             , prev_num_input_proofss
              , prev_num_ruless )
              H3.T(Statement_with_proof).t
           -> A_value.t
-          -> (Max_num_parents.n, Max_num_parents.n) Proof.t Async.Deferred.t =
+          -> (Max_num_input_proofs.n, Max_num_input_proofs.n) Proof.t
+             Async.Deferred.t =
        fun (T b as branch_data) (step_pk, step_vk) ->
         let (module Requests) = b.requests in
-        let total_num_parents, prevs_lengths, prevs_length = b.num_parents in
+        let total_num_input_proofs, prevs_lengths, prevs_length =
+          b.num_input_proofs
+        in
         let step handler prevs next_state =
           let wrap_vk = Lazy.force wrap_vk in
           S.f ?handler branch_data next_state ~prevs_length ~prevs_lengths
@@ -811,8 +829,9 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                       proof.statement.pass_through } }
           in
           let%map.Async proof =
-            Wrap.wrap ~max_num_parents:Max_num_parents.n full_signature.maxes
-              wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
+            Wrap.wrap ~max_num_input_proofs:Max_num_input_proofs.n
+              full_signature.maxes wrap_requests
+              ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
               ~pairing_plonk_indices:(Lazy.force step_vks) ~wrap_domains
               (Impls.Wrap.Keypair.pk (fst (Lazy.force wrap_pk)))
@@ -834,7 +853,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
              , xs3
              , xs4
              , A_value.t
-             , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )
+             , (max_num_input_proofs, max_num_input_proofs) Proof.t
+               Async.Deferred.t )
              H3_2.T(Prover).t =
        fun bs ks ->
         match (bs, ks) with
@@ -848,8 +868,8 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     Timer.clock __LOC__ ;
     let data : _ Types_map.Compiled.t =
       { num_rules= Num_rules.n
-      ; rules_num_parents
-      ; max_num_parents= (module Max_num_parents)
+      ; rules_num_input_proofs
+      ; max_num_input_proofs= (module Max_num_input_proofs)
       ; typ
       ; value_to_field_elements= A_value.to_field_elements
       ; var_to_field_elements= A.to_field_elements
@@ -875,26 +895,28 @@ module Side_loaded = struct
       ; wrap_index=
           Lazy.force d.wrap_key
           |> Plonk_verification_key_evals.map ~f:Array.to_list
-      ; num_parents=
-          Num_parents.of_int_exn (Nat.to_int (Nat.Add.n d.max_num_parents))
+      ; num_input_proofs=
+          Num_input_proofs.of_int_exn
+            (Nat.to_int (Nat.Add.n d.max_num_input_proofs))
       ; step_data=
           At_most.of_vector
-            (Vector.map2 d.rules_num_parents d.step_domains
-               ~f:(fun num_parents ds ->
-                 ({Domains.h= ds.h}, Num_parents.of_int_exn num_parents) ))
+            (Vector.map2 d.rules_num_input_proofs d.step_domains
+               ~f:(fun num_input_proofs ds ->
+                 ( {Domains.h= ds.h}
+                 , Num_input_proofs.of_int_exn num_input_proofs ) ))
             (Nat.lte_exn (Vector.length d.step_domains) Max_num_rules.n) }
 
-    module Max_num_parents = Num_parents.Max
+    module Max_num_input_proofs = Num_input_proofs.Max
   end
 
   let in_circuit tag vk = Types_map.set_ephemeral tag {index= `In_circuit vk}
 
   let in_prover tag vk = Types_map.set_ephemeral tag {index= `In_prover vk}
 
-  let create ~name ~max_num_parents ~value_to_field_elements
+  let create ~name ~max_num_input_proofs ~value_to_field_elements
       ~var_to_field_elements ~typ =
     Types_map.add_side_loaded ~name
-      { max_num_parents
+      { max_num_input_proofs
       ; value_to_field_elements
       ; var_to_field_elements
       ; typ
@@ -913,11 +935,11 @@ module Side_loaded = struct
       : Intf.Statement_value
         with type t = t )
     in
-    (* TODO: This should be the actual max number of parents on a per proof basis *)
-    let max_num_parents =
-      (module Verification_key.Max_num_parents
+    (* TODO: This should be the actual max number of input_proofs on a per proof basis *)
+    let max_num_input_proofs =
+      (module Verification_key.Max_num_input_proofs
       : Nat.Intf
-        with type n = Verification_key.Max_num_parents.n )
+        with type n = Verification_key.Max_num_input_proofs.n )
     in
     with_return (fun {return} ->
         List.map ts ~f:(fun (vk, x, p) ->
@@ -930,7 +952,7 @@ module Side_loaded = struct
                       let input_size =
                         Side_loaded_verification_key.(
                           input_size ~of_int:Fn.id ~add:( + ) ~mul:( * )
-                            (Num_parents.to_int vk.num_parents))
+                            (Num_input_proofs.to_int vk.num_input_proofs))
                       in
                       { Domains.x=
                           Pow_2_roots_of_unity (Int.ceil_log2 input_size)
@@ -941,13 +963,13 @@ module Side_loaded = struct
                   (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
                   {constraints= 0} }
             in
-            Verify.Instance.T (max_num_parents, m, vk, x, p) )
+            Verify.Instance.T (max_num_input_proofs, m, vk, x, p) )
         |> Verify.verify_heterogenous )
 end
 
 let compile
-    : type a_var a_value prev_varss prev_valuess prev_num_parentss prev_num_ruless max_num_parents num_rules.
-       ?self:(a_var, a_value, max_num_parents, num_rules) Tag.t
+    : type a_var a_value prev_varss prev_valuess prev_num_input_proofss prev_num_ruless max_num_input_proofs num_rules.
+       ?self:(a_var, a_value, max_num_input_proofs, num_rules) Tag.t
     -> ?cache:Key_cache.Spec.t list
     -> ?disk_keys:(Cache.Step.Key.Verification.t, num_rules) Vector.t
                   * Cache.Wrap.Key.Verification.t
@@ -955,30 +977,32 @@ let compile
     -> (module Statement_value_intf with type t = a_value)
     -> typ:(a_var, a_value) Impls.Step.Typ.t
     -> num_rules:(module Nat.Intf with type n = num_rules)
-    -> max_num_parents:(module Nat.Add.Intf with type n = max_num_parents)
+    -> max_num_input_proofs:(module Nat.Add.Intf
+                               with type n = max_num_input_proofs)
     -> name:string
     -> constraint_constants:Snark_keys_header.Constraint_constants.t
-    -> rules:(   self:(a_var, a_value, max_num_parents, num_rules) Tag.t
+    -> rules:(   self:(a_var, a_value, max_num_input_proofs, num_rules) Tag.t
               -> ( prev_varss
                  , prev_valuess
-                 , prev_num_parentss
+                 , prev_num_input_proofss
                  , prev_num_ruless
                  , a_var
                  , a_value )
                  H4_2.T(Inductive_rule.Singleton).t)
-    -> (a_var, a_value, max_num_parents, num_rules) Tag.t
+    -> (a_var, a_value, max_num_input_proofs, num_rules) Tag.t
        * Cache_handle.t
        * (module Proof_intf
-            with type t = (max_num_parents, max_num_parents) Proof.t
+            with type t = (max_num_input_proofs, max_num_input_proofs) Proof.t
              and type statement = a_value)
        * ( prev_valuess
-         , prev_num_parentss
+         , prev_num_input_proofss
          , prev_num_ruless
          , a_value
-         , (max_num_parents, max_num_parents) Proof.t Async.Deferred.t )
+         , (max_num_input_proofs, max_num_input_proofs) Proof.t
+           Async.Deferred.t )
          H3_2.T(Prover).t =
  fun ?self ?(cache = []) ?disk_keys (module A_var) (module A_value) ~typ
-     ~num_rules ~max_num_parents ~name ~constraint_constants ~rules ->
+     ~num_rules ~max_num_input_proofs ~name ~constraint_constants ~rules ->
   let self =
     match self with
     | None ->
@@ -1002,17 +1026,17 @@ let compile
         r :: conv_irs rs
   in
   let provers, wrap_vk, wrap_disk_key, cache_handle =
-    M.compile ~self ~cache ?disk_keys ~num_rules ~max_num_parents ~name ~typ
-      ~constraint_constants ~rules:(fun ~self -> conv_irs (rules ~self))
+    M.compile ~self ~cache ?disk_keys ~num_rules ~max_num_input_proofs ~name
+      ~typ ~constraint_constants ~rules:(fun ~self -> conv_irs (rules ~self))
   in
-  let (module Max_num_parents) = max_num_parents in
-  let T = Max_num_parents.eq in
+  let (module Max_num_input_proofs) = max_num_input_proofs in
+  let T = Max_num_input_proofs.eq in
   let module P = struct
     type statement = A_value.t
 
-    module Prev_max_num_parents = Max_num_parents
-    module Max_num_parents_vec = Nvector (Max_num_parents)
-    include Proof.Make (Max_num_parents) (Prev_max_num_parents)
+    module Prev_max_num_input_proofs = Max_num_input_proofs
+    module Max_num_input_proofs_vec = Nvector (Max_num_input_proofs)
+    include Proof.Make (Max_num_input_proofs) (Prev_max_num_input_proofs)
 
     let id = wrap_disk_key
 
@@ -1020,7 +1044,7 @@ let compile
 
     let verify ts =
       verify
-        (module Max_num_parents)
+        (module Max_num_input_proofs)
         (module A_value)
         (Lazy.force verification_key)
         ts
@@ -1068,7 +1092,7 @@ let%test_module "test no side-loaded" =
               (module Statement.Constant)
               ~typ:Field.typ
               ~num_rules:(module Nat.N1)
-              ~max_num_parents:(module Nat.N2)
+              ~max_num_input_proofs:(module Nat.N2)
               ~name:"blockchain-snark"
               ~constraint_constants:
                 (* Dummy values *)
@@ -1190,7 +1214,7 @@ let%test_module "test" =
             (module Statement.Constant)
             ~typ:Field.typ
             ~num_rules:(module Nat.N2) (* Should be able to set to 1 *)
-            ~max_num_parents:
+            ~max_num_input_proofs:
               (module Nat.N2) (* TODO: Should be able to set this to 0 *)
             ~name:"preimage"
             ~rules:(fun ~self ->
@@ -1230,7 +1254,7 @@ let%test_module "test" =
 
       let side_loaded =
         Side_loaded.create
-          ~max_num_parents:(module Nat.N2)
+          ~max_num_input_proofs:(module Nat.N2)
           ~name:"side-loaded"
           ~value_to_field_elements:Statement.to_field_elements
           ~var_to_field_elements:Statement.to_field_elements ~typ:Field.typ
@@ -1241,7 +1265,7 @@ let%test_module "test" =
           (module Statement.Constant)
           ~typ:Field.typ
           ~num_rules:(module Nat.N3)
-          ~max_num_parents:(module Nat.N2)
+          ~max_num_input_proofs:(module Nat.N2)
           ~name:"txn-snark"
           ~rules:(fun ~self ->
             [ { prevs= []
@@ -1345,7 +1369,7 @@ let%test_module "test" =
               (module Statement.Constant)
               ~typ:Field.typ
               ~num_rules:(module Nat.N1)
-              ~max_num_parents:(module Nat.N2)
+              ~max_num_input_proofs:(module Nat.N2)
               ~name:"blockchain-snark"
               ~rules:(fun ~self ->
                 [ { prevs= [self; Txn_snark.tag]
