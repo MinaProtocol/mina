@@ -22,7 +22,7 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
   containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items ]))
-  mina_containers = list(filter(lambda c: c['name'] in [ 'coda', 'seed', 'coordinator' ], containers))
+  mina_containers = list(filter(lambda c: c['name'] in [ 'coda', 'seed', 'coordinator', 'archive' ], containers))
 
   def restarted_recently(c):
 
@@ -56,10 +56,13 @@ def pods_with_no_new_logs(v1, namespace, nodes_with_no_new_logs):
 
   count = 0
   for pod in pods.items:
-    name = pod.metadata.name
-    recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=ten_minutes)
-    if len(recent_logs) == 0:
-      count += 1
+    containes = pod.status.container_statuses
+    mina_containers = list(filter(lambda c: c['name'] in [ 'coda', 'seed', 'coordinator' ], containers))
+    if len(mina_containers) != 0:
+      name = pod.metadata.name
+      recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=ten_minutes)
+      if len(recent_logs) == 0:
+        count += 1
 
   total_count = len(pods.items)
 
