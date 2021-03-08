@@ -3,7 +3,6 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
-open Cmd_util
 open Integration_test_lib
 
 let aws_region = "us-west-2"
@@ -78,6 +77,7 @@ module Network_config = struct
 
   type t =
     { coda_automation_location: string
+    ; debug_arg: bool
     ; keypairs: network_keypair list
     ; constants: Test_config.constants
     ; terraform: terraform_config }
@@ -89,7 +89,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let { Test_config.k
@@ -219,6 +219,7 @@ module Network_config = struct
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
+    ; debug_arg= debug
     ; keypairs= block_producer_keypairs
     ; constants
     ; terraform=
@@ -297,37 +298,46 @@ module Network_manager = struct
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
-  let run_cmd t prog args = run_cmd t.testnet_dir prog args
+  let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
+  let run_cmd_exn t prog args = Util.run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
+    let%bind all_namespaces_str =
+      Util.run_cmd_exn "/" "kubectl"
+        ["get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}"]
+    in
+    let all_namespaces = String.split ~on:' ' all_namespaces_str in
     let testnet_dir =
       network_config.coda_automation_location ^/ "terraform/testnets"
       ^/ network_config.terraform.testnet_name
     in
-    (* cleanup old deployment, if it exists; we will need to take good care of this logic when we put this in CI *)
     let%bind () =
-      if%bind File_system.dir_exists testnet_dir then (
-        [%log warn]
-          "Old network deployment found; attempting to refresh and cleanup" ;
-        let%bind _ =
-          Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
+      if
+        List.mem all_namespaces network_config.terraform.testnet_name
+          ~equal:String.equal
+      then
+        let%bind () =
+          if network_config.debug_arg then
+            Util.prompt_continue
+              "Existing namespace of same name detected, pausing startup. \
+               Enter [y/Y] to continue on and remove existing namespace, \
+               start clean, and run the test; press Cntrl-C to quit out: "
+          else
+            Deferred.return
+              ([%log info]
+                 "Existing namespace of same name detected; removing to start \
+                  clean")
         in
-        let%bind _ =
-          let open Process.Output in
-          let%bind state_output =
-            Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
-          in
-          if not (String.is_empty state_output.stdout) then
-            let%map _ =
-              Cmd_util.run_cmd_exn testnet_dir "terraform"
-                ["destroy"; "-auto-approve"]
-            in
-            ()
-          else return ()
+        let%bind () =
+          Util.run_cmd_exn "/" "kubectl"
+            ["delete"; "namespace"; network_config.terraform.testnet_name]
+          >>| Fn.const ()
         in
-        File_system.remove_dir testnet_dir )
+        if%bind File_system.dir_exists testnet_dir then (
+          [%log info] "Old terraform directory found; removing to start clean" ;
+          File_system.remove_dir testnet_dir )
+        else return ()
       else return ()
     in
     [%log info] "Writing network configuration" ;
