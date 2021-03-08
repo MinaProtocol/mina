@@ -24,6 +24,15 @@ groups:
       summary: "{{ $labels.testnet }} cluster nodes have crashed"
       description: "Cluster nodes have crashed on network {{ $labels.testnet }}."
 
+  - alert: WatchdogNoNewLogs
+    expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has pods which have not logged in 10 minutes"
+      description: "There are no new logs in the last 10 minutes for some pods on network {{ $labels.testnet }}."
+
   - alert: SeedListDown
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alerting_timeframe}])) == 0
     labels:
