@@ -110,6 +110,7 @@ spec:
         args: [ 
           "coda-archive",
           "run",
+          "-metrics-port", "{{ .Values.archive.ports.metrics }}",
           "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
