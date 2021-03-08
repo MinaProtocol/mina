@@ -30,6 +30,9 @@ module O = struct
 end
 
 module P1 = struct
+  (** This type is the application of a type [_ x] to the variable ['a],
+      represented as [('a, O.t1 x) t].
+  *)
   type (_, _) t
 
   module W (M : T1) = struct
@@ -73,6 +76,9 @@ module P1 = struct
 end
 
 module P2 = struct
+  (** This type is the application of a type [(_, _) x] to the variables ['a1],
+      ['a2], represented as [('a1, 'a2, (O.t1, O.t2) x) t].
+  *)
   type (_, _, _) t
 
   module W (M : T2) = struct
@@ -117,6 +123,10 @@ module P2 = struct
 end
 
 module P3 = struct
+  (** This type is the application of a type [(_, _, _) x] to the variables
+      ['a1], ['a2], ['a3], represented as
+      [('a1, 'a2, 'a3, (O.t1, O.t2, O.t3) x) t].
+  *)
   type (_, _, _, _) t
 
   module W (M : T3) = struct
@@ -162,6 +172,10 @@ module P3 = struct
 end
 
 module P4 = struct
+  (** This type is the application of a type [(_, _, _, _) x] to the variables
+      ['a1], ['a2], ['a3], ['a4] represented as
+      [('a1, 'a2, 'a3, 'a4, (O.t1, O.t2, O.t3, O.t4) x) t].
+  *)
   type (_, _, _, _, _) t
 
   module W (M : T4) = struct
@@ -208,6 +222,10 @@ module P4 = struct
 end
 
 module P5 = struct
+  (** This type is the application of a type [(_, _, _, _, _) x] to the
+      variables ['a1], ['a2], ['a3], ['a4], ['a5] represented as
+      [('a1, 'a2, 'a3, 'a4, 'a5, (O.t1, O.t2, O.t3, O.t4, O.t5) x) t].
+  *)
   type (_, _, _, _, _, _) t
 
   module W (M : T5) = struct
