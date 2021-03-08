@@ -8,25 +8,25 @@ type t =
 
 external create :
   Marlin_plonk_bindings_pasta_plookup_fp_index.t -> t
-  = "caml_pasta_fp_plonk_5_wires_verifier_index_create"
+  = "caml_pasta_fp_plonk_plookup_verifier_index_create"
 
 external read :
   ?offset:int -> Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
-  = "caml_pasta_fp_plonk_5_wires_verifier_index_read"
+  = "caml_pasta_fp_plonk_plookup_verifier_index_read"
 
 external write :
   ?append:bool -> t -> string -> unit
-  = "caml_pasta_fp_plonk_5_wires_verifier_index_write"
+  = "caml_pasta_fp_plonk_plookup_verifier_index_write"
 
 external shifts :
   log2_size:int -> Marlin_plonk_bindings_pasta_fp.t Plonk_verification_shifts.t
-  = "caml_pasta_fp_plonk_5_wires_verifier_index_shifts"
+  = "caml_pasta_fp_plonk_plookup_verifier_index_shifts"
 
-external dummy : unit -> t = "caml_pasta_fp_plonk_5_wires_verifier_index_dummy"
+external dummy : unit -> t = "caml_pasta_fp_plonk_plookup_verifier_index_dummy"
 
 external deep_copy :
   t -> t
-  = "caml_pasta_fp_plonk_5_wires_verifier_index_deep_copy"
+  = "caml_pasta_fp_plonk_plookup_verifier_index_deep_copy"
 
 let%test "deep_copy" =
   let x = dummy () in

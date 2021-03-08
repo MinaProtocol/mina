@@ -5,7 +5,7 @@ module H_list = Snarky_backendless.H_list
 module Stable = struct
   module V1 = struct
     type 'comm t =
-          'comm Marlin_plonk_bindings_types.Plonk_5_wires_verification_evals.t =
+          'comm Marlin_plonk_bindings_types.Plonk_plookup_verification_evals.t =
       { sigma_comm_0: 'comm
       ; sigma_comm_1: 'comm
       ; sigma_comm_2: 'comm
@@ -29,7 +29,10 @@ module Stable = struct
       ; mul1_comm: 'comm
       ; mul2_comm: 'comm
       ; emul_comm: 'comm
-      ; pack_comm: 'comm }
+      ; pack_comm: 'comm
+      ; lkp_comm: 'comm
+      ; table_comm: 'comm
+      }
     [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
   end
 end]
@@ -58,7 +61,10 @@ let map
     ; mul1_comm
     ; mul2_comm
     ; emul_comm
-    ; pack_comm } ~f =
+    ; pack_comm
+    ; lkp_comm
+    ; table_comm
+    } ~f =
   { sigma_comm_0= f sigma_comm_0
   ; sigma_comm_1= f sigma_comm_1
   ; sigma_comm_2= f sigma_comm_2
@@ -82,7 +88,10 @@ let map
   ; mul1_comm= f mul1_comm
   ; mul2_comm= f mul2_comm
   ; emul_comm= f emul_comm
-  ; pack_comm= f pack_comm }
+  ; pack_comm= f pack_comm
+  ; lkp_comm= f lkp_comm
+  ; table_comm= f table_comm
+  }
 
 let map2 t1 t2 ~f =
   { sigma_comm_0= f t1.sigma_comm_0 t2.sigma_comm_0
@@ -108,10 +117,13 @@ let map2 t1 t2 ~f =
   ; mul1_comm= f t1.mul1_comm t2.mul1_comm
   ; mul2_comm= f t1.mul2_comm t2.mul2_comm
   ; emul_comm= f t1.emul_comm t2.emul_comm
-  ; pack_comm= f t1.pack_comm t2.pack_comm }
+  ; pack_comm= f t1.pack_comm t2.pack_comm
+  ; lkp_comm= f t1.lkp_comm t2.lkp_comm
+  ; table_comm= f t1.table_comm t2.table_comm
+  }
 
 let typ g =
   Snarky_backendless.Typ.of_hlistable
-    [g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g]
+    [g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g; g]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist

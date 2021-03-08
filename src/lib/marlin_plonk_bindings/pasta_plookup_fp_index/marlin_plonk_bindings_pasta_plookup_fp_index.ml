@@ -5,49 +5,49 @@ module Gate_vector = struct
 
   external create :
     unit -> t
-    = "caml_pasta_fp_plonk_5_wires_gate_vector_create"
+    = "caml_pasta_fp_plonk_plookup_gate_vector_create"
 
   external add :
     t -> Marlin_plonk_bindings_pasta_fp.t Plonk_plookup_gate.t -> unit
-    = "caml_pasta_fp_plonk_5_wires_gate_vector_add"
+    = "caml_pasta_fp_plonk_plookup_gate_vector_add"
 
   external get :
     t -> int -> Marlin_plonk_bindings_pasta_fp.t Plonk_plookup_gate.t
-    = "caml_pasta_fp_plonk_5_wires_gate_vector_get"
+    = "caml_pasta_fp_plonk_plookup_gate_vector_get"
 
   external wrap :
     t -> Plonk_plookup_gate.Wire.t -> Plonk_plookup_gate.Wire.t -> unit
-    = "caml_pasta_fp_plonk_5_wires_gate_vector_wrap"
+    = "caml_pasta_fp_plonk_plookup_gate_vector_wrap"
 end
 
 type t
 
 external create :
   Gate_vector.t -> int -> Marlin_plonk_bindings_pasta_fp_urs.t -> t
-  = "caml_pasta_fp_plonk_5_wires_index_create"
+  = "caml_pasta_fp_plonk_plookup_index_create"
 
-external max_degree : t -> int = "caml_pasta_fp_plonk_5_wires_index_max_degree"
+external max_degree : t -> int = "caml_pasta_fp_plonk_plookup_index_max_degree"
 
 external public_inputs :
   t -> int
-  = "caml_pasta_fp_plonk_5_wires_index_public_inputs"
+  = "caml_pasta_fp_plonk_plookup_index_public_inputs"
 
 external domain_d1_size :
   t -> int
-  = "caml_pasta_fp_plonk_5_wires_index_domain_d1_size"
+  = "caml_pasta_fp_plonk_plookup_index_domain_d1_size"
 
 external domain_d4_size :
   t -> int
-  = "caml_pasta_fp_plonk_5_wires_index_domain_d4_size"
+  = "caml_pasta_fp_plonk_plookup_index_domain_d4_size"
 
 external domain_d8_size :
   t -> int
-  = "caml_pasta_fp_plonk_5_wires_index_domain_d8_size"
+  = "caml_pasta_fp_plonk_plookup_index_domain_d8_size"
 
 external read :
   ?offset:int -> Marlin_plonk_bindings_pasta_fp_urs.t -> string -> t
-  = "caml_pasta_fp_plonk_5_wires_index_read"
+  = "caml_pasta_fp_plonk_plookup_index_read"
 
 external write :
   ?append:bool -> t -> string -> unit
-  = "caml_pasta_fp_plonk_5_wires_index_write"
+  = "caml_pasta_fp_plonk_plookup_index_write"

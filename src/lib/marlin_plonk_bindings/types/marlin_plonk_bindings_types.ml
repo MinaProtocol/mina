@@ -75,7 +75,21 @@ module Plonk_5_wires_verification_evals = struct
     ; mul1_comm: 'poly_comm
     ; mul2_comm: 'poly_comm
     ; emul_comm: 'poly_comm
-    ; pack_comm: 'poly_comm }
+    ; pack_comm: 'poly_comm}
+end
+
+module Plonk_5_wires_verification_shifts = struct
+  type 'field t = {s0: 'field; s1: 'field; s2: 'field; s3: 'field; s4: 'field}
+end
+
+module Plonk_5_wires_verifier_index = struct
+  type ('field, 'urs, 'poly_comm) t =
+    { domain: 'field Plonk_domain.t
+    ; max_poly_size: int
+    ; max_quot_size: int
+    ; urs: 'urs
+    ; evals: 'poly_comm Plonk_5_wires_verification_evals.t
+    ; shifts: 'field Plonk_5_wires_verification_shifts.t }
 end
 
 module Plonk_plookup_verification_evals = struct
@@ -103,21 +117,10 @@ module Plonk_plookup_verification_evals = struct
     ; mul1_comm: 'poly_comm
     ; mul2_comm: 'poly_comm
     ; emul_comm: 'poly_comm
-    ; pack_comm: 'poly_comm }
-end
-
-module Plonk_5_wires_verification_shifts = struct
-  type 'field t = {s0: 'field; s1: 'field; s2: 'field; s3: 'field; s4: 'field}
-end
-
-module Plonk_5_wires_verifier_index = struct
-  type ('field, 'urs, 'poly_comm) t =
-    { domain: 'field Plonk_domain.t
-    ; max_poly_size: int
-    ; max_quot_size: int
-    ; urs: 'urs
-    ; evals: 'poly_comm Plonk_5_wires_verification_evals.t
-    ; shifts: 'field Plonk_5_wires_verification_shifts.t }
+    ; pack_comm: 'poly_comm
+    ; lkp_comm: 'poly_comm
+    ; table_comm: 'poly_comm
+    }
 end
 
 module Plonk_plookup_verifier_index = struct
@@ -126,7 +129,7 @@ module Plonk_plookup_verifier_index = struct
     ; max_poly_size: int
     ; max_quot_size: int
     ; urs: 'urs
-    ; evals: 'poly_comm Plonk_5_wires_verification_evals.t
+    ; evals: 'poly_comm Plonk_plookup_verification_evals.t
     ; shifts: 'field Plonk_5_wires_verification_shifts.t }
 end
 
@@ -203,6 +206,7 @@ module Plonk_plookup_gate = struct
       | Vbmul2
       | Endomul
       | Pack
+      | Lookup
   end
 
   module Col = struct
@@ -299,7 +303,13 @@ module Plonk_plookup_proof = struct
       ; z: 'field array
       ; t: 'field array
       ; f: 'field array
-      ; s: 'field array * 'field array * 'field array * 'field array }
+      ; s: 'field array * 'field array * 'field array * 'field array
+      ; lp: 'field array
+      ; lw: 'field array
+      ; h1: 'field array
+      ; h2: 'field array
+      ; tb: 'field array
+      }
   end
 
   module Opening_proof = Plonk_proof.Opening_proof
@@ -308,7 +318,12 @@ module Plonk_plookup_proof = struct
     type 'poly_comm t =
       { w_comm: 'poly_comm * 'poly_comm * 'poly_comm * 'poly_comm * 'poly_comm
       ; z_comm: 'poly_comm
-      ; t_comm: 'poly_comm }
+      ; t_comm: 'poly_comm
+      ; lp_comm: 'poly_comm
+      ; lw_comm: 'poly_comm
+      ; h1_comm: 'poly_comm
+      ; h2_comm: 'poly_comm
+      }
   end
 
   type ('field, 'g, 'poly_comm) t =
@@ -319,11 +334,35 @@ module Plonk_plookup_proof = struct
     ; prev_challenges: ('field array * 'poly_comm) array }
 end
 
-module Oracles = struct
+module Oracles_plonk = struct
   module Random_oracles = struct
     type 'field t =
       { beta: 'field
       ; gamma: 'field
+      ; alpha_chal: 'field Scalar_challenge.t
+      ; alpha: 'field
+      ; zeta: 'field
+      ; v: 'field
+      ; u: 'field
+      ; zeta_chal: 'field Scalar_challenge.t
+      ; v_chal: 'field Scalar_challenge.t
+      ; u_chal: 'field Scalar_challenge.t }
+  end
+
+  type 'field t =
+    { o: 'field Random_oracles.t
+    ; p_eval: 'field * 'field
+    ; opening_prechallenges: 'field array
+    ; digest_before_evaluations: 'field }
+end
+
+module Oracles_plookup = struct
+  module Random_oracles = struct
+    type 'field t =
+      { beta1: 'field
+      ; gamma1: 'field
+      ; beta2: 'field
+      ; gamma2: 'field
       ; alpha_chal: 'field Scalar_challenge.t
       ; alpha: 'field
       ; zeta: 'field

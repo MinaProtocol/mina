@@ -9,8 +9,8 @@
    (source_tree ../../marlin))
  (action
   (progn
-    (run cargo build --release)
-   (run cp target/release/libmarlin_plonk_stubs.a .))))
+    (run cargo build)
+   (run cp target/debug/libmarlin_plonk_stubs.a .))))
 
 (library
  (public_name marlin_plonk_bindings.stubs)

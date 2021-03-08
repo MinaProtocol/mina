@@ -16,13 +16,19 @@ module Evals = struct
         ; sigma1: 'a
         ; sigma2: 'a
         ; sigma3: 'a
-        ; sigma4: 'a }
+        ; sigma4: 'a
+        ; lp: 'a
+        ; lw: 'a
+        ; h1: 'a
+        ; h2: 'a
+        ; tb: 'a
+        }
       [@@deriving fields, sexp, compare, yojson, hash, eq]
     end
   end]
 
   let map (type a b)
-      ({l; r; o; q; p; z; t; f= f'; sigma1; sigma2; sigma3; sigma4} : a t)
+      ({l; r; o; q; p; z; t; f= f'; sigma1; sigma2; sigma3; sigma4; lp; lw; h1; h2; tb;} : a t)
       ~(f : a -> b) : b t =
     { l= f l
     ; r= f r
@@ -35,7 +41,13 @@ module Evals = struct
     ; sigma1= f sigma1
     ; sigma2= f sigma2
     ; sigma3= f sigma3
-    ; sigma4= f sigma4 }
+    ; sigma4= f sigma4
+    ; lp= f lp
+    ; lw= f lw
+    ; h1= f h1
+    ; h2= f h2
+    ; tb= f tb
+    }
 
   let map2 (type a b c) (t1 : a t) (t2 : b t) ~(f : a -> b -> c) : c t =
     { l= f t1.l t2.l
@@ -49,16 +61,22 @@ module Evals = struct
     ; sigma1= f t1.sigma1 t2.sigma1
     ; sigma2= f t1.sigma2 t2.sigma2
     ; sigma3= f t1.sigma3 t2.sigma3
-    ; sigma4= f t1.sigma4 t2.sigma4 }
+    ; sigma4= f t1.sigma4 t2.sigma4
+    ; lp= f t1.lp t2.lp
+    ; lw= f t1.lw t2.lw
+    ; h1= f t1.h1 t2.h1
+    ; h2= f t1.h2 t2.h2
+    ; tb= f t1.tb t2.tb
+    }
 
-  let to_vectors {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4} =
-    (Vector.[l; r; o; q; p; z; f; sigma1; sigma2; sigma3; sigma4], Vector.[t])
+  let to_vectors {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4; lp; lw; h1; h2; tb;} =
+    (Vector.[l; r; o; q; p; z; f; sigma1; sigma2; sigma3; sigma4; lp; lw; h1; h2; tb;], Vector.[t])
 
   let of_vectors
-      ( ([l; r; o; q; p; z; f; sigma1; sigma2; sigma3; sigma4] :
+      ( ([l; r; o; q; p; z; f; sigma1; sigma2; sigma3; sigma4; lp; lw; h1; h2; tb;] :
           ('a, _) Vector.t)
       , Vector.[t] ) : 'a t =
-    {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4}
+    {l; r; o; q; p; z; t; f; sigma1; sigma2; sigma3; sigma4; lp; lw; h1; h2; tb;}
 
   let typ (lengths : int t) (g : ('a, 'b, 'f) Snarky_backendless.Typ.t)
       ~default : ('a array t, 'b array t, 'f) Snarky_backendless.Typ.t =
@@ -120,7 +138,12 @@ module Messages = struct
         ; q_comm: 'g Without_degree_bound.Stable.V1.t
         ; p_comm: 'g Without_degree_bound.Stable.V1.t
         ; z_comm: 'g Without_degree_bound.Stable.V1.t
-        ; t_comm: 'g_opt With_degree_bound.Stable.V1.t }
+        ; t_comm: 'g_opt With_degree_bound.Stable.V1.t
+        ; lp_comm: 'g Without_degree_bound.Stable.V1.t
+        ; lw_comm: 'g Without_degree_bound.Stable.V1.t
+        ; h1_comm: 'g Without_degree_bound.Stable.V1.t
+        ; h2_comm: 'g Without_degree_bound.Stable.V1.t
+        }
       [@@deriving sexp, compare, yojson, fields, hash, eq, hlist]
     end
   end]
@@ -128,7 +151,7 @@ module Messages = struct
   let typ (type n) g ~dummy ~(commitment_lengths : (int, n) Vector.t Evals.t)
       ~bool =
     let open Snarky_backendless.Typ in
-    let {Evals.l; r; o; q; p; z; t; _} = commitment_lengths in
+    let {Evals.l; r; o; q; p; z; t; lp; lw; h1; h2; _} = commitment_lengths in
     let array ~length elt =
       Dlog_plonk_types.padded_array_typ ~dummy ~length elt
     in
@@ -139,7 +162,7 @@ module Messages = struct
         ~dummy_group_element:dummy ~bool
     in
     of_hlistable
-      [wo l; wo r; wo o; wo q; wo p; wo z; w t]
+      [wo l; wo r; wo o; wo q; wo p; wo z; w t; wo lp; wo lw; wo h1; wo h2]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end

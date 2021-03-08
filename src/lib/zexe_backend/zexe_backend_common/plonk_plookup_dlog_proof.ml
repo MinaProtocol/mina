@@ -227,7 +227,13 @@ module Make (Inputs : Inputs_intf) = struct
              ; sigma1
              ; sigma2
              ; sigma3
-             ; sigma4 } )
+             ; sigma4
+             ; lp= e.lp
+             ; lw= e.lw
+             ; h1= e.h1
+             ; h2= e.h2
+             ; tb= e.tb
+             })
     in
     let wo x =
       match Poly_comm.of_backend_without_degree_bound x with
@@ -252,7 +258,12 @@ module Make (Inputs : Inputs_intf) = struct
         ; q_comm= wo q_comm
         ; p_comm= wo p_comm
         ; z_comm= wo t.messages.z_comm
-        ; t_comm= w t.messages.t_comm }
+        ; t_comm= w t.messages.t_comm
+        ; lp_comm= wo t.messages.lp_comm
+        ; lw_comm= wo t.messages.lw_comm
+        ; h1_comm= wo t.messages.h1_comm
+        ; h2_comm= wo t.messages.h2_comm
+        }
       ~openings:{proof; evals}
 
   let eval_to_backend
@@ -267,8 +278,14 @@ module Make (Inputs : Inputs_intf) = struct
       ; sigma1= s1
       ; sigma2= s2
       ; sigma3= s3
-      ; sigma4= s4 } : Evaluations_backend.t =
-    {w= (l, r, o, q, p); z; t; f; s= (s1, s2, s3, s4)}
+      ; sigma4= s4
+      ; lp
+      ; lw
+      ; h1
+      ; h2
+      ; tb
+      } : Evaluations_backend.t =
+    {w= (l, r, o, q, p); z; t; f; s= (s1, s2, s3, s4); lp; lw; h1; h2; tb}
 
   let vec_to_array (type t elt)
       (module V : Snarky_intf.Vector.S with type t = t and type elt = elt)
@@ -276,7 +293,7 @@ module Make (Inputs : Inputs_intf) = struct
     Array.init (V.length v) ~f:(V.get v)
 
   let to_backend' (chal_polys : Challenge_polynomial.t list) primary_input
-      ({ messages= {l_comm; r_comm; o_comm; q_comm; p_comm; z_comm; t_comm}
+      ({ messages= {l_comm; r_comm; o_comm; q_comm; p_comm; z_comm; t_comm; lp_comm; lw_comm; h1_comm; h2_comm}
        ; openings= {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1} } :
         t) : Backend.t =
     let g x = G.Affine.to_backend (Or_infinity.Finite x) in
@@ -287,7 +304,12 @@ module Make (Inputs : Inputs_intf) = struct
         { w_comm=
             (pcwo l_comm, pcwo r_comm, pcwo o_comm, pcwo q_comm, pcwo p_comm)
         ; z_comm= pcwo z_comm
-        ; t_comm= pcw t_comm }
+        ; t_comm= pcw t_comm
+        ; lp_comm= pcwo lp_comm
+        ; lw_comm= pcwo lw_comm
+        ; h1_comm= pcwo h1_comm
+        ; h2_comm= pcwo h2_comm
+        }
     ; proof= {lr; delta= g delta; z1= z_1; z2= z_2; sg= g sg}
     ; evals= (eval_to_backend evals0, eval_to_backend evals1)
     ; public= primary_input

@@ -66,7 +66,7 @@ module Rounds = Rounds.Wrap
 module Keypair = Dlog_plonk_plookup_based_keypair.Make (struct
   open Marlin_plonk_bindings
 
-  let name = "pallas_5_wires"
+  let name = "pallas_plookup"
 
   module Rounds = Rounds
   module Urs = Pasta_fq_urs
@@ -82,7 +82,7 @@ end)
 module Proof = Plonk_plookup_dlog_proof.Make (struct
   open Marlin_plonk_bindings
 
-  let id = "pasta_pallas_5_wires"
+  let id = "pasta_pallas_plookup"
 
   module Scalar_field = Field
   module Base_field = Fp
@@ -175,7 +175,7 @@ module Proving_key = struct
   let of_string _ = failwith "TODO"
 end
 
-module Oracles = Plonk_dlog_oracles.Make (struct
+module Oracles = Plookup_dlog_oracles.Make (struct
   module Verifier_index = Verification_key
   module Field = Field
   module Proof = Proof

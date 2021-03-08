@@ -32,7 +32,7 @@ let%test_module "backend test" =
           assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
 
           (***** EC ARITHMETIC *****)
-
+(*
           let module Ecc = Plonk.Ecc.Constraints (Impl) in
           let y = sqrt (x*x*x + (Impl.Field.of_int 5)) in 
 
@@ -53,7 +53,7 @@ let%test_module "backend test" =
           assert_ (Snarky.Constraint.equal (y3*y3) (x3*x3*x3 + (Impl.Field.of_int 5)));
           let x4, y4 = Ecc.endoscale (x3, y3) bits in
           assert_ (Snarky.Constraint.equal (y4*y4) (x4*x4*x4 + (Impl.Field.of_int 5)));
-
+*)
         done;
 
         ()
