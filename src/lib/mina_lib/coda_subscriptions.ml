@@ -156,7 +156,14 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
              match (gcloud_keyfile, network, bucket) with
              | Some _, Some network, Some bucket ->
                  let hash_string = State_hash.to_string hash in
-                 let name = sprintf "%s-%s.json" network hash_string in
+                 let height =
+                   Mina_transition.External_transition.Validated
+                   .blockchain_length new_block
+                   |> Mina_numbers.Length.to_string
+                 in
+                 let name =
+                   sprintf "%s-%s-%s.json" network height hash_string
+                 in
                  (* TODO: Use a pipe to queue this if these are building up *)
                  don't_wait_for
                    ( Mina_metrics.(
