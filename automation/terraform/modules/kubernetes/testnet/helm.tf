@@ -26,7 +26,7 @@ resource "helm_release" "seeds" {
   name       = "${var.testnet_name}-seeds"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version    = "1.0.1"
+  version    = "1.0.3"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
