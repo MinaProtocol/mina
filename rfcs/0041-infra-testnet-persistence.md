@@ -344,7 +344,7 @@ What other designs have been considered and what is the rationale for not choosi
 
 ### Migration to other Cloud Provider K8s solutions
 
-
+Considering the current project's time boundedness, development costs to migrate existing infrastructure setups in addition to potential increases in operational costs and the cognitive overhead of familiarizing developers with new cloud provider tools and user-interfaces, the benefits of migrating to another cloud provider k8s solution (e.g. AWS EKS or Azure's AKS), which generally consist of both potential cost + performance savings in the form of organization credits and/or more economical and efficient resource offerings, the benefits don't appear to outweigh the costs. Though considering the relatively portable nature of most infrastructure components, further investigation and analysis is suggested and planned as the project progresses.
 
 ### Stateful Sets
 
@@ -360,10 +360,11 @@ The impact of not implementing a persistent-storage solution such as what's prop
 
 [prior-art]: #prior-art
 
-...
+* [Refactor](https://github.com/MinaProtocol/coda-automation/issues/352) Block Producer Helm Chart should use StatefulSet
+* Persistence investigations for [testing various chain scenarios](https://github.com/MinaProtocol/coda-automation/issues/391)
 
 ## Unresolved questions
 
 [unresolved-questions]: #unresolved-questions
 
-...
+TBD
