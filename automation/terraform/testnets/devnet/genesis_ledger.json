@@ -1,6 +1,6 @@
 {
   "genesis": {
-    "genesis_state_timestamp": "2021-03-09T04:57:20Z"
+    "genesis_state_timestamp": "2021-03-09T05:09:07Z"
   },
   "ledger": {
     "name": "devnet",
@@ -7183,10 +7183,6 @@
       },
       {
         "pk": "B62qkj3CCj2V3pBPPufCuWSkoP2RwjAZkgPZfLKFUae3hPoBEhRtmyo",
-        "balance": "66000.000000000"
-      },
-      {
-        "pk": "B62qr4i6YtAzvzdAag5CRemqKfBjWPE81goKoJaHnoQ5eX2eTCBFbjj",
         "balance": "66000.000000000"
       },
       {
