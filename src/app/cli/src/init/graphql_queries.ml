@@ -314,8 +314,8 @@ query get_peers {
 module Add_peers =
 [%graphql
 {|
-mutation ($peers: [NetworkPeer!]!) {
-  addPeers(peers: $peers) {
+mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
+  addPeers(peers: $peers, seed: $seed) {
     host
     libp2pPort
     peerId
@@ -339,6 +339,18 @@ module Archive_extensional_block =
 mutation ($block: ExtensionalBlock!) {
   archiveExtensionalBlock(block: $block) {
       applied
+  }
+}
+|}]
+
+module Send_rosetta_transaction =
+[%graphql
+{|
+mutation ($transaction: RosettaTransaction!) {
+  sendRosettaTransaction(input: $transaction) {
+    userCommand {
+      id
+    }
   }
 }
 |}]

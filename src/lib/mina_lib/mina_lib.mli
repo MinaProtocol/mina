@@ -35,7 +35,8 @@ val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 val replace_block_production_keypairs :
   t -> Keypair.And_compressed_pk.Set.t -> unit
 
-val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
+val next_producer_timing :
+  t -> Daemon_rpcs.Types.Status.Next_producer_timing.t option
 
 val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
@@ -86,6 +87,13 @@ val get_current_nonce :
 val add_transactions :
      t
   -> User_command_input.t list
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
+val add_full_transactions :
+     t
+  -> User_command.t list
   -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t

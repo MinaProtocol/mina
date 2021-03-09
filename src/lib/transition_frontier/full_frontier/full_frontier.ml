@@ -64,7 +64,8 @@ type t =
       Protocol_states_for_root_scan_state.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
-  ; precomputed_values: Precomputed_values.t }
+  ; precomputed_values: Precomputed_values.t
+  ; time_controller: Block_time.Controller.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -103,7 +104,7 @@ let close ~loc t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
-    ~precomputed_values =
+    ~precomputed_values ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
   let root_hash =
@@ -145,7 +146,8 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ; consensus_local_state
     ; max_length
     ; precomputed_values
-    ; protocol_states_for_root_scan_state }
+    ; protocol_states_for_root_scan_state
+    ; time_controller }
   in
   t
 
@@ -537,30 +539,116 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
         ~enable_epoch_ledger_sync ;
       (old_root_hash, Some new_root_hash)
 
+module Metrics = struct
+  (* The max length of a path disjoint from the best tip path. O(n) *)
+  let longest_fork t =
+    let children : Breadcrumb.t -> Breadcrumb.t list =
+      let tbl = State_hash.Table.create () in
+      Hashtbl.iter t.table ~f:(fun node ->
+          let b = node.breadcrumb in
+          Hashtbl.add_multi tbl ~key:(Breadcrumb.parent_hash b) ~data:b ) ;
+      fun b -> Hashtbl.find_multi tbl (Breadcrumb.state_hash b)
+    in
+    let on_best_tip_path : Breadcrumb.t -> bool =
+      let s = State_hash.Hash_set.create () in
+      List.iter (best_tip_path t) ~f:(fun b ->
+          Hash_set.add s (Breadcrumb.state_hash b) ) ;
+      fun b -> Hash_set.mem s (Breadcrumb.state_hash b)
+    in
+    let rec longest_fork subtree_root =
+      (* TODO: Make tail recursive *)
+      List.map (children subtree_root) ~f:(fun child ->
+          if on_best_tip_path child then longest_fork child
+          else 1 + longest_fork child )
+      |> List.max_elt ~compare:Int.compare
+      |> Option.value ~default:0
+    in
+    longest_fork (find_exn t t.root)
+
+  let parent t b = find t (Breadcrumb.parent_hash b)
+
+  let empty_blocks_at_best_tip t =
+    let rec go acc b =
+      if not (List.is_empty (Breadcrumb.commands b)) then acc
+      else match parent t b with None -> acc | Some b -> go (acc + 1) b
+    in
+    go 0 (best_tip t)
+
+  let slot_time t b =
+    Breadcrumb.consensus_state b
+    |> Consensus.Data.Consensus_state.consensus_time
+    |> Consensus.Data.Consensus_time.to_time
+         ~constants:t.precomputed_values.consensus_constants
+
+  let slot_time_to_offset_time_span s =
+    let r =
+      Block_time.to_span_since_epoch s
+      |> Block_time.Span.to_ms
+      |> (fun x -> Int64.(x / of_int 1000))
+      |> Int64.to_float
+    in
+    r -. Mina_metrics.time_offset_sec
+
+  let has_coinbase b =
+    let d1, d2 =
+      ( Breadcrumb.validated_transition b
+      |> External_transition.Validated.staged_ledger_diff )
+        .diff
+    in
+    match (d1.coinbase, d2) with
+    | Zero, None | Zero, Some {coinbase= Zero; _} ->
+        false
+    | Zero, Some {coinbase= One _; _} | One _, _ | Two _, _ ->
+        true
+
+  let intprop f b = Unsigned.UInt32.to_int (f (Breadcrumb.consensus_state b))
+
+  (* Rate of slots filled on the main chain in the k slots preceeding the best tip. *)
+  let slot_fill_rate t =
+    let open Consensus.Data.Consensus_state in
+    let best_tip = best_tip t in
+    let rec find_ancestor ~f b =
+      if f b then `Found b
+      else
+        match find t (Breadcrumb.parent_hash b) with
+        | None ->
+            `Ended_search_at b
+        | Some parent ->
+            find_ancestor ~f parent
+    in
+    let start =
+      let open Consensus.Data.Consensus_state in
+      let slot = intprop curr_global_slot in
+      let best_tip_slot = slot best_tip in
+      let k =
+        Unsigned.UInt32.to_int t.precomputed_values.consensus_constants.k
+      in
+      match
+        find_ancestor best_tip ~f:(fun b -> best_tip_slot - slot b >= k)
+      with
+      | `Found b | `Ended_search_at b ->
+          b
+    in
+    let change f = intprop f best_tip - intprop f start in
+    let length_change = change blockchain_length in
+    let slot_change = change curr_global_slot in
+    if slot_change = 0 then 1.
+    else Float.of_int length_change /. Float.of_int slot_change
+end
+
 let update_metrics_with_diff (type mutant) t
     (diff : (Diff.full, mutant) Diff.t) : unit =
+  let open Metrics in
   match diff with
-  | New_node _ ->
-      Mina_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
-      Mina_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs)
+  | New_node (Full b) ->
+      Mina_metrics.(
+        Gauge.inc_one Transition_frontier.active_breadcrumbs ;
+        Counter.inc_one Transition_frontier.total_breadcrumbs ;
+        Gauge.set Transition_frontier.accepted_block_slot_time_sec
+          (slot_time t b |> slot_time_to_offset_time_span))
   | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
       let new_root_breadcrumb = root t in
-      let best_tip_breadcrumb = best_tip t in
-      let consensus_state = Breadcrumb.consensus_state new_root_breadcrumb in
-      let blockchain_length =
-        Int.to_float
-          ( Consensus.Data.Consensus_state.blockchain_length consensus_state
-          |> Mina_numbers.Length.to_int )
-      in
-      let global_slot =
-        Consensus.Data.Consensus_state.consensus_time consensus_state
-        |> Consensus.Data.Consensus_time.to_uint32 |> Unsigned.UInt32.to_int
-        |> Float.of_int
-      in
       Mina_metrics.(
-        let best_tip_user_txns =
-          Int.to_float (List.length (Breadcrumb.commands best_tip_breadcrumb))
-        in
         let num_breadcrumbs_removed =
           Int.to_float (1 + List.length garbage_breadcrumbs)
         in
@@ -571,12 +659,9 @@ let update_metrics_with_diff (type mutant) t
           num_breadcrumbs_removed ;
         Gauge.set Transition_frontier.recently_finalized_staged_txns
           num_finalized_staged_txns ;
-        Gauge.set Transition_frontier.best_tip_user_txns best_tip_user_txns ;
         Counter.inc Transition_frontier.finalized_staged_txns
           num_finalized_staged_txns ;
         Counter.inc_one Transition_frontier.root_transitions ;
-        Gauge.set Transition_frontier.slot_fill_rate
-          (blockchain_length /. global_slot) ;
         Transition_frontier.TPS_30min.update num_finalized_staged_txns)
       (* TODO: optimize and add these metrics back in (#2850) *)
       (*
@@ -597,8 +682,35 @@ let update_metrics_with_diff (type mutant) t
         Gauge.set Transition_frontier.root_snarked_ledger_total_currency
           root_snarked_ledger_total_currency ;
         *)
-  | _ ->
-      ()
+  | Best_tip_changed _old_best_tip ->
+      let best_tip = best_tip t in
+      let open Consensus.Data.Consensus_state in
+      let slot_time = slot_time t best_tip in
+      let is_recent_block =
+        let now = Block_time.now t.time_controller in
+        let two_slots =
+          let one_slot =
+            t.precomputed_values.consensus_constants.block_window_duration_ms
+          in
+          Block_time.Span.(one_slot + one_slot)
+        in
+        Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
+      in
+      Mina_metrics.(
+        Gauge.set Transition_frontier.best_tip_user_txns
+          (Int.to_float (List.length (Breadcrumb.commands best_tip))) ;
+        if is_recent_block then
+          Gauge.set Transition_frontier.best_tip_coinbase
+            (if has_coinbase best_tip then 1. else 0.) ;
+        Gauge.set Transition_frontier.slot_fill_rate (slot_fill_rate t) ;
+        Gauge.set Transition_frontier.min_window_density
+          (Int.to_float (intprop min_window_density best_tip)) ;
+        Gauge.set Transition_frontier.longest_fork
+          (Int.to_float (longest_fork t)) ;
+        Gauge.set Transition_frontier.best_tip_slot_time_sec
+          (slot_time_to_offset_time_span slot_time) ;
+        Gauge.set Transition_frontier.empty_blocks_at_best_tip
+          (Int.to_float (empty_blocks_at_best_tip t)))
 
 let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   let open Root_identifier.Stable.Latest in
@@ -647,10 +759,7 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
                  required_local_state_sync or frontier_root_transition."
                 ~metadata:
                   [ ( "sync_jobs"
-                    , `List
-                        ( Non_empty_list.to_list jobs
-                        |> List.map
-                             ~f:Consensus.Hooks.local_state_sync_to_yojson ) )
+                    , Consensus.Hooks.local_state_sync_to_yojson jobs )
                   ; ( "local_state"
                     , Consensus.Data.Local_state.to_yojson
                         t.consensus_local_state )

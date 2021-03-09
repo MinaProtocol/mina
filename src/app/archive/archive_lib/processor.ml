@@ -966,7 +966,7 @@ module Block_and_signed_command = struct
                created_token,
                fee_payer_balance,
                source_balance,
-               receiver_balance,
+               receiver_balance
                FROM blocks_user_commands
                WHERE block_id = $1
                AND user_command_id = $2

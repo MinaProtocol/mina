@@ -92,6 +92,8 @@ const (
 	findPeer
 	listPeers
 	setGatingConfig
+	setNodeStatus
+	getPeerNodeStatus
 )
 
 const validationTimeout = 5 * time.Minute
@@ -1209,6 +1211,75 @@ func (ap *findPeerMsg) run(app *app) (interface{}, error) {
 	return *maybePeer, nil
 }
 
+type setNodeStatusMsg struct {
+	Data string `json:"data"`
+}
+
+func (m *setNodeStatusMsg) run(app *app) (interface{}, error) {
+	app.P2p.NodeStatus = m.Data
+	return "setNodeStatus success", nil
+}
+
+type getPeerNodeStatusMsg struct {
+	PeerMultiaddr string `json:"peer_multiaddr"`
+}
+
+func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
+	ctx, _ := context.WithTimeout(app.Ctx, 400*time.Millisecond)
+
+	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
+	if err != nil {
+		return nil, err
+	}
+
+	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
+
+	// Open a "get node status" stream on m.PeerID,
+	// block until you can read the response, return that.
+	s, err := app.P2p.Host.NewStream(ctx, addrInfo.ID, codanet.NodeStatusProtocolID)
+	if err != nil {
+		app.P2p.Logger.Error("failed to open stream: ", err)
+		return nil, err
+	}
+
+	defer func() {
+		_ = s.Close()
+	}()
+
+	errCh := make(chan error)
+	responseCh := make(chan string)
+
+	go func() {
+		// 1 megabyte
+		size := 1048576
+
+		data := make([]byte, size)
+		n, err := s.Read(data)
+		if err != nil && err != io.EOF {
+			app.P2p.Logger.Errorf("failed to decode node status data: err=%s", err)
+			errCh <- err
+			return
+		}
+
+		if n == size && err == nil {
+			errCh <- fmt.Errorf("node status data was greater than %d bytes", size)
+			return
+		}
+
+		responseCh <- string(data[:n])
+	}()
+
+	select {
+	case <-ctx.Done():
+		s.Reset()
+		return nil, errors.New("timed out requesting node status data from peer")
+	case err := <-errCh:
+		return nil, err
+	case response := <-responseCh:
+		return response, nil
+	}
+}
+
 type listPeersMsg struct {
 }
 
@@ -1317,25 +1388,27 @@ func (gc *setGatingConfigMsg) run(app *app) (interface{}, error) {
 }
 
 var msgHandlers = map[methodIdx]func() action{
-	configure:           func() action { return &configureMsg{} },
-	listen:              func() action { return &listenMsg{} },
-	publish:             func() action { return &publishMsg{} },
-	subscribe:           func() action { return &subscribeMsg{} },
-	unsubscribe:         func() action { return &unsubscribeMsg{} },
-	validationComplete:  func() action { return &validationCompleteMsg{} },
-	generateKeypair:     func() action { return &generateKeypairMsg{} },
-	openStream:          func() action { return &openStreamMsg{} },
-	closeStream:         func() action { return &closeStreamMsg{} },
-	resetStream:         func() action { return &resetStreamMsg{} },
-	sendStreamMsg:       func() action { return &sendStreamMsgMsg{} },
-	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
-	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
-	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
-	addPeer:             func() action { return &addPeerMsg{} },
-	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
-	findPeer:            func() action { return &findPeerMsg{} },
-	listPeers:           func() action { return &listPeersMsg{} },
-	setGatingConfig:     func() action { return &setGatingConfigMsg{} },
+	configure:            func() action { return &configureMsg{} },
+	listen:               func() action { return &listenMsg{} },
+	publish:              func() action { return &publishMsg{} },
+	subscribe:            func() action { return &subscribeMsg{} },
+	unsubscribe:          func() action { return &unsubscribeMsg{} },
+	validationComplete:   func() action { return &validationCompleteMsg{} },
+	generateKeypair:      func() action { return &generateKeypairMsg{} },
+	openStream:           func() action { return &openStreamMsg{} },
+	closeStream:          func() action { return &closeStreamMsg{} },
+	resetStream:          func() action { return &resetStreamMsg{} },
+	sendStreamMsg:        func() action { return &sendStreamMsgMsg{} },
+	removeStreamHandler:  func() action { return &removeStreamHandlerMsg{} },
+	addStreamHandler:     func() action { return &addStreamHandlerMsg{} },
+	listeningAddrs:       func() action { return &listeningAddrsMsg{} },
+	addPeer:              func() action { return &addPeerMsg{} },
+	beginAdvertising:     func() action { return &beginAdvertisingMsg{} },
+	findPeer:             func() action { return &findPeerMsg{} },
+	listPeers:            func() action { return &listPeersMsg{} },
+	setGatingConfig:      func() action { return &setGatingConfigMsg{} },
+	setNodeStatus:        func() action { return &setNodeStatusMsg{} },
+	getPeerNodeStatus:    func() action { return &getPeerNodeStatusMsg{} },
 }
 
 type errorResult struct {

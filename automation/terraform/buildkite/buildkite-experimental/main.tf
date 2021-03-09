@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 0.12.6"
+  required_version = ">= 0.13.3"
   backend "s3" {
     key     = "terraform-bk-experimental.tfstate"
     encrypt = true

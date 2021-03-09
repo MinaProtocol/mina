@@ -2,8 +2,8 @@
 
 (executable
  (package cli)
- (name coda)
- (public_name coda)
+ (name mina)
+ (public_name mina)
  (modes native)
  (libraries init tests consensus child_processes memory_stats node_addrs_and_ports jemalloc genesis_ledger_helper mina_plugins error_json)
  (preprocessor_deps ../../../config.mlh)

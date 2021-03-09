@@ -370,15 +370,16 @@ let () =
           "Consolidates best tip history from multiple log files into a rose \
            tree representation"
         (let%map input_dir =
-           Param.flag "-input-dir"
+           Param.flag "--input-dir" ~aliases:["-input-dir"]
              ~doc:
                "PATH Directory containing one or more mina-best-tip.log files"
              Param.(required string)
          and output_dir =
-           Param.flag "-output-dir" ~doc:"PATH Directory to save the output"
+           Param.flag "--output-dir" ~aliases:["-output-dir"]
+             ~doc:"PATH Directory to save the output"
              Param.(required string)
          and output_format =
-           Param.flag "-output-format"
+           Param.flag "--output-format" ~aliases:["-output-format"]
              ~doc:
                "Full|Compact Information shown for each block. Full= Protocol \
                 state and Compact= Current state hash, previous state hash, \
@@ -387,7 +388,7 @@ let () =
          and log_json = Cli_lib.Flag.Log.json
          and log_level = Cli_lib.Flag.Log.level
          and min_peers =
-           Param.flag "-min-peers"
+           Param.flag "--min-peers" ~aliases:["-min-peers"]
              ~doc:
                "Int(>0) Keep blocks that were accepted by at least min-peers \
                 number of peers and prune the rest (Default=1)"

@@ -21,6 +21,7 @@ module Engine = struct
          logger:Logger.t
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
+      -> debug:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t
