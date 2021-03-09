@@ -39,6 +39,8 @@ let slot_duration_ms =
 (* a month = 30 days, for purposes of vesting *)
 let slots_per_month = 30 * 24 * 60 * 60 * 1000 / slot_duration_ms
 
+let slots_per_month_float = Float.of_int slots_per_month
+
 let valid_mina_amount amount =
   let is_num_string s = String.for_all s ~f:Char.is_digit in
   match String.split ~on:'.' amount with
@@ -92,7 +94,11 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     else Currency.Balance.of_formatted_string initial_min_balance
   in
   let cliff_time =
-    Global_slot.of_int (Int.of_string cliff_time_months * slots_per_month)
+    let num_slots_float =
+      Float.of_string cliff_time_months *. slots_per_month_float
+    in
+    (* if there's a fractional slot, wait until next slot by rounding up *)
+    Global_slot.of_int (Float.iround_up_exn num_slots_float)
   in
   let cliff_amount = Currency.Amount.of_formatted_string cliff_amount in
   let vesting_period =
@@ -163,8 +169,8 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   in
   let valid_cliff_time_months =
     try
-      let n = Int.of_string cliff_time_months in
-      n >= 0
+      let n = Float.of_string cliff_time_months in
+      n >= 0.0
     with _ -> false
   in
   let valid_cliff_amount = valid_mina_amount cliff_amount in
