@@ -85,6 +85,15 @@ type pipes =
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
+  ; user_command_writer:
+      ( User_command.t list
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
   ; local_snark_work_writer:
       ( Network_pool.Snark_pool.Resource_pool.Diff.t
         * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
@@ -738,11 +747,14 @@ let get_current_nonce t aid =
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    ( uc_inputs
-    , ( if Ivar.is_full result_ivar then
-          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
-        Ivar.fill result_ivar )
-    , get_current_nonce t )
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
+
+let add_full_transactions t user_command =
+  let result_ivar = Ivar.create () in
+  Strict_pipe.Writer.write t.pipes.user_command_writer
+    (user_command, Ivar.fill result_ivar)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1631,6 +1643,7 @@ let create ?wallets (config : Config.t) =
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
                 ; user_command_input_writer
+                ; user_command_writer= local_txns_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
