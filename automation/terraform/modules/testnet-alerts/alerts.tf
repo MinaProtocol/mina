@@ -19,47 +19,37 @@ data "template_file" "testnet_alert_receivers" {
   }
 }
 
+# Setup
+
 resource "local_file" "alert_rules_config" {
   content  = data.template_file.testnet_alerts.rendered
-  filename = "/tmp/alert_rules.yml"
+  filename = "${path.cwd}/alert_rules.yml"
 }
 
 resource "null_resource" "download_cortextool" {
-  count = var.download_cortextool ? 1 : 0
-
   provisioner "local-exec" {
-    command = "sudo curl -fSL -o /usr/local/bin/cortextool ${local.cortextool_download_url}"
+    working_dir = path.cwd
+    command = "curl --fail --show-error --location --output /tmp/cortextool ${local.cortextool_download_url} && chmod a+x /tmp/cortextool"
   }
-
-  depends_on = [
-    local_file.alert_rules_config
-  ]
 }
 
 # Lint alerting config
 
 resource "null_resource" "alert_rules_lint" {
   provisioner "local-exec" {
-    working_dir = "/tmp"
-    command     = "cortextool rules lint --rule-files alert_rules.yml"
+    working_dir = path.cwd
+    command     = "/tmp/cortextool rules lint --rule-files alert_rules.yml"
   }
 
-  depends_on = [
-    local_file.alert_rules_config,
-    null_resource.download_cortextool
-  ]
+  depends_on = [local_file.alert_rules_config, null_resource.download_cortextool]
 }
 
 resource "null_resource" "alert_rules_check" {
   provisioner "local-exec" {
-    working_dir = "/tmp"
-    command     = "cortextool rules check --rule-files /tmp/alert_rules.yml"
+    command     = "/tmp/cortextool rules check --rule-files alert_rules.yml"
   }
 
-  depends_on = [
-    local_file.alert_rules_config,
-    null_resource.download_cortextool
-  ]
+  depends_on = [local_file.alert_rules_config, null_resource.download_cortextool]
 }
 
 resource "docker_container" "verify_alert_receivers" {
@@ -96,7 +86,7 @@ resource "docker_container" "sync_alert_rules" {
   }
 
   rm         = true
-  depends_on = [docker_container.check_rules_config, docker_container.lint_rules_config]
+  depends_on = [null_resource.alert_rules_lint, null_resource.alert_rules_check]
 }
 
 resource "docker_container" "update_alert_receivers" {
