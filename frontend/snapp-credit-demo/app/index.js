@@ -8,6 +8,7 @@ const {
   INVALID_LOGIN,
   PROOF_SUCCESS,
   PROOF_FAIL,
+  CREDIT_FAIL
 } = require("../constants");
 
 const hideProgressSpinner = () => {
@@ -85,7 +86,7 @@ ipcRenderer.on(WEBSCRAPE, () => {
 
 ipcRenderer.on(VALID_LOGIN, () => {
   showProgressSpinner();
-  setProgressStatusText("Login successful. Generating SNAPP proof...");
+  setProgressStatusText("Login successful. Attempting to generate SNAPP proof...");
 });
 
 ipcRenderer.on(INVALID_LOGIN, () => {
@@ -98,14 +99,20 @@ ipcRenderer.on(INVALID_LOGIN, () => {
 
 ipcRenderer.on(PROOF_SUCCESS, () => {
   const outputPath = localStorage.getItem("output-path");
-  //setProgressStatusText(`SNAPP proof saved to: ${outputPath}`);
+  setProgressStatusText(`Credit score is above 700, SNAPP proof succesfully saved to: ${outputPath}`);
   hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
 
 ipcRenderer.on(PROOF_FAIL, () => {
   const outputPath = localStorage.getItem("output-path");
-  //setProgressStatusText(`Failed to generate proof to: ${outputPath}`);
+  setProgressStatusText(`Failed to generate proof to: ${outputPath}`);
+  hideProgressSpinner();
+  localStorage.setItem("loading", false);
+});
+
+ipcRenderer.on(CREDIT_FAIL, () => {
+  setProgressStatusText(`Credit score is less than 700, cannot produce SNAPP proof to: ${outputPath}`);
   hideProgressSpinner();
   localStorage.setItem("loading", false);
 });

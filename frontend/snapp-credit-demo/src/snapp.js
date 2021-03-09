@@ -1,6 +1,6 @@
 const { exec } = require("child_process");
 const { execPath } = require("./binaries");
-const { PROOF_SUCCESS, PROOF_FAIL } = require("../constants");
+const { PROOF_SUCCESS, PROOF_FAIL, CREDIT_SCORE, CREDIT_FAIL } = require("../constants");
 
 const execSnappCommand = (execPath, outputPath, ethAddress, creditScore) => {
   // This is just for demo purposes. These values should change on launch.
@@ -27,10 +27,13 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
     true
   );
 
-  mainWindow.webContents.send("debug", { execPath });
   if (!outputPath || !creditScore) {
     mainWindow.webContents.send(PROOF_FAIL);
     return;
+  }
+
+  if (parseInt(creditScore) < CREDIT_SCORE) {
+    mainWindow.webContents.send(CREDIT_FAIL)
   }
 
   exec(

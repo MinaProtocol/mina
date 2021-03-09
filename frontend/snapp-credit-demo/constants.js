@@ -5,4 +5,6 @@ module.exports = Object.freeze({
   INVALID_LOGIN: "invalid-login",
   PROOF_SUCCESS: "proof-success",
   PROOF_FAIL: "proof-fail",
+  CREDIT_FAIL: "credit-fail",
+  CREDIT_SCORE: 700,
 });
