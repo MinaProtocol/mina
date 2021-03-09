@@ -17,11 +17,13 @@ spec:
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
-        {{- if .Values.archive.enableLocalDaemon }}
         prometheus.io/scrape: 'true'
+        {{- if .Values.archive.enableLocalDaemon }}
         prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
-        prometheus.io/path: '/metrics'
+        {{ else }}
+        prometheus.io/port: {{ .Values.archive.ports.metrics | quote }}
         {{- end }}
+        prometheus.io/path: '/metrics'
     spec:
       containers:
 {{- if .Values.archive.enableLocalDaemon }}
@@ -131,6 +133,9 @@ spec:
         - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
+        - name: metrics-port
+          protocol: TCP 
+          containerPort: {{ .Values.archive.ports.metrics }}
 {{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:
