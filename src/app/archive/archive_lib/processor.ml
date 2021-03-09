@@ -1720,11 +1720,16 @@ let add_genesis_accounts ~logger
       | Ok () ->
           () )
 
-let create_metrics_server ~logger ~metrics_server_port pool =
+let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+    pool =
   match metrics_server_port with
   | None ->
       return ()
   | Some port ->
+      let missing_blocks_width =
+        Option.value ~default:Metrics.default_missing_blocks_width
+          missing_blocks_width
+      in
       let%bind metric_server =
         Mina_metrics.Archive.create_archive_server ~port ~logger
       in
@@ -1732,14 +1737,17 @@ let create_metrics_server ~logger ~metrics_server_port pool =
         Float.of_int (Mina_compile_config.block_window_duration_ms * 2)
       in
       let rec go () =
-        let%bind () = Metrics.update pool metric_server ~logger in
+        let%bind () =
+          Metrics.update pool metric_server ~logger ~missing_blocks_width
+        in
         let%bind () = after (Time.Span.of_ms interval) in
         go ()
       in
       go ()
 
 let setup_server ~metrics_server_port ~constraint_constants ~logger
-    ~postgres_address ~server_port ~delete_older_than ~runtime_config_opt =
+    ~postgres_address ~server_port ~delete_older_than ~runtime_config_opt
+    ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -1837,7 +1845,9 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                      Deferred.unit )) )
       |> don't_wait_for ;
       (*Update archive metrics*)
-      create_metrics_server ~logger ~metrics_server_port pool |> don't_wait_for ;
+      create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+        pool
+      |> don't_wait_for ;
       [%log info] "Archive process ready. Clients can now connect" ;
       Async.never ()
 

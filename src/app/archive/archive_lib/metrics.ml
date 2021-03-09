@@ -10,10 +10,12 @@ let time ~label f =
     (Time.Span.to_string_hum (Time.diff stop start)) ;
   x
 
+let default_missing_blocks_width = 2000
+
 module Max_block_height = struct
   let query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
-      "SELECT max(height) FROM blocks"
+      "SELECT MAX(height) FROM blocks"
 
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
     time ~label:"max_block_height" (fun () ->
@@ -27,20 +29,22 @@ end
 
 module Missing_blocks = struct
   (*A block is missing if there is no entry for a specific height. However, if there is an entry then it doesn't necessarily mean that it is part of the main chain. Unparented_blocks will show value > 1 in that case. Look for the last 2000 blocks*)
-  let query =
+  let query missing_blocks_width =
     Caqti_request.find Caqti_type.unit Caqti_type.int
       (Core_kernel.sprintf
          {sql| 
-        SELECT count( * )
-        FROM (SELECT h::int FROM generate_series(GREATEST(1, (select max(height) from blocks)-2000) , (select max(height) from blocks)) h
+        SELECT COUNT( * )
+        FROM (SELECT h::int FROM generate_series(GREATEST(1, (SELECT MAX(height) FROM blocks) - %d) , (SELECT MAX(height) FROM blocks)) h
         LEFT JOIN blocks b 
-        ON h = b.height where b.height is null) as v
-      |sql})
+        ON h = b.height WHERE b.height IS NULL) as v
+      |sql}
+         missing_blocks_width)
 
-  let update (module Conn : Caqti_async.CONNECTION) metric_server =
+  let update ~missing_blocks_width (module Conn : Caqti_async.CONNECTION)
+      metric_server =
     let open Deferred.Result.Let_syntax in
     time ~label:"missing_blocks" (fun () ->
-        let%map missing_blocks = Conn.find query () in
+        let%map missing_blocks = Conn.find (query missing_blocks_width) () in
         Mina_metrics.(
           Gauge.set
             (Archive.missing_blocks metric_server)
@@ -53,7 +57,7 @@ module Unparented_blocks = struct
   let query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
       {sql|
-           SELECT count( * ) FROM blocks
+           SELECT COUNT( * ) FROM blocks
            WHERE parent_id IS NULL
       |sql}
 
@@ -85,10 +89,10 @@ let log_error ~logger pool metric_server
       [%log warn] "Error updating archive metrics: $error"
         ~metadata:[("error", `String (Caqti_error.show e))]
 
-let update ~logger pool metric_server =
+let update ~logger ~missing_blocks_width pool metric_server =
   Deferred.all_unit
     (List.map
        ~f:(log_error ~logger pool metric_server)
        [ Max_block_height.update
        ; Unparented_blocks.update
-       ; Missing_blocks.update ])
+       ; Missing_blocks.update ~missing_blocks_width ])

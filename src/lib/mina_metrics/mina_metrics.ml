@@ -936,9 +936,9 @@ module Archive = struct
 
   let missing_blocks t : Gauge.t =
     let help =
-      "Number of missing blocks in the last 2000 blocks (A block for a \
-       specific height is missing if there is no entry in the blocks table \
-       for that height)"
+      "Number of missing blocks in the last n (n = 2000 by default) blocks. A \
+       block for a specific height is missing if there is no entry in the \
+       blocks table for that height"
     in
     let name = "missing_blocks" in
     find_or_add t ~name ~help ~subsystem
