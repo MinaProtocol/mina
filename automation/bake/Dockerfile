@@ -24,8 +24,6 @@ RUN mkdir -p /root/.mina-config && echo "{}" > /root/.mina-config/daemon.json
 RUN mina daemon -config-file ${CONFIG_FILE} -generate-genesis-proof true; \
   mv ~/.mina-config/genesis/genesis_* /var/lib/coda/
 
-RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/${COMMIT_HASH}/automation/terraform/testnets/${TESTNET_NAME}/peers.txt -o /root/peers.txt
-
 #RUN curl https://raw.githubusercontent.com/MinaProtocol/mina/develop/dockerfiles/scripts/healthcheck-utilities.sh -o /healthcheck/utilities.sh
 
 RUN echo '#!/bin/bash -x\n\
@@ -38,11 +36,11 @@ shift \n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
   mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
-  coda_pid=$!\n\
+  mina_pid=$!\n\
   tail -q -f mina.log &\n\
   tail_pid=$!\n\
-  wait "$coda_pid"\n\
-  echo "Coda process exited with status code $?"\n\
+  wait "$mina_pid"\n\
+  echo "Mina process exited with status code $?"\n\
   sleep 10\n\
   kill "$tail_pid"\n\
   if [ ! -f stay_alive ]; then\n\
