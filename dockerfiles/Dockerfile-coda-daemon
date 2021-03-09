@@ -8,7 +8,7 @@ RUN echo "Building image with version $coda_deb_version"
 
 COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
 
-COPY scripts/auto-kill-nodes.sh /root/auto-kill-node.sh
+COPY scripts/auto-kill-node.sh /root/auto-kill-node.sh
 
 # Dependencies
 RUN apt-get -y update && \
