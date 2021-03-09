@@ -763,6 +763,45 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
+let send_rosetta_transactions_graphql =
+  Command.async
+    ~summary:
+      "Dispatch one or more transactions, provided to stdin in rosetta format"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let jsons = Yojson.Basic.stream_from_channel In_channel.stdin in
+         match%bind
+           Deferred.Or_error.try_with (fun () ->
+               (* TODO: There must be a better way to stream from yojson *and*
+                  do the async calls, surely?
+               *)
+               let prev = ref (Deferred.return ()) in
+               Caml.Stream.iter
+                 (fun transaction_json ->
+                   prev :=
+                     let%bind () = !prev in
+                     let%map response =
+                       Graphql_client.query_exn
+                         (Graphql_queries.Send_rosetta_transaction.make
+                            ~transaction:transaction_json ())
+                         graphql_endpoint
+                     in
+                     let (`UserCommand user_command) =
+                       (response#sendRosettaTransaction)#userCommand
+                     in
+                     printf "Dispatched command with TRANSACTION_ID %s\n"
+                       user_command#id )
+                 jsons ;
+               don't_wait_for !prev ;
+               !prev )
+         with
+         | Ok () ->
+             Deferred.return ()
+         | Error err ->
+             Format.eprintf "Error:@.%s@.@."
+               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+             Core_kernel.exit 1 ))
+
 module Export_logs = struct
   let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
 
@@ -2143,6 +2182,7 @@ let advanced =
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
     ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
+    ; ("send-rosetta-transactions", send_rosetta_transactions_graphql)
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
