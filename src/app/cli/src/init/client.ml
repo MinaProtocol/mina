@@ -770,23 +770,30 @@ let send_rosetta_transactions_graphql =
     (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
        ~f:(fun graphql_endpoint () ->
          let jsons = Yojson.Basic.stream_from_channel In_channel.stdin in
-         match
-           Or_error.try_with (fun () ->
+         match%bind
+           Deferred.Or_error.try_with (fun () ->
+               (* TODO: There must be a better way to stream from yojson *and*
+                  do the async calls, surely?
+               *)
+               let prev = ref (Deferred.return ()) in
                Caml.Stream.iter
                  (fun transaction_json ->
-                   Thread_safe.block_on_async_exn (fun () ->
-                       let%map response =
-                         Graphql_client.query_exn
-                           (Graphql_queries.Send_rosetta_transaction.make
-                              ~transaction:transaction_json ())
-                           graphql_endpoint
-                       in
-                       let (`UserCommand user_command) =
-                         (response#sendRosettaTransaction)#userCommand
-                       in
-                       printf "Dispatched command with TRANSACTION_ID %s\n"
-                         user_command#id ) )
-                 jsons )
+                   prev :=
+                     let%bind () = !prev in
+                     let%map response =
+                       Graphql_client.query_exn
+                         (Graphql_queries.Send_rosetta_transaction.make
+                            ~transaction:transaction_json ())
+                         graphql_endpoint
+                     in
+                     let (`UserCommand user_command) =
+                       (response#sendRosettaTransaction)#userCommand
+                     in
+                     printf "Dispatched command with TRANSACTION_ID %s\n"
+                       user_command#id )
+                 jsons ;
+               don't_wait_for !prev ;
+               !prev )
          with
          | Ok () ->
              Deferred.return ()
