@@ -1,22 +1,22 @@
 function is_synced {
-  local sync_status=$(mina client status | grep 'Sync status' | cut -d':' -f2)
+  local sync_status=$(mina client status | grep "Sync status" | cut -d":" -f2)
   if [ $? -ne 0 ];
   then
     echo Fail to fetch sync status
     return 0
   fi
-  if [ $sync_status != 'Synced' ];
+  if [ $sync_status != "Synced" ];
   then 
     echo Nodes not synced
     return 0
   fi
-  local max_observed_block=$(mina client status | grep 'Max observed block height' | cut -d':' -f2)
+  local max_observed_block=$(mina client status | grep "Max observed block height" | cut -d":" -f2)
   if [ $? -ne 0 ];
   then 
     echo Fail to fetch max_observed_block
     return 0
   fi
-  local max_unvalidated_block=$(mina client status | grep 'Max observed unvalidated block height' | cut -d':' -f2)
+  local max_unvalidated_block=$(mina client status | grep "Max observed unvalidated block height" | cut -d":" -f2)
   if [ $? -ne 0 ];
   then
     echo Fail to fetch max_unvalidated_block
