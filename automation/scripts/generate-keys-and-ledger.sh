@@ -381,14 +381,14 @@ GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Fix the ledger format for ease of use
 echo "Rewriting ./keys/genesis/* as ${ARTIFACT_PATH}/genesis_ledger.json in the proper format for daemon consumption..."
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${WHALE_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/whales.json"
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${FISH_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/fish.json"
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${COMMUNITY_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000"), timing: { initial_minimum_balance: "60000", cliff_time:"150", cliff_amount:"12000", vesting_period:"6", vesting_increment:"150"}}' | cat > "${ARTIFACT_PATH}/community_fast_locked_keys.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${WHALE_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/whales.accounts.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${FISH_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/fish.accounts.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${COMMUNITY_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000"), timing: { initial_minimum_balance: "60000", cliff_time:"150", cliff_amount:"12000", vesting_period:"6", vesting_increment:"150"}}' | cat > "${ARTIFACT_PATH}/community_fast_unlock.accounts.json"
 
 echo "Determining total accounts based on partial ledgers..."
 NUM_ACCOUNTS=$(jq -s 'length'  ${ARTIFACT_PATH}/*.json)
 
 echo "Merging partial ledgers into genesis_ledger..."
-jq -s '{ genesis: { genesis_state_timestamp: "'${GENESIS_TIMESTAMP}'" }, ledger: { name: "'${TESTNET}'", num_accounts: '${NUM_ACCOUNTS}', accounts: [ .[] ] } }' ${ARTIFACT_PATH}/*.json > "${ARTIFACT_PATH}/genesis_ledger.json"
+jq -s '{ genesis: { genesis_state_timestamp: "'${GENESIS_TIMESTAMP}'" }, ledger: { name: "'${TESTNET}'", num_accounts: '${NUM_ACCOUNTS}', accounts: [ .[] ] } }' ${ARTIFACT_PATH}/*.accounts.json > "${ARTIFACT_PATH}/genesis_ledger.json"
 
 echo "Keys and genesis ledger generated successfully, $TESTNET is ready to deploy!"

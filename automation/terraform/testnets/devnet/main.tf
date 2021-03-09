@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 0.12.0"
+  required_version = ">= 0.14.0"
   backend "s3" {
     key     = "terraform-devnet.tfstate"
     encrypt = true
@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "devnet"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-devnet-4744658"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.4-8202b60-devnet-0f2032c"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
@@ -88,7 +88,32 @@ module "testnet_east" {
   coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
   coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
   coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
+
+  archive_node_count  = 3
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql" 
+
+  archive_configs       = [
+    {
+      name = "archive-1"
+      enableLocalDaemon = false
+      enablePostgresDB  = true
+      postgresHost      = "archive-1-postgresql"
+    },
+    {
+      name = "archive-2"
+      enableLocalDaemon = false
+      enablePostgresDB  = false
+      postgresHost      = "archive-1-postgresql"
+    },
+    {
+      name = "archive-3"
+      enableLocalDaemon = false
+      enablePostgresDB  = true
+      postgresHost      = "archive-3-postgresql"
+    }
+  ]
+
 
   coda_faucet_amount = "10000000000"
   coda_faucet_fee    = "100000000"
@@ -98,9 +123,6 @@ module "testnet_east" {
   agent_min_tx = "0.0015"
   agent_max_tx = "0.0015"
   agent_send_every_mins = "1"
-
-  archive_node_count  = 1
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/474e314bf6a35adb4976ed7c5b1b68f5c776ad78/src/app/archive/create_schema.sql" 
 
   seed_zone   = local.seed_zone
   seed_region = local.seed_region
@@ -128,3 +150,4 @@ module "testnet_east" {
   make_report_accounts            = local.make_report_accounts
   seed_peers_url                  = "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
 }
+
