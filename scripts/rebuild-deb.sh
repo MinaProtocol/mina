@@ -185,8 +185,11 @@ for f in /tmp/s3_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp '../genesis_ledgers/final-final-2_(3).json' "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp '../genesis_ledgers/final-final-2_(3).json' "${BUILDDIR}/var/lib/coda/finalfinal2.json"
 cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+# The default configuration:
+cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
