@@ -1605,6 +1605,14 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let send_rosetta_transaction =
+      obj "SendRosettaTransactionPayload" ~fields:(fun _ ->
+          [ field "userCommand"
+              ~typ:(non_null UserCommand.user_command_interface)
+              ~doc:"Command that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let export_logs =
       obj "ExportLogsPayload" ~fields:(fun _ ->
           [ field "exportLogs"
@@ -1934,6 +1942,13 @@ module Types = struct
           ; valid_until
           ; memo
           ; nonce ]
+
+    let rosetta_transaction =
+      Schema.Arg.scalar "RosettaTransaction"
+        ~doc:"A transaction encoded in the rosetta format"
+        ~coerce:(fun graphql_json ->
+          Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
+          |> Result.map_error ~f:Error.to_string_hum )
 
     let create_account =
       obj "AddAccountInput" ~coerce:Fn.id
@@ -2497,6 +2512,28 @@ module Mutations = struct
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
               ~signature )
 
+  let send_rosetta_transaction =
+    io_field "sendRosettaTransaction"
+      ~doc:"Send a transaction in rosetta format"
+      ~typ:(non_null Types.Payload.send_rosetta_transaction)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.rosetta_transaction)]
+      ~resolve:(fun {ctx= mina; _} () signed_command ->
+        match%map
+          Mina_lib.add_full_transactions mina
+            [User_command.Signed_command signed_command]
+        with
+        | Ok ([(User_command.Signed_command signed_command as transaction)], _)
+          ->
+            Ok
+              (Types.UserCommand.mk_user_command
+                 { With_hash.data= signed_command
+                 ; hash= Transaction_hash.hash_command transaction })
+        | Error err ->
+            Error (Error.to_string_hum err)
+        | _ ->
+            (* TODO: Be better here, we actually have more info. *)
+            Error "Transaction could not be entered into the pool" )
+
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[arg "basename" ~typ:string]
@@ -2697,7 +2734,8 @@ module Mutations = struct
     ; set_connection_gating_config
     ; add_peer
     ; archive_precomputed_block
-    ; archive_extensional_block ]
+    ; archive_extensional_block
+    ; send_rosetta_transaction ]
 end
 
 module Queries = struct
