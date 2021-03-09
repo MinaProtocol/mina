@@ -60,7 +60,7 @@ def pods_with_no_new_logs(v1, namespace, nodes_with_no_new_logs):
     mina_containers = list(filter(lambda c: c.name in [ 'coda', 'seed', 'coordinator' ], containers))
     if len(mina_containers) != 0:
       name = pod.metadata.name
-      recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=ten_minutes)
+      recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=ten_minutes, container=mina_containers[0].name)
       if len(recent_logs) == 0:
         count += 1
 
