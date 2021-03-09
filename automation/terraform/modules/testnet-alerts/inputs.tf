@@ -31,3 +31,9 @@ variable "pagerduty_alert_filter" {
   type        = string
   description = "Filter to apply to alert rule violation space for managing which trigger PagerDuty notifications"
 }
+
+variable "download_cortextool" {
+  type        = bool
+  description = "Whether to automatically download cortextool for linting/testing operations"
+  default     = false
+}

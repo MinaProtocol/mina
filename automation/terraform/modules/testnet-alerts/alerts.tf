@@ -19,40 +19,47 @@ data "template_file" "testnet_alert_receivers" {
   }
 }
 
-# Lint alerting config
-
-resource "docker_container" "lint_rules_config" {
-  name  = "cortex_lint"
-  image = local.cortex_image
-  command = [
-    "rules",
-    "lint",
-    "--rule-files=/config/rules.yml"
-  ]
-
-  upload {
-    content = data.template_file.testnet_alerts.rendered
-    file    = "/config/rules.yml"
-  }
-
-  rm = true
+resource "local_file" "alert_rules_config" {
+  content  = data.template_file.testnet_alerts.rendered
+  filename = "/tmp/alert_rules.yml"
 }
 
-resource "docker_container" "check_rules_config" {
-  name  = "cortex_rules_check"
-  image = local.cortex_image
-  command = [
-    "rules",
-    "check",
-    "--rule-files=/config/rules.yml",
-  ]
+resource "null_resource" "download_cortextool" {
+  count = var.download_cortextool ? 1 : 0
 
-  upload {
-    content = data.template_file.testnet_alerts.rendered
-    file    = "/config/rules.yml"
+  provisioner "local-exec" {
+    command = "sudo curl -fSL -o /usr/local/bin/cortextool ${local.cortextool_download_url}"
   }
 
-  rm = true
+  depends_on = [
+    local_file.alert_rules_config
+  ]
+}
+
+# Lint alerting config
+
+resource "null_resource" "alert_rules_lint" {
+  provisioner "local-exec" {
+    working_dir = "/tmp"
+    command     = "cortextool rules lint --rule-files alert_rules.yml"
+  }
+
+  depends_on = [
+    local_file.alert_rules_config,
+    null_resource.download_cortextool
+  ]
+}
+
+resource "null_resource" "alert_rules_check" {
+  provisioner "local-exec" {
+    working_dir = "/tmp"
+    command     = "cortextool rules check --rule-files /tmp/alert_rules.yml"
+  }
+
+  depends_on = [
+    local_file.alert_rules_config,
+    null_resource.download_cortextool
+  ]
 }
 
 resource "docker_container" "verify_alert_receivers" {

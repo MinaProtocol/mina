@@ -9,12 +9,20 @@ terraform {
   }
 }
 
+variable "download_cortextool" {
+  type        = bool
+  description = "Whether to automatically download cortextool for linting/testing operations"
+  default     = false
+}
+
 module "o1testnet_alerts" {
   source = "../modules/testnet-alerts"
 
   rule_filter            = "{testnet=~\".+\"}" # any non-empty testnet name
   rule_timeframe         = "1h"
   pagerduty_alert_filter = "devnet"
+
+  download_cortextool = var.download_cortextool
 }
 
 output "testnet_alert_rules" {
