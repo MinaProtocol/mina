@@ -75,6 +75,13 @@ let rec deferred_result_list_fold ls ~init ~f =
       let%bind init = f init h in
       deferred_result_list_fold t ~init ~f
 
+let query ~f pool =
+  match%bind Caqti_async.Pool.use f pool with
+  | Ok v ->
+      return v
+  | Error msg ->
+      failwithf "Error querying db, error: %s" (Caqti_error.show msg) ()
+
 module Public_key = struct
   let find (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
     let public_key = Public_key.Compressed.to_base58_check t in
@@ -1556,40 +1563,43 @@ let retry ~f ~logger ~error_str retries =
   go retries
 
 let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
-    (module Conn : CONNECTION) block =
+    pool block =
   let add () =
-    let%bind res =
-      let open Deferred.Result.Let_syntax in
-      let%bind () = Conn.start () in
-      let%bind block_id = add_block (module Conn : CONNECTION) block in
-      (* if an existing block has a parent hash that's for the block just added,
+    Caqti_async.Pool.use
+      (fun (module Conn : CONNECTION) ->
+        let%bind res =
+          let open Deferred.Result.Let_syntax in
+          let%bind () = Conn.start () in
+          let%bind block_id = add_block (module Conn : CONNECTION) block in
+          (* if an existing block has a parent hash that's for the block just added,
        set its parent id
       *)
-      let%bind () =
-        Block.set_parent_id_if_null
-          (module Conn)
-          ~parent_hash:(hash block) ~parent_id:block_id
-      in
-      match delete_older_than with
-      | Some num_blocks ->
-          Block.delete_if_older_than ~num_blocks (module Conn)
-      | None ->
-          return ()
-    in
-    match res with
-    | Error e as err ->
-        (*Error in the current transaction*)
-        [%log warn]
-          "Error when adding block data to the database, rolling it back: \
-           $error"
-          ~metadata:[("error", `String (Caqti_error.show e))] ;
-        let%map _ = Conn.rollback () in
-        err
-    | Ok _ ->
-        [%log info] "Committing block data for $state_hash"
-          ~metadata:
-            [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
-        Conn.commit ()
+          let%bind () =
+            Block.set_parent_id_if_null
+              (module Conn)
+              ~parent_hash:(hash block) ~parent_id:block_id
+          in
+          match delete_older_than with
+          | Some num_blocks ->
+              Block.delete_if_older_than ~num_blocks (module Conn)
+          | None ->
+              return ()
+        in
+        match res with
+        | Error e as err ->
+            (*Error in the current transaction*)
+            [%log warn]
+              "Error when adding block data to the database, rolling it back: \
+               $error"
+              ~metadata:[("error", `String (Caqti_error.show e))] ;
+            let%map _ = Conn.rollback () in
+            err
+        | Ok _ ->
+            [%log info] "Committing block data for $state_hash"
+              ~metadata:
+                [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
+            Conn.commit () )
+      pool
   in
   retry ~f:add ~logger ~error_str:"add_block_aux" retries
 
@@ -1603,16 +1613,13 @@ let add_block_aux_extensional =
   add_block_aux ~add_block:Block.add_from_extensional
     ~hash:(fun (block : Extensional.Block.t) -> block.state_hash)
 
-let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
-    ~delete_older_than =
+let run pool reader ~constraint_constants ~logger ~delete_older_than =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         let add_block = Block.add_if_doesn't_exist ~constraint_constants in
         let hash block = With_hash.hash block in
         match%map
-          add_block_aux ~logger ~delete_older_than ~hash ~add_block
-            (module Conn)
-            block
+          add_block_aux ~logger ~delete_older_than ~hash ~add_block pool block
         with
         | Error e ->
             [%log warn]
@@ -1625,12 +1632,32 @@ let run (module Conn : CONNECTION) reader ~constraint_constants ~logger
     | Transition_frontier _ ->
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
-        Deferred.List.iter added ~f:(fun command ->
-            User_command.add_if_doesn't_exist (module Conn) command >>| ignore
-        ) )
+        let%map _ =
+          Caqti_async.Pool.use
+            (fun (module Conn : CONNECTION) ->
+              let%map () =
+                Deferred.List.iter added ~f:(fun command ->
+                    match%map
+                      User_command.add_if_doesn't_exist (module Conn) command
+                    with
+                    | Ok _ ->
+                        ()
+                    | Error e ->
+                        [%log warn]
+                          ~metadata:
+                            [ ("error", `String (Caqti_error.show e))
+                            ; ( "command"
+                              , Mina_base.User_command.to_yojson command ) ]
+                          "Failed to archive user command $command from \
+                           transaction pool: $block, see $error" )
+              in
+              Ok () )
+            pool
+        in
+        () )
 
-let add_genesis_accounts (module Conn : CONNECTION) ~logger
-    ~(runtime_config_opt : Runtime_config.t option) =
+let add_genesis_accounts ~logger
+    ~(runtime_config_opt : Runtime_config.t option) pool =
   match runtime_config_opt with
   | None ->
       Deferred.unit
@@ -1655,30 +1682,33 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
             failwith "No accounts found in runtime config file"
       in
       let add_accounts () =
-        let open Deferred.Result.Let_syntax in
-        let%bind () = Conn.start () in
-        let rec go accounts =
-          let open Deferred.Let_syntax in
-          match accounts with
-          | [] ->
-              Deferred.Result.return ()
-          | (_, account) :: accounts' -> (
-              match%bind
-                Timing_info.add_if_doesn't_exist (module Conn) account
-              with
-              | Error e as err ->
-                  [%log error]
-                    ~metadata:
-                      [ ("account", Account.to_yojson account)
-                      ; ("error", `String (Caqti_error.show e)) ]
-                    "Failed to add genesis account: $account, see $error" ;
-                  let%map _ = Conn.rollback () in
-                  err
-              | Ok _ ->
-                  go accounts' )
-        in
-        let%bind () = go accounts in
-        Conn.commit ()
+        Caqti_async.Pool.use
+          (fun (module Conn : CONNECTION) ->
+            let open Deferred.Result.Let_syntax in
+            let%bind () = Conn.start () in
+            let rec go accounts =
+              let open Deferred.Let_syntax in
+              match accounts with
+              | [] ->
+                  Deferred.Result.return ()
+              | (_, account) :: accounts' -> (
+                  match%bind
+                    Timing_info.add_if_doesn't_exist (module Conn) account
+                  with
+                  | Error e as err ->
+                      [%log error]
+                        ~metadata:
+                          [ ("account", Account.to_yojson account)
+                          ; ("error", `String (Caqti_error.show e)) ]
+                        "Failed to add genesis account: $account, see $error" ;
+                      let%map _ = Conn.rollback () in
+                      err
+                  | Ok _ ->
+                      go accounts' )
+            in
+            let%bind () = go accounts in
+            Conn.commit () )
+          pool
       in
       match%map
         retry ~f:add_accounts ~logger ~error_str:"add_genesis_accounts" 3
@@ -1690,8 +1720,34 @@ let add_genesis_accounts (module Conn : CONNECTION) ~logger
       | Ok () ->
           () )
 
-let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
-    ~delete_older_than ~runtime_config_opt =
+let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+    pool =
+  match metrics_server_port with
+  | None ->
+      return ()
+  | Some port ->
+      let missing_blocks_width =
+        Option.value ~default:Metrics.default_missing_blocks_width
+          missing_blocks_width
+      in
+      let%bind metric_server =
+        Mina_metrics.Archive.create_archive_server ~port ~logger
+      in
+      let interval =
+        Float.of_int (Mina_compile_config.block_window_duration_ms * 2)
+      in
+      let rec go () =
+        let%bind () =
+          Metrics.update pool metric_server ~logger ~missing_blocks_width
+        in
+        let%bind () = after (Time.Span.of_ms interval) in
+        go ()
+      in
+      go ()
+
+let setup_server ~metrics_server_port ~constraint_constants ~logger
+    ~postgres_address ~server_port ~delete_older_than ~runtime_config_opt
+    ~missing_blocks_width =
   let where_to_listen =
     Async.Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
@@ -1714,21 +1770,21 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
           Strict_pipe.Writer.write extensional_block_writer extensional_block
       ) ]
   in
-  match%bind Caqti_async.connect postgres_address with
+  match Caqti_async.connect_pool ~max_size:30 postgres_address with
   | Error e ->
       [%log error]
-        "Failed to connect to postgresql database, see error: $error"
+        "Failed to create a Caqti pool for Postgresql, see error: $error"
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
-  | Ok conn ->
-      let%bind () = add_genesis_accounts conn ~logger ~runtime_config_opt in
-      run ~constraint_constants conn reader ~logger ~delete_older_than
+  | Ok pool ->
+      let%bind () = add_genesis_accounts pool ~logger ~runtime_config_opt in
+      run ~constraint_constants pool reader ~logger ~delete_older_than
       |> don't_wait_for ;
       Strict_pipe.Reader.iter precomputed_block_reader
         ~f:(fun precomputed_block ->
           match%map
             add_block_aux_precomputed ~logger ~constraint_constants
-              ~delete_older_than conn precomputed_block
+              ~delete_older_than pool precomputed_block
           with
           | Error e ->
               [%log warn]
@@ -1744,7 +1800,7 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
       Strict_pipe.Reader.iter extensional_block_reader
         ~f:(fun extensional_block ->
           match%map
-            add_block_aux_extensional ~logger ~delete_older_than conn
+            add_block_aux_extensional ~logger ~delete_older_than pool
               extensional_block
           with
           | Error e ->
@@ -1787,6 +1843,10 @@ let setup_server ~constraint_constants ~logger ~postgres_address ~server_port
                          ; ( "address"
                            , `String (Unix.Inet_addr.to_string address) ) ] ;
                      Deferred.unit )) )
+      |> don't_wait_for ;
+      (*Update archive metrics*)
+      create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
+        pool
       |> don't_wait_for ;
       [%log info] "Archive process ready. Clients can now connect" ;
       Async.never ()
