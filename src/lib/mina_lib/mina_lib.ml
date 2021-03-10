@@ -709,7 +709,7 @@ let request_work t pk =
              fee $fee is lower than the account creation fee \
              $account_creation_fee. %s"
             ( if boost_fee then
-              "Setting fee for this snark work to $account_creation_fee."
+              "Setting fee for this snark work to the account creation fee."
             else "Refusing to produce snark work." )
             ~metadata:
               [ ("pk", Public_key.Compressed.to_yojson pk)

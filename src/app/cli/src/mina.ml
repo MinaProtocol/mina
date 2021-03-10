@@ -182,8 +182,8 @@ let setup_daemon logger =
       ~doc:
         "true/false If the snark worker's public key doesn't have an account \
          and its fee is too low to create one, boost the fee to the account \
-         creation fee until that account is created. If not set, no snark \
-         work will be produced when no account is present. (default: true)"
+         creation fee until that account is created. If false, no snark work \
+         will be produced when no account is present. (default: true)"
       (optional_with_default true bool)
   and work_reassignment_wait =
     flag "--work-reassignment-wait" ~aliases:["work-reassignment-wait"]
