@@ -19,36 +19,13 @@ let cluster_region = "us-west1"
 
 let cluster_zone = "us-west1a"
 
-type network_keypair =
-  { keypair: Keypair.t
-  ; secret_name: string
-  ; public_key_file: string
-  ; private_key_file: string }
-[@@deriving to_yojson]
-
-let create_network_keypair ~keypair ~secret_name =
-  let open Keypair in
-  let public_key_file =
-    Public_key.Compressed.to_base58_check
-      (Public_key.compress keypair.public_key)
-    ^ "\n"
-  in
-  let private_key_file =
-    let plaintext =
-      Bigstring.to_bytes (Private_key.to_bigstring keypair.private_key)
-    in
-    let password = Bytes.of_string "naughty blue worm" in
-    Secrets.Secret_box.encrypt ~plaintext ~password
-    |> Secrets.Secret_box.to_yojson |> Yojson.Safe.to_string
-  in
-  {keypair; secret_name; public_key_file; private_key_file}
-
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
   type block_producer_config =
     { name: string
     ; id: string
+    ; keypair: Network_keypair.t
     ; public_key: string
     ; private_key: string
     ; keypair_secret: string
@@ -78,7 +55,7 @@ module Network_config = struct
   type t =
     { coda_automation_location: string
     ; debug_arg: bool
-    ; keypairs: network_keypair list
+    ; keypairs: Network_keypair.t list
     ; constants: Test_config.constants
     ; terraform: terraform_config }
   [@@deriving to_yojson]
@@ -152,7 +129,8 @@ module Network_config = struct
         let keypair =
           {Keypair.public_key= Public_key.decompress_exn pk; private_key= sk}
         in
-        (create_network_keypair ~keypair ~secret_name, runtime_account)
+        ( Network_keypair.create_network_keypair ~keypair ~secret_name
+        , runtime_account )
       in
       List.mapi ~f
         (List.zip_exn block_producers
@@ -212,6 +190,7 @@ module Network_config = struct
     let block_producer_config index keypair =
       { name= "test-block-producer-" ^ Int.to_string (index + 1)
       ; id= Int.to_string index
+      ; keypair
       ; keypair_secret= keypair.secret_name
       ; public_key= keypair.public_key_file
       ; private_key= keypair.private_key_file
@@ -361,14 +340,15 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id =
+    let cons_node pod_id network_keypair_opt =
       { testnet_name= network_config.terraform.testnet_name
       ; Kubernetes_network.Node.cluster= cluster_id
       ; namespace= network_config.terraform.testnet_name
-      ; pod_id }
+      ; pod_id
+      ; network_keypair= network_keypair_opt }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_nodes = [cons_node "seed"] in
+    let seed_nodes = [cons_node "seed" None] in
     let snark_coordinator_name =
       "snark-coordinator-"
       ^ String.sub network_config.terraform.snark_worker_public_key
@@ -376,11 +356,11 @@ module Network_manager = struct
             (String.length network_config.terraform.snark_worker_public_key - 6)
           ~len:6
     in
-    let snark_coordinator_nodes = [cons_node snark_coordinator_name] in
+    let snark_coordinator_nodes = [cons_node snark_coordinator_name None] in
     let block_producer_nodes =
-      List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i ->
-          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) )
+      List.map network_config.terraform.block_producer_configs
+        ~f:(fun bp_config -> cons_node bp_config.name (Some bp_config.keypair)
+      )
     in
     let nodes_by_app_id =
       let all_nodes =

@@ -7,9 +7,15 @@ open Integration_test_lib
 
 module Node = struct
   type t =
-    {testnet_name: string; cluster: string; namespace: string; pod_id: string}
+    { testnet_name: string
+    ; cluster: string
+    ; namespace: string
+    ; pod_id: string
+    ; network_keypair: Network_keypair.t option }
 
   let id {pod_id; _} = pod_id
+
+  let network_keypair {network_keypair; _} = network_keypair
 
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
@@ -28,16 +34,22 @@ module Node = struct
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
     let%bind () =
+      Deferred.bind ~f:Malleable_error.return (run_in_container node "ps aux")
+    in
+    let%bind () =
       if fresh_state then
         Deferred.bind ~f:Malleable_error.return
-          (run_in_container node "rm -rf .mina-config")
+          (run_in_container node "rm -rf .mina-config/*")
       else Malleable_error.return ()
     in
     Deferred.bind ~f:Malleable_error.return
       (run_in_container node "./start.sh")
 
   let stop node =
-    Deferred.bind ~f:Malleable_error.return (run_in_container node "./stop.sh")
+    let%bind () = run_in_container node "ps aux" in
+    let%bind () = run_in_container node "./stop.sh" in
+    let%bind () = run_in_container node "ps aux" in
+    Malleable_error.return ()
 
   module Decoders = Graphql_lib.Decoders
 

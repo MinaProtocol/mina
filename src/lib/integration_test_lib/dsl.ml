@@ -36,6 +36,7 @@ module Make (Engine : Intf.Engine.S) () :
   module Wait_condition =
     Wait_condition.Make (Engine) (Event_router) (Network_state)
   module Node = Engine.Network.Node
+  module Util = Util.Make (Engine)
 
   (* TODO: monadify as Malleable_error w/ global value threading *)
   type t =
