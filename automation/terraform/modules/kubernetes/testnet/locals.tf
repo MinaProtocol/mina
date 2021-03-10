@@ -19,6 +19,7 @@ locals {
     logSnarkWorkGossip   = var.log_snark_work_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
+    exposeGraphql        = var.expose_graphql
   }
 
   seed_vars = {
@@ -39,6 +40,7 @@ locals {
       }
       seedPeersURL         = var.seed_peers_url
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+      exposeGraphql        = var.expose_graphql
     }
 
     seedConfigs = [

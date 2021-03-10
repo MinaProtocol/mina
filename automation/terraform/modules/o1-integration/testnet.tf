@@ -3,6 +3,7 @@ module "kubernetes_testnet" {
   source    = "../kubernetes/testnet"
 
   use_local_charts = true
+  expose_graphql   = true
   deploy_watchdog  = false
 
   cluster_name   = var.cluster_name
