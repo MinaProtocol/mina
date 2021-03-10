@@ -30,10 +30,10 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-            Cmd.run "cd automation/terraform/monitoring && terraform init",
+          Cmd.run "cd automation/terraform/monitoring && terraform init",
             Cmd.run (
-              "terraform apply -auto-approve -target module.o1testnet_alerts.docker_container.lint_rules_config" ++
-              " -target module.o1testnet_alerts.docker_container.check_rules_config"
+              "terraform apply -auto-approve -target module.o1testnet_alerts.null_resource.alert_rules_lint" ++
+              " -target module.o1testnet_alerts.null_resource.alert_rules_check"
             )
           ]
           , label = "Lint Testnet alert rules"

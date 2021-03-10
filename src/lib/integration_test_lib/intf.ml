@@ -21,6 +21,7 @@ module Engine = struct
          logger:Logger.t
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
+      -> debug:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t
@@ -31,6 +32,8 @@ module Engine = struct
       type t
 
       val id : t -> string
+
+      val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
@@ -204,6 +207,14 @@ module Dsl = struct
       -> t
   end
 
+  module type Util_intf = sig
+    module Engine : Engine.S
+
+    val pub_key_of_node :
+         Engine.Network.Node.t
+      -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+  end
+
   module type S = sig
     module Engine : Engine.S
 
@@ -219,6 +230,8 @@ module Dsl = struct
       with module Engine := Engine
        and module Event_router := Event_router
        and module Network_state := Network_state
+
+    module Util : Util_intf with module Engine := Engine
 
     type t
 

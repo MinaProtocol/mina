@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-finalfinal2-new.tfstate"
+    key     = "terraform-mainnet.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -54,9 +54,11 @@ variable "seed_count" {
 }
 
 locals {
-  testnet_name = "finalfinal2"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.0-fd39808-finalfinal2-fd39808"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.0-fix-archive-build-profile-e344c96"
+  testnet_name = "mainnet"
+  coda_image = "TODO" # TODO
+  coda_archive_image = "TODO" # TODO
+  seed_region = "us-east4"
+  seed_zone = "us-east4-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -70,20 +72,20 @@ locals {
   make_report_accounts = ""
 }
 
-module "finalfinal2" {
-  providers = { google.gke = google.google-us-east1 }
+module "mainnet" {
+  providers = { google.gke = google.google-us-east4 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-east"
-  cluster_region = "us-east1"
-  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
+  cluster_name   = "coda-infra-east4"
+  cluster_region = "us-east4"
+  k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
   coda_image         = local.coda_image
   coda_archive_image = local.coda_archive_image
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.1"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.3"
 
   block_producer_key_pass = "naughty blue worm"
 
@@ -126,5 +128,6 @@ module "finalfinal2" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "https://storage.googleapis.com/seed-lists/finalfinal2_seeds.txt?123"
+  seed_peers_url                  = "TODO"  # TODO
 }
+

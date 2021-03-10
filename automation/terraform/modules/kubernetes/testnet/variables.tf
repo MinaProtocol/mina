@@ -26,6 +26,11 @@ variable "use_local_charts" {
   default = false
 }
 
+variable "deploy_watchdog" {
+  type    = bool
+  default = true
+}
+
 variable "coda_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"

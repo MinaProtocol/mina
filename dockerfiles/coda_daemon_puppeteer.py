@@ -33,6 +33,25 @@ def handle_stop_request(signum, frame):
   global inactive_daemon_request
   inactive_daemon_request = True
 
+def get_child_processes(pid):
+  result = subprocess.run(
+    ['ps', '-o', 'pid=', '--ppid', str(pid)],
+    stdout=subprocess.PIPE
+  )
+  output = result.stdout.decode('ascii')
+  return list(map(int, filter(lambda s: len(s) > 0, output.split(' '))))
+
+def pid_is_running(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+def wait_for_pid(pid):
+    while pid_is_running(pid):
+        time.sleep(0.25)
+
 def start_daemon():
   global coda_process
   with open('mina.log', 'a') as f:
@@ -46,7 +65,11 @@ def start_daemon():
 def stop_daemon():
   global coda_process
   coda_process.send_signal(signal.SIGTERM)
+
+  child_pids = get_child_processes(coda_process.pid)
   coda_process.wait()
+  for child_pid in child_pids:
+      wait_for_pid(child_pid)
   Path('daemon-active').unlink()
   coda_process = None
 

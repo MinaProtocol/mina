@@ -3,9 +3,7 @@ open Async
 open Currency
 open Signature_lib
 open Mina_base
-open Cmd_util
 open Integration_test_lib
-open Unix
 
 let aws_region = "us-west-2"
 
@@ -21,36 +19,13 @@ let cluster_region = "us-west1"
 
 let cluster_zone = "us-west1a"
 
-type network_keypair =
-  { keypair: Keypair.t
-  ; secret_name: string
-  ; public_key_file: string
-  ; private_key_file: string }
-[@@deriving to_yojson]
-
-let create_network_keypair ~keypair ~secret_name =
-  let open Keypair in
-  let public_key_file =
-    Public_key.Compressed.to_base58_check
-      (Public_key.compress keypair.public_key)
-    ^ "\n"
-  in
-  let private_key_file =
-    let plaintext =
-      Bigstring.to_bytes (Private_key.to_bigstring keypair.private_key)
-    in
-    let password = Bytes.of_string "naughty blue worm" in
-    Secrets.Secret_box.encrypt ~plaintext ~password
-    |> Secrets.Secret_box.to_yojson |> Yojson.Safe.to_string
-  in
-  {keypair; secret_name; public_key_file; private_key_file}
-
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
   type block_producer_config =
     { name: string
     ; id: string
+    ; keypair: Network_keypair.t
     ; public_key: string
     ; private_key: string
     ; keypair_secret: string
@@ -79,7 +54,8 @@ module Network_config = struct
 
   type t =
     { coda_automation_location: string
-    ; keypairs: network_keypair list
+    ; debug_arg: bool
+    ; keypairs: Network_keypair.t list
     ; constants: Test_config.constants
     ; terraform: terraform_config }
   [@@deriving to_yojson]
@@ -90,7 +66,7 @@ module Network_config = struct
     in
     assoc
 
-  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t)
+  let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
       ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
       =
     let { Test_config.k
@@ -112,16 +88,8 @@ module Network_config = struct
     let user_len = Int.min 5 (String.length user_sanitized) in
     let user = String.sub user_sanitized ~pos:0 ~len:user_len in
     let git_commit = Mina_version.commit_id_short in
-    let time_now = Unix.gmtime (Unix.gettimeofday ()) in
-    let timestr =
-      string_of_int time_now.tm_mday
-      ^ string_of_int time_now.tm_hour
-      ^ string_of_int time_now.tm_min
-    in
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
-    let testnet_name =
-      user ^ "-" ^ git_commit ^ "-" ^ test_name ^ "-" ^ timestr
-    in
+    let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     let num_block_producers = List.length block_producers in
     let block_producer_keypairs, runtime_accounts =
@@ -161,7 +129,8 @@ module Network_config = struct
         let keypair =
           {Keypair.public_key= Public_key.decompress_exn pk; private_key= sk}
         in
-        (create_network_keypair ~keypair ~secret_name, runtime_account)
+        ( Network_keypair.create_network_keypair ~keypair ~secret_name
+        , runtime_account )
       in
       List.mapi ~f
         (List.zip_exn block_producers
@@ -221,6 +190,7 @@ module Network_config = struct
     let block_producer_config index keypair =
       { name= "test-block-producer-" ^ Int.to_string (index + 1)
       ; id= Int.to_string index
+      ; keypair
       ; keypair_secret= keypair.secret_name
       ; public_key= keypair.public_key_file
       ; private_key= keypair.private_key_file
@@ -228,6 +198,7 @@ module Network_config = struct
     in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
+    ; debug_arg= debug
     ; keypairs= block_producer_keypairs
     ; constants
     ; terraform=
@@ -306,37 +277,46 @@ module Network_manager = struct
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
-  let run_cmd t prog args = run_cmd t.testnet_dir prog args
+  let run_cmd t prog args = Util.run_cmd t.testnet_dir prog args
 
-  let run_cmd_exn t prog args = run_cmd_exn t.testnet_dir prog args
+  let run_cmd_exn t prog args = Util.run_cmd_exn t.testnet_dir prog args
 
   let create ~logger (network_config : Network_config.t) =
+    let%bind all_namespaces_str =
+      Util.run_cmd_exn "/" "kubectl"
+        ["get"; "namespaces"; "-ojsonpath={.items[*].metadata.name}"]
+    in
+    let all_namespaces = String.split ~on:' ' all_namespaces_str in
     let testnet_dir =
       network_config.coda_automation_location ^/ "terraform/testnets"
       ^/ network_config.terraform.testnet_name
     in
-    (* cleanup old deployment, if it exists; we will need to take good care of this logic when we put this in CI *)
     let%bind () =
-      if%bind File_system.dir_exists testnet_dir then (
-        [%log warn]
-          "Old network deployment found; attempting to refresh and cleanup" ;
-        let%bind _ =
-          Cmd_util.run_cmd_exn testnet_dir "terraform" ["refresh"]
+      if
+        List.mem all_namespaces network_config.terraform.testnet_name
+          ~equal:String.equal
+      then
+        let%bind () =
+          if network_config.debug_arg then
+            Util.prompt_continue
+              "Existing namespace of same name detected, pausing startup. \
+               Enter [y/Y] to continue on and remove existing namespace, \
+               start clean, and run the test; press Cntrl-C to quit out: "
+          else
+            Deferred.return
+              ([%log info]
+                 "Existing namespace of same name detected; removing to start \
+                  clean")
         in
-        let%bind _ =
-          let open Process.Output in
-          let%bind state_output =
-            Cmd_util.run_cmd testnet_dir "terraform" ["state"; "list"]
-          in
-          if not (String.is_empty state_output.stdout) then
-            let%map _ =
-              Cmd_util.run_cmd_exn testnet_dir "terraform"
-                ["destroy"; "-auto-approve"]
-            in
-            ()
-          else return ()
+        let%bind () =
+          Util.run_cmd_exn "/" "kubectl"
+            ["delete"; "namespace"; network_config.terraform.testnet_name]
+          >>| Fn.const ()
         in
-        File_system.remove_dir testnet_dir )
+        if%bind File_system.dir_exists testnet_dir then (
+          [%log info] "Old terraform directory found; removing to start clean" ;
+          File_system.remove_dir testnet_dir )
+        else return ()
       else return ()
     in
     [%log info] "Writing network configuration" ;
@@ -360,14 +340,15 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id =
+    let cons_node pod_id network_keypair_opt =
       { testnet_name= network_config.terraform.testnet_name
       ; Kubernetes_network.Node.cluster= cluster_id
       ; namespace= network_config.terraform.testnet_name
-      ; pod_id }
+      ; pod_id
+      ; network_keypair= network_keypair_opt }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_nodes = [cons_node "seed"] in
+    let seed_nodes = [cons_node "seed" None] in
     let snark_coordinator_name =
       "snark-coordinator-"
       ^ String.sub network_config.terraform.snark_worker_public_key
@@ -375,11 +356,11 @@ module Network_manager = struct
             (String.length network_config.terraform.snark_worker_public_key - 6)
           ~len:6
     in
-    let snark_coordinator_nodes = [cons_node snark_coordinator_name] in
+    let snark_coordinator_nodes = [cons_node snark_coordinator_name None] in
     let block_producer_nodes =
-      List.init (List.length network_config.terraform.block_producer_configs)
-        ~f:(fun i ->
-          cons_node (Printf.sprintf "test-block-producer-%d" (i + 1)) )
+      List.map network_config.terraform.block_producer_configs
+        ~f:(fun bp_config -> cons_node bp_config.name (Some bp_config.keypair)
+      )
     in
     let nodes_by_app_id =
       let all_nodes =

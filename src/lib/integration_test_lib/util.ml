@@ -1,10 +1,12 @@
 open Core
 open Async
 
+(* module util with  *)
+
 let run_cmd dir prog args =
   [%log' spam (Logger.create ())]
-    "Running command (from %s): %s" dir
-    (String.concat (prog :: args) ~sep:" ") ;
+    "Running command (from %s): $command" dir
+    ~metadata:[("command", `String (String.concat (prog :: args) ~sep:" "))] ;
   Process.create_exn ~working_dir:dir ~prog ~args ()
   >>= Process.collect_output_and_wait
 
@@ -46,3 +48,24 @@ let run_cmd_exn dir prog args =
       output
   | Error error ->
       Error.raise error
+
+let rec prompt_continue prompt_string =
+  print_string prompt_string ;
+  let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
+  let c = Option.value_exn In_channel.(input_char stdin) in
+  print_newline () ;
+  if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue prompt_string
+
+module Make (Engine : Intf.Engine.S) = struct
+  let pub_key_of_node node =
+    let open Signature_lib in
+    (* let n = Engine.Network.Node *)
+    match Engine.Network.Node.network_keypair node with
+    | Some nk ->
+        Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
+    | None ->
+        Malleable_error.of_string_hard_error_format
+          "Node '%s' did not have a network keypair, if node is a block \
+           producer this should not happen"
+          (Engine.Network.Node.id node)
+end
