@@ -115,7 +115,7 @@ def check_seed_list_up(v1, namespace, seeds_reachable):
 
   res = json.loads(val)
   #checklibp2p returns whether or not the connection to a peerID errored
-  successful_connections = list(filter(None,res.values()))
-  seeds_reachable.set(len(successful_connections))
+  fraction_up = sum(res.values())/len(res.values())
+  seeds_reachable.set(fraction_up)
 
 # ========================================================================
