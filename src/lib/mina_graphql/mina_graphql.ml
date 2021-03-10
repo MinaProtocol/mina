@@ -1168,7 +1168,7 @@ module Types = struct
       let map t ~f = {t with data= f t.data}
     end
 
-    let field' ?doc ?deprecated lab ~typ ~args ~resolve =
+    let field_no_status ?doc ?deprecated lab ~typ ~args ~resolve =
       field ?doc ?deprecated lab ~typ ~args ~resolve:(fun c uc ->
           resolve c uc.With_status.data )
 
@@ -1177,42 +1177,42 @@ module Types = struct
         , (Signed_command.t, Transaction_hash.t) With_hash.t With_status.t )
         field
         list =
-      [ field' "id" ~typ:(non_null guid) ~args:[]
+      [ field_no_status "id" ~typ:(non_null guid) ~args:[]
           ~resolve:(fun _ user_command ->
             Signed_command.to_base58_check user_command.With_hash.data )
-      ; field' "hash" ~typ:(non_null string) ~args:[]
+      ; field_no_status "hash" ~typ:(non_null string) ~args:[]
           ~resolve:(fun _ user_command ->
             Transaction_hash.to_base58_check user_command.With_hash.hash )
-      ; field' "kind" ~typ:(non_null kind) ~args:[]
+      ; field_no_status "kind" ~typ:(non_null kind) ~args:[]
           ~doc:"String describing the kind of user command"
           ~resolve:(fun _ cmd -> to_kind cmd.With_hash.data)
-      ; field' "nonce" ~typ:(non_null int) ~args:[]
+      ; field_no_status "nonce" ~typ:(non_null int) ~args:[]
           ~doc:"Sequence number of command for the fee-payer's account"
           ~resolve:(fun _ payment ->
             Signed_command_payload.nonce
             @@ Signed_command.payload payment.With_hash.data
             |> Account.Nonce.to_int )
-      ; field' "source" ~typ:(non_null AccountObj.account)
+      ; field_no_status "source" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command is sent from"
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.source ~next_available_token:Token_id.invalid
                  cmd.With_hash.data) )
-      ; field' "receiver" ~typ:(non_null AccountObj.account)
+      ; field_no_status "receiver" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that the command applies to"
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.receiver ~next_available_token:Token_id.invalid
                  cmd.With_hash.data) )
-      ; field' "feePayer" ~typ:(non_null AccountObj.account)
+      ; field_no_status "feePayer" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account that pays the fees for the command"
           ~resolve:(fun {ctx= coda; _} cmd ->
             AccountObj.get_best_ledger_account coda
               (Signed_command.fee_payer cmd.With_hash.data) )
-      ; field' "token" ~typ:(non_null token_id) ~args:[]
+      ; field_no_status "token" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used for the transaction" ~resolve:(fun _ cmd ->
             Signed_command.token cmd.With_hash.data )
-      ; field' "amount" ~typ:(non_null uint64) ~args:[]
+      ; field_no_status "amount" ~typ:(non_null uint64) ~args:[]
           ~doc:
             "Amount that the source is sending to receiver; 0 for commands \
              without an associated amount" ~resolve:(fun _ cmd ->
@@ -1221,15 +1221,15 @@ module Types = struct
                 Currency.Amount.to_uint64 amount
             | None ->
                 Unsigned.UInt64.zero )
-      ; field' "feeToken" ~typ:(non_null token_id) ~args:[]
+      ; field_no_status "feeToken" ~typ:(non_null token_id) ~args:[]
           ~doc:"Token used to pay the fee" ~resolve:(fun _ cmd ->
             Signed_command.fee_token cmd.With_hash.data )
-      ; field' "fee" ~typ:(non_null uint64) ~args:[]
+      ; field_no_status "fee" ~typ:(non_null uint64) ~args:[]
           ~doc:
             "Fee that the fee-payer is willing to pay for making the \
              transaction" ~resolve:(fun _ cmd ->
             Signed_command.fee cmd.With_hash.data |> Currency.Fee.to_uint64 )
-      ; field' "memo" ~typ:(non_null string) ~args:[]
+      ; field_no_status "memo" ~typ:(non_null string) ~args:[]
           ~doc:
             (sprintf
                "A short message from the sender, encoded with Base58Check, \
@@ -1240,7 +1240,7 @@ module Types = struct
             Signed_command_payload.memo
             @@ Signed_command.payload payment.With_hash.data
             |> Signed_command_memo.to_string )
-      ; field' "isDelegation" ~typ:(non_null bool) ~args:[]
+      ; field_no_status "isDelegation" ~typ:(non_null bool) ~args:[]
           ~doc:"If true, this command represents a delegation of stake"
           ~deprecated:(Deprecated (Some "use kind field instead"))
           ~resolve:(fun _ user_command ->
@@ -1252,21 +1252,21 @@ module Types = struct
                 true
             | _ ->
                 false )
-      ; field' "from" ~typ:(non_null public_key) ~args:[]
+      ; field_no_status "from" ~typ:(non_null public_key) ~args:[]
           ~doc:"Public key of the sender"
           ~deprecated:(Deprecated (Some "use feePayer field instead"))
           ~resolve:(fun _ cmd -> Signed_command.fee_payer_pk cmd.With_hash.data)
-      ; field' "fromAccount" ~typ:(non_null AccountObj.account)
+      ; field_no_status "fromAccount" ~typ:(non_null AccountObj.account)
           ~args:[] ~doc:"Account of the sender"
           ~deprecated:(Deprecated (Some "use feePayer field instead"))
           ~resolve:(fun {ctx= coda; _} payment ->
             AccountObj.get_best_ledger_account coda
             @@ Signed_command.fee_payer payment.With_hash.data )
-      ; field' "to" ~typ:(non_null public_key) ~args:[]
+      ; field_no_status "to" ~typ:(non_null public_key) ~args:[]
           ~doc:"Public key of the receiver"
           ~deprecated:(Deprecated (Some "use receiver field instead"))
           ~resolve:(fun _ cmd -> Signed_command.receiver_pk cmd.With_hash.data)
-      ; field' "toAccount"
+      ; field_no_status "toAccount"
           ~typ:(non_null AccountObj.account)
           ~doc:"Account of the receiver"
           ~deprecated:(Deprecated (Some "use receiver field instead"))
@@ -1292,13 +1292,13 @@ module Types = struct
 
     let stake_delegation =
       obj "UserCommandDelegation" ~fields:(fun _ ->
-          field' "delegator" ~typ:(non_null AccountObj.account) ~args:[]
-            ~resolve:(fun {ctx= coda; _} cmd ->
+          field_no_status "delegator" ~typ:(non_null AccountObj.account)
+            ~args:[] ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
                 (Signed_command.source ~next_available_token:Token_id.invalid
                    cmd.With_hash.data) )
-          :: field' "delegatee" ~typ:(non_null AccountObj.account) ~args:[]
-               ~resolve:(fun {ctx= coda; _} cmd ->
+          :: field_no_status "delegatee" ~typ:(non_null AccountObj.account)
+               ~args:[] ~resolve:(fun {ctx= coda; _} cmd ->
                  AccountObj.get_best_ledger_account coda
                    (Signed_command.receiver
                       ~next_available_token:Token_id.invalid cmd.With_hash.data)
@@ -1309,10 +1309,11 @@ module Types = struct
 
     let create_new_token =
       obj "UserCommandNewToken" ~fields:(fun _ ->
-          field' "tokenOwner" ~typ:(non_null public_key) ~args:[]
+          field_no_status "tokenOwner" ~typ:(non_null public_key) ~args:[]
             ~doc:"Public key to set as the owner of the new token"
             ~resolve:(fun _ cmd -> Signed_command.source_pk cmd.With_hash.data)
-          :: field' "newAccountsDisabled" ~typ:(non_null bool) ~args:[]
+          :: field_no_status "newAccountsDisabled" ~typ:(non_null bool)
+               ~args:[]
                ~doc:"Whether new accounts created in this token are disabled"
                ~resolve:(fun _ cmd ->
                  match
@@ -1332,13 +1333,13 @@ module Types = struct
 
     let create_token_account =
       obj "UserCommandNewAccount" ~fields:(fun _ ->
-          field' "tokenOwner" ~typ:(non_null AccountObj.account)
+          field_no_status "tokenOwner" ~typ:(non_null AccountObj.account)
             ~args:[] ~doc:"The account that owns the token for the new account"
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
                 (Signed_command.source ~next_available_token:Token_id.invalid
                    cmd.With_hash.data) )
-          :: field' "disabled" ~typ:(non_null bool) ~args:[]
+          :: field_no_status "disabled" ~typ:(non_null bool) ~args:[]
                ~doc:
                  "Whether this account should be disabled upon creation. If \
                   this command was not issued by the token owner, it should \
@@ -1362,7 +1363,7 @@ module Types = struct
 
     let mint_tokens =
       obj "UserCommandMintTokens" ~fields:(fun _ ->
-          field' "tokenOwner" ~typ:(non_null AccountObj.account)
+          field_no_status "tokenOwner" ~typ:(non_null AccountObj.account)
             ~args:[] ~doc:"The account that owns the token to mint"
             ~resolve:(fun {ctx= coda; _} cmd ->
               AccountObj.get_best_ledger_account coda
