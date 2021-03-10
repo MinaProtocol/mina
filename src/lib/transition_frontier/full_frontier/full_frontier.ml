@@ -64,7 +64,8 @@ type t =
       Protocol_states_for_root_scan_state.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
-  ; precomputed_values: Precomputed_values.t }
+  ; precomputed_values: Precomputed_values.t
+  ; time_controller: Block_time.Controller.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -103,7 +104,7 @@ let close ~loc t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
-    ~precomputed_values =
+    ~precomputed_values ~time_controller =
   let open Root_data in
   let transition_receipt_time = None in
   let root_hash =
@@ -145,7 +146,8 @@ let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ; consensus_local_state
     ; max_length
     ; precomputed_values
-    ; protocol_states_for_root_scan_state }
+    ; protocol_states_for_root_scan_state
+    ; time_controller }
   in
   t
 
@@ -573,12 +575,15 @@ module Metrics = struct
     go 0 (best_tip t)
 
   let slot_time t b =
+    Breadcrumb.consensus_state b
+    |> Consensus.Data.Consensus_state.consensus_time
+    |> Consensus.Data.Consensus_time.to_time
+         ~constants:t.precomputed_values.consensus_constants
+
+  let slot_time_to_offset_time_span s =
     let r =
-      Breadcrumb.consensus_state b
-      |> Consensus.Data.Consensus_state.consensus_time
-      |> Consensus.Data.Consensus_time.to_time
-           ~constants:t.precomputed_values.consensus_constants
-      |> Block_time.to_span_since_epoch |> Block_time.Span.to_ms
+      Block_time.to_span_since_epoch s
+      |> Block_time.Span.to_ms
       |> (fun x -> Int64.(x / of_int 1000))
       |> Int64.to_float
     in
@@ -640,7 +645,7 @@ let update_metrics_with_diff (type mutant) t
         Gauge.inc_one Transition_frontier.active_breadcrumbs ;
         Counter.inc_one Transition_frontier.total_breadcrumbs ;
         Gauge.set Transition_frontier.accepted_block_slot_time_sec
-          (slot_time t b))
+          (slot_time t b |> slot_time_to_offset_time_span))
   | Root_transitioned {garbage= Full garbage_breadcrumbs; _} ->
       let new_root_breadcrumb = root t in
       Mina_metrics.(
@@ -680,18 +685,30 @@ let update_metrics_with_diff (type mutant) t
   | Best_tip_changed _old_best_tip ->
       let best_tip = best_tip t in
       let open Consensus.Data.Consensus_state in
+      let slot_time = slot_time t best_tip in
+      let is_recent_block =
+        let now = Block_time.now t.time_controller in
+        let two_slots =
+          let one_slot =
+            t.precomputed_values.consensus_constants.block_window_duration_ms
+          in
+          Block_time.Span.(one_slot + one_slot)
+        in
+        Block_time.Span.( <= ) (Block_time.diff now slot_time) two_slots
+      in
       Mina_metrics.(
         Gauge.set Transition_frontier.best_tip_user_txns
           (Int.to_float (List.length (Breadcrumb.commands best_tip))) ;
-        Gauge.set Transition_frontier.best_tip_coinbase
-          (if has_coinbase best_tip then 1. else 0.) ;
+        if is_recent_block then
+          Gauge.set Transition_frontier.best_tip_coinbase
+            (if has_coinbase best_tip then 1. else 0.) ;
         Gauge.set Transition_frontier.slot_fill_rate (slot_fill_rate t) ;
         Gauge.set Transition_frontier.min_window_density
           (Int.to_float (intprop min_window_density best_tip)) ;
         Gauge.set Transition_frontier.longest_fork
           (Int.to_float (longest_fork t)) ;
         Gauge.set Transition_frontier.best_tip_slot_time_sec
-          (slot_time t best_tip) ;
+          (slot_time_to_offset_time_span slot_time) ;
         Gauge.set Transition_frontier.empty_blocks_at_best_tip
           (Int.to_float (empty_blocks_at_best_tip t)))
 

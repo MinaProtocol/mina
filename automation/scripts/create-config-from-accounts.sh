@@ -16,4 +16,4 @@ fi
 
 # Optional: add num_accounts
 
-jq -s '{ genesis: { genesis_state_timestamp: "'${GENESIS_TIMESTAMP}'" }, ledger: { name: "'${TESTNET}'", accounts: [ .[] ] } }' ${ARTIFACT_PATH}/*.json > "${ARTIFACT_PATH}/genesis_ledger.json"
+jq -s '{ genesis: { genesis_state_timestamp: "'${GENESIS_TIMESTAMP}'" }, ledger: { name: "'${TESTNET}'", accounts: [ .[] ] } }' ${ARTIFACT_PATH}/*.accounts.json > "${ARTIFACT_PATH}/genesis_ledger.json"
