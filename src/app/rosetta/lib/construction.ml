@@ -158,18 +158,11 @@ module Metadata_data = struct
   type t =
     { sender: string
     ; nonce: Unsigned_extended.UInt32.t
-    ; token_id: Unsigned_extended.UInt64.t
-    ; minimum_fee: Amount.t list [@default []] }
+    ; token_id: Unsigned_extended.UInt64.t }
   [@@deriving yojson]
 
   let create ~nonce ~sender ~token_id =
-    { sender= Public_key.Compressed.to_base58_check sender
-    ; nonce
-    ; token_id
-    ; minimum_fee=
-        [ Amount_of.coda
-            (MinaCurrency.Fee.to_uint64
-               Mina_compile_config.minimum_user_command_fee) ] }
+    {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id}
 
   let of_json r =
     of_yojson r
@@ -296,14 +289,24 @@ module Metadata = struct
           account#nonce
         |> Option.value ~default:Unsigned.UInt32.zero
       in
+      let suggested_fee =
+        Amount_of.coda
+          (MinaCurrency.Fee.to_uint64
+             Mina_compile_config.default_transaction_fee)
+      in
+      let amount_metadata =
+        `Assoc
+          [ ( "minimum_fee"
+            , Amount.to_yojson
+                (Amount_of.coda
+                   (MinaCurrency.Fee.to_uint64
+                      Mina_compile_config.minimum_user_command_fee)) ) ]
+      in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
-      ; suggested_fee=
-          [ Amount_of.coda
-              (MinaCurrency.Fee.to_uint64
-                 Mina_compile_config.default_transaction_fee) ] }
+      ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
   end
 
   module Real = Impl (Deferred.Result)
