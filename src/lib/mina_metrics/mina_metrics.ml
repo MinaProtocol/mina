@@ -5,6 +5,7 @@ open Core_kernel
 open Prometheus
 open Namespace
 open Metric_generators
+open Async_kernel
 
 let time_offset_sec = 1609459200.
 
@@ -878,7 +879,7 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
-let server ~port ~logger =
+let generic_server ~port ~logger ~registry =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
@@ -890,7 +891,7 @@ let server ~port ~logger =
     let uri = Request.uri req in
     match (Request.meth req, Uri.path uri) with
     | `GET, "/metrics" ->
-        let data = CollectorRegistry.(collect default) in
+        let data = CollectorRegistry.(collect registry) in
         let body = Fmt.to_to_string TextFormat_0_0_4.output data in
         let headers =
           Header.init_with "Content-Type" "text/plain; version=0.0.4"
@@ -902,6 +903,52 @@ let server ~port ~logger =
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
     (Async_extra.Tcp.Where_to_listen.of_port port)
     callback
+
+let server ~port ~logger =
+  generic_server ~port ~logger ~registry:CollectorRegistry.default
+
+module Archive = struct
+  type t =
+    {registry: CollectorRegistry.t; gauge_metrics: (string, Gauge.t) Hashtbl.t}
+
+  let subsystem = "Archive"
+
+  let find_or_add t ~name ~help ~subsystem =
+    match Hashtbl.find t.gauge_metrics name with
+    | None ->
+        let g =
+          Gauge.v name ~help ~namespace ~subsystem ~registry:t.registry
+        in
+        Hashtbl.add_exn t.gauge_metrics ~key:name ~data:g ;
+        g
+    | Some m ->
+        m
+
+  let unparented_blocks t : Gauge.t =
+    let help = "Number of blocks without a parent" in
+    let name = "unparented_blocks" in
+    find_or_add t ~name ~help ~subsystem
+
+  let max_block_height t : Gauge.t =
+    let help = "Max block height recorded in the archive database" in
+    let name = "max_block_height" in
+    find_or_add t ~name ~help ~subsystem
+
+  let missing_blocks t : Gauge.t =
+    let help =
+      "Number of missing blocks in the last n (n = 2000 by default) blocks. A \
+       block for a specific height is missing if there is no entry in the \
+       blocks table for that height"
+    in
+    let name = "missing_blocks" in
+    find_or_add t ~name ~help ~subsystem
+
+  let create_archive_server ~port ~logger =
+    let open Async_kernel.Deferred.Let_syntax in
+    let archive_registry = CollectorRegistry.create () in
+    let%map _ = generic_server ~port ~logger ~registry:archive_registry in
+    {registry= archive_registry; gauge_metrics= Hashtbl.create (module String)}
+end
 
 (* re-export a constrained subset of prometheus to keep consumers of this module abstract over implementation *)
 include (
