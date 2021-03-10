@@ -44,14 +44,10 @@ in
               -- Download test dependencies
               Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
               Cmd.run "artifact-cache-helper.sh ${deployEnv}",
+              Cmd.run "cat ${deployEnv}",
 
               -- Execute test based on BUILD image
-              Cmd.run (
-                "source ${deployEnv} && ./test_executive.exe cloud" ++
-                " --coda-image gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
-                " --coda-automation-location ./automation" ++
-                " ${testName}"
-              )
+              Cmd.run "source ${deployEnv} && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "Execute integration test: ${testName}",

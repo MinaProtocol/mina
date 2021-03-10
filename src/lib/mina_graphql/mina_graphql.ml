@@ -390,12 +390,26 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Public key of fee transfer recipient"
             ~typ:(non_null public_key)
-            ~resolve:(fun _ {Fee_transfer.receiver_pk= pk; _} -> pk)
+            ~resolve:(fun _ ({Fee_transfer.receiver_pk= pk; _}, _) -> pk)
         ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
             ~doc:"Amount that the recipient is paid in this fee transfer"
-            ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
-        ] )
+            ~resolve:(fun _ ({Fee_transfer.fee; _}, _) ->
+              Currency.Fee.to_uint64 fee )
+        ; field "type" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~doc:
+              "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees \
+               deducted from the coinbase amount are of type \
+               'Fee_transfer_via_coinbase', rest are deducted from \
+               transaction fees"
+            ~resolve:(fun _ (_, transfer_type) ->
+              match transfer_type with
+              | Filtered_external_transition.Fee_transfer_type
+                .Fee_transfer_via_coinbase ->
+                  "Fee_transfer_via_coinbase"
+              | Fee_transfer ->
+                  "Fee_transfer" ) ] )
 
   let account_timing : (Mina_lib.t, Account_timing.t option) typ =
     obj "AccountTiming" ~fields:(fun _ ->
@@ -554,25 +568,6 @@ module Types = struct
             ~resolve:
               (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
               Frozen_ledger_hash.to_string snarked_ledger_hash )
-        ; field "stagedLedgerProofEmitted" ~typ:bool
-            ~doc:
-              "Block finished a staged ledger, and a proof was emitted from \
-               it and included into this block's proof. If there is no \
-               transition frontier available, this will return null."
-            ~args:Arg.[]
-            ~resolve:
-              (fun {ctx= coda; _}
-                   {Mina_state.Blockchain_state.Poly.state_hash; _} ->
-              let open Option.Let_syntax in
-              let%bind frontier =
-                Mina_lib.transition_frontier coda
-                |> Pipe_lib.Broadcast_pipe.Reader.peek
-              in
-              match Transition_frontier.find frontier state_hash with
-              | None ->
-                  None
-              | Some b ->
-                  Some (Breadcrumb.just_emitted_a_proof b) )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
@@ -679,8 +674,13 @@ module Types = struct
                 ~resolve:(fun _ (b : t) ->
                   Option.map (min_balance b) ~f:(fun min_balance ->
                       let total_balance : uint64 = Balance.to_uint64 b.total in
-                      Unsigned.UInt64.sub total_balance
-                        (Balance.to_uint64 min_balance) ) )
+                      let min_balance_uint64 = Balance.to_uint64 min_balance in
+                      if
+                        Unsigned.UInt64.compare total_balance
+                          min_balance_uint64
+                        > 0
+                      then Unsigned.UInt64.sub total_balance min_balance_uint64
+                      else Unsigned.UInt64.zero ) )
             ; field "locked" ~typ:uint64
                 ~doc:
                   "The amount of coda owned by the account which is currently \
@@ -1605,6 +1605,14 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let send_rosetta_transaction =
+      obj "SendRosettaTransactionPayload" ~fields:(fun _ ->
+          [ field "userCommand"
+              ~typ:(non_null UserCommand.user_command_interface)
+              ~doc:"Command that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let export_logs =
       obj "ExportLogsPayload" ~fields:(fun _ ->
           [ field "exportLogs"
@@ -1934,6 +1942,13 @@ module Types = struct
           ; valid_until
           ; memo
           ; nonce ]
+
+    let rosetta_transaction =
+      Schema.Arg.scalar "RosettaTransaction"
+        ~doc:"A transaction encoded in the rosetta format"
+        ~coerce:(fun graphql_json ->
+          Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
+          |> Result.map_error ~f:Error.to_string_hum )
 
     let create_account =
       obj "AddAccountInput" ~coerce:Fn.id
@@ -2497,6 +2512,28 @@ module Mutations = struct
               ~fee ~fee_token ~fee_payer_pk:token_owner ~valid_until ~body
               ~signature )
 
+  let send_rosetta_transaction =
+    io_field "sendRosettaTransaction"
+      ~doc:"Send a transaction in rosetta format"
+      ~typ:(non_null Types.Payload.send_rosetta_transaction)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.rosetta_transaction)]
+      ~resolve:(fun {ctx= mina; _} () signed_command ->
+        match%map
+          Mina_lib.add_full_transactions mina
+            [User_command.Signed_command signed_command]
+        with
+        | Ok ([(User_command.Signed_command signed_command as transaction)], _)
+          ->
+            Ok
+              (Types.UserCommand.mk_user_command
+                 { With_hash.data= signed_command
+                 ; hash= Transaction_hash.hash_command transaction })
+        | Error err ->
+            Error (Error.to_string_hum err)
+        | _ ->
+            (* TODO: Be better here, we actually have more info. *)
+            Error "Transaction could not be entered into the pool" )
+
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
       ~args:Arg.[arg "basename" ~typ:string]
@@ -2697,7 +2734,8 @@ module Mutations = struct
     ; set_connection_gating_config
     ; add_peer
     ; archive_precomputed_block
-    ; archive_extensional_block ]
+    ; archive_extensional_block
+    ; send_rosetta_transaction ]
 end
 
 module Queries = struct
@@ -3028,7 +3066,9 @@ module Queries = struct
         Arg.
           [ arg "stateHash" ~doc:"The state hash of the desired block"
               ~typ:string
-          ; arg "height" ~doc:"The height of the desired block" ~typ:int ]
+          ; arg "height"
+              ~doc:"The height of the desired block in the best chain" ~typ:int
+          ]
       ~resolve:
         (fun {ctx= coda; _} () (state_hash_base58_opt : string option)
              (height_opt : int option) ->
@@ -3065,11 +3105,11 @@ module Queries = struct
             Unsigned.UInt32.of_int height
           in
           let%bind transition_frontier = get_transition_frontier () in
-          let breadcrumbs =
-            Transition_frontier.all_breadcrumbs transition_frontier
+          let best_chain_breadcrumbs =
+            Transition_frontier.best_tip_path transition_frontier
           in
           let%map desired_breadcrumb =
-            List.find breadcrumbs ~f:(fun bc ->
+            List.find best_chain_breadcrumbs ~f:(fun bc ->
                 let validated_transition =
                   Transition_frontier.Breadcrumb.validated_transition bc
                 in

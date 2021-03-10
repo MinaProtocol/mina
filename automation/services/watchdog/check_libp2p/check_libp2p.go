@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	libp2pmplex "github.com/libp2p/go-libp2p-mplex"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 

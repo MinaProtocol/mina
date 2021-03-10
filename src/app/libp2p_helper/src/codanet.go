@@ -66,7 +66,7 @@ var (
 	}
 
 	pxProtocolID        = protocol.ID("/mina/peer-exchange")
-	TelemetryProtocolID = protocol.ID("/mina/telemetry")
+	NodeStatusProtocolID = protocol.ID("/mina/node-status")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -234,7 +234,7 @@ type Helper struct {
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
 	Seeds             []peer.AddrInfo
-	TelemetryData     string
+	NodeStatus        string
 }
 
 // this type implements the ConnectionGating interface
@@ -514,21 +514,32 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	}
 }
 
-func (h *Helper) handleTelemetryStreams(s network.Stream) {
+func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	defer func() {
-		_ = s.Close()
+		err := s.Close()
+		if err != nil {
+			logger.Error("failed to close write side of stream", err)
+			return
+		}
+
+		<-time.After(400 * time.Millisecond)
+
+		err = s.Reset()
+		if err != nil {
+			logger.Error("failed to reset stream", err)
+		}
 	}()
 
-	n, err := s.Write([]byte(h.TelemetryData))
+	n, err := s.Write([]byte(h.NodeStatus))
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(h.TelemetryData) {
+	} else if n != len(h.NodeStatus) {
 		logger.Error("failed to write all data to stream")
 		return
 	}
 
-	logger.Debugf("wrote telemetry data to stream %s", s.Protocol())
+	logger.Debugf("wrote node status to stream %s", s.Protocol())
 }
 
 // MakeHelper does all the initialization to run one host
@@ -636,6 +647,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	connManager.ctx = ctx
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
-	h.Host.SetStreamHandler(TelemetryProtocolID, h.handleTelemetryStreams)
+	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil
 }

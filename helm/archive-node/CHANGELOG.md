@@ -12,3 +12,10 @@
 - fix daemon side-car hostPort reference
 - add peers list URL chart value
 
+1.0.0:
+------
+- coda -> mina
+
+1.0.1:
+------
+- enable toggle of local daemon and associated postgresDB deployments

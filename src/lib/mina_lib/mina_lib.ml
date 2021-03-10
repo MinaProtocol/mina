@@ -17,19 +17,19 @@ module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
 type Structured_log_events.t += Connecting
-  [@@deriving register_event {msg= "Coda daemon is connecting"}]
+  [@@deriving register_event {msg= "Mina daemon is connecting"}]
 
 type Structured_log_events.t += Listening
-  [@@deriving register_event {msg= "Coda daemon is listening"}]
+  [@@deriving register_event {msg= "Mina daemon is listening"}]
 
 type Structured_log_events.t += Bootstrapping
-  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
+  [@@deriving register_event {msg= "Mina daemon is bootstrapping"}]
 
 type Structured_log_events.t += Ledger_catchup
-  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
+  [@@deriving register_event {msg= "Mina daemon is doing ledger catchup"}]
 
 type Structured_log_events.t += Synced
-  [@@deriving register_event {msg= "Coda daemon is synced"}]
+  [@@deriving register_event {msg= "Mina daemon is synced"}]
 
 type Structured_log_events.t +=
   | Rebroadcast_transition of {state_hash: State_hash.t}
@@ -82,6 +82,15 @@ type pipes =
            -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
               , string )
               Result.t)
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
+  ; user_command_writer:
+      ( User_command.t list
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -738,11 +747,14 @@ let get_current_nonce t aid =
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    ( uc_inputs
-    , ( if Ivar.is_full result_ivar then
-          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
-        Ivar.fill result_ivar )
-    , get_current_nonce t )
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
+
+let add_full_transactions t user_command =
+  let result_ivar = Ivar.create () in
+  Strict_pipe.Writer.write t.pipes.user_command_writer
+    (user_command, Ivar.fill result_ivar)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1081,10 +1093,10 @@ let create ?wallets (config : Config.t) =
                 in
                 f ~frontier input )
           in
-          (* knot-tying hacks so we can pass a get_telemetry function before net, Mina_lib.t created *)
+          (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
-          let get_telemetry_data _env =
+          let get_node_status _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
             in
@@ -1093,27 +1105,27 @@ let create ?wallets (config : Config.t) =
               Option.value_map peer_opt ~default:"<UNKNOWN>" ~f:(fun peer ->
                   peer.peer_id )
             in
-            if config.disable_telemetry then
+            if config.disable_node_status then
               Deferred.return
               @@ Error
                    (Error.of_string
                       (sprintf
                          !"Node with IP address=%{sexp: Unix.Inet_addr.t}, \
-                           peer ID=%s, telemetry is disabled"
+                           peer ID=%s, node status is disabled"
                          node_ip_addr node_peer_id))
             else
               match !net_ref with
               | None ->
                   (* should be unreachable; without a network, we wouldn't receive this RPC call *)
                   [%log' info config.logger]
-                    "Network not instantiated when telemetry data requested" ;
+                    "Network not instantiated when node status requested" ;
                   Deferred.return
                   @@ Error
                        (Error.of_string
                           (sprintf
                              !"Node with IP address=%{sexp: \
                                Unix.Inet_addr.t}, peer ID=%s, network not \
-                               instantiated when telemetry data requested"
+                               instantiated when node status requested"
                              node_ip_addr node_peer_id))
               | Some net ->
                   let protocol_state_hash, k_block_hashes_and_timestamps =
@@ -1180,7 +1192,7 @@ let create ?wallets (config : Config.t) =
                       ~f:Fn.id
                       ~default:(Float.to_int minutes_float)
                   in
-                  Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                  Mina_networking.Rpcs.Get_node_status.Node_status.
                     { node_ip_addr
                     ; node_peer_id
                     ; sync_status
@@ -1273,7 +1285,7 @@ let create ?wallets (config : Config.t) =
                      in
                      { proof_with_data with
                        data= With_hash.data proof_with_data.data } ))
-              ~get_telemetry_data
+              ~get_node_status
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->
@@ -1631,6 +1643,7 @@ let create ?wallets (config : Config.t) =
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
                 ; user_command_input_writer
+                ; user_command_writer= local_txns_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs

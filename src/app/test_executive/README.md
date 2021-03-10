@@ -48,8 +48,8 @@ test_executive cloud $TEST --coda-image=$CODA_IMAGE --debug | tee test.log | log
 
 Running the integration test will of course create a testnet on GCP.  In order to differentiate different test runs, a unique testnet namespace is constructed for each testnet.  The namespace is constructed from appending together the first 5 chars of the local system username of the person running the test, the short 7 char git hash, the test name, and part of the timestamp.
 
-format is: ``username-gitHash-testname-DayofmonthHrMin`
+format is: ``it-{username}-{gitHash}-{testname}`
 
-ex: ``adalo-3a9f8ce-block-prod-151134`; user is adalovelace, git commit 3a9f8ce, running block production test, 15th of a month, 11:34 AM, GMT time
+ex: ``it-adalo-3a9f8ce-block-prod`; user is adalovelace, git commit 3a9f8ce, running block production test
 
 GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters

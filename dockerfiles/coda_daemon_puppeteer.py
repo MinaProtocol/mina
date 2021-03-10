@@ -33,11 +33,30 @@ def handle_stop_request(signum, frame):
   global inactive_daemon_request
   inactive_daemon_request = True
 
+def get_child_processes(pid):
+  result = subprocess.run(
+    ['ps', '-o', 'pid=', '--ppid', str(pid)],
+    stdout=subprocess.PIPE
+  )
+  output = result.stdout.decode('ascii')
+  return list(map(int, filter(lambda s: len(s) > 0, output.split(' '))))
+
+def pid_is_running(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+def wait_for_pid(pid):
+    while pid_is_running(pid):
+        time.sleep(0.25)
+
 def start_daemon():
   global coda_process
-  with open('coda.log', 'a') as f:
+  with open('mina.log', 'a') as f:
     coda_process = subprocess.Popen(
-        ['coda'] + daemon_args,
+        ['mina'] + daemon_args,
         stdout=f,
         stderr=subprocess.STDOUT
     )
@@ -46,7 +65,11 @@ def start_daemon():
 def stop_daemon():
   global coda_process
   coda_process.send_signal(signal.SIGTERM)
+
+  child_pids = get_child_processes(coda_process.pid)
   coda_process.wait()
+  for child_pid in child_pids:
+      wait_for_pid(child_pid)
   Path('daemon-active').unlink()
   coda_process = None
 
@@ -89,15 +112,15 @@ if __name__ == '__main__':
   signal.signal(signal.SIGUSR1, handle_stop_request)
   signal.signal(signal.SIGUSR2, handle_start_request)
 
-  Path('.coda-config').mkdir(exist_ok=True)
-  Path('coda.log').touch()
-  Path('.coda-config/coda-prover.log').touch()
-  Path('.coda-config/coda-verifier.log').touch()
-  Path('.coda-config/mina-best-tip.log').touch()
+  Path('.mina-config').mkdir(exist_ok=True)
+  Path('mina.log').touch()
+  Path('.mina-config/mina-prover.log').touch()
+  Path('.mina-config/mina-verifier.log').touch()
+  Path('.mina-config/mina-best-tip.log').touch()
 
   # currently does not handle tail process dying
   tail_process = subprocess.Popen(
-      ['tail', '-q', '-f', 'coda.log', '-f', '.coda-config/coda-prover.log', '-f', '.coda-config/coda-verifier.log', '-f' , '.coda-config/mina-best-tip.log']
+      ['tail', '-q', '-f', 'mina.log', '-f', '.mina-config/mina-prover.log', '-f', '.mina-config/mina-verifier.log', '-f' , '.mina-config/mina-best-tip.log']
   )
 
   start_daemon()

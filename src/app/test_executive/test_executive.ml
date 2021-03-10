@@ -32,6 +32,10 @@ type inputs =
   ; coda_image: string
   ; debug: bool }
 
+let validate_inputs {coda_image; _} =
+  if String.is_empty coda_image then
+    failwith "Coda image cannot be an empt string"
+
 let engines : engine list =
   [("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))]
 
@@ -218,7 +222,7 @@ let main inputs =
   in
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~test_config:T.config ~images
+      ~debug:inputs.debug ~test_config:T.config ~images
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -227,15 +231,10 @@ let main inputs =
   let network_state_writer_ref = ref None in
   let cleanup_deferred_ref = ref None in
   let f_dispatch_cleanup =
-    let rec prompt_continue () =
-      print_string "Pausing cleanup. Enter [y/Y] to continue: " ;
-      let%bind () = Writer.flushed (Lazy.force Writer.stdout) in
-      let c = Option.value_exn In_channel.(input_char stdin) in
-      print_newline () ;
-      if c = 'y' || c = 'Y' then Deferred.unit else prompt_continue ()
-    in
     let init_cleanup_func () =
-      if inputs.debug then prompt_continue () else Deferred.unit
+      if inputs.debug then
+        Util.prompt_continue "Pausing cleanup. Enter [y/Y] to continue: "
+      else Deferred.unit
     in
     let lift_accumulated_errors_func () =
       Option.value_map !error_accumulator_ref ~default:Test_error.Set.empty
@@ -318,6 +317,7 @@ let main inputs =
   exit 0
 
 let start inputs =
+  validate_inputs inputs ;
   never_returns
     (Async.Scheduler.go_main ~main:(fun () -> don't_wait_for (main inputs)) ())
 

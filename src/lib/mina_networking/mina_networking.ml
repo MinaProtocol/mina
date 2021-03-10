@@ -563,8 +563,8 @@ module Rpcs = struct
     end
   end
 
-  module Get_telemetry_data = struct
-    module Telemetry_data = struct
+  module Get_node_status = struct
+    module Node_status = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
@@ -603,12 +603,12 @@ module Rpcs = struct
     end
 
     module Master = struct
-      let name = "get_telemetry_data"
+      let name = "get_node_status"
 
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        type response = Telemetry_data.t Or_error.t
+        type response = Node_status.t Or_error.t
       end
 
       module Caller = T
@@ -621,8 +621,8 @@ module Rpcs = struct
 
     let response_to_yojson response =
       match response with
-      | Ok telem ->
-          Telemetry_data.Stable.V1.to_yojson telem
+      | Ok status ->
+          Node_status.Stable.V1.to_yojson status
       | Error err ->
           `Assoc [("error", Error_json.error_to_yojson err)]
 
@@ -636,7 +636,7 @@ module Rpcs = struct
         type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
-          Telemetry_data.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+          Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -839,9 +839,9 @@ let create (config : Config.t)
     ~(get_best_tip :
           Rpcs.Get_best_tip.query Envelope.Incoming.t
        -> Rpcs.Get_best_tip.response Deferred.t)
-    ~(get_telemetry_data :
-          Rpcs.Get_telemetry_data.query Envelope.Incoming.t
-       -> Rpcs.Get_telemetry_data.response Deferred.t)
+    ~(get_node_status :
+          Rpcs.Get_node_status.query Envelope.Incoming.t
+       -> Rpcs.Get_node_status.response Deferred.t)
     ~(get_transition_chain_proof :
           Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
@@ -1149,19 +1149,19 @@ let create (config : Config.t)
   let%map gossip_net =
     Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
   in
-  (* The telemetry data RPC is implemented directly in go, serving a string which
+  (* The node status RPC is implemented directly in go, serving a string which
      is periodically updated. This is so that one can make this RPC on a node even
      if that node is at its connection limit. *)
   let fake_time = Time.now () in
   Clock.every' (Time.Span.of_min 1.) (fun () ->
       match%bind
-        get_telemetry_data {data= (); sender= Local; received_at= fake_time}
+        get_node_status {data= (); sender= Local; received_at= fake_time}
       with
       | Error _ ->
           Deferred.unit
       | Ok data ->
-          Gossip_net.Any.set_telemetry_data gossip_net
-            ( Rpcs.Get_telemetry_data.Telemetry_data.to_yojson data
+          Gossip_net.Any.set_node_status gossip_net
+            ( Rpcs.Get_node_status.Node_status.to_yojson data
             |> Yojson.Safe.to_string )
           >>| ignore ) ;
   don't_wait_for
@@ -1245,12 +1245,12 @@ include struct
 
   let peers = lift peers
 
-  let get_peer_telemetry_data t peer =
+  let get_peer_node_status t peer =
     let open Deferred.Or_error.Let_syntax in
-    let%bind s = get_peer_telemetry_data t.gossip_net peer in
+    let%bind s = get_peer_node_status t.gossip_net peer in
     Or_error.try_with (fun () ->
         match
-          Rpcs.Get_telemetry_data.Telemetry_data.of_yojson
+          Rpcs.Get_node_status.Node_status.of_yojson
             (Yojson.Safe.from_string s)
         with
         | Ok x ->
