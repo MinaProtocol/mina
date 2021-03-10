@@ -25,6 +25,7 @@ archive:
   ports:
     server: 3086
     postgres: "5432"
+    metrics: "10002"
   enableLocalDaemon: true
   enablePostgresDB: true
 

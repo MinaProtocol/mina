@@ -162,13 +162,13 @@ groups:
       description: "High block gossip latency (ms) within {{ $labels.testnet }} network."
 
   - alert: SomewhatOldBestTip
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 8 * 180
+    expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 8 * 180) > 1
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
     annotations:
-      summary: "{{ $labels.testnet }}: all nodes have best tips older than 8 slots"
-      description: "All nodes have best tips older than 8 slots (24 minutes) on network {{ $labels.testnet }}."
+      summary: "{{ $labels.testnet }}: at least 2 nodes have best tips older than 8 slots"
+      description: "At least 2 nodes have best tips older than 8 slots (24 minutes) on network {{ $labels.testnet }}."
 
   - alert: MediumFork
     expr: max by (testnet) (Coda_Transition_frontier_longest_fork ${rule_filter}) >= 8
