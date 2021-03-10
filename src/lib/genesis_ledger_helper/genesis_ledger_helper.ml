@@ -1088,9 +1088,11 @@ module Genesis_proof = struct
           (Mina_user_error.Mina_user_error
              { where= Some "generating a genesis proof"
              ; message=
-                 "Hint: pass the flag --generate-genesis-proof true. For \
-                  example,\n\
-                  mina.exe daemon --generate-genesis-proof true" })
+                 sprintf
+                   "Hint: pass the flag --generate-genesis-proof true. For \
+                    example,\n\
+                    %s daemon --generate-genesis-proof true"
+                   Sys.argv.(0) })
 end
 
 let make_constraint_constants
