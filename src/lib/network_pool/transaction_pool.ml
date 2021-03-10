@@ -96,6 +96,37 @@ module Diff_versioned = struct
       | Expired
       | Overloaded
     [@@deriving sexp, yojson]
+
+    let to_string_hum = function
+      | Insufficient_replace_fee ->
+          "This transaction would have replaced an existing transaction in \
+           the pool, but the fee was too low"
+      | Invalid_signature ->
+          "This transaction had an invalid signature"
+      | Duplicate ->
+          "This transaction is a duplicate of one already in the pool"
+      | Sender_account_does_not_exist ->
+          "The fee-payer's account for this transaction could not be found in \
+           the ledger"
+      | Invalid_nonce ->
+          "This transaction had an invalid nonce"
+      | Insufficient_funds ->
+          "There are not enough funds in the fee-payer's account to execute \
+           this transaction"
+      | Insufficient_fee ->
+          "The fee for this transaction is too low"
+      | Overflow ->
+          "Executing this transaction would result in an integer overflow"
+      | Bad_token ->
+          "This transaction uses non-default tokens where they are not \
+           permitted"
+      | Unwanted_fee_token ->
+          "This transaction pays fees in a non-default token that this pool \
+           does not accept"
+      | Expired ->
+          "This transaction has expired"
+      | Overloaded ->
+          "The diff containing this transaction was too large"
   end
 
   module Rejected = struct
@@ -771,6 +802,8 @@ struct
           | Expired
           | Overloaded
         [@@deriving sexp, yojson]
+
+        let to_string_hum = Diff_versioned.Diff_error.to_string_hum
       end
 
       module Rejected = struct

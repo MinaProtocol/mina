@@ -2530,9 +2530,17 @@ module Mutations = struct
                  ; hash= Transaction_hash.hash_command transaction })
         | Error err ->
             Error (Error.to_string_hum err)
-        | _ ->
-            (* TODO: Be better here, we actually have more info. *)
-            Error "Transaction could not be entered into the pool" )
+        | Ok ([], [(_, diff_error)]) ->
+            let diff_error =
+              Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+              .to_string_hum diff_error
+            in
+            Error
+              (sprintf "Transaction could not be entered into the pool: %s"
+                 diff_error)
+        | Ok _ ->
+            Error
+              "Internal error: response from transaction pool was malformed" )
 
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"
