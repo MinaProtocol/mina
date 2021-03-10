@@ -103,13 +103,19 @@ def check_seed_list_up(v1, namespace, seeds_reachable):
     contents = f.read().decode('utf-8')
 
   seeds =  ' '.join(contents.split('\n'))
+  #stdbuf -o0 is to disable buffering
+  command = 'stdbuf -o0 check_libp2p/check_libp2p ' + seeds
+  proc = subprocess.Popen(command,stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
+  for line in proc.stderr.readlines():
+        print("check_libp2p error: {}".format(line))
+  val = proc.stdout.read()
+  print("check_libp2p output: {}".format(val))
+  proc.stdout.close()
+  proc.wait()
 
-  command = 'check_libp2p/check_libp2p ' + seeds
-  proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
-  res = json.loads(proc.stdout.read())
-
-  fraction_up = sum(res.values())/len(res.values())
-
-  seeds_reachable.set(fraction_up)
+  res = json.loads(val)
+  #checklibp2p returns whether or not the connection to a peerID errored
+  successful_connections = list(filter(None,res.values()))
+  seeds_reachable.set(len(successful_connections))
 
 # ========================================================================
