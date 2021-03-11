@@ -34,7 +34,7 @@ Generally, when adding or updating alerts:
 
 Testing of testnet alerts currently involves leveraging Grafana's [cortex-tools](https://github.com/grafana/cortex-tools), a toolset developed and maintained by the Grafana community for managing Prometheus/Alertmanager alerting configurations. Specifically, the testing process makes use of `lint` and `check` for ensuring alerting rules defined within *testnet-alert-rules.yml* are both syntactically correct and also meet best practices/standards for maintaining consistency in how rules are expressed and formatted. Both operations can be executed automatically in CI or manually within a developer's local environment.
 
-**Note:** all manual steps are executed in a Docker container/environment to ensure portability and should be run from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory with the *mina* repo.
+**Note:** all manual steps should be run from the [automation monitoring](https://github.com/MinaProtocol/mina/tree/develop/automation/terraform/monitoring) directory within the *mina* repo. A copy of the rendered rules configuration will be placed in this directory for reference when testing locally.
 
 ##### Linting
 
@@ -46,7 +46,7 @@ Executed by CI's *Lint/TestnetAlerts* [job](https://github.com/MinaProtocol/mina
 
 ###### manual steps
 
-    `terraform apply -target module.o1testnet_alerts.docker_container.lint_rules_config` 
+    `terraform apply -target module.o1testnet_alerts.null_resource.alert_rules_lint` 
 
 ##### Check alerts against recommended [best practices](https://prometheus.io/docs/practices/rules/)
 
@@ -56,7 +56,7 @@ Executed by CI's *Lint/TestnetAlerts* [job](https://github.com/MinaProtocol/mina
 
 ###### manual steps
 
-    `terraform apply -target module.o1testnet_alerts.docker_container.check_rules_config`
+    `terraform apply -target module.o1testnet_alerts.null_resource.alert_rules_check`
 
 #### Deployment
 
@@ -120,6 +120,7 @@ Alert receivers are reporting endpoints for messaging alert rules which are in v
 
 Updates to testnet alert receivers will typically involve 1 or more of the following tasks:
 * modify which testnets trigger Pagerduty incidents when alert rule violations occur
+* modify which testnets are included within the monitoring and alerting system (e.g. to exclude testnets launched by CI)
 * update the Testnet PagerDuty service integration key
 * update the Discord webhook integration key
 
@@ -127,7 +128,11 @@ Updates to testnet alert receivers will typically involve 1 or more of the follo
 
 The list of testnets which trigger PagerDuty incidents when rule violations occur is controlled by a single regular expression defined in the [o1-testnet-alerts](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/monitoring/o1-testnet-alerts.tf#L17) terraform module config. 
 
-This value can be modified to any regex for capturing testnets by name though should generally be a relatively simple expression (e.g. `"mainnet|qanet|release-net"`) considering the critical nature of the setting and allowing easy identification of which testnets developers will be paged about. 
+This value can be modified to any regex for capturing testnets by name though should generally be a relatively simple expression (e.g. `"mainnet|qanet|release-net"`) considering the critical nature of the setting and allowing easy identification of which testnets developers will be paged about.
+
+##### Modify monitored testnets
+
+Like the list of testnets which trigger PagerDuty incidents, the list of testnets monitored is also controlled by a single regular expression defined in the [o1-testnet-alerts](https://github.com/MinaProtocol/mina/blob/develop/automation/terraform/monitoring/o1-testnet-alerts.tf#L15) terraform module config. This setting should always be a superset of the testnets alerting to PagerDuty since it manages all testnets to be included in the monitoring and alerting pipeline and both operationally and technically should be as expressive as visibility calls for.
 
 ##### Update Pagerduty Testnet Service Integration Key 
 
