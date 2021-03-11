@@ -46,11 +46,13 @@ func main() {
 	for i, addr := range addrs {
 		maddr, err := ma.NewMultiaddr(addr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr,err)
 			panic(err)
 		}
 
 		infos[i], err = peer.AddrInfoFromP2pAddr(maddr)
 		if err != nil {
+			fmt.Fprintln(os.Stderr,err)
 			panic(err)
 		}
 	}
@@ -63,6 +65,7 @@ func main() {
 		if err == nil {
 			online[info.ID.String()] = true
 		} else {
+			fmt.Fprintln(os.Stderr, err)
 			online[info.ID.String()] = false
 		}
 		cancel()
@@ -70,6 +73,7 @@ func main() {
 
 	prettyJSON, err := json.MarshalIndent(online, "", "    ")
 	if err != nil {
+		fmt.Println(err)
 		panic(err)
 	}
 	fmt.Println(string(prettyJSON))
