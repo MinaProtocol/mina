@@ -15,16 +15,24 @@ let%test_module "Archive node unit tests" =
 
     module Genesis_ledger = (val Genesis_ledger.for_unit_tests)
 
+    let archive_uri =
+      Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
+
     let conn_lazy =
       lazy
         ( Thread_safe.block_on_async_exn
         @@ fun () ->
-        match%map
-          Caqti_async.connect
-            (Uri.of_string "postgres://admin:codarules@localhost:5432/archiver")
-        with
+        match%map Caqti_async.connect archive_uri with
         | Ok conn ->
             conn
+        | Error e ->
+            failwith @@ Caqti_error.show e )
+
+    let conn_pool_lazy =
+      lazy
+        ( match Caqti_async.connect_pool archive_uri with
+        | Ok pool ->
+            pool
         | Error e ->
             failwith @@ Caqti_error.show e )
 
@@ -126,7 +134,7 @@ let%test_module "Archive node unit tests" =
               failwith @@ Caqti_error.show e )
 
     let%test_unit "Block: read and write" =
-      let conn = Lazy.force conn_lazy in
+      let pool = Lazy.force conn_pool_lazy in
       Quickcheck.test ~trials:20
         ( Quickcheck.Generator.with_size ~size:10
         @@ Quickcheck_lib.gen_imperative_list
@@ -147,7 +155,7 @@ let%test_module "Archive node unit tests" =
           let processor_deferred_computation =
             Processor.run
               ~constraint_constants:precomputed_values.constraint_constants
-              conn reader ~logger ~delete_older_than:None
+              pool reader ~logger ~delete_older_than:None
           in
           let diffs =
             List.map
@@ -162,29 +170,32 @@ let%test_module "Archive node unit tests" =
           match%map
             Processor.deferred_result_list_fold breadcrumbs ~init:()
               ~f:(fun () breadcrumb ->
-                let open Deferred.Result.Let_syntax in
-                match%bind
-                  Processor.Block.find_opt conn
-                    ~state_hash:
-                      (Transition_frontier.Breadcrumb.state_hash breadcrumb)
-                with
-                | Some id ->
-                    let%bind Processor.Block.{parent_id; _} =
-                      Processor.Block.load conn ~id
-                    in
-                    if
-                      Transition_frontier.Breadcrumb.blockchain_length
-                        breadcrumb
-                      > Unsigned.UInt32.of_int 1
-                    then
-                      Processor.For_test.assert_parent_exist ~parent_id
-                        ~parent_hash:
-                          (Transition_frontier.Breadcrumb.parent_hash
-                             breadcrumb)
-                        conn
-                    else Deferred.Result.return ()
-                | None ->
-                    failwith "Failed to find saved block in database" )
+                Caqti_async.Pool.use
+                  (fun conn ->
+                    let open Deferred.Result.Let_syntax in
+                    match%bind
+                      Processor.Block.find_opt conn
+                        ~state_hash:
+                          (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+                    with
+                    | Some id ->
+                        let%bind Processor.Block.{parent_id; _} =
+                          Processor.Block.load conn ~id
+                        in
+                        if
+                          Transition_frontier.Breadcrumb.blockchain_length
+                            breadcrumb
+                          > Unsigned.UInt32.of_int 1
+                        then
+                          Processor.For_test.assert_parent_exist ~parent_id
+                            ~parent_hash:
+                              (Transition_frontier.Breadcrumb.parent_hash
+                                 breadcrumb)
+                            conn
+                        else Deferred.Result.return ()
+                    | None ->
+                        failwith "Failed to find saved block in database" )
+                  pool )
           with
           | Ok () ->
               ()
