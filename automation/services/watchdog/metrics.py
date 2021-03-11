@@ -94,6 +94,24 @@ def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
 
 # ========================================================================
 
+def daemon_containers(v1, namespace):
+  pods = v1.list_namespaced_pod(namespace, watch=False)
+
+  for pod in pods.items:
+    containers = pod.status.container_statuses
+    for c in containers:
+      if c.name in [ 'coda', 'mina', 'seed']:
+        yield (pod.name, c.name)
+
+def get_chain_id(v1, namespace):
+  for (pod_name, container_name) in daemon_containers(v1, namespace):
+    resp = util.exec_on_pod(v1, namespace, pod_name, container, 'mina client status --json')
+    try:
+      resp = json.loads(resp.strip())
+      return resp['chain_id']
+    except:
+      continue
+
 def check_seed_list_up(v1, namespace, seeds_reachable):
   print('checking seed list up')
 
@@ -104,18 +122,23 @@ def check_seed_list_up(v1, namespace, seeds_reachable):
 
   seeds =  ' '.join(contents.split('\n'))
   #stdbuf -o0 is to disable buffering
-  command = 'stdbuf -o0 check_libp2p/check_libp2p ' + seeds
-  proc = subprocess.Popen(command,stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
-  for line in proc.stderr.readlines():
-        print("check_libp2p error: {}".format(line))
-  val = proc.stdout.read()
-  print("check_libp2p output: {}".format(val))
-  proc.stdout.close()
-  proc.wait()
 
-  res = json.loads(val)
-  #checklibp2p returns whether or not the connection to a peerID errored
-  fraction_up = sum(res.values())/len(res.values())
-  seeds_reachable.set(fraction_up)
+  chain_id = get_chain_id(v1, namespace)
+  if chain_id is None:
+    print('could not get chain id')
+  else:
+    command = 'stdbuf -o0 check_libp2p/check_libp2p ' + chain_id + ' ' + seeds
+    proc = subprocess.Popen(command,stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True)
+    for line in proc.stderr.readlines():
+            print("check_libp2p error: {}".format(line))
+    val = proc.stdout.read()
+    print("check_libp2p output: {}".format(val))
+    proc.stdout.close()
+    proc.wait()
+
+    res = json.loads(val)
+    #checklibp2p returns whether or not the connection to a peerID errored
+    fraction_up = sum(res.values())/len(res.values())
+    seeds_reachable.set(fraction_up)
 
 # ========================================================================
