@@ -66,6 +66,7 @@ def cleanup_namespace_resources(namespace_pattern, cleanup_older_than, k8s_conte
 
     for ctx in k8s_context:
         print("Processing Kubernetes context {context}...".format(context=ctx))
+        _execute_command("kubectl config use-context {context}".format(context=ctx))
 
         config.load_kube_config(context=ctx, config_file=kube_config_file)
         v1 = client.CoreV1Api()
@@ -76,8 +77,11 @@ def cleanup_namespace_resources(namespace_pattern, cleanup_older_than, k8s_conte
 
             regexp = re.compile(pattern)
             for ns in response.items:
-                print("Namespace: {namespace}, creation_time: {createdAt}".format(
-                    namespace=ns.metadata.name, createdAt=ns.metadata.creation_timestamp))
+                print("Namespace: {namespace}, creation_time: {createdAt}, age: {age}".format(
+                    namespace=ns.metadata.name,
+                    createdAt=ns.metadata.creation_timestamp,
+                    age=str(datetime.datetime.now(pytz.utc) - ns.metadata.creation_timestamp))
+                )
 
                 # cleanup all namespace resources which match pattern and whose creation time is older than threshold
                 if ns.metadata.name and regexp.search(ns.metadata.name) \
@@ -86,7 +90,6 @@ def cleanup_namespace_resources(namespace_pattern, cleanup_older_than, k8s_conte
                     print("Namespace [{namespace}] exceeds age of {age} seconds. Cleaning up resources...".format(
                         namespace=ns.metadata.name, age=cleanup_older_than))
 
-                    _execute_command("kubectl config use-context {context}".format(context=ctx))
                     _execute_command("kubectl delete all -n {namespace} --all".format(namespace=ns.metadata.name))
                     _execute_command("kubectl delete ns {namespace}".format(namespace=ns.metadata.name))
                 else:
