@@ -50,7 +50,7 @@ in
               Cmd.run "source ${deployEnv} && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
-        label = "Execute integration test: ${testName}",
+        label = "${testName} integration test",
         key = "integration-test-${testName}",
         target = Size.Medium,
         depends_on = dependsOn
