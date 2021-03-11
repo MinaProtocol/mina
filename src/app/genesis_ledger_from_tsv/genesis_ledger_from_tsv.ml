@@ -306,11 +306,13 @@ let main ~tsv_file ~output_file () =
   [%log info] "Writing JSON output" ;
   let accounts = provided_accounts @ generated_accounts in
   Out_channel.with_file output_file ~f:(fun out_channel ->
-      let json =
-        `List (List.map accounts ~f:Runtime_config.Accounts.Single.to_yojson)
+      let jsons =
+        List.map accounts ~f:Runtime_config.Accounts.Single.to_yojson
       in
-      Out_channel.output_string out_channel (Yojson.Safe.pretty_to_string json) ;
-      Out_channel.newline out_channel ) ;
+      List.iter jsons ~f:(fun json ->
+          Out_channel.output_string out_channel
+            (Yojson.Safe.pretty_to_string json) ;
+          Out_channel.newline out_channel ) ) ;
   return ()
 
 let () =
