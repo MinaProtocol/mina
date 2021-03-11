@@ -301,6 +301,7 @@ RUN apt-get -y update \
     ca-certificates \
     dnsutils \
     dumb-init \
+    gettext \
     libffi6 \
     libgmp10 \
     libgomp1 \
@@ -330,7 +331,7 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.jso
 COPY --from=builder /home/opam/demo-genesis ${MINA_CONFIG_DIR}/demo-genesis
 # Fix a bad symlink by also putting this data in /home/opam
 COPY --from=builder /home/opam/demo-genesis /home/opam/demo-genesis
-COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json
+COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json.template
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   && echo "$PK" >  ${MINA_CONFIG_DIR}/wallets/store/$PK.pub \
