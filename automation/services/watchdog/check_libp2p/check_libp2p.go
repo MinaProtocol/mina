@@ -20,7 +20,11 @@ func main() {
 	// create a background context (i.e. one that never cancels)
 	ctx := context.Background()
 
-	networkID := "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
+	if len(os.Args) < 2 {
+		panic("expecting first argument to be networkID")
+	}
+
+	networkID := os.Args[1]
 	rendezvousString := fmt.Sprintf("/coda/0.0.1/%s", networkID)
 	pnetKey := blake2b.Sum256([]byte(rendezvousString))
 
@@ -36,7 +40,7 @@ func main() {
 		panic(err)
 	}
 
-	addrs := os.Args[1:]
+	addrs := os.Args[2:]
 
 	infos := make([]*peer.AddrInfo, len(addrs))
 	for i, addr := range addrs {
