@@ -63,7 +63,6 @@ func main() {
 		if err == nil {
 			online[info.ID.String()] = true
 		} else {
-			fmt.Printf("peer=%s err=%s\n", info.ID, err)
 			online[info.ID.String()] = false
 		}
 		cancel()
