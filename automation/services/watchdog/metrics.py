@@ -101,15 +101,21 @@ def daemon_containers(v1, namespace):
     containers = pod.status.container_statuses
     for c in containers:
       if c.name in [ 'coda', 'mina', 'seed']:
-        yield (pod.name, c.name)
+        yield (pod.metadata.name, c.name)
 
 def get_chain_id(v1, namespace):
   for (pod_name, container_name) in daemon_containers(v1, namespace):
-    resp = util.exec_on_pod(v1, namespace, pod_name, container, 'mina client status --json')
+    resp = util.exec_on_pod(v1, namespace, pod_name, container_name, 'mina client status --json')
     try:
+      resp = resp.strip()
+      if resp[0] != '{':
+        #first line could be 'Using password from environment variable CODA_PRIVKEY_PASS'
+        resp = resp.split("\n", 1)[1]
       resp = json.loads(resp.strip())
+      print("Chain ID: {}".format(resp['chain_id']))
       return resp['chain_id']
-    except:
+    except Exception as e:
+      print("Exception when extracting chain id: {}\n mina client status response: {}".format(e, resp))
       continue
 
 def check_seed_list_up(v1, namespace, seeds_reachable):
