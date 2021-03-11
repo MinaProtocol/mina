@@ -1,13 +1,17 @@
 const { exec } = require("child_process");
 const { execPath } = require("./binaries");
-const { PROOF_SUCCESS, PROOF_FAIL, CREDIT_SCORE, CREDIT_FAIL } = require("../constants");
+const {
+  PROOF_SUCCESS,
+  PROOF_FAIL,
+  CREDIT_SCORE,
+  CREDIT_FAIL,
+} = require("../constants");
 
 const execSnappCommand = (execPath, outputPath, ethAddress, creditScore) => {
-  // This is just for demo purposes. These values should change on launch.
   const snappPublicKey =
-    "B62qiyajxvnfKKx3KfQQTLV8xcb7LEgLmmqrdTgWoo7F5dVNMP2YXto";
+    "B62qpeeaJV6jm3FZL9hvApQ7CjbwiLL8TXbZBWZwJwSm3rqM7yUmRLC";
   const receiverPublicKey =
-    "B62qqYSLkTCoMVaPj5kfct9CxJcbDjVqb3LcstQShDtg2vck8mt5MRF";
+    "B62qnW5wYBhf9zCKSpyp3Q9bhEBgx47aP3iLAVbWHi2diSHFNG6Nwtw";
   const fee = "10000000";
   const amount = "10000000";
 
@@ -33,7 +37,7 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
   }
 
   if (parseInt(creditScore) < CREDIT_SCORE) {
-    mainWindow.webContents.send(CREDIT_FAIL)
+    mainWindow.webContents.send(CREDIT_FAIL);
   }
 
   exec(

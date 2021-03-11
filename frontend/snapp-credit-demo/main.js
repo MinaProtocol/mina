@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const { scrape } = require("./src/puppeteer");
 const { generateSnapp } = require("./src/snapp");
-const { WEBSCRAPE, LOGIN, VALID_LOGIN, INVALID_LOGIN } = require("./constants");
+const { LOGIN, VALID_LOGIN, INVALID_LOGIN } = require("./constants");
 
 process.env.NODE_ENV = "production";
 
@@ -13,7 +13,7 @@ const createMainWindow = async () => {
   mainWindow = new BrowserWindow({
     title: "SNAPP Credit Check",
     width: isDev ? 1200 : 600,
-    height: 600,
+    height: 650,
     resizable: isDev ? true : false,
     backgroundColor: "white",
     webPreferences: {
@@ -87,9 +87,8 @@ app.on("window-all-closed", () => {
   }
 });
 
-ipcMain.on(LOGIN, (_, { ethAddress, email, password }) => {
-  mainWindow.webContents.send(WEBSCRAPE);
-  scrape(email, password)
+ipcMain.on(LOGIN, (_, { ethAddress, email, password, domain }) => {
+  scrape({ email, password, mainWindow, domain })
     .then((creditScore) => {
       mainWindow.webContents.send(VALID_LOGIN);
       generateSnapp(mainWindow, ethAddress, creditScore);

@@ -2,13 +2,16 @@ const path = require("path");
 const { ipcRenderer, remote } = require("electron");
 const { dialog } = remote;
 const {
-  WEBSCRAPE,
   LOGIN,
+  LOGIN_COM,
+  LOGIN_CA,
   VALID_LOGIN,
   INVALID_LOGIN,
   PROOF_SUCCESS,
   PROOF_FAIL,
-  CREDIT_FAIL
+  CREDIT_FAIL,
+  COM_DOMAIN,
+  CA_DOMAIN,
 } = require("../constants");
 
 const hideProgressSpinner = () => {
@@ -35,7 +38,7 @@ const chooseFolder = () => {
         }
       })
       .catch((err) => {
-        console.log(err);
+        console.error(err);
       });
   });
 };
@@ -60,8 +63,10 @@ form.addEventListener("submit", (e) => {
   const ethAddress = document.getElementById("eth-address")?.value;
   const email = document.getElementById("email")?.value;
   const password = document.getElementById("password")?.value;
-  const outputPath = document.getElementById("output-path-display")?.value;
 
+  const outputPath = document.getElementById("output-path-display")?.value;
+  const usaRadioBtn = document.getElementById("radio-usa")?.checked;
+  const domain = usaRadioBtn ? COM_DOMAIN : CA_DOMAIN;
   localStorage.setItem("loading", true);
 
   if (ethAddress && email && password && outputPath) {
@@ -69,6 +74,7 @@ form.addEventListener("submit", (e) => {
       ethAddress,
       email,
       password,
+      domain,
     });
   } else {
     setProgressStatusText(
@@ -77,16 +83,11 @@ form.addEventListener("submit", (e) => {
   }
 });
 
-ipcRenderer.on(WEBSCRAPE, () => {
-  showProgressSpinner();
-  setProgressStatusText(
-    "Attempting to log in, please do not close the application..."
-  );
-});
-
 ipcRenderer.on(VALID_LOGIN, () => {
   showProgressSpinner();
-  setProgressStatusText("Login successful. Attempting to generate SNAPP proof...");
+  setProgressStatusText(
+    "Login successful. Attempting to generate SNAPP proof..."
+  );
 });
 
 ipcRenderer.on(INVALID_LOGIN, () => {
@@ -97,9 +98,25 @@ ipcRenderer.on(INVALID_LOGIN, () => {
   localStorage.setItem("loading", false);
 });
 
+ipcRenderer.on(LOGIN_COM, () => {
+  showProgressSpinner();
+  setProgressStatusText(
+    `Attempting to log into creditkarma.com, please do not close the application...`
+  );
+});
+
+ipcRenderer.on(LOGIN_CA, () => {
+  showProgressSpinner();
+  setProgressStatusText(
+    `Attempting to log into creditkarma.ca, please do not close the application...`
+  );
+});
+
 ipcRenderer.on(PROOF_SUCCESS, () => {
   const outputPath = localStorage.getItem("output-path");
-  setProgressStatusText(`Credit score is above 700, SNAPP proof succesfully saved to: ${outputPath}`);
+  setProgressStatusText(
+    `Credit score is above 700, SNAPP proof succesfully saved to: ${outputPath}`
+  );
   hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
@@ -112,11 +129,9 @@ ipcRenderer.on(PROOF_FAIL, () => {
 });
 
 ipcRenderer.on(CREDIT_FAIL, () => {
-  setProgressStatusText(`Credit score is less than 700, cannot produce SNAPP proof to: ${outputPath}`);
+  setProgressStatusText(
+    `Credit score is less than 700, cannot produce SNAPP proof to: ${outputPath}`
+  );
   hideProgressSpinner();
   localStorage.setItem("loading", false);
-});
-
-ipcRenderer.on("debug", (_, { execPath }) => {
-  setProgressStatusText(`Binary located at: ${execPath}`);
 });

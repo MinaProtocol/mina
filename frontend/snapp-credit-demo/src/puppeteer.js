@@ -1,31 +1,61 @@
 const puppeteer = require("puppeteer");
+const { LOGIN_CA, LOGIN_COM, COM_DOMAIN, CA_DOMAIN } = require("../constants");
 
-let scrape = (username, password) => {
+let scrape = ({ email, password, mainWindow, domain }) => {
   return new Promise(async (resolve, reject) => {
-    const browser = await puppeteer.launch();
+    let browser;
     try {
-      const page = await browser.newPage();
-      // TODO: Targeting .ca, should be changed and verified to work on .com
-      await page.goto("https://www.creditkarma.ca/login", {
+      browser = await puppeteer.launch({ headless: false });
+      let creditScore;
+      if (domain === COM_DOMAIN) {
+        mainWindow.webContents.send(LOGIN_COM);
+        creditScore = await scrapeSpecifiedDomain({
+          email,
+          password,
+          browser,
+          url: COM_DOMAIN,
+        });
+      } else if (domain === CA_DOMAIN) {
+        mainWindow.webContents.send(LOGIN_CA);
+        creditScore = await scrapeSpecifiedDomain({
+          email,
+          password,
+          browser,
+          url: CA_DOMAIN,
+        });
+      }
+      resolve(creditScore);
+    } catch (err) {
+      reject(err);
+    } finally {
+      await browser.close();
+    }
+  });
+};
+
+let scrapeSpecifiedDomain = ({ email, password, browser, url }) => {
+  return new Promise(async (resolve, reject) => {
+    let page;
+    try {
+      page = await browser.newPage();
+      await page.goto(url, {
         waitUntil: "domcontentloaded",
       });
 
       await page.waitForSelector("[type=submit]");
-      await page.type("[type=email]", username);
+      await page.type("[type=email]", email);
       await page.type("[type=password]", password);
       await page.waitForTimeout(750);
       await page.click("[type=submit]");
 
-      await page.waitForSelector(".score-dial", { timeout: 8000 });
-      let creditScore = await page.evaluate(() => {
-        let creditContainer = document.querySelectorAll(".score-dial");
+      await page.waitForSelector(".score-dial", { timeout: 20000 });
+      const creditScore = await page.evaluate(() => {
+        const creditContainer = document.querySelector(".score-dial");
         // Return credit score value
-        return creditContainer[0]?.children[3].textContent;
+        return creditContainer?.children[3].textContent;
       });
-      browser.close();
       return resolve(creditScore);
     } catch (err) {
-      if (browser) browser.close();
       return reject(err);
     }
   });
