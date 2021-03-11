@@ -2114,7 +2114,7 @@ module Visualization = struct
   end
 
   let command_group =
-    Command.group ~summary:"Visualize data structures special to Coda"
+    Command.group ~summary:"Visualize data structures special to Mina"
       [ (Frontier.name, Frontier.command)
       ; (Registered_masks.name, Registered_masks.command) ]
 end

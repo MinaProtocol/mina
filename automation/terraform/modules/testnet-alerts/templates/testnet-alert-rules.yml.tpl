@@ -150,6 +150,24 @@ groups:
       summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
 
+  - alert: HighUnparentedBlockCount
+    expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alerting_timeframe}])) > 30
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has a critically high unparented block count"
+      description: "{{ $value }} Unparented block count is critically high on network {{ $labels.testnet }}."
+
+  - alert: HighMissingBlockCount
+    expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alerting_timeframe}])) > 30
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has a critically high missing block count"
+      description: "{{ $value }} Missing block count is critically high on network {{ $labels.testnet }}."
+
 - name: Warnings
   rules:
   - alert: HighBlockGossipLatency
@@ -162,13 +180,13 @@ groups:
       description: "High block gossip latency (ms) within {{ $labels.testnet }} network."
 
   - alert: SomewhatOldBestTip
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 8 * 180
+    expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 8 * 180) > 1
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
     annotations:
-      summary: "{{ $labels.testnet }}: all nodes have best tips older than 8 slots"
-      description: "All nodes have best tips older than 8 slots (24 minutes) on network {{ $labels.testnet }}."
+      summary: "{{ $labels.testnet }}: at least 2 nodes have best tips older than 8 slots"
+      description: "At least 2 nodes have best tips older than 8 slots (24 minutes) on network {{ $labels.testnet }}."
 
   - alert: MediumFork
     expr: max by (testnet) (Coda_Transition_frontier_longest_fork ${rule_filter}) >= 8
@@ -205,3 +223,30 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} block production is critically low (there has been less than 1 block in the last hour)"
       description: "Zero blocks have been produced on network {{ $labels.testnet }} in the last hour (according to some node)."
+
+  - alert: LowPostgresBlockHeightGrowth
+    expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alerting_timeframe}])) < 1
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} rate of archival of network blocks in Postgres DB is lower than expected"
+      description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
+
+  - alert: UnparentedBlocksObserved
+    expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alerting_timeframe}])) > 1
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "Unparented blocks observed on {{ $labels.testnet }}"
+      description: "{{ $value }} Unparented block(s) observed on network {{ $labels.testnet }}."
+
+  - alert: MissingBlocksObserved
+    expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alerting_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "Missing blocks observed on {{ $labels.testnet }}"
+      description: "{{ $value }} Missing block(s) observed on network {{ $labels.testnet }}."

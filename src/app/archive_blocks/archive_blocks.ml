@@ -20,13 +20,13 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
   if Bool.equal precomputed extensional then
     failwith "Must provide exactly one of -precomputed and -extensional" ;
   let logger = Logger.create () in
-  match%bind Caqti_async.connect archive_uri with
+  match Caqti_async.connect_pool archive_uri with
   | Error e ->
       [%log fatal]
         ~metadata:[("error", `String (Caqti_error.show e))]
         "Failed to create a Caqti connection to Postgresql" ;
       exit 1
-  | Ok conn ->
+  | Ok pool ->
       [%log info] "Successfully created Caqti connection to Postgresql" ;
       let make_add_block of_yojson add_block_aux ~json ~file =
         match of_yojson json with
@@ -52,12 +52,12 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
           Mina_transition.External_transition.Precomputed_block.of_yojson
           (Processor.add_block_aux_precomputed
              ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled conn
+               Genesis_constants.Constraint_constants.compiled pool
              ~delete_older_than:None ~logger)
       in
       let add_extensional_block =
         make_add_block Archive_lib.Extensional.Block.of_yojson
-          (Processor.add_block_aux_extensional ~logger conn
+          (Processor.add_block_aux_extensional ~logger pool
              ~delete_older_than:None)
       in
       Deferred.List.iter files ~f:(fun file ->
