@@ -32,6 +32,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} seed list is down (no seeds are reachable)"
       description: "Seed list is down on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/SeedListDown-d8d4e14609884c63a7086309336f3462"
 
   - alert: BlockStorageBucketNoNewBlocks
     expr: min by (testnet) (min_over_time(Coda_watchdog_recent_google_bucket_blocks ${rule_filter} [${alerting_timeframe}])) >= 30*60
