@@ -51,6 +51,13 @@ let valid_mina_amount amount =
   | _ ->
       false
 
+let amount_geq_min_balance ~amount ~initial_min_balance =
+  let amount = Currency.Amount.of_formatted_string amount in
+  let initial_min_balance =
+    Currency.Amount.of_formatted_string initial_min_balance
+  in
+  Currency.Amount.( >= ) amount initial_min_balance
+
 (* for delegatee that does not have an entry in the TSV,
    generate an entry with zero balance, untimed
 *)
@@ -166,6 +173,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   let valid_init_min_balance =
     String.is_empty initial_min_balance
     || valid_mina_amount initial_min_balance
+       && amount_geq_min_balance ~amount ~initial_min_balance
   in
   let valid_cliff_time_months =
     try
@@ -306,11 +314,13 @@ let main ~tsv_file ~output_file () =
   [%log info] "Writing JSON output" ;
   let accounts = provided_accounts @ generated_accounts in
   Out_channel.with_file output_file ~f:(fun out_channel ->
-      let json =
-        `List (List.map accounts ~f:Runtime_config.Accounts.Single.to_yojson)
+      let jsons =
+        List.map accounts ~f:Runtime_config.Accounts.Single.to_yojson
       in
-      Out_channel.output_string out_channel (Yojson.Safe.pretty_to_string json) ;
-      Out_channel.newline out_channel ) ;
+      List.iter jsons ~f:(fun json ->
+          Out_channel.output_string out_channel
+            (Yojson.Safe.pretty_to_string json) ;
+          Out_channel.newline out_channel ) ) ;
   return ()
 
 let () =
