@@ -57,6 +57,8 @@ module Engine = struct
 
       val get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
+
+      val best_chain : logger:Logger.t -> t -> string list Malleable_error.t
     end
 
     type t
