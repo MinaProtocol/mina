@@ -253,7 +253,7 @@ resource "kubernetes_cron_job" "integration-testnet-namespace-cleanup" {
           spec {
             container {
               name  = "integration-test-janitor"
-              image = "gcr.io/o1labs-192920/watchdog:0.3.9"
+              image = "gcr.io/o1labs-192920/watchdog:0.4.4"
               args = [
                 "/scripts/network-utilities.py",
                 "janitor",
