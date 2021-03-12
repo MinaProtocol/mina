@@ -5,7 +5,7 @@ let scrape = ({ email, password, mainWindow, domain }) => {
   return new Promise(async (resolve, reject) => {
     let browser;
     try {
-      browser = await puppeteer.launch({ headless: false });
+      browser = await puppeteer.launch();
       let creditScore;
       if (domain === COM_DOMAIN) {
         mainWindow.webContents.send(LOGIN_COM);
