@@ -34,9 +34,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~init:(List.hd_exn recent_chains)
         (List.tl_exn recent_chains)
     in
-    if Hash_set.length common_prefixes = 0 then
+    let length = Hash_set.length common_prefixes in
+    if length = 0 then
       Malleable_error.of_string_hard_error_format
-        "Chains don't have common prefixes among their most recent %d blocks" n
+        "Chains don't have any common prefixes among their most recent %d \
+         blocks"
+        n
+    else if length < n then
+      Malleable_error.soft_error ()
+        (Error.of_string
+           (sprintf
+              !"Chains only have %d common prefixes, expected %d common \
+                prefixes"
+              length n))
     else Malleable_error.return ()
 
   let run network t =
@@ -48,11 +58,10 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter block_producers ~f:(fun bp ->
           wait_for t @@ Wait_condition.node_to_initialize bp )
     in
-    [%log info] "common prefix test: running network for 5 minutes" ;
-    let%bind.Async.Deferred.Let_syntax () =
-      Async.after (Time.Span.of_min 5.)
-    in
-    [%log info] "common prefix test: done running network" ;
+    [%log info]
+      "common prefix test: waiting for 15 blocks to be produced on the network" ;
+    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 15) in
+    [%log info] "common prefix test: collecting best chains from nodes" ;
     let%bind chains =
       Malleable_error.List.map block_producers ~f:(fun bp ->
           Network.Node.best_chain ~logger bp )
