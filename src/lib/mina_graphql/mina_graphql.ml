@@ -3309,6 +3309,10 @@ module Queries = struct
         let%map user_command, _ =
           User_command_input.to_user_command
             ~get_current_nonce:(Mina_lib.get_current_nonce mina)
+            ~get_account:(Mina_lib.get_account mina)
+            ~constraint_constants:
+              (Mina_lib.config mina).precomputed_values.constraint_constants
+            ~logger:(Mina_lib.top_level_logger mina)
             user_command_input
           |> Deferred.Result.map_error ~f:Error.to_string_hum
         in
