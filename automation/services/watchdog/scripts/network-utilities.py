@@ -38,20 +38,6 @@ DEFAULT_CLEANUP_PATTERNS = []
 DEFAULT_K8S_CONTEXTS = []
 
 
-def _execute_command(command):
-    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-    output, error = process.communicate()
-
-    if error:
-        print(error.decode('utf-8'))
-
-    if output:
-        print(output.decode('utf-8'))
-
-    if process.returncode > 0:
-        print('Executing command \"%s\" returned a non-zero status code %d' % (command, process.returncode))
-        sys.exit(process.returncode)
-
 def execute_command(command):
     process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
@@ -97,10 +83,10 @@ def get_mapped_ports(instance_group, zone):
 
 def set_port_mappings(instance_group, zone, port_mappings):
     assignments = ['%s:%d' % (name, port) for name, port in port_mappings.items()]
-    _execute_command(
+    print(execute_command(
         'gcloud compute instance-groups set-named-ports %s --zone=%s --named-ports=%s'
         % (instance_group, zone, ','.join(assignments))
-    )
+    ))
 
 @janitor.command()
 @click.option('--instance-group',
@@ -119,7 +105,7 @@ def set_port_mappings(instance_group, zone, port_mappings):
 def cleanup_port_mappings(instance_group, zone, k8s_context, kube_config_file):
 
     config.load_kube_config(context=k8s_context, config_file=kube_config_file)
-    _execute_command("kubectl config use-context %s" % k8s_context)
+    print(execute_command("kubectl config use-context %s" % k8s_context))
 
     print('Finding active node port services')
     active_ports = get_active_node_ports()
@@ -171,9 +157,9 @@ def cleanup_namespace_resources(namespace_pattern, cleanup_older_than, k8s_conte
                     print("Namespace [{namespace}] exceeds age of {age} seconds. Cleaning up resources...".format(
                         namespace=ns.metadata.name, age=cleanup_older_than))
 
-                    _execute_command("kubectl config use-context {context}".format(context=ctx))
-                    _execute_command("kubectl delete all -n {namespace} --all".format(namespace=ns.metadata.name))
-                    _execute_command("kubectl delete ns {namespace}".format(namespace=ns.metadata.name))
+                    execute_command("kubectl config use-context {context}".format(context=ctx))
+                    execute_command("kubectl delete all -n {namespace} --all".format(namespace=ns.metadata.name))
+                    execute_command("kubectl delete ns {namespace}".format(namespace=ns.metadata.name))
                 else:
                     print("Skipping Namespace {namespace}.".format(
                         namespace=ns.metadata.name))
