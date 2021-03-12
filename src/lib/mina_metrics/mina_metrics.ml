@@ -656,7 +656,8 @@ module Transition_frontier = struct
     let help =
       "0 if there is no coinbase in the current best tip, 1 otherwise"
     in
-    Gauge.v "best_tip_coinbase" ~help ~namespace ~subsystem
+    let t = Gauge.v "best_tip_coinbase" ~help ~namespace ~subsystem in
+    Gauge.set t 1. ; t
 
   let longest_fork : Gauge.t =
     let help = "Length of the longest path in the frontier" in
