@@ -287,11 +287,16 @@ module Node = struct
   let best_chain ~logger t =
     let open Malleable_error.Let_syntax in
     let query = Graphql.Best_chain.make () in
-    let%map result =
+    let%bind result =
       exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
         ~query_name:"best_chain" query
     in
-    (result#bestChain)#stateHash
+    match result#bestChain with
+    | None | Some [||] ->
+        Malleable_error.of_string_hard_error "failed to get best chains"
+    | Some chain ->
+        Malleable_error.return
+        @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
 
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in
