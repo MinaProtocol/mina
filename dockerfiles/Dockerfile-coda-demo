@@ -28,7 +28,7 @@ RUN apt-get update --yes \
 # coda package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
   && apt-get update \
-  && apt-get install mina-testnet-postake-medium-curves=$coda_deb_version -y --allow-downgrades
+  && apt-get install mina-mainnet=$coda_deb_version -y --allow-downgrades
 
 ENV PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 ENV MINA_CONFIG_DIR=/root/.mina-config
