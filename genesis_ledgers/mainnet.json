@@ -10217,9 +10217,9 @@
         "timing": {
           "initial_minimum_balance": "2418750",
           "cliff_time": "86400",
-          "cliff_amount": "134375.1075",
+          "cliff_amount": "2418750",
           "vesting_period": "1",
-          "vesting_increment": "9.331596783"
+          "vesting_increment": "0"
         }
       },
       {
@@ -10229,9 +10229,9 @@
         "timing": {
           "initial_minimum_balance": "2418750",
           "cliff_time": "86400",
-          "cliff_amount": "134375.1075",
+          "cliff_amount": "2418750",
           "vesting_period": "1",
-          "vesting_increment": "9.331596783"
+          "vesting_increment": "0"
         }
       },
       {
@@ -10287,9 +10287,9 @@
         "timing": {
           "initial_minimum_balance": "2418750",
           "cliff_time": "86400",
-          "cliff_amount": "134375.1075",
+          "cliff_amount": "2418750",
           "vesting_period": "1",
-          "vesting_increment": "9.331596783"
+          "vesting_increment": "0"
         }
       },
       {
@@ -10299,9 +10299,9 @@
         "timing": {
           "initial_minimum_balance": "2418750",
           "cliff_time": "86400",
-          "cliff_amount": "134375.1075",
+          "cliff_amount": "2418750",
           "vesting_period": "1",
-          "vesting_increment": "9.331596783"
+          "vesting_increment": "0"
         }
       },
       {
