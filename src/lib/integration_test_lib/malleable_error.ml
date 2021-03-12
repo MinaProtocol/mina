@@ -215,6 +215,15 @@ module List = struct
             return init'
         | `Continue init' ->
             fold_left_while t ~init:init' ~f )
+
+  let iteri ls ~f =
+    let open T.Let_syntax in
+    let%map _ =
+      fold ls ~init:0 ~f:(fun i x ->
+          let%map () = f i x in
+          i + 1 )
+    in
+    ()
 end
 
 (* Unit tests to follow *)

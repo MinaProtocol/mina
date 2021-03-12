@@ -41,6 +41,7 @@ module "kubernetes_testnet" {
 
   log_level           = var.log_level
   log_txn_pool_gossip = var.log_txn_pool_gossip
+  log_precomputed_blocks = var.log_precomputed_blocks
 
   agent_min_fee         = var.agent_min_fee
   agent_max_fee         = var.agent_max_fee
