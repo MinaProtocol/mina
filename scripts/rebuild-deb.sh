@@ -17,9 +17,10 @@ set +u
 PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 
-if [[ "$GITBRANCH" == "master" ]] ; then
-  DUNE_PROFILE="mainnet"
-fi
+# TODO: be smarter about this when we introduce a devnet package
+#if [[ "$GITBRANCH" == "master" ]] ; then
+DUNE_PROFILE="mainnet"
+#fi
 
 PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
