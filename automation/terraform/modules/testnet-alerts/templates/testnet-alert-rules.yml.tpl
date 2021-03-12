@@ -77,6 +77,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} avg. peer count is critically low"
       description: "Critically low peer count on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429
 
   - alert: LowMinWindowDensity
     expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
