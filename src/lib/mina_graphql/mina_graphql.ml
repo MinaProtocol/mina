@@ -3355,4 +3355,6 @@ let schema =
 let schema_limited =
   (*including version because that's the default query*)
   Graphql_async.Schema.(
-    schema [Queries.block; Queries.version] ~mutations:[] ~subscriptions:[])
+    schema
+      [Queries.daemon_status; Queries.block; Queries.version]
+      ~mutations:[] ~subscriptions:[])
