@@ -16,6 +16,11 @@ GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 set +u
 PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
+
+if [[ "$GITBRANCH" == "master" ]] ; then
+  DUNE_PROFILE="mainnet"
+fi
+
 PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
@@ -185,10 +190,10 @@ for f in /tmp/s3_cache_dir/genesis*; do
 done
 
 #copy config.json
-cp '../genesis_ledgers/final-final-2_(3).json' "${BUILDDIR}/var/lib/coda/finalfinal2.json"
+cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
 cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
 # The default configuration:
-cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 
 # Bash autocompletion
