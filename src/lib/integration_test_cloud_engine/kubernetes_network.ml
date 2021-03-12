@@ -440,6 +440,7 @@ end
 type t =
   { namespace: string
   ; constants: Test_config.constants
+  ; seeds: Node.t list
   ; block_producers: Node.t list
   ; snark_coordinators: Node.t list
   ; archive_nodes: Node.t list
@@ -453,15 +454,18 @@ let constraint_constants {constants; _} = constants.constraints
 
 let genesis_constants {constants; _} = constants.genesis
 
+let seeds {seeds; _} = seeds
+
 let block_producers {block_producers; _} = block_producers
 
 let snark_coordinators {snark_coordinators; _} = snark_coordinators
 
 let archive_nodes {archive_nodes; _} = archive_nodes
 
-let keypairs {keypairs; _} = keypairs
+(* TODO: snark workers (until then, pretty sure snark work won't be done) *)
+let all_nodes {seeds; block_producers; snark_coordinators; archive_nodes; _} =
+  List.concat [seeds; block_producers; snark_coordinators; archive_nodes]
 
-let all_nodes {block_producers; snark_coordinators; archive_nodes; _} =
-  block_producers @ snark_coordinators @ archive_nodes
+let keypairs {keypairs; _} = keypairs
 
 let lookup_node_by_app_id t = Map.find t.nodes_by_app_id

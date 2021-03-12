@@ -370,7 +370,11 @@ module Network_manager = struct
             (String.length network_config.terraform.snark_worker_public_key - 6)
           ~len:6
     in
-    let snark_coordinator_nodes = [cons_node snark_coordinator_name None] in
+    let snark_coordinator_nodes =
+      if network_config.terraform.snark_worker_replicas > 0 then
+        [cons_node snark_coordinator_name None]
+      else []
+    in
     let block_producer_nodes =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config -> cons_node bp_config.name (Some bp_config.keypair)
@@ -418,6 +422,7 @@ module Network_manager = struct
     let result =
       { Kubernetes_network.namespace= t.namespace
       ; constants= t.constants
+      ; seeds= t.seed_nodes
       ; block_producers= t.block_producer_nodes
       ; snark_coordinators= t.snark_coordinator_nodes
       ; archive_nodes= t.archive_nodes

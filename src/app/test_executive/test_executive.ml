@@ -303,6 +303,12 @@ let main inputs =
         let%bind network, dsl =
           Deferred.bind init_result ~f:Malleable_error.of_or_error_hard
         in
+        let%bind () =
+          Engine.Network.all_nodes network
+          (* TODO: parallelize (requires accumlative hard errors) *)
+          |> Malleable_error.List.iter
+               ~f:(Engine.Network.Node.start ~fresh_state:false)
+        in
         T.run network dsl )
   in
   let exit_reason, test_result =

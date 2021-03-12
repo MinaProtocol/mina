@@ -26,6 +26,11 @@ variable "use_local_charts" {
   default = false
 }
 
+variable "healthcheck_enabled" {
+  type    = bool
+  default = true
+}
+
 variable "deploy_watchdog" {
   type    = bool
   default = true
