@@ -37,17 +37,21 @@ You can additionally see `src/app/snapp_runner/examples/credit_score_demo/README
 **Note:** If you are developing against this, change the `process.env.NODE_ENV` variable to `dev` in `main.js`.
 
 ```
-npm run start
+yarn start
 ```
 
-## Package and Create Installer
+or
+
+```
+yarn dev
+```
+
+## Package for Linux
 
 Run the following to build an installer for Linux:
 
 ```
-npm run package-linux
+yarn dist
 ```
 
-```
-npm run create-installer-linux
-```
+Make sure you have the `/resouces/bin/credit_score_demo.exe` in the project, otherwise the application will not behave as expected.
