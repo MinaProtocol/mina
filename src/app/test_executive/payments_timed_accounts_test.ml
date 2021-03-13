@@ -104,6 +104,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       | Error {hard_error= {error; _}; soft_errors= _} ->
           (* expect GraphQL error due to insufficient funds *)
           let err_str = Error.to_string_mach error in
+          [%log info] "err_str: %s" err_str ;
           let err_str_lowercase = String.lowercase err_str in
           if
             String.is_substring ~substring:"insufficient_funds"
@@ -118,5 +119,5 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             Malleable_error.of_string_hard_error_format
               "Payment failed for unexpected reason: %s" err_str )
     in
-    [%log info] "Payment test with timed accounts completed"
+    [%log info] "Payment test with timed accounts completed succesfully!"
 end

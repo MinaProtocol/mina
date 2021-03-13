@@ -62,6 +62,12 @@ module Breadcrumb_added : sig
   include Event_type_intf with type t := t
 end
 
+module Transaction_rejected : sig
+  type t = {command: User_command.Valid.t With_status.t list}
+
+  include Event_type_intf with type t := t
+end
+
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
@@ -69,6 +75,7 @@ type 'a t =
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
   | Breadcrumb_added : Breadcrumb_added.t t
+  | Transaction_rejected : Transaction_rejected.t t
 
 val to_string : 'a t -> string
 

@@ -194,6 +194,26 @@ module Breadcrumb_added = struct
     {user_commands}
 end
 
+module Transaction_rejected = struct
+  let name = "Transaction_rejected"
+
+  let structured_event_id =
+    Some
+      Network_pool.Transaction_pool
+      .rejecting_command_for_reason_structured_events_id
+
+  type t = {command: User_command.Valid.t With_status.t list}
+  [@@deriving to_yojson]
+
+  let parse message =
+    let open Json_parsing in
+    let open Or_error.Let_syntax in
+    let%map command =
+      get_metadata message "command" >>= parse valid_commands_with_statuses
+    in
+    {command}
+end
+
 type 'a t =
   | Log_error : Log_error.t t
   | Node_initialization : Node_initialization.t t
@@ -201,6 +221,7 @@ type 'a t =
       : Transition_frontier_diff_application.t t
   | Block_produced : Block_produced.t t
   | Breadcrumb_added : Breadcrumb_added.t t
+  | Transaction_rejected : Transaction_rejected.t t
 
 type existential = Event_type : 'a t -> existential
 
@@ -215,6 +236,8 @@ let existential_to_string = function
       "Block_produced"
   | Event_type Breadcrumb_added ->
       "Breadcrumb_added"
+  | Event_type Transaction_rejected ->
+      "Transaction_rejected"
 
 let to_string e = existential_to_string (Event_type e)
 
@@ -229,6 +252,8 @@ let existential_of_string_exn = function
       Event_type Block_produced
   | "Breadcrumb_added" ->
       Event_type Breadcrumb_added
+  | "Transaction_rejected" ->
+      Event_type Transaction_rejected
   | _ ->
       failwith "invalid event type string"
 
@@ -261,7 +286,8 @@ let all_event_types =
   ; Event_type Node_initialization
   ; Event_type Transition_frontier_diff_application
   ; Event_type Block_produced
-  ; Event_type Breadcrumb_added ]
+  ; Event_type Breadcrumb_added
+  ; Event_type Transaction_rejected ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
     = function
@@ -275,6 +301,8 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
       (module Block_produced)
   | Breadcrumb_added ->
       (module Breadcrumb_added)
+  | Transaction_rejected ->
+      (module Transaction_rejected)
 
 let event_to_yojson event =
   let (Event (t, d)) = event in

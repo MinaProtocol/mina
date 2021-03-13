@@ -927,6 +927,8 @@ struct
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
+        [%log' info t.logger]
+          "transaction_pool.ml apply: is_sender_local == %b" is_sender_local ;
         let pool_max_size = t.config.pool_max_size in
         let global_slot = Indexed_pool.current_global_slot t.pool in
         match t.best_tip_ledger with
@@ -1130,6 +1132,18 @@ struct
                              transactions at the same nonce to different
                              nodes, which will then naturally gossip them.
                           *)
+                              if is_sender_local then
+                                let diff_err, error_extra =
+                                  of_indexed_pool_error
+                                    (Insufficient_replace_fee
+                                       (`Replace_fee rfee, fee))
+                                in
+                                [%str_log' error t.logger]
+                                  (Rejecting_command_for_reason
+                                     { command= tx
+                                     ; reason= diff_err
+                                     ; error_extra })
+                              else () ;
                               let f_log =
                                 if is_sender_local then [%log' error t.logger]
                                 else [%log' debug t.logger]
@@ -1151,6 +1165,17 @@ struct
                               (* We can't punish peers for this, since these
                                    are our specific preferences.
                                 *)
+                              if is_sender_local then
+                                let diff_err, error_extra =
+                                  of_indexed_pool_error
+                                    (Unwanted_fee_token fee_token)
+                                in
+                                [%str_log' error t.logger]
+                                  (Rejecting_command_for_reason
+                                     { command= tx
+                                     ; reason= diff_err
+                                     ; error_extra })
+                              else () ;
                               let f_log =
                                 if is_sender_local then [%log' error t.logger]
                                 else [%log' debug t.logger]
@@ -1168,6 +1193,16 @@ struct
                                     .Unwanted_fee_token )
                                   :: rejected )
                           | Error Invalid_transaction ->
+                              if is_sender_local then
+                                let diff_err, error_extra =
+                                  of_indexed_pool_error Invalid_transaction
+                                in
+                                [%str_log' error t.logger]
+                                  (Rejecting_command_for_reason
+                                     { command= tx
+                                     ; reason= diff_err
+                                     ; error_extra })
+                              else () ;
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useless_gossip
