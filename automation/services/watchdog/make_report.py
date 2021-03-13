@@ -5,6 +5,7 @@
 # python3 services/watchdog/make_report.py -n $namespace --discord_webhook_url $MAKE_REPORT_DISCORD_WEBHOOK_URL -a "$(cat accounts.csv)"
 
 import sys
+import os
 import traceback
 import argparse
 import time
@@ -29,15 +30,23 @@ namespace = ''
 discord_webhook_url = None
 discord_char_limit = 2000
 
+def peer_to_multiaddr(peer):
+  return '/ip4/{}/tcp/{}/p2p/{}'.format(
+    peer['host'],
+    peer['libp2p_port'],
+    peer['peer_id'] )
+
 def main():
 
     global discord_webhook_url
     global namespace
     parser = argparse.ArgumentParser(description="Make a report for the active network and optionally send to discord")
-    parser.add_argument("-n", "--namespace", help="testnet namespace", required=True, type=str, dest="namespace")
+    parser.add_argument("-n", "--namespace", help="testnet namespace", required=False, type=str, dest="namespace")
     parser.add_argument("-ic", "--incluster", help="if we're running from inside the cluster", required=False, default=False, type=bool, dest="incluster")
     parser.add_argument("-d", "--discord_webhook_url", help="discord webhook url", required=False, type=str, dest="discord_webhook_url")
     parser.add_argument("-a", "--accounts", help="community accounts csv", required=False, type=str, dest="accounts_csv")
+    parser.add_argument("-l", "--local", help="run with a local node", required=False, type=bool, default=False)
+    parser.add_argument("-b", "--bin", help="local mina binary", required=False, type=str, default="mina", dest="binary")
 
     # ==========================================
 
@@ -67,12 +76,29 @@ def main():
 
     pods = v1.list_namespaced_pod(args.namespace, watch=False)
 
-    seed = [ p for p in pods.items if 'seed' in p.metadata.name ][0]
+    seed = [ p for p in pods.items if 'seed' in p.metadata.name ][-1]
     seed_daemon_container = [ c for c in seed.spec.containers if c.args[0] == 'daemon' ][0]
     seed_vars_dict = [ v.to_dict() for v in seed_daemon_container.env ]
     seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
+    print('seed', seed.metadata.name)
 
     request_timeout_seconds = 600
+
+    def exec_locally(command):
+      command = command.replace('mina', args.binary)
+      print(command)
+      import subprocess
+      subprocess = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, text=True)
+      res = subprocess.stdout.read()
+      print('result', len(res))
+
+      return res
+
+      #import IPython; IPython.embed()
+
+      #print(command)
+      #sys.exit()
+      #pass
 
     def exec_on_seed(command):
 
@@ -82,7 +108,7 @@ def main():
           '-c',
           command,
         ]
-        result = stream.stream(v1.connect_get_namespaced_pod_exec, seed.metadata.name, args.namespace, command=exec_command, container='seed', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
+        result = stream.stream(v1.connect_get_namespaced_pod_exec, seed.metadata.name, args.namespace, command=exec_command, container='coda', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
         return result
 
       print('running command:', command)
@@ -116,22 +142,23 @@ def main():
 
       received_len = len(result.encode('utf-8'))
 
-      # seems to fail frequently
-      # assert(file_len - received_len == 0 or file_len - received_len == 1)
-
       return result
 
+    if args.local:
+      exec_command = exec_locally
+    else:
+      exec_command = exec_on_seed
 
     peer_table = {}
 
     queried_peers = set()
-    unqueried_peers = set()
+    unqueried_peers = {}
 
-    telemetry_heartbeat_errors = []
-    telemetry_transport_stopped_errors = []
-    telemetry_handshake_errors = []
-    telemetry_libp2p_errors = []
-    telemetry_other_errors = []
+    node_status_heartbeat_errors = []
+    node_status_transport_stopped_errors = []
+    node_status_handshake_errors = []
+    node_status_libp2p_errors = []
+    node_status_other_errors = []
 
     uptime_less_than_10_min = []
     uptime_less_than_30_min = []
@@ -155,13 +182,24 @@ def main():
       # we use ast instead of json to handle properties with single quotes instead of double quotes (which the response seems to often contain)
       resps = [ ast.literal_eval(s) for s in resp.split('\n') if s != '' ]
 
-      print ('Received %s telemetry responses'%(str(len(resps))))
+
+      print ('Received %s node_status responses'%(str(len(resps))))
 
       peers = list(filter(no_error,resps))
       error_resps = list(filter(contains_error,resps))
 
-      print ('\t%s valid responses from peers'%(str(len(list(peers)))))
-      print ('\t%s error responses'%(str(len(list(error_resps)))))
+      errors = list(set([ str(s) for s in error_resps ]))
+
+
+      print('\t%s valid responses from peers'%(str(len(list(peers)))))
+      print('\t%s error responses'%(str(len(list(error_resps)))))
+      print('\t%s unique errors'%(str(len(errors))))
+      print('=========================')
+      for e in errors[:5]:
+        print(e)
+      print('=========================')
+      #if len(errors) > 100:
+      #  import IPython; IPython.embed()
 
       key_value_peers = [ ((p['node_ip_addr'], p['node_peer_id']), p) for p in peers ]
 
@@ -170,9 +208,12 @@ def main():
           peer_table[k] = v
 
       queried_peers.update([ p['node_peer_id'] for p in peers ])
-      queried_peers.update(direct_queried_peers)
-      unqueried_peers.update([ p['peer_id'] for p in list(itertools.chain(*[ p['peers'] for p in peers ])) ])
-      unqueried_peers.difference_update(queried_peers)
+      queried_peers.update([ p['peer_id'] for p in direct_queried_peers ])
+      for p in itertools.chain(*[ p['peers'] for p in peers ]):
+        unqueried_peers[p['peer_id']] = p
+      for p in queried_peers:
+        if p in unqueried_peers:
+          del unqueried_peers[p]
 
       for p in peers:
         uptime = int(p['uptime_minutes'])
@@ -194,46 +235,47 @@ def main():
       for e in error_resps:
         error = str(e['error'])
         if 'handshake error' in error:
-          telemetry_handshake_errors.append(e)
+          node_status_handshake_errors.append(e)
         elif 'heartbeats' in error:
-          telemetry_heartbeat_errors.append(e)
+          node_status_heartbeat_errors.append(e)
         elif 'transport stopped' in error:
-          telemetry_transport_stopped_errors.append(e)
+          node_status_transport_stopped_errors.append(e)
         elif 'libp2p' in error:
-          telemetry_libp2p_errors.append(e)
+          node_status_libp2p_errors.append(e)
         else:
-          telemetry_other_errors.append(e)
+          node_status_other_errors.append(e)
 
-    print ('Gathering telemetry from daemon peers')
+    print ('Gathering node_status from daemon peers')
 
-    seed_status = exec_on_seed("coda client status")
+    seed_status = exec_command("mina client status")
     if seed_status == '':
       raise Exception("unable to connect to seed node within " + str(request_timeout_seconds) + " seconds" )
 
-    resp = exec_on_seed("coda advanced telemetry -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors")
+    get_status_value = lambda key: [ s for s in seed_status.split('\n') if key in s ][0].split(':')[1].strip()
 
+    accounts = int(get_status_value('Global number of accounts'))
+    blocks = int(get_status_value('Max observed block height'))
+    slot_time = get_status_value('Consensus time now')
+    epoch, slot = [ int(s.split('=')[1]) for s in slot_time.split(',') ]
+    slots_per_epoch = int(get_status_value('Slots per epoch'))
+    global_slot = epoch*slots_per_epoch + slot
+
+    resp = exec_command("mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors")
     add_resp(resp, [])
 
     requests = 0
 
     while len(unqueried_peers) > 0 and requests < 10:
-      peer_ids = ','.join(list(unqueried_peers))
+      peers_to_query = list(unqueried_peers.values())
+      peers = ','.join(peer_to_multiaddr(p) for p in peers_to_query)
 
-      print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering telemetry on %s unqueried peers'%(str(len(unqueried_peers))))
+      print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering node_status on %s unqueried peers'%(str(len(unqueried_peers))))
 
-      resp = exec_on_seed("coda advanced telemetry -daemon-port " + seed_daemon_port + " -peer-ids " + peer_ids + " -show-errors")
-      add_resp(resp, list(unqueried_peers))
+      resp = exec_on_seed("mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
+      add_resp(resp, peers_to_query)
 
       requests += 1
 
-    get_status_value = lambda key: [ s for s in seed_status.split('\n') if key in s ][0].split(':')[1].strip()
-
-    accounts = int(get_status_value('Global number of accounts'))
-    blocks = int(get_status_value('Max observed block length'))
-    slot_time = get_status_value('Consensus time now')
-    epoch, slot = [ int(s.split('=')[1]) for s in slot_time.split(',') ]
-    slots_per_epoch = int(get_status_value('Slots per epoch'))
-    global_slot = epoch*slots_per_epoch + slot
 
     peer_numbers = [ len(node['peers']) for node in peer_table.values() ]
     peer_percentiles = [ 0, 5, 25, 50, 95, 100 ]
@@ -333,7 +375,7 @@ def main():
       discord_to_keys = {}
       online_discord_counts = {}
 
-    version_counts = dict(Counter([ v['git_commit'] for v in peer_table.values() ]))
+    version_counts = dict(Counter([ v['git_commit'] for v in peer_table.values() if 'git_commit' in v ]))
 
     # --------------------
     # collect long-running data
@@ -392,11 +434,11 @@ def main():
       "namespace": args.namespace,
       "queried_nodes": len(queried_peers),
       "responding_nodes": len(peer_table),
-      "telemetry_handshake_errors": len(telemetry_handshake_errors),
-      "telemetry_heartbeat_errors": len(telemetry_heartbeat_errors),
-      "telemetry_transport_stopped_errors": len(telemetry_transport_stopped_errors),
-      "telemetry_libp2p_errors": len(telemetry_libp2p_errors),
-      "telemetry_other_errors": len(telemetry_other_errors),
+      "node_status_handshake_errors": len(node_status_handshake_errors),
+      "node_status_heartbeat_errors": len(node_status_heartbeat_errors),
+      "node_status_transport_stopped_errors": len(node_status_transport_stopped_errors),
+      "node_status_libp2p_errors": len(node_status_libp2p_errors),
+      "node_status_other_errors": len(node_status_other_errors),
       "uptime_less_than_10_min": len(uptime_less_than_10_min),
       "uptime_less_than_30_min": len(uptime_less_than_30_min),
       "uptime_less_than_1_hour": len(uptime_less_than_1_hour),
@@ -424,7 +466,6 @@ def main():
       "version_counts": version_counts,
     }
 
-    #import IPython; IPython.embed()
 
     # TODO
     # * timing of block receipt with a health indicator
@@ -460,7 +501,7 @@ def main():
     make_block_tree_graph()
 
     copy = [ 'namespace', 'queried_nodes', 'responding_nodes', 'epoch', 'epoch_slot', 'global_slot', 'blocks', 'block_fill_rate', 'has_forks', 'has_participants',
-             'telemetry_handshake_errors', 'telemetry_heartbeat_errors', 'telemetry_transport_stopped_errors', 'telemetry_libp2p_errors', 'telemetry_other_errors',
+             'node_status_handshake_errors', 'node_status_heartbeat_errors', 'node_status_transport_stopped_errors', 'node_status_libp2p_errors', 'node_status_other_errors',
              'uptime_less_than_10_min', 'uptime_less_than_30_min', 'uptime_less_than_1_hour', 'uptime_less_than_6_hour', 'uptime_less_than_12_hour',
              'uptime_less_than_24_hour', 'uptime_greater_than_24_hour' ]
     json_report = {}

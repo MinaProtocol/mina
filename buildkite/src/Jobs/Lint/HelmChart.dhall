@@ -1,7 +1,4 @@
 let Prelude = ../../External/Prelude.dhall
-let B = ../../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
@@ -12,8 +9,6 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
-
-let jobDocker = Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).codaToolchain}
 
 in
 

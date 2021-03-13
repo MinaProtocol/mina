@@ -100,8 +100,45 @@
         },
         {
           "kind": "SCALAR",
-          "name": "PrecomputedBlock",
-          "description": "Block encoded in precomputed block format",
+          "name": "RosettaTransaction",
+          "description": "A transaction encoded in the rosetta format",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SendRosettaTransactionPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "userCommand",
+              "description": "Command that was sent",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "UserCommand",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "ExtensionalBlock",
+          "description": "Block encoded in extensional block format",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -110,8 +147,8 @@
         },
         {
           "kind": "SCALAR",
-          "name": "ExtensionalBlock",
-          "description": "Block encoded in extensional block format",
+          "name": "PrecomputedBlock",
+          "description": "Block encoded in precomputed block format",
           "fields": null,
           "inputFields": null,
           "interfaces": null,
@@ -2871,7 +2908,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -2983,7 +3020,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -3118,7 +3155,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -3230,7 +3267,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -3365,7 +3402,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -3445,7 +3482,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -3552,7 +3589,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -3636,7 +3673,7 @@
             },
             {
               "name": "memo",
-              "description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -4886,6 +4923,16 @@
               "description": "Connect to the given peers",
               "args": [
                 {
+                  "name": "seed",
+                  "description": null,
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "peers",
                   "description": null,
                   "type": {
@@ -4984,6 +5031,37 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "Applied",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "sendRosettaTransaction",
+              "description": "Send a transaction in rosetta format",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "RosettaTransaction",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SendRosettaTransactionPayload",
                   "ofType": null
                 }
               },
@@ -5737,6 +5815,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "type",
+              "description": "Fee_transfer|Fee_transfer_via_coinbase Snark worker fees deducted from the coinbase amount are of type 'Fee_transfer_via_coinbase', rest are deducted from transaction fees",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
@@ -7257,7 +7351,7 @@
             },
             {
               "name": "isDelegation",
-              "description": "If true, this represents a delegation of stake, otherwise it is a payment",
+              "description": "If true, this command represents a delegation of stake",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -7334,6 +7428,18 @@
               },
               "isDeprecated": true,
               "deprecationReason": "use receiver field instead"
+            },
+            {
+              "name": "failureReason",
+              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -7655,6 +7761,18 @@
               },
               "isDeprecated": true,
               "deprecationReason": "use receiver field instead"
+            },
+            {
+              "name": "failureReason",
+              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -7976,6 +8094,18 @@
               },
               "isDeprecated": true,
               "deprecationReason": "use receiver field instead"
+            },
+            {
+              "name": "failureReason",
+              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -8297,6 +8427,18 @@
               },
               "isDeprecated": true,
               "deprecationReason": "use receiver field instead"
+            },
+            {
+              "name": "failureReason",
+              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -8622,6 +8764,18 @@
               },
               "isDeprecated": true,
               "deprecationReason": "use receiver field instead"
+            },
+            {
+              "name": "failureReason",
+              "description": "null is no failure or status unknown, reason for failure otherwise.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -8818,7 +8972,7 @@
             },
             {
               "name": "memo",
-		"description": "A short message from the sender, encoded with Base58Check, version byte=0x14; byte 2 of the decoding is the message length",
+              "description": "Short arbitrary message provided by the sender",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -8911,6 +9065,18 @@
               },
               "isDeprecated": true,
               "deprecationReason": "use receiver field instead"
+            },
+            {
+              "name": "failureReason",
+              "description": "null is no failure, reason for failure otherwise.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -9059,7 +9225,20 @@
           "kind": "OBJECT",
           "name": "protocolStateProof",
           "description": null,
-          "fields": [],
+          "fields": [
+            {
+              "name": "base64",
+              "description": "Base-64 encoded proof",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
           "inputFields": null,
           "interfaces": [],
           "enumValues": null,
@@ -9994,16 +10173,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "UInt64",
-          "description": "String representing a uint64 number in base 10",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "AnnotatedBalance",
           "description": "A total balance annotated with the amount that is currently unknown with the invariant unknown <= total, as well as the currently liquid and locked balances.",
@@ -10042,25 +10211,27 @@
             },
             {
               "name": "liquid",
-              "isDeprecated": true,
+              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
-              "deprecationReason": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "UInt64"
+                "name": "UInt64",
+                "ofType": null
               },
-              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping."
+              "isDeprecated": true,
+              "deprecationReason": null
             },
             {
               "name": "locked",
-              "isDeprecated": true,
+              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
-              "deprecationReason": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "UInt64"
+                "name": "UInt64",
+                "ofType": null
               },
-              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping."
+              "isDeprecated": true,
+              "deprecationReason": null
             },
             {
               "name": "blockHeight",
@@ -10085,6 +10256,87 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "UInt64",
+          "description": "String representing a uint64 number in base 10",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "AccountTiming",
+          "description": null,
+          "fields": [
+            {
+              "name": "initial_mininum_balance",
+              "description": "The initial minimum balance for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_time",
+              "description": "The cliff time for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "cliff_amount",
+              "description": "The cliff amount for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_period",
+              "description": "The vesting period for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "vesting_increment",
+              "description": "The vesting increment for a time-locked account",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt64",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -10147,6 +10399,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "TokenId",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "timing",
+              "description": "The timing associated with this account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AccountTiming",
                   "ofType": null
                 }
               },
@@ -10579,12 +10847,55 @@
         },
         {
           "kind": "OBJECT",
+          "name": "ConsensusTimeGlobalSlot",
+          "description": "Consensus time and the corresponding global slot since genesis",
+          "fields": [
+            {
+              "name": "consensusTime",
+              "description": "Time in terms of slot number in an epoch, start and end time of the slot since UTC epoch",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ConsensusTime",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlotSinceGenesis",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "BlockProducerTimings",
           "description": null,
           "fields": [
             {
               "name": "times",
-              "description": null,
+              "description": "Next block production time",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10601,6 +10912,46 @@
                       "ofType": null
                     }
                   }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlotSinceGenesis",
+              "description": "Next block production global-slot-since-genesis ",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "UInt32",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "generatedFromConsensusAt",
+              "description": "Consensus time of the block that was used to determine the next block production time",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ConsensusTimeGlobalSlot",
+                  "ofType": null
                 }
               },
               "isDeprecated": false,
@@ -11170,6 +11521,22 @@
             },
             {
               "name": "highestBlockLengthReceived",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "highestUnvalidatedBlockLengthReceived",
               "description": null,
               "args": [],
               "type": {
@@ -11822,7 +12189,7 @@
             },
             {
               "name": "bestChain",
-              "description": "Retrieve a list of blocks from transition frontier's root to the current best tip. Returns null if the system is bootstrapping.",
+              "description": "Retrieve a list of blocks from transition frontier's root to the current best tip. Returns an error if the system is bootstrapping.",
               "args": [
                 {
                   "name": "maxLength",
@@ -11857,7 +12224,7 @@
               "args": [
                 {
                   "name": "height",
-                  "description": "The height of the desired block",
+                  "description": "The height of the desired block in the best chain",
                   "type": {
                     "kind": "SCALAR",
                     "name": "Int",

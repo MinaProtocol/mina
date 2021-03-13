@@ -27,6 +27,7 @@ Pipeline.build
       JobSpec::{
         dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "src"),
+          S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
@@ -46,17 +47,17 @@ Pipeline.build
             "DUNE_PROFILE=testnet_postake_medium_curves",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
+            "CODA_BRANCH=$BUILDKITE_BRANCH",
+            "CODA_COMMIT_SHA1=$BUILDKITE_COMMIT",
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
           label = "Build Mina daemon debian package",
           key = "build-deb-pkg",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "_build/*.deb" ]
+          artifact_paths = [ S.contains "_build/*.deb" ],
+          retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
         },
-
-      -- Tests that depend on the debian package
-      ConnectToTestnet.step dependsOn,
 
       -- daemon image
       let daemonSpec = DockerImage.ReleaseSpec::{

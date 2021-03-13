@@ -1,0 +1,3 @@
+(* same as testnet_postake_medium_curves, but always starts at genesis = 0 *)
+[%%import "/src/config/testnet_postake_medium_curves.mlh"]
+[%%import "/src/config/fork.mlh"]

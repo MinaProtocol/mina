@@ -1,5 +1,5 @@
 locals {
-  west1_region = "us-west1"
+  west1_region      = "us-west1"
   west1_k8s_context = "gke_o1labs-192920_us-west1_mina-integration-west1"
 
   west1_prometheus_helm_values = {
@@ -21,9 +21,9 @@ locals {
           }
           write_relabel_configs = [
             {
-              source_labels: ["__name__"]
-              regex: "(container.*|Coda.*)"
-              action: "keep"
+              source_labels : ["__name__"]
+              regex : "(buildkite.*|container.*|Coda.*|watchdog.*)"
+              action : "keep"
             }
           ]
         }
@@ -43,22 +43,22 @@ provider "google" {
 }
 
 provider "kubernetes" {
-  alias   = "k8s_west1"
+  alias          = "k8s_west1"
   config_context = local.west1_k8s_context
 }
 
 data "google_compute_zones" "west1_available" {
   project = local.gcp_project
-  region = local.west1_region
-  status = "UP"
+  region  = local.west1_region
+  status  = "UP"
 }
 
 ### Testnets
 
 resource "google_container_cluster" "mina_integration_west1" {
-  provider = google.google_west1
-  name     = "mina-integration-west1"
-  location = local.west1_region
+  provider           = google.google_west1
+  name               = "mina-integration-west1"
+  location           = local.west1_region
   min_master_version = "1.16"
 
   node_locations = data.google_compute_zones.west1_available.names
@@ -80,7 +80,7 @@ resource "google_container_cluster" "mina_integration_west1" {
 }
 
 resource "google_container_node_pool" "west1_integration_primary" {
-  provider = google.google_west1
+  provider   = google.google_west1
   name       = "mina-integration-primary"
   location   = local.west1_region
   cluster    = google_container_cluster.mina_integration_west1.name
@@ -106,7 +106,7 @@ resource "google_container_node_pool" "west1_integration_primary" {
 }
 
 resource "google_container_node_pool" "west1_integration_preemptible" {
-  provider = google.google_west1
+  provider   = google.google_west1
   name       = "mina-integration-preemptible"
   location   = local.west1_region
   cluster    = google_container_cluster.mina_integration_west1.name
@@ -133,6 +133,7 @@ resource "google_container_node_pool" "west1_integration_preemptible" {
 
 ## Data Persistence
 
+# TODO: deprecate below region based storage classes once OK to do so (i.e. all testnets have migrated to new classes)
 resource "kubernetes_storage_class" "west1_ssd" {
   provider = kubernetes.k8s_west1
 
@@ -167,6 +168,42 @@ resource "kubernetes_storage_class" "west1_standard" {
   }
 }
 
+# ---
+
+resource "kubernetes_storage_class" "west1_infra_ssd" {
+  provider = kubernetes.k8s_west1
+
+  count = length(local.storage_reclaim_policies)
+
+  metadata {
+    name = "ssd-${lower(local.storage_reclaim_policies[count.index])}"
+  }
+
+  storage_provisioner = "kubernetes.io/gce-pd"
+  reclaim_policy      = local.storage_reclaim_policies[count.index]
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "pd-ssd"
+  }
+}
+
+resource "kubernetes_storage_class" "west1_infra_standard" {
+  provider = kubernetes.k8s_west1
+
+  count = length(local.storage_reclaim_policies)
+
+  metadata {
+    name = "standard-${lower(local.storage_reclaim_policies[count.index])}"
+  }
+
+  storage_provisioner = "kubernetes.io/gce-pd"
+  reclaim_policy      = local.storage_reclaim_policies[count.index]
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "pd-standard"
+  }
+}
+
 ## Monitoring
 
 provider helm {
@@ -184,7 +221,64 @@ resource "helm_release" "west1_prometheus" {
   values = [
     yamlencode(local.west1_prometheus_helm_values)
   ]
-  wait       = true
-  depends_on = [google_container_cluster.mina_integration_west1]
-  force_update  = true
+  wait         = true
+  depends_on   = [google_container_cluster.mina_integration_west1]
+  force_update = true
+}
+
+# Utilities
+
+provider kubernetes {
+  config_context = local.west1_k8s_context
+}
+
+resource "kubernetes_cron_job" "integration-testnet-cleanup" {
+  metadata {
+    name      = "integration-test-cleanup"
+    namespace = "default"
+  }
+  spec {
+    concurrency_policy            = "Replace"
+    failed_jobs_history_limit     = 5
+    schedule                      = "0 * * * *"
+    starting_deadline_seconds     = 10
+    successful_jobs_history_limit = 10
+    job_template {
+      metadata {}
+      spec {
+        backoff_limit              = 5
+        ttl_seconds_after_finished = 10
+        template {
+          metadata {}
+          spec {
+            container {
+              name  = "integration-test-janitor"
+              image = "gcr.io/o1labs-192920/watchdog:0.3.9"
+              args = [
+                "/scripts/network-utilities.py",
+                "janitor",
+                "cleanup-namespace-resources",
+                "--namespace-pattern",
+                "^it-.*|^ci-net.*",
+                "--cleanup-older-than",
+                "10800", # 60 * 60 * 3 seconds (3 hours)
+                "--k8s-context",
+                "gke_o1labs-192920_us-west1_mina-integration-west1",
+                "--kube-config-file",
+                "/root/.kube/config"
+              ]
+              env {
+                name  = "GCLOUD_APPLICATION_CREDENTIALS_JSON"
+                value = base64decode(google_service_account_key.janitor_svc_key.private_key)
+              }
+              env {
+                name  = "CLUSTER_SERVICE_EMAIL"
+                value = google_service_account.gcp_janitor_account.email
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }

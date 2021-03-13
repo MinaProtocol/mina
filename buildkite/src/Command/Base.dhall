@@ -20,6 +20,8 @@ let B/Manual = B.definitions/commandStep/properties/retry/properties/manual/Type
 let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 let B/Skip = B.definitions/commandStep/properties/skip/Type
 
+let B/If = B.definitions/commandStep/properties/if/Type
+
 let Cmd = ../Lib/Cmds.dhall
 let Decorate = ../Lib/Decorate.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
@@ -99,6 +101,7 @@ let Config =
       , retries : List Retry.Type
       , soft_fail : Optional B/SoftFail
       , skip: Optional B/Skip
+      , if : Optional B/If
       }
   , default =
     { depends_on = [] : List TaggedKey.Type
@@ -110,6 +113,7 @@ let Config =
     , retries = [] : List Retry.Type
     , soft_fail = None B/SoftFail
     , skip = None B/Skip
+    , if = None B/If
     }
   }
 
@@ -168,12 +172,14 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
                     ([
-                      -- ensure automatic retries on -1 exit status (infra error)
+                      -- infra error
                       Retry::{ exit_status = -1, limit = Some 2 },
-                      -- automatically retry on 100 exit status (apt-get update race condition error)
+                      -- common/flake error
+                      Retry::{ exit_status = +1, limit = Some 1 },
+                      -- apt-get update race condition error
                       Retry::{ exit_status = +100, limit = Some 2 },
-                      -- automatically retry on 1 exit status (common/flake error)
-                      Retry::{ exit_status = +1, limit = Some 1 }
+                      -- Git checkout error
+                      Retry::{ exit_status = +128, limit = Some 2 }
                     ] #
                     -- and the retries that are passed in (if any)
                     c.retries)
@@ -183,6 +189,7 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
           },
     soft_fail = c.soft_fail,
     skip = c.skip,
+    if = c.if,
     plugins =
       let dockerPart =
         Optional/toList
@@ -218,5 +225,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry}
 

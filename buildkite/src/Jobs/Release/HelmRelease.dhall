@@ -1,7 +1,4 @@
 let Prelude = ../../External/Prelude.dhall
-let B = ../../External/Buildkite.dhall
-
-let B/SoftFail = B.definitions/commandStep/properties/soft_fail/Type
 
 let S = ../../Lib/SelectFiles.dhall
 let Cmd = ../../Lib/Cmds.dhall
@@ -13,15 +10,13 @@ let Command = ../../Command/Base.dhall
 let Docker = ../../Command/Docker/Type.dhall
 let Size = ../../Command/Size.dhall
 
-let jobDocker = Cmd.Docker::{image = (../../Constants/ContainerImages.dhall).codaToolchain}
-
 in
 
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.strictly (S.contains "Chart.yaml"),
+        S.strictlyEnd (S.contains "Chart.yaml"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
         S.exactly "buildkite/scripts/helm-ci" "sh"
       ],

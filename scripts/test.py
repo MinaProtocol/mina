@@ -97,7 +97,9 @@ required_excludes = [
 ]
 
 # these extra jobs are not filters, they are full status check names
-extra_required_status_checks = ['buildkite/mina/pr']
+extra_required_status_checks = [
+    'buildkite/mina/pr', 'buildkite/mina-pr-gating'
+]
 
 # these are full status check names. they will not be required to succeed.
 not_required_status_checks = [
@@ -337,7 +339,7 @@ class Executive:
 # It is responsible for dispatching builds and tests.
 class CodaProject:
     logproc_exe_path = 'src/app/logproc/logproc.exe'
-    coda_exe_path = 'src/app/cli/src/coda.exe'
+    coda_exe_path = 'src/app/cli/src/mina.exe'
 
     def __init__(self, executive, root='.'):
         self.executive = executive

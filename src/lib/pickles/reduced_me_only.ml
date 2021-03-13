@@ -15,7 +15,7 @@ module Pairing_based = struct
     module V1 = struct
       type ('s, 'sgs, 'bpcs) t =
         {app_state: 's; sg: 'sgs; old_bulletproof_challenges: 'bpcs}
-      [@@deriving sexp, yojson, sexp, compare, hash, eq]
+      [@@deriving sexp, yojson, sexp, compare, hash, equal]
     end
   end]
 
@@ -29,20 +29,32 @@ end
 
 module Dlog_based = struct
   module Challenges_vector = struct
-    [%%versioned_asserted
+    [%%versioned
     module Stable = struct
+      [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t =
-          Challenge.Constant.t Scalar_challenge.Stable.V1.t
+          Limb_vector.Constant.Hex64.Stable.V1.t Vector.Vector_2.Stable.V1.t
+          Scalar_challenge.Stable.V1.t
           Bulletproof_challenge.Stable.V1.t
           Wrap_bp_vec.Stable.V1.t
-        [@@deriving sexp, compare, yojson, hash, eq]
+        [@@deriving sexp, compare, yojson, hash, equal]
 
         let to_latest = Fn.id
       end
-
-      module Tests = struct end
     end]
+
+    type t =
+      Challenge.Constant.t Scalar_challenge.t Bulletproof_challenge.t
+      Wrap_bp_vec.t
+    [@@deriving sexp, compare, yojson, hash, equal]
+
+    let _ =
+      let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
+       fun () -> Type_equal.T
+      in
+      ()
 
     module Prepared = struct
       type t = (Tock.Field.t, Tock.Rounds.n) Vector.t

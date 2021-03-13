@@ -9,12 +9,30 @@ let command_run =
     (let%map_open log_json = Flag.Log.json
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
+     and metrics_server_port =
+       flag "--metrics-port" ~aliases:["-metrics-port"]
+         ~doc:
+           "PORT metrics server for scraping via Prometheus (default no \
+            metrics-server)"
+         (optional Cli_lib.Arg_type.int16)
+     and missing_blocks_width =
+       flag "--missing-blocks-width" ~aliases:["-missing-blocks-width"]
+         ~doc:
+           (sprintf
+              "int The width of block heights within which missing blocks are \
+               reported in Prometheus metrics. If the maximum height in the \
+               database is h and missing-blocks-width is n, then \
+               Coda_Archive_missing_blocks will report missing blocks between \
+               heights max(1, h-n) and h (default %d)"
+              Archive_lib.Metrics.default_missing_blocks_width)
+         (optional int)
      and postgres = Flag.Uri.Archive.postgres
      and runtime_config_file =
-       flag "-config-file" (optional string)
+       flag "--config-file" ~aliases:["-config-file"] (optional string)
          ~doc:"PATH to the configuration file containing the genesis ledger"
      and delete_older_than =
-       flag "-delete-older-than" (optional int)
+       flag "--delete-older-than" ~aliases:["-delete-older-than"]
+         (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block."
@@ -27,12 +45,12 @@ let command_run =
      fun () ->
        let logger = Logger.create () in
        Stdout_log.setup log_json log_level ;
-       Archive_lib.Processor.setup_server ~logger
+       Archive_lib.Processor.setup_server ~metrics_server_port ~logger
          ~constraint_constants:Genesis_constants.Constraint_constants.compiled
          ~postgres_address:postgres.value
          ~server_port:
            (Option.value server_port.value ~default:server_port.default)
-         ~delete_older_than ~runtime_config_opt)
+         ~delete_older_than ~runtime_config_opt ~missing_blocks_width)
 
 let time_arg =
   (* Same timezone as Genesis_constants.genesis_state_timestamp. *)
@@ -44,16 +62,16 @@ let command_prune =
   let open Command.Let_syntax in
   Command.async ~summary:"Prune old blocks and their transactions"
     (let%map_open height =
-       flag "-height" (optional int)
+       flag "--height" ~aliases:["-height"] (optional int)
          ~doc:"int Delete blocks with height lower than the given height"
      and num_blocks =
-       flag "-num-blocks" (optional int)
+       flag "--num-blocks" ~aliases:["-num-blocks"] (optional int)
          ~doc:
            "int Delete blocks that are more than n blocks lower than the \
             maximum seen block. This argument is ignored if the --height \
             argument is also given"
      and timestamp =
-       flag "-timestamp" (optional time_arg)
+       flag "--timestamp" ~aliases:["-timestamp"] (optional time_arg)
          ~doc:
            "timestamp Delete blocks that are older than the given timestamp. \
             Format: 2000-00-00 12:00:00+0100"

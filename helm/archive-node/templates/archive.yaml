@@ -18,10 +18,11 @@ spec:
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
       annotations:
         prometheus.io/scrape: 'true'
-        prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
+        prometheus.io/port: {{ .Values.archive.ports.metrics | quote }}
         prometheus.io/path: '/metrics'
     spec:
       containers:
+{{- if .Values.archive.enableLocalDaemon }}
       - name: coda
         resources:
           limits:
@@ -45,10 +46,12 @@ spec:
           "-peer-exchange true"
           {{- end -}}
           {{- range .Values.coda.directPeers }}
-
           "-direct-peers", {{ . | quote }},
           {{- end -}}
-          "-config-directory", "/root/.coda-config",
+          {{- if .Values.coda.seedPeersURL }}
+          "-peer-list-url", {{ .Values.coda.seedPeersURL | quote }},
+          {{- end -}}
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-insecure-rest-server",
@@ -57,8 +60,8 @@ spec:
           "-archive-address", "$(DAEMON_ARCHIVE_PORT)",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
-          "-generate-genesis-proof", "true",
           {{- end -}}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
         ]
         env:
         - name: DAEMON_REST_PORT
@@ -88,22 +91,24 @@ spec:
         - name: external-port
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
-          hostPort: {{ .Values.coda.ports.external }}
+          hostPort: {{ .Values.coda.ports.p2p }}
 {{- include "healthcheck.daemon.allChecks" .Values | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 
         - name: config-dir
-          mountPath: /root/.coda-config
+          mountPath: /root/.mina-config
         {{- if .Values.coda.runtimeConfig }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
+{{- end }}
       # Archive Process
       - name: archive
         image: {{ .Values.archive.image }}
         args: [ 
           "coda-archive",
           "run",
+          "-metrics-port", "{{ .Values.archive.ports.metrics }}",
           "-postgres-uri", "{{ tpl .Values.archive.postgresUri . }}",
           {{- if .Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
@@ -124,6 +129,9 @@ spec:
         - name: postgres-port
           protocol: TCP
           containerPort: {{ .Values.archive.ports.postgres }}
+        - name: metrics-port
+          protocol: TCP 
+          containerPort: {{ .Values.archive.ports.metrics }}
 {{- include "healthcheck.archive.allChecks" . | indent 8 }}
 {{- include "nodeSelector.preemptible" .Values | indent 6 }}
       volumes:

@@ -30,7 +30,7 @@ const runCircleBuild = async (github) => {
   return request;
 };
 
-const runBuild = async (github) => {
+const runBuild = async (github, pipeline_name, env) => {
   const postData = JSON.stringify({
     commit: github.pull_request.head.sha,
     branch: github.pull_request.head.ref,
@@ -41,12 +41,13 @@ const runBuild = async (github) => {
     pull_request_base_branch: github.pull_request.base.ref,
     pull_request_id: github.pull_request.number,
     pull_request_repository: github.pull_request.head.repo.clone_url,
+    env: env,
   });
 
   const options = {
     hostname: "api.buildkite.com",
     port: 443,
-    path: `/v2/organizations/o-1-labs-2/pipelines/mina/builds`,
+    path: `/v2/organizations/o-1-labs-2/pipelines/${pipeline_name}/builds`,
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -111,16 +112,55 @@ const handler = async (event, req) => {
       }
 
       if (!buildAlreadyExists) {
-        const buildkite = await runBuild(req.body);
+        const buildkite = await runBuild(req.body, "mina", {});
         const circle = await runCircleBuild(req.body);
         return [buildkite, circle];
       } else {
         console.info("Build for this commit on this branch was already found");
-        return ["build already found for this commit", "build already found for this commit"];
+        return [
+          "build already found for this commit",
+          "build already found for this commit",
+        ];
       }
     }
   } else if (event == "issue_comment") {
+    // PR Gating Lifting section
     if (
+      // we are creating the comment
+      req.body.action == "created" &&
+      // and this is actually a pull request
+      req.body.issue.pull_request &&
+      req.body.issue.pull_request.url &&
+      // and the comment contents is exactly the slug we are looking for
+      req.body.comment.body == "!approved-for-mainnet"
+    ) {
+      // TODO #7711: Actually look at @MinaProtocol/stakeholder-reviewers team instead of hardcoding the users here
+      if (
+        req.body.sender.login == "es92" ||
+        req.body.sender.login == "aneesharaines" ||
+        req.body.sender.login == "bkase" ||
+        req.body.sender.login == "imeckler"
+      ) {
+        const prData = await getRequest(req.body.issue.pull_request.url);
+        const buildkite = await runBuild(
+          {
+            sender: req.body.sender,
+            pull_request: prData.data,
+          },
+          "mina-pr-gating",
+          { PR_GATE: "lifted" }
+        );
+        return [buildkite, null];
+      } else {
+        return [
+          "comment author is not (publically) a member of the core team",
+          "comment author is not (publically) a member of the core team",
+        ];
+      }
+    }
+
+    // Mina CI Build section
+    else if (
       // we are creating the comment
       req.body.action == "created" &&
       // and this is actually a pull request
@@ -135,17 +175,24 @@ const handler = async (event, req) => {
         orgData.data.filter((org) => org.login == "MinaProtocol").length > 0
       ) {
         const prData = await getRequest(req.body.issue.pull_request.url);
-        const buildkite = await runBuild({
-          sender: req.body.sender,
-          pull_request: prData.data,
-        });
+        const buildkite = await runBuild(
+          {
+            sender: req.body.sender,
+            pull_request: prData.data,
+          },
+          "mina",
+          {}
+        );
         const circle = await runCircleBuild({
           pull_request: prData.data,
         });
         return [buildkite, circle];
       } else {
         // NB: Users that are 'privately' a member of the org will not be able to trigger CI jobs
-        return ["comment author is not (publically) a member of the core team", "comment author is not (publically) a member of the core team"];
+        return [
+          "comment author is not (publically) a member of the core team",
+          "comment author is not (publically) a member of the core team",
+        ];
       }
     }
   }

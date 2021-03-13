@@ -10,7 +10,7 @@ module Width : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, eq, compare, hash, yojson]
+      type t [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -24,12 +24,24 @@ module Width : sig
 
   module Max : Nat.Add.Intf_transparent
 
+  module Max_vector : Vector.With_version(Max).S
+
+  module Max_at_most : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'a t = ('a, Max.n) At_most.t
+        [@@deriving compare, sexp, yojson, hash, equal]
+      end
+    end]
+  end
+
   module Length : Nat.Add.Intf_transparent
 end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = char [@@deriving sexp, eq, compare, hash, yojson]
+      type t = char [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -38,6 +50,49 @@ end = struct
   let zero = Char.of_int_exn 0
 
   module Max = Nat.N2
+
+  (* Think about versioning here! These vector types *will* change
+     serialization if the numbers above change, and so will require a new
+     version number. Thus, it's important that these are modules with new
+     versioned types, and not just module aliases to the corresponding vector
+     implementation.
+  *)
+  module Max_vector = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type 'a t = 'a Vector.Vector_2.Stable.V1.t
+        [@@deriving compare, yojson, sexp, hash, equal]
+      end
+    end]
+
+    type 'a t = 'a Vector.Vector_2.t
+    [@@deriving compare, yojson, sexp, hash, equal]
+
+    let map = Vector.map
+
+    let of_list_exn = Vector.Vector_2.of_list_exn
+
+    let to_list = Vector.to_list
+  end
+
+  module Max_at_most = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
+
+      module V1 = struct
+        type 'a t = 'a At_most.At_most_2.Stable.V1.t
+        [@@deriving compare, yojson, sexp, hash, equal]
+      end
+    end]
+
+    type 'a t = 'a At_most.At_most_2.t
+    [@@deriving compare, yojson, sexp, hash, equal]
+  end
+
   module Length = Nat.N4
 
   let to_int = Char.to_int
@@ -59,14 +114,20 @@ module Max_branches = struct
 end
 
 module Max_branches_vec = struct
-  module T = At_most.With_length (Max_branches)
-
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = 'a T.t [@@deriving version {asserted}]
+      type 'a t = 'a At_most.At_most_8.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
+
+  let _ =
+    let _f : type a. unit -> (a t, (a, Max_branches.n) At_most.t) Type_equal.t
+        =
+     fun () -> Type_equal.T
+    in
+    ()
 end
 
 module Domains = struct
@@ -74,7 +135,7 @@ module Domains = struct
   module Stable = struct
     module V1 = struct
       type 'a t = {h: 'a}
-      [@@deriving sexp, eq, compare, hash, yojson, hlist, fields]
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]
 
@@ -90,7 +151,7 @@ module Repr = struct
       type 'g t =
         { step_data:
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.T.t
+            Max_branches_vec.Stable.V1.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t }
       [@@deriving sexp]
@@ -107,11 +168,11 @@ module Poly = struct
       type ('g, 'vk) t =
         { step_data:
             (Domain.Stable.V1.t Domains.Stable.V1.t * Width.Stable.V1.t)
-            Max_branches_vec.T.t
+            Max_branches_vec.Stable.V1.t
         ; max_width: Width.Stable.V1.t
         ; wrap_index: 'g list Plonk_verification_key_evals.Stable.V1.t
         ; wrap_vk: ('vk option[@of_yojson fun _ -> Ok None]) }
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 end
@@ -192,59 +253,3 @@ let to_input : _ Poly.t -> _ =
             wrap_index
         ; num_branches ]
       : _ Random_oracle_input.t )
-
-let to_repr {Poly.step_data; max_width; wrap_index; wrap_vk= _} =
-  {Repr.step_data; max_width; wrap_index}
-
-module Make (G : sig
-  type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
-end) (Vk : sig
-  type t [@@deriving sexp, eq, compare, hash, yojson]
-
-  val of_repr : G.t Repr.t -> t
-end) : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = (G.t, Vk.t) Poly.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash, yojson]
-    end
-  end]
-end = struct
-  [%%versioned_binable
-  module Stable = struct
-    module V1 = struct
-      type t = (G.t, Vk.t) Poly.Stable.V1.t
-      [@@deriving eq, sexp, compare, hash, yojson]
-
-      let of_repr ({Repr.Stable.V1.step_data; max_width; wrap_index= c} as t) :
-          t =
-        {Poly.step_data; max_width; wrap_index= c; wrap_vk= Some (Vk.of_repr t)}
-
-      let sexp_of_t (t : t) = Repr.Stable.V1.sexp_of_t G.sexp_of_t (to_repr t)
-
-      let t_of_sexp s : t = of_repr (Repr.Stable.V1.t_of_sexp G.t_of_sexp s)
-
-      let of_yojson json =
-        let open Result.Let_syntax in
-        let%map t = of_yojson json in
-        {t with Poly.wrap_vk= Some (Vk.of_repr (to_repr t))}
-
-      let to_latest = Fn.id
-
-      module R = struct
-        type t = G.t Repr.Stable.Latest.t [@@deriving bin_io]
-      end
-
-      include Binable.Of_binable
-                (R)
-                (struct
-                  type nonrec t = t
-
-                  let to_binable = to_repr
-
-                  let of_binable = of_repr
-                end)
-    end
-  end]
-end

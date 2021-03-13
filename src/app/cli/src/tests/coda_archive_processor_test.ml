@@ -18,8 +18,8 @@ let main () =
         failwith @@ Caqti_error.show e
   in
   let logger = Logger.create () in
-  Archive_lib.Processor.setup_server ~logger ~constraint_constants
-    ~postgres_address
+  Archive_lib.Processor.setup_server ~metrics_server_port:None
+    ~missing_blocks_width:None ~logger ~constraint_constants ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
     ~delete_older_than:None
     ~runtime_config_opt:

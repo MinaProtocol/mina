@@ -97,10 +97,9 @@ module Reader = struct
       | `Eof ->
           return ()
       | `Ok v ->
-          if%bind f v then return ()
-          else (
-            Pipe.Consumer.values_sent_downstream consumer ;
-            loop ~consumer reader )
+          let%bind b = f v in
+          Pipe.Consumer.values_sent_downstream consumer ;
+          if b then return () else loop ~consumer reader
     in
     prepare_pipe t ~default_value:() ~f:(fun reader ->
         let consumer = add_trivial_consumer reader in

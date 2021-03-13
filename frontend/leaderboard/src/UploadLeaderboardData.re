@@ -156,13 +156,13 @@ let getAllValidUsers = (usernameColumn, userData) => {
 
 let computeMemberProfileData = mainData => {
   let mainUserIndex = 2; /* usernames are located in the 3rd column */
-  let allTimePoints = 19; /* all time points are located in the 20th column */
-  let phasePoints = 16; /* all time points are located in the 17th column */
-  let releasePoints = 39; /* all time points are located in the 40th column */
+  let allTimePoints = 20; /* all time points are located in the 21st column */
+  let phasePoints = 17; /* all time points are located in the 17th column */
+  let releasePoints = 40; /* all time points are located in the 41st column */
 
-  let allTimeRank = 18; /* all time points are located in the 19th column */
-  let phaseRank = 15; /* all time points are located in the 16th column */
-  let releaseRank = 40; /* all time points are located in the 41st column */
+  let allTimeRank = 19; /* all time points are located in the 20th column */
+  let phaseRank = 16; /* all time points are located in the 17th column */
+  let releaseRank = 41; /* all time points are located in the 42nd column */
 
   let genesisBadge = 4; /* all time points are located in the 17th column */
   let technicalBadge = 5; /* all time points are located in the 17th column */
