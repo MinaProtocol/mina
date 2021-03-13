@@ -20,4 +20,4 @@
 /ip4/135.181.63.89/tcp/8302/p2p/12D3KooWNtvMGAvzrDEPBAHhiB7YoSWjPgmLcMmEeLCeoomWT8bT
 /ip4/135.181.132.212/tcp/8302/p2p/12D3KooWDGUWGrbHWrzft9iASSeytvbU9QmzxMavxAqqDfz8e7xE
 /dns4/seed.piconbello.com/tcp/10001/p2p/12D3KooWKKF6GzbsdJHJPQmoiywu2KnM4bvZh6gBWMKpkctdmti7
-/ip4/mina-seed.w3m.one/tcp/10001/p2p/12D3KooWFVvahnR3ofaSNX5XZaUQJ1zbrySjNCJP8K1vjBhHWURB
+/dns4/mina-seed.w3m.one/tcp/10001/p2p/12D3KooWFVvahnR3ofaSNX5XZaUQJ1zbrySjNCJP8K1vjBhHWURB
