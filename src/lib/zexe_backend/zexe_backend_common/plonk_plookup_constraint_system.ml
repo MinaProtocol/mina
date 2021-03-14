@@ -113,6 +113,7 @@ module Plonk_constraint = struct
       | EC_scale of {state: 'v Scale_round_5_wires.t array}
       | EC_scale_pack of {state: 'v Scale_pack_round_5_wires.t array}
       | EC_endoscale of {state: 'v Endoscale_round_5_wires.t array}
+      | Bytes_lookup of {bytes: 'v array}
     [@@deriving sexp]
 
     let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
@@ -142,6 +143,8 @@ module Plonk_constraint = struct
             { state=
                 Array.map ~f:(fun x -> Endoscale_round_5_wires.map ~f x) state
             }
+      | Bytes_lookup {bytes} ->
+          Bytes_lookup {bytes= Array.map ~f bytes}
 
     let eval (type v f)
         (module F : Snarky_backendless.Field_intf.S with type t = f)
@@ -225,7 +228,8 @@ type ('a, 'f) t =
   ; mutable hash: Hash_state.t
   ; mutable constraints: int
   ; public_input_size: int Core_kernel.Set_once.t
-  ; mutable auxiliary_input_size: int }
+  ; mutable auxiliary_input_size: int
+  ; mutable lookup_table: 'a array }
 
 module Hash = Core.Md5
 
@@ -319,7 +323,10 @@ struct
           let t = H.feed_string t "ec_endoscale" in
           Array.fold state ~init:t
             ~f:(fun acc {b2; xt; b1; xq; yt; xp; l1; yp; xs; ys} ->
-              cvars [b2; xt; b1; xq; yt; xp; l1; yp; xs; ys] acc ) )
+              cvars [b2; xt; b1; xq; yt; xp; l1; yp; xs; ys] acc )
+      | Bytes_lookup {bytes} ->
+          let t = H.feed_string t "bytes_lookup" in
+          t |> cvars (Array.to_list bytes) )
     | _ ->
         failwith "Unsupported constraint"
 
@@ -388,7 +395,8 @@ struct
     ; equivalence_classes= V.Table.create ()
     ; hash= Hash_state.empty
     ; constraints= 0
-    ; auxiliary_input_size= 0 }
+    ; auxiliary_input_size= 0
+    ; lookup_table= [||] }
 
   (* TODO *)
   let to_json _ = `List []
@@ -941,6 +949,22 @@ struct
         add_generic_constraint ?l:(var l) ?r:(var r) ?o:(var o)
           [|coeff l; coeff r; coeff o; Fp.zero; Fp.zero; m; !c|]
           sys
+    | Plonk_constraint.T (Bytes_lookup {bytes}) ->
+        let row =
+          Array.map
+            bytes
+            ~f:(fun x -> reduce_to_v x)
+        in
+        add_row sys
+          (Array.map row ~f:(fun x -> Some x))
+          Lookup
+          (wire sys row.(0) sys.next_row L)
+          (wire sys row.(1) sys.next_row R)
+          (wire sys row.(2) sys.next_row O)
+          (wire sys row.(3) sys.next_row Q)
+          (wire sys row.(4) sys.next_row P)
+          [||] ;
+        ()
     | Plonk_constraint.T (Pack {state}) ->
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :
             V.t array array =

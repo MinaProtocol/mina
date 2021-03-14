@@ -105,7 +105,16 @@ pub fn caml_pasta_fq_plonk_plookup_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
     proof: DlogProof<GAffine>,
 ) -> bool {
-    proof_verify(lgr_comm, &index.into(), proof)
+    if proof_verify(lgr_comm, &index.into(), proof)
+    {
+        println!("Verification success");
+        true
+    }
+    else
+    {
+        println!("Verification failure");
+        false
+    }
 }
 
 #[ocaml::func]
@@ -123,11 +132,20 @@ pub fn caml_pasta_fq_plonk_plookup_proof_batch_verify(
     let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
     let group_map = GroupMap::<Fp>::setup();
 
-    DlogProof::<GAffine>::verify::<
+    if DlogProof::<GAffine>::verify::<
         DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fq, PlonkSpongeConstants>,
     >(&group_map, &ts)
     .is_ok()
+    {
+        println!("Verification success");
+        true
+    }
+    else
+    {
+        println!("Verification failure");
+        false
+    }
 }
 
 #[ocaml::func]

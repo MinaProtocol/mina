@@ -16,6 +16,13 @@ let%test_module "backend test" =
       let computation x () =
         let open Field in
 
+        (***** BIT-WISE OPERATIONS *****)
+
+        let module Bytes = Plonk.Bytes.Constraints (Impl) in
+        let b1 = Impl.Field.of_int 1 in
+        let b2 = Impl.Field.of_int 2 in
+        let b3 = Bytes.xor b1 b2 in
+
         for j = 0 to 0 do
 
           (***** PACKING *****)
@@ -24,7 +31,7 @@ let%test_module "backend test" =
           let bits = Pack.unpack x in
           let scalar = Pack.pack bits in
           assert_ (Snarky.Constraint.equal x scalar);
-
+(*
           (***** POSEIDON PERMUTATION *****)
 
           let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
@@ -32,7 +39,7 @@ let%test_module "backend test" =
           assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
 
           (***** EC ARITHMETIC *****)
-(*
+
           let module Ecc = Plonk.Ecc.Constraints (Impl) in
           let y = sqrt (x*x*x + (Impl.Field.of_int 5)) in 
 

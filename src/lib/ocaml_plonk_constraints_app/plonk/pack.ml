@@ -16,7 +16,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         (Snarky.Typ.array ~length:Int.(rounds + 1) (Snarky.Typ.array 5 Field.typ)) 
         ~compute:As_prover.(fun () ->
             (
-              let bits =  Field.Constant.unpack (read_var scalar) |> List.rev |> Array.of_list in
+              let bits = Field.Constant.unpack (read_var scalar) |> List.rev |> Array.of_list in
               let bits = Array.init len ~f:(fun i -> (if i < padlen then false else bits.(Int.(i - padlen)))) |>
                 Array.map ~f:(fun x -> if x = true then Field.Constant.one else Field.Constant.zero) in
               let state = Array.create Int.(rounds + 1) (Array.create 5 zero) in

@@ -20,6 +20,7 @@ use std::{
     rc::Rc,
 };
 
+use crate::lookup_fq_table;
 use crate::index_serialization_plookup;
 use crate::pasta_fq_urs::CamlPastaFqUrs;
 use crate::plonk_plookup_gate::{CamlPlonkGate, CamlPlonkWire, CamlPlonkWires};
@@ -122,8 +123,11 @@ pub fn caml_pasta_fq_plonk_plookup_index_create(
 ) -> Result<CamlPastaFqPlonkIndex<'static>, ocaml::Error> {
     let gates: Vec<_> = gates.as_ref().0.clone();
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
+
+    println!("{}{:?}", "Circuit size: ", gates.len());
+
     let cs =
-        match ConstraintSystem::<Fq>::create(gates, Vec::new(), oracle::pasta::fq5::params(), public as usize)
+        match ConstraintSystem::<Fq>::create(gates, lookup_fq_table::init_table(), oracle::pasta::fq5::params(), public as usize)
         {
             None => Err(ocaml::Error::failwith(
                 "caml_pasta_fq_plonk_plookup_index_create: could not create constraint system",

@@ -75,3 +75,6 @@ pub mod pasta_fp_plonk_5_wires_oracles;
 pub mod pasta_fq_plonk_5_wires_oracles;
 pub mod pasta_fp_plonk_plookup_oracles;
 pub mod pasta_fq_plonk_plookup_oracles;
+// temporary
+pub mod lookup_fp_table;
+pub mod lookup_fq_table;
