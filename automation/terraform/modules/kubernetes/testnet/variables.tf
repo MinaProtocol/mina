@@ -23,7 +23,7 @@ variable "k8s_context" {
 
 variable "use_local_charts" {
   type    = bool
-  default = false
+  default = true
 }
 
 variable "deploy_watchdog" {
