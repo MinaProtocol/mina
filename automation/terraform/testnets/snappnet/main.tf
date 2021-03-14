@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "snappnet"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.4-8202b60-snappnet-0f2032c"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon:1.0.5-feature-snapp-demo-eth-addr-5ad330c"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.5-feature-snapp-demo-eth-addr-5ad330c"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
