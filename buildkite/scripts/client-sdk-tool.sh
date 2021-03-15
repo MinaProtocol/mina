@@ -7,12 +7,14 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
+echo "CURRENT REGION ${AWS_REGION}"
+
 TAG=$(git tag --points-at HEAD)
 
 yarn_args="${1}"
 
 
-echo "//registry.yarnpkg.com/:_authToken=${NPM_TOKEN}" > .npmrc
+echo "//registry.yarnpkg.com/:_authToken=${NPM_TOKEN}" > ~/.npmrc
 
 echo "--- Client SDK execute: ${yarn_args}"
 eval `opam config env` && \
