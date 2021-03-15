@@ -8,13 +8,13 @@
 /dns4/mina-seed.genesislab.net/tcp/8302/p2p/12D3KooWRcHiFQsbYgjPSxtMg4Y9ifrvmCFtJQ8Qztqd3z4L9buU
 /dns4/mina-seed.hashquark.io/tcp/8302/p2p/12D3KooWRqdbJszoX6AB2E47KR45Kex1RptichA2MDkNSCqX5eb4
 /ip4/95.217.106.189/tcp/8302/p2p/12D3KooWSxxCtzRLfUzoxgRYW9fTKWPUujdvStuwCPSPUN3629mb
-/ip4/78.46.151.176/tcp/10128/p2p/12D3KooWJMTfHo5vb19aAseDa9D5Zn93Vc5RZ3yCHZZkz99mrS4T
-/dns4/mina-seed.dsrvlabs.net/tcp/8302/p2p/12D3KooWJQAvnn3dcQgpiMXBczkKQs58rVVbakZHJEvCvQC9XubE
+/dns4/mina.cloud.p2pvalidator.org/tcp/8302/p2p/12D3KooW9qa8CcihmpPbKjN1e8da1RsBS67bExgpVDD9sCjzbHfh
+/dns4/mina-seed.dsrvlabs.net/tcp/8302/p2p/12D3KooWFTrtiuscobTsJwvShNzBWH56Jt6hWoZTtYqFFyQWFA7c
 /dns4/mina-seed-1.nodeasy.com/tcp/10001/p2p/12D3KooWRMXtoYktAqkNFd9LkT1XpAJWryqje88owWf9v9SpaayN
 /dns4/earth.mina.kelepool.pro/tcp/8302/p2p/12D3KooWSBRhKVd9r1JXkRTD4qc9SkNd9ACrRCeW9e6GcDakqHjh
 /dns4/seed.minaprotocol.fish/tcp/8302/p2p/12D3KooWQHTEXCbS1xxEMFHdALBTA1uLbFPr3okXvUos57d5seHW
 /ip4/159.89.96.164/tcp/8302/p2p/12D3KooWCCZkMjQxsBsSLPmAvFC9RGLz4XjKtdvpKmBdr5zpYz6x
-/dns4/mina-seed.staging.staked.cloud/tcp/8302/p2p/12D3KooWKRMu8MVEqMe19SEuBz7MZeQ4ogdk7oks1HE2FAKKzFmL
+/dns4/seed.mina-staked.cloud/tcp/8302/p2p/12D3KooWNbeghjwB9MKgVniTv4pqtCbtHxjWpidiaoRiMhow3Mr1
 /ip4/47.242.110.4/tcp/8302/p2p/12D3KooWKsgKQRNsptXF7MDJ37FzJ9sz6uACuzow6zTJkyog3bWq
 /dns4/seed.minaexplorer.com/tcp/8302/p2p/12D3KooWR7coZtrMHvsgsfiWq2GESYypac3i29LFGp6EpbtjxBiJ
 /ip4/135.181.63.89/tcp/8302/p2p/12D3KooWNtvMGAvzrDEPBAHhiB7YoSWjPgmLcMmEeLCeoomWT8bT
