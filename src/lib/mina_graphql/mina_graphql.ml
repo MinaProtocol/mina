@@ -2852,12 +2852,17 @@ module Queries = struct
                | Snapp_command _ ->
                    None ) )
 
-  let sync_state =
-    result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
+  let sync_status =
+    io_field "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
-        Result.map_error
-          (Mina_incremental.Status.Observer.value @@ Mina_lib.sync_status coda)
-          ~f:Error.to_string_hum )
+        let open Deferred.Let_syntax in
+        (* pull out sync status from status, so that result here
+             agrees with status; see issue #8251
+          *)
+        let%map {sync_status; _} =
+          Mina_commands.get_status ~flag:`Performance coda
+        in
+        Ok sync_status )
 
   let daemon_status =
     io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
@@ -3319,7 +3324,7 @@ module Queries = struct
         Signed_command.check_signature user_command )
 
   let commands =
-    [ sync_state
+    [ sync_status
     ; daemon_status
     ; version
     ; owned_wallets (* deprecated *)
