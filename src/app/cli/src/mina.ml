@@ -612,8 +612,7 @@ let setup_daemon logger =
                     "The configuration file %s could not be read:\n%s"
                     config_file (Error.to_string_hum err)
               | `May_be_missing ->
-                  [%log warn]
-                    "Could not read configuration from $config_file: $error"
+                  [%log warn] "Could not read configuration from $config_file"
                     ~metadata:
                       [ ("config_file", `String config_file)
                       ; ("error", Error_json.error_to_yojson err) ] ;
