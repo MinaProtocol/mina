@@ -398,6 +398,18 @@ module Body = struct
         Transaction_union_tag.Create_account
     | Mint_tokens _ ->
         Transaction_union_tag.Mint_tokens
+
+  let amount = function
+    | Payment payload ->
+        Some payload.Payment_payload.Poly.amount
+    | Stake_delegation _ ->
+        None
+    | Create_new_token _ ->
+        None
+    | Create_token_account _ ->
+        None
+    | Mint_tokens payload ->
+        Some payload.Minting_payload.amount
 end
 
 module Poly = struct
@@ -466,18 +478,7 @@ let token (t : t) = Body.token t.body
 
 let tag (t : t) = Body.tag t.body
 
-let amount (t : t) =
-  match t.body with
-  | Payment payload ->
-      Some payload.Payment_payload.Poly.amount
-  | Stake_delegation _ ->
-      None
-  | Create_new_token _ ->
-      None
-  | Create_token_account _ ->
-      None
-  | Mint_tokens payload ->
-      Some payload.Minting_payload.amount
+let amount (t : t) = Body.amount t.body
 
 let fee_excess (t : t) =
   Fee_excess.of_single (fee_token t, Currency.Fee.Signed.of_unsigned (fee t))
