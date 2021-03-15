@@ -23,30 +23,30 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let run network t =
     let open Malleable_error.Let_syntax in
-    let block_producer = Caml.List.nth (Network.block_producers network) 0 in
-    let%bind () =
-      wait_for t (Wait_condition.node_to_initialize block_producer)
-    in
-    let node = Core_kernel.List.nth_exn (Network.block_producers network) 0 in
     let logger = Logger.create () in
+    [%log info] "send_payment_test: starting..." ;
+    let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
+    let sender_bp =
+      Core_kernel.List.nth_exn (Network.block_producers network) 1
+    in
+    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
     (* wait for initialization *)
-    let%bind () = wait_for t (Wait_condition.node_to_initialize node) in
+    let%bind () = wait_for t (Wait_condition.node_to_initialize receiver_bp) in
+    let%bind () = wait_for t (Wait_condition.node_to_initialize sender_bp) in
     [%log info] "send_payment_test: done waiting for initialization" ;
-    (* same keypairs used by Coda_automation to populate the ledger *)
-    let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs in
     (* send the payment *)
-    let sender, _sk1 = keypairs.(0) in
-    let receiver, _sk2 = keypairs.(1) in
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
-      Network.Node.send_payment ~logger node ~sender ~receiver ~amount ~fee
+      Network.Node.send_payment ~logger sender_bp ~sender:sender_pub_key
+        ~receiver:receiver_pub_key ~amount ~fee
     in
     (* confirm payment *)
     let%map () =
       wait_for t
-        (Wait_condition.payment_to_be_included_in_frontier ~sender ~receiver
-           ~amount)
+        (Wait_condition.payment_to_be_included_in_frontier
+           ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount)
     in
     [%log info] "send_payment_test: succesfully completed"
 end
