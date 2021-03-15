@@ -8,7 +8,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 echo "CURRENT REGION"
-echo ${AWS_REGION}
+echo $AWS_REGION
 echo "END REGION"
 
 TAG=$(git tag --points-at HEAD)
