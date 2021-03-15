@@ -24,7 +24,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
 
   let expected_error_event_reprs = []
 
-  let check_common_prefixes ?number_of_blocks:(n = 5) chains =
+  let check_common_prefixes ?number_of_blocks:(n = 3) chains =
     let recent_chains =
       List.map chains ~f:(fun chain ->
           List.take chain n |> Hash_set.of_list (module String) )
@@ -60,7 +60,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info]
       "common prefix test: waiting for 15 blocks to be produced on the network" ;
-    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 15) in
+    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 10) in
     [%log info] "common prefix test: collecting best chains from nodes" ;
     let%bind chains =
       Malleable_error.List.map block_producers ~f:(fun bp ->
