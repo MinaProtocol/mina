@@ -246,6 +246,10 @@ ls -lh mina*.deb
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
+# Build mina block producer sidecar 
+source ../automation/services/mina-bp-stats/sidecar/build.sh
+ls -lh mina*.deb
+
 
 # Export variables for use with downstream circle-ci steps (see buildkite/scripts/publish-deb.sh for BK DOCKER_DEPLOY_ENV)
 echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
