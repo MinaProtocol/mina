@@ -1903,7 +1903,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of mina to send to to receiver"
+          ; arg "amount" ~doc:"Amount of mina to send to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
