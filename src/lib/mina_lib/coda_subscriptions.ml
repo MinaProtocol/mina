@@ -58,7 +58,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             let user_commands =
               filtered_external_transition
               |> Filtered_external_transition.commands
-              |> List.map ~f:(fun {With_hash.data; _} -> data)
+              |> List.map ~f:(fun {With_status.data; _} -> data.data)
               |> List.filter_map ~f:(function
                    | User_command.Signed_command c ->
                        Some c

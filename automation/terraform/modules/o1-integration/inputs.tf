@@ -60,6 +60,23 @@ variable "snark_worker_public_key" {
 
 }
 
+variable "log_precomputed_blocks" {
+  type = bool
+}
+
+variable "archive_configs" {
+  description = "individual archive-node deployment configurations"
+  default = null
+}
+
+variable "archive_node_count" {
+  type = number
+}
+
+variable "mina_archive_schema" {
+  type = string
+}
+
 variable "block_producer_configs" {
   type = list(
     object({

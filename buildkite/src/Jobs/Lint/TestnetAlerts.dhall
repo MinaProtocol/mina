@@ -20,6 +20,7 @@ Pipeline.build
     spec = JobSpec::{
       dirtyWhen = [
         S.exactly "automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml" "tpl",
+        S.exactly "automation/terraform/monitoring/o1-testnet-alerts" "tf",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/TestnetAlerts"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
@@ -30,7 +31,8 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-          Cmd.run "cd automation/terraform/monitoring && terraform init",
+            --- destroy state prior to start to ensure reset
+            Cmd.run "cd automation/terraform/monitoring && terraform init && terraform destroy -auto-approve",
             Cmd.run (
               "terraform apply -auto-approve -target module.o1testnet_alerts.null_resource.alert_rules_lint" ++
               " -target module.o1testnet_alerts.null_resource.alert_rules_check"
