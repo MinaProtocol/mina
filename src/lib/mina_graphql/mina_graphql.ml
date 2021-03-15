@@ -2463,11 +2463,18 @@ module Mutations = struct
       ~args:
         Arg.
           [ arg "input" ~typ:(non_null Types.Input.send_payment)
-          ; Types.Input.Fields.signature ]
+          ; Types.Input.Fields.signature
+          ; arg "ignoreWarnings"
+              ~doc:
+                "When true the payment will be attempted even if we \
+                 anticipate an error (defaults to false)"
+              ~typ:bool ]
       ~resolve:
         (fun {ctx= coda; _} ()
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+             signature ignore_warnings ->
+        let ignore_warnings = Option.value ~default:false ignore_warnings in
+        let _ = ignore ignore_warnings in
         let body =
           Signed_command_payload.Body.Payment
             { source_pk= from
@@ -3365,12 +3372,19 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "input" ~typ:(non_null Types.Input.send_payment)
-          ; Types.Input.Fields.signature ]
+          ; Types.Input.Fields.signature
+          ; arg "ignoreWarnings"
+              ~doc:
+                "When true warnings will be ignored when validating the \
+                 payment (defaults to true)"
+              ~typ:bool ]
       ~resolve:
         (fun {ctx= mina; _} ()
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
-             signature ->
+             signature ignore_warnings ->
         let open Deferred.Result.Let_syntax in
+        let ignore_warnings = Option.value ~default:true ignore_warnings in
+        let _ = ignore ignore_warnings in
         let body =
           Signed_command_payload.Body.Payment
             { source_pk= from

@@ -68,7 +68,9 @@ module SendTransaction = struct
   [%graphql
   {|
     mutation sendPayment($fee: UInt64!, $amount: UInt64!, $token: TokenId, $to_: PublicKey!, $from: PublicKey!) {
-      sendPayment(input: {fee: $fee, amount: $amount, token: $token, to: $to_, from: $from}, signature: null) {
+      sendPayment(input: {fee: $fee, amount: $amount, token: $token, to: $to_, from: $from},
+                  signature: null,
+                  ignoreWarnings: true) {
         payment {
           hash
         }
