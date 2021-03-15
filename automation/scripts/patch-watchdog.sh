@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-IMAGE="gcr.io/o1labs-192920/watchdog:0.4.4"
+IMAGE="gcr.io/o1labs-192920/watchdog:0.4.5"
 
 
 read -r -d '' PATCH << SPEC
