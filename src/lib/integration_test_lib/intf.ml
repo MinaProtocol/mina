@@ -87,6 +87,8 @@ module Engine = struct
     val all_nodes : t -> Node.t list
 
     val keypairs : t -> Signature_lib.Keypair.t list
+
+    val initialize : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig

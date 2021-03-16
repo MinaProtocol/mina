@@ -475,3 +475,69 @@ let all_nodes {seeds; block_producers; snark_coordinators; archive_nodes; _} =
 let keypairs {keypairs; _} = keypairs
 
 let lookup_node_by_app_id t = Map.find t.nodes_by_app_id
+
+let initialize ~logger network =
+  let open Malleable_error.Let_syntax in
+  let poll_interval = Time.Span.of_sec 15.0 in
+  let max_polls = 60 (* 15 mins *) in
+  let all_pods =
+    all_nodes network
+    |> List.map ~f:(fun {pod_id; _} -> pod_id)
+    |> String.Set.of_list
+  in
+  let get_pod_statuses () =
+    let%map output =
+      Deferred.bind ~f:Malleable_error.return
+        (Util.run_cmd_exn "/" "kubectl"
+           [ "-n"
+           ; network.namespace
+           ; "get"
+           ; "pods"
+           ; "-ojsonpath={range \
+              .items[*]}{.metadata.labels.app}{':'}{.status.phase}{'\\n'}{end}"
+           ])
+    in
+    output |> String.split_lines
+    |> List.map ~f:(fun line ->
+           let parts = String.split line ~on:':' in
+           assert (List.length parts = 2) ;
+           (List.nth_exn parts 0, List.nth_exn parts 1) )
+    |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
+  in
+  let rec poll n =
+    let%bind pod_statuses = get_pod_statuses () in
+    (* TODO: detect "bad statuses" (eg CrashLoopBackoff) and terminate early *)
+    let bad_pod_statuses =
+      List.filter pod_statuses ~f:(fun (_, status) -> status <> "Running")
+    in
+    if List.is_empty bad_pod_statuses then return ()
+    else if n < max_polls then
+      let%bind () =
+        after poll_interval |> Deferred.bind ~f:Malleable_error.return
+      in
+      poll (n + 1)
+    else
+      let bad_pod_statuses_json =
+        `List
+          (List.map bad_pod_statuses ~f:(fun (pod_name, status) ->
+               `Assoc
+                 [("pod_name", `String pod_name); ("status", `String status)]
+           ))
+      in
+      [%log fatal]
+        "Not all pods were assigned to nodes and ready in time: \
+         $bad_pod_statuses"
+        ~metadata:[("bad_pod_statuses", bad_pod_statuses_json)] ;
+      Malleable_error.of_string_hard_error_format
+        "Some pods either were not assigned to nodes or did deploy properly \
+         (errors: %s)"
+        (Yojson.Safe.to_string bad_pod_statuses_json)
+  in
+  [%log info] "Waiting for pods to be assigned nodes and become ready" ;
+  let open Deferred.Let_syntax in
+  let%bind res = poll 0 in
+  if Malleable_error.is_ok res then
+    all_nodes network
+    (* TODO: parallelize (requires accumlative hard errors) *)
+    |> Malleable_error.List.iter ~f:(Node.start ~fresh_state:false)
+  else Deferred.return res
