@@ -41,7 +41,6 @@ Pipeline.build
           , label = "Lint Testnet alert rules"
           , key = "lint-testnet-alerts"
           , target = Size.Small
-          , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
         }
     ]
