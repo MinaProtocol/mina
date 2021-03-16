@@ -12,7 +12,7 @@ source buildkite/scripts/export-git-env-vars.sh
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get install -y apt-transport-https ca-certificates
+apt-get install -y apt-transport-https ca-certificates make
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
 apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
