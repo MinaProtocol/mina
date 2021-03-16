@@ -1,0 +1,7 @@
+{
+  "name": "mina-bp-ingest",
+  "version": "1.0.0",
+  "dependencies": {
+    "@google-cloud/storage": "^5.8.1"
+  }
+}

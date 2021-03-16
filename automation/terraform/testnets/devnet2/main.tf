@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 0.14.0"
   backend "s3" {
-    key     = "terraform-devnet.tfstate"
+    key     = "terraform-devnet2-2.tfstate"
     encrypt = true
     region  = "us-west-2"
     bucket  = "o1labs-terraform-state"
@@ -54,7 +54,7 @@ variable "seed_count" {
 }
 
 locals {
-  testnet_name = "devnet"
+  testnet_name = "devnet2"
   coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.4-8202b60-devnet-0f2032c"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
   seed_region = "us-east4"
