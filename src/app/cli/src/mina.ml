@@ -20,9 +20,11 @@ let () = Async.Scheduler.set_record_backtraces true
 [%%endif]
 
 let chain_id ~genesis_state_hash ~genesis_constants =
+  (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
   let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
+  Format.eprintf "LEN: %d@." (String.length all_snark_keys) ;
   let b2 =
     Blake2.digest_string
       (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)

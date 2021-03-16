@@ -140,6 +140,17 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
     Receipt.Chain_hash.cons p parent_hash
 end)
 
+let chain_id_inputs (t : Mina_lib.t) =
+  (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
+  let config = Mina_lib.config t in
+  let precomputed_values = config.precomputed_values in
+  let genesis_state_hash =
+    Precomputed_values.genesis_state_hash precomputed_values
+  in
+  let genesis_constants = precomputed_values.genesis_constants in
+  let snark_keys = Precomputed_values.key_hashes in
+  (genesis_state_hash, genesis_constants, snark_keys)
+
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
   let open Participating_state.Let_syntax in
