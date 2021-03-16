@@ -137,6 +137,7 @@ let run_test () : unit Deferred.t =
           ; chain_id
           ; flooding= false
           ; direct_peers= []
+          ; seed_peer_list_url= None
           ; peer_exchange= true
           ; mina_peer_exchange= true
           ; addrs_and_ports=
@@ -186,7 +187,7 @@ let run_test () : unit Deferred.t =
         Mina_lib.create
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~is_seed:true ~disable_telemetry:true
+             ~gossip_net_params ~is_seed:true ~disable_node_status:true
              ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None ~super_catchup:true
              ~work_selection_method:

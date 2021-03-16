@@ -44,7 +44,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libbz2-dev \
     apt-transport-https
 
-RUN sudo pip install awscli readchar
+RUN sudo pip3 install awscli readchar
 
 RUN sudo pip3 install sexpdata
 
@@ -77,6 +77,7 @@ RUN chmod +x /tmp/rust_install.sh
 RUN /tmp/rust_install.sh -y
 RUN export PATH="$PATH:$HOME/.cargo/bin"
 RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
+RUN bash -c "source $HOME/.cargo/env && rustup toolchain install 1.45.2 && rustup default 1.45.2"
 
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
@@ -101,7 +102,7 @@ RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
 RUN sudo apt-get install --yes wget 
-RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
+RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.15.8.linux-amd64.tar.gz && sudo tar -xvf go1.15.8.linux-amd64.tar.gz && sudo rm go1.15.8.linux-amd64.tar.gz
 RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs

@@ -763,6 +763,45 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
+let send_rosetta_transactions_graphql =
+  Command.async
+    ~summary:
+      "Dispatch one or more transactions, provided to stdin in rosetta format"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let jsons = Yojson.Basic.stream_from_channel In_channel.stdin in
+         match%bind
+           Deferred.Or_error.try_with (fun () ->
+               (* TODO: There must be a better way to stream from yojson *and*
+                  do the async calls, surely?
+               *)
+               let prev = ref (Deferred.return ()) in
+               Caml.Stream.iter
+                 (fun transaction_json ->
+                   prev :=
+                     let%bind () = !prev in
+                     let%map response =
+                       Graphql_client.query_exn
+                         (Graphql_queries.Send_rosetta_transaction.make
+                            ~transaction:transaction_json ())
+                         graphql_endpoint
+                     in
+                     let (`UserCommand user_command) =
+                       (response#sendRosettaTransaction)#userCommand
+                     in
+                     printf "Dispatched command with TRANSACTION_ID %s\n"
+                       user_command#id )
+                 jsons ;
+               don't_wait_for !prev ;
+               !prev )
+         with
+         | Ok () ->
+             Deferred.return ()
+         | Error err ->
+             Format.eprintf "Error:@.%s@.@."
+               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+             Core_kernel.exit 1 ))
+
 module Export_logs = struct
   let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
 
@@ -852,7 +891,7 @@ let dump_keypair =
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
 
-let handle_dump_ledger_response ~json = function
+let handle_export_ledger_response ~json = function
   | Error e ->
       Daemon_rpcs.Client.print_rpc_error e
   | Ok (Error e) ->
@@ -866,37 +905,176 @@ let handle_dump_ledger_response ~json = function
         printf "\n" )
       else printf !"%{sexp:Account.t list}\n" accounts
 
-let dump_ledger =
-  let sl_hash_flag =
+let export_ledger =
+  let state_hash_flag =
     Command.Param.(
       flag "--state-hash" ~aliases:["state-hash"]
-        ~doc:"STATE-HASH State hash (default: best state hash)"
+        ~doc:
+          "STATE-HASH State hash, if printing a staged ledger (default: state \
+           hash for the best tip)"
         (optional string))
   in
-  let json_flag = Cli_lib.Flag.json in
-  let flags = Args.zip2 sl_hash_flag json_flag in
-  Command.async ~summary:"Print the ledger with given Merkle root"
-    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (x, json) ->
-         (* TODO: allow input in Base58Check format: issue #3036 *)
-         let state_hash = Option.map ~f:State_hash.of_base58_check_exn x in
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc state_hash port
-         >>| handle_dump_ledger_response ~json ))
-
-let dump_staking_ledger =
-  let which =
+  let ledger_kind =
     let t =
       Command.Param.Arg_type.of_alist_exn
-        [("current", Daemon_rpcs.Get_staking_ledger.Current); ("next", Next)]
+        (List.map
+           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
+           ~f:(fun s -> (s, s)))
     in
-    Command.Param.(anon ("current|next" %: t))
+    Command.Param.(
+      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
   in
-  Command.async ~summary:"Print either the staking or next epoch ledger"
-    (Cli_lib.Background_daemon.rpc_init (Args.zip2 which Cli_lib.Flag.json)
-       ~f:(fun port (which, json) ->
-         (* TODO: allow input in Base58Check format: issue #3036 *)
-         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc which
-           port
-         >>| handle_dump_ledger_response ~json ))
+  let plaintext_flag = Cli_lib.Flag.plaintext in
+  let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
+  Command.async
+    ~summary:
+      "Print the specified ledger (default: staged ledger at the best tip)"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (state_hash, plaintext, ledger_kind) ->
+         let check_for_state_hash () =
+           if Option.is_some state_hash then (
+             Format.eprintf "A state hash should not be given for %s@."
+               ledger_kind ;
+             Core_kernel.exit 1 )
+         in
+         let response =
+           match ledger_kind with
+           | "staged-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
+               in
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+                 state_hash port
+           | "staking-epoch-ledger" ->
+               check_for_state_hash () ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
+                 Daemon_rpcs.Get_staking_ledger.Current port
+           | "next-epoch-ledger" ->
+               check_for_state_hash () ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
+                 Daemon_rpcs.Get_staking_ledger.Next port
+           | _ ->
+               (* unreachable *)
+               failwithf "Unknown ledger kind: %s" ledger_kind ()
+         in
+         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+
+let hash_ledger =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Print the Merkle root of the ledger contained in the specified file"
+    (let%map ledger_file =
+       Command.Param.(
+         flag "--ledger-file"
+           ~doc:"LEDGER-FILE File containing an exported ledger"
+           (required string))
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let process_accounts accounts =
+         let constraint_constants =
+           Genesis_constants.Constraint_constants.compiled
+         in
+         let packed_ledger =
+           Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+             ~depth:constraint_constants.ledger_depth accounts
+         in
+         let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+         Format.printf "%s@."
+           (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+       in
+       Deferred.return
+       @@
+       if plaintext then
+         In_channel.with_file ledger_file ~f:(fun in_channel ->
+             let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+             let accounts =
+               lazy
+                 (List.map
+                    ([%of_sexp: Account.t list] sexp)
+                    ~f:(fun acct -> (None, acct)))
+             in
+             process_accounts accounts )
+       else
+         let json = Yojson.Safe.from_file ledger_file in
+         match Runtime_config.Accounts.of_yojson json with
+         | Ok runtime_accounts ->
+             let accounts =
+               lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
+             in
+             process_accounts accounts
+         | Error err ->
+             Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
+               err ;
+             ignore (exit 1))
+
+let currency_in_ledger =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:
+      "Print the total currency for each token present in the ledger \
+       contained in the specified file"
+    (let%map ledger_file =
+       Command.Param.(
+         flag "--ledger-file"
+           ~doc:"LEDGER-FILE File containing an exported ledger"
+           (required string))
+     and plaintext = Cli_lib.Flag.plaintext in
+     fun () ->
+       let process_accounts accounts =
+         (* track currency total for each token
+            use uint64 to make arithmetic simple
+         *)
+         let currency_tbl : Unsigned.UInt64.t Token_id.Table.t =
+           Token_id.Table.create ()
+         in
+         List.iter accounts ~f:(fun (acct : Account.t) ->
+             let token_id = Account.token acct in
+             let balance = acct.balance |> Currency.Balance.to_uint64 in
+             match Token_id.Table.find currency_tbl token_id with
+             | None ->
+                 Token_id.Table.add_exn currency_tbl ~key:token_id
+                   ~data:balance
+             | Some total ->
+                 let new_total = Unsigned.UInt64.add total balance in
+                 Token_id.Table.set currency_tbl ~key:token_id ~data:new_total
+         ) ;
+         let tokens =
+           Token_id.Table.keys currency_tbl
+           |> List.dedup_and_sort ~compare:Token_id.compare
+         in
+         List.iter tokens ~f:(fun token ->
+             let total =
+               Token_id.Table.find_exn currency_tbl token
+               |> Currency.Balance.of_uint64
+               |> Currency.Balance.to_formatted_string
+             in
+             if Token_id.equal token Token_id.default then
+               Format.printf "MINA: %s@." total
+             else
+               Format.printf "TOKEN %s: %s@." (Token_id.to_string token) total
+         )
+       in
+       Deferred.return
+       @@
+       if plaintext then
+         In_channel.with_file ledger_file ~f:(fun in_channel ->
+             let sexp = In_channel.input_all in_channel |> Sexp.of_string in
+             let accounts = [%of_sexp: Account.t list] sexp in
+             process_accounts accounts )
+       else
+         let json = Yojson.Safe.from_file ledger_file in
+         match Runtime_config.Accounts.of_yojson json with
+         | Ok runtime_accounts ->
+             let accounts =
+               Genesis_ledger_helper.Accounts.to_full runtime_accounts
+               |> List.map ~f:(fun (_sk_opt, acct) -> acct)
+             in
+             process_accounts accounts
+         | Error err ->
+             Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
+               err ;
+             ignore (exit 1))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1082,7 +1260,7 @@ let set_staking_graphql =
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
          print_message
-           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+           "❌ Failed to start staking with keys (try `mina accounts unlock` \
             first)"
            (result#setStaking)#lockedPublicKeys ;
          print_message "Started staking with"
@@ -1285,7 +1463,7 @@ let list_accounts =
          | [||] ->
              printf
                "😢 You have no tracked accounts!\n\
-                You can make a new one using `coda accounts create`\n"
+                You can make a new one using `mina accounts create`\n"
          | accounts ->
              Array.iteri accounts ~f:(fun i w ->
                  printf
@@ -1504,6 +1682,14 @@ let get_peers_graphql =
 
 let add_peers_graphql =
   let open Command in
+  let seed =
+    Param.(
+      flag "--seed" ~aliases:["-seed"]
+        ~doc:
+          "true/false Whether to add these peers as 'seed' peers, which may \
+           perform peer exchange. Default: true"
+        (optional bool))
+  in
   let peers =
     Param.(anon Anons.(non_empty_sequence_as_list ("peer" %: string)))
   in
@@ -1511,8 +1697,8 @@ let add_peers_graphql =
     ~summary:
       "Add peers to the daemon\n\n\
        Addresses take the format /ip4/IPADDR/tcp/PORT/p2p/PEERID"
-    (Cli_lib.Background_daemon.graphql_init peers
-       ~f:(fun graphql_endpoint input_peers ->
+    (Cli_lib.Background_daemon.graphql_init (Param.both peers seed)
+       ~f:(fun graphql_endpoint (input_peers, seed) ->
          let open Deferred.Let_syntax in
          let peers =
            Array.of_list_map input_peers ~f:(fun peer ->
@@ -1536,9 +1722,10 @@ let add_peers_graphql =
                      peer ;
                    Core.exit 1 )
          in
+         let seed = Option.value ~default:true seed in
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Add_peers.make ~peers ())
+             (Graphql_queries.Add_peers.make ~peers ~seed ())
              graphql_endpoint
          in
          printf "Requested to add peers:\n" ;
@@ -1616,55 +1803,55 @@ let compile_time_constants =
          in
          Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
 
-let telemetry =
+let node_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
     flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
-      ~doc:"Get telemetry data for peers known to the daemon"
+      ~doc:"Get node statuses for peers known to the daemon"
   in
-  let peer_ids_flag =
-    flag "--peer-ids" ~aliases:["peer-ids"]
+  let peers_flag =
+    flag "--peers" ~aliases:["peers"]
       (optional (Arg_type.comma_separated string))
-      ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
+      ~doc:"CSV-LIST Peer multiaddrs for obtaining node status"
   in
   let show_errors_flag =
     flag "--show-errors" ~aliases:["show-errors"] no_arg
       ~doc:"Include error responses in output"
   in
-  let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
-  Command.async ~summary:"Get telemetry data for a set of peers"
+  let flags = Args.zip3 daemon_peers_flag peers_flag show_errors_flag in
+  Command.async ~summary:"Get node statuses for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
-       ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
+       ~f:(fun port (daemon_peers, peers, show_errors) ->
          if
-           (Option.is_none peer_ids && not daemon_peers)
-           || (Option.is_some peer_ids && daemon_peers)
+           (Option.is_none peers && not daemon_peers)
+           || (Option.is_some peers && daemon_peers)
          then (
            eprintf
              "Must provide exactly one of daemon-peers or peer-ids flags\n%!" ;
            don't_wait_for (exit 33) ) ;
          let peer_ids_opt =
-           Option.map peer_ids ~f:(fun peer_ids ->
-               List.map peer_ids ~f:Network_peer.Peer.Id.unsafe_of_string )
+           Option.map peers ~f:(fun peers ->
+               List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
          match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_node_status.rpc
              peer_ids_opt port
          with
-         | Ok all_telem_data ->
-             let all_telem_data =
-               if show_errors then all_telem_data
+         | Ok all_status_data ->
+             let all_status_data =
+               if show_errors then all_status_data
                else
-                 List.filter all_telem_data ~f:(fun td ->
+                 List.filter all_status_data ~f:(fun td ->
                      match td with Ok _ -> true | Error _ -> false )
              in
-             List.iter all_telem_data ~f:(fun peer_telem_data ->
+             List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_telemetry_data
-                      .response_to_yojson peer_telem_data ) )
+                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                        peer_status_data ) )
          | Error err ->
-             printf "Failed to get telemetry data: %s\n%!"
+             printf "Failed to get node status: %s\n%!"
                (Error.to_string_hum err) ))
 
 let next_available_token_cmd =
@@ -1767,7 +1954,7 @@ let archive_blocks =
                  Graphql_client.query (graphql_make ~block ()) graphql_endpoint
                  |> Deferred.Result.map_error ~f:(function
                       | `Failed_request e ->
-                          Error.create "Unable to connect to Coda daemon" ()
+                          Error.create "Unable to connect to Mina daemon" ()
                             (fun () ->
                               Sexp.List
                                 [ List
@@ -1859,6 +2046,35 @@ let archive_blocks =
                    path (Error.to_string_hum err) ;
                  add_to_failure_file path ) ))
 
+let receipt_chain_hash =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:
+      "Compute the next receipt chain hash from the previous hash and \
+       transaction ID"
+    (let%map_open previous_hash =
+       flag "--previous-hash"
+         ~doc:"Previous receipt chain hash, base58check encoded"
+         (required string)
+     and transaction_id =
+       flag "--transaction-id" ~doc:"Transaction ID, base58check encoded"
+         (required string)
+     in
+     fun () ->
+       let previous_hash =
+         Receipt.Chain_hash.of_base58_check_exn previous_hash
+       in
+       (* What we call transation IDs in GraphQL are just base58_check-encoded
+         transactions. It's easy to handle, and we return it from the
+         transaction commands above, so lets use this format.
+      *)
+       let transaction = Signed_command.of_base58_check_exn transaction_id in
+       let hash =
+         Receipt.Chain_hash.cons (Signed_command transaction.payload)
+           previous_hash
+       in
+       printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1898,7 +2114,7 @@ module Visualization = struct
   end
 
   let command_group =
-    Command.group ~summary:"Visualize data structures special to Coda"
+    Command.group ~summary:"Visualize data structures special to Mina"
       [ (Frontier.name, Frontier.command)
       ; (Registered_masks.name, Registered_masks.command) ]
 end
@@ -1951,8 +2167,6 @@ let advanced =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
-    ; ("dump-ledger", dump_ledger)
-    ; ("dump-staking-ledger", dump_staking_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
@@ -1962,15 +2176,23 @@ let advanced =
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
-    ; ("telemetry", telemetry)
+    ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
     ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
+    ; ("send-rosetta-transactions", send_rosetta_transactions_graphql)
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
-    ; ("archive-blocks", archive_blocks) ]
+    ; ("archive-blocks", archive_blocks)
+    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
+
+let ledger =
+  Command.group ~summary:"Ledger commands"
+    [ ("export", export_ledger)
+    ; ("hash", hash_ledger)
+    ; ("currency", currency_in_ledger) ]

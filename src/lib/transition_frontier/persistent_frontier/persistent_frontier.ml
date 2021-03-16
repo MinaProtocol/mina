@@ -243,6 +243,7 @@ module Instance = struct
     (* initialize the new in memory frontier and extensions *)
     let frontier =
       Full_frontier.create ~logger:t.factory.logger
+        ~time_controller:t.factory.time_controller
         ~root_data:
           { transition= root_transition
           ; staged_ledger= root_staged_ledger

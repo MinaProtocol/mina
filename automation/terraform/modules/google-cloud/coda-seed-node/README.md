@@ -17,7 +17,7 @@ A terraform module to launch a Seed Node on Google Compute Engine
 | instance\_name | The desired name to assign to the deployed instance | `string` | `"coda-seed-node"` | no |
 | project\_id | The project ID to deploy resources into | `any` | n/a | yes |
 | region | The GCP region to deploy addresses into | `string` | n/a | yes |
-| seed\_peers | An Optional space-separated list of -peer <peer-string> arguments for the coda daemon | `string` | `""` | no |
+| seed\_peers | An Optional space-separated list of -peer <peer-string> arguments for the mina daemon | `string` | `""` | no |
 | subnetwork | The name of the subnetwork to deploy instances into | `any` | n/a | yes |
 | subnetwork\_project | The project ID where the desired subnetwork is provisioned | `any` | n/a | yes |
 | zone | The GCP zone to deploy instances into | `string` | n/a | yes |

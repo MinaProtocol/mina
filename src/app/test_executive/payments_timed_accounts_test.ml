@@ -45,36 +45,26 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Network_pool.Transaction_pool in
     [rejecting_command_for_reason_structured_events_repr]
 
-  let pk_of_keypair keypairs n =
-    let open Signature_lib in
-    let open Keypair in
-    let {public_key; _} = List.nth_exn keypairs n in
-    public_key |> Public_key.compress
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
-    let block_producer1 = List.nth_exn (Network.block_producers network) 0 in
-    let block_producer2 = List.nth_exn (Network.block_producers network) 1 in
+    let receiver_bp = List.nth_exn (Network.block_producers network) 0 in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
+    let sender_bp = List.nth_exn (Network.block_producers network) 1 in
+    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
     [%log info] "Waiting for block producer 1 (of 2) to initialize" ;
-    let%bind () =
-      wait_for t (Wait_condition.node_to_initialize block_producer1)
-    in
+    let%bind () = wait_for t (Wait_condition.node_to_initialize receiver_bp) in
     [%log info] "Block producer 1 (of 2) initialized" ;
     [%log info] "Waiting for block producer 2 (of 2) to initialize" ;
-    let%bind () =
-      wait_for t (Wait_condition.node_to_initialize block_producer2)
-    in
+    let%bind () = wait_for t (Wait_condition.node_to_initialize sender_bp) in
     [%log info] "Block producer 2 (of 2) initialized" ;
-    let sender = pk_of_keypair (Network.keypairs network) 1 in
-    let receiver = pk_of_keypair (Network.keypairs network) 0 in
     let fee = Currency.Fee.of_int 10_000_000 in
     [%log info] "Sending payment, should succeed" ;
     let amount = Currency.Amount.of_int 300_000_000_000 in
     let payment_or_error =
-      Node.send_payment ~retry_on_graphql_error:false ~logger block_producer2
-        ~sender ~receiver ~amount ~fee
+      Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
+        ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount ~fee
     in
     let%bind () =
       match%bind.Async_kernel.Deferred.Let_syntax payment_or_error with
@@ -91,16 +81,16 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Waiting for payment to appear in breadcrumb" ;
     let%bind () =
       wait_for t
-        (Wait_condition.payment_to_be_included_in_frontier ~sender ~receiver
-           ~amount)
+        (Wait_condition.payment_to_be_included_in_frontier
+           ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount)
     in
     [%log info] "Got breadcrumb with desired payment" ;
     [%log info]
       "Sending payment, should fail because of minimum balance violation" ;
     let amount' = Currency.Amount.of_int 600_000_000_000 in
     let payment_or_error =
-      Node.send_payment ~retry_on_graphql_error:false ~logger block_producer2
-        ~sender ~receiver ~amount:amount' ~fee
+      Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
+        ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount:amount' ~fee
     in
     let%map () =
       match%bind.Async_kernel.Deferred.Let_syntax payment_or_error with

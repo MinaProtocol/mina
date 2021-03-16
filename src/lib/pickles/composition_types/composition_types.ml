@@ -54,12 +54,19 @@ module Dlog_based = struct
     module Deferred_values = struct
       module Plonk = struct
         module Minimal = struct
-          type ('challenge, 'scalar_challenge) t =
-            { alpha: 'scalar_challenge
-            ; beta: 'challenge
-            ; gamma: 'challenge
-            ; zeta: 'scalar_challenge }
-          [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
+          [%%versioned
+          module Stable = struct
+            module V1 = struct
+              type ('challenge, 'scalar_challenge) t =
+                { alpha: 'scalar_challenge
+                ; beta: 'challenge
+                ; gamma: 'challenge
+                ; zeta: 'scalar_challenge }
+              [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+              let to_latest = Fn.id
+            end
+          end]
         end
 
         open Pickles_types
@@ -82,7 +89,7 @@ module Dlog_based = struct
             ; endomul0: 'fp
             ; endomul1: 'fp
             ; endomul2: 'fp }
-          [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq, fields]
+          [@@deriving sexp, compare, yojson, hlist, hash, equal, fields]
 
           let map_challenges t ~f ~scalar =
             { t with
@@ -105,8 +112,6 @@ module Dlog_based = struct
             ; endomul0= f t.endomul0
             ; endomul1= f t.endomul1
             ; endomul2= f t.endomul2 }
-
-          open Snarky_backendless.H_list
 
           let typ (type f fp) ~challenge ~scalar_challenge
               (fp : (fp, _, f) Snarky_backendless.Typ.t) =
@@ -135,20 +140,51 @@ module Dlog_based = struct
           {alpha= t.alpha; beta= t.beta; zeta= t.zeta; gamma= t.gamma}
       end
 
+      [%%versioned
+      module Stable = struct
+        [@@@no_toplevel_latest_type]
+
+        module V1 = struct
+          type ( 'plonk
+               , 'scalar_challenge
+               , 'fp
+               , 'fq
+               , 'bulletproof_challenges
+               , 'index )
+               t =
+            { plonk: 'plonk
+            ; combined_inner_product: 'fp
+            ; b: 'fp
+            ; xi: 'scalar_challenge
+            ; bulletproof_challenges: 'bulletproof_challenges
+            ; which_branch: 'index }
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+
+          let to_latest = Fn.id
+        end
+      end]
+
       type ( 'plonk
            , 'scalar_challenge
            , 'fp
            , 'fq
            , 'bulletproof_challenges
            , 'index )
-           t_ =
+           t =
+            ( 'plonk
+            , 'scalar_challenge
+            , 'fp
+            , 'fq
+            , 'bulletproof_challenges
+            , 'index )
+            Stable.Latest.t =
         { plonk: 'plonk
         ; combined_inner_product: 'fp
         ; b: 'fp
         ; xi: 'scalar_challenge
         ; bulletproof_challenges: 'bulletproof_challenges
         ; which_branch: 'index }
-      [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
+      [@@deriving sexp, compare, yojson, hlist, hash, equal]
 
       module Minimal = struct
         type ( 'challenge
@@ -164,8 +200,8 @@ module Dlog_based = struct
           , 'fq
           , 'bulletproof_challenges
           , 'index )
-          t_
-        [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+          Stable.Latest.t
+        [@@deriving sexp, compare, yojson, hash, equal]
       end
 
       let map_challenges
@@ -196,10 +232,10 @@ module Dlog_based = struct
           , 'fq
           , 'bulletproof_challenges
           , 'index )
-          t_
-        [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+          Stable.Latest.t
+        [@@deriving sexp, compare, yojson, hash, equal]
 
-        let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
+        let to_hlist, of_hlist = (to_hlist, of_hlist)
 
         let typ (type f fp) ~challenge ~scalar_challenge
             (fp : (fp, _, f) Snarky_backendless.Typ.t) fq index =
@@ -221,9 +257,14 @@ module Dlog_based = struct
     end
 
     module Me_only = struct
-      type ('g1, 'bulletproof_challenges) t =
-        {sg: 'g1; old_bulletproof_challenges: 'bulletproof_challenges}
-      [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ('g1, 'bulletproof_challenges) t =
+            {sg: 'g1; old_bulletproof_challenges: 'bulletproof_challenges}
+          [@@deriving sexp, compare, yojson, hlist, hash, equal]
+        end
+      end]
 
       let to_field_elements {sg; old_bulletproof_challenges}
           ~g1:g1_to_field_elements =
@@ -239,27 +280,32 @@ module Dlog_based = struct
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
-    type ( 'plonk
-         , 'scalar_challenge
-         , 'fp
-         , 'fq
-         , 'me_only
-         , 'digest
-         , 'bp_chals
-         , 'index )
-         t_ =
-      { deferred_values:
-          ( 'plonk
-          , 'scalar_challenge
-          , 'fp
-          , 'fq
-          , 'bp_chals
-          , 'index )
-          Deferred_values.t_
-      ; sponge_digest_before_evaluations: 'digest
-            (* Not needed by other proof system *)
-      ; me_only: 'me_only }
-    [@@deriving bin_io, sexp, compare, yojson, hlist, hash, eq]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ( 'plonk
+             , 'scalar_challenge
+             , 'fp
+             , 'fq
+             , 'me_only
+             , 'digest
+             , 'bp_chals
+             , 'index )
+             t =
+          { deferred_values:
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'fq
+              , 'bp_chals
+              , 'index )
+              Deferred_values.Stable.V1.t
+          ; sponge_digest_before_evaluations: 'digest
+                (* Not needed by other proof system *)
+          ; me_only: 'me_only }
+        [@@deriving sexp, compare, yojson, hlist, hash, equal]
+      end
+    end]
 
     module Minimal = struct
       type ( 'challenge
@@ -279,8 +325,8 @@ module Dlog_based = struct
         , 'digest
         , 'bp_chals
         , 'index )
-        t_
-      [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+        Stable.Latest.t
+      [@@deriving sexp, compare, yojson, hash, equal]
     end
 
     module In_circuit = struct
@@ -304,10 +350,10 @@ module Dlog_based = struct
         , 'digest
         , 'bp_chals
         , 'index )
-        t_
-      [@@deriving bin_io, sexp, compare, yojson, hash, eq]
+        Stable.Latest.t
+      [@@deriving sexp, compare, yojson, hash, equal]
 
-      let to_hlist, of_hlist = (t__to_hlist, t__of_hlist)
+      let to_hlist, of_hlist = (to_hlist, of_hlist)
 
       let typ (type f fp) ~challenge ~scalar_challenge
           (fp : (fp, _, f) Snarky_backendless.Typ.t) fq me_only digest index =
@@ -373,53 +419,63 @@ module Dlog_based = struct
   end
 
   module Statement = struct
-    type ( 'plonk
-         , 'scalar_challenge
-         , 'fp
-         , 'fq
-         , 'me_only
-         , 'digest
-         , 'pass_through
-         , 'bp_chals
-         , 'index )
-         t_ =
-      { proof_state:
-          ( 'plonk
-          , 'scalar_challenge
-          , 'fp
-          , 'fq
-          , 'me_only
-          , 'digest
-          , 'bp_chals
-          , 'index )
-          Proof_state.t_
-      ; pass_through: 'pass_through }
-    [@@deriving bin_io, compare, yojson, sexp, hash, eq]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ( 'plonk
+             , 'scalar_challenge
+             , 'fp
+             , 'fq
+             , 'me_only
+             , 'digest
+             , 'pass_through
+             , 'bp_chals
+             , 'index )
+             t =
+          { proof_state:
+              ( 'plonk
+              , 'scalar_challenge
+              , 'fp
+              , 'fq
+              , 'me_only
+              , 'digest
+              , 'bp_chals
+              , 'index )
+              Proof_state.Stable.V1.t
+          ; pass_through: 'pass_through }
+        [@@deriving compare, yojson, sexp, hash, equal]
+      end
+    end]
 
     module Minimal = struct
-      type ( 'challenge
-           , 'scalar_challenge
-           , 'fp
-           , 'fq
-           , 'me_only
-           , 'digest
-           , 'pass_through
-           , 'bp_chals
-           , 'index )
-           t =
-        ( ( 'challenge
-          , 'scalar_challenge )
-          Proof_state.Deferred_values.Plonk.Minimal.t
-        , 'scalar_challenge
-        , 'fp
-        , 'fq
-        , 'me_only
-        , 'digest
-        , 'pass_through
-        , 'bp_chals
-        , 'index )
-        t_
-      [@@deriving bin_io, compare, yojson, sexp, hash, eq]
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ( 'challenge
+               , 'scalar_challenge
+               , 'fp
+               , 'fq
+               , 'me_only
+               , 'digest
+               , 'pass_through
+               , 'bp_chals
+               , 'index )
+               t =
+            ( ( 'challenge
+              , 'scalar_challenge )
+              Proof_state.Deferred_values.Plonk.Minimal.Stable.V1.t
+            , 'scalar_challenge
+            , 'fp
+            , 'fq
+            , 'me_only
+            , 'digest
+            , 'pass_through
+            , 'bp_chals
+            , 'index )
+            Stable.V1.t
+          [@@deriving compare, yojson, sexp, hash, equal]
+        end
+      end]
     end
 
     module In_circuit = struct
@@ -445,8 +501,8 @@ module Dlog_based = struct
         , 'pass_through
         , 'bp_chals
         , 'index )
-        t_
-      [@@deriving bin_io, compare, yojson, sexp, hash, eq]
+        Stable.Latest.t
+      [@@deriving compare, yojson, sexp, hash, equal]
 
       let spec =
         let open Spec in
@@ -626,7 +682,7 @@ module Pairing_based = struct
         ; xi: 'scalar_challenge (* 128 bits *)
         ; bulletproof_challenges: 'bulletproof_challenges
         ; b: 'fq }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
         type ('challenge, 'scalar_challenge, 'fq, 'bulletproof_challenges) t =
@@ -635,7 +691,7 @@ module Pairing_based = struct
           , 'fq
           , 'bulletproof_challenges )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
 
       module In_circuit = struct
@@ -645,7 +701,7 @@ module Pairing_based = struct
           , 'fq
           , 'bulletproof_challenges )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
     end
 
@@ -668,7 +724,7 @@ module Pairing_based = struct
             Deferred_values.t_
         ; should_finalize: 'bool
         ; sponge_digest_before_evaluations: 'digest }
-      [@@deriving bin_io, sexp, compare, yojson]
+      [@@deriving sexp, compare, yojson]
 
       module Minimal = struct
         type ( 'challenge
@@ -685,7 +741,7 @@ module Pairing_based = struct
           , 'digest
           , 'bool )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
       end
 
       module In_circuit = struct
@@ -706,7 +762,7 @@ module Pairing_based = struct
           , 'digest
           , 'bool )
           t_
-        [@@deriving bin_io, sexp, compare, yojson]
+        [@@deriving sexp, compare, yojson]
 
         let spec bp_log2 =
           let open Spec in
@@ -824,7 +880,7 @@ module Pairing_based = struct
 
     type ('unfinalized_proofs, 'me_only) t =
       {unfinalized_proofs: 'unfinalized_proofs; me_only: 'me_only}
-    [@@deriving bin_io, sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson]
 
     let spec unfinalized_proofs me_only =
       let open Spec in
@@ -862,7 +918,7 @@ module Pairing_based = struct
     type ('unfinalized_proofs, 'me_only, 'pass_through) t =
       { proof_state: ('unfinalized_proofs, 'me_only) Proof_state.t
       ; pass_through: 'pass_through }
-    [@@deriving bin_io, sexp, compare, yojson]
+    [@@deriving sexp, compare, yojson]
 
     let to_data {proof_state= {unfinalized_proofs; me_only}; pass_through} =
       let open Hlist.HlistId in
@@ -888,8 +944,8 @@ module Pairing_based = struct
 end
 
 module Nvector = Vector.With_length
-module Wrap_bp_vec = Nvector (Backend.Tock.Rounds)
-module Step_bp_vec = Nvector (Backend.Tick.Rounds)
+module Wrap_bp_vec = Backend.Tock.Rounds_vector
+module Step_bp_vec = Backend.Tick.Rounds_vector
 
 module Challenges_vector = struct
   type 'n t =
