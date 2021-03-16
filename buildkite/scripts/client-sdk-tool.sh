@@ -7,14 +7,10 @@ if [[ $# -ne 1 ]]; then
     exit 1
 fi
 
-echo "CURRENT REGION"
-echo $AWS_REGION
-echo "END REGION"
-
 TAG=$(git tag --points-at HEAD)
+[[ -z $TAG ]] && exit
 
 yarn_args="${1}"
-
 
 echo "//registry.yarnpkg.com/:_authToken=${NPM_TOKEN}" > ~/.npmrc
 
