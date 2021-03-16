@@ -66,6 +66,7 @@ module Engine = struct
 
       val dump_precomputed_blocks :
         logger:Logger.t -> t -> unit Malleable_error.t
+
       val best_chain : logger:Logger.t -> t -> string list Malleable_error.t
     end
 
