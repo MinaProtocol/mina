@@ -2,6 +2,10 @@ provider "google" {
   alias = "gke"
 }
 
+variable "deploy_graphql_ingress" {
+  type = bool
+}
+
 variable "aws_route53_zone_id" {
   type = string
 }

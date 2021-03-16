@@ -38,6 +38,7 @@ module Network_config = struct
     ; cluster_region: string
     ; aws_route53_zone_id: string
     ; testnet_name: string
+    ; deploy_graphql_ingress: bool
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -78,6 +79,7 @@ module Network_config = struct
         ; slots_per_sub_window
         ; proof_level
         ; txpool_max_size
+        ; requires_graphql
         ; block_producers
         ; num_snark_workers
         ; num_archive_nodes
@@ -216,6 +218,7 @@ module Network_config = struct
         ; cluster_region
         ; k8s_context= cluster_id
         ; testnet_name
+        ; deploy_graphql_ingress= requires_graphql
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
@@ -322,15 +325,15 @@ module Network_manager = struct
                  "Existing namespace of same name detected; removing to start \
                   clean")
         in
-        let%bind () =
-          Util.run_cmd_exn "/" "kubectl"
-            ["delete"; "namespace"; network_config.terraform.testnet_name]
-          >>| Fn.const ()
-        in
-        if%bind File_system.dir_exists testnet_dir then (
-          [%log info] "Old terraform directory found; removing to start clean" ;
-          File_system.remove_dir testnet_dir )
-        else return ()
+        Util.run_cmd_exn "/" "kubectl"
+          ["delete"; "namespace"; network_config.terraform.testnet_name]
+        >>| Fn.const ()
+      else return ()
+    in
+    let%bind () =
+      if%bind File_system.dir_exists testnet_dir then (
+        [%log info] "Old terraform directory found; removing to start clean" ;
+        File_system.remove_dir testnet_dir )
       else return ()
     in
     [%log info] "Writing network configuration" ;
@@ -355,10 +358,12 @@ module Network_manager = struct
       Network_config.testnet_log_filter network_config
     in
     let cons_node pod_id network_keypair_opt =
-      { testnet_name= network_config.terraform.testnet_name
-      ; Kubernetes_network.Node.cluster= cluster_id
+      { Kubernetes_network.Node.testnet_name=
+          network_config.terraform.testnet_name
+      ; cluster= cluster_id
       ; namespace= network_config.terraform.testnet_name
       ; pod_id
+      ; graphql_enabled= network_config.terraform.deploy_graphql_ingress
       ; network_keypair= network_keypair_opt }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)

@@ -161,6 +161,7 @@ module Subscription = struct
     in
     let topic = name ^ "_topic" in
     let sink = name ^ "_sink" in
+    (* TODO: check if exists, delete old one, create new one always *)
     let%bind _ = create_topic topic in
     let%bind _ = create_sink ~topic ~filter ~key ~logger sink in
     let%map _ = create_subscription name topic in
