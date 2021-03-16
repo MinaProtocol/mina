@@ -25,6 +25,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "block-prod" dependsOn,
     TestExecutive.execute "bootstrap" dependsOn,
     TestExecutive.execute "peers" dependsOn,
-    TestExecutive.execute "send-payment" dependsOn
+    TestExecutive.execute "send-payment" dependsOn,
+    TestExecutive.execute "common-prefix" dependsOn,
   ]
 }
