@@ -3,7 +3,7 @@
 </a>
 <hr/>
 
-Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project. It contains code for the OCaml protocol implementation, [website](https://minaprotocol.com), and wallet. Enjoy!
+Mina is the first cryptocurrency with a lightweight, constant-sized blockchain. This is the main source code repository for the Mina project. It contains code for the OCaml protocol implementation, [website](https://minaprotocol.com), and wallet. Enjoy?
 
 ## Notes
 
