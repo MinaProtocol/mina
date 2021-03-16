@@ -655,19 +655,19 @@ module Types = struct
              unknown with the invariant unknown <= total, as well as the \
              currently liquid and locked balances." ~fields:(fun _ ->
             [ field "total" ~typ:(non_null uint64)
-                ~doc:"The amount of coda owned by the account"
+                ~doc:"The amount of mina owned by the account"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.total)
             ; field "unknown" ~typ:(non_null uint64)
                 ~doc:
-                  "The amount of coda owned by the account whose origin is \
+                  "The amount of mina owned by the account whose origin is \
                    currently unknown"
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
             ; field "liquid" ~typ:uint64
                 ~doc:
-                  "The amount of coda owned by the account which is currently \
+                  "The amount of mina owned by the account which is currently \
                    available. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -683,7 +683,7 @@ module Types = struct
                       else Unsigned.UInt64.zero ) )
             ; field "locked" ~typ:uint64
                 ~doc:
-                  "The amount of coda owned by the account which is currently \
+                  "The amount of mina owned by the account which is currently \
                    locked. Can be null if bootstrapping."
                 ~deprecated:(Deprecated None)
                 ~args:Arg.[]
@@ -874,7 +874,7 @@ module Types = struct
                  ~resolve:(fun _ {account; _} -> account.Account.Poly.timing)
              ; field "balance"
                  ~typ:(non_null AnnotatedBalance.obj)
-                 ~doc:"The amount of coda owned by the account"
+                 ~doc:"The amount of mina owned by the account"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} -> account.Account.Poly.balance)
              ; field "nonce" ~typ:string
@@ -1426,7 +1426,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {fee_transfers; _} -> fee_transfers)
         ; field "coinbase" ~typ:(non_null uint64)
-            ~doc:"Amount of coda granted to the producer of this block"
+            ~doc:"Amount of mina granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ {coinbase; _} -> Currency.Amount.to_uint64 coinbase)
         ; field "coinbaseReceiverAccount" ~typ:AccountObj.account
@@ -1903,7 +1903,7 @@ module Types = struct
           [ from ~doc:"Public key of sender of payment"
           ; to_ ~doc:"Public key of recipient of payment"
           ; token_opt ~doc:"Token to send"
-          ; arg "amount" ~doc:"Amount of coda to send to to receiver"
+          ; arg "amount" ~doc:"Amount of mina to send to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
