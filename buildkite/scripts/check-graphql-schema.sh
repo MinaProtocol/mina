@@ -3,7 +3,7 @@
 set -eo pipefail
 
 apt-get update
-apt-get install -y git
+apt-get install -y git python3
 
 export DUNE_PROFILE=testnet_postake_medium_curves
 
