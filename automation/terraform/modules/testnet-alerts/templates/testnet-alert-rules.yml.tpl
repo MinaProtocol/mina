@@ -42,6 +42,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has no new blocks posted to the google block storage bucket recently"
       description: "{{ $value }} new blocks posted to the google storage bucket for {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/BlockStorageBucketNoNewBlock-80ddaf0fa7944fb4a9c5a4ffb4bbd6e2"
 
   - alert: ProverErrors
     expr: max by (testnet) (max_over_time(Coda_watchdog_prover_errors_total ${rule_filter} [${alerting_timeframe}])) > 0
@@ -60,6 +61,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has <= 50% of nodes synced"
       description: "Nodes sync rate of {{ $value }} is <= 50% on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/Nodes-not-synced-34e4d4eeaeaf47e381de660bab9ce7b7"
 
   - alert: NodesOutOfSync
     expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alerting_timeframe}])) < .9
@@ -69,6 +71,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has < 90% of nodes that are synced on the same best tip"
       description: "< 90% of nodes that are synced are on the same best tip for  network {{ $labels.testnet }} with rate of {{ $value }}."
+      runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
 
   - alert: LowPeerCount
     expr: min by (testnet) (Coda_Network_peers ${rule_filter}) < 3
@@ -87,6 +90,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} min density is low"
       description: "Critically low min density of {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
 
   - alert: LowFillRate
     expr: min by (testnet) (Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
@@ -105,6 +109,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has >= 5 blocks without transactions at the tip"
       description: "{{ $value }} blocks without transactions on tip of network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/No-Transactions-In-Several-Blocks-55ca13df38dd4c3491e11d8ea8020c08"
 
   - alert: NoCoinbaseInBlocks
     expr: min by (testnet) (min_over_time(Coda_Transition_frontier_best_tip_coinbase ${rule_filter} [10m])) < 1
@@ -114,6 +119,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has blocks without coinbases"
       description: "{{ $value }} Blocks without coinbases on tip of network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoCoinbaseInBlocks-aacbc2a4f9334d0db2de20c2f77ac34f"
 
   - alert: LongFork
     expr: max by (testnet) (Coda_Transition_frontier_longest_fork ${rule_filter}) >= 16
@@ -123,6 +129,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has a fork of length at least 16"
       description: "Fork of length {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LongFork-e65e5ad7437f4f4dbac201abbf9ace81"
 
   - alert: OldBestTip
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 15 * 180
@@ -132,6 +139,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }}: all nodes have best tips older than 15 slots"
       description: "All nodes have best tips older than 15 slots (45 minutes) on network {{ $labels.testnet }}. Best tip: {{ $value }}"
+      runbook: "https://www.notion.so/minaprotocol/OldBestTip-8afa955101b642bd8356edfd0b03b640"
 
   - alert: NoNewSnarks
     expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec ${rule_filter}) >= 2 * 180
@@ -141,6 +149,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }}: no new SNARK work seen for 2 slots."
       description: "No node has received SNARK work in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoNewSnarks-f86d27c81af54954b2fb61378bff9d4d"
 
   - alert: NoNewTransactions
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec ${rule_filter}) >= 2 * 180
@@ -150,6 +159,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }}: no new transactions seen for 2 slots."
       description: "No node has received transactions in their transaction pool in the last 2 slots (6 minutes) on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoNewTransactions-27dbeafab8ea4d659ee6f748acb2fd6c"
 
   - alert: HighUnparentedBlockCount
     expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alerting_timeframe}])) > 30
@@ -179,6 +189,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} block gossip latency is high"
       description: "High block gossip latency of {{ $value }}(ms) within {{ $labels.testnet }} network."
+      runbook: "https://www.notion.so/minaprotocol/HighBlockGossipLatency-2096501c7cf34032b44e903ec1a4d79c"
 
   - alert: SomewhatOldBestTip
     expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 8 * 180) > 1
@@ -188,6 +199,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }}: at least 2 nodes have best tips older than 8 slots"
       description: "At least 2 nodes have best tips older than 8 slots (24 minutes) on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/SomewhatOldBestTip-bb1509582bdd4908bcda656eebf421b5"
 
   - alert: MediumFork
     expr: max by (testnet) (Coda_Transition_frontier_longest_fork ${rule_filter}) >= 8
