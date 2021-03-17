@@ -161,7 +161,8 @@ module Network_config = struct
         ~default:Genesis_constants.Constraint_constants.compiled proof_config
     in
     let runtime_config =
-      { Runtime_config.daemon= Some {txpool_max_size= Some txpool_max_size}
+      { Runtime_config.daemon=
+          Some {txpool_max_size= Some txpool_max_size; peers_list_url= None}
       ; genesis=
           Some
             { k= Some k
