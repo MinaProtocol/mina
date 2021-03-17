@@ -17,11 +17,12 @@ let%test_module "backend test" =
         let open Field in
 
         (***** BIT-WISE OPERATIONS *****)
-
         let module Bytes = Plonk.Bytes.Constraints (Impl) in
-        let b1 = Impl.Field.of_int 1 in
-        let b2 = Impl.Field.of_int 2 in
-        let b3 = Bytes.xor b1 b2 in
+
+        Random.full_init [|7|];
+        let rec add x n = if n < 1 then x else add (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
+        let y = add (Impl.Field.of_int (Random.int 255)) 50001 in
+        assert_ (Snarky.Constraint.equal y y);
 
         for j = 0 to 0 do
 

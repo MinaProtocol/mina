@@ -7,6 +7,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
 
   let xor (b1 : Field.t) (b2 : Field.t) : Field.t =
 
+    let bits = Field.size_in_bits - 1 in
     let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
       let b1 = read_var b1 in
       let b2 = read_var b2 in
@@ -15,12 +16,10 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
       let xor = Int.(0) in
       let x = ref xor in
       for i = 0 to 7 do
-        let b1 = Intf.Bigint.test_bit bit1 i in
-        let b2 = Intf.Bigint.test_bit bit2 i in
-        let bit = if b1 = b2 then 0 else 1 in
+        let bit = if Intf.Bigint.(test_bit bit1 i = test_bit bit2 i) then 0 else 1 in
         x := Int.(!x + (bit lsl i));
       done;
-      let b3 = read_var (Field.of_int 3) in
+      let b3 = read_var (Field.of_int !x) in
 
       [|
         one;
