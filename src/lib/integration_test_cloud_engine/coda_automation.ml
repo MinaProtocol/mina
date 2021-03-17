@@ -162,7 +162,7 @@ module Network_config = struct
     in
     let runtime_config =
       { Runtime_config.daemon=
-          Some {txpool_max_size= Some txpool_max_size; peers_list_url= None}
+          Some {txpool_max_size= Some txpool_max_size; peer_list_url= None}
       ; genesis=
           Some
             { k= Some k
