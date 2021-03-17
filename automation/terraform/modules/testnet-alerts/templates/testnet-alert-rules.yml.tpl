@@ -142,7 +142,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/OldBestTip-8afa955101b642bd8356edfd0b03b640"
 
   - alert: NoNewSnarks
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec ${rule_filter}) >= 2 * 180
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec ${rule_filter}) >= 2 * 180 and max by (testnet) (Coda_Snark_work_pending_snark_work ${rule_filter}) != 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
