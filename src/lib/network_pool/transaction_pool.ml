@@ -1423,12 +1423,18 @@ end)
         |> List.map
              ~f:Transaction_hash.User_command_with_valid_signature.command
       in
+      let nonce_of_txn txn =
+        (* Snapp commands don't necessarily have a nonce, so just use a nonce
+           of zero.
+        *)
+        try User_command.nonce_exn txn
+        with _ -> Mina_numbers.Account_nonce.zero
+      in
       if List.is_empty rebroadcastable_txs then []
       else
         [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
-              User_command.(
-                Mina_numbers.Account_nonce.compare (nonce_exn tx1)
-                  (nonce_exn tx2)) ) ]
+                Mina_numbers.Account_nonce.compare (nonce_of_txn tx1)
+                  (nonce_of_txn tx2)) ]
   end
 end
 *)
@@ -2526,12 +2532,18 @@ struct
         |> List.map
              ~f:Transaction_hash.User_command_with_valid_signature.command
       in
+      let nonce_of_txn txn =
+        (* Snapp commands don't necessarily have a nonce, so just use a nonce
+           of zero.
+        *)
+        try User_command.nonce_exn txn
+        with _ -> Mina_numbers.Account_nonce.zero
+      in
       if List.is_empty rebroadcastable_txs then []
       else
         [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
-              User_command.(
-                Mina_numbers.Account_nonce.compare (nonce_exn tx1)
-                  (nonce_exn tx2)) ) ]
+              Mina_numbers.Account_nonce.compare (nonce_of_txn tx1)
+                (nonce_of_txn tx2) ) ]
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
