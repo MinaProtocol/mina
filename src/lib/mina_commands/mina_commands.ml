@@ -196,6 +196,13 @@ let get_status ~flag t =
   in
   let snark_work_fee = Currency.Fee.to_int @@ Mina_lib.snark_work_fee t in
   let block_production_keys = Mina_lib.block_production_pubkeys t in
+  let coinbase_receiver =
+    match Mina_lib.coinbase_receiver t with
+    | `Producer ->
+        None
+    | `Other pk ->
+        Some pk
+  in
   let consensus_mechanism = Consensus.name in
   let time_controller = config.time_controller in
   let consensus_time_now =
@@ -363,6 +370,8 @@ let get_status ~flag t =
   ; block_production_keys=
       Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
+  ; coinbase_receiver=
+      Option.map ~f:Public_key.Compressed.to_base58_check coinbase_receiver
   ; histograms
   ; next_block_production
   ; consensus_time_now

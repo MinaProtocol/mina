@@ -372,6 +372,7 @@ module Types = struct
                ~sync_status:(id ~typ:(non_null sync_status))
                ~block_production_keys:
                  (id ~typ:(non_null @@ list (non_null Schema.string)))
+               ~coinbase_receiver:(id ~typ:Schema.string)
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:(id ~typ:consensus_time)
                ~global_slot_since_genesis_best_tip:int
@@ -1694,6 +1695,23 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ (_, _, currentStaking) -> currentStaking) ] )
 
+    let set_coinbase_receiver =
+      obj "SetCoinbaseReceiverPayload" ~fields:(fun _ ->
+          [ field "lastCoinbaseReceiver"
+              ~doc:
+                "Returns the public key that was receiving coinbases \
+                 previously, or none if it was the block producer"
+              ~typ:public_key
+              ~args:Arg.[]
+              ~resolve:(fun _ (last_receiver, _) -> last_receiver)
+          ; field "currentCoinbaseReceiver"
+              ~doc:
+                "Returns the public key that will receive coinbase, or none \
+                 if it will be the block producer"
+              ~typ:public_key
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, current_receiver) -> current_receiver) ] )
+
     let set_snark_work_fee =
       obj "SetSnarkWorkFeePayload" ~fields:(fun _ ->
           [ field "lastFee" ~doc:"Returns the last fee set to do snark work"
@@ -2058,6 +2076,15 @@ module Types = struct
               ~doc:
                 "Public keys of accounts you wish to stake with - these must \
                  be accounts that are in trackedAccounts" ]
+
+    let set_coinbase_receiver =
+      obj "SetCoinbaseReceiverInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "publicKey" ~typ:public_key_arg
+              ~doc:
+                "Public key of the account to receive coinbases. Block \
+                 production keys will receive the coinbases if none is given"
+          ]
 
     let set_snark_work_fee =
       obj "SetSnarkWorkFee"
@@ -2624,6 +2651,28 @@ module Mutations = struct
         , locked
         , List.map ~f:Tuple.T2.get2 unlocked ) )
 
+  let set_coinbase_receiver =
+    field "setCoinbaseReceiver" ~doc:"Set the key to receive coinbases"
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_coinbase_receiver)]
+      ~typ:(non_null Types.Payload.set_coinbase_receiver)
+      ~resolve:(fun {ctx= mina; _} () coinbase_receiver ->
+        let old_coinbase_receiver =
+          match Mina_lib.coinbase_receiver mina with
+          | `Producer ->
+              None
+          | `Other pk ->
+              Some pk
+        in
+        let coinbase_receiver_full =
+          match coinbase_receiver with
+          | None ->
+              `Producer
+          | Some pk ->
+              `Other pk
+        in
+        Mina_lib.replace_coinbase_receiver mina coinbase_receiver_full ;
+        (old_coinbase_receiver, coinbase_receiver) )
+
   let set_snark_worker =
     io_field "setSnarkWorker"
       ~doc:"Set key you wish to snark work with or disable snark working"
@@ -2778,6 +2827,7 @@ module Mutations = struct
     ; mint_tokens
     ; export_logs
     ; set_staking
+    ; set_coinbase_receiver
     ; set_snark_worker
     ; set_snark_work_fee
     ; set_connection_gating_config
