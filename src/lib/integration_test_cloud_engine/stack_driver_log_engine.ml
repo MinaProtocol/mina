@@ -170,24 +170,22 @@ module Subscription = struct
     {name; topic; sink}
 
   let delete t =
-    let open Deferred.Or_error.Let_syntax in
-    let delete_subscription =
+    let open Deferred.Let_syntax in
+    let%bind delete_subscription_res =
       run_cmd_or_error "." prog
         ["pubsub"; "subscriptions"; "delete"; t.name; "--project"; project_id]
     in
-    let delete_sink =
+    let%bind delete_sink_res =
       run_cmd_or_error "." prog
         ["logging"; "sinks"; "delete"; t.sink; "--project"; project_id]
     in
-    let delete_topic =
+    let%map delete_topic_res =
       run_cmd_or_error "." prog
         ["pubsub"; "topics"; "delete"; t.topic; "--project"; project_id]
     in
-    let%map _ =
-      Deferred.Or_error.combine_errors
-        [delete_subscription; delete_sink; delete_topic]
-    in
-    ()
+    Or_error.combine_errors
+      [delete_subscription_res; delete_sink_res; delete_topic_res]
+    |> Or_error.map ~f:(Fn.const ())
 
   let pull ~logger t =
     let open Deferred.Or_error.Let_syntax in
