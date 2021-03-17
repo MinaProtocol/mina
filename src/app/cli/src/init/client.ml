@@ -1266,6 +1266,44 @@ let set_staking_graphql =
          print_message "Started staking with"
            (result#setStaking)#currentStakingKeys ))
 
+let set_coinbase_receiver_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let open Graphql_lib in
+  let pk_flag =
+    choose_one ~if_nothing_chosen:`Raise
+      [ flag "--public-key" ~aliases:["public-key"]
+          ~doc:"PUBLICKEY Public key of account to send coinbase rewards to"
+          (optional public_key_compressed)
+        |> map ~f:(Option.map ~f:Option.some)
+      ; flag "--block-producer" ~aliases:["block-producer"]
+          ~doc:"Send coinbase rewards to the block producer's public key"
+          no_arg
+        |> map ~f:(function true -> Some None | false -> None) ]
+  in
+  Command.async ~summary:"Set the coinbase receiver"
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint public_key_opt ->
+         let print_pk_opt () = function
+           | None ->
+               "block producer"
+           | Some pk ->
+               "public key " ^ Public_key.Compressed.to_base58_check pk
+         in
+         let%map result =
+           Graphql_client.query_exn
+             (Graphql_queries.Set_coinbase_receiver.make
+                ~public_key:
+                  (Option.value_map ~f:Encoders.public_key public_key_opt
+                     ~default:`Null)
+                ())
+             graphql_endpoint
+         in
+         printf
+           "Was sending coinbases to the %a\nNow sending coinbases to the %a\n"
+           print_pk_opt (result#setCoinbaseReceiver)#lastCoinbaseReceiver
+           print_pk_opt (result#setCoinbaseReceiver)#currentCoinbaseReceiver ))
+
 let set_snark_worker =
   let open Command.Param in
   let public_key_flag =
@@ -2207,7 +2245,8 @@ let advanced =
     ; ("object-lifetime-statistics", object_lifetime_statistics)
     ; ("archive-blocks", archive_blocks)
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
-    ; ("hash-transaction", hash_transaction) ]
+    ; ("hash-transaction", hash_transaction)
+    ; ("set-coinbase-receiver", set_coinbase_receiver_graphql) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"
