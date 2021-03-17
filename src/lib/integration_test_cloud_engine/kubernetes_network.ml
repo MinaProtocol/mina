@@ -11,6 +11,7 @@ module Node = struct
     ; cluster: string
     ; namespace: string
     ; pod_id: string
+    ; graphql_enabled: bool
     ; network_keypair: Network_keypair.t option }
 
   let id {pod_id; _} = pod_id
@@ -194,63 +195,68 @@ module Node = struct
       ?(initial_delay_sec = 30.0) ~logger ~node
       ?(retry_on_graphql_error = false) ~query_name query_obj =
     let open Malleable_error.Let_syntax in
-    let uri = Graphql.ingress_uri node in
-    let metadata =
-      [("query", `String query_name); ("uri", `String (Uri.to_string uri))]
-    in
-    [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\""
-      ~metadata ;
-    let rec retry n =
-      if n <= 0 then (
-        [%log error]
-          "GraphQL request \"$query\" to \"$uri\" failed too many times"
-          ~metadata ;
-        Malleable_error.of_string_hard_error_format
-          "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
-          (Uri.to_string uri) )
-      else
-        match%bind
-          Deferred.bind ~f:Malleable_error.return
-            ((Graphql.Client.query query_obj) uri)
-        with
-        | Ok result ->
-            [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
-              ~metadata ;
-            return result
-        | Error (`Failed_request err_string) ->
-            [%log warn]
-              "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
-               ($num_tries attempts left)"
-              ~metadata:
-                ( metadata
-                @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
-                ) ;
-            let%bind () =
-              Deferred.bind ~f:Malleable_error.return
-                (after (Time.Span.of_sec retry_delay_sec))
-            in
-            retry (n - 1)
-        | Error (`Graphql_error err_string) ->
-            [%log error]
-              "GraphQL request \"$query\" to \"$uri\" returned an error: \
-               \"$error\" ($num_tries attempts left)"
-              ~metadata:
-                ( metadata
-                @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
-                ) ;
-            if retry_on_graphql_error then
+    if not node.graphql_enabled then
+      Malleable_error.of_string_hard_error
+        "graphql is not enabled (hint: set `requires_graphql= true` in the \
+         test config)"
+    else
+      let uri = Graphql.ingress_uri node in
+      let metadata =
+        [("query", `String query_name); ("uri", `String (Uri.to_string uri))]
+      in
+      [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\""
+        ~metadata ;
+      let rec retry n =
+        if n <= 0 then (
+          [%log error]
+            "GraphQL request \"$query\" to \"$uri\" failed too many times"
+            ~metadata ;
+          Malleable_error.of_string_hard_error_format
+            "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
+            (Uri.to_string uri) )
+        else
+          match%bind
+            Deferred.bind ~f:Malleable_error.return
+              ((Graphql.Client.query query_obj) uri)
+          with
+          | Ok result ->
+              [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
+                ~metadata ;
+              return result
+          | Error (`Failed_request err_string) ->
+              [%log warn]
+                "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
+                 ($num_tries attempts left)"
+                ~metadata:
+                  ( metadata
+                  @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
+                  ) ;
               let%bind () =
                 Deferred.bind ~f:Malleable_error.return
                   (after (Time.Span.of_sec retry_delay_sec))
               in
               retry (n - 1)
-            else Malleable_error.of_string_hard_error err_string
-    in
-    let%bind () =
-      Deferred.bind ~f:Malleable_error.return
-        (after (Time.Span.of_sec initial_delay_sec))
-    in
-    retry num_tries
+          | Error (`Graphql_error err_string) ->
+              [%log error]
+                "GraphQL request \"$query\" to \"$uri\" returned an error: \
+                 \"$error\" ($num_tries attempts left)"
+                ~metadata:
+                  ( metadata
+                  @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
+                  ) ;
+              if retry_on_graphql_error then
+                let%bind () =
+                  Deferred.bind ~f:Malleable_error.return
+                    (after (Time.Span.of_sec retry_delay_sec))
+                in
+                retry (n - 1)
+              else Malleable_error.of_string_hard_error err_string
+      in
+      let%bind () =
+        Deferred.bind ~f:Malleable_error.return
+          (after (Time.Span.of_sec initial_delay_sec))
+      in
+      retry num_tries
 
   let get_peer_id ~logger t =
     let open Malleable_error.Let_syntax in
@@ -464,6 +470,7 @@ end
 type t =
   { namespace: string
   ; constants: Test_config.constants
+  ; seeds: Node.t list
   ; block_producers: Node.t list
   ; snark_coordinators: Node.t list
   ; archive_nodes: Node.t list
@@ -477,15 +484,103 @@ let constraint_constants {constants; _} = constants.constraints
 
 let genesis_constants {constants; _} = constants.genesis
 
+let seeds {seeds; _} = seeds
+
 let block_producers {block_producers; _} = block_producers
 
 let snark_coordinators {snark_coordinators; _} = snark_coordinators
 
 let archive_nodes {archive_nodes; _} = archive_nodes
 
+(* TODO: snark workers (until then, pretty sure snark work won't be done) *)
+let all_nodes {seeds; block_producers; snark_coordinators; archive_nodes; _} =
+  List.concat [seeds; block_producers; snark_coordinators; archive_nodes]
+
 let keypairs {keypairs; _} = keypairs
 
-let all_nodes {block_producers; snark_coordinators; archive_nodes; _} =
-  block_producers @ snark_coordinators @ archive_nodes
-
 let lookup_node_by_app_id t = Map.find t.nodes_by_app_id
+
+let initialize ~logger network =
+  let open Malleable_error.Let_syntax in
+  let poll_interval = Time.Span.of_sec 15.0 in
+  let max_polls = 60 (* 15 mins *) in
+  let all_pods =
+    all_nodes network
+    |> List.map ~f:(fun {pod_id; _} -> pod_id)
+    |> String.Set.of_list
+  in
+  let get_pod_statuses () =
+    let%map output =
+      Deferred.bind ~f:Malleable_error.return
+        (Util.run_cmd_exn "/" "kubectl"
+           [ "-n"
+           ; network.namespace
+           ; "get"
+           ; "pods"
+           ; "-ojsonpath={range \
+              .items[*]}{.metadata.labels.app}{':'}{.status.phase}{'\\n'}{end}"
+           ])
+    in
+    output |> String.split_lines
+    |> List.map ~f:(fun line ->
+           let parts = String.split line ~on:':' in
+           assert (List.length parts = 2) ;
+           (List.nth_exn parts 0, List.nth_exn parts 1) )
+    |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
+  in
+  let rec poll n =
+    let%bind pod_statuses = get_pod_statuses () in
+    (* TODO: detect "bad statuses" (eg CrashLoopBackoff) and terminate early *)
+    let bad_pod_statuses =
+      List.filter pod_statuses ~f:(fun (_, status) -> status <> "Running")
+    in
+    if List.is_empty bad_pod_statuses then return ()
+    else if n < max_polls then
+      let%bind () =
+        after poll_interval |> Deferred.bind ~f:Malleable_error.return
+      in
+      poll (n + 1)
+    else
+      let bad_pod_statuses_json =
+        `List
+          (List.map bad_pod_statuses ~f:(fun (pod_name, status) ->
+               `Assoc
+                 [("pod_name", `String pod_name); ("status", `String status)]
+           ))
+      in
+      [%log fatal]
+        "Not all pods were assigned to nodes and ready in time: \
+         $bad_pod_statuses"
+        ~metadata:[("bad_pod_statuses", bad_pod_statuses_json)] ;
+      Malleable_error.of_string_hard_error_format
+        "Some pods either were not assigned to nodes or did deploy properly \
+         (errors: %s)"
+        (Yojson.Safe.to_string bad_pod_statuses_json)
+  in
+  [%log info] "Waiting for pods to be assigned nodes and become ready" ;
+  Deferred.bind (poll 0) ~f:(fun res ->
+      if Malleable_error.is_ok res then
+        let seed_nodes = seeds network in
+        let seed_pod_ids =
+          seed_nodes
+          |> List.map ~f:(fun {Node.pod_id; _} -> pod_id)
+          |> String.Set.of_list
+        in
+        let non_seed_nodes =
+          network |> all_nodes
+          |> List.filter ~f:(fun {Node.pod_id; _} ->
+                 not (String.Set.mem seed_pod_ids pod_id) )
+        in
+        (* TODO: parallelize (requires accumlative hard errors) *)
+        let%bind () =
+          Malleable_error.List.iter seed_nodes
+            ~f:(Node.start ~fresh_state:false)
+        in
+        (* put a short delay before starting other nodes, to help avoid artifact generation races *)
+        let%bind () =
+          after (Time.Span.of_sec 30.0)
+          |> Deferred.bind ~f:Malleable_error.return
+        in
+        Malleable_error.List.iter non_seed_nodes
+          ~f:(Node.start ~fresh_state:false)
+      else Deferred.return res )

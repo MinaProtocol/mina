@@ -78,13 +78,19 @@ module Engine = struct
 
     val genesis_constants : t -> Genesis_constants.t
 
+    val seeds : t -> Node.t list
+
     val block_producers : t -> Node.t list
 
     val snark_coordinators : t -> Node.t list
 
     val archive_nodes : t -> Node.t list
 
+    val all_nodes : t -> Node.t list
+
     val keypairs : t -> Signature_lib.Keypair.t list
+
+    val initialize : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig
