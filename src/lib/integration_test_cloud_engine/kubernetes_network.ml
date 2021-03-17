@@ -534,10 +534,29 @@ let initialize ~logger network =
         (Yojson.Safe.to_string bad_pod_statuses_json)
   in
   [%log info] "Waiting for pods to be assigned nodes and become ready" ;
-  let open Deferred.Let_syntax in
-  let%bind res = poll 0 in
-  if Malleable_error.is_ok res then
-    all_nodes network
-    (* TODO: parallelize (requires accumlative hard errors) *)
-    |> Malleable_error.List.iter ~f:(Node.start ~fresh_state:false)
-  else Deferred.return res
+  Deferred.bind (poll 0) ~f:(fun res ->
+      if Malleable_error.is_ok res then
+        let seed_nodes = seeds network in
+        let seed_pod_ids =
+          seed_nodes
+          |> List.map ~f:(fun {Node.pod_id; _} -> pod_id)
+          |> String.Set.of_list
+        in
+        let non_seed_nodes =
+          network |> all_nodes
+          |> List.filter ~f:(fun {Node.pod_id; _} ->
+                 not (String.Set.mem seed_pod_ids pod_id) )
+        in
+        (* TODO: parallelize (requires accumlative hard errors) *)
+        let%bind () =
+          Malleable_error.List.iter seed_nodes
+            ~f:(Node.start ~fresh_state:false)
+        in
+        (* put a short delay before starting other nodes, to help avoid artifact generation races *)
+        let%bind () =
+          after (Time.Span.of_sec 30.0)
+          |> Deferred.bind ~f:Malleable_error.return
+        in
+        Malleable_error.List.iter non_seed_nodes
+          ~f:(Node.start ~fresh_state:false)
+      else Deferred.return res )
