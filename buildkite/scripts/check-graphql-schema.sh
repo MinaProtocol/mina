@@ -17,7 +17,7 @@ echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt
 apt-get update
 apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 
-coda daemon --seed --proof-level none --rest-port 8080 &
+mina daemon --seed --proof-level none --rest-port 8080 &
 
 # Update the graphql schema
 num_retries=5
