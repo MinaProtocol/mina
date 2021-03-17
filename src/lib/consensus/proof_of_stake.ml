@@ -2646,7 +2646,7 @@ module Data = struct
 end
 
 module Coinbase_receiver = struct
-  type t = [`Producer | `Other of Public_key.Compressed.t]
+  type t = [`Producer | `Other of Public_key.Compressed.t] [@@deriving yojson]
 
   let resolve ~self : t -> Public_key.Compressed.t = function
     | `Producer ->

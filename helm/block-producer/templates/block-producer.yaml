@@ -177,6 +177,9 @@ spec:
           {{- if $.Values.coda.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}
+          {{- if $.Values.coda.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
           {{- if $config.isolated }}
           "-isolate-network", "true",
           {{- end -}}

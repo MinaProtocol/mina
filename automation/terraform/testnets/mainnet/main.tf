@@ -55,10 +55,10 @@ variable "seed_count" {
 
 locals {
   testnet_name = "mainnet"
-  coda_image = "TODO" # TODO
-  coda_archive_image = "TODO" # TODO
-  seed_region = "us-east4"
-  seed_zone = "us-east4-b"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
+  seed_region = "us-east1"
+  seed_zone = "us-east1-b"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -73,14 +73,14 @@ locals {
 }
 
 module "mainnet" {
-  providers = { google.gke = google.google-us-east4 }
+  providers = { google.gke = google.google-us-east1 }
   source    = "../../modules/o1-testnet"
 
   artifact_path = abspath(path.module)
 
-  cluster_name   = "coda-infra-east4"
-  cluster_region = "us-east4"
-  k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
+  cluster_name   = "coda-infra-east"
+  cluster_region = "us-east1"
+  k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
   coda_image         = local.coda_image
@@ -90,7 +90,7 @@ module "mainnet" {
   block_producer_key_pass = "naughty blue worm"
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql" 
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/06691e343be1ddad036c1fc4a6c94afc12afc4ee/src/app/archive/create_schema.sql"
 
   archive_configs       = [
     {
@@ -128,6 +128,6 @@ module "mainnet" {
   make_report_every_mins          = "5"
   make_report_discord_webhook_url = local.make_report_discord_webhook_url
   make_report_accounts            = local.make_report_accounts
-  seed_peers_url                  = "TODO"  # TODO
+  seed_peers_url                  = "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
 }
 

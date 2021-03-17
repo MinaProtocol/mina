@@ -27,6 +27,13 @@ module "kubernetes_testnet" {
   seed_region = "us-west1"
   seed_configs = [local.seed_config]
 
+  archive_configs = local.archive_node_configs
+
+  log_precomputed_blocks = var.log_precomputed_blocks
+
+  archive_node_count   = var.archive_node_count
+  mina_archive_schema  = var.mina_archive_schema
+
   snark_worker_replicas   = var.snark_worker_replicas
   snark_worker_fee        = var.snark_worker_fee
   snark_worker_public_key = var.snark_worker_public_key
@@ -46,8 +53,8 @@ module "kubernetes_testnet" {
       run_with_user_agent    = false
       run_with_bots          = false
       enable_peer_exchange   = true
-      enableArchive          = false
-      archiveAddress         = null
+      enableArchive          = var.archive_node_count > 0
+      archiveAddress         = element(local.archive_node_names, index)
     }
   ]
 }
