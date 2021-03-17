@@ -2184,6 +2184,28 @@ module Subscriptions = struct
   let commands = [new_sync_update; new_block; chain_reorganization]
 end
 
+let check_if_unable_to_pay_account_creation_fee ~mina ~body ~amount =
+  let open Deferred.Result.Let_syntax in
+  let get_account = Mina_lib.get_account mina in
+  let constraint_constants =
+    (Mina_lib.config mina).precomputed_values.constraint_constants
+  in
+  let unable_to_pay_account_creation_fee =
+    User_command_input.unable_to_pay_account_creation_fee ~get_account
+      ~constraint_constants body
+  in
+  if unable_to_pay_account_creation_fee then
+    let open Currency.Amount in
+    Deferred.Result.fail
+      (sprintf
+         "This transaction is likely to fail because the receiver account \
+          doesn't appear to have been created already and the transaction \
+          amount of %s is smaller than the account creation fee of %s."
+         (to_formatted_string (of_uint64 amount))
+         (to_formatted_string
+            (of_fee constraint_constants.account_creation_fee)))
+  else return ()
+
 module Mutations = struct
   open Schema
 
@@ -2473,14 +2495,20 @@ module Mutations = struct
         (fun {ctx= coda; _} ()
              (from, to_, token_id, amount, fee, valid_until, memo, nonce_opt)
              signature ignore_warnings ->
+        let open Deferred.Result.Let_syntax in
         let ignore_warnings = Option.value ~default:false ignore_warnings in
-        let _ = ignore ignore_warnings in
         let body =
           Signed_command_payload.Body.Payment
             { source_pk= from
             ; receiver_pk= to_
             ; token_id= Option.value ~default:Token_id.default token_id
             ; amount= Amount.of_uint64 amount }
+        in
+        let%bind () =
+          if ignore_warnings then return ()
+          else
+            check_if_unable_to_pay_account_creation_fee ~mina:coda ~body
+              ~amount
         in
         let fee_token = Token_id.default in
         match signature with
@@ -3384,13 +3412,16 @@ module Queries = struct
              signature ignore_warnings ->
         let open Deferred.Result.Let_syntax in
         let ignore_warnings = Option.value ~default:true ignore_warnings in
-        let _ = ignore ignore_warnings in
         let body =
           Signed_command_payload.Body.Payment
             { source_pk= from
             ; receiver_pk= to_
             ; token_id= Option.value ~default:Token_id.default token_id
             ; amount= Amount.of_uint64 amount }
+        in
+        let%bind () =
+          if ignore_warnings then return ()
+          else check_if_unable_to_pay_account_creation_fee ~mina ~body ~amount
         in
         let fee_token = Token_id.default in
         let%bind signature =
