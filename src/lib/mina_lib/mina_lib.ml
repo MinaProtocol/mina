@@ -140,6 +140,14 @@ let block_production_pubkeys t : Public_key.Compressed.Set.t =
 let coinbase_receiver t = !(t.coinbase_receiver)
 
 let replace_coinbase_receiver t coinbase_receiver =
+  [%log' info t.config.logger]
+    "Changing the coinbase receiver for produced blocks from $old_receiver to \
+     $new_receiver"
+    ~metadata:
+      [ ( "old_receiver"
+        , Consensus.Coinbase_receiver.to_yojson !(t.coinbase_receiver) )
+      ; ( "new_receiver"
+        , Consensus.Coinbase_receiver.to_yojson coinbase_receiver ) ] ;
   t.coinbase_receiver := coinbase_receiver
 
 let replace_block_production_keypairs t kps =
