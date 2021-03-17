@@ -94,12 +94,12 @@ For more information, reach out to [#reliability-engineering](https://discord.co
 
 #### Silence Alerts
 
+* Alertmanager alert silencing: create new alert silences using either the [Alertmanager](https://alertmanager-us-central1.grafana.net/alertmanager/#/silences/new) or [Grafanacloud](https://o1testnet.grafana.net/a/grafana-alerting-ui-app/?tab=silences&alertmanager=grafanacloud-o1testnet-alertmanager) UI.
 * Pagerduty alert suppression: see [guide](https://support.pagerduty.com/docs/event-management#suppressing-alerts)
-* Alertmanager alert silencing: create new alerts using either the [Alertmanager](https://alertmanager-us-central1.grafana.net/alertmanager/#/silences/new) or [Grafanacloud](https://o1testnet.grafana.net/a/grafana-alerting-ui-app/?tab=silences&alertmanager=grafanacloud-o1testnet-alertmanager) UI.
 
 ##### Creating new silences
 
-When creating new alert silences (from the above link or otherwise), you'll likely want to make use of the AlertManager's `Matchers` construct, which basically consists of a set of key-value pairs used to target the alert to silence. For example, if silencing the "LowFillRate" alert currently firing for testnet *devnet*, you would create a new silence with individual `Matchers` for the alert name and testnet like the following:
+When creating new alert silences (from the above links or otherwise), you'll likely want to make use of the AlertManager's `Matchers` construct, which basically consists of a set of key-value pairs used to target the alert to silence. For example, if silencing the "LowFillRate" alert currently firing for testnet *devnet*, you would create a new silence with individual `Matchers` for the alert name and testnet like the following:
 
 ###### Matchers example
 
