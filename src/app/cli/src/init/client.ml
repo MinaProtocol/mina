@@ -2075,6 +2075,23 @@ let receipt_chain_hash =
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
 
+let hash_transaction =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:"Compute the hash of a transaction from its transaction ID"
+    (let%map_open transaction =
+       flag "--transaction-id" ~doc:"ID ID of the transaction to hash"
+         (required string)
+     in
+     fun () ->
+       let signed_command =
+         Signed_command.of_base58_check transaction |> Or_error.ok_exn
+       in
+       let hash =
+         Transaction_hash.hash_command (Signed_command signed_command)
+       in
+       printf "%s\n" (Transaction_hash.to_base58_check hash))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2189,7 +2206,8 @@ let advanced =
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
     ; ("archive-blocks", archive_blocks)
-    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
+    ; ("compute-receipt-chain-hash", receipt_chain_hash)
+    ; ("hash-transaction", hash_transaction) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"
