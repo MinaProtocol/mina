@@ -27,12 +27,12 @@ module Staking = struct
   module Enable =
   [%graphql
   {|
-  mutation enableStaking($publicKey: PublicKey!) {
+    mutation enableStaking($publicKey: PublicKey!) {
       setStaking(input: {publicKeys: [$publicKey]}) {
         lastStaking
       }
     }
-|}]
+  |}]
 
   let enable ~graphql_uri =
     let open Deferred.Result.Let_syntax in
@@ -46,12 +46,12 @@ module Account = struct
   module Unlock =
   [%graphql
   {|
-      mutation ($password: String!, $public_key: PublicKey!) {
-        unlockAccount(input: {password: $password, publicKey: $public_key }) {
-          publicKey
-        }
+    mutation ($password: String!, $public_key: PublicKey!) {
+      unlockAccount(input: {password: $password, publicKey: $public_key }) {
+        publicKey
       }
-    |}]
+    }
+  |}]
 
   let unlock ~graphql_uri =
     let open Deferred.Result.Let_syntax in
@@ -67,14 +67,14 @@ module SendTransaction = struct
   module Payment =
   [%graphql
   {|
-      mutation sendPayment($fee: UInt64!, $amount: UInt64!, $token: TokenId, $to_: PublicKey!, $from: PublicKey!) {
-        sendPayment(input: {fee: $fee, amount: $amount, token: $token, to: $to_, from: $from}, signature: null) {
-          payment {
-            hash
-          }
+    mutation sendPayment($fee: UInt64!, $amount: UInt64!, $token: TokenId, $to_: PublicKey!, $from: PublicKey!) {
+      sendPayment(input: {fee: $fee, amount: $amount, token: $token, to: $to_, from: $from}, signature: null) {
+        payment {
+          hash
         }
-        }
-    |}]
+      }
+    }
+  |}]
 
   let payment ~fee ~amount ?token ~to_ ~graphql_uri () =
     let open Deferred.Result.Let_syntax in
@@ -108,15 +108,14 @@ module SendTransaction = struct
   module Delegation =
   [%graphql
   {|
-
-       mutation sendDelegation($fee : UInt64!, $to_: PublicKey!, $from: PublicKey!) {
-         sendDelegation(input: {fee: $fee, to: $to_, from: $from}, signature: null) {
-           delegation {
-             hash
-           }
-         }
-       }
-    |}]
+    mutation sendDelegation($fee : UInt64!, $to_: PublicKey!, $from: PublicKey!) {
+      sendDelegation(input: {fee: $fee, to: $to_, from: $from}, signature: null) {
+        delegation {
+          hash
+        }
+      }
+    }
+  |}]
 
   let delegation ~fee ~to_ ~graphql_uri () =
     let open Deferred.Result.Let_syntax in
@@ -144,16 +143,16 @@ module SendTransaction = struct
   module Create_token =
   [%graphql
   {|
-       mutation ($sender: PublicKey!,
-                 $receiver: PublicKey!,
-                 $fee: UInt64!) {
-          createToken(input: {feePayer: $sender, tokenOwner: $receiver, fee: $fee}, signature: null) {
-           createNewToken {
-             hash
-           }
-       }
-     }
-   |}]
+    mutation ($sender: PublicKey!,
+              $receiver: PublicKey!,
+              $fee: UInt64!) {
+      createToken(input: {feePayer: $sender, tokenOwner: $receiver, fee: $fee}, signature: null) {
+        createNewToken {
+          hash
+        }
+      }
+    }
+  |}]
 
   let create_token ~fee ~receiver:_ ~graphql_uri () =
     let open Deferred.Result.Let_syntax in
@@ -180,19 +179,19 @@ module SendTransaction = struct
   module Create_token_account =
   [%graphql
   {|
-  mutation ($sender: PublicKey,
-            $tokenOwner: PublicKey!,
-            $receiver: PublicKey!,
-            $token: TokenId!,
-            $fee: UInt64!) {
-    createTokenAccount(input:
-       {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee}, signature: null) {
-         createNewTokenAccount {
-           hash
-         }
-       }
-     }
-   |}]
+    mutation ($sender: PublicKey,
+              $tokenOwner: PublicKey!,
+              $receiver: PublicKey!,
+              $token: TokenId!,
+              $fee: UInt64!) {
+      createTokenAccount(input:
+        {feePayer: $sender, tokenOwner: $tokenOwner, receiver: $receiver, token: $token, fee: $fee}, signature: null) {
+        createNewTokenAccount {
+          hash
+        }
+      }
+    }
+  |}]
 
   let create_token_account ~fee ~receiver ~token ~graphql_uri () =
     let open Deferred.Result.Let_syntax in
