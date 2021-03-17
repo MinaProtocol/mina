@@ -37,6 +37,7 @@ Pipeline.build
           , depends_on = [ { name = "TestnetAlerts", key = "lint-testnet-alerts" } ]
           , soft_fail = Some (B/SoftFail.Boolean True)
           , docker = None Docker.Type
+          , if = Some "build.branch == 'compatible' || build.env('DEPLOY_ALERTS') == 'true'"
         }
     ]
   }
