@@ -454,8 +454,9 @@ module T = struct
           let coda_deferred () =
             Mina_lib.create
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~disable_telemetry:true ~super_catchup:true
-                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
+                 ~chain_id ~is_seed ~disable_node_status:true
+                 ~super_catchup:true ~coinbase_receiver:`Producer ~net_config
+                 ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:

@@ -396,8 +396,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
-    ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
-          Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda) peers )
+    ; implement Daemon_rpcs.Get_node_status.rpc (fun () peers ->
+          Node_status.get_node_status_from_peers (Mina_lib.net coda) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
@@ -570,11 +570,11 @@ let coda_crash_message ~log_issue ~action ~error =
   let followup =
     if log_issue then
       sprintf
-        !{err| The Coda Protocol developers would like to know why!
+        !{err| The Mina Protocol developers would like to know why!
 
     Please:
       Open an issue:
-        <https://github.com/CodaProtocol/coda/issues/new>
+        <https://github.com/MinaProtocol/mina/issues/new>
 
       Briefly describe what you were doing and %s
 
@@ -584,7 +584,7 @@ let coda_crash_message ~log_issue ~action ~error =
   in
   sprintf !{err|
 
-  ☠  Coda Daemon %s.
+  ☠  Mina Daemon %s.
   %s
 %!|err} error followup
 
@@ -696,7 +696,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
             [("coda_run", `String "Program was killed by signal")]
         in
         [%log info]
-          !"Coda process was interrupted by $signal"
+          !"Mina process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
         (* causes async shutdown and at_exit handlers to run *)
         Async.shutdown 130 ))

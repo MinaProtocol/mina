@@ -225,3 +225,60 @@ resource "helm_release" "west1_prometheus" {
   depends_on   = [google_container_cluster.mina_integration_west1]
   force_update = true
 }
+
+# Utilities
+
+provider kubernetes {
+  config_context = local.west1_k8s_context
+}
+
+resource "kubernetes_cron_job" "integration-testnet-cleanup" {
+  metadata {
+    name      = "integration-test-cleanup"
+    namespace = "default"
+  }
+  spec {
+    concurrency_policy            = "Replace"
+    failed_jobs_history_limit     = 5
+    schedule                      = "0 * * * *"
+    starting_deadline_seconds     = 10
+    successful_jobs_history_limit = 10
+    job_template {
+      metadata {}
+      spec {
+        backoff_limit              = 5
+        ttl_seconds_after_finished = 10
+        template {
+          metadata {}
+          spec {
+            container {
+              name  = "integration-test-janitor"
+              image = "gcr.io/o1labs-192920/watchdog:0.3.9"
+              args = [
+                "/scripts/network-utilities.py",
+                "janitor",
+                "cleanup-namespace-resources",
+                "--namespace-pattern",
+                "^it-.*|^ci-net.*",
+                "--cleanup-older-than",
+                "10800", # 60 * 60 * 3 seconds (3 hours)
+                "--k8s-context",
+                "gke_o1labs-192920_us-west1_mina-integration-west1",
+                "--kube-config-file",
+                "/root/.kube/config"
+              ]
+              env {
+                name  = "GCLOUD_APPLICATION_CREDENTIALS_JSON"
+                value = base64decode(google_service_account_key.janitor_svc_key.private_key)
+              }
+              env {
+                name  = "CLUSTER_SERVICE_EMAIL"
+                value = google_service_account.gcp_janitor_account.email
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

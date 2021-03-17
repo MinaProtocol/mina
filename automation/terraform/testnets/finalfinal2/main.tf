@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "finalfinal2"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.3-compatible-5e78a42-finalfinal2-4131ed5"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.3-compatible-5e78a42"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.0-fd39808-finalfinal2-fd39808"
+  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.0-fix-archive-build-profile-e344c96"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
   make_report_discord_webhook_url = <<EOT
@@ -83,15 +83,12 @@ module "finalfinal2" {
 
   coda_image         = local.coda_image
   coda_archive_image = local.coda_archive_image
-  coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
-  coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.1"
 
   block_producer_key_pass = "naughty blue worm"
 
   archive_node_count  = 3
-  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/5e78a42b8e6abd0534300d9b9540360e0d67fed0/src/app/archive/create_schema.sql" 
+  mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql" 
 
   archive_configs       = [
     {

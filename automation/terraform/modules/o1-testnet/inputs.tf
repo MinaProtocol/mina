@@ -246,6 +246,11 @@ variable "make_report_accounts" {
   default = ""
 }
 
+variable "log_precomputed_blocks" {
+  type = bool
+  default = false
+}
+
 # Archive-Postgres Vars
 
 variable "archive_node_count" {

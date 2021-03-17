@@ -38,8 +38,8 @@ echo "========================= STARTING ARCHIVE PROCESS =======================
 sleep 3
 
 # Setup and run demo-node
-PK=${PK:-B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV}
-SNARK_PK=${SNARK_PK:-B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL}
+PK=${PK:-B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
+SNARK_PK=${SNARK_PK:-B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p}
 genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
 now_time=$(date +%s)
 
@@ -48,6 +48,8 @@ export CODA_PRIVKEY_PASS=""
 export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
 MINA_CONFIG_DIR=/root/.mina-config
+
+envsubst < "$MINA_CONFIG_DIR/daemon.json.template" > "$MINA_CONFIG_DIR/daemon.json"
 
 # MINA_CONFIG_DIR is exposed by the dockerfile and contains demo mode essentials
 echo "========================= STARTING DAEMON ==========================="
@@ -59,13 +61,13 @@ echo "========================= STARTING DAEMON ==========================="
   -config-file "$MINA_CONFIG_DIR/daemon.json" \
   -genesis-ledger-dir "$MINA_CONFIG_DIR/demo-genesis" \
   -demo-mode \
-  -disable-telemetry \
+  -disable-node-status \
   -external-ip 127.0.0.1 \
   -external-port "${MINA_DAEMON_PORT:-10101}" \
   -insecure-rest-server \
   -log-level debug \
   -log-json \
-  -run-snark-worker $SNARK_PK \
+  -run-snark-worker "${SNARK_PK}" \
   -seed \
   $@
 

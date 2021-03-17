@@ -1,0 +1,4 @@
+/dns4/seed-1.devnet2.o1test.net/tcp/10000/p2p/12D3KooWJ44yJKh9PtJSoS6GASFkz5qtVboCyhiD1ZTmSV3QiSUn
+/dns4/seed-2.devnet2.o1test.net/tcp/10001/p2p/12D3KooWKRugVtsHHyktoCYGbntom6kziE9DAPhVTV1AdP84P6wb
+/dns4/seed-3.devnet2.o1test.net/tcp/10002/p2p/12D3KooWJcdhZst7gHYK4QiupZgJPBAG5g6T7d7Xd6jFRxEHRrDc
+

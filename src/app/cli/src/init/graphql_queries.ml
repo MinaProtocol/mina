@@ -353,3 +353,15 @@ mutation ($block: ExtensionalBlock!) {
   }
 }
 |}]
+
+module Send_rosetta_transaction =
+[%graphql
+{|
+mutation ($transaction: RosettaTransaction!) {
+  sendRosettaTransaction(input: $transaction) {
+    userCommand {
+      id
+    }
+  }
+}
+|}]
