@@ -20,7 +20,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ {balance= "1000"; timing= Untimed}
         ; {balance= "1000"; timing= Untimed}
         ; {balance= "1000"; timing= Untimed}
-        ; {balance= "1000"; timing= Untimed}
         ; {balance= "1000"; timing= Untimed} ]
     ; num_snark_workers= 0 }
 
