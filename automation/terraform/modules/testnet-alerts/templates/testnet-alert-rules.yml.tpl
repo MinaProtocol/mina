@@ -8,6 +8,7 @@ groups:
   rules:
   - alert: WatchdogClusterCrashes
     expr: max by (testnet) (max_over_time(Coda_watchdog_cluster_crashes ${rule_filter} [${alerting_timeframe}])) > 0.5
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -17,6 +18,7 @@ groups:
 
   - alert: WatchdogNoNewLogs
     expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) > 0
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -26,6 +28,7 @@ groups:
 
   - alert: SeedListDown
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alerting_timeframe}])) == 0
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -36,6 +39,7 @@ groups:
 
   - alert: BlockStorageBucketNoNewBlocks
     expr: min by (testnet) (min_over_time(Coda_watchdog_recent_google_bucket_blocks ${rule_filter} [${alerting_timeframe}])) >= 30*60
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -46,6 +50,7 @@ groups:
 
   - alert: ProverErrors
     expr: max by (testnet) (max_over_time(Coda_watchdog_prover_errors_total ${rule_filter} [${alerting_timeframe}])) > 0
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -55,6 +60,7 @@ groups:
 
   - alert: NodesNotSynced
     expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced ${rule_filter} [${alerting_timeframe}])) <= .5
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -65,6 +71,7 @@ groups:
 
   - alert: NodesOutOfSync
     expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alerting_timeframe}])) < .9
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -75,6 +82,7 @@ groups:
 
   - alert: LowPeerCount
     expr: min by (testnet) (Coda_Network_peers ${rule_filter}) < 3
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -84,6 +92,7 @@ groups:
 
   - alert: LowMinWindowDensity
     expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -94,6 +103,7 @@ groups:
 
   - alert: LowFillRate
     expr: min by (testnet) (Coda_Transition_frontier_slot_fill_rate ${rule_filter}) < 0.75 * 0.75
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -103,6 +113,7 @@ groups:
 
   - alert: NoTransactionsInSeveralBlocks
     expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) >= 5
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -113,6 +124,7 @@ groups:
 
   - alert: NoCoinbaseInBlocks
     expr: min by (testnet) (min_over_time(Coda_Transition_frontier_best_tip_coinbase ${rule_filter} [10m])) < 1
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -123,6 +135,7 @@ groups:
 
   - alert: LongFork
     expr: max by (testnet) (Coda_Transition_frontier_longest_fork ${rule_filter}) >= 16
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -133,6 +146,7 @@ groups:
 
   - alert: OldBestTip
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 15 * 180
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -143,6 +157,7 @@ groups:
 
   - alert: NoNewSnarks
     expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec ${rule_filter}) >= 2 * 180
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -153,6 +168,7 @@ groups:
 
   - alert: NoNewTransactions
     expr: min by (testnet) ((time() - 1609459200) - Coda_Transaction_pool_useful_transactions_received_time_sec ${rule_filter}) >= 2 * 180
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -163,6 +179,7 @@ groups:
 
   - alert: HighUnparentedBlockCount
     expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alerting_timeframe}])) > 30
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -172,6 +189,7 @@ groups:
 
   - alert: HighMissingBlockCount
     expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alerting_timeframe}])) > 30
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -183,6 +201,7 @@ groups:
   rules:
   - alert: HighBlockGossipLatency
     expr: max by (testnet) (max_over_time(Coda_Block_latency_gossip_time ${rule_filter} [${alerting_timeframe}])) > 200
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -193,6 +212,7 @@ groups:
 
   - alert: SomewhatOldBestTip
     expr: count by (testnet) (((time() - 1609459200) - Coda_Transition_frontier_best_tip_slot_time_sec ${rule_filter}) >= 8 * 180) > 1
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -203,6 +223,7 @@ groups:
 
   - alert: MediumFork
     expr: max by (testnet) (Coda_Transition_frontier_longest_fork ${rule_filter}) >= 8
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -212,6 +233,7 @@ groups:
 
   - alert: NoTransactionsInAtLeastOneBlock
     expr: max by (testnet) (max_over_time(Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter} [${alerting_timeframe}])) > 0
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -221,6 +243,7 @@ groups:
 
   - alert: SeedListDegraded
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alerting_timeframe}])) <= 0.5
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -230,6 +253,7 @@ groups:
 
   - alert: FewBlocksPerHour
     expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alerting_timeframe}])) < 1
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -239,6 +263,7 @@ groups:
 
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alerting_timeframe}])) < 1
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -248,6 +273,7 @@ groups:
 
   - alert: UnparentedBlocksObserved
     expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alerting_timeframe}])) > 1
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -257,6 +283,7 @@ groups:
 
   - alert: MissingBlocksObserved
     expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alerting_timeframe}])) > 0
+    for: ${alerting_timeframe}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
