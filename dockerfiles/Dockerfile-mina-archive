@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
 
 COPY scripts/archive-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Dependencies
 RUN apt-get -y update && \
