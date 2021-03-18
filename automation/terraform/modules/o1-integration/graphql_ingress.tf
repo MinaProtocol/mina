@@ -1,4 +1,5 @@
 resource "kubernetes_ingress" "testnet_graphql_ingress" {
+  count = var.deploy_graphql_ingress ? 1 : 0
   depends_on = [
     module.kubernetes_testnet.testnet_namespace,
     module.kubernetes_testnet.seeds_release,
@@ -39,11 +40,12 @@ resource "kubernetes_ingress" "testnet_graphql_ingress" {
 }
 
 resource "aws_route53_record" "testnet_graphql_dns" {
+  count = var.deploy_graphql_ingress ? 1 : 0
   depends_on = [kubernetes_ingress.testnet_graphql_ingress]
 
   zone_id = var.aws_route53_zone_id
   name    = "*.${local.base_graphql_dns}"
   type    = "A"
   ttl     = "300"
-  records = [kubernetes_ingress.testnet_graphql_ingress.status[0].load_balancer[0].ingress[0].ip]
+  records = [kubernetes_ingress.testnet_graphql_ingress[0].status[0].load_balancer[0].ingress[0].ip]
 }

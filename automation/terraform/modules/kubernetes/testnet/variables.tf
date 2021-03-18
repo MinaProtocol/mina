@@ -26,6 +26,11 @@ variable "use_local_charts" {
   default = false
 }
 
+variable "healthcheck_enabled" {
+  type    = bool
+  default = true
+}
+
 variable "deploy_watchdog" {
   type    = bool
   default = true
@@ -44,6 +49,11 @@ variable "coda_archive_image" {
 variable "mina_archive_schema" {
   type    = string
   default = ""
+}
+
+variable "archive_node_count" {
+  type    = number
+  default = 0
 }
 
 variable "coda_agent_image" {
@@ -131,6 +141,11 @@ variable "log_level" {
 }
 
 variable "log_snark_work_gossip" {
+  type    = bool
+  default = false
+}
+
+variable "log_precomputed_blocks" {
   type    = bool
   default = false
 }

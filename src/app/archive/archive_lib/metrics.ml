@@ -15,7 +15,7 @@ let default_missing_blocks_width = 2000
 module Max_block_height = struct
   let query =
     Caqti_request.find Caqti_type.unit Caqti_type.int
-      "SELECT MAX(height) FROM blocks"
+      "SELECT GREATEST(0, MAX(height)) FROM blocks"
 
   let update (module Conn : Caqti_async.CONNECTION) metric_server =
     time ~label:"max_block_height" (fun () ->
