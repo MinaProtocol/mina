@@ -83,7 +83,9 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
     if parent in parents:
       last_n_protocol_states.append(parents[parent])
 
-  synced_near_best_tip_num = [ p['protocol_state_hash'] in last_n_protocol_states for p in peers.values() ]
+  any_hash_in_last_n = lambda peer: any([ p_hash in last_n_protocol_states for p_hash, _ in peer['k_block_hashes_and_timestamps'][-n:] ])
+
+  synced_near_best_tip_num = [ any_hash_in_last_n(peer) for p in peers.values() ]
   synced_near_best_tip_fraction = sum(synced_near_best_tip_num) / len(peers.values())
 
   nodes_synced_near_best_tip.set(synced_near_best_tip_fraction)
