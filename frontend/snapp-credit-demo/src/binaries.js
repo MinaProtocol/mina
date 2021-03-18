@@ -17,6 +17,7 @@ const linuxPath = path.join(
 const macPath = path.join(
   path.dirname(app.getAppPath()),
   "../",
+  "../",
   "./Contents",
   "./Resources",
   "./Resources",
