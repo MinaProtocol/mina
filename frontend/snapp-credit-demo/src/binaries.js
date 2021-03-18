@@ -2,11 +2,10 @@
 
 const path = require("path");
 const { app } = require("electron");
-
 const { isPackaged } = app;
-const root = process.cwd();
 
 const isMac = process.platform === "darwin" ? true : false;
+
 const linuxPath = path.join(
   path.dirname(app.getAppPath()),
   "../",
@@ -14,6 +13,7 @@ const linuxPath = path.join(
   "./Resources",
   "./bin"
 );
+
 const macPath = path.join(
   path.dirname(app.getAppPath()),
   "../",
@@ -28,7 +28,7 @@ let binariesPath;
 if (isPackaged) {
   binariesPath = isMac ? macPath : linuxPath;
 } else {
-  binariesPath = path.join(root, "./resources", "./bin");
+  binariesPath = path.join(process.cwd(), "./resources", "./bin");
 }
 
 const execPath = path.resolve(

@@ -135,7 +135,3 @@ ipcRenderer.on(CREDIT_FAIL, () => {
   hideProgressSpinner();
   localStorage.setItem("loading", false);
 });
-
-ipcRenderer.on("debug", (_, { execPath }) => {
-  setProgressStatusText(`Binary located at: ${execPath}`);
-});
