@@ -15,7 +15,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let config =
     let open Test_config in
     { default with
-      block_producers=
+      requires_graphql= true
+    ; block_producers=
         [ {balance= "1000"; timing= Untimed}
         ; {balance= "1000"; timing= Untimed}
         ; {balance= "1000"; timing= Untimed}
@@ -59,7 +60,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           wait_for t @@ Wait_condition.node_to_initialize bp )
     in
     [%log info]
-      "common prefix test: waiting for 15 blocks to be produced on the network" ;
+      "common prefix test: waiting for 10 blocks to be produced on the network" ;
     let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 10) in
     [%log info] "common prefix test: collecting best chains from nodes" ;
     let%bind chains =
