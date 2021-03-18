@@ -40,7 +40,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       requires_graphql= true
     ; block_producers=
         [ {balance= block_producer_balance; timing= timing1}
-        ; {balance= block_producer_balance; timing= timing2} ] }
+        ; {balance= block_producer_balance; timing= timing2} ]
+    ; num_snark_workers= 0 }
 
   let expected_error_event_reprs =
     let open Network_pool.Transaction_pool in
