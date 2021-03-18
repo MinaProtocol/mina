@@ -232,7 +232,7 @@ pub fn mul_init(x: &Block, y: &Block) -> Block
 
 pub fn init_table() -> Vec<Fp>
 {
-    let mut table = vec![Fp::zero(); 0x10000];
+    let mut table = vec![Fp::zero(); 0x20000];
 
     // init GF(2^8) XOR and GF(2^128) multiplication tables
     for x in 0..0x100 {for y in 0..0x100
@@ -241,8 +241,6 @@ pub fn init_table() -> Vec<Fp>
         let xor: u64 = 1 + ((x as u64) << 8) + ((y as u64) << 16) + (((x ^ y) as u64) << 24);
         table[y | (x << 8)] = Fp::from(xor);
     }}
-    table[0xffff] = Fp::zero();
-    return table;
     // init GF(2^8) XOR and GF(2^128) multiplication tables
     for x in 0..0x100 {for y in 0..0x100
     {
@@ -253,9 +251,11 @@ pub fn init_table() -> Vec<Fp>
             let mut yy: Block = [0; 16]; yy[0] = y as u8;
             mul_init(&xx, &yy)
         };
-        let mul: u64 = 2 + ((x as u64) << 8) + ((y as u64) << 16) + ((mul[1] as u64) << 24) + ((mul[0] as u64) << 32);
+        let mul: u64 = (x as u64) + ((y as u64) << 8) + ((mul[0] as u64) << 16) + ((mul[1] as u64) << 24);
         table[y | (x << 8) + 0x10000] = Fp::from(mul);
     }}
+    table[0x1ffff] = Fp::zero();
+    return table;
     // GF(2^128) multiplication
     for x in 0..0x100
     {

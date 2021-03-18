@@ -21,7 +21,13 @@ let%test_module "backend test" =
 
         Random.full_init [|7|];
         let rec add x n = if n < 1 then x else add (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
-        let y = add (Impl.Field.of_int (Random.int 255)) 50001 in
+        let rec mul (x, y) n = if n < 1 then (x, y) else mul (Bytes.mul x y) Int.(n - 1) in
+
+        let y = add (Impl.Field.of_int (Random.int 255)) 60000 in
+        let (a, b) = mul ((Impl.Field.of_int (Random.int 255)), (Impl.Field.of_int (Random.int 255))) 60000 in
+
+        assert_ (Snarky.Constraint.equal a a);
+        assert_ (Snarky.Constraint.equal b b);
         assert_ (Snarky.Constraint.equal y y);
 
         for j = 0 to 0 do
