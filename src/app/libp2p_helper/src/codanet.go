@@ -503,7 +503,11 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	}
 
 	for _, p := range peers {
-		h.pxDiscoveries <- p
+		select {
+		case h.pxDiscoveries <- p:
+		default:
+			logger.Debugf("peer discoveries channel full; dropping peer %v", p)
+		}
 	}
 }
 
@@ -654,7 +658,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return h, nil
 	}
 
-	h.pxDiscoveries = make(chan peer.AddrInfo)
+	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections * 3)
 	for w := 0; w < numPxConnectionWorkers; w++ {
 		go h.pxConnectionWorker()
 	}
