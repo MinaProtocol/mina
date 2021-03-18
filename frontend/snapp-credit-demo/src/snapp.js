@@ -31,22 +31,24 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
     true
   );
 
+  mainWindow.webContents.send("debug", { execPath });
+
   if (!outputPath || !creditScore) {
-    mainWindow.webContents.send(PROOF_FAIL);
+    //mainWindow.webContents.send(PROOF_FAIL);
     return;
   }
 
   if (parseInt(creditScore) < CREDIT_SCORE) {
-    mainWindow.webContents.send(CREDIT_FAIL);
+    //mainWindow.webContents.send(CREDIT_FAIL);
   }
 
   exec(
     execSnappCommand(execPath, outputPath, ethAddress, creditScore),
     (error) => {
       if (error) {
-        mainWindow.webContents.send(PROOF_FAIL);
+        //mainWindow.webContents.send(PROOF_FAIL);
       } else {
-        mainWindow.webContents.send(PROOF_SUCCESS);
+        //mainWindow.webContents.send(PROOF_SUCCESS);
       }
     }
   );
