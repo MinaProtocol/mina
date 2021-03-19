@@ -20,6 +20,14 @@ locals {
     logPrecomputedBlocks = var.log_precomputed_blocks
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
+    exposeGraphql        = var.expose_graphql
+  }
+
+  healthcheck_vars = {
+    enabled             = var.healthcheck_enabled
+    failureThreshold    = 60
+    periodSeconds       = 5
+    initialDelaySeconds = 30
   }
 
   seed_vars = {
@@ -40,7 +48,10 @@ locals {
       }
       seedPeersURL         = var.seed_peers_url
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+      exposeGraphql        = var.expose_graphql
     }
+
+    healthcheck = local.healthcheck_vars
 
     seedConfigs = [
       for index, config in var.seed_configs : {
@@ -60,6 +71,8 @@ locals {
     testnetName = var.testnet_name
 
     coda = local.coda_vars
+
+    healthcheck = local.healthcheck_vars
 
     userAgent = {
       image         = var.coda_agent_image
@@ -106,6 +119,7 @@ locals {
         runtimeConfig = local.coda_vars.runtimeConfig
         seedPeersURL  = var.seed_peers_url
       }
+      healthcheck = local.healthcheck_vars
       archive     = item
       postgresql = {
         persistence = {
@@ -139,6 +153,7 @@ locals {
   snark_worker_vars = {
     testnetName = var.testnet_name
     coda        = local.coda_vars
+    healthcheck = local.healthcheck_vars
     worker = {
       active      = var.snark_worker_replicas > 0
       numReplicas = var.snark_worker_replicas
