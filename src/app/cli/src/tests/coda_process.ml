@@ -167,30 +167,8 @@ let stop_snark_worker (conn, _, _) =
     ~f:Coda_worker.functions.stop_snark_worker ~arg:()
 
 let disconnect ((conn, proc, _) as t) ~logger =
-  (* Handle implicit raciness in the wait syscall by calling [Process.wait]
-     early, so that its value will be correctly cached when we actually need
-     it.
-  *)
-  ( match
-      Or_error.try_with (fun () ->
-          (* Eagerly force [Process.wait], so that it won't be captured
-             elsewhere on exit.
-          *)
-          let waiting = Process.wait proc in
-          don't_wait_for
-            ( match%map Monitor.try_with_or_error (fun () -> waiting) with
-            | Ok _ ->
-                ()
-            | Error err ->
-                [%log error]
-                  "Saw a deferred exception $exn while waiting for process"
-                  ~metadata:[("exn", Error_json.error_to_yojson err)] ) )
-    with
-  | Ok _ ->
-      ()
-  | Error err ->
-      [%log error] "Saw an exception $exn while waiting for process"
-        ~metadata:[("exn", Error_json.error_to_yojson err)] ) ;
+  Child_processes.Termination.wait_for_process_log_errors ~logger proc
+    ~module_:__MODULE__ ~location:__LOC__ ;
   (* This kills any straggling snark worker process *)
   let%bind () =
     match%map Monitor.try_with (fun () -> stop_snark_worker t) with
