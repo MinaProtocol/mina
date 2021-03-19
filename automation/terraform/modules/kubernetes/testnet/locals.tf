@@ -20,6 +20,7 @@ locals {
     logPrecomputedBlocks = var.log_precomputed_blocks
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
+    exposeGraphql        = var.expose_graphql
   }
 
   healthcheck_vars = {
@@ -47,6 +48,7 @@ locals {
       }
       seedPeersURL         = var.seed_peers_url
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
+      exposeGraphql        = var.expose_graphql
     }
 
     healthcheck = local.healthcheck_vars

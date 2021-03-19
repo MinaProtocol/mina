@@ -21,6 +21,11 @@ variable "k8s_context" {
 
 # Global Vars
 
+variable "expose_graphql" {
+  type    = bool
+  default = false
+}
+
 variable "use_local_charts" {
   type    = bool
   default = false
