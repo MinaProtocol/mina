@@ -28,7 +28,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let check_common_prefixes ?number_of_blocks:(n = 3) chains =
     let recent_chains =
       List.map chains ~f:(fun chain ->
-          List.take chain n |> Hash_set.of_list (module String) )
+          List.take (List.rev chain) n |> Hash_set.of_list (module String) )
     in
     let common_prefixes =
       List.fold ~f:Hash_set.inter
