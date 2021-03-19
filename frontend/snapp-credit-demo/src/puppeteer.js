@@ -52,11 +52,19 @@ let scrapeSpecifiedDomain = ({ email, password, browser, url }) => {
       const creditScore = await page.evaluate(() => {
         const creditContainer = document.querySelector(".score-dial");
         // Return credit score value
-        return creditContainer?.children[3].textContent;
+        for (let i = 0; i < creditContainer.children.length; i++) {
+          const child = creditContainer.children[i];
+          if (child.textContent > 0 && child.textContent < 850) {
+            return child.textContent;
+          }
+        }
+        return 0;
       });
       return resolve(creditScore);
     } catch (err) {
       return reject(err);
+    } finally {
+      await page.close();
     }
   });
 };
