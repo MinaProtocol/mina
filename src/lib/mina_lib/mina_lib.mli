@@ -35,6 +35,10 @@ val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 val replace_block_production_keypairs :
   t -> Keypair.And_compressed_pk.Set.t -> unit
 
+val coinbase_receiver : t -> Consensus.Coinbase_receiver.t
+
+val replace_coinbase_receiver : t -> Consensus.Coinbase_receiver.t -> unit
+
 val next_producer_timing :
   t -> Daemon_rpcs.Types.Status.Next_producer_timing.t option
 

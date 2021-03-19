@@ -2,8 +2,10 @@ module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
 
-  use_local_charts = true
-  deploy_watchdog  = false
+  use_local_charts    = true
+  expose_graphql      = var.deploy_graphql_ingress
+  healthcheck_enabled = false
+  deploy_watchdog     = false
 
   cluster_name   = var.cluster_name
   cluster_region = var.cluster_region

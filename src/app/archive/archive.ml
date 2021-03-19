@@ -5,7 +5,7 @@ open Cli_lib
 let command_run =
   let open Command.Let_syntax in
   Command.async
-    ~summary:"Run an archive process that can store all of the data of Coda"
+    ~summary:"Run an archive process that can store all of the data of Mina"
     (let%map_open log_json = Flag.Log.json
      and log_level = Flag.Log.level
      and server_port = Flag.Port.Archive.server
