@@ -73,6 +73,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           , `List
               (List.map chains ~f:(fun chain ->
                    `List (List.map chain ~f:(fun hash -> `String hash)) )) ) ]
-      "common prefix test: successfully made graphql query." ;
+      "common prefix test: successfully collected best chains" ;
     check_common_prefixes chains
 end
