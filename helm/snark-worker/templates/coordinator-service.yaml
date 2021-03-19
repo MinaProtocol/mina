@@ -21,6 +21,7 @@ spec:
     port: {{ .Values.coda.ports.client }}
     targetPort: client-port
 ---
+{{- if .Values.coda.exposeGraphql }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -34,5 +35,6 @@ spec:
   - name: http-graphql
     protocol: TCP
     port: {{ .Values.coda.ports.graphql }}
+{{- end }}
 ---
 {{ end }}

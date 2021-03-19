@@ -13,6 +13,7 @@ coda:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+  exposeGraphql: false
 
 seed:
   active: true
