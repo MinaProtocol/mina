@@ -82,6 +82,7 @@ type pipes =
            -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
               , string )
               Result.t)
+        * (Account_id.t -> Account.t option Participating_state.T.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -111,7 +112,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; coinbase_receiver: Consensus.Coinbase_receiver.t
+  ; coinbase_receiver: Consensus.Coinbase_receiver.t ref
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t
@@ -145,6 +146,19 @@ let client_port t =
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
   let public_keys, _ = Agent.get t.block_production_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
+
+let coinbase_receiver t = !(t.coinbase_receiver)
+
+let replace_coinbase_receiver t coinbase_receiver =
+  [%log' info t.config.logger]
+    "Changing the coinbase receiver for produced blocks from $old_receiver to \
+     $new_receiver"
+    ~metadata:
+      [ ( "old_receiver"
+        , Consensus.Coinbase_receiver.to_yojson !(t.coinbase_receiver) )
+      ; ( "new_receiver"
+        , Consensus.Coinbase_receiver.to_yojson coinbase_receiver ) ] ;
+  t.coinbase_receiver := coinbase_receiver
 
 let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
@@ -747,7 +761,7 @@ let get_current_nonce t aid =
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t)
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1330,9 +1344,10 @@ let create ?wallets (config : Config.t) =
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (input_list, result_cb, get_current_nonce) ->
+            ~f:(fun (input_list, result_cb, get_current_nonce, get_account) ->
               match%bind
                 User_command_input.to_user_commands ~get_current_nonce
+                  ~get_account ~constraint_constants ~logger:config.logger
                   input_list
               with
               | Ok user_commands ->
@@ -1647,7 +1662,7 @@ let create ?wallets (config : Config.t) =
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
-            ; coinbase_receiver= config.coinbase_receiver
+            ; coinbase_receiver= ref config.coinbase_receiver
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status

@@ -33,7 +33,8 @@ in
             ],
         label = "Build test-executive",
         key = "build-test-executive",
-        target = Size.XLarge
+        target = Size.XLarge,
+        if = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       },
 
   execute = \(testName : Text) -> \(dependsOn : List Command.TaggedKey.Type) ->
@@ -50,9 +51,10 @@ in
               Cmd.run "source ${deployEnv} && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
-        label = "Execute integration test: ${testName}",
+        label = "${testName} integration test",
         key = "integration-test-${testName}",
         target = Size.Medium,
-        depends_on = dependsOn
+        depends_on = dependsOn,
+        if = Some "build.branch != 'develop' && build.branch != 'compatible' && build.branch != 'develop-next'"
       }
 }

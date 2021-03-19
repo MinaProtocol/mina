@@ -128,6 +128,17 @@ mutation ($public_key: PublicKey) {
   }
 |}]
 
+module Set_coinbase_receiver =
+[%graphql
+{|
+mutation ($public_key: PublicKey) {
+  setCoinbaseReceiver(input : {publicKey: $public_key}) {
+    lastCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
+    currentCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
+    }
+  }
+|}]
+
 module Set_snark_worker =
 [%graphql
 {|

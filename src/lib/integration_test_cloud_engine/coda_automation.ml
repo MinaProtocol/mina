@@ -38,6 +38,7 @@ module Network_config = struct
     ; cluster_region: string
     ; aws_route53_zone_id: string
     ; testnet_name: string
+    ; deploy_graphql_ingress: bool
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -47,6 +48,9 @@ module Network_config = struct
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs: block_producer_config list
+    ; log_precomputed_blocks: bool
+    ; archive_node_count: int
+    ; mina_archive_schema: string
     ; snark_worker_replicas: int
     ; snark_worker_fee: string
     ; snark_worker_public_key: string }
@@ -75,8 +79,11 @@ module Network_config = struct
         ; slots_per_sub_window
         ; proof_level
         ; txpool_max_size
+        ; requires_graphql
         ; block_producers
         ; num_snark_workers
+        ; num_archive_nodes
+        ; log_precomputed_blocks
         ; snark_worker_fee
         ; snark_worker_public_key } =
       test_config
@@ -167,7 +174,9 @@ module Network_config = struct
             ; slots_per_sub_window= Some slots_per_sub_window
             ; genesis_state_timestamp=
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ())) }
-      ; proof= Some proof_config (* TODO: prebake ledger and only set hash *)
+      ; proof=
+          None
+          (* was: Some proof_config; TODO: prebake ledger and only set hash *)
       ; ledger=
           Some
             { base= Accounts runtime_accounts
@@ -196,6 +205,9 @@ module Network_config = struct
       ; private_key= keypair.private_key_file
       ; libp2p_secret= "" }
     in
+    let mina_archive_schema =
+      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+    in
     (* NETWORK CONFIG *)
     { coda_automation_location= cli_inputs.coda_automation_location
     ; debug_arg= debug
@@ -206,14 +218,18 @@ module Network_config = struct
         ; cluster_region
         ; k8s_context= cluster_id
         ; testnet_name
+        ; deploy_graphql_ingress= requires_graphql
         ; coda_image= images.coda
         ; coda_agent_image= images.user_agent
         ; coda_bots_image= images.bots
         ; coda_points_image= images.points
-        ; coda_archive_image= ""
+        ; coda_archive_image= images.archive_node
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_configs=
             List.mapi block_producer_keypairs ~f:block_producer_config
+        ; log_precomputed_blocks
+        ; archive_node_count= num_archive_nodes
+        ; mina_archive_schema
         ; snark_worker_replicas= num_snark_workers
         ; snark_worker_public_key
         ; snark_worker_fee
@@ -273,6 +289,7 @@ module Network_manager = struct
     ; seed_nodes: Kubernetes_network.Node.t list
     ; block_producer_nodes: Kubernetes_network.Node.t list
     ; snark_coordinator_nodes: Kubernetes_network.Node.t list
+    ; archive_nodes: Kubernetes_network.Node.t list
     ; nodes_by_app_id: Kubernetes_network.Node.t String.Map.t
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
@@ -308,15 +325,15 @@ module Network_manager = struct
                  "Existing namespace of same name detected; removing to start \
                   clean")
         in
-        let%bind () =
-          Util.run_cmd_exn "/" "kubectl"
-            ["delete"; "namespace"; network_config.terraform.testnet_name]
-          >>| Fn.const ()
-        in
-        if%bind File_system.dir_exists testnet_dir then (
-          [%log info] "Old terraform directory found; removing to start clean" ;
-          File_system.remove_dir testnet_dir )
-        else return ()
+        Util.run_cmd_exn "/" "kubectl"
+          ["delete"; "namespace"; network_config.terraform.testnet_name]
+        >>| Fn.const ()
+      else return ()
+    in
+    let%bind () =
+      if%bind File_system.dir_exists testnet_dir then (
+        [%log info] "Old terraform directory found; removing to start clean" ;
+        File_system.remove_dir testnet_dir )
       else return ()
     in
     [%log info] "Writing network configuration" ;
@@ -341,10 +358,12 @@ module Network_manager = struct
       Network_config.testnet_log_filter network_config
     in
     let cons_node pod_id network_keypair_opt =
-      { testnet_name= network_config.terraform.testnet_name
-      ; Kubernetes_network.Node.cluster= cluster_id
+      { Kubernetes_network.Node.testnet_name=
+          network_config.terraform.testnet_name
+      ; cluster= cluster_id
       ; namespace= network_config.terraform.testnet_name
       ; pod_id
+      ; graphql_enabled= network_config.terraform.deploy_graphql_ingress
       ; network_keypair= network_keypair_opt }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
@@ -356,15 +375,24 @@ module Network_manager = struct
             (String.length network_config.terraform.snark_worker_public_key - 6)
           ~len:6
     in
-    let snark_coordinator_nodes = [cons_node snark_coordinator_name None] in
+    let snark_coordinator_nodes =
+      if network_config.terraform.snark_worker_replicas > 0 then
+        [cons_node snark_coordinator_name None]
+      else []
+    in
     let block_producer_nodes =
       List.map network_config.terraform.block_producer_configs
         ~f:(fun bp_config -> cons_node bp_config.name (Some bp_config.keypair)
       )
     in
+    let archive_nodes =
+      List.init network_config.terraform.archive_node_count ~f:(fun i ->
+          cons_node (sprintf "archive-%d" (i + 1)) None )
+    in
     let nodes_by_app_id =
       let all_nodes =
         seed_nodes @ snark_coordinator_nodes @ block_producer_nodes
+        @ archive_nodes
       in
       all_nodes
       |> List.map ~f:(fun node -> (node.pod_id, node))
@@ -380,6 +408,7 @@ module Network_manager = struct
       ; seed_nodes
       ; block_producer_nodes
       ; snark_coordinator_nodes
+      ; archive_nodes
       ; nodes_by_app_id
       ; deployed= false
       ; keypairs=
@@ -398,9 +427,10 @@ module Network_manager = struct
     let result =
       { Kubernetes_network.namespace= t.namespace
       ; constants= t.constants
+      ; seeds= t.seed_nodes
       ; block_producers= t.block_producer_nodes
       ; snark_coordinators= t.snark_coordinator_nodes
-      ; archive_nodes= []
+      ; archive_nodes= t.archive_nodes
       ; nodes_by_app_id= t.nodes_by_app_id
       ; testnet_log_filter= t.testnet_log_filter
       ; keypairs= t.keypairs }
