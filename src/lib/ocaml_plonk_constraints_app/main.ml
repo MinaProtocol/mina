@@ -23,13 +23,13 @@ let%test_module "backend test" =
         let rec add x n = if n < 1 then x else add (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
         let rec mul (x, y) n = if n < 1 then (x, y) else mul (Bytes.mul x y) Int.(n - 1) in
 
-        let y = add (Impl.Field.of_int (Random.int 255)) 125000 in
-        let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 125000 in
+        let y = add (Impl.Field.of_int (Random.int 255)) 75357 in
+        let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 75357 in
 
         assert_ (Snarky.Constraint.equal a a);
         assert_ (Snarky.Constraint.equal b b);
-(*
-        for j = 0 to 0 do
+
+        for j = 0 to 37 do
 
           (***** PACKING *****)
 
@@ -68,7 +68,7 @@ let%test_module "backend test" =
           assert_ (Snarky.Constraint.equal (y4*y4) (x4*x4*x4 + (Impl.Field.of_int 5)));
 
         done;
-*)
+
         ()
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
