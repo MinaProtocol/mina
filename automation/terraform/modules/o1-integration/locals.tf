@@ -32,7 +32,7 @@ locals {
     enableLocalDaemon       = true
     enablePostgresDB        = true
 
-    postgresHost            = "archive-1-postgresql"
+    postgresHost            = "archive-1-postgresql-0"
     postgresPort            = 5432
     postgresDB              = "archive"
     postgresqlUsername      = "postgres"
@@ -49,7 +49,7 @@ locals {
   archive_node_configs = var.archive_configs != null ? [for item in var.archive_configs : merge(local.default_archive_node, item)] : [
     for i in range(1, var.archive_node_count + 1) : merge(local.default_archive_node, {
       name              = "archive-${i}"
-      postgresHost      = "archive-${i}-postgresql"
+      postgresHost      = "archive-${i}-postgresql-0"
     })
   ]
 
