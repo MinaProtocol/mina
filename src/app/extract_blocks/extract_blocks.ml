@@ -340,53 +340,53 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
           | None, Some end_state_hash ->
               [%log info]
                 "Querying for subchain to end block with given state hash" ;
-              query_db pool
-                ~f:(fun db ->
-                  Sql.Subchain.start_from_unparented db ~end_state_hash )
-                ~item:"blocks starting from unparented"
+              let%map blocks =
+                query_db pool
+                  ~f:(fun db ->
+                    Sql.Subchain.start_from_unparented db ~end_state_hash )
+                  ~item:"blocks starting from unparented"
+              in
+              let end_block_found =
+                List.exists blocks ~f:(fun block ->
+                    String.equal block.state_hash end_state_hash )
+              in
+              if not end_block_found then (
+                [%log error]
+                  "No subchain available from an unparented block (possibly \
+                   the genesis block) to block with given end state hash" ;
+                Core.exit 1 ) ;
+              blocks
           | Some start_state_hash, Some end_state_hash ->
               [%log info]
                 "Querying for subchain from start block to end block with \
                  given state hashes" ;
-              query_db pool
-                ~f:(fun db ->
-                  Sql.Subchain.start_from_specified db ~start_state_hash
-                    ~end_state_hash )
-                ~item:"blocks starting from specified"
-          | _ ->
-              (* unreachable *)
-              failwith "Unexpected flag combination"
-      in
-      ( match end_state_hash_opt with
-      | None ->
-          (* all blocks *)
-          ()
-      | Some end_state_hash -> (
-          (* some blocks, check whether we have the desired chain *)
-          let end_block_found =
-            List.exists blocks ~f:(fun block ->
-                String.equal block.state_hash end_state_hash )
-          in
-          match start_state_hash_opt with
-          | Some state_hash ->
-              if
-                not
-                  ( end_block_found
-                  && List.exists blocks ~f:(fun block ->
-                         String.equal block.state_hash state_hash ) )
-              then (
+              let%map blocks =
+                query_db pool
+                  ~f:(fun db ->
+                    Sql.Subchain.start_from_specified db ~start_state_hash
+                      ~end_state_hash )
+                  ~item:"blocks starting from specified"
+              in
+              let start_block_found =
+                List.exists blocks ~f:(fun block ->
+                    String.equal block.state_hash start_state_hash )
+              in
+              let end_block_found =
+                List.exists blocks ~f:(fun block ->
+                    String.equal block.state_hash end_state_hash )
+              in
+              if not (start_block_found && end_block_found) then (
                 [%log error]
                   "No subchain with given start and end state hashes \
                    available; try omitting the start state hash, to get a \
                    chain from an unparented block to the block with the end \
                    state hash" ;
-                Core.exit 1 )
-          | None ->
-              if not end_block_found then (
-                [%log error]
-                  "No subchain available from an unparented block (possibly \
-                   the genesis block) to block with given end state hash" ;
-                Core.exit 1 ) ) ) ;
+                Core.exit 1 ) ;
+              blocks
+          | _ ->
+              (* unreachable *)
+              failwith "Unexpected flag combination"
+      in
       let%bind extensional_blocks =
         Deferred.List.map blocks ~f:(fill_in_block pool)
       in
