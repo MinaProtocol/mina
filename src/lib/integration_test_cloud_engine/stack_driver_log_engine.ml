@@ -132,6 +132,11 @@ module Subscription = struct
     | None ->
         Deferred.Or_error.ok_unit
 
+  let resource_names name : t =
+    let topic = name ^ "_topic" in
+    let sink = name ^ "_sink" in
+    {name; topic; sink}
+
   let create ~name ~filter ~logger =
     let open Deferred.Or_error.Let_syntax in
     let gcloud_key_file_env = "GCLOUD_API_KEY" in
@@ -159,15 +164,14 @@ module Subscription = struct
         ; "--topic-project"
         ; project_id ]
     in
-    let topic = name ^ "_topic" in
-    let sink = name ^ "_sink" in
-    let%bind _ = create_topic topic in
-    let%bind _ = create_sink ~topic ~filter ~key ~logger sink in
-    let%map _ = create_subscription name topic in
+    let t = resource_names name in
+    let%bind _ = create_topic t.topic in
+    let%bind _ = create_sink ~topic:t.topic ~filter ~key ~logger t.sink in
+    let%map _ = create_subscription name t.topic in
     [%log debug]
       "Succesfully created subscription \"$name\" to topic \"$topic\""
-      ~metadata:[("name", `String name); ("topic", `String topic)] ;
-    {name; topic; sink}
+      ~metadata:[("name", `String name); ("topic", `String t.topic)] ;
+    t
 
   let delete t =
     let open Deferred.Let_syntax in
@@ -186,6 +190,25 @@ module Subscription = struct
     Or_error.combine_errors
       [delete_subscription_res; delete_sink_res; delete_topic_res]
     |> Or_error.map ~f:(Fn.const ())
+
+  let cleanup name =
+    let t = resource_names name in
+    delete t
+
+  let create_with_retry ~name ~filter ~logger =
+    let open Deferred.Let_syntax in
+    let create () = create ~logger ~name ~filter in
+    match%bind create () with
+    | Error e ->
+        [%log error]
+          "Failed to created stackdriver subscription: $error. Cleaning up \
+           existing pubsub resources (topic, subscription, sink) and \
+           retrying.."
+          ~metadata:[("error", `String (Error.to_string_hum e))] ;
+        let%bind _ = cleanup name in
+        create ()
+    | Ok res ->
+        Deferred.Or_error.return res
 
   let pull ~logger t =
     let open Deferred.Or_error.Let_syntax in
@@ -278,7 +301,8 @@ let create ~logger ~(network : Kubernetes_network.t) =
     String.concat filters ~sep:"\n"
   in
   let%map subscription =
-    Subscription.create ~logger ~name:network.namespace ~filter:log_filter
+    Subscription.create_with_retry ~logger ~name:network.namespace
+      ~filter:log_filter
   in
   [%log info] "Event subscription created" ;
   let event_reader, event_writer = Pipe.create () in
