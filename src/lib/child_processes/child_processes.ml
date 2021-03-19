@@ -279,6 +279,30 @@ let start_custom :
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
+  (* Handle implicit raciness in the wait syscall by calling [Process.wait]
+     early, so that its value will be correctly cached when we actually need
+     it.
+  *)
+  ( match
+      Or_error.try_with (fun () ->
+          (* Eagerly force [Process.wait], so that it won't be captured
+             elsewhere on exit.
+          *)
+          let waiting = Process.wait process in
+          don't_wait_for
+            ( match%map.Async Monitor.try_with_or_error (fun () -> waiting) with
+            | Ok _ ->
+                ()
+            | Error err ->
+                [%log error]
+                  "Saw a deferred exception $exn while waiting for process"
+                  ~metadata:[("exn", Error_json.error_to_yojson err)] ) )
+    with
+  | Ok _ ->
+      ()
+  | Error err ->
+      [%log error] "Saw an exception $exn while waiting for process"
+        ~metadata:[("exn", Error_json.error_to_yojson err)] ) ;
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ Async.Writer.save lock_path
