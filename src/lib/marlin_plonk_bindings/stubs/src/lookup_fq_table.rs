@@ -314,5 +314,6 @@ pub fn init_table() -> Vec<Fq>
         let mul: u64 = 12 + ((x as u64) << 8) + ((Rcon[x as usize] as u64) << 16);
         table[x as usize + 0x20900] = Fq::from(mul);
     }
+    table.sort_unstable();
     table
 }

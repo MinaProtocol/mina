@@ -2,6 +2,7 @@
 #![allow(non_upper_case_globals)]
 
 use algebra::{pasta::Fp, Zero};
+use std::cmp::Ordering;
 
 // GF(2^128) multiplication
 const MUL: [u16; 0x100] =
@@ -230,9 +231,12 @@ pub fn mul_init(x: &Block, y: &Block) -> Block
     z.to_be_bytes()
 }
 
+const DOMAIN_SIZE: usize = 0x40000;
+
 pub fn init_table() -> Vec<Fp>
 {
-    let mut table = vec![Fp::zero(); 0x20000];
+    let z = Fp::zero();
+    let mut table = vec![z; DOMAIN_SIZE];
 
     // init GF(2^8) XOR and GF(2^128) multiplication tables
     for x in 0..0x100 {for y in 0..0x100
@@ -241,6 +245,7 @@ pub fn init_table() -> Vec<Fp>
         let xor: u64 = 1 + ((x as u64) << 8) + ((y as u64) << 16) + (((x ^ y) as u64) << 24);
         table[y | (x << 8)] = Fp::from(xor);
     }}
+
     // init GF(2^8) XOR and GF(2^128) multiplication tables
     for x in 0..0x100 {for y in 0..0x100
     {
@@ -254,8 +259,6 @@ pub fn init_table() -> Vec<Fp>
         let mul: u64 = (x as u64) + ((y as u64) << 8) + ((mul[0] as u64) << 16) + ((mul[1] as u64) << 24);
         table[y | (x << 8) + 0x10000] = Fp::from(mul);
     }}
-    table[0x1ffff] = Fp::zero();
-    return table;
     // GF(2^128) multiplication
     for x in 0..0x100
     {
@@ -316,5 +319,6 @@ pub fn init_table() -> Vec<Fp>
         let mul: u64 = 12 + ((x as u64) << 8) + ((Rcon[x as usize] as u64) << 16);
         table[x as usize + 0x20900] = Fp::from(mul);
     }
+    table.sort_unstable();
     table
 }

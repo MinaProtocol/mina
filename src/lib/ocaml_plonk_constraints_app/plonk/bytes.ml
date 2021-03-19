@@ -42,8 +42,8 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
     let z = ref (Uint128.of_int 0) in
     let v = x in
     let v = ref v in
-    for i = 0 to 128 do
-        if Uint128.logand y (Uint128.shift_left o (127-i)) = zr then
+    for i = 0 to 127 do
+        if Uint128.logand y (Uint128.shift_left o (127-i)) <> zr then
           z := Uint128.logxor !z !v;
         v := Uint128.logxor (Uint128.shift_right !v 1) (if (Uint128.logand !v o) = zr then zr else r);
     done;

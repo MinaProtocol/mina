@@ -23,13 +23,12 @@ let%test_module "backend test" =
         let rec add x n = if n < 1 then x else add (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
         let rec mul (x, y) n = if n < 1 then (x, y) else mul (Bytes.mul x y) Int.(n - 1) in
 
-        let y = add (Impl.Field.of_int (Random.int 255)) 60000 in
-        let (a, b) = mul ((Impl.Field.of_int (Random.int 255)), (Impl.Field.of_int (Random.int 255))) 60000 in
+        let y = add (Impl.Field.of_int (Random.int 255)) 125000 in
+        let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 125000 in
 
         assert_ (Snarky.Constraint.equal a a);
         assert_ (Snarky.Constraint.equal b b);
-        assert_ (Snarky.Constraint.equal y y);
-
+(*
         for j = 0 to 0 do
 
           (***** PACKING *****)
@@ -38,7 +37,7 @@ let%test_module "backend test" =
           let bits = Pack.unpack x in
           let scalar = Pack.pack bits in
           assert_ (Snarky.Constraint.equal x scalar);
-(*
+
           (***** POSEIDON PERMUTATION *****)
 
           let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
@@ -67,9 +66,9 @@ let%test_module "backend test" =
           assert_ (Snarky.Constraint.equal (y3*y3) (x3*x3*x3 + (Impl.Field.of_int 5)));
           let x4, y4 = Ecc.endoscale (x3, y3) bits in
           assert_ (Snarky.Constraint.equal (y4*y4) (x4*x4*x4 + (Impl.Field.of_int 5)));
-*)
-        done;
 
+        done;
+*)
         ()
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
