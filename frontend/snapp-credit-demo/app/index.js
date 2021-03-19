@@ -129,6 +129,7 @@ ipcRenderer.on(PROOF_FAIL, () => {
 });
 
 ipcRenderer.on(CREDIT_FAIL, () => {
+  const outputPath = localStorage.getItem("output-path");
   setProgressStatusText(
     `Credit score is less than 700, cannot produce SNAPP proof to: ${outputPath}`
   );

@@ -36,8 +36,9 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
     return;
   }
 
-  if (parseInt(creditScore) < CREDIT_SCORE) {
+  if (creditScore < 700) {
     mainWindow.webContents.send(CREDIT_FAIL);
+    return;
   }
 
   exec(
