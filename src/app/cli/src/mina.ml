@@ -524,8 +524,14 @@ let setup_daemon logger =
           let%bind () = Async.after (Time.Span.of_min 1.) in
           terminated_child_loop ()
       | Some (child_pid, exit_or_signal) ->
+          let child_data =
+            Child_processes.Termination.get_child_data pids child_pid
+          in
           let child_pid_metadata =
-            [("child_pid", `Int (Pid.to_int child_pid))]
+            [ ("child_pid", `Int (Pid.to_int child_pid))
+            ; ( "child_data"
+              , [%to_yojson: Child_processes.Termination.data option]
+                  child_data ) ]
           in
           ( match exit_or_signal with
           | Ok () ->
