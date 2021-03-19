@@ -63,7 +63,7 @@ module Breadcrumb_added : sig
 end
 
 module Transaction_rejected : sig
-  type t = {command: User_command.Valid.t With_status.t list}
+  type t = unit
 
   include Event_type_intf with type t := t
 end

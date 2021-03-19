@@ -202,16 +202,20 @@ module Transaction_rejected = struct
       Network_pool.Transaction_pool
       .rejecting_command_for_reason_structured_events_id
 
-  type t = {command: User_command.Valid.t With_status.t list}
+  type t = unit [@@deriving to_yojson]
+
+  let parse = Fn.const (Or_error.return ())
+
+  (* type t = {command: User_command.Valid.t With_status.t list}
   [@@deriving to_yojson]
 
   let parse message =
     let open Json_parsing in
     let open Or_error.Let_syntax in
     let%map command =
-      get_metadata message "command" >>= parse valid_commands_with_statuses
+      get_metadata message "message" >>= parse valid_commands_with_statuses
     in
-    {command}
+    {command} *)
 end
 
 type 'a t =
