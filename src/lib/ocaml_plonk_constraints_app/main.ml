@@ -16,20 +16,34 @@ let%test_module "backend test" =
       let computation x () =
         let open Field in
 
-        (***** BIT-WISE OPERATIONS *****)
+        (***** BIT-WISE OPERATIONS FOR GCM-AES *****)
         let module Bytes = Plonk.Bytes.Constraints (Impl) in
 
         Random.full_init [|7|];
         let rec add x n = if n < 1 then x else add (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
         let rec mul (x, y) n = if n < 1 then (x, y) else mul (Bytes.mul x y) Int.(n - 1) in
 
-        let y = add (Impl.Field.of_int (Random.int 255)) 75357 in
+        let y = add (Impl.Field.of_int (Random.int 255)) 75537 in
         let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 75357 in
+
+        for i = 0 to 255 do
+          let a, b = Bytes.xtimesp (Impl.Field.of_int i) in
+          let a = Bytes.aesLookup a Plonk.Gcm.sboxInd in
+          let a = Bytes.aesLookup a Plonk.Gcm.invsboxInd in
+          let a = Bytes.aesLookup a Plonk.Gcm.xtime2sboxInd in
+          let a = Bytes.aesLookup a Plonk.Gcm.xtime3sboxInd in
+          let a = Bytes.aesLookup a Plonk.Gcm.xtime9Ind in
+          let a = Bytes.aesLookup a Plonk.Gcm.xtimebInd in
+          let a = Bytes.aesLookup a Plonk.Gcm.xtimedInd in
+          let a = Bytes.aesLookup a Plonk.Gcm.xtimeeInd + b +
+            Bytes.aesLookup (Impl.Field.of_int (i mod 10)) Plonk.Gcm.rconInd in
+          assert_ (Snarky.Constraint.equal a a);
+        done;
 
         assert_ (Snarky.Constraint.equal a a);
         assert_ (Snarky.Constraint.equal b b);
 
-        for j = 0 to 37 do
+        for j = 0 to 35 do
 
           (***** PACKING *****)
 
