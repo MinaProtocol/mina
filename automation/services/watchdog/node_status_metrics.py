@@ -86,8 +86,6 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   most_common_best_protocol_state,_ = max(common_states.items(), key=lambda x: x[1])
 
-  print("best protocol states:{}".format(best_protocol_states, key=lambda x: x[1], default=[ None ]))
-
   n = 3
   last_n_protocol_states = [ most_common_best_protocol_state ]
   for i in range(n):
