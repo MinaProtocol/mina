@@ -43,7 +43,7 @@ groups:
       description: "No new blocks posted to the google storage bucket for {{ $labels.testnet }}."
 
   - alert: ProverErrors
-    expr: max by (testnet) (max_over_time(Coda_watchdog_prover_errors_total ${rule_filter} [${alerting_timeframe}])) >= 0
+    expr: max by (testnet) (max_over_time(Coda_watchdog_prover_errors_total ${rule_filter} [${alerting_timeframe}])) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
