@@ -32,7 +32,7 @@ module Node = struct
     let%bind cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
 
-  let get_logs_in_container container node =
+  let get_logs_in_container node =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let pod_cmd =
@@ -41,7 +41,7 @@ module Node = struct
     let%bind cwd = Unix.getcwd () in
     let%bind pod = Util.run_cmd_exn cwd "sh" ["-c"; pod_cmd] in
     let kubectl_cmd =
-      Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd container
+      Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd node.container_id
         node.namespace pod
     in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -386,7 +386,7 @@ module Node = struct
   let dump_container_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
     let%map logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container "coda" t)
+      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -396,7 +396,7 @@ module Node = struct
     let open Malleable_error.Let_syntax in
     [%log info] "Dumping precomputed blocks from logs for node %s" t.pod_id ;
     let%bind logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container "coda" t)
+      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
