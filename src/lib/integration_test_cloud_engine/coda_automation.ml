@@ -358,37 +358,44 @@ module Network_manager = struct
     let testnet_log_filter =
       Network_config.testnet_log_filter network_config
     in
-    let cons_node pod_id network_keypair_opt =
+    let cons_node pod_id container_id network_keypair_opt =
       { Kubernetes_network.Node.testnet_name=
           network_config.terraform.testnet_name
       ; cluster= cluster_id
       ; namespace= network_config.terraform.testnet_name
       ; pod_id
+      ; container_id
       ; graphql_enabled= network_config.terraform.deploy_graphql_ingress
       ; network_keypair= network_keypair_opt }
     in
     (* we currently only deploy 1 seed and coordinator per deploy (will be configurable later) *)
-    let seed_nodes = [cons_node "seed" None] in
+    let seed_nodes = [cons_node "seed" "coda" None] in
     let snark_coordinator_name =
       "snark-coordinator-"
-      ^ String.sub network_config.terraform.snark_worker_public_key
-          ~pos:
-            (String.length network_config.terraform.snark_worker_public_key - 6)
-          ~len:6
+      ^ String.lowercase
+          (String.sub network_config.terraform.snark_worker_public_key
+             ~pos:
+               ( String.length network_config.terraform.snark_worker_public_key
+               - 6 )
+             ~len:6)
     in
     let snark_coordinator_nodes =
       if network_config.terraform.snark_worker_replicas > 0 then
-        [cons_node snark_coordinator_name None]
+        [cons_node snark_coordinator_name "coordinator" None]
       else []
     in
     let block_producer_nodes =
       List.map network_config.terraform.block_producer_configs
-        ~f:(fun bp_config -> cons_node bp_config.name (Some bp_config.keypair)
-      )
+        ~f:(fun bp_config ->
+          cons_node bp_config.name "coda" (Some bp_config.keypair) )
     in
     let archive_nodes =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
-          cons_node (sprintf "archive-%d" (i + 1)) None )
+          cons_node
+            (sprintf "archive-%d" (i + 1))
+            (sprintf "archive-%d-postgresql" (i + 1))
+            None )
+      (*this may be the incorrect container id *)
     in
     let nodes_by_app_id =
       let all_nodes =

@@ -11,6 +11,7 @@ module Node = struct
     ; cluster: string
     ; namespace: string
     ; pod_id: string
+    ; container_id: string (* name of the container inside the pod *)
     ; graphql_enabled: bool
     ; network_keypair: Network_keypair.t option }
 
@@ -50,8 +51,8 @@ module Node = struct
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
       Printf.sprintf
-        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
-        base_kube_cmd base_kube_cmd node.pod_id cmd
+        "%s -c %s exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
+        base_kube_cmd node.container_id base_kube_cmd node.pod_id cmd
     in
     let%bind.Deferred.Let_syntax cwd = Unix.getcwd () in
     Malleable_error.return (Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd])

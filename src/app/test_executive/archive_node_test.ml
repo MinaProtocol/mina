@@ -24,6 +24,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; {balance= "8000"; timing= Untimed}
         ; {balance= "17000"; timing= Untimed} ]
     ; num_archive_nodes= 1
+    ; num_snark_workers= 0
     ; log_precomputed_blocks= true }
 
   let expected_error_event_reprs = []
