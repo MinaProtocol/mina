@@ -24,7 +24,7 @@ let%test_module "backend test" =
         let rec mul (x, y) n = if n < 1 then (x, y) else mul (Bytes.mul x y) Int.(n - 1) in
 
         let y = add (Impl.Field.of_int (Random.int 255)) 75537 in
-        let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 75357 in
+        let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 75359 in
 
         for i = 0 to 255 do
           let a, b = Bytes.xtimesp (Impl.Field.of_int i) in
