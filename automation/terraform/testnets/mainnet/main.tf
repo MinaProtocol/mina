@@ -85,7 +85,7 @@ module "mainnet" {
 
   coda_image         = local.coda_image
   coda_archive_image = local.coda_archive_image
-  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.4"
+  watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.5"
 
   block_producer_key_pass = "naughty blue worm"
 
