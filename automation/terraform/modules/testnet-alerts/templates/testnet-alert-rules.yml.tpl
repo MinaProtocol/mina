@@ -81,6 +81,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} avg. peer count is critically low"
       description: "Critically low peer count of {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429"
 
   - alert: LowMinWindowDensity
     expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
@@ -98,8 +99,9 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} avg. peer count is critically low"
+      summary: "{{ $labels.testnet }} slot fill rate is critically low"
       description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowFillRate-36efb1cd9b5d461db6976bc1938fab9e"
 
   - alert: NoTransactionsInSeveralBlocks
     expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) >= 5
