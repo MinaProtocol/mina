@@ -72,7 +72,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     [%log info] "mina_peers_test: started" ;
-    let peer_list = Network.block_producers network in
+    let peer_list = Network.seeds network @ Network.block_producers network in
     let%bind () =
       Malleable_error.List.iter peer_list ~f:(fun node ->
           wait_for t (Wait_condition.node_to_initialize node) )
