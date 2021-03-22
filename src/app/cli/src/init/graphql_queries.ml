@@ -168,10 +168,11 @@ mutation ($sender: PublicKey!,
           $token: UInt64,
           $fee: UInt64!,
           $nonce: UInt32,
-          $memo: String) {
+          $memo: String,
+          $ignore_warnings: Boolean!) {
   sendPayment(input:
     {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo},
-    ignoreWarnings: true) {
+    ignoreWarnings: $ignore_warnings) {
     payment {
       id
     }

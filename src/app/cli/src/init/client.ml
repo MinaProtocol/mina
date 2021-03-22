@@ -524,15 +524,27 @@ let send_payment_graphql =
     flag "--token" ~aliases:["token"]
       ~doc:"TOKEN_ID The ID of the token to transfer" (optional token_id)
   in
+  let ignore_warnings_flag =
+    flag "--ignore_warnings" ~aliases:["ignore_warnings"]
+      ~doc:
+        "true|false When true, attempt the payment even if we anticipate an \
+         error"
+      (optional bool)
+  in
   let args =
-    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
-      token_flag
+    Args.zip5 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+      token_flag ignore_warnings_flag
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
        ~f:(fun graphql_endpoint
-          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount, token)
+          ( {Cli_lib.Flag.sender; fee; nonce; memo}
+          , receiver
+          , amount
+          , token
+          , ignore_warnings )
           ->
+         let ignore_warnings = Option.value ~default:false ignore_warnings in
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Send_payment.make
@@ -541,7 +553,7 @@ let send_payment_graphql =
                 ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
                 ?token:(Option.map ~f:Encoders.token token)
                 ?nonce:(Option.map nonce ~f:Encoders.nonce)
-                ?memo ())
+                ?memo ~ignore_warnings ())
              graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
@@ -755,7 +767,7 @@ let cancel_transaction_graphql =
                (uint32
                   (Mina_numbers.Account_nonce.to_uint32
                      (Signed_command.nonce user_command)))
-             ()
+             ~ignore_warnings:true ()
          in
          let%map cancel_response =
            Graphql_client.query_exn cancel_query graphql_endpoint
