@@ -37,7 +37,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_period:1 ~vesting_increment:500_000_000_000
     in
     { default with
-      block_producers=
+      requires_graphql= true
+    ; block_producers=
         [ {balance= block_producer_balance; timing= timing1}
         ; {balance= block_producer_balance; timing= timing2} ] }
 
