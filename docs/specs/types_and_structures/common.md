@@ -35,11 +35,7 @@ Variable length vector of type `T`
 
 ### `GAffine`
 
-| Field      | Type      | Description |
-| - | - | - |
-| `x`        | `BigInteger256` | |
-| `y`        | `BigInteger256` | |
-| `infinity` | `bool` | |
+`TODO`
 
 ### `PolyComm<T>`
 
