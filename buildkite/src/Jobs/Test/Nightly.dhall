@@ -11,6 +11,7 @@ let dependsOn = [
 ]
 
 let spec = DeployTestnet.DeploySpec::{
+  testnetLabel = "Nightly",
   workspace = "nightly",
   deployCondition = "build.branch == 'compatible' || build.env('NIGHTLY') == 'true'",
   preDeploy = "terraform destroy -auto-approve",
@@ -25,7 +26,7 @@ in
 Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
-      dirtyWhen = [ S.strictlyStart (S.contains "src") ],
+      dirtyWhen = [ S.exactly "buildkite/src/Jobs/Test/Nightly" "dhall" ],
       path = "Test",
       name = "Nightly"
     },
