@@ -21,13 +21,12 @@ module Node = struct
 
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
-  let run_in_postgresql_container node ~n ~cmd =
+  let run_in_postgresql_container node ~cmd =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
-      Printf.sprintf
-        "%s -c archive-%d-postgresql exec -i archive-%d-postgresql-0 -- %s"
-        base_kube_cmd n n cmd
+      Printf.sprintf "%s -c %s exec -i %s-0 -- %s" base_kube_cmd
+        node.container_id node.container_id cmd
     in
     let%bind cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -372,9 +371,11 @@ module Node = struct
 
   let dump_archive_data ~logger (t : t) ~data_file =
     let open Malleable_error.Let_syntax in
+    [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
+      t.container_id ;
     let%map data =
       Deferred.bind ~f:Malleable_error.return
-        (run_in_postgresql_container t ~n:1
+        (run_in_postgresql_container t
            ~cmd:
              "pg_dump --create --no-owner \
               postgres://postgres:foobar@localhost:5432/archive")
@@ -385,6 +386,8 @@ module Node = struct
 
   let dump_container_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      t.pod_id t.container_id ;
     let%map logs =
       Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
@@ -394,7 +397,9 @@ module Node = struct
 
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping precomputed blocks from logs for node %s" t.pod_id ;
+    [%log info]
+      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
+      t.pod_id t.container_id ;
     let%bind logs =
       Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
@@ -460,9 +465,10 @@ module Node = struct
                 "File already exists for precomputed block with state hash %s"
                 state_hash
           | _ ->
-              [%log info] "Dumping precomputed block with state hash %s"
-                state_hash ;
-              Out_channel.with_file (state_hash ^ ".json") ~f:(fun out_ch ->
+              [%log info]
+                "Dumping precomputed block with state hash %s to file %s"
+                state_hash filename ;
+              Out_channel.with_file filename ~f:(fun out_ch ->
                   Out_channel.output_string out_ch block ) )
     in
     Malleable_error.return ()
