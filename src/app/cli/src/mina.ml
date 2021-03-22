@@ -20,6 +20,7 @@ let () = Async.Scheduler.set_record_backtraces true
 [%%endif]
 
 let chain_id ~genesis_state_hash ~genesis_constants =
+  (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
   let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
@@ -980,6 +981,13 @@ let setup_daemon logger =
           ~default:Cli_lib.Default.validation_queue_size validation_queue_size
       in
       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+      let seed_peer_list_url =
+        Option.value_map seed_peer_list_url ~f:Option.some
+          ~default:
+            (Option.bind config.daemon
+               ~f:(fun {Runtime_config.Daemon.peer_list_url; _} ->
+                 peer_list_url ))
+      in
       if is_seed then [%log info] "Starting node as a seed node"
       else if List.is_empty initial_peers && Option.is_none seed_peer_list_url
       then
