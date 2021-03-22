@@ -51,7 +51,7 @@ type payment = {
 };
 
 type codaSDK;
-[@bs.module "./client_sdk.bc.js"] external codaSDK: codaSDK = "codaSDK";
+[@bs.module "./client_sdk.bc.js"] external codaSDK: codaSDK = "minaSDK";
 
 [@bs.send] external genKeys: (codaSDK, unit) => keypair = "genKeys";
 /**
