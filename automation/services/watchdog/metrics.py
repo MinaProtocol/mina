@@ -111,9 +111,9 @@ def get_chain_id(v1, namespace):
       if resp[0] != '{':
         #first line could be 'Using password from environment variable CODA_PRIVKEY_PASS'
         resp = resp.split("\n", 1)[1]
-      resp = json.loads(resp.strip())
-      print("Chain ID: {}".format(resp['chain_id']))
-      return resp['chain_id']
+      resp_dict = ast.literal_eval(resp.strip())
+      print("Chain ID: {}".format(resp_dict['chain_id']))
+      return resp_dict['chain_id']
     except Exception as e:
       print("Exception when extracting chain id: {}\n mina client status response: {}".format(e, resp))
       continue
