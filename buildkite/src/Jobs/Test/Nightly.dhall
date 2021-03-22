@@ -12,7 +12,7 @@ let dependsOn = [
 
 let spec = DeployTestnet.DeploySpec::{
   workspace = "nightly",
-  deployCondition = "build.branch == 'compatible' && build.env('NIGHTLY') == 'true'",
+  deployCondition = "build.branch == 'compatible' || build.env('NIGHTLY') == 'true'",
   preDeploy = "terraform destroy -auto-approve",
   deps = [
     { name = "MinaArtifact", key = "mina-docker-image" },
