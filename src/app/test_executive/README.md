@@ -1,12 +1,16 @@
 # How to Run Integration Tests
 
+
 ## Prerequisites Environment Setup
 
 Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
-1) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
+1) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  Run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
 
-2) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the "automated-validation@<email domain>" page, click into the "Keys" section in the topbar, and create a new key (one may already have one).  Download this key and save to one's preferred path, it will be needed in step 4 of this setup.  Note that each individual should have their own key.
+2) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the "automated-validation@<email domain>" page, click into the "Keys" section in the topbar, and create a new key (see picture).  Download this key and save to one's preferred path, it will be needed in step 4 of this setup.  Note that each individual should have their own key.
+
+![Screenshot from 2021-03-22 16-09-13](https://user-images.githubusercontent.com/3465290/112069570-4efc2700-8b29-11eb-9ff6-497a272ce434.png)
+
 
 3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set: `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`, vars relating to ocaml compilation.  It's recommened to set all of these in .bashrc or .profile.
 
@@ -22,8 +26,10 @@ When the service account is activated, one can run the integration tests but it 
 
 5) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
 
-```alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
-alias logproc=./_build/default/src/app/logproc/logproc.exe```
+```
+alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
+alias logproc=./_build/default/src/app/logproc/logproc.exe
+```
 
 
 
@@ -35,9 +41,9 @@ alias logproc=./_build/default/src/app/logproc/logproc.exe```
 
 3) Run `test_executive.exe`, passing in the coda image selected in step 1, and the name of the test one intends to run
   
-  3.a) It's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
+3.1) It's recommended to run with the `--debug` flag when iterating on the development of tests.  this flag will pause the destruction and cleanup of the generated testnet and associated terraform configuration files, so that those things can be inspected post-hoc
   
-  3.b) It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals); use `tee` to store the raw output for later inspection
+3.2) It's also recommended to pipe log output through logproc with a filter to remove Debug and Spam logs be default (those log levels are very verbose and are intended for debugging test framework internals).  Use `tee test.log` to store the raw output into the file `test.log` so that it can be saved and later inspected.
 
 ```sh
 alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
@@ -56,8 +62,8 @@ test_executive cloud $TEST --coda-image=$CODA_IMAGE --debug | tee test.log | log
 
 Running the integration test will of course create a testnet on GCP.  In order to differentiate different test runs, a unique testnet namespace is constructed for each testnet.  The namespace is constructed from appending together the first 5 chars of the local system username of the person running the test, the short 7 char git hash, the test name, and part of the timestamp.
 
-format is: ``it-{username}-{gitHash}-{testname}`
+format is: `it-{username}-{gitHash}-{testname}`
 
-ex: ``it-adalo-3a9f8ce-block-prod`; user is adalovelace, git commit 3a9f8ce, running block production test
+ex: `it-adalo-3a9f8ce-block-prod`; user is adalovelace, git commit 3a9f8ce, running block production test
 
 GCP namespaces are limited to 53 characters.    This format uses up a fixed minimum of 22 characters, the integration tests will need a further number of those characters when constructing release names, and the longest release name for any resource happens to be "-block-producers" which is another 16 characters. As such the name of an integration test including dashes cannot exceed 15 characters
