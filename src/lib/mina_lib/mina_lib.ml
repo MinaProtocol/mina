@@ -196,6 +196,30 @@ module Snark_worker = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
     in
+    (* Handle implicit raciness in the wait syscall by calling [Process.wait]
+       early, so that its value will be correctly cached when we actually need
+       it.
+    *)
+    ( match
+        Or_error.try_with (fun () ->
+            (* Eagerly force [Process.wait], so that it won't be captured
+               elsewhere on exit.
+            *)
+            let waiting = Process.wait snark_worker_process in
+            don't_wait_for
+              ( match%map Monitor.try_with_or_error (fun () -> waiting) with
+              | Ok _ ->
+                  ()
+              | Error err ->
+                  [%log error]
+                    "Saw a deferred exception $exn while waiting for process"
+                    ~metadata:[("exn", Error_json.error_to_yojson err)] ) )
+      with
+    | Ok _ ->
+        ()
+    | Error err ->
+        [%log error] "Saw an exception $exn while waiting for process"
+          ~metadata:[("exn", Error_json.error_to_yojson err)] ) ;
     don't_wait_for
       ( match%bind
           Monitor.try_with (fun () -> Process.wait snark_worker_process)

@@ -1731,7 +1731,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
           missing_blocks_width
       in
       let%bind metric_server =
-        Mina_metrics.Archive.create_archive_server ~port ~logger
+        Mina_metrics.Archive.create_archive_server ~port ~logger ()
       in
       let interval =
         Float.of_int (Mina_compile_config.block_window_duration_ms * 2)

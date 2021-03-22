@@ -880,7 +880,7 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
-let generic_server ~port ~logger ~registry =
+let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
@@ -892,8 +892,33 @@ let generic_server ~port ~logger ~registry =
     let uri = Request.uri req in
     match (Request.meth req, Uri.path uri) with
     | `GET, "/metrics" ->
+        let%bind other_data =
+          match forward_uri with
+          | Some uri ->
+              let%bind resp, body = Client.get uri in
+              let status = Response.status resp in
+              if Code.is_success (Code.code_of_status status) then
+                let%map body = Body.to_string body in
+                Some body
+              else (
+                [%log error] "Could not forward request to $url, got: $status"
+                  ~metadata:
+                    [ ("url", `String (Uri.to_string uri))
+                    ; ("status_code", `Int (Code.code_of_status status))
+                    ; ("status", `String (Code.string_of_status status)) ] ;
+                return None )
+          | None ->
+              return None
+        in
         let data = CollectorRegistry.(collect registry) in
         let body = Fmt.to_to_string TextFormat_0_0_4.output data in
+        let body =
+          match other_data with
+          | Some other_data ->
+              body ^ "\n" ^ other_data
+          | None ->
+              body
+        in
         let headers =
           Header.init_with "Content-Type" "text/plain; version=0.0.4"
         in
@@ -905,8 +930,9 @@ let generic_server ~port ~logger ~registry =
     (Async_extra.Tcp.Where_to_listen.of_port port)
     callback
 
-let server ~port ~logger =
-  generic_server ~port ~logger ~registry:CollectorRegistry.default
+let server ?forward_uri ~port ~logger () =
+  generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
+    ()
 
 module Archive = struct
   type t =
@@ -944,10 +970,12 @@ module Archive = struct
     let name = "missing_blocks" in
     find_or_add t ~name ~help ~subsystem
 
-  let create_archive_server ~port ~logger =
+  let create_archive_server ?forward_uri ~port ~logger () =
     let open Async_kernel.Deferred.Let_syntax in
     let archive_registry = CollectorRegistry.create () in
-    let%map _ = generic_server ~port ~logger ~registry:archive_registry in
+    let%map _ =
+      generic_server ?forward_uri ~port ~logger ~registry:archive_registry ()
+    in
     {registry= archive_registry; gauge_metrics= Hashtbl.create (module String)}
 end
 

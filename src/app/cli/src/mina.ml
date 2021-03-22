@@ -504,21 +504,35 @@ let setup_daemon logger =
     let pids = Child_processes.Termination.create_pid_table () in
     let rec terminated_child_loop () =
       match
-        try Unix.wait_nohang `Any
-        with
+        try Unix.wait_nohang `Any with
         | Unix.Unix_error (errno, _, _)
-        when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
-             (* no child processes exist *)
-        ->
-          None
+          when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
+               (* no child processes exist *) ->
+            None
+        | exn ->
+            [%log fatal] "Saw an unexpected error $exn from wait_nohang."
+              ~metadata:
+                [ ( "exn"
+                  , Error_json.error_to_yojson
+                      (Error.of_exn ~backtrace:`Get exn) ) ] ;
+            (* This will now appear in the backtrace for this exception when it
+               reaches the top level, making this very easy to identify.
+            *)
+            raise exn
       with
       | None ->
           (* no children have terminated, wait to check again *)
           let%bind () = Async.after (Time.Span.of_min 1.) in
           terminated_child_loop ()
       | Some (child_pid, exit_or_signal) ->
+          let child_data =
+            Child_processes.Termination.get_child_data pids child_pid
+          in
           let child_pid_metadata =
-            [("child_pid", `Int (Pid.to_int child_pid))]
+            [ ("child_pid", `Int (Pid.to_int child_pid))
+            ; ( "child_data"
+              , [%to_yojson: Child_processes.Termination.data option]
+                  child_data ) ]
           in
           ( match exit_or_signal with
           | Ok () ->
@@ -1106,7 +1120,12 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
-          Mina_metrics.server ~port ~logger >>| ignore )
+          let forward_uri =
+            Option.map libp2p_metrics_port ~f:(fun port ->
+                Uri.with_uri ~scheme:(Some "http") ~host:(Some "127.0.0.1")
+                  ~port:(Some port) ~path:(Some "/metrics") Uri.empty )
+          in
+          Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore )
       |> Option.value ~default:Deferred.unit
     in
     let () = Mina_plugins.init_plugins ~logger coda plugins in
