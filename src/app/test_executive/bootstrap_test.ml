@@ -19,7 +19,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     { default with
       block_producers=
         [{balance= "1000"; timing= Untimed}; {balance= "1000"; timing= Untimed}]
-    ; num_snark_workers= 2 }
+    ; num_snark_workers= 0 }
 
   let expected_error_event_reprs = []
 
