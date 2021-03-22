@@ -3130,7 +3130,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of coda to send to to receiver",
+              "description": "Amount of mina to send to receiver",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3236,7 +3236,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of coda to send to to receiver",
+              "description": "Amount of mina to send to receiver",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -5775,7 +5775,7 @@
             },
             {
               "name": "coinbase",
-              "description": "Amount of coda granted to the producer of this block",
+              "description": "Amount of mina granted to the producer of this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6765,7 +6765,7 @@
           "fields": [
             {
               "name": "total",
-              "description": "The amount of coda owned by the account",
+              "description": "The amount of mina owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6781,7 +6781,7 @@
             },
             {
               "name": "unknown",
-              "description": "The amount of coda owned by the account whose origin is currently unknown",
+              "description": "The amount of mina owned by the account whose origin is currently unknown",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -6797,7 +6797,7 @@
             },
             {
               "name": "liquid",
-              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping.",
+              "description": "The amount of mina owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -6809,7 +6809,7 @@
             },
             {
               "name": "locked",
-              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping.",
+              "description": "The amount of mina owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -7009,7 +7009,7 @@
             },
             {
               "name": "balance",
-              "description": "The amount of coda owned by the account",
+              "description": "The amount of mina owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",

@@ -81,6 +81,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} avg. peer count is critically low"
       description: "Critically low peer count of {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowPeerCount-3a66ae1ca6fd44b585eca37f9206d429"
 
   - alert: LowMinWindowDensity
     expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
@@ -98,8 +99,9 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} avg. peer count is critically low"
+      summary: "{{ $labels.testnet }} slot fill rate is critically low"
       description: "Lower fill rate of {{ $value }} than expected on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/LowFillRate-36efb1cd9b5d461db6976bc1938fab9e"
 
   - alert: NoTransactionsInSeveralBlocks
     expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) >= 5
@@ -142,7 +144,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/OldBestTip-8afa955101b642bd8356edfd0b03b640"
 
   - alert: NoNewSnarks
-    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec ${rule_filter}) >= 2 * 180
+    expr: min by (testnet) ((time() - 1609459200) - Coda_Snark_work_useful_snark_work_received_time_sec ${rule_filter}) >= 2 * 180 and max by (testnet) (Coda_Snark_work_pending_snark_work ${rule_filter}) != 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical

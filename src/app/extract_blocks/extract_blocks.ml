@@ -100,7 +100,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; user_cmds= []
     ; internal_cmds= [] }
 
-let fill_in_user_command pool block_state_hash =
+let fill_in_user_commands pool block_state_hash =
   let query_db ~item ~f = query_db pool ~item ~f in
   let pk_of_id id ~item =
     let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
@@ -223,7 +223,7 @@ let fill_in_user_command pool block_state_hash =
         ; receiver_balance
         ; created_token } )
 
-let fill_in_internal_command pool block_state_hash =
+let fill_in_internal_commands pool block_state_hash =
   let query_db ~item ~f = query_db pool ~item ~f in
   let pk_of_id id ~item =
     let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
@@ -395,14 +395,30 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
       [%log info] "Querying for user commands in blocks" ;
       let%bind blocks_with_user_cmds =
         Deferred.List.map extensional_blocks ~f:(fun block ->
-            let%map user_cmds = fill_in_user_command pool block.state_hash in
+            let%map unsorted_user_cmds =
+              fill_in_user_commands pool block.state_hash
+            in
+            (* sort, to give block a canonical representation *)
+            let user_cmds =
+              List.sort unsorted_user_cmds
+                ~compare:(fun (cmd1 : Extensional.User_command.t) cmd2 ->
+                  Int.compare cmd1.sequence_no cmd2.sequence_no )
+            in
             {block with user_cmds} )
       in
       [%log info] "Querying for internal commands in blocks" ;
       let%bind blocks_with_all_cmds =
         Deferred.List.map blocks_with_user_cmds ~f:(fun block ->
-            let%map internal_cmds =
-              fill_in_internal_command pool block.state_hash
+            let%map unsorted_internal_cmds =
+              fill_in_internal_commands pool block.state_hash
+            in
+            (* sort, to give block a canonical representation *)
+            let internal_cmds =
+              List.sort unsorted_internal_cmds
+                ~compare:(fun (cmd1 : Extensional.Internal_command.t) cmd2 ->
+                  [%compare: int * int]
+                    (cmd1.sequence_no, cmd1.secondary_sequence_no)
+                    (cmd2.sequence_no, cmd2.secondary_sequence_no) )
             in
             {block with internal_cmds} )
       in

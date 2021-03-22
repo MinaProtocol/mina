@@ -167,7 +167,7 @@ macos-portable:
 
 update-graphql:
 	@echo Make sure that the daemon is running with -rest-port 8080
-	python scripts/introspection_query.py > graphql_schema.json
+	python3 scripts/introspection_query.py > graphql_schema.json
 
 ########################################
 ## Lint
