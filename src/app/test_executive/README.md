@@ -1,21 +1,29 @@
 # How to Run Integration Tests
 
-## Prerequisites
+## Prerequisites Environment Setup
 
-1) Ensure the following environment variables are properly set if not already: `GCLOUD_API_KEY` (relating to the gcloud service account used in step 2), `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, vars relating to AWS access, vars relating to ocaml compilation.
+Note: this environment setup assumes that one is a member of o(1) labs and has access to organization infrastructure.  You will need an o(1) labs GCP account and AWS account.
 
-2) Log in to Google Cloud, with the correct cluster, and activate the service account
+1) Download the gcloud integration test API key.  Go to the API Credentials page (https://console.cloud.google.com/apis/credentials), find "Integration-tests log-engine" and copy the key for that onto your clipboard.  run `export GCLOUD_API_KEY=<key>` and/or put it in one's bashrc or .profile.  Note that this API key is shared by everyone.
 
-`gcloud auth login --no-launch-browser <personal login name>`
-`gcloud container clusters get-credentials --region us-west1 mina-integration-west1`
-`gcloud auth activate-service-account <name of service account> --key-file=<path to key file>`
+2) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the "automated-validation@<email domain>" page, click into the "Keys" section in the topbar, and create a new key (one may already have one).  Download this key and save to one's preferred path, it will be needed in step 4 of this setup.  Note that each individual should have their own key.
 
-If, in the course of other development, one switches to a separate account, one may need to run the last line again in order to switch back to the service account.
+3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set: `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`, vars relating to ocaml compilation.  It's recommened to set all of these in .bashrc or .profile.
 
-3) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+4) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
 
-`alias test_executive=./_build/default/src/app/test_executive/test_executive.exe`
-`alias logproc=./_build/default/src/app/logproc/logproc.exe`
+```
+gcloud auth login --no-launch-browser <personal login name>
+gcloud container clusters get-credentials --region us-west1 mina-integration-west1
+gcloud auth activate-service-account automated-validation@<email domain> --key-file=<path to automated-validation key file>
+```
+
+When the service account is activated, one can run the integration tests but it may interfere with other activity on GCP.  If, in the course of other development, one switches to a separate account, one may need to run the last line again in order to switch back to the service account.
+
+5) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
+
+```alias test_executive=./_build/default/src/app/test_executive/test_executive.exe
+alias logproc=./_build/default/src/app/logproc/logproc.exe```
 
 
 
