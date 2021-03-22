@@ -9,8 +9,7 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 
 2) Download your key file for the `automated-validation` service account.  Go to the IAM Service Accounts page (https://console.cloud.google.com/iam-admin/serviceaccounts), click into the "automated-validation@<email domain>" page, click into the "Keys" section in the topbar, and create a new key (see picture).  Download this key and save to one's preferred path, it will be needed in step 4 of this setup.  Note that each individual should have their own key.
 
-![Screenshot from 2021-03-22 16-09-13](https://user-images.githubusercontent.com/3465290/112069570-4efc2700-8b29-11eb-9ff6-497a272ce434.png)
-
+![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
 
 3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set: `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`, vars relating to ocaml compilation.  It's recommened to set all of these in .bashrc or .profile.
 
