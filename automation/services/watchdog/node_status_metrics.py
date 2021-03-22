@@ -73,18 +73,40 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
         children_and_depths.append((child, depth + 1))
     return max(children_and_depths, key=lambda x: x[1])
 
-  best_protocol_states = [ get_deepest_child(root) for root in roots ]
-  best_protocol_state = max(best_protocol_states, key=lambda x: x[1], default=[ None ])[0]
+  #get the latest protocol states of each node and the length of the chain (to eliminate nodes that are newly joining or restarting without persisted frontier)
+  latest_protocol_states = [c[len(c)-1][0] for c in chains if len(c) >= 290 and len(c) > 0]
+  common_states = {}
+  for state_hash in latest_protocol_states:
+    if state_hash in common_states:
+      common_states[state_hash] = common_states[state_hash] + 1
+    else:
+      common_states[state_hash] = 1
+
+  print("Best protocol states and the number of nodes synced to it:{}".format(common_states))
+
+  most_common_best_protocol_state,_ = max(common_states.items(), key=lambda x: x[1])
 
   n = 3
-  last_n_protocol_states = [ best_protocol_state ]
+  last_n_protocol_states = [ most_common_best_protocol_state ]
   for i in range(n):
     parent = last_n_protocol_states[-1]
     if parent in parents:
       last_n_protocol_states.append(parents[parent])
 
-  synced_near_best_tip_num = [ p['protocol_state_hash'] in last_n_protocol_states for p in peers.values() ]
-  synced_near_best_tip_fraction = sum(synced_near_best_tip_num) / len(peers.values())
+  print("Latest {} protocol states:{}".format(n+1, last_n_protocol_states))
+
+  any_hash_in_last_n = lambda peer: any([ p_hash in last_n_protocol_states for p_hash, _ in peer['k_block_hashes_and_timestamps'][-n:] ])
+
+  synced_near_best_tip_num = [ any_hash_in_last_n(p) for p in peers.values() if p['sync_status'] == 'Synced' ]
+
+  #don't include nodes that are in catchup or bootstrap state
+  all_synced_peers = [ p['sync_status'] == 'Synced' for p in peers.values() ]
+
+  synced_near_best_tip_fraction = sum(synced_near_best_tip_num) / sum(all_synced_peers)
+
+  peers_out_of_sync=[("peer-id:"+p['node_peer_id'], "state-hash:"+p['protocol_state_hash'], "status:"+p['sync_status']) for p in peers.values() if not any_hash_in_last_n(p) and p['sync_status'] == 'Synced']
+
+  print("Number of  peers with 'Synced' status: {}\nPeers not synced near the best tip: {}".format(sum(all_synced_peers), peers_out_of_sync))
 
   nodes_synced_near_best_tip.set(synced_near_best_tip_fraction)
 
