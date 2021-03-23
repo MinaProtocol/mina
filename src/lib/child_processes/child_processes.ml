@@ -263,8 +263,10 @@ let start_custom :
     Deferred.map ~f:Or_error.return
     @@ maybe_kill_and_unlock name lock_path logger
   in
-  [%log debug] "Starting custom child process %s with args $args" name
-    ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
+  [%log debug] "Starting custom child process $name with args $args"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a))) ] ;
   let%bind coda_binary_path = get_coda_binary () in
   let relative_to_root =
     get_project_root ()
@@ -279,6 +281,11 @@ let start_custom :
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
+  [%log info] "Custom child process $name started with pid $pid"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a)))
+      ; ("pid", `Int (Process.pid process |> Pid.to_int)) ] ;
   (* Handle implicit raciness in the wait syscall by calling [Process.wait]
      early, so that its value will be correctly cached when we actually need
      it.
