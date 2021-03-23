@@ -11,7 +11,7 @@ let dependsOn = [
 ]
 
 let spec = DeployTestnet.DeploySpec::{
-  testnetLabel = "Deploy Nightly",
+  testnetLabel = "nightly",
   workspace = "nightly",
   deployCondition = "build.branch == 'compatible' || build.env('NIGHTLY') == 'true'",
   preDeploy = "terraform destroy -auto-approve",

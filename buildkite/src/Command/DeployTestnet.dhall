@@ -63,7 +63,7 @@ in
           -- execute post-deploy operation
           Cmd.run "${spec.postDeploy}"
         ],
-        label = "${spec.testnetLabel}",
+        label = "Deploy ${spec.testnetLabel}",
         key = "deploy-${spec.testnetLabel}",
         target = Size.Large,
         depends_on = spec.deps,
