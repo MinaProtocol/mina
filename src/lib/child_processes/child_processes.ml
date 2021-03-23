@@ -394,6 +394,10 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
   | Some _ ->
       Deferred.Or_error.error_string "already terminated"
 
+let register_process ?termination_expected (t : Termination.t) (process : t)
+    kind =
+  Termination.register_process ?termination_expected t process.process kind
+
 let%test_module _ =
   ( module struct
     let logger = Logger.create ()
