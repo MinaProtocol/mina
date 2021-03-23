@@ -1184,7 +1184,14 @@ module Multiaddr = struct
 
   let of_file_contents ~(contents : string) : t list =
     String.split ~on:'\n' contents
-    |> List.filter ~f:(fun s -> not (String.is_empty s))
+    |> List.filter ~f:(fun s ->
+           if valid_as_peer s then true
+           else if String.is_empty s then false
+           else (
+             [%log' error (Logger.create ())]
+               "Invalid peer $peer found in peers list"
+               ~metadata:[("peer", `String s)] ;
+             false ) )
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
