@@ -23,6 +23,8 @@ module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
 
+  cluster_name   = var.cluster_name
+  cluster_region = var.cluster_region
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 

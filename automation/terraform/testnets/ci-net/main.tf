@@ -58,6 +58,11 @@ variable "snark_worker_count" {
   default = 1
 }
 
+variable "cluster_name" {
+  type    = string
+  default = "mina-integration-west1"
+}
+
 variable "cluster_region" {
   type    = string
   default = "us-west1"
@@ -79,6 +84,7 @@ module "ci_testnet" {
   artifact_path = var.artifact_path
 
   # TODO: remove obsolete cluster_name var + cluster region
+  cluster_name   = var.cluster_name
   cluster_region = var.cluster_region
   k8s_context    = var.k8s_ctx
   testnet_name   = length(var.testnet_name) > 0 ? var.testnet_name : "ci-net-${substr(sha256(terraform.workspace), 0, 7)}"
