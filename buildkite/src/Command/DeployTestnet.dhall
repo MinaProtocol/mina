@@ -54,7 +54,7 @@ in
           Cmd.run (
             "terraform apply -auto-approve -var-file=${spec.varFile}" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
-              " -var coda_archive_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
+              " -var coda_archive_image=gcr.io/o1labs-192920/coda-archive:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
               " -var artifact_path=${spec.artifactPath} " ++
               " || (terraform destroy -auto-approve && exit 1)"
           ),
@@ -63,7 +63,7 @@ in
           -- execute post-deploy operation
           Cmd.run "${spec.postDeploy}"
         ],
-        label = "Deploy ${spec.testnetLabel}",
+        label = "${spec.testnetLabel}",
         key = "deploy-${spec.testnetLabel}",
         target = Size.Large,
         depends_on = spec.deps,
