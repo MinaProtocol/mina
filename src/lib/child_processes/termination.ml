@@ -6,9 +6,11 @@ open Async
 open Core_kernel
 include Hashable.Make_binable (Pid)
 
-type process_kind = Prover | Verifier [@@deriving show {with_path= false}]
+type process_kind = Prover | Verifier
+[@@deriving show {with_path= false}, yojson]
 
 type data = {kind: process_kind; termination_expected: bool}
+[@@deriving yojson]
 
 type t = data Pid.Table.t
 
@@ -34,6 +36,8 @@ let get_signal_cause_opt =
     ~f:(fun (signal, msg) ->
       Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg) ) ;
   fun signal -> Signal.Table.find signal_causes_tbl signal
+
+let get_child_data (t : t) child_pid = Pid.Table.find t child_pid
 
 let check_terminated_child (t : t) child_pid logger =
   if Pid.Table.mem t child_pid then

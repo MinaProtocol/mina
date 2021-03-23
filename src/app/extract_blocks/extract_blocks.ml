@@ -1,4 +1,4 @@
-(* missing_subchain.ml -- report available missing subchain from archive db *)
+(* extract_blocks.ml -- dump extensional blocks from archive db *)
 
 open Core_kernel
 open Async
@@ -100,7 +100,7 @@ let fill_in_block pool (block : Archive_lib.Processor.Block.t) :
     ; user_cmds= []
     ; internal_cmds= [] }
 
-let fill_in_user_command pool block_state_hash =
+let fill_in_user_commands pool block_state_hash =
   let query_db ~item ~f = query_db pool ~item ~f in
   let pk_of_id id ~item =
     let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
@@ -223,7 +223,7 @@ let fill_in_user_command pool block_state_hash =
         ; receiver_balance
         ; created_token } )
 
-let fill_in_internal_command pool block_state_hash =
+let fill_in_internal_commands pool block_state_hash =
   let query_db ~item ~f = query_db pool ~item ~f in
   let pk_of_id id ~item =
     let%map pk_str = query_db ~f:(fun db -> Sql.Public_key.run db id) ~item in
@@ -291,17 +291,36 @@ let fill_in_internal_command pool block_state_hash =
               global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
-let main ~archive_uri ~start_state_hash_opt ~end_state_hash () =
+let check_state_hash ~logger state_hash_opt =
+  match state_hash_opt with
+  | None ->
+      ()
+  | Some state_hash -> (
+    match State_hash.of_base58_check state_hash with
+    | Ok _ ->
+        ()
+    | Error err ->
+        [%log error] "Error decoding state hash"
+          ~metadata:
+            [ ("state_hash", `String state_hash)
+            ; ("error", Error_json.error_to_yojson err) ] ;
+        Core.exit 1 )
+
+let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
+    =
+  ( match (start_state_hash_opt, end_state_hash_opt, all_blocks) with
+  | None, None, true | None, Some _, false | Some _, Some _, false ->
+      ()
+  | Some _, None, true ->
+      failwith "If --all-blocks is given, do not also give --start-state-hash"
+  | _, None, false | _, Some _, true ->
+      failwith "Must specify exactly one of --end-state-hash and --all-blocks"
+  ) ;
   let logger = Logger.create () in
   let archive_uri = Uri.of_string archive_uri in
-  (* sanity-check input state hash *)
-  ( match State_hash.of_base58_check end_state_hash with
-  | Ok _ ->
-      ()
-  | Error err ->
-      [%log error] "Error decoding end state hash"
-        ~metadata:[("error", Error_json.error_to_yojson err)] ;
-      Core.exit 1 ) ;
+  (* sanity-check input state hashes *)
+  check_state_hash ~logger start_state_hash_opt ;
+  check_state_hash ~logger end_state_hash_opt ;
   match Caqti_async.connect_pool ~max_size:128 archive_uri with
   | Error e ->
       [%log fatal]
@@ -311,47 +330,63 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash () =
   | Ok pool ->
       [%log info] "Successfully created Caqti pool for Postgresql" ;
       let%bind blocks =
-        match start_state_hash_opt with
-        | None ->
-            [%log info]
-              "Querying for subchain to end block with given state hash" ;
-            query_db pool
-              ~f:(fun db ->
-                Sql.Subchain.start_from_unparented db ~end_state_hash )
-              ~item:"blocks starting from unparented"
-        | Some start_state_hash ->
-            [%log info]
-              "Querying for subchain from start block to end block with given \
-               state hashes" ;
-            query_db pool
-              ~f:(fun db ->
-                Sql.Subchain.start_from_specified db ~start_state_hash
-                  ~end_state_hash )
-              ~item:"blocks starting from specified"
+        if all_blocks then (
+          [%log info] "Querying for all blocks" ;
+          query_db pool
+            ~f:(fun db -> Sql.Subchain.all_blocks db)
+            ~item:"all blocks" )
+        else
+          match (start_state_hash_opt, end_state_hash_opt) with
+          | None, Some end_state_hash ->
+              [%log info]
+                "Querying for subchain to end block with given state hash" ;
+              let%map blocks =
+                query_db pool
+                  ~f:(fun db ->
+                    Sql.Subchain.start_from_unparented db ~end_state_hash )
+                  ~item:"blocks starting from unparented"
+              in
+              let end_block_found =
+                List.exists blocks ~f:(fun block ->
+                    String.equal block.state_hash end_state_hash )
+              in
+              if not end_block_found then (
+                [%log error]
+                  "No subchain available from an unparented block (possibly \
+                   the genesis block) to block with given end state hash" ;
+                Core.exit 1 ) ;
+              blocks
+          | Some start_state_hash, Some end_state_hash ->
+              [%log info]
+                "Querying for subchain from start block to end block with \
+                 given state hashes" ;
+              let%map blocks =
+                query_db pool
+                  ~f:(fun db ->
+                    Sql.Subchain.start_from_specified db ~start_state_hash
+                      ~end_state_hash )
+                  ~item:"blocks starting from specified"
+              in
+              let start_block_found =
+                List.exists blocks ~f:(fun block ->
+                    String.equal block.state_hash start_state_hash )
+              in
+              let end_block_found =
+                List.exists blocks ~f:(fun block ->
+                    String.equal block.state_hash end_state_hash )
+              in
+              if not (start_block_found && end_block_found) then (
+                [%log error]
+                  "No subchain with given start and end state hashes \
+                   available; try omitting the start state hash, to get a \
+                   chain from an unparented block to the block with the end \
+                   state hash" ;
+                Core.exit 1 ) ;
+              blocks
+          | _ ->
+              (* unreachable *)
+              failwith "Unexpected flag combination"
       in
-      let end_block_found =
-        List.exists blocks ~f:(fun block ->
-            String.equal block.state_hash end_state_hash )
-      in
-      ( match start_state_hash_opt with
-      | Some state_hash ->
-          if
-            not
-              ( end_block_found
-              && List.exists blocks ~f:(fun block ->
-                     String.equal block.state_hash state_hash ) )
-          then (
-            [%log error]
-              "No subchain with given start and end state hashes available; \
-               try omitting the start state hash, to get a chain from an \
-               unparented block to the block with the end state hash" ;
-            Core.exit 1 )
-      | None ->
-          if not end_block_found then (
-            [%log error]
-              "No subchain available from an unparented block (possibly the \
-               genesis block) to block with given end state hash" ;
-            Core.exit 1 ) ) ;
       let%bind extensional_blocks =
         Deferred.List.map blocks ~f:(fill_in_block pool)
       in
@@ -360,14 +395,30 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash () =
       [%log info] "Querying for user commands in blocks" ;
       let%bind blocks_with_user_cmds =
         Deferred.List.map extensional_blocks ~f:(fun block ->
-            let%map user_cmds = fill_in_user_command pool block.state_hash in
+            let%map unsorted_user_cmds =
+              fill_in_user_commands pool block.state_hash
+            in
+            (* sort, to give block a canonical representation *)
+            let user_cmds =
+              List.sort unsorted_user_cmds
+                ~compare:(fun (cmd1 : Extensional.User_command.t) cmd2 ->
+                  Int.compare cmd1.sequence_no cmd2.sequence_no )
+            in
             {block with user_cmds} )
       in
       [%log info] "Querying for internal commands in blocks" ;
       let%bind blocks_with_all_cmds =
         Deferred.List.map blocks_with_user_cmds ~f:(fun block ->
-            let%map internal_cmds =
-              fill_in_internal_command pool block.state_hash
+            let%map unsorted_internal_cmds =
+              fill_in_internal_commands pool block.state_hash
+            in
+            (* sort, to give block a canonical representation *)
+            let internal_cmds =
+              List.sort unsorted_internal_cmds
+                ~compare:(fun (cmd1 : Extensional.Internal_command.t) cmd2 ->
+                  [%compare: int * int]
+                    (cmd1.sequence_no, cmd1.secondary_sequence_no)
+                    (cmd2.sequence_no, cmd2.secondary_sequence_no) )
             in
             {block with internal_cmds} )
       in
@@ -393,8 +444,8 @@ let () =
       (let open Let_syntax in
       async
         ~summary:
-          "Report blocks in a subchain from the genesis block to a specific \
-           block"
+          "Extract blocks from an archive db, either all blocks, or from a \
+           subchain"
         (let%map archive_uri =
            Param.flag "--archive-uri"
              ~doc:
@@ -408,9 +459,13 @@ let () =
                 at the block closest to the end block without a parent, \
                 possibly the genesis block)"
              Param.(optional string)
-         and end_state_hash =
+         and end_state_hash_opt =
            Param.flag "--end-state-hash"
              ~doc:"State hash of the block that ends a chain"
-             Param.(required string)
+             Param.(optional string)
+         and all_blocks =
+           Param.flag "--all-blocks" Param.no_arg
+             ~doc:"Extract all blocks in the archive database"
          in
-         main ~archive_uri ~start_state_hash_opt ~end_state_hash)))
+         main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt
+           ~all_blocks)))

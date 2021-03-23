@@ -44,7 +44,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libbz2-dev \
     apt-transport-https
 
-RUN sudo pip install awscli readchar
+RUN sudo pip3 install awscli readchar
 
 RUN sudo pip3 install sexpdata
 

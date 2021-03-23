@@ -21,6 +21,7 @@ module Engine = struct
          logger:Logger.t
       -> test_name:string
       -> cli_inputs:Cli_inputs.t
+      -> debug:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
       -> t
@@ -31,6 +32,8 @@ module Engine = struct
       type t
 
       val id : t -> string
+
+      val network_keypair : t -> Network_keypair.t option
 
       val start : fresh_state:bool -> t -> unit Malleable_error.t
 
@@ -54,6 +57,15 @@ module Engine = struct
 
       val get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
+
+      val dump_archive_data :
+        logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
+
+      val dump_container_logs :
+        logger:Logger.t -> t -> log_file:string -> unit Malleable_error.t
+
+      val dump_precomputed_blocks :
+        logger:Logger.t -> t -> unit Malleable_error.t
     end
 
     type t
@@ -64,13 +76,19 @@ module Engine = struct
 
     val genesis_constants : t -> Genesis_constants.t
 
+    val seeds : t -> Node.t list
+
     val block_producers : t -> Node.t list
 
     val snark_coordinators : t -> Node.t list
 
     val archive_nodes : t -> Node.t list
 
+    val all_nodes : t -> Node.t list
+
     val keypairs : t -> Signature_lib.Keypair.t list
+
+    val initialize : logger:Logger.t -> t -> unit Malleable_error.t
   end
 
   module type Network_manager_intf = sig
@@ -204,6 +222,14 @@ module Dsl = struct
       -> t
   end
 
+  module type Util_intf = sig
+    module Engine : Engine.S
+
+    val pub_key_of_node :
+         Engine.Network.Node.t
+      -> Signature_lib.Public_key.Compressed.t Malleable_error.t
+  end
+
   module type S = sig
     module Engine : Engine.S
 
@@ -219,6 +245,8 @@ module Dsl = struct
       with module Engine := Engine
        and module Event_router := Event_router
        and module Network_state := Network_state
+
+    module Util : Util_intf with module Engine := Engine
 
     type t
 
