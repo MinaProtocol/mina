@@ -78,6 +78,21 @@ variable "artifact_path" {
   default = "/tmp"
 }
 
+variable "upload_blocks_to_gcloud" {
+  type    = bool
+  default = false
+}
+
+variable "make_reports" {
+  type    = bool
+  default = false
+}
+
+variable "report_discord_webhook_url" {
+  type    = string
+  default = ""
+}
+
 module "ci_testnet" {
   source = "../../modules/o1-testnet"
 
@@ -105,8 +120,8 @@ module "ci_testnet" {
 
   agent_min_fee         = "0.05"
   agent_max_fee         = "0.1"
-  agent_min_tx          = "0.0015"
-  agent_max_tx          = "0.0015"
+  agent_min_tx          = "1.0015"
+  agent_max_tx          = "1.0015"
   agent_send_every_mins = "1"
 
   log_level           = "Info"
@@ -122,12 +137,9 @@ module "ci_testnet" {
   snark_worker_fee        = "0.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
 
-  upload_blocks_to_gcloud         = false
+  upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
   restart_nodes                   = false
-  restart_nodes_every_mins        = "60"
-  make_reports                    = true
+  make_reports                    = var.make_reports
   make_report_every_mins          = "5"
-  make_report_discord_webhook_url = ""
-  make_report_accounts            = false
-  seed_peers_url                  = ""
+  make_report_discord_webhook_url = var.report_discord_webhook_url
 }

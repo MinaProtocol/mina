@@ -17,3 +17,5 @@ archive_configs = [
     postgresHost      = "archive-1-postgresql"
   }
 ]
+upload_blocks_to_gcloud = true
+make_reports = false
