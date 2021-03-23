@@ -278,6 +278,8 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
         {conf_dir; logger; proof_level}
     in
+    Child_processes.Termination.wait_for_process_log_errors ~logger process
+      ~module_:__MODULE__ ~location:__LOC__ ;
     let exit_or_signal = wait_safe process in
     [%log info]
       "Daemon started process of kind $process_kind with pid $verifier_pid"

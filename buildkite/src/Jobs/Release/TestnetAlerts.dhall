@@ -39,6 +39,7 @@ Pipeline.build
           , target = Size.Medium
           , depends_on = [ { name = "TestnetAlerts", key = "lint-testnet-alerts" } ]
           , docker = None Docker.Type
+          , if = Some "build.branch == 'compatible' || build.env('DEPLOY_ALERTS') == 'true'"
         }
     ]
   }

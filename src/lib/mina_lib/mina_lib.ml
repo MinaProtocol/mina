@@ -196,6 +196,8 @@ module Snark_worker = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
     in
+    Child_processes.Termination.wait_for_process_log_errors ~logger
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
     don't_wait_for
       ( match%bind
           Monitor.try_with (fun () -> Process.wait snark_worker_process)
