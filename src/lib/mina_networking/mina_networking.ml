@@ -595,7 +595,7 @@ module Rpcs = struct
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int
-            ; block_height_opt: int option }
+            ; block_height_opt: int option [@default None] }
           [@@deriving to_yojson, of_yojson]
 
           let to_latest = Fn.id
@@ -631,7 +631,7 @@ module Rpcs = struct
             ; uptime_minutes: int }
           [@@deriving to_yojson, of_yojson]
 
-          let to_latest status : V2.t =
+          let to_latest status : Latest.t =
             { node_ip_addr= status.node_ip_addr
             ; node_peer_id= status.node_peer_id
             ; sync_status= status.sync_status
