@@ -278,30 +278,8 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
         {conf_dir; logger; proof_level}
     in
-    (* Handle implicit raciness in the wait syscall by calling [Process.wait]
-       early, so that its value will be correctly cached when we actually need
-       it.
-    *)
-    ( match
-        Or_error.try_with (fun () ->
-            (* Eagerly force [Process.wait], so that it won't be captured
-               elsewhere on exit.
-            *)
-            let waiting = Process.wait process in
-            don't_wait_for
-              ( match%map Monitor.try_with_or_error (fun () -> waiting) with
-              | Ok _ ->
-                  ()
-              | Error err ->
-                  [%log error]
-                    "Saw a deferred exception $exn while waiting for process"
-                    ~metadata:[("exn", Error_json.error_to_yojson err)] ) )
-      with
-    | Ok _ ->
-        ()
-    | Error err ->
-        [%log error] "Saw an exception $exn while waiting for process"
-          ~metadata:[("exn", Error_json.error_to_yojson err)] ) ;
+    Child_processes.Termination.wait_for_process_log_errors ~logger process
+      ~module_:__MODULE__ ~location:__LOC__ ;
     let exit_or_signal = wait_safe process in
     [%log info]
       "Daemon started process of kind $process_kind with pid $verifier_pid"
