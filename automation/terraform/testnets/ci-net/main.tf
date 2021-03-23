@@ -20,10 +20,12 @@ variable "testnet_name" {
 
 variable "coda_image" {
   type = string
+  default = "codaprotocol/coda-daemon:1.1.3-compatible"
 }
 
 variable "coda_archive_image" {
   type = string
+  default = "codaprotocol/coda-archive:1.1.3-compatible"
 }
 
 variable "seed_count" {
