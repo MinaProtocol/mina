@@ -60,8 +60,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
           wait_for t @@ Wait_condition.node_to_initialize bp )
     in
     [%log info]
-      "common prefix test: waiting for 10 blocks to be produced on the network" ;
-    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 10) in
+      "common prefix test: waiting for 6 blocks to be produced on the network" ;
+    let%bind () = wait_for t (Wait_condition.blocks_to_be_produced 6) in
     [%log info] "common prefix test: collecting best chains from nodes" ;
     let%bind chains =
       Malleable_error.List.map block_producers ~f:(fun bp ->
