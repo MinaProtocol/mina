@@ -61,7 +61,7 @@ groups:
       description: "<= 50% nodes synced on network {{ $labels.testnet }}."
 
   - alert: NodesOutOfSync
-    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alerting_timeframe}])) < .9
+    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alerting_timeframe}])) < .75
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -78,13 +78,13 @@ groups:
       summary: "{{ $labels.testnet }} avg. peer count is critically low"
       description: "Critically low peer count on network {{ $labels.testnet }}."
 
-  - alert: LowMinWindowDensity
-    expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) < 0.75 * 0.75 * 77
+  - alert: CriticallyLowMinWindowDensity
+    expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) <= 30
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} min density is low"
+      summary: "{{ $labels.testnet }} min density is critically low"
       description: "Critically low min density on network {{ $labels.testnet }}."
 
   - alert: LowFillRate
@@ -205,6 +205,15 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 block without transactions at the tip"
       description: "At least 5 blocks without transactions on tip of network {{ $labels.testnet }} within ${alerting_timeframe}."
+
+  - alert: LowMinWindowDensity
+    expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) <= 35
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} min density is low"
+      description: "Low min density on network {{ $labels.testnet }}."
 
   - alert: SeedListDegraded
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alerting_timeframe}])) <= 0.5
