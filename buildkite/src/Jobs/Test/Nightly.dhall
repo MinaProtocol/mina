@@ -5,16 +5,13 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 
 let DeployTestnet = ../../Command/DeployTestnet.dhall
 
-let dependsOn = [
-    { name = "MinaArtifact", key = "mina-docker-image" },
-    { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
-]
 
 let spec = DeployTestnet.DeploySpec::{
   testnetLabel = "nightly",
   workspace = "nightly",
   deployCondition = "build.branch == 'compatible' || build.env('NIGHTLY') == 'true'",
   preDeploy = "terraform destroy -auto-approve",
+  extraArgs =  "-var-file=nightly.tfvars",
   deps = [
     { name = "MinaArtifact", key = "mina-docker-image" },
     { name = "ArchiveNodeArtifact", key = "archive-docker-image" }

@@ -14,10 +14,10 @@ let DeploySpec = {
     artifactPath: Text,
     preDeploy: Text,
     postDeploy: Text,
+    deployCondition: Text,
     testnetDir: Text,
     deps : List Command.TaggedKey.Type,
-    varFile: Text,
-    deployCondition: Text
+    extraArgs: Text
   },
   default = {
     testnetLabel = "ci-net",
@@ -26,10 +26,10 @@ let DeploySpec = {
     artifactPath = "/tmp/artifacts",
     preDeploy = "echo Deploying network...",
     postDeploy = "echo Deployment successfull!",
+    deployCondition = "",
     testnetDir = "automation/terraform/testnets/ci-net",
     deps = [] : List Command.TaggedKey.Type,
-    varFile = "ci-net.tfvars",
-    deployCondition = ""
+    extraArgs = ""
   }
 }
 
@@ -49,13 +49,13 @@ in
           Cmd.run "artifact-cache-helper.sh ${spec.deployEnvFile}",
           -- launch testnet based on deploy ENV and ensure auto-cleanup on `apply` failures
           Cmd.run "source ${spec.deployEnvFile}",
-          -- execute post-deploy operation
+          -- execute pre-deploy operation
           Cmd.run "${spec.preDeploy}",
           Cmd.run (
-            "terraform apply -auto-approve -var-file=${spec.varFile}" ++
+            "terraform apply -auto-approve ${spec.extraArgs}" ++
               " -var coda_image=gcr.io/o1labs-192920/coda-daemon:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
               " -var coda_archive_image=gcr.io/o1labs-192920/coda-archive:\\\$CODA_VERSION-\\\$CODA_GIT_HASH" ++
-              " -var artifact_path=${spec.artifactPath} " ++
+              " -var artifact_path=${spec.artifactPath}" ++
               " || (terraform destroy -auto-approve && exit 1)"
           ),
           -- upload/cache testnet genesis_ledger

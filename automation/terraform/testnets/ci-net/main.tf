@@ -85,8 +85,12 @@ module "ci_testnet" {
 
   coda_image         = var.coda_image
   coda_archive_image = var.coda_archive_image
+  coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.6"
 
+  seed_count              = var.seed_count
+
+  archive_node_count  = var.archive_count
   archive_configs     = var.archive_configs
   mina_archive_schema = "https://raw.githubusercontent.com/MinaProtocol/mina/fd3980820fb82c7355af49462ffefe6718800b77/src/app/archive/create_schema.sql"
 
@@ -102,14 +106,13 @@ module "ci_testnet" {
   log_level           = "Info"
   log_txn_pool_gossip = false
 
+  whale_count             = var.whale_count
+  fish_count              = var.fish_count
   block_producer_key_pass           = "naughty blue worm"
   block_producer_starting_host_port = 10501
 
+  snark_worker_replicas   = var.snark_worker_count
   snark_worker_host_port  = 10401
-  whale_count             = var.whale_count
-  fish_count              = var.fish_count
-  seed_count              = var.seed_count
-  snark_worker_replicas   = 1
   snark_worker_fee        = "0.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
 
