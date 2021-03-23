@@ -263,8 +263,10 @@ let start_custom :
     Deferred.map ~f:Or_error.return
     @@ maybe_kill_and_unlock name lock_path logger
   in
-  [%log debug] "Starting custom child process %s with args $args" name
-    ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
+  [%log debug] "Starting custom child process $name with args $args"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a))) ] ;
   let%bind coda_binary_path = get_coda_binary () in
   let relative_to_root =
     get_project_root ()
