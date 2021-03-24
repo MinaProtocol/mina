@@ -56,7 +56,7 @@ outputPathInput.addEventListener("click", async (e) => {
 const form = document.getElementById("snapp-form");
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  if (localStorage.getItem("loading") === true) {
+  if (localStorage.getItem("loading") === "true") {
     return;
   }
 
