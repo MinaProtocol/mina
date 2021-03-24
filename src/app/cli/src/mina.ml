@@ -1037,8 +1037,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         ; is_seed
         ; creatable_gossip_net=
             Mina_networking.Gossip_net.(
-              Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
-        }
+              Any.Creatable
+                ((module Libp2p), Libp2p.create ~pids gossip_net_params)) }
       in
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
