@@ -53,7 +53,12 @@
     },
     "linux": {
       "target": [
-        "AppImage"
+        "deb"
+      ]
+    },
+    "deb": {
+      "depends": [
+        "libjemalloc2"
       ]
     },
     "win": {
