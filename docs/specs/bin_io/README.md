@@ -84,8 +84,6 @@ If writing `Bin_prot`-compatible code in a language other than OCaml, that
 code would have to replicate the serialization and deserialization strategy
 used in the custom code.
 
-`bin_size_t` is used to  `bin_write_t` is used to . `bin_read_t` is used
-
 # Versioned types
 
 In Mina, except for types involved in client-to-daemon communication,
