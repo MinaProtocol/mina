@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
 	"math/rand"
 	gonet "net"
 	"path"
+	"sync/atomic"
 	"time"
+
+	"github.com/libp2p/go-libp2p-core/peerstore"
 
 	dsb "github.com/ipfs/go-ds-badger"
 	logging "github.com/ipfs/go-log"
@@ -53,7 +55,10 @@ func parseCIDR(cidr string) gonet.IPNet {
 
 type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
-const numPxConnectionWorkers int = 8
+const (
+	numPxConnectionWorkers int = 8
+    ConsensusNodeTag  = "consensus_node"
+)
 
 var (
 	logger      = logging.Logger("codanet.Helper")
@@ -71,6 +76,7 @@ var (
 
 	pxProtocolID         = protocol.ID("/mina/peer-exchange")
 	NodeStatusProtocolID = protocol.ID("/mina/node-status")
+	HandshakeProtocolID  = protocol.ID("/mina/handshake")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -91,16 +97,18 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx              context.Context
-	host             host.Host
-	p2pManager       *p2pconnmgr.BasicConnMgr
-	minaPeerExchange bool
-	getRandomPeers   getRandomPeersFunc
-	OnConnect        func(network.Network, network.Conn)
-	OnDisconnect     func(network.Network, network.Conn)
+	ctx                context.Context
+	host               host.Host
+	p2pManager         *p2pconnmgr.BasicConnMgr
+	minaPeerExchange   bool
+	getRandomPeers     getRandomPeersFunc
+	OnConnect          func(network.Network, network.Conn)
+	OnDisconnect       func(network.Network, network.Conn)
+	consensusNodeCount int64
+	maxConsensusNode   int64
 }
 
-func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaConnectionManager {
+func newCodaConnectionManager(maxConnections int, minaPeerExchange bool, maxConsensusNode int64) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
@@ -108,6 +116,7 @@ func newCodaConnectionManager(maxConnections int, minaPeerExchange bool) *CodaCo
 		OnConnect:        noop,
 		OnDisconnect:     noop,
 		minaPeerExchange: minaPeerExchange,
+		maxConsensusNode: maxConsensusNode,
 	}
 }
 
@@ -123,8 +132,15 @@ func (cm *CodaConnectionManager) GetTagInfo(p peer.ID) *connmgr.TagInfo {
 	return cm.p2pManager.GetTagInfo(p)
 }
 func (cm *CodaConnectionManager) TrimOpenConns(ctx context.Context) { cm.p2pManager.TrimOpenConns(ctx) }
-func (cm *CodaConnectionManager) Protect(p peer.ID, tag string)     { cm.p2pManager.Protect(p, tag) }
+func (cm *CodaConnectionManager) Protect(p peer.ID, tag string) {
+	if cm.consensusNodeCount >= cm.maxConsensusNode && tag == ConsensusNodeTag {
+		return
+	}
+	cm.p2pManager.Protect(p, tag)
+	atomic.AddInt64(&cm.consensusNodeCount, 1)
+}
 func (cm *CodaConnectionManager) Unprotect(p peer.ID, tag string) bool {
+	atomic.AddInt64(&cm.consensusNodeCount, -1)
 	return cm.p2pManager.Unprotect(p, tag)
 }
 func (cm *CodaConnectionManager) IsProtected(p peer.ID, tag string) bool {
@@ -216,6 +232,9 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
 	cm.OnDisconnect(net, c)
 	cm.p2pManager.Notifee().Disconnected(net, c)
+	if cm.IsProtected(c.LocalPeer(), ConsensusNodeTag) {
+		atomic.AddInt64(&cm.consensusNodeCount, -1)
+	}
 }
 
 // proxy remaining p2pconnmgr.BasicConnMgr methods for access
@@ -240,6 +259,7 @@ type Helper struct {
 	Seeds             []peer.AddrInfo
 	NodeStatus        string
 	pxDiscoveries     chan peer.AddrInfo
+	IsConsensusNode   bool
 }
 
 // this type implements the ConnectionGating interface
@@ -539,6 +559,39 @@ func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	logger.Debugf("wrote node status to stream %s", s.Protocol())
 }
 
+func (h *Helper) handleHandshakeStream(s network.Stream) {
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			logger.Error("failed to close write side of stream", err)
+			return
+		}
+
+		<-time.After(400 * time.Millisecond)
+
+		err = s.Reset()
+		if err != nil {
+			logger.Error("failed to reset stream", err)
+		}
+	}()
+
+	data, err := json.Marshal(h.IsConsensusNode)
+	if err != nil {
+		logger.Error("failed to unmarshal Handshake data", err)
+	}
+
+	n, err := s.Write(data)
+	if err != nil {
+		logger.Error("failed to write data to stream", err)
+		return
+	} else if n != len(data) {
+		logger.Error("failed to write all data to stream")
+		return
+	}
+
+	logger.Debugf("wrote Handshake data to stream %s", s.Protocol())
+}
+
 func (h Helper) pxConnectionWorker() {
 	for peer := range h.pxDiscoveries {
 		connInfo := h.ConnectionManager.GetInfo()
@@ -557,7 +610,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool, maxConsensusNode int64) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -594,7 +647,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange)
+	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange, maxConsensusNode)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,
@@ -652,13 +705,14 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		BandwidthCounter:  bandwidthCounter,
 		Seeds:             seeds,
 		pxDiscoveries:     nil,
+		IsConsensusNode:   false,
 	}
 
 	if !minaPeerExchange {
 		return h, nil
 	}
 
-	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections * 3)
+	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections*3)
 	for w := 0; w < numPxConnectionWorkers; w++ {
 		go h.pxConnectionWorker()
 	}
@@ -668,5 +722,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
 	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
+	h.Host.SetStreamHandler(HandshakeProtocolID, h.handleHandshakeStream)
 	return h, nil
 }

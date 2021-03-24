@@ -20,8 +20,8 @@ import (
 	peer "github.com/libp2p/go-libp2p-core/peer"
 	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
-	"github.com/libp2p/go-libp2p-pubsub"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 
 func testStreamHandler(_ net.Stream) {}
 
-func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *app {
+func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int, maxConsensusNode int64) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
@@ -69,6 +69,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *
 		codanet.NewCodaGatingState(nil, nil, nil, nil),
 		maxConns,
 		true,
+		maxConsensusNode,
 	)
 	require.NoError(t, err)
 	port++
@@ -97,7 +98,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, maxConns int) *
 }
 
 func newTestApp(t *testing.T, seeds []peer.AddrInfo) *app {
-	return newTestAppWithMaxConns(t, seeds, 50)
+	return newTestAppWithMaxConns(t, seeds, 50, 0)
 }
 
 func addrInfos(h host.Host) (addrInfos []peer.AddrInfo, err error) {
@@ -881,7 +882,7 @@ func TestGetPeerMessage(t *testing.T) {
 
 	// only allow peer count of 2 for node A
 	maxCount := 2
-	appA := newTestAppWithMaxConns(t, nil, maxCount)
+	appA := newTestAppWithMaxConns(t, nil, maxCount, 0)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 
@@ -936,7 +937,7 @@ func TestGetNodeStatus(t *testing.T) {
 
 	// only allow peer count of 1 for node A
 	maxCount := 1
-	appA := newTestAppWithMaxConns(t, nil, maxCount)
+	appA := newTestAppWithMaxConns(t, nil, maxCount, 0)
 	appAInfos, err := addrInfos(appA.P2p.Host)
 	require.NoError(t, err)
 	appA.P2p.NodeStatus = "testdata"
@@ -958,4 +959,73 @@ func TestGetNodeStatus(t *testing.T) {
 	ret, err := msg.run(appC)
 	require.NoError(t, err)
 	require.Equal(t, appA.P2p.NodeStatus, ret)
+}
+
+func TestTotalConsensusNode(t *testing.T) {
+	codanet.NoDHT = true
+	defer func() {
+		codanet.NoDHT = false
+	}()
+
+	expected := &setConsensusNodeMsg{
+		IsConsensusNode: true,
+	}
+
+	// Only allow one active connection for node A.
+	maxCount := 1
+	appA := newTestAppWithMaxConns(t, nil, maxCount, 0)
+	appB := newTestAppWithMaxConns(t, nil, maxCount, 0)
+	appC := newTestAppWithMaxConns(t, nil, maxCount, 1)
+
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+	err = appC.P2p.Host.Connect(appA.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	appBInfos, err := addrInfos(appB.P2p.Host)
+	require.NoError(t, err)
+	err = appC.P2p.Host.Connect(appB.Ctx, appBInfos[0])
+	require.NoError(t, err)
+
+	ret, err := expected.run(appA)
+	require.NoError(t, err)
+	require.Equal(t, "consensusNodeMsg set successfully", ret)
+
+	ret, err = expected.run(appB)
+	require.NoError(t, err)
+	require.Equal(t, "consensusNodeMsg set successfully", ret)
+
+	// Ensure handshake data is exchanged.
+	getCnsNodeA := &getConsensusNodeMsg{
+		PeerMultiaddr: multiaddrs(appA.P2p.Host)[0].String(),
+	}
+
+	ret, err = getCnsNodeA.run(appC)
+	require.NoError(t, err)
+	isConsensusNode, ok := ret.(bool)
+	require.True(t, ok)
+	require.Equal(t, expected.IsConsensusNode, isConsensusNode)
+
+	getCnsNodeB := &getConsensusNodeMsg{
+		PeerMultiaddr: multiaddrs(appB.P2p.Host)[0].String(),
+	}
+
+	ret, err = getCnsNodeB.run(appC)
+	require.NoError(t, err)
+	isConsensusNode, ok = ret.(bool)
+	require.True(t, ok)
+	require.Equal(t, expected.IsConsensusNode, isConsensusNode)
+
+    // maxConsensusNode limit is set to 1, so only 1 peer will be protected.
+    require.True(t, appC.P2p.ConnectionManager.IsProtected(appA.P2p.Me, ""))
+	require.False(t, appC.P2p.ConnectionManager.IsProtected(appB.P2p.Me, ""))
+	require.Equal(t, 2, len(appC.P2p.Host.Network().Peers()))
+
+	appC.P2p.ConnectionManager.TrimOpenConns(context.Background())
+
+	time.Sleep(1 * time.Second)
+
+	require.Equal(t, 1, len(appC.P2p.Host.Network().Peers()))
+	require.Equal(t, appC.P2p.Host.Network().Peers()[0].Pretty(), appA.P2p.Me.Pretty())
+	require.True(t, appC.P2p.ConnectionManager.IsProtected(appA.P2p.Me, ""))
 }
