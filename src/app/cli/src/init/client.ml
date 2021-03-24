@@ -2102,7 +2102,7 @@ let receipt_chain_hash =
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
        in
-       (* What we call transation IDs in GraphQL are just base58_check-encoded
+       (* What we call transaction IDs in GraphQL are just base58_check-encoded
          transactions. It's easy to handle, and we return it from the
          transaction commands above, so lets use this format.
       *)
@@ -2112,6 +2112,35 @@ let receipt_chain_hash =
            previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
+let chain_id_inputs =
+  let open Deferred.Let_syntax in
+  Command.async ~summary:"Print the inputs that yield the current chain id"
+    (Cli_lib.Background_daemon.rpc_init (Command.Param.all_unit [])
+       ~f:(fun port () ->
+         let open Daemon_rpcs in
+         match%map Client.dispatch Chain_id_inputs.rpc () port with
+         | Ok (genesis_state_hash, genesis_constants, snark_keys) ->
+             let open Format in
+             printf "Genesis state hash: %s@."
+               (State_hash.to_base58_check genesis_state_hash) ;
+             printf "Genesis_constants:@." ;
+             printf "  Protocol:          %s@."
+               ( Genesis_constants.Protocol.to_yojson genesis_constants.protocol
+               |> Yojson.Safe.to_string ) ;
+             printf "  Txn pool max size: %d@."
+               genesis_constants.txpool_max_size ;
+             printf "  Num accounts:      %s@."
+               ( match genesis_constants.num_accounts with
+               | Some n ->
+                   Int.to_string n
+               | None ->
+                   "None" ) ;
+             printf "Snark keys:@." ;
+             List.iter snark_keys ~f:(printf "  %s@.")
+         | Error err ->
+             Format.eprintf "Could not get chain id inputs: %s@."
+               (Error.to_string_hum err) ))
 
 let hash_transaction =
   let open Command.Let_syntax in
@@ -2246,7 +2275,8 @@ let advanced =
     ; ("archive-blocks", archive_blocks)
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
-    ; ("set-coinbase-receiver", set_coinbase_receiver_graphql) ]
+    ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
+    ; ("chain-id-inputs", chain_id_inputs) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"

@@ -279,6 +279,8 @@ let start_custom :
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
+  Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
+    ~location:__LOC__ ;
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ Async.Writer.save lock_path

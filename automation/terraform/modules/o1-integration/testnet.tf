@@ -3,6 +3,7 @@ module "kubernetes_testnet" {
   source    = "../kubernetes/testnet"
 
   use_local_charts    = true
+  expose_graphql      = var.deploy_graphql_ingress
   healthcheck_enabled = false
   deploy_watchdog     = false
 

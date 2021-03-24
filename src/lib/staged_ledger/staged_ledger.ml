@@ -1568,8 +1568,7 @@ module T = struct
         (*There's enough work. Check if they satisfy other constraints*)
         Resources.budget_sufficient resources
       then
-        if Resources.space_constraint_satisfied resources then (resources, log)
-        else if Resources.worked_more ~constraint_constants resources then
+        if Resources.worked_more ~constraint_constants resources then
           (*There are too many fee_transfers(from the proofs) occupying the slots. discard one and check*)
           let resources', work_opt =
             Resources.discard_last_work ~constraint_constants resources
@@ -1578,6 +1577,8 @@ module T = struct
             (Option.value_map work_opt ~default:log ~f:(fun work ->
                  Diff_creation_log.discard_completed_work `Extra_work work log
              ))
+        else if Resources.space_constraint_satisfied resources then
+          (resources, log)
         else
           (*Well, there's no space; discard a user command *)
           let resources', uc_opt = Resources.discard_user_command resources in
