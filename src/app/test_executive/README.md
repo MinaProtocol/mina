@@ -11,17 +11,22 @@ Note: this environment setup assumes that one is a member of o(1) labs and has a
 
 ![automated-validation service account "Keys" tab](https://user-images.githubusercontent.com/3465290/112069746-9aaed080-8b29-11eb-83f1-f36876f3ac3d.png)
 
-3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set: `KUBE_CONFIG_PATH`, any other vars relating to Google cloud access, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`, vars relating to ocaml compilation.  It's recommened to set all of these in .bashrc or .profile.
+3) Other than `GCLOUD_API_KEY`, ensure the following other environment variables are also properly set (preferably in in .bashrc or .profile.): 
+- `KUBE_CONFIG_PATH`.  this should usually be `~/.kube/config`
+- any other vars relating to Google cloud access, 
+- any AWS related vars, namely: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION=us-west-2`, 
+- vars relating to ocaml compilation
 
 4) Run the following commands in order to log in to Google Cloud, and activate the service account for one's work machine.
 
 ```
 gcloud auth login --no-launch-browser <personal login name>
 gcloud container clusters get-credentials --region us-west1 mina-integration-west1
-gcloud auth activate-service-account automated-validation@<email domain> --key-file=<path to automated-validation key file>
+kubectl config use-context gke_o1labs-192920_us-west1_mina-integration-west1
+gcloud auth activate-service-account <service account name> --key-file=<path to service account key file>
 ```
 
-When the service account is activated, one can run the integration tests but it may interfere with other activity on GCP.  If, in the course of other development, one switches to a separate account, one may need to run the last line again in order to switch back to the service account.
+When the service account is activated, one can run the integration tests.  However, in the course of using GCP, one may need to re-activate other accounts or set the context to use other clusters, switching away from the service account.  If one is getting authentication errors, then re-running the above commands to set the correct cluster and activate the service account will probably fix them.
 
 5) OPTIONAL: Set the following aliases in one's .bashrc or .bash_aliases (note that aliases don't work if set in .profile):
 
