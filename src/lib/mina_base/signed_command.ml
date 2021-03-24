@@ -387,11 +387,18 @@ let check_signature ({payload; signer; signature} : t) =
 
 [%%endif]
 
+let check_valid_keys t =
+  let fee_payer = fee_payer_pk t in
+  let source = source_pk t in
+  let receiver = receiver_pk t in
+  List.for_all [fee_payer; source; receiver] ~f:(fun pk ->
+      Option.is_some (Public_key.decompress pk) )
+
 let create_with_signature_checked signature signer payload =
   let open Option.Let_syntax in
   let%bind signer = Public_key.decompress signer in
   let t = Poly.{payload; signature; signer} in
-  Option.some_if (check_signature t) t
+  Option.some_if (check_signature t && check_valid_keys t) t
 
 let gen_test =
   let open Quickcheck.Let_syntax in
@@ -409,7 +416,7 @@ let%test_unit "json" =
       assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t)
   )
 
-let check t = Option.some_if (check_signature t) t
+let check t = Option.some_if (check_signature t && check_valid_keys t) t
 
 let forget_check t = t
 
