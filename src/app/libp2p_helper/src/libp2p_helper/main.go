@@ -1423,7 +1423,7 @@ type successResult struct {
 }
 
 var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "connection_count",
+	Name: "Coda_active_connections_total",
 	Help: "Number of active connections, according to the CodaConnectionManager.",
 })
 
