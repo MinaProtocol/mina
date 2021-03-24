@@ -37,7 +37,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let%bind () = wait_for t (Wait_condition.node_to_initialize sender_bp) in
     [%log info] "send_payment_test: done waiting for initialization" ;
     (* send the payment *)
-    let amount = Currency.Amount.of_int 200_000_000 in
+    let amount = Currency.Amount.of_int 200_000_000_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
       Network.Node.send_payment ~logger sender_bp ~sender:sender_pub_key
