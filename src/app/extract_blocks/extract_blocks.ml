@@ -238,7 +238,7 @@ let fill_in_internal_commands pool block_state_hash =
     query_db
       ~item:
         "internal command id, global_slot, sequence no, secondary sequence \
-         no, receiver_balance" ~f:(fun db ->
+         no, receiver_balance_id" ~f:(fun db ->
         Sql.Blocks_and_internal_commands.run db ~block_id )
   in
   Deferred.List.map internal_cmd_info
@@ -246,10 +246,14 @@ let fill_in_internal_commands pool block_state_hash =
             ; global_slot
             ; sequence_no
             ; secondary_sequence_no
-            ; receiver_balance }
+            ; receiver_balance_id }
        ->
+      let%bind _pubkey, receiver_balance_int64 =
+        query_db ~item:"receiver balance" ~f:(fun db ->
+            Processor.Balance.load db ~id:receiver_balance_id )
+      in
       let receiver_balance =
-        receiver_balance |> Unsigned.UInt64.of_int64
+        Unsigned.UInt64.of_int64 receiver_balance_int64
         |> Currency.Balance.of_uint64
       in
       (* pieces from the internal_commands table *)
