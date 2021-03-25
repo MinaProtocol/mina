@@ -13,8 +13,9 @@ module "o1testnet_alerts" {
   source = "../modules/testnet-alerts"
 
   rule_filter            = "{testnet!~\"^(it-|ci-net).+\"}" # omit testnets deployed by integration/CI tests
-  rule_timeframe         = "1h"
-  pagerduty_alert_filter = "devnet2"
+  alert_timeframe        = "1h"
+  alert_duration         = "10m"
+  pagerduty_alert_filter = "devnet2|mainnet"
 }
 
 output "testnet_alert_rules" {
