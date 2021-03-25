@@ -1,6 +1,3 @@
-[%%import
-"../../config.mlh"]
-
 open Core_kernel
 open Mina_base
 
@@ -69,18 +66,7 @@ struct
   let create ~statement ~sok_digest ~proof:_ = (statement, sok_digest)
 end
 
-[%%if
-proof_level = "full"]
-
 include Prod
-
-[%%else]
-
-(* TODO #1698: proof_level=check *)
-
-include Debug
-
-[%%endif]
 
 type _ type_witness =
   | Debug : Debug.t type_witness
