@@ -8,7 +8,7 @@ In terms of the data structure, the transition frontier can be thought of as a c
 2) A history of recently finalized blocks.
 3) A snarked ledger for the most recently finalized block.
 4) A series of ledger masks, chained off of the aforementioned snarked ledger, to represent intermediate staged ledger states achieved by blocks tracked past the most recently finalized block.
-5) The auxilliary scan state information associated with each block tracked past the most recently finalized block.
+5) The auxiliary scan state information associated with each block tracked past the most recently finalized block.
 
 Importantly, the transition frontier also can identify which of the states it is tracking is the strongest state, which is referred to as the "best tip". The consensus mechanism informs the transition frontier of how to compare blocks for strength.
 
@@ -23,8 +23,8 @@ TODO
 | Best Tip                 | The best state in a frontier. This is always a tip (leaf) of the frontier, by nature of the consensus selection rules |
 | Breadcrumb               | A fully expanded state for a block. Contains a validated block and a make-chained staged ledger, with some metadata. |
 | Frontier Diff            | A representation of a state transition to perform on a frontier data structure. |
-| Frontier Root Data       | Fat, auxilliary information stored for the root of a persistent frontier. Stored in a single file, it contains a serialized scan state and pending coinbase state, which can be used to reconstruct a staged ledger at the root of the persistent frontier. |
-| Frontier Root Identifier | Light, auxilliary information stored for the persistent root. Stored in a single file, it identifies the root state hash currently associated with a persistent root. |
+| Frontier Root Data       | Fat, auxiliary information stored for the root of a persistent frontier. Stored in a single file, it contains a serialized scan state and pending coinbase state, which can be used to reconstruct a staged ledger at the root of the persistent frontier. |
+| Frontier Root Identifier | Light, auxiliary information stored for the persistent root. Stored in a single file, it identifies the root state hash currently associated with a persistent root. |
 | Full Frontier            | The in-memory representation of the transition frontier, with fully expanded states at every node (breadcrumbs). |
 | Persistent Frontier      | An on-disk representation of the transition frontier. Stores block information in RocksDB, which is asynchronously updated by processing frontier diffs applied to the in memory full frontier representation. |
 | Persistent Root          | An on-disk ledger where the root snarked ledger of the transition frontier is stored. The ledger serves as the root ledger in the full frontier's mask chain, and is actively mutated by the full frontier as new roots are committed. |
@@ -81,9 +81,9 @@ TODO: mask maintenance on root transition & mask chaining diagram
 
 TODO: add the new rules here for izzy's root hack
 
-The persistent frontier is an on-disk, limited representation of a frontier, along with a concurrent subsystem for synchronizing it with the full frontier's state. To maintain a reasonable level of disk I/O, the persistent frontier stores only blocks and not fully expanded breadcrumbs. It maintains neither the auxilliary scan state or the ledger required to construct the staged ledger. Instead, it relies on additional auxilliary information, "minimal root data", to also be available. This information is more expensive to write (larger) than the normal database synchronization operations, but occurs less often. Because the root data in the database is not necessarily kept in sync with the other information for the persistent frontier, and there is no guarantee that the persisted root (which is required for building the root staged ledger) will be in sync, it is important that the persistent frontier can recover from desynchronizations. The daemon attempts to always synchronize this data when it shuts down, but in the case of a crash, sometimes this will not happen.
+The persistent frontier is an on-disk, limited representation of a frontier, along with a concurrent subsystem for synchronizing it with the full frontier's state. To maintain a reasonable level of disk I/O, the persistent frontier stores only blocks and not fully expanded breadcrumbs. It maintains neither the auxiliary scan state or the ledger required to construct the staged ledger. Instead, it relies on additional auxiliary information, "minimal root data", to also be available. This information is more expensive to write (larger) than the normal database synchronization operations, but occurs less often. Because the root data in the database is not necessarily kept in sync with the other information for the persistent frontier, and there is no guarantee that the persisted root (which is required for building the root staged ledger) will be in sync, it is important that the persistent frontier can recover from desynchronizations. The daemon attempts to always synchronize this data when it shuts down, but in the case of a crash, sometimes this will not happen.
 
-The persistent frontier receives a notification every time diffs are applied to the full frontier. When this notification is received, the persistent frontier writes any diffs that were applied into a diff buffer. At a later point in time, this diff buffer is flushed, and all of the recorded diffs are performed against the persistent frontier's database. All diffs are processed in the buffer, but the auxilliary root data stored in the persistent frontier is only updated 1 time per flush.
+The persistent frontier receives a notification every time diffs are applied to the full frontier. When this notification is received, the persistent frontier writes any diffs that were applied into a diff buffer. At a later point in time, this diff buffer is flushed, and all of the recorded diffs are performed against the persistent frontier's database. All diffs are processed in the buffer, but the auxiliary root data stored in the persistent frontier is only updated 1 time per flush.
 
 ![](./res/persistent_frontier_concurrency.dot.png)
 
@@ -98,7 +98,7 @@ The database supports the following schema:
 | Key                                   | Args           | Value                       | Description |
 |---------------------------------------|----------------|-----------------------------|-------------|
 | `Db_version`                          | `()`           | `int`                       | The current schema version stored in the database. |
-| `Root`                                | `()`           | `Root_data.Minimal.t`       | The auxilliary root data. |
+| `Root`                                | `()`           | `Root_data.Minimal.t`       | The auxiliary root data. |
 | `Best_tip`                            | `()`           | `State_hash.t`              | Pointer to the current best tip. |
 | `Protocol_states_for_root_scan_state` | `()`           | `Protocol_state.value list` | Auxilliary block headers required for constructing the scan state at the root |
 | `Transition`                          | `State_hash.t` | `External_transition.t`     | Block storage by state hash. |
