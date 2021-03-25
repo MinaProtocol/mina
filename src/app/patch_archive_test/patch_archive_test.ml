@@ -258,7 +258,7 @@ let () =
            Param.flag "--archive-uri"
              ~doc:
                "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER:$PASSWORD@localhost:5432/archiver)"
+                postgres://$USER:password@localhost:5432/archiver)"
              Param.(required string)
          and num_blocks_to_patch =
            Param.(
