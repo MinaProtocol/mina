@@ -1016,8 +1016,8 @@ func TestTotalConsensusNode(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, expected.IsConsensusNode, isConsensusNode)
 
-    // maxConsensusNode limit is set to 1, so only 1 peer will be protected.
-    require.True(t, appC.P2p.ConnectionManager.IsProtected(appA.P2p.Me, ""))
+	// maxConsensusNode limit is set to 1, so only 1 peer will be protected.
+	require.True(t, appC.P2p.ConnectionManager.IsProtected(appA.P2p.Me, ""))
 	require.False(t, appC.P2p.ConnectionManager.IsProtected(appB.P2p.Me, ""))
 	require.Equal(t, 2, len(appC.P2p.Host.Network().Peers()))
 

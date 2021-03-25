@@ -57,7 +57,7 @@ type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
 const (
 	numPxConnectionWorkers int = 8
-    ConsensusNodeTag  = "consensus_node"
+	ConsensusNodeTag           = "consensus_node"
 )
 
 var (
