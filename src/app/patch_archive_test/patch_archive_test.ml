@@ -183,8 +183,8 @@ let main ~archive_uri ~num_blocks_to_patch ~archive_blocks_path
         Deferred.List.iter indexes_to_delete ~f:(fun ndx ->
             let state_hash = state_hash_array.(ndx) in
             (* before removing block, remove any parent id references to that block
-                 otherwise, we get a foreign key constraint violation
-              *)
+               otherwise, we get a foreign key constraint violation
+            *)
             [%log info]
               "Removing parent references to block with state hash \
                $state_hash in copied database"
