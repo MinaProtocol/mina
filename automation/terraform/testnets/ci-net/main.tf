@@ -93,6 +93,14 @@ variable "report_discord_webhook_url" {
   default = ""
 }
 
+data "aws_secretsmanager_secret" "health_report_discord_webhook_metadata" {
+  name = "mina/health/discord/webhook"
+}
+
+data "aws_secretsmanager_secret_version" "health_report_discord_webhook" {
+  secret_id = "${data.aws_secretsmanager_secret.health_report_discord_webhook_metadata.id}"
+}
+
 module "ci_testnet" {
   source = "../../modules/o1-testnet"
 
@@ -141,5 +149,5 @@ module "ci_testnet" {
   restart_nodes                   = false
   make_reports                    = var.make_reports
   make_report_every_mins          = "5"
-  make_report_discord_webhook_url = var.report_discord_webhook_url
+  make_report_discord_webhook_url = length(var.report_discord_webhook_url) > 0 ? var.report_discord_webhook_url : data.aws_secretsmanager_secret_version.health_report_discord_webhook.secret_string
 }
