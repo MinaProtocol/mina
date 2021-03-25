@@ -1,5 +1,3 @@
-[%%import "../../config.mlh"]
-
 module Failure = Verification_failure
 
 module Dummy : module type of Dummy
