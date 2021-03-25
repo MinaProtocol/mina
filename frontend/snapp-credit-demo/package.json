@@ -58,7 +58,7 @@
     },
     "deb": {
       "depends": [
-        "libjemalloc2"
+        "libjemalloc-dev"
       ]
     },
     "win": {
