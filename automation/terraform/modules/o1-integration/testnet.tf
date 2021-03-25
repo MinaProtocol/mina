@@ -25,7 +25,8 @@ module "kubernetes_testnet" {
   additional_peers = [local.seed_peer.multiaddr]
   runtime_config   = var.runtime_config
 
-  seed_zone   = "us-west1-a"
+  # seed_zone   = "us-west1-a"
+  seed_zone   = "asdfasdfasdfasdfasdf"
   seed_region = "us-west1"
   seed_configs = [local.seed_config]
 

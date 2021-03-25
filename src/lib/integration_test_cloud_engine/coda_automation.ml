@@ -217,7 +217,7 @@ module Network_config = struct
     ; terraform=
         { cluster_name
         ; cluster_region
-        ; k8s_context= "asdfasddfasdf" (* cluster_id *)
+        ; k8s_context= cluster_id
         ; testnet_name
         ; deploy_graphql_ingress= requires_graphql
         ; coda_image= images.coda
