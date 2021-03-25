@@ -23,14 +23,7 @@ let public_key_compressed =
           (Public_key.Compressed.to_base58_check random) ;
         exit 1
       in
-      let key =
-        try Ok (Public_key.Compressed.of_base58_check_exn s)
-        with e ->
-          Or_error.error_string
-            (sprintf "Invalid key format: %s"
-               (Error.to_string_hum (Error.of_exn e)))
-      in
-      match key with
+      match Public_key.Compressed.of_base58_check s with
       | Error e ->
           error_string e
       | Ok key -> (
