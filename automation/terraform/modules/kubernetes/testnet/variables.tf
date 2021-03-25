@@ -4,19 +4,19 @@ terraform {
 
 # K8s Cluster Vars
 
-variable "k8s_context" {
-  type = string
-
-  description = "K8s resource provider context"
-  default     = "gke_o1labs-192920_us-east1_coda-infra-east"
-}
-
 variable "cluster_name" {
   type = string
 }
 
 variable "cluster_region" {
   type = string
+}
+
+variable "k8s_context" {
+  type = string
+
+  description = "K8s resource provider context"
+  default     = "gke_o1labs-192920_us-east1_coda-infra-east"
 }
 
 # Global Vars

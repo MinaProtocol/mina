@@ -9,7 +9,7 @@ let DeployTestnet = ../../Command/DeployTestnet.dhall
 let spec = DeployTestnet.DeploySpec::{
   testnetLabel = "nightly",
   workspace = "nightly",
-  deployCondition = "build.branch == 'compatible' || build.env('NIGHTLY') == 'true'",
+  deployCondition = "build.branch == 'compatible' && build.env('NIGHTLY') == 'true'",
   preDeploy = "terraform destroy -auto-approve && cp /tmp/gcp_creds.json ../../../gcloud-keyfile.json",
   extraArgs =  "-var-file=nightly.tfvars",
   deps = [
