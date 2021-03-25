@@ -11,6 +11,7 @@
     "test": "tsc test/Test.ts && node test/Test.js"
   },
   "keywords": [
+    "mina",
     "coda",
     "cryptocurrency"
   ],
