@@ -108,27 +108,6 @@ module Proof = Plonk_plookup_dlog_proof.Make (struct
       let n = Pasta_plookup_fq_index.domain_d1_size pk.index in
       let len = Array.length witness in
 
-
-(*
-
-      printf "DOMAIN SIZE %d" n;
-      print_endline "";
-      printf "WITNESS LENGTH %d" (Array.length witness);
-      print_endline "";
-      print_endline "";
-      print_endline "";
-
-
-      print_endline "*****WITNESS*****";
-      Array.iteri witness ~f:(fun i x ->
-      (
-        print_endline (Sexp.to_string ([%sexp_of:  int] i));
-        print_endline (Sexp.to_string ([%sexp_of:  Fq.t array] x))
-      ));
-
-*)
-
-
       let of_witness j =
         Array.init n ~f:(fun i ->
             if i < len then witness.(i).(j) else Field.zero )

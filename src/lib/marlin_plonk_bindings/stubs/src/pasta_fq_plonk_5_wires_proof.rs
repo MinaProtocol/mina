@@ -1,9 +1,9 @@
 use algebra::{
     curves::AffineCurve,
     pasta::{
-        pallas::{Affine as GAffine, PallasParameters},
-        fq::Fq,
+        vesta::{Affine as GAffine, VestaParameters},
         fp::Fp,
+        fq::Fq,
     },
     One,
 };
@@ -21,22 +21,22 @@ use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use plonk_5_wires_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
 use plonk_5_wires_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
 
-use crate::pasta_fq_plonk_5_wires_index::CamlPastaFqPlonkIndexPtr;
-use crate::pasta_fq_plonk_5_wires_verifier_index::CamlPastaFqPlonkVerifierIndex;
-use crate::pasta_fq_vector::CamlPastaFqVector;
+use crate::pasta_fp_plonk_5_wires_index::CamlPastaFpPlonkIndexPtr;
+use crate::pasta_fp_plonk_5_wires_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use crate::pasta_fp_vector::CamlPastaFpVector;
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_5_wires_proof_create(
-    index: CamlPastaFqPlonkIndexPtr<'static>,
-    primary_input: CamlPastaFqVector,
-    auxiliary_input: (Vec<Fq>, Vec<Fq>, Vec<Fq>, Vec<Fq>, Vec<Fq>),
-    prev_challenges: Vec<Fq>,
+pub fn caml_pasta_fp_plonk_5_wires_proof_create(
+    index: CamlPastaFpPlonkIndexPtr<'static>,
+    primary_input: CamlPastaFpVector,
+    auxiliary_input: (Vec<Fp>, Vec<Fp>, Vec<Fp>, Vec<Fp>, Vec<Fp>),
+    prev_challenges: Vec<Fp>,
     prev_sgs: Vec<GAffine>,
 ) -> DlogProof<GAffine> {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
-    let prev: Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
+    let prev: Vec<(Vec<Fp>, PolyComm<GAffine>)> = {
         if prev_challenges.len() == 0 {
             Vec::new()
         } else {
@@ -65,10 +65,10 @@ pub fn caml_pasta_fq_plonk_5_wires_proof_create(
 
     ocaml::runtime::release_lock();
 
-    let map = GroupMap::<Fp>::setup();
+    let map = GroupMap::<Fq>::setup();
     let proof = DlogProof::create::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstants>,
+        DefaultFrSponge<Fp, PlonkSpongeConstants>,
     >(&map, &witness, index, prev)
     .unwrap();
 
@@ -85,8 +85,8 @@ pub fn proof_verify(
     let group_map = <GAffine as CommitmentCurve>::Map::setup();
 
     DlogProof::verify::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstants>,
+        DefaultFrSponge<Fp, PlonkSpongeConstants>,
     >(
         &group_map,
         &[(
@@ -100,27 +100,18 @@ pub fn proof_verify(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_5_wires_proof_verify(
+pub fn caml_pasta_fp_plonk_5_wires_proof_verify(
     lgr_comm: Vec<PolyComm<GAffine>>,
-    index: CamlPastaFqPlonkVerifierIndex,
+    index: CamlPastaFpPlonkVerifierIndex,
     proof: DlogProof<GAffine>,
 ) -> bool {
-    if proof_verify(lgr_comm, &index.into(), proof)
-    {
-        println!("Verification success");
-        true
-    }
-    else
-    {
-        println!("Verification failure");
-        false
-    }
+    proof_verify(lgr_comm, &index.into(), proof)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_5_wires_proof_batch_verify(
+pub fn caml_pasta_fp_plonk_5_wires_proof_batch_verify(
     lgr_comms: Vec<Vec<PolyComm<GAffine>>>,
-    indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
+    indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
     proofs: Vec<DlogProof<GAffine>>,
 ) -> bool {
     let ts: Vec<_> = indexes
@@ -130,26 +121,17 @@ pub fn caml_pasta_fq_plonk_5_wires_proof_batch_verify(
         .map(|((i, l), p)| (i.into(), l.into_iter().map(From::from).collect(), p.into()))
         .collect();
     let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
-    let group_map = GroupMap::<Fp>::setup();
+    let group_map = GroupMap::<Fq>::setup();
 
-    if DlogProof::<GAffine>::verify::<
-        DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
-        DefaultFrSponge<Fq, PlonkSpongeConstants>,
+    DlogProof::<GAffine>::verify::<
+        DefaultFqSponge<VestaParameters, PlonkSpongeConstants>,
+        DefaultFrSponge<Fp, PlonkSpongeConstants>,
     >(&group_map, &ts)
     .is_ok()
-    {
-        println!("Verification success");
-        true
-    }
-    else
-    {
-        println!("Verification failure");
-        false
-    }
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_5_wires_proof_dummy() -> DlogProof<GAffine> {
+pub fn caml_pasta_fp_plonk_5_wires_proof_dummy() -> DlogProof<GAffine> {
     let g = || GAffine::prime_subgroup_generator();
     let comm = || PolyComm {
         shifted: Some(g()),
@@ -157,14 +139,14 @@ pub fn caml_pasta_fq_plonk_5_wires_proof_dummy() -> DlogProof<GAffine> {
     };
     DlogProof {
         prev_challenges: vec![
-            (vec![Fq::one(), Fq::one()], comm()),
-            (vec![Fq::one(), Fq::one()], comm()),
-            (vec![Fq::one(), Fq::one()], comm()),
+            (vec![Fp::one(), Fp::one()], comm()),
+            (vec![Fp::one(), Fp::one()], comm()),
+            (vec![Fp::one(), Fp::one()], comm()),
         ],
         proof: OpeningProof {
             lr: vec![(g(), g()), (g(), g()), (g(), g())],
-            z1: Fq::one(),
-            z2: Fq::one(),
+            z1: Fp::one(),
+            z2: Fp::one(),
             delta: g(),
             sg: g(),
         },
@@ -173,9 +155,9 @@ pub fn caml_pasta_fq_plonk_5_wires_proof_dummy() -> DlogProof<GAffine> {
             z_comm: comm(),
             t_comm: comm(),
         },
-        public: vec![Fq::one(), Fq::one()],
+        public: vec![Fp::one(), Fp::one()],
         evals: {
-            let evals = || vec![Fq::one(), Fq::one(), Fq::one(), Fq::one()];
+            let evals = || vec![Fp::one(), Fp::one(), Fp::one(), Fp::one()];
             let evals = || DlogProofEvaluations {
                 w: [evals(), evals(), evals(), evals(), evals()],
                 z: evals(),
@@ -189,6 +171,6 @@ pub fn caml_pasta_fq_plonk_5_wires_proof_dummy() -> DlogProof<GAffine> {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_5_wires_proof_deep_copy(x: DlogProof<GAffine>) -> DlogProof<GAffine> {
+pub fn caml_pasta_fp_plonk_5_wires_proof_deep_copy(x: DlogProof<GAffine>) -> DlogProof<GAffine> {
     x
 }

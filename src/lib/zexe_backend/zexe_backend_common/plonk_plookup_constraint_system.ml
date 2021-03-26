@@ -685,10 +685,7 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-    (*
-    let deb = Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr) in
-    print_endline deb;
-*)
+
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =

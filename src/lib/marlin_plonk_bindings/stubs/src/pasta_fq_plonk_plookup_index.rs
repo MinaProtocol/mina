@@ -24,7 +24,6 @@ use crate::lookup_fq_table;
 use crate::index_serialization_plookup;
 use crate::pasta_fq_urs::CamlPastaFqUrs;
 use crate::plonk_plookup_gate::{CamlPlonkGate, CamlPlonkWire, CamlPlonkWires};
-use std::time::Instant;
 
 pub struct CamlPastaFqPlonkGateVector(Vec<CircuitGate<Fq>>);
 pub type CamlPastaFqPlonkGateVectorPtr = ocaml::Pointer<CamlPastaFqPlonkGateVector>;
@@ -125,9 +124,6 @@ pub fn caml_pasta_fq_plonk_plookup_index_create(
     let gates: Vec<_> = gates.as_ref().0.clone();
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
 
-    println!("{}{:?}", "Circuit size: ", gates.len());
-    let start = Instant::now();
-
     let cs =
         match ConstraintSystem::<Fq>::create(gates, lookup_fq_table::init_table(), oracle::pasta::fq5::params(), public as usize)
         {
@@ -145,7 +141,7 @@ pub fn caml_pasta_fq_plonk_plookup_index_create(
         // Rc<_>s into weak pointers.
         SRSSpec::Use(unsafe { &*Rc::into_raw(urs_copy) })
     };
-    let ret = Ok(CamlPastaFqPlonkIndex(
+    Ok(CamlPastaFqPlonkIndex(
         Box::new(DlogIndex::<GAffine>::create(
             cs,
             oracle::pasta::fp5::params(),
@@ -153,9 +149,7 @@ pub fn caml_pasta_fq_plonk_plookup_index_create(
             srs,
         )),
         urs_copy_outer,
-    ));
-    println!("{}{:?}", "Index setup time: ", start.elapsed());
-    ret
+    ))
 }
 
 #[ocaml::func]
