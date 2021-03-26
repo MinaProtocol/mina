@@ -249,6 +249,10 @@ struct
                    in the pool are always valid against the best tip, so
                    no need to check balances here *)
                 ~fee_payer_balance:Currency.Amount.max_int
+                ~fee_payer_nonce:
+                  ( Transaction_hash.User_command_with_valid_signature.command
+                      cmd
+                  |> User_command.nonce_exn )
             with
             | Ok (t, _) ->
                 Some (cmd, t)
@@ -466,19 +470,19 @@ struct
                 Base_ledger.location_of_account best_tip_ledger account_id
               with
               | None ->
-                  Currency.Balance.zero
+                  (Currency.Amount.zero, Mina_base.Account.Nonce.zero)
               | Some loc ->
                   let acc =
                     Option.value_exn
                       ~message:"public key has location but no account"
                       (Base_ledger.get best_tip_ledger loc)
                   in
-                  balance_of_account ~global_slot acc
+                  ( Currency.Balance.to_amount
+                      (balance_of_account ~global_slot acc)
+                  , acc.nonce )
             in
             let fee_payer = User_command.(fee_payer (forget_check cmd.data)) in
-            let fee_payer_balance =
-              Currency.Balance.to_amount (balance fee_payer)
-            in
+            let fee_payer_balance, fee_payer_nonce = balance fee_payer in
             let cmd' =
               Transaction_hash.User_command_with_valid_signature.create
                 cmd.data
@@ -500,6 +504,7 @@ struct
             let p', dropped =
               match
                 Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
+                  ~fee_payer_nonce
               with
               | Ok res ->
                   res
