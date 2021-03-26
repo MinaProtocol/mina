@@ -65,13 +65,13 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Nodes-not-synced-34e4d4eeaeaf47e381de660bab9ce7b7"
 
   - alert: NodesOutOfSync
-    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alert_timeframe}])) < .75
+    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alert_timeframe}])) < .6
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} has < 90% of nodes that are synced on the same best tip"
-      description: "< 90% of nodes that are synced are on the same best tip for  network {{ $labels.testnet }} with rate of {{ $value }}."
+      summary: "{{ $labels.testnet }} has < 60% of nodes that are synced on the same best tip"
+      description: "< 60% of nodes that are synced are on the same best tip for  network {{ $labels.testnet }} with rate of {{ $value }}."
       runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
 
   - alert: LowPeerCount
