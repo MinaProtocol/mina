@@ -72,7 +72,7 @@ let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
     [%log error] "Copied database contains these blocks not in the original"
       ~metadata:[("blocks", `List (List.map copy_diff ~f:(fun s -> `String s)))] ;
     Core_kernel.exit 1 ) ;
-  [%log error]
+  [%log info]
     "After patching, original and copied databases contain the same set of \
      blocks" ;
   (* same set of blocks, see if the blocks are equal *)
