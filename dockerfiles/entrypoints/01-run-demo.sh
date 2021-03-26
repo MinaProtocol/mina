@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -eo pipefail
-set +x
 
 if [[ -n ${RUN_DEMO} ]]; then
     # Demo keys and config file
@@ -39,4 +38,7 @@ if [[ -n ${RUN_DEMO} ]]; then
     MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
 
     exec mina daemon --generate-genesis-proof true --seed --demo-mode --config-dir ${MINA_CONFIG_DIR} --block-producer-pubkey ${PK} --run-snark-worker ${SNARK_PK} -insecure-rest-server $@
+
+    rc=$?
+    echo "Exiting Mina demo." && exit $rc
 fi

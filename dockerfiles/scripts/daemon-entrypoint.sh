@@ -23,8 +23,7 @@ touch .mina-config/mina-prover.log
 touch .mina-config/mina-verifier.log
 touch .mina-config/mina-best-tip.log
 
-while true;
-do
+while true; do
   rm -f /root/.mina-config/.mina-lock
   mina "$@" 2>&1 >mina.log &
   coda_pid=$!
