@@ -126,10 +126,10 @@ module "ci_testnet" {
   coda_faucet_amount = "10000000000"
   coda_faucet_fee    = "100000000"
 
-  agent_min_fee         = "0.05"
-  agent_max_fee         = "0.1"
-  agent_min_tx          = "1.0015"
-  agent_max_tx          = "1.0015"
+  agent_min_fee         = "1.05"
+  agent_max_fee         = "1.1"
+  agent_min_tx          = "1"
+  agent_max_tx          = "10"
   agent_send_every_mins = "1"
 
   log_level           = "Info"
@@ -142,7 +142,7 @@ module "ci_testnet" {
 
   snark_worker_replicas   = var.snark_worker_count
   snark_worker_host_port  = 10401
-  snark_worker_fee        = "0.025"
+  snark_worker_fee        = "1.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
 
   upload_blocks_to_gcloud         = var.upload_blocks_to_gcloud
