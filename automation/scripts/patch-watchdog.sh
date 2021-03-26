@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-IMAGE="gcr.io/o1labs-192920/watchdog:0.4.2"
+IMAGE="gcr.io/o1labs-192920/watchdog:0.4.5"
 
 
 read -r -d '' PATCH << SPEC
@@ -15,7 +15,7 @@ SPEC
 
 echo -e "$PATCH"
 
-kubectl patch deploy/archive-1 -p "$PATCH"
+kubectl patch deploy/watchdog -p "$PATCH"
 
 # ====================================
 

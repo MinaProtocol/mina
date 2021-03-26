@@ -46,6 +46,16 @@ module Subchain = struct
   let start_from_specified (module Conn : Caqti_async.CONNECTION)
       ~start_state_hash ~end_state_hash =
     Conn.collect_list query_from_start (end_state_hash, start_state_hash)
+
+  let query_all =
+    Caqti_request.collect Caqti_type.unit Archive_lib.Processor.Block.typ
+      {sql| SELECT state_hash,parent_id,parent_hash,creator_id,block_winner_id,snarked_ledger_hash_id,staking_epoch_data_id,
+                   next_epoch_data_id,ledger_hash,height,global_slot,global_slot_since_genesis,timestamp
+            FROM blocks
+      |sql}
+
+  let all_blocks (module Conn : Caqti_async.CONNECTION) =
+    Conn.collect_list query_all ()
 end
 
 (* Archive_lib.Processor does not have the queries given here *)
