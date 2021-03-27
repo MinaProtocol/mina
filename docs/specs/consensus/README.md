@@ -18,6 +18,14 @@ Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consens
   * [3.4 Genesis Initialization](#genesis-initialization)
   * [3.5 Staking Procedure](#staking-procedure)
 
+**Conventions**
+* We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
+
+**Notations**
+* `a⌢b` - Concatenation of `a` and `b`
+* `x[i]` - Element `i` of array `x`, starting at index `0`
+* `x[a..b]` - Slice of vector `x` containing elements from indexes `[a, b)`
+
 # 1. Constants
 
 These are the parameters Mina uses for Samasika
@@ -33,10 +41,6 @@ These are the parameters Mina uses for Samasika
 | `acceptable_network_delay`      | `180000` (= 3m)         | Acceptable network delay in ms |
 | `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 3.2](#window-min-density)) |
 | `sub_windows_per_window`        | `11`                    | Sub windows per window (see [Section 3.2](#window-min-density)) |
-
-**Terminology**
-
-* We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
 
 # 2. Structures
 
@@ -132,7 +136,7 @@ Samasika overcomes this problem by tracking a moving window of slots over each c
 
 [Section 3.2](#window-min-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the long-range fork rule.
 
-For succinctness the minimum window density is stored in each block.  Specifically, it is stored in the `Consensus_state`, located in the `min_window_density` field (see [Section 2.3](#consensus_state)).
+For succinctness the minimum window density is stored in each block.  Specifically, it is stored in the `min_window_density` field of the `Consensus_state` (see [Section 2.3](#consensus_state)).
 
 The function [`getMinDen(C)`](#getminden) outputs the minimum chain density observed so far in chain `C`. In other words, it simply outputs the value of the `min_window_density` field of the top block of `C`.
 
@@ -148,35 +152,44 @@ We specify the chain selection algorithm in more detail in [Section 3.3](#chain-
 
 ## 3.2 Window Min-density
 
-This section describes how to compute the density windows and minimum density.
+This section describes how to compute the density windows and minimum density. Firstly we must define some terminology.
 
-The list of sliding window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.3](#consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, all implimentations of Mina will at least require serialization for this type.
+* We say a slot is _`filled`_ if it contains a valid non-orphaned block
+* An `n-window` is a sequential list of slots s<sub>1</sub>,...,s<sub>n</sub> of length `n`
+* The density of a window, `density(W)`, is the number of slots filled in window `W`
 
-The _sliding window_ is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
+The _`sliding window`_ is referred to as a `v`-shifting `w`-window and it characterisd by two parameters.
 
 | Parameter | Description                                | Value |
 | - | - | - |
 | `v`       | Length by which the window shifts in slots (shift parameter) | [`slots_per_sub_window`](#constants) (= 7) |
-| `w`       | Window length in slots                                       | [`slots_per_sub_window`](#constants)` * `[`sub_windows_per_window`](#constants) (= 77 slots) |
+| `w`       | Window length in slots                                       | [`slots_per_sub_window`](#constants)` * `[`sub_windows_per_window`](#constants) (= 7*11 = 77 slots) |
 
-This is a `w`-long window that shifts `v`-slots at a time.  You can think of the `w`-length window as being comprised of `k` sub-windows (`sub_windows_per_window`), each of length `v` slots.  The sliding window looks like
+This is a `w`-long window that shifts `v`-slots at a time.  You can think of the `w`-length window as being comprised of `k` sub-windows (`sub_windows_per_window`), each of length `v` slots.  For the parameters given in the table above, the sliding window looks like this:
 
 ```
-   |d1,...,s7|d8,...,d14| ... |d71,...,d77|
+   |s1,...,s7|s8,...,s14| ... |s71,...,s77|
 k:      1          2      ...      11
 ```
-where `di` is the density of slot `i`.
+where `si` is slot `i`.
 
-The values stored `sub_window_densities` have a slighly different format
+Samasika tracks the list of densities of the previous `k` sub-windows and the current window density `dc`
+
+```
+                      |s1,...,s7|s8,...,s14| ... |s71,...,s77|s78,...
+sub_window_densities:      d1        d2      ...       dk          dc
+```
+
+This list of window of densities is stored in each block, in the `sub_window_densities` field of the `Consensus_state` (see [Section 2.3](#consensus_state)).  This field is of type `Length.Stable.V1.t list` and because it must be written into blocks as part of the protocol, all implimentations of Mina will at least require serialization for this type.
+
+The values stored in `sub_window_densities` have this format.
 
 | Index | Contents |
 | - | - |
 | `0` | Oldest window density |
 | `...` | |
-| `w - 1` | Previous window density |
-| `w` | Minimum window density |
-
-with the addition of the minimum window density stored there.
+| `k - 1` | Previous window density |
+| `k` | Current window density |
 
 ### 3.2.1 `isWindowStop`
 
@@ -187,11 +200,14 @@ fn isWindowStop(sl,v) -> bool
 
 ### 3.2.2 `shiftWindow`
 
-This algorithm is responsible for shifting the sliding window.
+<!-- This algorithm is responsible for shifting the sliding window.  It inputs the sliding window `W` = [d<sub>1</sub>,...,d<sub>w</sub>] and the current sub window densities `Curr` = [d<sub>w+1</sub>,...,d<sub>w+v</sub>] and then outputs the result `W'` = [d<sub>1+v</sub>,...,d<sub>w+v</sub>], where `v` is the shift parameter. -->
+
+This algorithm is responsible for shifting the sliding window.  It inputs the sub-window densities `D` = [d<sub>0</sub>,...,d<sub>k</sub>] and then outputs the result `D'` = [d<sub>1</sub>,...,d<sub>k</sub>].
 
 >```rust
-fn shiftWindow(Windows, curr) -> Windows
+fn shiftWindow(D) -> D'
 {
+    return D[1..]
 }
 
 ## 3.3 Chain Selection Protocol
