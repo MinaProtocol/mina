@@ -1,10 +1,11 @@
 # Merkle ledgers
 
-A Merkle ledger is a binary tree with a fixed depth, whose leaves
-contain account data. Each node in the tree has an associated hash and
-from those node hashes, a Merkle root can be computed. In Mina, there
-are several implementations of the ledger data structure, with some
-common features.
+A Merkle ledger is essentially a binary tree with a fixed depth, whose
+leaves contain account data. Each node in the tree has an associated
+hash and from those node hashes, a Merkle root can be
+computed. Ledgers also maintain some bookkeeping data stored outside
+the binary tree. In Mina, there are several implementations of the
+ledger data structure, with some common features.
 
 The basic interface for ledgers is in `Base_ledger_intf.ml`. The items
 below help to explain some of the types and terminology mentioned
@@ -40,7 +41,8 @@ bookkeeping state information is stored, unrelated to the binary tree
 as such.
 
 Besides locations, each account in a ledger has a distinct index,
-which is an integer.
+which is an integer. Indexes are a 0-based integer indicating
+the leaf order in the ledger's binary tree.
 
 Some ledger implementations may rely on a file system, with an
 associated notion of directories.
