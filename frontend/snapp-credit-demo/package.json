@@ -58,7 +58,19 @@
     },
     "deb": {
       "depends": [
-        "libjemalloc-dev"
+        "libjemalloc-dev",
+        "libffi6",
+        "libssl1.1",
+        "libprocps6",
+        "libgmp10",
+        "libgomp1",
+        "apt-transport-https",
+        "curl",
+        "jq",
+        "strace",
+        "ca-certificates",
+        "dnsutils",
+        "tzdata"
       ]
     },
     "win": {
