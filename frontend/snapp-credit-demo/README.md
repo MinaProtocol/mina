@@ -48,6 +48,36 @@ yarn dev
 
 ## Package for Linux
 
+Building for Ubuntu 20.04 and Ubuntu 18.04 require different dependencies so you will have to build them differently. By default, this project is structured to build for Ubuntu 18.04. To build for 20.04, make the follow changes in `package.json`:
+
+Change:
+```
+"depends": [
+        "libjemalloc1",
+        "libffi6",
+        "libssl1.1",
+        "libgmp10",
+        "libgomp1",
+        "apt-transport-https",
+        "curl",
+        "ca-certificates"
+      ]
+```
+
+to:
+```
+"depends": [
+        "libjemalloc2",
+        "libffi7",
+        "libssl1.1",
+        "libgmp10",
+        "libgomp1",
+        "apt-transport-https",
+        "curl",
+        "ca-certificates"
+      ]
+```
+
 Run the following to build an installer for Linux:
 
 ```
