@@ -141,7 +141,9 @@ Samasika uses two consensus rules: one for *short-range forks* and one for *long
 
 This rule is triggered whenever the fork is such that the adversary has not yet had the opportunity to mutate the block density distribution.
 
-> `Choose the longest chain`
+```rust
+Choose the longest chain
+```
 
 A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve implemention of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 3.2](#decentralized-checkpointing).
 
@@ -161,11 +163,14 @@ The function [`getMinDen(C)`](#getminden) outputs the minimum chain density obse
 
 Let `C1` be the local chain and `C2` be a [valid](#isValidChain) alternative chain; the _long-range fork rule_ is
 
->```bash
-if getMinDen(C2) > getMinDen(C1) then
+```rust
+if getMinDen(C2) > getMinDen(C1) {
     Select C2
-else
+}
+else {
     Continue with C1
+}
+```
 
 We specify the chain selection algorithm in more detail in [Section 3.3](#chain-selection-protocol).
 
@@ -251,7 +256,7 @@ The values stored in `sub_window_densities` have this format.
 
 This algorithm detects whether we have reached the end of a sub-window.  It is used to decide if we must perform a `v`-shift.  It takes as input the current local slot number `s`, the shift parameter `v` and outputs `true` if we have reached the end of a sub-window and `false` otherwise.
 
->```rust
+```rust
 fn isWindowStop(s, v) -> bool
 {
     if s mod v == 0 {
@@ -261,10 +266,12 @@ fn isWindowStop(s, v) -> bool
         return false
     }
 }
+```
 
 ### 3.3.2 `shiftWindow`
 
-<!-- This algorithm is responsible for shifting the sliding window.  It inputs the sliding window `W` = [d<sub>1</sub>,...,d<sub>w</sub>] and the current sub window densities `C = [d<sub>w+1</sub>,...,d<sub>w+v</sub>] and then outputs the result `W'` = [d<sub>1+v</sub>,...,d<sub>w+v</sub>], where `v` is the shift parameter.
+<!--
+This algorithm is responsible for shifting the sliding window.  It inputs the sliding window `W` = [d<sub>1</sub>,...,d<sub>w</sub>] and the current sub window densities `C = [d<sub>w+1</sub>,...,d<sub>w+v</sub>] and then outputs the result `W'` = [d<sub>1+v</sub>,...,d<sub>w+v</sub>], where `v` is the shift parameter.
 
 >```rust
 fn shiftWindow(W, C) -> W'
@@ -276,11 +283,12 @@ fn shiftWindow(W, C) -> W'
 
 This algorithm is responsible for shifting the sliding window.  It inputs the sub-window densities `D` = [d<sub>0</sub>,...,d<sub>k</sub>] and then outputs the result `D'` = [d<sub>1</sub>,...,d<sub>k</sub>].
 
->```rust
+```rust
 fn shiftWindow(D) -> D'
 {
     return D[1..]
 }
+```
 
 ## 3.4 Chain Selection Protocol
 
@@ -290,7 +298,7 @@ The chain selection protocol specifies how peers are required to apply the fork 
 
 As mentioned in [Section 3.1.2]("#long-range-fork-rule") this function returns the current minimum density of a chain `C`.
 
->```rust
+```rust
 fn getMinDen(C) -> density
 {
     B = last block of C
@@ -299,12 +307,13 @@ fn getMinDen(C) -> density
     else
         return min(B.protocol_state.body.consensus_state.sub_window_densities)
 }
+```
 
 ### 3.4.2 `isShortRange`
 
 This algorithm determins if the fork of two chains is short-range or long-range.
 
->```rust
+```rust
 fn isShortRange(C1,C2) -> bool
 {
     B1 = last block of C1
@@ -316,28 +325,31 @@ fn isShortRange(C1,C2) -> bool
         return false
     }
 }
+```
 
 ### 3.4.3 `isValidChain`
 
->```rust
+```rust
 fn isValidChain(C1) -> bool
 {
 }
+```
 
 ### 3.4.4 `maxvalid-sc`
 
->```rust
+```rust
 fn maxvalid-sc(Cl,Chains,k) -> Chain
 {
 }
-
+```
 
 ### 3.4.5 `selectChain`
 
->```rust
+```rust
 fn selectChain(Peer,Chains,k) -> ()
 {
 }
+```
 
 ## 3.5 Genesis Initialization
 
