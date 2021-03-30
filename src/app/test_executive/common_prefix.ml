@@ -37,10 +37,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     let length = Hash_set.length common_prefixes in
     if length = 0 then
-      Malleable_error.of_string_hard_error_format
-        "Chains don't have any common prefixes among their most recent %d \
-         blocks"
-        n
+      Malleable_error.soft_error ()
+        (Error.of_string
+           (sprintf
+              "Chains don't have any common prefixes among their most recent \
+               %d blocks"
+              n))
     else if length < n then
       Malleable_error.soft_error ()
         (Error.of_string
