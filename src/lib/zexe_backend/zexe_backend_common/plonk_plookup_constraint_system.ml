@@ -114,6 +114,8 @@ module Plonk_constraint = struct
       | EC_scale_pack of {state: 'v Scale_pack_round_5_wires.t array}
       | EC_endoscale of {state: 'v Endoscale_round_5_wires.t array}
       | Bytes_lookup of {bytes: 'v array}
+      | Bytes4_tof of {bytes: 'v array}
+      | Bytes16_tof of {bytes: 'v array}
     [@@deriving sexp]
 
     let map (type a b f) (t : (a, f) t) ~(f : a -> b) =
@@ -145,6 +147,10 @@ module Plonk_constraint = struct
             }
       | Bytes_lookup {bytes} ->
           Bytes_lookup {bytes= Array.map ~f bytes}
+      | Bytes4_tof {bytes} ->
+          Bytes4_tof {bytes= Array.map ~f bytes}
+      | Bytes16_tof {bytes} ->
+          Bytes16_tof {bytes= Array.map ~f bytes}
 
     let eval (type v f)
         (module F : Snarky_backendless.Field_intf.S with type t = f)
@@ -326,6 +332,12 @@ struct
               cvars [b2; xt; b1; xq; yt; xp; l1; yp; xs; ys] acc )
       | Bytes_lookup {bytes} ->
           let t = H.feed_string t "bytes_lookup" in
+          t |> cvars (Array.to_list bytes)
+      | Bytes4_tof {bytes} ->
+          let t = H.feed_string t "bytes4_tof" in
+          t |> cvars (Array.to_list bytes)
+      | Bytes16_tof {bytes} ->
+          let t = H.feed_string t "bytes16_tof" in
           t |> cvars (Array.to_list bytes) )
     | _ ->
         failwith "Unsupported constraint"
@@ -685,7 +697,10 @@ struct
         ( Fp.t Snarky_backendless.Cvar.t
         , Fp.t )
         Snarky_backendless.Constraint.basic) =
-
+    (*
+    let deb = Sexp.to_string ([%sexp_of: (Fp.t Snarky_backendless.Cvar.t, Fp.t) Snarky_backendless.Constraint.basic] constr) in
+    print_endline deb;
+*)
     sys.hash <- feed_constraint sys.hash constr ;
     let red = reduce_lincom sys in
     let reduce_to_v (x : Fp.t Snarky_backendless.Cvar.t) : V.t =
@@ -961,6 +976,48 @@ struct
           (wire sys row.(3) sys.next_row Q)
           (wire sys row.(4) sys.next_row P)
           [||] ;
+        ()
+    | Plonk_constraint.T (Bytes4_tof {bytes}) ->
+        let row =
+          Array.map
+            bytes
+            ~f:(fun x -> reduce_to_v x)
+        in
+        add_row sys
+          (Array.map row ~f:(fun x -> Some x))
+          Generic
+          (wire sys row.(0) sys.next_row L)
+          (wire sys row.(1) sys.next_row R)
+          (wire sys row.(2) sys.next_row O)
+          (wire sys row.(3) sys.next_row Q)
+          (wire sys row.(4) sys.next_row P)
+          [|Fp.one; Fp.of_int 256; Fp.of_int 65536; Fp.of_int 16777216; Fp.(negate one); Fp.zero; Fp.zero|] ;
+        ()
+    | Plonk_constraint.T (Bytes16_tof {bytes}) ->
+        let row =
+          Array.map
+            bytes
+            ~f:(fun x -> reduce_to_v x)
+        in
+        let f4 = Fp.of_string "4294967296" in
+        let f8 = Fp.square f4 in
+        add_row sys
+          (Array.map row ~f:(fun x -> Some x))
+          Generic
+          (wire sys row.(0) sys.next_row L)
+          (wire sys row.(1) sys.next_row R)
+          (wire sys row.(2) sys.next_row O)
+          (wire sys row.(3) sys.next_row Q)
+          (wire sys row.(4) sys.next_row P)
+          [|
+            Fp.one;
+            f4;
+            f8;
+            Fp.(f4 * f8);
+            Fp.(negate one);
+            Fp.zero;
+            Fp.zero
+          |] ;
         ()
     | Plonk_constraint.T (Pack {state}) ->
         let reduce_state sys (s : Fp.t Snarky_backendless.Cvar.t array array) :

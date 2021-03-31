@@ -3,28 +3,18 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t =
-      {xt: 'a; b: 'a; yt: 'a; xp: 'a; l1: 'a; l2: 'a; yp: 'a; xs: 'a; ys: 'a}
+    type 'a t = {mutable xt: 'a; mutable b: 'a; mutable yt: 'a; mutable xp: 'a; l1: 'a; l2: 'a; mutable yp: 'a; xs: 'a; ys: 'a}
     [@@deriving sexp, fields, hlist]
   end
 end]
 
 let typ g =
-  Snarky_backendless.Typ.of_hlistable
-    [g; g; g; g; g; g; g; g; g]
+  Snarky_backendless.Typ.of_hlistable [g; g; g; g; g; g; g; g; g]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
 let map {xt; b; yt; xp; l1; l2; yp; xs; ys} ~f =
-  { xt= f xt
-  ; b= f b
-  ; yt= f yt
-  ; xp= f xp
-  ; l1= f l1
-  ; l2= f l2
-  ; yp= f yp
-  ; xs= f xs
-  ; ys= f ys }
+  {xt= f xt; b= f b; yt= f yt; xp= f xp; l1= f l1; l2= f l2; yp= f yp; xs= f xs; ys= f ys}
 
 let map2 t1 t2 ~f =
   { xt= f t1.xt t2.xt
@@ -36,4 +26,3 @@ let map2 t1 t2 ~f =
   ; yp= f t1.yp t2.yp
   ; xs= f t1.xs t2.xs
   ; ys= f t1.ys t2.ys }
-  

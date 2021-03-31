@@ -24,6 +24,7 @@ use plonk_plookup_protocol_dlog::prover::{ProverCommitments as DlogCommitments, 
 use crate::pasta_fq_plonk_plookup_index::CamlPastaFqPlonkIndexPtr;
 use crate::pasta_fq_plonk_plookup_verifier_index::CamlPastaFqPlonkVerifierIndex;
 use crate::pasta_fq_vector::CamlPastaFqVector;
+use std::time::Instant;
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_plookup_proof_create(
@@ -66,11 +67,14 @@ pub fn caml_pasta_fq_plonk_plookup_proof_create(
     ocaml::runtime::release_lock();
 
     let map = GroupMap::<Fp>::setup();
+
+    let start = Instant::now();
     let proof = DlogProof::create::<
         DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fq, PlonkSpongeConstants>,
     >(&map, &witness, index, prev)
     .unwrap();
+    println!("{}{:?}", "Proof computation time: ", start.elapsed());
 
     ocaml::runtime::acquire_lock();
 
@@ -105,7 +109,10 @@ pub fn caml_pasta_fq_plonk_plookup_proof_verify(
     index: CamlPastaFqPlonkVerifierIndex,
     proof: DlogProof<GAffine>,
 ) -> bool {
-    proof_verify(lgr_comm, &index.into(), proof)
+    let start = Instant::now();
+    let ret = proof_verify(lgr_comm, &index.into(), proof);
+    println!("{}{:?}", "Proof verification time: ", start.elapsed());
+    ret
 }
 
 #[ocaml::func]
@@ -123,11 +130,14 @@ pub fn caml_pasta_fq_plonk_plookup_proof_batch_verify(
     let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
     let group_map = GroupMap::<Fp>::setup();
 
-    DlogProof::<GAffine>::verify::<
+    let start = Instant::now();
+    let ret = DlogProof::<GAffine>::verify::<
         DefaultFqSponge<PallasParameters, PlonkSpongeConstants>,
         DefaultFrSponge<Fq, PlonkSpongeConstants>,
     >(&group_map, &ts)
-    .is_ok()
+    .is_ok();
+    println!("{}{:?}", "Proof verification time: ", start.elapsed());
+    ret
 }
 
 #[ocaml::func]
