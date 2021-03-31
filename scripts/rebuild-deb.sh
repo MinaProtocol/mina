@@ -138,6 +138,7 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
 # Genesis Ledger/proof/epoch ledger Copy
+mkdir -p "${BUILDDIR}/var/lib/coda"
 for f in /tmp/coda_cache_dir/genesis*; do
     if [ -e "$f" ]; then
         mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
