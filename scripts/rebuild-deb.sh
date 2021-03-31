@@ -88,9 +88,13 @@ rm -f "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
+# deb without the proving keys
+echo "------------------------------------------------------------"
+echo "Building deb without keys:"
+
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}
+Package: ${PROJECT}-noprovingkeys
 Version: ${VERSION}
 Section: base
 Priority: optional
@@ -132,6 +136,75 @@ mkdir -p "${BUILDDIR}/etc/coda/build_config"
 cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
 rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
+# Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
+# Genesis Ledger/proof/epoch ledger Copy
+for f in /tmp/coda_cache_dir/genesis*; do
+    if [ -e "$f" ]; then
+        mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    fi
+done
+
+#copy config.json
+cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
+cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
+# The default configuration:
+cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
+
+# Copy genesis Ledger/proof/epoch ledger if they were downloaded from s3
+for f in /tmp/s3_cache_dir/genesis*; do
+    if [ -e "$f" ]; then
+        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
+    fi
+done
+
+# Bash autocompletion
+# NOTE: We do not list bash-completion as a required package,
+#       but it needs to be present for this to be effective
+mkdir -p "${BUILDDIR}/etc/bash_completion.d"
+cwd=$(pwd)
+export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
+env COMMAND_OUTPUT_INSTALLATION_BASH=1 mina  > "${BUILDDIR}/etc/bash_completion.d/mina"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
+ls -lh mina*.deb
+
+
+# remove build dir to prevent running out of space on the host machine
+rm -rf "${BUILDDIR}"
+
+# second deb with the proving keys
+echo "------------------------------------------------------------"
+echo "Building deb with keys:"
+
+mkdir -p "${BUILDDIR}/DEBIAN"
+
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: ${PROJECT}
+Version: ${VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, ${PROJECT}-noprovingkeys=${VERSION}
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # For now, deleting keys in /tmp/ so that the complicated logic below for moving them short-circuits and both packages are built without keys
@@ -139,7 +212,7 @@ rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
 
 # Keys
 # Identify actual keys used in build
-#NOTE: Moving the keys from /tmp because of storage constraints. This is OK
+# NOTE: Moving the keys from /tmp because of storage constraints. This is OK
 # because building deb is the last step and therefore keys, genesis ledger, and
 # proof are not required in /tmp
 echo "Checking PV keys"
@@ -175,36 +248,6 @@ do
     done
 done
 
-# Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
-# Genesis Ledger/proof/epoch ledger Copy
-for f in /tmp/coda_cache_dir/genesis*; do
-    if [ -e "$f" ]; then
-        mv /tmp/coda_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    fi
-done
-
-# Copy genesis Ledger/proof/epoch ledger if they were downloaded from s3
-for f in /tmp/s3_cache_dir/genesis*; do
-    if [ -e "$f" ]; then
-        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    fi
-done
-
-#copy config.json
-cp '../genesis_ledgers/mainnet.json' "${BUILDDIR}/var/lib/coda/mainnet.json"
-cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
-# The default configuration:
-cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
-
-
-# Bash autocompletion
-# NOTE: We do not list bash-completion as a required package,
-#       but it needs to be present for this to be effective
-mkdir -p "${BUILDDIR}/etc/bash_completion.d"
-cwd=$(pwd)
-export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
-env COMMAND_OUTPUT_INSTALLATION_BASH=1 mina  > "${BUILDDIR}/etc/bash_completion.d/mina"
-
 # echo contents of deb
 echo "------------------------------------------------------------"
 echo "Deb Contents:"
@@ -213,34 +256,6 @@ find "${BUILDDIR}"
 # Build the package
 echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
-ls -lh mina*.deb
-
-
-# second deb without the proving keys -- FIXME: DRY
-echo "------------------------------------------------------------"
-echo "Building deb without keys:"
-
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}-noprovingkeys
-Version: ${VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
-License: Apache-2.0
-Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
-Description: Mina Client and Daemon
- Mina Protocol Client and Daemon
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-# remove proving keys
-rm -f "${BUILDDIR}"/var/lib/coda/step*
-rm -f "${BUILDDIR}"/var/lib/coda/wrap*
-
-# build another deb
-fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh mina*.deb
 
 #remove build dir to prevent running out of space on the host machine
