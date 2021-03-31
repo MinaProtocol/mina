@@ -15,8 +15,8 @@ This documents specifies the protocol and related structures.
   * [2.4 Epoch_data](#24-epoch_data)
 * [3 Algorithms](#3-algorithms)
   * [3.1 Chain Selection Rules](#31-chain-selection-rules)
-    * [3.1.1 Short-range](#311-short-range-fork-rule)
-    * [3.1.2 Long-range](#312-long-range-fork-rule)
+    * [3.1.1 Short-range fork rule](#311-short-range-fork-rule)
+    * [3.1.2 Long-range fork rule](#312-long-range-fork-rule)
   * [3.2 Decentralized Checkpointing](#32-decentralized-checkpointing)
   * [3.3 Window Min-density](#33-window-min-density)
     * [3.3.1 `isWindowStop`](#331-iswindowstop)
@@ -108,8 +108,8 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 4.1](#31-chain-selection-rules)) |
 | `last_vrf_output`                        | `Vrf.Output.Truncated.Stable.V1.t` | Additional VRS output from leader (for seeding Random Oracle) |
 | `total_currency`                         | `Amount.Stable.V1.t` | Total supply of currency |
-| `curr_global_slot`                       | `Global_slot.Stable.V1.t` | |
-| `global_slot_since_genesis`              | `Mina_numbers.Global_slot.Stable.V1.t` | Claimed slot |
+| `curr_global_slot`                       | `Global_slot.Stable.V1.t` | Current global slot number relative to the current hard fork  |
+| `global_slot_since_genesis`              | `Mina_numbers.Global_slot.Stable.V1.t` | Absolute global slot number since genesis |
 | `staking_epoch_data`                     | `Epoch_data.Staking_value_versioned.Value.Stable.V1.t` | Epoch data for previous epoch |
 | `next_epoch_data`                        | `Epoch_data.Next_value_versioned.Value.Stable.V1.t` | Epoch data for current epoch |
 | `has_ancestor_in_same_checkpoint_window` | `bool` | |
@@ -296,7 +296,7 @@ The chain selection protocol specifies how peers are required to apply the fork 
 
 ### 3.4.1 `getMinDen`
 
-As mentioned in [Section 3.1.2]("#312-long-range-fork-rule") this function returns the current minimum density of a chain `C`.
+As mentioned in [Section 3.1.2](#312-long-range-fork-rule) this function returns the current minimum density of a chain `C`.
 
 ```rust
 fn getMinDen(C) -> density
@@ -385,9 +385,15 @@ fn initSubWindowDensities(G) -> ()
 
 ### 3.6.1 `updateCheckpoints`
 
-This algorithm updates the checkpoints of the block being created as part of the staking procedure.  It inputs the parent block `P`, the current block `B` and updates `B`'s checkpoints according to the description in [Section 3.2](/#32-decentralized-checkpointing).
+This algorithm updates the checkpoints of the block being created as part of the staking procedure.  It inputs the parent block `P`, the current block `B` and updates `B`'s checkpoints according to the description in [Section 3.2](#32-decentralized-checkpointing).
 
 ```rust
+fn epochSlot(S) -> uint
+{
+   return S.curr_global_slot mod slots_per_epoch
+}
+
+
 fn updateCheckpoints(P, B) -> ()
 {
     SP = P.protocol_state.body.consensus_state
@@ -396,9 +402,9 @@ fn updateCheckpoints(P, B) -> ()
     if SB.slot == 1 then // !? We need the local slot number ?!
         SB.next_epoch_data.start_checkpoint = state_hash
 
-    if 1 ≤ SB.slot < 2/3*slots_duration {
+    if 1 ≤ SB.slot < 2/3*slots_per_epoch {
         SB.next_epoch_data.lock_checkpoint = state_hash
     }
 }
 ```
-Specifically, if the slot (`SB.slot`) of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the parent block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch, then the `lock_checkpoint` of the current epoch data is also updated to the same value.
+Specifically, if the slot (`SB.slot`) of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the parent block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
