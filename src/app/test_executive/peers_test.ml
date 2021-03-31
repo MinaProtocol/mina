@@ -79,7 +79,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "mina_peers_test: done waiting for initialization" ;
     [%log info] "peers_list"
-      ~metadata:[("peers", `List (List.map peer_list ~f:(fun n -> `String (Node.id n) )))] ;
+      ~metadata:
+        [ ( "peers"
+          , `List (List.map peer_list ~f:(fun n -> `String (Node.id n))) ) ] ;
     let get_peer_id_partial = Node.get_peer_id ~logger in
     (* each element in query_results represents the data of a single node relevant to this test. ( peer_id of node * [list of peer_ids of node's peers] ) *)
     let%bind (query_results : (string * string list) list) =
