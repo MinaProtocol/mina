@@ -2,7 +2,7 @@
 
 Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consensus.
 
-Samasika consensus is an extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succint blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.
+Samasika consensus is an extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.
 
 This documents specifies the protocol and related structures.
 
@@ -399,10 +399,10 @@ fn updateCheckpoints(P, B) -> ()
     SP = P.protocol_state.body.consensus_state
     SB = B.protocol_state.body.consensus_state
     state_hash = hash(latest state ϵ SP.next_epoch_data.seed's update range) ?
-    if SB.slot == 1 then // !? We need the local slot number ?!
+    if epochSlot(SB.slot) == 0 then
         SB.next_epoch_data.start_checkpoint = state_hash
 
-    if 1 ≤ SB.slot < 2/3*slots_per_epoch {
+    if 0 ≤ epochSlot(SB) < 2/3*slots_per_epoch {
         SB.next_epoch_data.lock_checkpoint = state_hash
     }
 }
