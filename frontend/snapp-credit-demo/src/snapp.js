@@ -1,5 +1,7 @@
 const { exec } = require("child_process");
 const { execPath } = require("./binaries");
+const fs = require("fs");
+
 const {
   PROOF_SUCCESS,
   PROOF_FAIL,
@@ -7,7 +9,7 @@ const {
   CREDIT_FAIL,
 } = require("../constants");
 
-const execSnappCommand = (execPath, outputPath, ethAddress, creditScore) => {
+const execSnappCommand = (execPath, ethAddress, creditScore) => {
   const snappPublicKey =
     "B62qpeeaJV6jm3FZL9hvApQ7CjbwiLL8TXbZBWZwJwSm3rqM7yUmRLC";
   const receiverPublicKey =
@@ -21,8 +23,7 @@ const execSnappCommand = (execPath, outputPath, ethAddress, creditScore) => {
     --snapp-public-key ${snappPublicKey}\
     --receiver-public-key ${receiverPublicKey}\
     --fee ${fee}\
-    --amount ${amount}\
-    > ${outputPath}`;
+    --amount ${amount}`;
 };
 
 const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
@@ -41,16 +42,15 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
     return;
   }
 
-  exec(
-    execSnappCommand(execPath, outputPath, ethAddress, creditScore),
-    (error) => {
-      if (error) {
-        mainWindow.webContents.send(PROOF_FAIL);
-      } else {
-        mainWindow.webContents.send(PROOF_SUCCESS);
-      }
+  exec(execSnappCommand(execPath, ethAddress, creditScore), (error, stdout) => {
+    if (error) {
+      mainWindow.webContents.send(PROOF_FAIL);
+    } else {
+      const output = stdout.substr(stdout.indexOf("mutation"));
+      fs.writeFileSync(outputPath, output);
+      mainWindow.webContents.send(PROOF_SUCCESS);
     }
-  );
+  });
 };
 
 exports.generateSnapp = generateSnapp;
