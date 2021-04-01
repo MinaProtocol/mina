@@ -274,9 +274,31 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
     in
     prev_start := now ;
     let%map connection, process =
-      Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-        ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
-        {conf_dir; logger; proof_level}
+      (* This [try_with] isn't really here to catch an error that throws while
+         the process is being spawned. Indeed, the immediate [ok_exn] will
+         ensure that any errors that occur during that time are immediately
+         re-raised.
+         However, this *also* captures any exceptions raised by code scheduled
+         as a result of the inner calls, but which have not completed by the
+         time the process has been created.
+         In order to suppress errors around [wait]s coming from [Rpc_parallel]
+         -- in particular the "no child processes" WNOHANG error -- we supply a
+         [rest] handler for the 'rest' of the errors after the value is
+         determined, which logs the errors and then swallows them.
+      *)
+      Monitor.try_with ~name:"Verifier RPC worker" ~run:`Now
+        ~rest:
+          (`Call
+            (fun exn ->
+              let err = Error.of_exn ~backtrace:`Get exn in
+              [%log error] "Error from verifier worker $err"
+                ~metadata:[("err", Error_json.error_to_yojson err)] ))
+        (fun () ->
+          Worker.spawn_in_foreground_exn
+            ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
+            ~shutdown_on:Disconnect ~connection_state_init_arg:()
+            {conf_dir; logger; proof_level} )
+      >>| Result.ok_exn
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger process
       ~module_:__MODULE__ ~location:__LOC__ ;
