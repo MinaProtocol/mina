@@ -4,7 +4,7 @@ open Mina_base
 
 type t = unit
 
-type ledger_proof = Ledger_proof.Debug.t
+type ledger_proof = Ledger_proof.t
 
 let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
   match proof_level with
@@ -35,13 +35,4 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
           `Valid c )
   |> Deferred.Or_error.return
 
-let verify_transaction_snarks _ ts =
-  (*Don't check if the proof has default sok becasue they were probably not
-  intended to be checked. If it has some value then check that against the
-  message passed. This is particularly used to test that invalid proofs are not
-  added to the snark pool*)
-  List.for_all ts ~f:(fun (proof, message) ->
-      let msg_digest = Sok_message.digest message in
-      Sok_message.Digest.(equal (snd proof) default)
-      || Mina_base.Sok_message.Digest.equal (snd proof) msg_digest )
-  |> Deferred.Or_error.return
+let verify_transaction_snarks _ _ = Deferred.Or_error.return true
