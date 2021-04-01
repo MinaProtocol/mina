@@ -1007,9 +1007,10 @@ let create ?wallets (config : Config.t) =
               ~rest:
                 (`Call
                   (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
@@ -1023,10 +1024,11 @@ let create ?wallets (config : Config.t) =
               ~rest:
                 (`Call
                   (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
               (fun () ->
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
