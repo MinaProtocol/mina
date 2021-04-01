@@ -35,4 +35,16 @@ let verify_commands _ (cs : User_command.Verifiable.t list) :
           `Valid c )
   |> Deferred.Or_error.return
 
-let verify_transaction_snarks _ _ = Deferred.Or_error.return true
+let verify_transaction_snarks _ ts =
+  (* Don't check if the proof has default sok, becasue they were probably not
+     intended to be checked. If it has some value then check that against the
+     message passed.
+     This is particularly used to test that invalid proofs are not added to the
+     snark pool
+  *)
+  List.for_all ts ~f:(fun (proof, message) ->
+      let msg_digest = Sok_message.digest message in
+      let sok_digest = Transaction_snark.sok_digest proof in
+      Sok_message.Digest.(equal sok_digest default)
+      || Mina_base.Sok_message.Digest.equal sok_digest msg_digest )
+  |> Deferred.Or_error.return
