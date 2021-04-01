@@ -19,6 +19,53 @@ module Inputs = struct
            [None] here.
         *)
         Pickles.Verification_key.Id.t option }
+
+  let runtime_config {runtime_config; _} = runtime_config
+
+  let constraint_constants {constraint_constants; _} = constraint_constants
+
+  let genesis_constants {genesis_constants; _} = genesis_constants
+
+  let proof_level {proof_level; _} = proof_level
+
+  let protocol_constants t = (genesis_constants t).protocol
+
+  let ledger_depth {genesis_ledger; _} =
+    Genesis_ledger.Packed.depth genesis_ledger
+
+  include Genesis_ledger.Utils
+
+  let genesis_ledger {genesis_ledger; _} =
+    Genesis_ledger.Packed.t genesis_ledger
+
+  let genesis_epoch_data {genesis_epoch_data; _} = genesis_epoch_data
+
+  let accounts {genesis_ledger; _} =
+    Genesis_ledger.Packed.accounts genesis_ledger
+
+  let find_new_account_record_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.find_new_account_record_exn genesis_ledger
+
+  let find_new_account_record_exn_ {genesis_ledger; _} =
+    Genesis_ledger.Packed.find_new_account_record_exn_ genesis_ledger
+
+  let largest_account_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.largest_account_exn genesis_ledger
+
+  let largest_account_keypair_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.largest_account_keypair_exn genesis_ledger
+
+  let largest_account_pk_exn {genesis_ledger; _} =
+    Genesis_ledger.Packed.largest_account_pk_exn genesis_ledger
+
+  let consensus_constants {consensus_constants; _} = consensus_constants
+
+  let genesis_state_with_hash {protocol_state_with_hash; _} =
+    protocol_state_with_hash
+
+  let genesis_state t = (genesis_state_with_hash t).data
+
+  let genesis_state_hash t = (genesis_state_with_hash t).hash
 end
 
 module T = struct
