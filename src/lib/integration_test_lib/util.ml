@@ -64,7 +64,7 @@ module Make (Engine : Intf.Engine.S) = struct
     | Some nk ->
         Malleable_error.return (nk.keypair.public_key |> Public_key.compress)
     | None ->
-        Malleable_error.of_string_hard_error_format
+        Malleable_error.hard_error_format
           "Node '%s' did not have a network keypair, if node is a block \
            producer this should not happen"
           (Engine.Network.Node.id node)
