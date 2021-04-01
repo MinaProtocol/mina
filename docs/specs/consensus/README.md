@@ -10,9 +10,9 @@ This documents specifies the protocol and related structures.
 * [1 Constants](#1-constants)
 * [2 Structures](#2-structures)
   * [2.1 Block](#21-block)
-  * [2.2 Protocol_state](#22-protocol_state)
-  * [2.3 Consensus_state](#23-consensus_state)
-  * [2.4 Epoch_data](#24-epoch_data)
+  * [2.2 `Protocol_state`](#22-protocol_state)
+  * [2.3 `Consensus_state`](#23-consensus_state)
+  * [2.4 `Epoch_data`](#24-epoch_data)
 * [3 Algorithms](#3-algorithms)
   * [3.1 Chain Selection Rules](#31-chain-selection-rules)
     * [3.1.1 Short-range fork rule](#311-short-range-fork-rule)
@@ -35,7 +35,7 @@ This documents specifies the protocol and related structures.
 
 **Conventions**
 * We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
-* We use the term _local slot number_ to refer to the intra-epoch slot number that resets to 1 every epoch
+* We use the terms _local or epoch slot number_ to refer to the intra-epoch slot number that resets to 1 every epoch
 * We use _global slot number_ to refer to the global slot number since genesis starting at 1
 
 **Notations**
@@ -383,23 +383,18 @@ fn initSubWindowDensities(G) -> ()
 
 ## 3.6 Staking Procedure
 
+
 ### 3.6.1 `updateCheckpoints`
 
 This algorithm updates the checkpoints of the block being created as part of the staking procedure.  It inputs the parent block `P`, the current block `B` and updates `B`'s checkpoints according to the description in [Section 3.2](#32-decentralized-checkpointing).
 
 ```rust
-fn epochSlot(S) -> uint
-{
-   return S.curr_global_slot mod slots_per_epoch
-}
-
-
 fn updateCheckpoints(P, B) -> ()
 {
     SP = P.protocol_state.body.consensus_state
     SB = B.protocol_state.body.consensus_state
     state_hash = hash(latest state ϵ SP.next_epoch_data.seed's update range) ?
-    if epochSlot(SB.slot) == 0 then
+    if epochSlot(SB) == 0 then
         SB.next_epoch_data.start_checkpoint = state_hash
 
     if 0 ≤ epochSlot(SB) < 2/3*slots_per_epoch {
@@ -408,3 +403,12 @@ fn updateCheckpoints(P, B) -> ()
 }
 ```
 Specifically, if the slot (`SB.slot`) of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the parent block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
+
+### 3.6.2 `epochSlot`
+
+```rust
+fn epochSlot(S) -> uint
+{
+   return S.curr_global_slot mod slots_per_epoch
+}
+```
