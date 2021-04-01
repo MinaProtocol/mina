@@ -345,11 +345,19 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
     in
     upon finished (fun e ->
         let pid = Process.pid process in
+        let create_worker_trigger = Ivar.create () in
+        don't_wait_for
+          (* If we don't hear back that the process has died after 10 seconds,
+             begin creating a new process anyway.
+          *)
+          (let%map () = after (Time.Span.of_sec 10.) in
+           Ivar.fill_if_empty create_worker_trigger ()) ;
         let () =
           match e with
           | `Unexpected_termination ->
               [%log error] "verifier terminated unexpectedly"
-                ~metadata:[("verifier_pid", `Int (Pid.to_int pid))]
+                ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] ;
+              Ivar.fill_if_empty create_worker_trigger ()
           | `Time_to_restart | `Wait_threw_an_exception _ -> (
               ( match e with
               | `Wait_threw_an_exception err ->
@@ -364,7 +372,8 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
               | `No_such_process ->
                   [%log info]
                     "verifier failed to get sigkill (no such process)"
-                    ~metadata:[("verifier_pid", `Int (Pid.to_int pid))]
+                    ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] ;
+                  Ivar.fill_if_empty create_worker_trigger ()
               | `Ok ->
                   [%log info] "verifier successfully got sigkill"
                     ~metadata:[("verifier_pid", `Int (Pid.to_int pid))] )
@@ -372,7 +381,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         let new_worker = Ivar.create () in
         worker_ref := new_worker ;
         don't_wait_for
-        @@ let%bind exit_metadata =
+          (let%map exit_metadata =
              match%map exit_or_signal with
              | Ok res ->
                  [ ( "exit_status"
@@ -386,9 +395,12 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
                ( ("verifier_pid", `Int (Process.pid process |> Pid.to_int))
                :: exit_metadata ) ;
            Child_processes.Termination.remove pids pid ;
+           Ivar.fill_if_empty create_worker_trigger ()) ;
+        don't_wait_for
+          (let%bind () = Ivar.read create_worker_trigger in
            let%map worker = create_worker () in
            on_worker worker ;
-           Ivar.fill new_worker worker )
+           Ivar.fill new_worker worker) )
   in
   on_worker worker ;
   {worker= worker_ref; logger}
