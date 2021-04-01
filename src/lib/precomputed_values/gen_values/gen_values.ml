@@ -20,7 +20,8 @@ let use_dummy_values = true
 
 [%%endif]
 
-let generate_genesis_proof = false
+[%%inject
+"generate_genesis_proof", generate_genesis_proof]
 
 module type S = sig
   val blockchain_proof_system_id : Parsetree.expression

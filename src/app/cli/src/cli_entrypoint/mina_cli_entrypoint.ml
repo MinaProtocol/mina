@@ -324,8 +324,11 @@ let setup_daemon logger =
   and may_generate =
     flag "--generate-genesis-proof" ~aliases:["generate-genesis-proof"]
       ~doc:
-        "true|false Generate a new genesis proof for the current \
-         configuration if none is found (default: false)"
+        (sprintf
+           "true|false Generate a new genesis proof for the current \
+            configuration if none is found (default: %s)"
+           ( if Mina_compile_config.generate_genesis_proof then "false"
+           else "true" ))
       (optional bool)
   and disable_node_status =
     flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
@@ -499,7 +502,13 @@ let setup_daemon logger =
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
-    let may_generate = Option.value ~default:false may_generate in
+    let may_generate =
+      (* Default is [true] if there is no compile-time genesis proof to fall
+         back on, or [false] otherwise.
+      *)
+      Option.value may_generate
+        ~default:(not Mina_compile_config.generate_genesis_proof)
+    in
     (* FIXME adapt to new system, move into child_processes lib *)
     let pids = Child_processes.Termination.create_pid_table () in
     let rec terminated_child_loop () =
