@@ -310,9 +310,13 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
         ; ( "process_kind"
           , `String Child_processes.Termination.(show_process_kind Verifier) )
         ] ;
-    if prev_died_early then
-      Child_processes.Termination.register_process pids process
-        Child_processes.Termination.Verifier ;
+    Child_processes.Termination.register_process pids process
+      Child_processes.Termination.Verifier ;
+    (* Always report termination as expected, and use the restart logic here
+       instead.
+    *)
+    let pid = Process.pid process in
+    Child_processes.Termination.mark_termination_as_expected pids pid ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stdout process |> Reader.pipe)
@@ -367,7 +371,6 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
                     ~metadata:[("exn", Error_json.error_to_yojson err)]
               | _ ->
                   () ) ;
-              Child_processes.Termination.mark_termination_as_expected pids pid ;
               match Signal.send Signal.kill (`Pid pid) with
               | `No_such_process ->
                   [%log info]
