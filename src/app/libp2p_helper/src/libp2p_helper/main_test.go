@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	net "github.com/libp2p/go-libp2p-core/network"
 	peer "github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 
 	"github.com/libp2p/go-libp2p-pubsub"
@@ -491,10 +492,12 @@ func TestOpenStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -525,10 +528,12 @@ func TestCloseStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -570,10 +575,12 @@ func TestResetStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -615,10 +622,12 @@ func TestSendStreamMsg(t *testing.T) {
 	ret, err := msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -671,10 +680,12 @@ func TestAddStreamHandlerMsg(t *testing.T) {
 	ret, err = msg.run(appA)
 	require.NoError(t, err)
 
+	expectedHost, err := appB.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 1
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appB.P2p.Host.ID().String(),
 	}
 
@@ -776,10 +787,12 @@ func TestFindPeerMsg(t *testing.T) {
 		PeerID: appA.P2p.Host.ID().String(),
 	}
 
+	expectedHost, err := appA.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
@@ -806,10 +819,12 @@ func TestListPeersMsg(t *testing.T) {
 	addrs := appB.P2p.Host.Peerstore().Addrs(appA.P2p.Host.ID())
 	require.NotEqual(t, 0, len(addrs))
 
+	expectedHost, err := appA.P2p.Host.Addrs()[0].ValueForProtocol(4)
+	require.NoError(t, err)
 	expectedPort := port - 2
 	expected := codaPeerInfo{
 		Libp2pPort: expectedPort,
-		Host:       "192.168.0.100",
+		Host:       expectedHost,
 		PeerID:     appA.P2p.Host.ID().String(),
 	}
 
@@ -864,7 +879,7 @@ func TestGetPeerMessage(t *testing.T) {
 		codanet.NoDHT = false
 	}()
 
-	// only allow peer count of 1 for node A
+	// only allow peer count of 2 for node A
 	maxCount := 2
 	appA := newTestAppWithMaxConns(t, nil, maxCount)
 	appAInfos, err := addrInfos(appA.P2p.Host)
@@ -911,4 +926,36 @@ func TestGetPeerMessage(t *testing.T) {
 
 	time.Sleep(time.Second)
 	require.Equal(t, maxCount, len(appA.P2p.Host.Network().Peers()))
+}
+
+func TestGetNodeStatus(t *testing.T) {
+	codanet.NoDHT = true
+	defer func() {
+		codanet.NoDHT = false
+	}()
+
+	// only allow peer count of 1 for node A
+	maxCount := 1
+	appA := newTestAppWithMaxConns(t, nil, maxCount)
+	appAInfos, err := addrInfos(appA.P2p.Host)
+	require.NoError(t, err)
+	appA.P2p.NodeStatus = "testdata"
+
+	appB := newTestApp(t, nil)
+	err = appB.P2p.Host.Connect(appB.Ctx, appAInfos[0])
+	require.NoError(t, err)
+
+	appC := newTestApp(t, nil)
+	appC.P2p.Host.Peerstore().AddAddrs(appA.P2p.Host.ID(), appAInfos[0].Addrs, peerstore.ConnectedAddrTTL)
+
+	maStrs := multiaddrs(appA.P2p.Host)
+
+	// ensure we can receive data before being disconnected
+	msg := &getPeerNodeStatusMsg{
+		PeerMultiaddr: maStrs[0].String(),
+	}
+
+	ret, err := msg.run(appC)
+	require.NoError(t, err)
+	require.Equal(t, appA.P2p.NodeStatus, ret)
 }

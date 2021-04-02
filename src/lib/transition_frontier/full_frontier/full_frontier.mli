@@ -32,6 +32,7 @@ val create :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> max_length:int
   -> precomputed_values:Precomputed_values.t
+  -> time_controller:Block_time.Controller.t
   -> t
 
 val close : loc:string -> t -> unit

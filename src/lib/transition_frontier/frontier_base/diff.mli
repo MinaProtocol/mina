@@ -115,9 +115,19 @@ type ('repr, 'mutant) t =
    *  pointer at the time of processing this diff.
    *)
 
+module Repr : sig
+  type t =
+    | New_node of State_hash.t
+    | Root_transitioned of {new_root: State_hash.t; garbage: State_hash.t list}
+    | Best_tip_changed of State_hash.t
+  [@@deriving yojson]
+end
+
 type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
-val to_yojson : ('repr, 'mutant) t -> Yojson.Safe.t
+val to_repr : _ t -> Repr.t
+
+val to_yojson : _ t -> Yojson.Safe.t
 
 val to_lite : (full, 'mutant) t -> (lite, 'mutant) t
 
