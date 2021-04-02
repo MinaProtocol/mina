@@ -362,14 +362,15 @@ kind: Service
 metadata:
   name: {{ $config.name }}-graphql
 spec:
-  type: NodePort
+  type: ClusterIP
   publishNotReadyAddresses: true
   selector:
     app: {{ $config.name }}
   ports:
   - name: http-graphql
     protocol: TCP
-    port: {{ $.Values.coda.ports.graphql }}
+    port: 80
+    targetPort: {{ $.Values.coda.ports.graphql }}
 {{- end }}
 ---
 {{ end }}
