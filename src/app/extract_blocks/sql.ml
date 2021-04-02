@@ -104,12 +104,12 @@ module Blocks_and_internal_commands = struct
     ; global_slot: int64
     ; sequence_no: int
     ; secondary_sequence_no: int
-    ; receiver_balance: int64 }
+    ; receiver_balance_id: int }
   [@@deriving hlist]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[int; int64; int; int; int64] in
+    let spec = Caqti_type.[int; int64; int; int; int] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
