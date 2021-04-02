@@ -11,7 +11,7 @@
     "bs-electron": "github:Schmavery/bs-electron#0cf39124417bc3157b7a675154f591bf6e4b79ba",
     "bs-platform": "7.2.2",
     "bs-react-intl": "^1.0.0",
-    "node-fetch": "^2.5.0",
+    "node-fetch": "^2.6.1",
     "react-intl": "^3.6.2",
     "react-modal": "^3.8.1",
     "react-waypoint": "^9.0.2",
