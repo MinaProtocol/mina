@@ -24,10 +24,10 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
     export VERSION="${GITTAG}-${GITHASH}"
     export GENERATE_KEYPAIR_VERSION=${VERSION}
-    export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
+    export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g; s!+!-!g')"
 else
     export VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}"
-    export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
+    export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g; s!+!-!g')"
     export GENERATE_KEYPAIR_VERSION=${GITTAG}-${GITHASH}
 fi
 
