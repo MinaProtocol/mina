@@ -197,13 +197,9 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
-# Overwrite binaries
-sudo chown $(whoami) /usr/local/bin
-sudo rm -f /usr/local/bin/mina
-sudo rm -f /usr/local/bin/mina-rosetta
-sudo chmod +w /usr/local/bin
-cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+# Overwrite binaries (sudo to fix permissions error)
+sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 
 # echo contents of deb
@@ -243,13 +239,9 @@ echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
-# Overwrite binaries
-sudo chown $(whoami) /usr/local/bin
-sudo rm -f /usr/local/bin/mina
-sudo rm -f /usr/local/bin/mina-rosetta
-sudo chmod +w /usr/local/bin
-cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+# Overwrite binaries (sudo to fix permissions error)
+sudo cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
