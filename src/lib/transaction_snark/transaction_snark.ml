@@ -404,7 +404,7 @@ module Proof = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = T.t
+      type t = Pickles.Proof.Branching_2.Stable.V1.t
       [@@deriving version {asserted}, yojson, bin_io, compare, sexp, hash]
 
       let to_latest = Fn.id

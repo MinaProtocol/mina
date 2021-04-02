@@ -74,7 +74,8 @@ module Proof : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t = Make(Nat.N2)(Nat.N2).t [@@deriving sexp, compare, yojson]
+        type t = Make(Nat.N2)(Nat.N2).t
+        [@@deriving sexp, compare, yojson, hash]
       end
     end]
   end
