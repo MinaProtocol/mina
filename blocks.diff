@@ -1,0 +1,496 @@
+diff --git a/3NKGnC2e3KxFh8yixHLt1vLUmf5yzdChQWVDLxfupgPcrPLC4Qso.json b/3NKGnC2e3KxFh8yixHLt1vLUmf5yzdChQWVDLxfupgPcrPLC4Qso.json
+index 286f81d..0b0ba0a 100644
+--- a/3NKGnC2e3KxFh8yixHLt1vLUmf5yzdChQWVDLxfupgPcrPLC4Qso.json
++++ b/3NKGnC2e3KxFh8yixHLt1vLUmf5yzdChQWVDLxfupgPcrPLC4Qso.json
+@@ -81,7 +81,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qnYVJSEPGrVtUvECksn4cRDBa8c4QhLQ7dzoHxqB6kPcAZvY41ui",
+-      "receiver_balance": "200000001",
++      "receiver_balance": "20160409999999",
+       "fee": "0.019999999",
+       "token": "1",
+       "hash": "CkpZwBHe5FtHWdwqrA2yvidL8CPNMTNS1Y87V4dVE2bTPMcjn93fP"
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qoUaAA4bfUaA7F797qFEwWJTJak5wSUqujHiyevtLYHDwt6hcu55",
+-      "receiver_balance": "20160409999999",
++      "receiver_balance": "200000001",
+       "fee": "0.000000001",
+       "token": "1",
+       "hash": "CkpYrsyt61uavNV9VdZrNjQMA1rboe7fJvCngkUsAMncgDM151BUo"
+diff --git a/3NKSXjinmeVEGMRGYz1S9UkmQAFD58awZgA2nZUm1moSsxkn4Txw.json b/3NKSXjinmeVEGMRGYz1S9UkmQAFD58awZgA2nZUm1moSsxkn4Txw.json
+index 2178442..508c991 100644
+--- a/3NKSXjinmeVEGMRGYz1S9UkmQAFD58awZgA2nZUm1moSsxkn4Txw.json
++++ b/3NKSXjinmeVEGMRGYz1S9UkmQAFD58awZgA2nZUm1moSsxkn4Txw.json
+@@ -81,7 +81,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qorXXHv971Kvnq91TkvWsRAvMCB8yszCX6yUhpyZseKcibSZSDSF",
+-      "receiver_balance": "100000",
++      "receiver_balance": "10080189899999",
+       "fee": "0.009899999",
+       "token": "1",
+       "hash": "CkpZj9FuzPBagGQrZp9Pup8Qrno1b5hGZ8ccPi4XL7sWnmMPV9hWS"
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qmrsFZNeW2ReoHpTafy9hy1oNw12UuR1UdGJEUqTuFZ3LPVccDTA",
+-      "receiver_balance": "10080189899999",
++      "receiver_balance": "100000",
+       "fee": "0.0001",
+       "token": "1",
+       "hash": "CkpYxVj6WKEG4BcaQaNriGdJbKqEmQ4yQNaTtDnHPf2EyCdTDtB1m"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qrQ4m3KNeNBsC86AW1vyXxEs32NbG2pDA2mdvCq5erxLqftVyZTj",
+-      "receiver_balance": "200000002",
++      "receiver_balance": "1210000024",
+       "fee": "0.01",
+       "token": "1",
+       "hash": "CkpYnp2ZYLubStRMik5JCWzUT1yoaCr72JXc6ofEsPvBYaMDtXeLR"
+@@ -111,7 +111,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qqQSeAh9dG1zmNQY7ngCkcDWDkGH9ykEHBDhE8B1WXexy1uq6eoZ",
+-      "receiver_balance": "1210000024",
++      "receiver_balance": "200000002",
+       "fee": "0.000000001",
+       "token": "1",
+       "hash": "CkpYdopUpWHsmih8GAmiZxdmMa3s18KiFNquz5oPQyTZe3tDhy4Li"
+diff --git a/3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json b/3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json
+index ad25fbf..26c9dc8 100644
+--- a/3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json
++++ b/3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qr9jmNyuKG9Zhi1jENgPuswFRRDrkin3tP6D76qx8HNpjke5aUMs",
+-      "receiver_balance": "205000000",
++      "receiver_balance": "720000220000",
+       "fee": "0.00011",
+       "token": "1",
+       "hash": "CkpZpobAj3wFYRPHEyqTv8iFdoM9RDjSp2Ljmt4TWar8CZXHvYz4a"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qqyBD6cBATkdAa29tNAEJvJfkMTzwfuWyaJz6Ya3dJ76ZixfUter",
+-      "receiver_balance": "720000220000",
++      "receiver_balance": "205000000",
+       "fee": "0.005",
+       "token": "1",
+       "hash": "Ckpa6GHrrPikUNF69x8qG6PbMfHu87791C3zVCdr2qi72bZLm6ftb"
+@@ -111,7 +111,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qmkmSCiTvayykE34nVjvyGdYDvFhx1iHV94rHgkESSNiApTzixj9",
+-      "receiver_balance": "12240161001000",
++      "receiver_balance": "12237483889008",
+       "fee": "0.014889016",
+       "token": "1",
+       "hash": "CkpZjPTUdBJA8rmUw5vXFQNTUnnzQFvMEnBGGK5z9MUCWn5sfiW5N"
+@@ -121,7 +121,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h",
+-      "receiver_balance": "12237483889008",
++      "receiver_balance": "12240161001000",
+       "fee": "0.000000984",
+       "token": "1",
+       "hash": "Ckpa9WgytoJopiNubFKsNag9EDVYgg8Zv3oz47Qk9ce6BCqfxw6su"
+diff --git a/3NKWgjnJukg2GaVRy66QUzm1kpKCH9fvBzcNkF56BEa6HHRjmfk7.json b/3NKWgjnJukg2GaVRy66QUzm1kpKCH9fvBzcNkF56BEa6HHRjmfk7.json
+index 56e38d2..a6c7d03 100644
+--- a/3NKWgjnJukg2GaVRy66QUzm1kpKCH9fvBzcNkF56BEa6HHRjmfk7.json
++++ b/3NKWgjnJukg2GaVRy66QUzm1kpKCH9fvBzcNkF56BEa6HHRjmfk7.json
+@@ -127,7 +127,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qr2mdhKQAJb3nSwHJsvubaexz6S41PHTtuDbvqCgp7d6Wx9C4A5z",
+-      "receiver_balance": "26659962020000",
++      "receiver_balance": "66000001980000",
+       "fee": "0.00198",
+       "token": "1",
+       "hash": "CkpZJCZAxvc25Xt3kcwV4E2XnF8DaeB2K9c3MeoSLJUuJoJJt6cFw"
+@@ -137,7 +137,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qnYVcxiHswuEBZjAkkejZU5ssqemMLY3VZkXXHzqUeEVgoZiktbs",
+-      "receiver_balance": "66000001980000",
++      "receiver_balance": "26659962020000",
+       "fee": "0.03802",
+       "token": "1",
+       "hash": "CkpZd36QHSgC4ogLrT1nvpkusfjvP4P1UdFZyP7EZK7Bn7WnbnyZD"
+diff --git a/3NKeE2B3nh5p3YhNdqtbSADMj1AWR8Q7K3ufEvrJu8hs21JXb6An.json b/3NKeE2B3nh5p3YhNdqtbSADMj1AWR8Q7K3ufEvrJu8hs21JXb6An.json
+index 6d6665c..97dd9d6 100644
+--- a/3NKeE2B3nh5p3YhNdqtbSADMj1AWR8Q7K3ufEvrJu8hs21JXb6An.json
++++ b/3NKeE2B3nh5p3YhNdqtbSADMj1AWR8Q7K3ufEvrJu8hs21JXb6An.json
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qqSUUCnoC8Vehw5xwhrnaNxhk6Xe3FcBhngoxyXCbJBfvVhiqia1",
+-      "receiver_balance": "1401000000",
++      "receiver_balance": "69121261980000",
+       "fee": "0.00898",
+       "token": "1",
+       "hash": "CkpYfGgoqSjVhkdQUQmE1QAbJq8JQNw7ZHEE9dYsM74TdPpyY5gAU"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qmBVAArv7jDvKKcWv4dhdPrqcti4C7XUM93ThCfaHdnfemXfHYTx",
+-      "receiver_balance": "69121261980000",
++      "receiver_balance": "1401000000",
+       "fee": "0.001",
+       "token": "1",
+       "hash": "CkpZPmQdN1qATNjpnM5GUVTJJv2RZEk9eF7MopK7hA5fTRk5mj5Q4"
+diff --git a/3NKjEfCzCZcfoakkg4i2iG9g2X3HLx2YuSiVCtNiNYRfzStTSRWr.json b/3NKjEfCzCZcfoakkg4i2iG9g2X3HLx2YuSiVCtNiNYRfzStTSRWr.json
+index 4fa2b9c..02e6899 100644
+--- a/3NKjEfCzCZcfoakkg4i2iG9g2X3HLx2YuSiVCtNiNYRfzStTSRWr.json
++++ b/3NKjEfCzCZcfoakkg4i2iG9g2X3HLx2YuSiVCtNiNYRfzStTSRWr.json
+@@ -81,7 +81,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qr1yLuknMwcNYeqXoqUeQBpuMKVtHiQz62qP1eZDgLTcU9jrYfjQ",
+-      "receiver_balance": "8640172798540",
++      "receiver_balance": "1000000200",
+       "fee": "0.0000002",
+       "token": "1",
+       "hash": "CkpYVVQPjb9FMKFbmPriTCLadziyCzKuSp9H7MkfLqDA4K3JDsJaC"
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qoJuLTSJt6fqkk2N2yntcPKSEb45C8HWKr24Wi7atzCzgeXjg5oN",
+-      "receiver_balance": "1000000200",
++      "receiver_balance": "8640172798540",
+       "fee": "0.00279854",
+       "token": "1",
+       "hash": "CkpZUFqPfAppMBEjFvTYqr9QHDAweT7snx2i58VWLvEAFUtqFPtKg"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qmdsqUB7b3GYTWmCTGSioxMKeSesj4JrcRQRmmPRqwTtTo6xdYDz",
+-      "receiver_balance": "4200600",
++      "receiver_balance": "66000000000660",
+       "fee": "0.00000066",
+       "token": "1",
+       "hash": "CkpZfPYaHTcHsJAGVgxgXmUjxZqyr9AU3y63ZACK8ESRr6XLLRk4u"
+@@ -111,7 +111,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qs2P91UjdhngetBJ57C56HQ8t5V7ECAYWBvpkaC45ovXNgnzqfG6",
+-      "receiver_balance": "66000000000660",
++      "receiver_balance": "4200600",
+       "fee": "0.0042006",
+       "token": "1",
+       "hash": "CkpZ9fRxT3xUN5NKxWX2uCPVh1xUcsfC4tB7UoRUEM3ZWEaLLN6X4"
+@@ -121,7 +121,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qoYVcxsGQWVuPuvU53jCHFnuJ4FLePM8SwkVYNfxboJU5pttpyMf",
+-      "receiver_balance": "12600000",
++      "receiver_balance": "400400000",
+       "fee": "0.0004",
+       "token": "1",
+       "hash": "CkpZG6naMZhwYm4QAxzwbJ784vqTbxvbWRpoAXGLXE2KqctrX7dLX"
+@@ -131,7 +131,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qiYicQcKtuSqdDZwFkaMzMCtkPmmFuaPFy6ufp8MtpG3UsHfe2tH",
+-      "receiver_balance": "400400000",
++      "receiver_balance": "12600000",
+       "fee": "0.0126",
+       "token": "1",
+       "hash": "CkpYcH6kCepDh7hvcfiBgeNWnoeCSAYkoPbW9cYrHFhbdaYtWjzgs"
+diff --git a/3NKjsFwQDroJgKn2wHTLKhFqX3QxzbB9fmgMviz1rYbwSYdCN1Tv.json b/3NKjsFwQDroJgKn2wHTLKhFqX3QxzbB9fmgMviz1rYbwSYdCN1Tv.json
+index bf58a63..44abb1b 100644
+--- a/3NKjsFwQDroJgKn2wHTLKhFqX3QxzbB9fmgMviz1rYbwSYdCN1Tv.json
++++ b/3NKjsFwQDroJgKn2wHTLKhFqX3QxzbB9fmgMviz1rYbwSYdCN1Tv.json
+@@ -193,7 +193,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qmdsqUB7b3GYTWmCTGSioxMKeSesj4JrcRQRmmPRqwTtTo6xdYDz",
+-      "receiver_balance": "18000260999760",
++      "receiver_balance": "66000000001290",
+       "fee": "0.00000023",
+       "token": "1",
+       "hash": "CkpYRagbgvFL9as7tdHSYN8NA2hx9jSB5N2MyrLGzZvESTk1RjHMg"
+@@ -203,7 +203,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qpyX7tTKzTzFaJ6w5uu8PgedH9eftfKzE4kXGidZDPnJ9XLjGbP2",
+-      "receiver_balance": "66000000001290",
++      "receiver_balance": "18000260999760",
+       "fee": "0.01999977",
+       "token": "1",
+       "hash": "CkpZxNZ4pjmYAE1EvKdD1CueAmymiyHibBpvZBnqjmZtTmbV2Ai68"
+diff --git a/3NKkT8BjXizuEuAeNPdFZf3tEkwFzjjYBj8CfJXgBrjDFLxsg4q5.json b/3NKkT8BjXizuEuAeNPdFZf3tEkwFzjjYBj8CfJXgBrjDFLxsg4q5.json
+index cae052c..7f26f85 100644
+--- a/3NKkT8BjXizuEuAeNPdFZf3tEkwFzjjYBj8CfJXgBrjDFLxsg4q5.json
++++ b/3NKkT8BjXizuEuAeNPdFZf3tEkwFzjjYBj8CfJXgBrjDFLxsg4q5.json
+@@ -58,7 +58,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qnYVcxiHswuEBZjAkkejZU5ssqemMLY3VZkXXHzqUeEVgoZiktbs",
+-      "receiver_balance": "200000002",
++      "receiver_balance": "32420148019999",
+       "fee": "0.014999999",
+       "token": "1",
+       "hash": "CkpYw2fbATQqCHBW13hrck4qY8Sfhm2q8tsfvb9HDUYUcDe1FkHYh"
+@@ -68,7 +68,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qpNRrR31Z4VGxwNYBnaHsptu15GRScjFnkMcWn3s9mtb3VLt2i1b",
+-      "receiver_balance": "32420148019999",
++      "receiver_balance": "200000002",
+       "fee": "0.000000001",
+       "token": "1",
+       "hash": "CkpZLNnQ8xdi1kbyzNHtTWnwj74Bn2AWx5LfXZmiHbByQ7DAE74g8"
+diff --git a/3NKmkxwogfkV2x5oL4RuR3WFWmvNpKmFghdNSZfRiRHn8pjvCxJH.json b/3NKmkxwogfkV2x5oL4RuR3WFWmvNpKmFghdNSZfRiRHn8pjvCxJH.json
+index 006d154..012d9a4 100644
+--- a/3NKmkxwogfkV2x5oL4RuR3WFWmvNpKmFghdNSZfRiRHn8pjvCxJH.json
++++ b/3NKmkxwogfkV2x5oL4RuR3WFWmvNpKmFghdNSZfRiRHn8pjvCxJH.json
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qqKCmTdo7JJS6hP2YsiMoXvkpo7rcK6EsxBns3etbQytnoY8b49C",
+-      "receiver_balance": "209900000",
++      "receiver_balance": "15121750100000",
+       "fee": "0.0001",
+       "token": "1",
+       "hash": "CkpZXqPa8YxA9rdhcFGjCL2R1D7QNgTjT9M9Bxb7gXwnivdUuWsaQ"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qopJnUq7VZHA4FvgcwN4Jy2uANe9pFE2ejSCjtW1XHtdBCdPYYZy",
+-      "receiver_balance": "15121750100000",
++      "receiver_balance": "209900000",
+       "fee": "0.0099",
+       "token": "1",
+       "hash": "CkpYtVfritR4P4fodJiRarUATuJJpiJYeg9cT4kAuACRcKX7nNMDg"
+diff --git a/3NKxVcd8DixEjjmuBb2k5xW5RTSMwhNSpRJNJ7KcKL7RW7jAVY2t.json b/3NKxVcd8DixEjjmuBb2k5xW5RTSMwhNSpRJNJ7KcKL7RW7jAVY2t.json
+index 516ec12..a85e7d8 100644
+--- a/3NKxVcd8DixEjjmuBb2k5xW5RTSMwhNSpRJNJ7KcKL7RW7jAVY2t.json
++++ b/3NKxVcd8DixEjjmuBb2k5xW5RTSMwhNSpRJNJ7KcKL7RW7jAVY2t.json
+@@ -81,7 +81,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qnJjx96oDkfA4rcDog7whcyHB19XfG6yYi8fekgXge9N9m9uax6U",
+-      "receiver_balance": "4200000",
++      "receiver_balance": "195000000",
+       "fee": "0.005",
+       "token": "1",
+       "hash": "CkpYVrXoY2Sx62QUtokkby5X9PpbNh3Tuca8tHR6fPMQF2DWymHkH"
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qpe129AcY7gPkiNdStKxNtwQC9Y2ZyZCMKGKn6taZGCdTdBtuBYR",
+-      "receiver_balance": "195000000",
++      "receiver_balance": "4200000",
+       "fee": "0.0042",
+       "token": "1",
+       "hash": "CkpZ3Bfh3j2QedtJj9jNxLicZJWco1xCka6RVcgcfNY8jTHA7vuoY"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qjEGSN5BUPT1x6uKJMLngzWFs4p4vZUAHnbPfgsDmg1DyWrrhLoG",
+-      "receiver_balance": "61921683799997",
++      "receiver_balance": "200100003",
+       "fee": "0.000000003",
+       "token": "1",
+       "hash": "CkpYtvLqVAfuRzvuRewNAXFtBHN2Xz6VmN3Gf7AzMnj2LHmXJyLUy"
+@@ -111,7 +111,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qknBg1mTvb9uXy9exbBsxs16BXgMQiJ5N73eEFXmWBLaRetqMvMb",
+-      "receiver_balance": "200100003",
++      "receiver_balance": "61921683799997",
+       "fee": "0.010799997",
+       "token": "1",
+       "hash": "CkpZVHhEEFeSgyqJd4iCANYJfUwMe3oXE4qRGS1xoN39sXb3J3RWu"
+diff --git a/3NLBtAZnfZtrGyHsLpxzi9scUoPHgXCRNndEDvUMar42jrN5A3Vb.json b/3NLBtAZnfZtrGyHsLpxzi9scUoPHgXCRNndEDvUMar42jrN5A3Vb.json
+index e88df51..e065dcc 100644
+--- a/3NLBtAZnfZtrGyHsLpxzi9scUoPHgXCRNndEDvUMar42jrN5A3Vb.json
++++ b/3NLBtAZnfZtrGyHsLpxzi9scUoPHgXCRNndEDvUMar42jrN5A3Vb.json
+@@ -367,7 +367,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qqvDf19E357mwCfM6fHRhuBTaNcwnKCJbaNE3waGnQ8uNZZPU66g",
+-      "receiver_balance": "10000001",
++      "receiver_balance": "101",
+       "fee": "0.000000101",
+       "token": "1",
+       "hash": "CkpYc4t1WEmE5BUJvhspyFMn4W5YrvGkVVTnDBhpQiTmGJn5B8Dks"
+@@ -377,7 +377,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qpanxZjnQLtZHQfY8VGgCYyE29aDcG7BL2KwkQJbDzaSxwwZqT7i",
+-      "receiver_balance": "101",
++      "receiver_balance": "10000001",
+       "fee": "0.000000001",
+       "token": "1",
+       "hash": "CkpZ6kevYPJhaCkfgbr9JuNzJHVER9pM17zw3CwmSkDeL2goSCiYH"
+@@ -387,7 +387,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qjEGSN5BUPT1x6uKJMLngzWFs4p4vZUAHnbPfgsDmg1DyWrrhLoG",
+-      "receiver_balance": "14401420899898",
++      "receiver_balance": "200100000",
+       "fee": "0.0001",
+       "token": "1",
+       "hash": "CkpZDQ8nq8tRnxCowvDqVLx1q4Wu2oSaaCvLsnzPDsk9vYxfZiRTG"
+@@ -397,7 +397,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qq3tqfdj19hqaVCozJFM2q9gT2WezQMaJMKD6wxyvK3fMpHiP9va",
+-      "receiver_balance": "200100000",
++      "receiver_balance": "14401420899898",
+       "fee": "0.629899898",
+       "token": "1",
+       "hash": "CkpZw85mMRzWnhRhZRdEvDLxK1Ke76zyc9PyqCg2YRbT1MrDM1W1D"
+diff --git a/3NLCEv7V6s6rgzwuqDYrdR7nWj1PXVc8sVMbLV6H9jBrcdMxsErM.json b/3NLCEv7V6s6rgzwuqDYrdR7nWj1PXVc8sVMbLV6H9jBrcdMxsErM.json
+index 5066de7..c839f54 100644
+--- a/3NLCEv7V6s6rgzwuqDYrdR7nWj1PXVc8sVMbLV6H9jBrcdMxsErM.json
++++ b/3NLCEv7V6s6rgzwuqDYrdR7nWj1PXVc8sVMbLV6H9jBrcdMxsErM.json
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qr2mdhKQAJb3nSwHJsvubaexz6S41PHTtuDbvqCgp7d6Wx9C4A5z",
+-      "receiver_balance": "108002684819997",
++      "receiver_balance": "66000003960000",
+       "fee": "0.00099",
+       "token": "1",
+       "hash": "CkpZSpPNxQkTqeqrnm26gLPgt9BgXdks4UD9xdVkH4p2WYnDY7h82"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qknBg1mTvb9uXy9exbBsxs16BXgMQiJ5N73eEFXmWBLaRetqMvMb",
+-      "receiver_balance": "66000003960000",
++      "receiver_balance": "108002684819997",
+       "fee": "0.01901",
+       "token": "1",
+       "hash": "CkpaCp6mkZ4ktsGbiwuRfjf9fX1zUUPBkbWjsLs9AVDxWXvbKQLnf"
+diff --git a/3NLJPo9fcJvmtYBhDS3bJNnvLkPokj8thU6bcAL36isADYtaHi3m.json b/3NLJPo9fcJvmtYBhDS3bJNnvLkPokj8thU6bcAL36isADYtaHi3m.json
+index 9ec385a..0539c98 100644
+--- a/3NLJPo9fcJvmtYBhDS3bJNnvLkPokj8thU6bcAL36isADYtaHi3m.json
++++ b/3NLJPo9fcJvmtYBhDS3bJNnvLkPokj8thU6bcAL36isADYtaHi3m.json
+@@ -150,7 +150,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qitpkSH8U24Zj5V2oziG7Mv3xTyGTyqPkrJ9C4tJaAjKWzLpdyhT",
+-      "receiver_balance": "66000000001050",
++      "receiver_balance": "200000010",
+       "fee": "0.00000001",
+       "token": "1",
+       "hash": "CkpYqfoHPHdzH7qTQcjZmHfCqibNsYzEnh2iPHcsNcxzBGFyjnYv3"
+@@ -160,7 +160,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qmdsqUB7b3GYTWmCTGSioxMKeSesj4JrcRQRmmPRqwTtTo6xdYDz",
+-      "receiver_balance": "200000010",
++      "receiver_balance": "66000000001050",
+       "fee": "0.00000001",
+       "token": "1",
+       "hash": "CkpZb49YGQyQLnwpo3oNLc7nqu8zTdbPPKJ56eQcSV1j3jyviFrrG"
+@@ -170,7 +170,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qpanxZjnQLtZHQfY8VGgCYyE29aDcG7BL2KwkQJbDzaSxwwZqT7i",
+-      "receiver_balance": "7200319999977",
++      "receiver_balance": "10000002",
+       "fee": "0.000000001",
+       "token": "1",
+       "hash": "CkpZ6kevYPJhaCkfgbr9JuNzJHVER9pM17zw3CwmSkDeL2goSCiYH"
+@@ -180,7 +180,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qpFJeY8uiLwzhrmwFGthQS7yjZonyUACq32G4ULkZcRB9W3WVFgE",
+-      "receiver_balance": "10000002",
++      "receiver_balance": "7200319999977",
+       "fee": "0.049999977",
+       "token": "1",
+       "hash": "CkpZSEgJqqXggTxa5LQtShCanYeSJp73FmtpJisaZCUHwpiTMCiAe"
+diff --git a/3NLVCk5bA1nCQLCqudxY8gq7TfASSxvuvwkgcAz1QCMjcvb5ijLE.json b/3NLVCk5bA1nCQLCqudxY8gq7TfASSxvuvwkgcAz1QCMjcvb5ijLE.json
+index bdd1e1e..df5a7be 100644
+--- a/3NLVCk5bA1nCQLCqudxY8gq7TfASSxvuvwkgcAz1QCMjcvb5ijLE.json
++++ b/3NLVCk5bA1nCQLCqudxY8gq7TfASSxvuvwkgcAz1QCMjcvb5ijLE.json
+@@ -81,7 +81,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qr1yLuknMwcNYeqXoqUeQBpuMKVtHiQz62qP1eZDgLTcU9jrYfjQ",
+-      "receiver_balance": "66000000001040",
++      "receiver_balance": "1000001100",
+       "fee": "0.0000009",
+       "token": "1",
+       "hash": "CkpZ6LHwrmu7qRsJFCdMN6tBdw1rFtzns9LgXqRb96QFGY4BxoBGr"
+@@ -91,7 +91,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qmdsqUB7b3GYTWmCTGSioxMKeSesj4JrcRQRmmPRqwTtTo6xdYDz",
+-      "receiver_balance": "1000001100",
++      "receiver_balance": "66000000001040",
+       "fee": "0.00000038",
+       "token": "1",
+       "hash": "CkpYh1fXu3z28MtaSCpwPh7U32s4CLjpS4BETc4WB75QJ8CYCLZwk"
+@@ -101,7 +101,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qs2P91UjdhngetBJ57C56HQ8t5V7ECAYWBvpkaC45ovXNgnzqfG6",
+-      "receiver_balance": "21000000",
++      "receiver_balance": "12603400",
+       "fee": "0.0084028",
+       "token": "1",
+       "hash": "CkpZG4DSWF81FD8CDdgYnRR3iWVeqNmgPCRSDzmVc5eh4RdFFhyzV"
+@@ -111,7 +111,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qiYicQcKtuSqdDZwFkaMzMCtkPmmFuaPFy6ufp8MtpG3UsHfe2tH",
+-      "receiver_balance": "12603400",
++      "receiver_balance": "21000000",
+       "fee": "0.0084",
+       "token": "1",
+       "hash": "CkpYrZVHXEk8xvEUyKUh2ChQsrD7Kgpec9XxGrLCBSafDdx2yFPwn"
+diff --git a/3NLkP7Wu2JovZj8MFch9ugfY6hGWwVe5Uy8J8qkeVVi16ay96dac.json b/3NLkP7Wu2JovZj8MFch9ugfY6hGWwVe5Uy8J8qkeVVi16ay96dac.json
+index b2f68b5..477a7e1 100644
+--- a/3NLkP7Wu2JovZj8MFch9ugfY6hGWwVe5Uy8J8qkeVVi16ay96dac.json
++++ b/3NLkP7Wu2JovZj8MFch9ugfY6hGWwVe5Uy8J8qkeVVi16ay96dac.json
+@@ -206,7 +206,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qpJvSB8A42sQjvpz2bbXYvz9kbLH7w7sxAMFQ5eK2LNbMx5NGcAC",
+-      "receiver_balance": "18000419100000",
++      "receiver_balance": "9900000",
+       "fee": "0.0099",
+       "token": "1",
+       "hash": "CkpZq8c25pnibRDc2vxJZozGnt7NLT9zG5wVMV2hMVTqyBnmjPGq7"
+@@ -216,7 +216,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qpUpEH7ivz61Sxo3PuTxntUNswmiHo2jwE2HvqmSVYW7q8xoStkx",
+-      "receiver_balance": "9900000",
++      "receiver_balance": "18000419100000",
+       "fee": "0.0301",
+       "token": "1",
+       "hash": "CkpYbVuA5FYVoVM7f41NYiskmbz1HDt1fGY7XCic1HU6mX8WKfZTs"
+diff --git a/3NLt3WEYazTo9XjKqCZjWRkozR7z6oz8dCBPuY2ixDKgNG2RctW7.json b/3NLt3WEYazTo9XjKqCZjWRkozR7z6oz8dCBPuY2ixDKgNG2RctW7.json
+index 4fd1e1b..5b85023 100644
+--- a/3NLt3WEYazTo9XjKqCZjWRkozR7z6oz8dCBPuY2ixDKgNG2RctW7.json
++++ b/3NLt3WEYazTo9XjKqCZjWRkozR7z6oz8dCBPuY2ixDKgNG2RctW7.json
+@@ -127,7 +127,7 @@
+       "secondary_sequence_no": 0,
+       "typ": "fee_transfer",
+       "receiver": "B62qrQiw9JhUumq457sMxicgQ94Z1WD9JChzJu19kBE8Szb5T8tcUAC",
+-      "receiver_balance": "200000001",
++      "receiver_balance": "2033997277001",
+       "fee": "0.039999999",
+       "token": "1",
+       "hash": "CkpaGUunFgbzYnsAYGWj1kmVgV4yYVoqxingwSVWGHHNQRvdf2EJJ"
+@@ -137,7 +137,7 @@
+       "secondary_sequence_no": 1,
+       "typ": "fee_transfer",
+       "receiver": "B62qnD3BjmwCYg7aeFqBmxSTdg9VA9zFttCMNxfPUEiEfKmgTNqRZxs",
+-      "receiver_balance": "2033997277001",
++      "receiver_balance": "200000001",
+       "fee": "0.000000001",
+       "token": "1",
+       "hash": "CkpYkBk8E1QkcW8TJrpzdFgU3iBYGg3sDvXZ3Tv1ohiBAXDDJQpy6"
