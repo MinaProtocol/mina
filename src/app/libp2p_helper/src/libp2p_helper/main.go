@@ -1232,7 +1232,7 @@ func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
 
 	app.P2p.Host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.ConnectedAddrTTL)
 
-	newStreamCtx, _ := context.WithTimeout(app.Ctx, 10*Time.Second)
+	newStreamCtx, _ := context.WithTimeout(app.Ctx, 10*time.Second)
 	// Open a "get node status" stream on m.PeerID,
 	// block until you can read the response, return that.
 	s, err := app.P2p.Host.NewStream(newStreamCtx, addrInfo.ID, codanet.NodeStatusProtocolID)
