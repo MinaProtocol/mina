@@ -2,9 +2,6 @@
 
 set -eo pipefail
 
-echo "Disabled for now as we don't have a testnet online yet"
-exit 0
-
 if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
   echo "Not pulling against compatible, not running the connect test"
   exit 0
@@ -25,7 +22,7 @@ echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt
 apt-get update
 apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
 
-TESTNET_NAME="testworld"
+TESTNET_NAME="mainnet"
 
 
 # Generate genesis proof and then crash due to no peers
@@ -39,9 +36,9 @@ rm ~/.mina-config/.mina-lock ||:
 
 # Restart in the background
 mina daemon \
-  -peer-list-file automation/terraform/testnets/$TESTNET_NAME/peers.txt \
-  -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
-  -generate-genesis-proof true \
+  --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt \
+  --config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
+  --generate-genesis-proof true \
   & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
