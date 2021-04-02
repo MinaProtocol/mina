@@ -21,7 +21,7 @@
   },
   "homepage": "https://github.com/minaprotocol/mina",
   "dependencies": {
-    "axios": "^0.19.2"
+    "axios": "^0.21.1"
   },
   "devDependencies": {
     "@google-cloud/functions-framework": "^1.6.0",
