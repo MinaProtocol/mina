@@ -10,7 +10,7 @@
     "graphql": "^15.0.0",
     "graphql-subscriptions": "^1.1.0",
     "isomorphic-ws": "^4.0.1",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
     "react": "^16.13.1",
     "subscriptions-transport-ws": "^0.9.16",
     "urql": "^1.9.5",
