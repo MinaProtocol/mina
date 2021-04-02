@@ -82,16 +82,13 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
 ls -lh mina*.deb
 
-# Remove generate-keypair, validate-keypair binaries before other builds with the same dir
-rm -f "${BUILDDIR}/usr/local/bin/mina-generate-keypair"
-rm -f "${BUILDDIR}/usr/local/bin/mina-validate-keypair"
-
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
 
-# deb without the proving keys
+###### deb without the proving keys
 echo "------------------------------------------------------------"
 echo "Building deb without keys:"
 
+rm -r "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}-noprovingkeys
@@ -100,7 +97,7 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery
+Conflicts: mina-discovery ${PROJECT}-testnet-noprovingkeys ${PROJECT}-mainnet-noprovingkeys
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -176,14 +173,94 @@ echo "------------------------------------------------------------"
 fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh mina*.deb
 
+###### deb with testnet signatures
+echo "------------------------------------------------------------"
+echo "Building testnet signatures deb without keys:"
 
-# remove build dir to prevent running out of space on the host machine
-rm -rf "${BUILDDIR}"
+# Overwrite control file
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: ${PROJECT}-testnet-noprovingkeys
+Version: ${VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
+Conflicts: mina-discovery ${PROJECT}-noprovingkeys ${PROJECT}-mainnet-noprovingkeys
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
 
-# second deb with the proving keys
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
+# Overwrite binaries
+cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+ls -l ../src/app/libp2p_helper/result/bin
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-testnet-noprovingkeys_${VERSION}.deb
+ls -lh mina*.deb
+
+###### deb with mainnet signatures
+echo "------------------------------------------------------------"
+echo "Building mainnet signatures deb without keys:"
+
+# Overwrite control file
+rm -r "${BUILDDIR}"
+mkdir -p "${BUILDDIR}/DEBIAN"
+cat << EOF > "${BUILDDIR}/DEBIAN/control"
+Package: ${PROJECT}-mainnet-noprovingkeys
+Version: ${VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
+Conflicts: mina-discovery ${PROJECT}-noprovingkeys ${PROJECT}-testnet-noprovingkeys
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
+Description: Mina Client and Daemon
+ Mina Protocol Client and Daemon
+ Built from ${GITHASH} by ${BUILD_URL}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILDDIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
+# Overwrite binaries
+cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILDDIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-mainnet-noprovingkeys_${VERSION}.deb
+ls -lh mina*.deb
+
+###### deb with the proving keys
 echo "------------------------------------------------------------"
 echo "Building deb with keys:"
 
+rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
@@ -208,6 +285,7 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
+# TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
 # For now, deleting keys in /tmp/ so that the complicated logic below for moving them short-circuits and both packages are built without keys
 rm -rf /tmp/s3_cache_dir /tmp/coda_cache_dir
 
