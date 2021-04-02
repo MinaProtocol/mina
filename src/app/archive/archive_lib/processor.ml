@@ -1189,12 +1189,12 @@ module Block = struct
                       (id, secondary_sequence_no, fee_transfer.receiver_pk)
                       :: acc )
                 in
-                (* the fold reverses the order of the infos from the fee transfers *)
                 let fee_transfer_infos_with_balances =
                   match fee_transfer_infos with
                   | [id] ->
                       [(id, balances.receiver1_balance)]
                   | [id2; id1] ->
+                      (* the fold reverses the order of the infos from the fee transfers *)
                       [ (id1, balances.receiver1_balance)
                       ; (id2, Option.value_exn balances.receiver2_balance) ]
                   | _ ->
