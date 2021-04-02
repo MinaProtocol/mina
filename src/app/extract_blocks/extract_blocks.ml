@@ -243,7 +243,6 @@ let fill_in_internal_commands pool block_state_hash =
   in
   Deferred.List.map internal_cmd_info
     ~f:(fun { internal_command_id
-            ; global_slot
             ; sequence_no
             ; secondary_sequence_no
             ; receiver_balance_id }
@@ -280,19 +279,6 @@ let fill_in_internal_commands pool block_state_hash =
         ; token
         ; hash }
       in
-      ( if String.equal cmd.typ "fee_transfer_via_coinbase" then
-        match
-          Block.Fee_transfer_via_coinbase.Table.add Block.fee_transfer_tbl
-            ~key:(global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
-            ~data:cmd
-        with
-        | `Ok ->
-            ()
-        | `Duplicate ->
-            failwithf
-              "Duplicate fee transfer via coinbase at global slot = %Ld, \
-               sequence no = %d, secondary sequence no = %d"
-              global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
 let check_state_hash ~logger state_hash_opt =
