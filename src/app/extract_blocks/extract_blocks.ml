@@ -380,8 +380,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
       let%bind extensional_blocks =
         Deferred.List.map blocks ~f:(fill_in_block pool)
       in
-      [%log info] "Found a subchain of length %d"
-        (List.length extensional_blocks) ;
+      let num_blocks = List.length extensional_blocks in
+      if all_blocks then [%log info] "Found %d blocks" num_blocks
+      else [%log info] "Found a subchain of length %d" num_blocks ;
       [%log info] "Querying for user commands in blocks" ;
       let%bind blocks_with_user_cmds =
         Deferred.List.map extensional_blocks ~f:(fun block ->
