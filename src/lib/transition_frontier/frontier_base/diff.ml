@@ -126,38 +126,34 @@ type ('repr, 'mutant) t =
 
 type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
-let name : type repr mutant. (repr, mutant) t -> string = function
-  | Root_transitioned _ ->
-      "Root_transitioned"
-  | New_node _ ->
-      "New_node"
-  | Best_tip_changed _ ->
-      "Best_tip_changed"
+module Repr = struct
+  type t =
+    | New_node of State_hash.t
+    | Root_transitioned of {new_root: State_hash.t; garbage: State_hash.t list}
+    | Best_tip_changed of State_hash.t
+  [@@deriving yojson]
+end
+
+let to_repr (type repr mutant) (key : (repr, mutant) t) : Repr.t =
+  match key with
+  | New_node (Full breadcrumb) ->
+      New_node (Breadcrumb.state_hash breadcrumb)
+  | New_node (Lite transition) ->
+      New_node (External_transition.Validated.state_hash transition)
+  | Root_transitioned {new_root; garbage} ->
+      let garbage =
+        match garbage with
+        | Node_list.Full nodes ->
+            Node_list.to_lite nodes
+        | Node_list.Lite hashes ->
+            hashes
+      in
+      Root_transitioned {new_root= Root_data.Limited.hash new_root; garbage}
+  | Best_tip_changed breadcrumb ->
+      Best_tip_changed breadcrumb
 
 let to_yojson (type repr mutant) (key : (repr, mutant) t) =
-  let json_key =
-    match key with
-    | New_node (Full breadcrumb) ->
-        State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
-    | New_node (Lite transition) ->
-        State_hash.to_yojson
-          (External_transition.Validated.state_hash transition)
-    | Root_transitioned {new_root; garbage} ->
-        let garbage_hashes =
-          match garbage with
-          | Node_list.Full nodes ->
-              Node_list.to_lite nodes
-          | Node_list.Lite hashes ->
-              hashes
-        in
-        `Assoc
-          [ ("new_root", State_hash.to_yojson (Root_data.Limited.hash new_root))
-          ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
-          ]
-    | Best_tip_changed breadcrumb ->
-        State_hash.to_yojson breadcrumb
-  in
-  `Assoc [(name key, json_key)]
+  Repr.to_yojson (to_repr key)
 
 let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
   match diff with

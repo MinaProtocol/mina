@@ -20,10 +20,12 @@ module Catchup_hash_tree = Catchup_hash_tree
 
 include Frontier_intf.S
 
-type Structured_log_events.t += Added_breadcrumb_user_commands
+type Structured_log_events.t +=
+  | Added_breadcrumb_user_commands of
+      { user_commands: User_command.Valid.t With_status.t list }
   [@@deriving register_event]
 
-type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+type Structured_log_events.t += Applying_diffs of {diffs: Diff.Repr.t list}
   [@@deriving register_event]
 
 val max_catchup_chunk_length : int
