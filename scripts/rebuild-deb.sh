@@ -22,13 +22,13 @@ PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md
 DUNE_PROFILE="mainnet"
 #fi
 
-PROJECT="mina-dev"
-
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+
+PROJECT="mina-dev"
 
 cd "${SCRIPTPATH}/../_build"
 
