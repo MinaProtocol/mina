@@ -807,7 +807,7 @@ let next_epoch_ledger t =
   in
   if
     Mina_numbers.Length.(
-      equal root_epoch best_tip_epoch || equal root_epoch zero)
+      equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized

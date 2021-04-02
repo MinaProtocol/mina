@@ -68,3 +68,12 @@ let of_string_opt s = try Some (of_string_exn s) with _ -> None
    negative numbers
 *)
 let is_valid t = t.major >= 0 && t.minor >= 0 && t.patch >= 0
+
+let to_yojson (t : t) : Yojson.Safe.t = `String (to_string t)
+
+let of_yojson (j : Yojson.Safe.t) =
+  match j with
+  | `String s -> (
+    try Ok (of_string_exn s) with e -> Error (Exn.to_string e) )
+  | _ ->
+      Error "expected string"
