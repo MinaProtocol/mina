@@ -5,7 +5,7 @@
     "apollo-client": "^2.6.8",
     "apollo-link-http": "^1.5.16",
     "apollo-link-ws": "^1.0.19",
-    "apollo-server": "^2.11.0",
+    "apollo-server": "^2.14.2",
     "fast-crc32c": "^2.0.0",
     "graphql": "^15.0.0",
     "graphql-subscriptions": "^1.1.0",
