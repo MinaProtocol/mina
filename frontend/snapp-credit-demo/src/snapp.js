@@ -9,6 +9,8 @@ const {
   CREDIT_FAIL,
 } = require("../constants");
 
+const isMac = process.platform === "darwin" ? true : false;
+
 const execSnappCommand = (execPath, ethAddress, creditScore) => {
   const snappPublicKey =
     "B62qpeeaJV6jm3FZL9hvApQ7CjbwiLL8TXbZBWZwJwSm3rqM7yUmRLC";
@@ -24,6 +26,11 @@ const execSnappCommand = (execPath, ethAddress, creditScore) => {
     --receiver-public-key ${receiverPublicKey}\
     --fee ${fee}\
     --amount ${amount}`;
+};
+
+const writeOutputToFile = (output, outputPath) => {
+  const proofOutput = output.substr(output.indexOf("mutation"));
+  fs.writeFileSync(outputPath, proofOutput);
 };
 
 const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
@@ -44,10 +51,18 @@ const generateSnapp = async (mainWindow, ethAddress, creditScore) => {
 
   exec(execSnappCommand(execPath, ethAddress, creditScore), (error, stdout) => {
     if (error) {
-      mainWindow.webContents.send(PROOF_FAIL);
+      /*
+        Snapp executable returns an error code of 1 on Mac even if it's successful
+        so we skip over that. Otherwise consider it an error.
+      */
+      if (isMac && error.code === 1) {
+        writeOutputToFile(stdout, outputPath);
+        mainWindow.webContents.send(PROOF_SUCCESS);
+      } else {
+        mainWindow.webContents.send(PROOF_FAIL);
+      }
     } else {
-      const output = stdout.substr(stdout.indexOf("mutation"));
-      fs.writeFileSync(outputPath, output);
+      writeOutputToFile(stdout, outputPath);
       mainWindow.webContents.send(PROOF_SUCCESS);
     }
   });
