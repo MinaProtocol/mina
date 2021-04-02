@@ -88,7 +88,7 @@ ls -lh mina*.deb
 echo "------------------------------------------------------------"
 echo "Building deb without keys:"
 
-rm -r "${BUILDDIR}"
+rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}-noprovingkeys
@@ -219,7 +219,7 @@ echo "------------------------------------------------------------"
 echo "Building mainnet signatures deb without keys:"
 
 # Overwrite control file
-rm -r "${BUILDDIR}"
+rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}-mainnet-noprovingkeys
