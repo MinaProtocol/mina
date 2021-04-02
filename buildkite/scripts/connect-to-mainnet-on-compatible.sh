@@ -20,7 +20,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get install -y apt-transport-https ca-certificates
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
-apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
+apt-get install --allow-downgrades -y curl ${PROJECT}-mainnet=${VERSION}
 
 TESTNET_NAME="mainnet"
 
