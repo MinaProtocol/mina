@@ -38,14 +38,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
-      Network.Node.must_send_payment ~logger sender_bp ~sender:sender_pub_key
-        ~receiver:receiver_pub_key ~amount ~fee
+      Network.Node.must_send_payment ~logger sender_bp ~sender_pub_key
+        ~receiver_pub_key ~amount ~fee
     in
     (* confirm payment *)
     let%map () =
       wait_for t
-        (Wait_condition.payment_to_be_included_in_frontier
-           ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount)
+        (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
+           ~receiver_pub_key ~amount)
     in
     [%log info] "send_payment_test: succesfully completed"
 end

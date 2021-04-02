@@ -48,7 +48,8 @@ let tests : test list =
     , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
   *)
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
-  ; ("common-prefix", (module Common_prefix.Make : Intf.Test.Functor_intf)) ]
+  ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
+  ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
   (* TODO: we should be able to show which sections passed as well *)

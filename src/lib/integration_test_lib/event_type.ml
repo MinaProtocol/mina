@@ -17,6 +17,12 @@ let get_metadata (message : Logger.Message.t) key =
   | None ->
       Or_error.errorf "did not find key \"%s\" in message metadata" key
 
+let parse id (m : Logger.Message.t) =
+  Or_error.try_with (fun () ->
+      Structured_log_events.parse_exn id (Map.to_alist m.metadata) )
+
+let bad_parse = Or_error.error_string "bad parse"
+
 module type Event_type_intf = sig
   type t [@@deriving to_yojson]
 

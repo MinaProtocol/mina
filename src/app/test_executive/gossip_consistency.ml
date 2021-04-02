@@ -1,6 +1,5 @@
 open Core
 open Integration_test_lib
-open Currency
 open Signature_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
@@ -21,7 +20,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let n = 5 in
     let open Test_config in
     { default with
-      block_producers=
+      requires_graphql= true
+    ; block_producers=
         List.init n ~f:(fun _ ->
             {Block_producer.balance= block_producer_balance; timing= Untimed}
         ) }
@@ -41,38 +41,55 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         () )
     |> Malleable_error.all_unit
 
-  let send_payments ~logger ~sender ~receiver ~node n =
+  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee
+      ~node n =
     let open Malleable_error.Let_syntax in
-    let amount = Currency.Amount.of_int 1 in
-    let fee = Currency.Fee.of_int 1 in
     let rec go n =
       if n = 0 then return ()
       else
         let%bind () =
-          Network.Node.send_payment ~retry_on_graphql_error:false ~logger node
-            ~sender ~receiver ~amount ~fee
+          Network.Node.must_send_payment ~retry_on_graphql_error:false ~logger
+            ~sender_pub_key ~receiver_pub_key ~amount ~fee node
+        in
+        go (n - 1)
+    in
+    go n
+
+  let wait_for_payments ~dsl ~sender_pub_key ~receiver_pub_key ~amount n =
+    let open Malleable_error.Let_syntax in
+    let rec go n =
+      if n = 0 then return ()
+      else
+        (* confirm payment *)
+        let%bind () =
+          wait_for dsl
+            (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
+               ~receiver_pub_key ~amount)
         in
         go (n - 1)
     in
     go n
 
   let run network t =
-    let open Network in
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
     let%bind () = wait_for_all_to_initialize ~logger network t in
-    let sender = pk_of_keypair (Network.keypairs network) 1 in
-    let receiver = pk_of_keypair (Network.keypairs network) 0 in
+    let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
+    let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
+    let sender_bp =
+      Core_kernel.List.nth_exn (Network.block_producers network) 1
+    in
+    let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
     let num_payments = 10 in
+    let fee = Currency.Fee.of_int 10_000_000 in
+    let amount = Currency.Amount.of_int 10_000_000 in
     let%bind () =
-      send_payments ~logger ~sender ~receiver
-        ~node:(List.nth_exn (Network.block_producers network) 1)
-        num_payments
+      send_payments ~logger ~sender_pub_key ~receiver_pub_key ~node:sender_bp
+        ~fee ~amount num_payments
     in
     let%bind () =
-      let open Async in
-      let%bind () = after (Time.Span.of_sec 30.) in
-      Malleable_error.ok_unit
+      wait_for_payments ~dsl:t ~sender_pub_key ~receiver_pub_key ~amount
+        num_payments
     in
     let gossip_states = (network_state t).gossip_received in
     let ratio =
@@ -91,13 +108,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Consistency ratio %f" ratio ;
     let%bind () =
       if num_transactions_seen < 9 then
-        Malleable_error.of_error_hard
+        Malleable_error.hard_error
           (Error.createf "transactions seen = %d < 9" num_transactions_seen)
       else Malleable_error.ok_unit
     in
     let threshold = 0.95 in
     if ratio < threshold then
-      Malleable_error.of_error_hard
+      Malleable_error.hard_error
         (Error.createf "consistency ratio = %f < %f" ratio threshold)
     else Malleable_error.ok_unit
 end

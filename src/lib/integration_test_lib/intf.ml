@@ -43,8 +43,8 @@ module Engine = struct
            ?retry_on_graphql_error:bool
         -> logger:Logger.t
         -> t
-        -> sender:Signature_lib.Public_key.Compressed.t
-        -> receiver:Signature_lib.Public_key.Compressed.t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> unit Deferred.Or_error.t
@@ -53,8 +53,8 @@ module Engine = struct
            ?retry_on_graphql_error:bool
         -> logger:Logger.t
         -> t
-        -> sender:Signature_lib.Public_key.Compressed.t
-        -> receiver:Signature_lib.Public_key.Compressed.t
+        -> sender_pub_key:Signature_lib.Public_key.Compressed.t
+        -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
         -> unit Malleable_error.t
@@ -244,8 +244,8 @@ module Dsl = struct
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 
     val payment_to_be_included_in_frontier :
-         sender:Public_key.Compressed.t
-      -> receiver:Public_key.Compressed.t
+         sender_pub_key:Public_key.Compressed.t
+      -> receiver_pub_key:Public_key.Compressed.t
       -> amount:Amount.t
       -> t
   end
