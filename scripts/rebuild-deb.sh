@@ -19,7 +19,7 @@ PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md
 
 # TODO: be smarter about this when we introduce a devnet package
 #if [[ "$GITBRANCH" == "master" ]] ; then
-DUNE_PROFILE="mainnet"
+DUNE_PROFILE="testnet_postake_medium_curves"
 #fi
 
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
@@ -27,8 +27,6 @@ BUILD_URL=${BUILDKITE_BUILD_URL}
 
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
-
-PROJECT="mina-dev"
 
 cd "${SCRIPTPATH}/../_build"
 
