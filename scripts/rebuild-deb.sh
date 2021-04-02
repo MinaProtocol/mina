@@ -200,6 +200,9 @@ cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
 # Overwrite binaries
+sudo chown $(whoami) /usr/local/bin
+sudo rm -f /usr/local/bin/mina
+sudo rm -f /usr/local/bin/mina-rosetta
 cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
@@ -219,7 +222,6 @@ echo "------------------------------------------------------------"
 echo "Building mainnet signatures deb without keys:"
 
 # Overwrite control file
-rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: ${PROJECT}-mainnet-noprovingkeys
@@ -243,6 +245,9 @@ cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
 # Overwrite binaries
+sudo chown $(whoami) /usr/local/bin
+sudo rm -f /usr/local/bin/mina
+sudo rm -f /usr/local/bin/mina-rosetta
 cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 
