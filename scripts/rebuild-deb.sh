@@ -19,7 +19,7 @@ PVKEYHASH=$(./default/src/app/cli/src/mina.exe internal snark-hashes | sort | md
 
 # TODO: be smarter about this when we introduce a devnet package
 #if [[ "$GITBRANCH" == "master" ]] ; then
-DUNE_PROFILE="mainnet"
+DUNE_PROFILE="testnet_postake_medium_curves"
 #fi
 
 PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
@@ -97,7 +97,7 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery ${PROJECT}-testnet-noprovingkeys ${PROJECT}-mainnet-noprovingkeys
+Conflicts: mina-discovery, ${PROJECT}-testnet-noprovingkeys, ${PROJECT}-mainnet-noprovingkeys
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -185,7 +185,7 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery ${PROJECT}-noprovingkeys ${PROJECT}-mainnet-noprovingkeys
+Conflicts: mina-discovery, ${PROJECT}-noprovingkeys, ${PROJECT}-mainnet-noprovingkeys
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -228,7 +228,7 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery ${PROJECT}-noprovingkeys ${PROJECT}-testnet-noprovingkeys
+Conflicts: mina-discovery, ${PROJECT}-noprovingkeys, ${PROJECT}-testnet-noprovingkeys
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
