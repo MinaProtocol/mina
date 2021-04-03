@@ -29,7 +29,7 @@ case $BUILDKITE_BRANCH in
     master)
         CODENAME=release ;;
     master-qa)
-        CODANAME=pre-release ;;
+        CODENAME=pre-release ;;
     *)
         CODENAME=unstable ;;
 esac
