@@ -33,7 +33,25 @@ module Constraints
     Intf.assert_
       [{
         basic= Plonk_constraint.T (Poseidon { state }) ;
-        annotation= None
+        annotation= Some "plonk-poseidon"
       }];
     state.(rounds)
+
+  let poseidon_block_cipher (start : Field.t array) : Field.t array =
+    permute start 31
+end
+
+module ArithmeticSponge
+    (Intf : Snark_intf.Run with type prover_state = unit)
+    (Params : sig val params : Intf.field Params.t end)
+= struct
+  open Intf
+
+  type sponge_state = Absorbed of int | Squeezed of int [@@deriving sexp]
+
+  let state = Array.init 5 ~f:(fun _ -> Field.zero)
+
+  let absorb (start : Field.t array) = ()
+
+  let squeze (start : Field.t array) = ()
 end

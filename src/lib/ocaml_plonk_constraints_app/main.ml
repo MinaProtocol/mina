@@ -13,21 +13,34 @@ let%test_module "backend test" =
       open Core
       open Impl
 
-      let authentication tag () =
+      let authentication x () =
 
         Random.full_init [|7|];
         let ptl = 1000 + Random.int 1000 in
         let blocks = (ptl + 15 ) / 16 in
         let ec = Array.init blocks ~f:(fun _ -> Array.init 16 ~f:(fun _ -> Impl.Field.of_int (Random.int 255))) in
+        let h = Array.init 16 ~f:(fun _ -> Impl.Field.of_int (Random.int 255)) in
 
         let pt = Array.init ptl ~f:(fun _ -> Impl.Field.of_int (Random.int 255)) in
 
         let module Bytes = Plonk.Bytes.Constraints (Impl) in
+        
         let ct = Array.init ptl ~f:(fun i -> Bytes.xor ec.(i/16).(i%16) pt.(i)) in
 
         let ctp = Array.append ct (Array.init (blocks*16-ptl) ~f:(fun _ -> Impl.Field.zero)) in
         let ctb = Array.init (blocks*4) ~f:(fun i -> (Bytes.b4tof ctp.(i) ctp.(i+1) ctp.(i+2) ctp.(i+3))) in
         let ctb = Array.init (blocks) ~f:(fun i -> (Bytes.b16tof ctb.(i) ctb.(i+1) ctb.(i+2) ctb.(i+3))) in
+        
+        let rec tag x n = if n < 1 then x else tag (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
+
+        let ht = Array.init ptl ~f:(fun _ -> Impl.Field.zero) in
+
+(*
+        let open Field in
+        let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
+        let perm = Poseidon.poseidon_block_cipher [|x; x+one; x-one; square x; square x|] in
+        assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
+*)
         ()
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
@@ -87,7 +100,7 @@ let%test_module "backend test" =
           (***** POSEIDON PERMUTATION *****)
 
           let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
-          let perm = Poseidon.permute [|x; x+one; x-one; square x; square x|] 31 in
+          let perm = Poseidon.poseidon_block_cipher [|x; x+one; x-one; square x; square x|] in
           assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
 
           (***** EC ARITHMETIC *****)

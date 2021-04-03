@@ -78,3 +78,4 @@ pub mod pasta_fq_plonk_plookup_oracles;
 // temporary
 pub mod lookup_fp_table;
 pub mod lookup_fq_table;
+pub mod lookup_table;
