@@ -155,7 +155,7 @@ module Make (Engine : Intf.Engine.S) () :
             "wait_for hit a soft timeout waiting for %s (condition succeeded, \
              but beyond expectation)"
             condition.description
-          |> Malleable_error.soft_error ()
+          |> Malleable_error.soft_error ~value:()
 
   (**************************************************************************************************)
   (* TODO: move into executive module *)

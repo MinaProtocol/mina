@@ -86,7 +86,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       with
       (* TODO: this currently relies on the returned error being a soft error and not a hard error *)
       | Ok () ->
-          Malleable_error.soft_error_string ()
+          Malleable_error.soft_error_string ~value:()
             "Payment succeeded, but expected it to fail because of a minimum \
              balance violation"
       | Error error ->
@@ -103,7 +103,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             [%log error]
               "Payment failed in GraphQL, but for unexpected reason: %s"
               err_str ;
-            Malleable_error.soft_error_format ()
+            Malleable_error.soft_error_format ~value:()
               "Payment failed for unexpected reason: %s" err_str )
     in
     [%log info] "Payment test with timed accounts completed"

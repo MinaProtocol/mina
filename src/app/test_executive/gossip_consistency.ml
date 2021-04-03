@@ -108,13 +108,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Consistency ratio %f" ratio ;
     let%bind () =
       if num_transactions_seen < 9 then
-        Malleable_error.hard_error
-          (Error.createf "transactions seen = %d < 9" num_transactions_seen)
+        Malleable_error.soft_error_string ~value:()
+          (Printf.sprintf "transactions seen = %d < 9" num_transactions_seen)
       else Malleable_error.ok_unit
     in
     let threshold = 0.95 in
     if ratio < threshold then
-      Malleable_error.hard_error
-        (Error.createf "consistency ratio = %f < %f" ratio threshold)
+      Malleable_error.soft_error_string ~value:()
+        (Printf.sprintf "consistency ratio = %f < %f" ratio threshold)
     else Malleable_error.ok_unit
 end
