@@ -61,7 +61,6 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
       tree.setdefault(parent, set())
       tree[parent].add(child)
       parents[child] = parent
- 
 
   blocks = set(itertools.chain(tree.keys(), *tree.values()))
   roots = [ b for b in blocks if b not in parents.keys() ]
