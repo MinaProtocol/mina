@@ -1,37 +1,41 @@
 # Consensus
 
-Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consensus.
+Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consensus, hereafter referred to as Samasika.  The three fundamental guarantees delivered are
+* High decentralization - Self-bootstrap, uncapped participation and dynamic availability
+* Succinctness - Constant-time synchronization with full-validation and high interoperability
+* Universal composability - Proven security for interacting with other protocols, no slashing required
 
-Samasika consensus is an extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.
+Samasika extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.  The name Samasika comes from the Sanskrit word, meaning small or succinct.
 
 This documents specifies the protocol and related structures.
 
 **Table of Contents**
 * [1 Constants](#1-constants)
 * [2 Structures](#2-structures)
-  * [2.1 Block](#21-block)
+  * [2.1 `External_transition`](#21-external_transition)
   * [2.2 `Protocol_state`](#22-protocol_state)
   * [2.3 `Consensus_state`](#23-consensus_state)
   * [2.4 `Epoch_data`](#24-epoch_data)
 * [3 Algorithms](#3-algorithms)
-  * [3.1 Chain Selection Rules](#31-chain-selection-rules)
-    * [3.1.1 Short-range fork rule](#311-short-range-fork-rule)
-    * [3.1.2 Long-range fork rule](#312-long-range-fork-rule)
-  * [3.2 Decentralized Checkpointing](#32-decentralized-checkpointing)
-  * [3.3 Window Min-density](#33-window-min-density)
-    * [3.3.1 `isWindowStop`](#331-iswindowstop)
-    * [3.3.2 `shiftWindow`](#332-shiftwindow)
-  * [3.4 Chain Selection Protocol](#34-chain-selection-protocol)
-    * [3.4.1 `getMinDen`](#341-getminden)
-    * [3.4.2 `isShortRange`](#342-isshortrange)
-    * [3.4.3 `isValidChain`](#343-isvalidchain)
-    * [3.4.4 `maxvalid-sc`](#344-maxvalid-sc)
-    * [3.4.5 `selectChain`](#345-selectchain)
-  * [3.5 Genesis Initialization](#35-genesis-initialization)
-    * [3.5.1 `initCheckpoints`](#351-initcheckpoints)
-    * [3.5.2 `initSubWindowDensities`](#352-initsubwindowdensities)
-  * [3.6 Staking Procedure](#36-staking-procedure)
-    * [3.6.1 `updateCheckpoints`](#361-updatecheckpoints)
+  * [3.1 Common](#31-common)
+    * [3.1.1 `epochSlot`](#311-epochslot)
+  * [3.2 Chain selection](#32-chain-selection)
+    * [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
+    * [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
+    * [3.2.3 `selectSecureChain`](#323-selectsecurechain)
+  * [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
+    * [3.3.1 `initCheckpoints`](#331-initcheckpoints)
+    * [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
+    * [3.3.3 `isShortRange`](#333-isshortrange)
+  * [3.4 Window min-density](#34-window-min-density)
+    * [3.4.1 `isWindowStop`](#341-iswindowstop)
+    * [3.4.2 `shiftWindow`](#342-shiftwindow)
+    * [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
+    * [3.4.4 `getMinDen`](#344-getminden)
+* [4 Protocol](#4-protocol)
+  * [4.1 Initialize consensus](#41-initialize-consensus)
+  * [4.2 Select chain](#42-select-chain)
+  * [4.3 Produce block](#43-produce-block)
 
 **Conventions**
 * We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
@@ -56,14 +60,16 @@ These are the parameters Mina uses for Samasika
 | `epoch_duration`                | `1285200000` (= 14d21h) | Duration of an epoch in ms |
 | `genesis_state_timestamp`       | `1615939200000` (Mar 17, 2021 00:00:00 GMT+0000) | Timestamp of genesis block in unixtime |
 | `acceptable_network_delay`      | `180000` (= 3m)         | Acceptable network delay in ms |
-| `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 3.2](#33-window-min-density)) |
-| `sub_windows_per_window`        | `11`                    | Sub windows per window (see [Section 3.2](#33-window-min-density)) |
+| `slots_per_sub_window`          | `7`                     | Slots per sub window (see [Section 3.4](#34-window-min-density)) |
+| `sub_windows_per_window`        | `11`                    | Sub windows per window (see [Section 3.4](#34-window-min-density)) |
 
 # 2. Structures
 
 The main structures used in Mina consensus are as follows
 
-## 2.1 Block
+## 2.1 `External_transition`
+
+This is Mina's block structure.
 
 | Field                           | Type                               | Description |
 | - | - | - |
@@ -75,7 +81,7 @@ The main structures used in Mina consensus are as follows
 | `current_protocol_version`      | `Protocol_version.Stable.V1.t`        | |
 | `proposed_protocol_version_opt` | `Protocol_version.Stable.V1.t option` | |
 
-## 2.2 Protocol_state
+## 2.2 `Protocol_state`
 
 This structure can be thought of like the block header.  It contains the most essential information of a block.
 
@@ -85,7 +91,7 @@ This structure can be thought of like the block header.  It contains the most es
 | `previous_state_hash` | `State_hash.Stable.V1.t` | Commitment to previous block |
 | `body`                | `Protocol_state.Body.Value.Stable.V1` | The body of the protocol state |
 
-### 2.2.1 Protocol_state.Body
+### 2.2.1 `Protocol_state.Body`
 
 | Field                 | Type                     | Description |
 | - | - | - |
@@ -95,7 +101,7 @@ This structure can be thought of like the block header.  It contains the most es
 | `consensus_state`     | `Consensus.Data.Consensus_state.Value.Stable.V1.t` | |
 | `constants`           | `Protocol_constants_checked.Value.Stable.V1.t` | |
 
-## 2.3 Consensus_state
+## 2.3 `Consensus_state`
 
 This structure encapsulates the succinct state of the consensus protocol.  The stake distribution information is contained by the `staking_epoch_data` field.  Due to its succinct nature, Samasika cannot look back into the past to obtain ledger snapshots for the stake distribution.  Instead, Samasika implements a novel approach where the future stake distribution snapshot is prepared by the current consensus epoch.  Samasika prepares the past for the future!  This future state is stored in the `next_epoch_data` field.
 
@@ -104,8 +110,8 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `version`                                | `u8` (= 0x01)            | Block structure version |
 | `blockchain_length`                      | `Length.Stable.V1.t` | Height of block ? |
 | `epoch_count`                            | `Length.Stable.V1.t` | Epoch number ? |
-| `min_window_density`                     | `Length.Stable.V1.t` | Minimum windows density observed on this chain (see [Section 4.1](#31-chain-selection-rules)) |
-| `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 4.1](#31-chain-selection-rules)) |
+| `min_window_density`                     | `Length.Stable.V1.t` | Minimum windows density observed on this chain (see [Section 3.2.2](#322-long-range-fork-rule)) |
+| `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 3.4](#34-window-min-density)) |
 | `last_vrf_output`                        | `Vrf.Output.Truncated.Stable.V1.t` | Additional VRS output from leader (for seeding Random Oracle) |
 | `total_currency`                         | `Amount.Stable.V1.t` | Total supply of currency |
 | `curr_global_slot`                       | `Global_slot.Stable.V1.t` | Current global slot number relative to the current hard fork  |
@@ -118,26 +124,41 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `coinbase_receiver`                      | `Public_key.Compressed.Stable.V1.t` | Compresed public key of account receiving the block reward |
 | `supercharge_coinbase`                   | `bool` | `true` if `block_stake_winner` has no locked tokens, `false` otherwise |
 
-## 2.4 Epoch_data
+## 2.4 `Epoch_data`
 
 | Field              | Type                     | Description |
 | - | - | - |
 | `version`          | `u8` (= 0x01)            | Block structure version |
 | `ledger`           | `Epoch_ledger.Value.Stable.V1.t` | |
 | `seed`             | `Epoch_seed.Stable.V1.t` | |
-| `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 3.2](#32-decentralized-checkpointing))|
-| `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.2](#32-decentralized-checkpointing))|
+| `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 3.3](#33-decentralized-checkpointing))|
+| `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.3](#33-decentralized-checkpointing))|
 | `epoch_length`     | `Length.Stable.V1.t` | |
 
 # 3. Algorithms
 
-This section outlines the main changes in Ouroboros Samasikia.
+This section outlines the main algorithms and constructs used by Samasikia.
 
-## 3.1 Chain Selection Rules
+## 3.1 Common
+
+This section outlines some commonly used helpers.
+
+### 3.1.1 `epochSlot`
+
+The algorithm computes the _epoch slot number_ from the global slot number.  The input is the global slot number `g` and the output is the local slot number in `[0, slots_per_epoch]`.
+
+```rust
+fn epochSlot(g) -> u32
+{
+   return g mod slots_per_epoch
+}
+```
+
+## 3.2 Chain selection rules
 
 Samasika uses two consensus rules: one for *short-range forks* and one for *long-range forks*.
 
-### 3.1.1 Short-range fork rule
+### 3.2.1 Short-range fork rule
 
 This rule is triggered whenever the fork is such that the adversary has not yet had the opportunity to mutate the block density distribution.
 
@@ -145,23 +166,23 @@ This rule is triggered whenever the fork is such that the adversary has not yet 
 Choose the longest chain
 ```
 
-A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve implemention of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 3.2](#32-decentralized-checkpointing).
+A fork is short-range if it occured less than `m` blocks ago.  The naı̈ve implemention of this rule is to always store the last `m` blocks, but for a succinct blockchain this is not desirable.  Mina Samasika adopts an approach that only requires information about two blocks.  The idea is a decentralized checkpointing algorithm, the details of which are given in [Section 3.3](#33-decentralized-checkpointing).
 
-### 3.1.2 Long-range fork rule
+### 3.2.2 Long-range fork rule
 
 Recall that when an adversary creates a long-range fork, over time it skews the leader selection distribution leading to a longer adversarial chain.  Initially the dishonest chain will have a lower density, but in time the adversary will work to increase it.  Thus, we can only rely on the density difference in the first few slots following the fork, the so-called *critical window*.  The idea is that in the critical window the honest chain the density is overwhelmingly likely to be higher because this contains the majority of stake.
 
 As a succint blockchain, Mina does not have a chain into which it can look back on the fork point to observe the densities.  Moreover, the slot range of the desired densities cannot be know ahead of time.
 
-Samasika overcomes this problem by tracking a moving window of slots over each chain and then storing only the *minimum* of all densities observed for each chain.  The intuition is that if the adversary manages to increase the density on the dishonest chain, the tracked minimum density still points to the critical window following the fork.
+Samasika overcomes this problem by storing a succinct summary of a sliding window of slots over each chain and then tracks the *minimum* of all densities observed for each sliding window.  The intuition is that if the adversary manages to increase the density on the dishonest chain, the tracked minimum density still points to the critical window following the fork.
 
-[Section 3.3](#33-window-min-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the long-range fork rule.
+[Section 3.4](#34-window-min-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the long-range fork rule.
 
-For succinctness the minimum window density is stored in each block.  Specifically, it is stored in the `min_window_density` field of the `Consensus_state` (see [Section 2.3](#23-consensus_state)).
+The minimum window density is stored in each block, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.3](#23-consensus_state)).
 
-The function [`getMinDen(C)`](#341-getminden) outputs the minimum chain density observed so far in chain `C`. In other words, it simply outputs the value of the `min_window_density` field of the top block of `C`.
+The function [`getMinDen(C)`](#344-getminden) outputs the minimum chain density observed so far in chain `C`. In other words, it simply outputs the value of the `min_window_density` field of the top block of `C`.
 
-Let `C1` be the local chain and `C2` be a [valid](#343-isValidChain) alternative chain; the _long-range fork rule_ is
+Let `C1` be the local chain and `C2` be a [valid](../verification/README.md#1.1-isvalidchain) alternative chain; the _long-range fork rule_ is
 
 ```rust
 if getMinDen(C2) > getMinDen(C1) {
@@ -172,9 +193,38 @@ else {
 }
 ```
 
-We specify the chain selection algorithm in more detail in [Section 3.4](#34-chain-selection-protocol).
+We specify the chain selection algorithm in more detail next.
 
-## 3.2 Decentralized Checkpointing
+### 3.2.3 `selectSecureChain`
+
+This is the chain selection algorithm for choosing the secure chain from among a set of chains.  It takes as input the current chain `Curr` and a set of chains `Chains` and outputs the most secure chain according to the chain rules described above.
+
+```rust
+fn selectSecureChain(Curr, Chains) -> Chain
+{
+    // Compare Current to each candidate in Chains
+    secure_chain = Curr
+    for chain in Chains {
+        if isShortRange(chain, best_chain) {
+            // short-range fork
+            if chain.length > best_chain.length {
+                secure_chain = chain
+            }
+        }
+        else {
+            // long-range fork
+            if getMinDen(chain) > getMinDen(best_chain) {
+                secure_chain = chain
+            }
+        }
+    }
+    return secure_chain
+}
+```
+
+It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#344-getminden) algorithms described in Sections 3.3.3 and 3.4.4.
+
+## 3.3 Decentralized checkpointing
 
 <!--
 ; start_checkpoint: 'start_checkpoint
@@ -208,8 +258,61 @@ Since the leader selection distribution for the current epoch is computed by the
 
 Since Mina is succinct this means that it must stored the checkpoints for the current epoch in addition to the checkpoints for the previous epoch.  This is why the [`Consensus_state`](#23-consensus_state) structure contains two `Epoch_data` fields: `staking_epoch_data` and `next_epoch_data`.  The former contains the checkpoints for the previous epoch and the latter contains that of the current epoch.
 
+### 3.3.1 `initCheckpoints`
 
-## 3.3 Window Min-density
+This algorithm initializes the checkpoints for genesis block `G`
+
+```rust
+fn initCheckpoints(G) -> ()
+{
+    S = G.protocol_state.body.consensus_state
+    state_hash = hash(latest state ϵ S.next_epoch_data.seed's update range) ?
+    S.staking_epoch_data.lock_checkpoint = 0 (or empty hash?)
+    S.staking_epoch_data.start_checkpoint = 0 ?
+    S.next_epoch_data.start_checkpoint = state_hash ?
+    S.next_epoch_data.lock_checkpoint =  state_hash ?
+}
+```
+
+### 3.3.2 `updateCheckpoints`
+
+This algorithm updates the checkpoints of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s checkpoints according to the description in [Section 3.3](#33-decentralized-checkpointing).
+
+```rust
+fn updateCheckpoints(P, B) -> ()
+{
+    SP = P.protocol_state.body.consensus_state
+    SB = B.protocol_state.body.consensus_state
+    state_hash = hash(latest state ϵ SP.next_epoch_data.seed's update range) ?
+    if epochSlot(SB.curr_global_slot) == 0 then
+        SB.next_epoch_data.start_checkpoint = state_hash
+
+    if 0 ≤ epochSlot(SB.curr_global_slot) < 2/3*slots_per_epoch {
+        SB.next_epoch_data.lock_checkpoint = state_hash
+    }
+}
+```
+Specifically, if the slot (`SB.slot`) of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
+
+### 3.3.3 `isShortRange`
+
+This algorithm uses the checkpoints to determine if the fork of two chains is short-range or long-range.  It inputs two chains with a fork `C1` and `C2` and outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
+
+```rust
+fn isShortRange(C1,C2) -> bool
+{
+    B1 = last block of C1
+    B2 = last block of C2
+    if B1.staking_epoch_data.lock_checkpoint == B2.staking_epoch_data.lock_checkpoint {
+        return true
+    }
+    else {
+        return false
+    }
+}
+```
+
+## 3.4 Window min-density
 
 This section describes how to compute the density windows and minimum density. Firstly we must define some terminology.
 
@@ -252,7 +355,7 @@ The values stored in `sub_window_densities` have this format.
 | `k - 1` | Previous window density |
 | `k` | Current window density |
 
-### 3.3.1 `isWindowStop`
+### 3.4.1 `isWindowStop`
 
 This algorithm detects whether we have reached the end of a sub-window.  It is used to decide if we must perform a `v`-shift.  It takes as input the current local slot number `s`, the shift parameter `v` and outputs `true` if we have reached the end of a sub-window and `false` otherwise.
 
@@ -268,7 +371,7 @@ fn isWindowStop(s, v) -> bool
 }
 ```
 
-### 3.3.2 `shiftWindow`
+### 3.4.2 `shiftWindow`
 
 <!--
 This algorithm is responsible for shifting the sliding window.  It inputs the sliding window `W` = [d<sub>1</sub>,...,d<sub>w</sub>] and the current sub window densities `C = [d<sub>w+1</sub>,...,d<sub>w+v</sub>] and then outputs the result `W'` = [d<sub>1+v</sub>,...,d<sub>w+v</sub>], where `v` is the shift parameter.
@@ -290,13 +393,21 @@ fn shiftWindow(D) -> D'
 }
 ```
 
-## 3.4 Chain Selection Protocol
+### 3.4.3 `initSubWindowDensities`
 
-The chain selection protocol specifies how peers are required to apply the fork rules from the [Chain Selection Rules Section](#31-chain-selection-rules).  There are three main algorithms at work.
+This algorithm initializes the sub-window densities for genesis block `G`
 
-### 3.4.1 `getMinDen`
+```rust
+fn initSubWindowDensities(G) -> ()
+{
+    G.protocol_state.body.consensus_state.sub_window_densities = [0]
+    G.protocol_state.body.consensus_state.min_window_density = ω ?
+}
+```
 
-As mentioned in [Section 3.1.2](#312-long-range-fork-rule) this function returns the current minimum density of a chain `C`.
+### 3.4.4 `getMinDen`
+
+As mentioned in [Section 3.2.2](#322-long-range-fork-rule), this function returns the current minimum density of a chain `C`.
 
 ```rust
 fn getMinDen(C) -> density
@@ -309,106 +420,49 @@ fn getMinDen(C) -> density
 }
 ```
 
-### 3.4.2 `isShortRange`
+# 4 Protocol
 
-This algorithm determins if the fork of two chains is short-range or long-range.
+This section specifies the consensus protocol in terms of events and prescribed actions that MUST be implemented by a compatible peer.  The supported set of consensus events are:
+* [`Initialize consensus`](#41-initialize-consensus)
+* [`Select chain`](#42-select-chain)
+* [`Produce block`](#43-produce-block)
+
+Additionally there are certain local data members that all peers MUST maintain in order to participate in consensus.
+
+| Parameter   | Description |
+| - | - |
+| `genesis_block` | The initial block in the blockchain |
+| `neighbors` | Set of connections to neighboring peers |
+| `chains`    | Set of known (succinct) candidate chains |
+| `chain`     | Currently selected chain according to the chain selection algorithm (i.e. secure chain) |
+
+How these are represented is up to the implementation, but careful consideration must be given to scalability.
+
+In the following description we use _dot notation_ to refer the local data members of peers. For example, given peer `P`, we use `P.genesis_block` and `P.chain`, to refer to the genesis block and currently selected chain, respectively.
+
+## 4.1 Initialize consensus
+
+Things a peer MUST do to initialize consensus includes
+* Load the genesis block
+* Get head of the current chain
+* Decide if we should bootstrap or sync
+
+## 4.2 Select chain
+
+Chain selection is triggered anytime a block is added to any of a peer's chains.  This section specifies how peers are required to apply the fork rules from the [Chain Selection Rules Section](#32-chain-selection).  The chain selection algorithm is the same as that of Ouroboros Genesis, except that it uses the `selectBestChain` algorithm.
 
 ```rust
-fn isShortRange(C1,C2) -> bool
+fn selectChain(Peer, Chains) -> ()
 {
-    B1 = last block of C1
-    B2 = last block of C2
-    if B1.staking_epoch_data.lock_checkpoint == B2.staking_epoch_data.lock_checkpoint {
-        return true
+    // Discard invalid chains
+    for chain in Chains {
+        if not isValidChain(Peer.chain, chain) {
+            Discard chain from Chains
+        }
     }
-    else {
-        return false
-    }
+    // Select the best chain
+    Peer.chain = selectSecureChain(Peer.chain, Chains)
 }
 ```
 
-### 3.4.3 `isValidChain`
-
-```rust
-fn isValidChain(C1) -> bool
-{
-}
-```
-
-### 3.4.4 `maxvalid-sc`
-
-```rust
-fn maxvalid-sc(Cl,Chains,k) -> Chain
-{
-}
-```
-
-### 3.4.5 `selectChain`
-
-```rust
-fn selectChain(Peer,Chains,k) -> ()
-{
-}
-```
-
-## 3.5 Genesis Initialization
-
-### 3.5.1 `initCheckpoints`
-
-This algorithm initializes the checkpoints for genesis block `G`
-
-```rust
-fn initCheckpoints(G) -> ()
-{
-    S = G.protocol_state.body.consensus_state
-    state_hash = hash(latest state ϵ S.next_epoch_data.seed's update range) ?
-    S.staking_epoch_data.lock_checkpoint = 0 (or empty hash?)
-    S.staking_epoch_data.start_checkpoint = 0 ?
-    S.next_epoch_data.start_checkpoint = state_hash ?
-    S.next_epoch_data.lock_checkpoint =  state_hash ?
-}
-```
-
-### 3.5.2 `initSubWindowDensities`
-
-This algorithm initializes the sub-window densities for genesis block `G`
-
-```rust
-fn initSubWindowDensities(G) -> ()
-{
-    G.protocol_state.body.consensus_state.sub_window_densities = [0]
-    G.protocol_state.body.consensus_state.min_window_density = ω ?
-}
-```
-
-## 3.6 Staking Procedure
-
-
-### 3.6.1 `updateCheckpoints`
-
-This algorithm updates the checkpoints of the block being created as part of the staking procedure.  It inputs the parent block `P`, the current block `B` and updates `B`'s checkpoints according to the description in [Section 3.2](#32-decentralized-checkpointing).
-
-```rust
-fn updateCheckpoints(P, B) -> ()
-{
-    SP = P.protocol_state.body.consensus_state
-    SB = B.protocol_state.body.consensus_state
-    state_hash = hash(latest state ϵ SP.next_epoch_data.seed's update range) ?
-    if epochSlot(SB) == 0 then
-        SB.next_epoch_data.start_checkpoint = state_hash
-
-    if 0 ≤ epochSlot(SB) < 2/3*slots_per_epoch {
-        SB.next_epoch_data.lock_checkpoint = state_hash
-    }
-}
-```
-Specifically, if the slot (`SB.slot`) of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the parent block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
-
-### 3.6.2 `epochSlot`
-
-```rust
-fn epochSlot(S) -> uint
-{
-   return S.curr_global_slot mod slots_per_epoch
-}
-```
+## 4.3 Produce block
