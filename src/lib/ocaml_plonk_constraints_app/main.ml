@@ -26,14 +26,20 @@ let%test_module "backend test" =
         let module Bytes = Plonk.Bytes.Constraints (Impl) in
         
         let ct = Array.init ptl ~f:(fun i -> Bytes.xor ec.(i/16).(i%16) pt.(i)) in
-
         let ctp = Array.append ct (Array.init (blocks*16-ptl) ~f:(fun _ -> Impl.Field.zero)) in
-        let ctb = Array.init (blocks*4) ~f:(fun i -> (Bytes.b4tof ctp.(i) ctp.(i+1) ctp.(i+2) ctp.(i+3))) in
-        let ctb = Array.init (blocks) ~f:(fun i -> (Bytes.b16tof ctb.(i) ctb.(i+1) ctb.(i+2) ctb.(i+3))) in
         
-        let rec tag x n = if n < 1 then x else tag (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
+        let module Block = Plonk.Bytes.Block (Impl) in
+        
+        let rec tag ht ct =
+          if Array.length ct <= 0 then ht
+          else Block.mul (Block.xor (tag ht (Array.sub ct 0 (Array.length ct - 16))) (Array.sub ct (Array.length ct - 16) 16)) h
+        in
 
-        let ht = Array.init ptl ~f:(fun _ -> Impl.Field.zero) in
+        let ptlb = ptl * 8 in
+        let len = Array.init 16 ~f:(fun i -> Impl.Field.of_int ((ptlb lsr (i*8)) land 255)) in
+        let ht = tag (Array.init 16 ~f:(fun _ -> Impl.Field.zero)) (Array.append ctp len) in
+        let ht = Array.init 4 ~f:(fun i -> (Bytes.b4tof ht.(i*4) ht.(i*4+1) ht.(i*4+2) ht.(i*4+3))) in
+        let ht = Bytes.b16tof ht.(0) ht.(1) ht.(2) ht.(3) in
 
 (*
         let open Field in

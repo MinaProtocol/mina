@@ -1,41 +1,29 @@
 open Core
 open Snarky
 open Zexe_backend_common.Plonk_plookup_constraint_system
-open Stdint
 open Gcm
-
-let mul_gf2128 (x: uint128) (y: uint128) : uint128 =
-  let r = Uint128.of_string "0xE1000000000000000000000000000000" in
-  let zr = Uint128.of_int 0 in
-  let o = Uint128.of_int 1 in
-  let z = ref (Uint128.of_int 0) in
-  let v = x in
-  let v = ref v in
-  for i = 0 to 127 do
-      if Uint128.logand y (Uint128.shift_left o Int.(127-i)) <> zr then
-        z := Uint128.logxor !z !v;
-      v := Uint128.logxor (Uint128.shift_right !v 1) (if (Uint128.logand !v o) = zr then zr else r);
-  done;
-  !z
 
 module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struct
   open Intf
+  
+  let f2ind (b1: field) (b2: field) : int =
+    let bit1 = Intf.Bigint.of_field b1 in
+    let bit2 = Intf.Bigint.of_field b2 in
+    let x = ref Int.(0) in
+    for i = 0 to 7 do
+      if Intf.Bigint.test_bit bit1 i then
+        x := Int.(!x + (1 lsl i));
+      if Intf.Bigint.test_bit bit2 i then
+        x := Int.(!x + (1 lsl (i+8)));
+    done;
+    !x
 
   let xor (b1 : Field.t) (b2 : Field.t) : Field.t =
     let open Field in
     let bytes = exists (Snarky.Typ.array 5 typ) ~compute:As_prover.(fun () ->
       let b1 = read_var b1 in
       let b2 = read_var b2 in
-      let bit1 = Intf.Bigint.of_field b1 in
-      let bit2 = Intf.Bigint.of_field b2 in
-      let x = ref Int.(0) in
-      for i = 0 to 7 do
-        if Intf.Bigint.test_bit bit1 i then
-          x := Int.(!x + (1 lsl i));
-        if Intf.Bigint.test_bit bit2 i then
-          x := Int.(!x + (1 lsl (i+8)));
-      done;
-      let b3 = of_int Gcm.table.(0).(Int.(!x)) in
+      let b3 = of_int Gcm.table.(0).(f2ind b1 b2) in
 
       [|
         one;
@@ -57,28 +45,9 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
   
   let mul (b1 : Field.t) (b2 : Field.t) : (Field.t * Field.t) =
     let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
-      let f2b (f: field) : uint128 =
-        let f = Intf.Bigint.of_field f in
-        let o = Uint128.of_int 1 in
-        let x = ref (Uint128.of_int 0) in
-        for i = 0 to 7 do
-          if (Intf.Bigint.test_bit f i) then
-            x := Uint128.(!x + shift_left o Int.(i + 120));
-        done;
-        !x
-      in
       let b1 = read_var b1 in
       let b2 = read_var b2 in
-      let x = ref Int.(0) in
-      let bit1 = Intf.Bigint.of_field b1 in
-      let bit2 = Intf.Bigint.of_field b2 in
-      for i = 0 to 7 do
-        if Intf.Bigint.test_bit bit1 i then
-          x := Int.(!x + (1 lsl i));
-        if Intf.Bigint.test_bit bit2 i then
-          x := Int.(!x + (1 lsl (i+8)));
-      done;
-      let mul = Gcm.table.(1).(Int.(!x)) in
+      let mul = Gcm.table.(1).(f2ind b1 b2) in
       let b3 = of_int (mul land 255) in
       let b4 = of_int (mul lsr 8) in
       [|
@@ -210,46 +179,44 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     if (Array.length b1) <> 16 || (Array.length b2) <> 16 then
       raise (BlockArith "Incorrect block size");
 
-    let z = ref (Array.init 16 ~f:(fun _ -> Field.zero)) in
-    (*
+    let z = (Array.init 16 ~f:(fun _ -> Field.zero)) in
     for i = 0 to 15 do
         for j = 0 to 15 do
             let k = i + j in
-            let m = MULT[(x[i] as usize) | ((y[j] as usize) << 8)] in
+            let m0, m1 = Constrained.mul b1.(i) b2.(j) in
 
-            if k < 15
-            {
-                z[k] = xor(z[k], m[0], false);
-                z[k+1] = xor(z[k+1], m[1], false);
-            }
-            else if k == 15
-            {
-                let r = R[m[1] as usize]; GCMLKPS += 1;
-                z[0] = xor(z[0], r[0], false);
-                z[1] = xor(z[1], r[1], false);
-                z[15] = xor(z[15], m[0], false);
-            }
-            else if k < 30
-            {
-                let r0 = R[m[0] as usize];
-                let r1 = R[m[1] as usize]; GCMLKPS += 2;
-                z[k-16] = xor(z[k-16], r0[0], false);
-                z[k-15] = xor(z[k-15], xor(r0[1], r1[0], false), false);
-                z[k-14] = xor(z[k-14], r1[1], false);
-            }
+            if k < 15 then
+            (
+                z.(k) <- Constrained.xor z.(k) m0;
+                z.(k+1) <- Constrained.xor z.(k+1) m1;
+            )
+            else if k = 15 then
+            (
+                let r0, r1 = Constrained.xtimesp m1 in
+                z.(0) <- Constrained.xor z.(0) r0;
+                z.(1) <- Constrained.xor z.(1) r1;
+                z.(15) <- Constrained.xor z.(15) m0;
+            )
+            else if k < 30 then
+            (
+                let r00, r01 = Constrained.xtimesp m0 in
+                let r10, r11 = Constrained.xtimesp m1 in
+                z.(k-16) <- Constrained.xor z.(k-16) r00;
+                z.(k-15) <- Constrained.xor z.(k-15) (Constrained.xor r01 r10);
+                z.(k-14) <- Constrained.xor z.(k-14) r11;
+            )
             else
-            {
-                let r0 = R[m[0] as usize];
-                let r1 = R[m[1] as usize];
-                let r2 = R[r1[1] as usize]; GCMLKPS += 3;
-                z[0] = xor(z[0], r2[0], false);
-                z[1] = xor(z[1], r2[1], false);
-                z[14] = xor(z[14], r0[0], false);
-                z[15] = xor(z[15], xor(r0[1], r1[0], false), false);
-            }
+            (
+                let r00, r01 = Constrained.xtimesp m0 in
+                let r10, r11 = Constrained.xtimesp m1 in
+                let r20, r21 = Constrained.xtimesp r11 in
+                z.(0) <- Constrained.xor z.(0) r20;
+                z.(1) <- Constrained.xor z.(1) r21;
+                z.(14) <- Constrained.xor z.(14) r00;
+                z.(15) <- Constrained.xor z.(15) (Constrained.xor r01 r10);
+            )
         done;
     done;
-    *)
-    !z
+    z
 
 end
