@@ -1658,8 +1658,8 @@ let retry ~f ~logger ~error_str retries =
   in
   go retries
 
-let add_block_aux ?(retries = 3) ?(_replace_block = false) ~logger ~add_block
-    ~hash ~delete_older_than pool block =
+let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
+    pool block =
   let add () =
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
