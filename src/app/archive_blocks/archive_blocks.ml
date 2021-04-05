@@ -2,10 +2,11 @@
 
 open Core_kernel
 open Async
+open Caqti_async
 open Archive_lib
 
-let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
-    ~log_successes ~files () =
+let main ~archive_uri ~replace ~precomputed ~extensional ~success_file
+    ~failure_file ~log_successes ~files () =
   let output_file_line path =
     match path with
     | Some path ->
@@ -28,37 +29,78 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
       exit 1
   | Ok pool ->
       [%log info] "Successfully created Caqti connection to Postgresql" ;
-      let make_add_block of_yojson add_block_aux ~json ~file =
+      let make_add_block ~of_yojson ~state_hash_of ~add_block_aux ~json ~file =
         match of_yojson json with
-        | Ok block -> (
-            match%map add_block_aux block with
-            | Ok () ->
-                if log_successes then
-                  [%log info] "Added block" ~metadata:[("file", `String file)] ;
-                add_to_success_file file
-            | Error err ->
-                [%log error] "Error when adding block"
-                  ~metadata:
-                    [ ("file", `String file)
-                    ; ("error", `String (Caqti_error.show err)) ] ;
-                add_to_failure_file file )
+        | Ok block ->
+            let%bind proceed_with_add =
+              if replace then (
+                match%bind
+                  (Caqti_async.Pool.use (fun (module Conn : CONNECTION) ->
+                       Processor.Block.delete
+                         (module Conn : CONNECTION)
+                         ~state_hash:(state_hash_of block) ))
+                    pool
+                with
+                | Ok () ->
+                    if log_successes then
+                      [%log info] "Deleted block to be replaced, if it existed"
+                        ~metadata:[("file", `String file)] ;
+                    add_to_success_file file ;
+                    return true
+                | Error err ->
+                    [%log error] "Error when deleting block to be replaced"
+                      ~metadata:
+                        [ ("file", `String file)
+                        ; ("error", `String (Caqti_error.show err)) ] ;
+                    return false )
+              else return true
+            in
+            if proceed_with_add then (
+              match%map add_block_aux block with
+              | Ok () ->
+                  if log_successes then
+                    [%log info] "Added block" ~metadata:[("file", `String file)] ;
+                  add_to_success_file file
+              | Error err ->
+                  [%log error] "Error when adding block"
+                    ~metadata:
+                      [ ("file", `String file)
+                      ; ("error", `String (Caqti_error.show err)) ] ;
+                  add_to_failure_file file )
+            else Deferred.unit
         | Error err ->
             [%log error] "Could not create block from JSON"
               ~metadata:[("file", `String file); ("error", `String err)] ;
             return (add_to_failure_file file)
       in
       let add_precomputed_block =
-        make_add_block
+        let of_yojson =
           Mina_transition.External_transition.Precomputed_block.of_yojson
-          (Processor.add_block_aux_precomputed
-             ~constraint_constants:
-               Genesis_constants.Constraint_constants.compiled pool
-             ~delete_older_than:None ~logger)
+        in
+        let state_hash_of
+            { Mina_transition.External_transition.Precomputed_block
+              .protocol_state
+            ; _ } =
+          Mina_state.Protocol_state.hash protocol_state
+        in
+        let add_block_aux =
+          Processor.add_block_aux_precomputed
+            ~constraint_constants:
+              Genesis_constants.Constraint_constants.compiled pool
+            ~delete_older_than:None ~logger
+        in
+        make_add_block ~of_yojson ~state_hash_of ~add_block_aux
       in
       let add_extensional_block =
-        make_add_block Archive_lib.Extensional.Block.of_yojson
-          (Processor.add_block_aux_extensional ~logger pool
-             ~delete_older_than:None)
+        let of_yojson = Archive_lib.Extensional.Block.of_yojson in
+        let state_hash_of {Archive_lib.Extensional.Block.state_hash; _} =
+          state_hash
+        in
+        let add_block_aux =
+          Processor.add_block_aux_extensional ~logger pool
+            ~delete_older_than:None
+        in
+        make_add_block ~of_yojson ~state_hash_of ~add_block_aux
       in
       Deferred.List.iter files ~f:(fun file ->
           In_channel.with_file file ~f:(fun in_channel ->
@@ -91,6 +133,9 @@ let () =
                "URI URI for connecting to the archive database (e.g., \
                 postgres://$USER:$USER@localhost:5432/archiver)"
              Param.(required string)
+         and replace =
+           Param.(flag "--replace" ~aliases:["replace"] no_arg)
+             ~doc:"Replace existing blocks when they exist"
          and precomputed =
            Param.(flag "--precomputed" ~aliases:["precomputed"] no_arg)
              ~doc:"Blocks are in precomputed format"
@@ -113,5 +158,5 @@ let () =
                 processed successfully"
              (Flag.optional_with_default true Param.bool)
          and files = Param.anon Anons.(sequence ("FILES" %: Param.string)) in
-         main ~archive_uri ~precomputed ~extensional ~success_file
+         main ~archive_uri ~replace ~precomputed ~extensional ~success_file
            ~failure_file ~log_successes ~files)))

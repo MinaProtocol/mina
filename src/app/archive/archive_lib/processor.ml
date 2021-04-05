@@ -1066,6 +1066,79 @@ module Block = struct
          |sql})
       id
 
+  let delete (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    let state_hash_base58 = State_hash.to_base58_check state_hash in
+    (* delete user commands *)
+    let%bind () =
+      Conn.exec
+        (Caqti_request.exec Caqti_type.string
+           {sql| DELETE FROM user_commands
+                 WHERE id IN
+                  (SELECT user_command_id FROM blocks_user_commands
+                   INNER JOIN blocks
+                   ON blocks.id = block_id
+                   WHERE blocks.state_hash = ?)
+           |sql})
+        state_hash_base58
+    in
+    (* delete internal commands *)
+    let%bind () =
+      Conn.exec
+        (Caqti_request.exec Caqti_type.string
+           {sql| DELETE FROM internal_commands
+                 WHERE id IN
+                  (SELECT internal_command_id FROM blocks_internal_commands
+                   INNER JOIN blocks
+                   ON blocks.id = block_id
+                   WHERE blocks.state_hash = ?)
+           |sql})
+        state_hash_base58
+    in
+    (* delete reference(s) to parent so foreign key constraint is not violated *)
+    let%bind () =
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(string)
+           {sql| UPDATE blocks SET parent_id = NULL
+                 WHERE parent_hash = ?
+         |sql})
+        state_hash_base58
+    in
+    (* delete the block *)
+    let%bind () =
+      Conn.exec
+        (Caqti_request.exec
+           Caqti_type.(string)
+           {sql| DELETE FROM blocks
+               WHERE state_hash = ?
+         |sql})
+        state_hash_base58
+    in
+    (* delete other orphaned data *)
+    let%bind () =
+      Conn.exec
+        (Caqti_request.exec Caqti_type.unit
+           {sql| DELETE FROM snarked_ledger_hashes
+                 WHERE id NOT IN
+                  (SELECT snarked_ledger_hash_id FROM blocks)
+           |sql})
+        ()
+    in
+    Conn.exec
+      (Caqti_request.exec Caqti_type.unit
+         {sql| DELETE FROM public_keys
+               WHERE id NOT IN (SELECT fee_payer_id FROM user_commands)
+               AND id NOT IN (SELECT source_id FROM user_commands)
+               AND id NOT IN (SELECT receiver_id FROM user_commands)
+               AND id NOT IN (SELECT receiver_id FROM internal_commands)
+               AND id NOT IN (SELECT creator_id FROM blocks)
+               AND id NOT IN (SELECT block_winner_id FROM blocks)
+               AND id NOT IN (SELECT public_key_id FROM balances)
+               AND id NOT IN (SELECT public_key_id FROM timing_info)
+             |sql})
+      ()
+
   let add_parts_if_doesn't_exist (module Conn : CONNECTION)
       ~constraint_constants ~protocol_state ~staged_ledger_diff ~hash =
     let open Deferred.Result.Let_syntax in
@@ -1585,8 +1658,8 @@ let retry ~f ~logger ~error_str retries =
   in
   go retries
 
-let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
-    pool block =
+let add_block_aux ?(retries = 3) ?(_replace_block = false) ~logger ~add_block
+    ~hash ~delete_older_than pool block =
   let add () =
     Caqti_async.Pool.use
       (fun (module Conn : CONNECTION) ->
@@ -1595,8 +1668,8 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
           let%bind () = Conn.start () in
           let%bind block_id = add_block (module Conn : CONNECTION) block in
           (* if an existing block has a parent hash that's for the block just added,
-       set its parent id
-      *)
+             set its parent id
+          *)
           let%bind () =
             Block.set_parent_id_if_null
               (module Conn)
