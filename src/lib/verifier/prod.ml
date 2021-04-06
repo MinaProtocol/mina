@@ -266,13 +266,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
       ~metadata:[("err", Error_json.error_to_yojson err)] ;
     Error.raise err
   in
-  let prev_start = ref (Time.of_span_since_epoch Time.Span.zero) in
   let create_worker () =
-    let now = Time.now () in
-    let prev_died_early =
-      Time.Span.( < ) (Time.diff now !prev_start) min_expected_lifetime
-    in
-    prev_start := now ;
     let%map connection, process =
       (* This [try_with] isn't really here to catch an error that throws while
          the process is being spawned. Indeed, the immediate [ok_exn] will
