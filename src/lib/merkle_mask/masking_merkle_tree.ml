@@ -418,8 +418,19 @@ module Make (Inputs : Inputs_intf.S) = struct
           match t.current_location with
           | None ->
               Some parent_loc
-          | Some our_loc ->
-              Some (max parent_loc our_loc) )
+          | Some our_loc -> (
+            match (parent_loc, our_loc) with
+            | Account parent_addr, Account our_addr ->
+                (* Addr.compare is Bitstring.compare, essentially String.compare *)
+                let loc =
+                  if Addr.compare parent_addr our_addr >= 0 then parent_loc
+                  else our_loc
+                in
+                Some loc
+            | _ ->
+                failwith
+                  "last_filled: expected account locations for the parent and \
+                   mask" ) )
 
     include Merkle_ledger.Util.Make (struct
       module Location = Location
