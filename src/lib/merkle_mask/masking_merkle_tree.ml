@@ -229,7 +229,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       fixup_merkle_path t parent_merkle_path address
 
     (* given a Merkle path corresponding to a starting address, calculate
-       addresses and hash for each node affected by the starting hash; that is,
+       addresses and hashes for each node affected by the starting hash; that is,
        along the path from the account address to root *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
