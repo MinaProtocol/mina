@@ -444,7 +444,8 @@ module T = struct
             ; creatable_gossip_net=
                 Mina_networking.Gossip_net.(
                   Any.Creatable
-                    ((module Libp2p), Libp2p.create gossip_net_params)) }
+                    ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
