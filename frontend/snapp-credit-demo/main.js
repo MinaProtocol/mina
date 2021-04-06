@@ -13,7 +13,7 @@ const createMainWindow = async () => {
   mainWindow = new BrowserWindow({
     title: "SNAPP Credit Check",
     width: isDev ? 1200 : 600,
-    height: 650,
+    height: 670,
     resizable: isDev ? true : false,
     backgroundColor: "white",
     webPreferences: {

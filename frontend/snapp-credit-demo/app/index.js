@@ -27,7 +27,7 @@ const setProgressStatusText = (status) => {
 };
 
 const chooseFolder = () => {
-  return new Promise(function (resolve) {
+  return new Promise((resolve) => {
     dialog
       .showOpenDialog(remote.getCurrentWindow(), {
         properties: ["openDirectory"],
@@ -80,13 +80,14 @@ form.addEventListener("submit", (e) => {
     setProgressStatusText(
       "All fields are required, please fill them before continuing"
     );
+    localStorage.setItem("loading", false);
   }
 });
 
 ipcRenderer.on(VALID_LOGIN, () => {
   showProgressSpinner();
   setProgressStatusText(
-    "Login successful. Attempting to generate SNAPP proof..."
+    "Login successful. Attempting to generate SNAPP proof, this can take up to a few minutes. Please be patient..."
   );
 });
 
