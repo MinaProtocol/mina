@@ -226,8 +226,6 @@ type t = {worker: worker Ivar.t ref; logger: Logger.Stable.Latest.t}
 let plus_or_minus initial ~delta =
   initial +. (Random.float (2. *. delta) -. delta)
 
-let min_expected_lifetime = Time.Span.of_min 1.
-
 (** Call this as early as possible after the process is known, and store the
     resulting [Deferred.t] somewhere to be used later.
 *)
