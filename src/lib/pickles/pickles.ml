@@ -238,7 +238,7 @@ end
 module type Proof_intf = sig
   type statement
 
-  type t [@@deriving bin_io]
+  type t
 
   val verification_key : Verification_key.t Lazy.t
 
@@ -817,20 +817,7 @@ module Side_loaded = struct
       ; typ
       ; branches= Verification_key.Max_branches.n }
 
-  module Proof = struct
-    module T =
-      Proof.Make (Verification_key.Width.Max) (Verification_key.Width.Max)
-
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = T.t
-        [@@deriving version {asserted}, sexp, eq, yojson, hash, compare]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
+  module Proof = Proof.Branching_max
 
   let verify (type t) ~(value_to_field_elements : t -> _)
       (ts : (Verification_key.t * t * Proof.t) list) =

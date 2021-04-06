@@ -2,6 +2,8 @@ testnetName: "coda-testnet"
 coda:
   runtimeConfig:
   generateGenesisProof: true
+  enableArchive: false
+  archiveAddress: archive-1:3086
   genesis:
     active: true
     k: 10
@@ -17,6 +19,7 @@ coda:
     graphql: "3085"
     metrics: "10001"
     p2p: "10909"
+  exposeGraphql: false
 
 worker:
   fullname: "snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"

@@ -58,7 +58,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
             let user_commands =
               filtered_external_transition
               |> Filtered_external_transition.commands
-              |> List.map ~f:(fun {With_hash.data; _} -> data)
+              |> List.map ~f:(fun {With_status.data; _} -> data.data)
               |> List.filter_map ~f:(function
                    | User_command.Signed_command c ->
                        Some c
@@ -174,7 +174,21 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                          bucket name
                      in
                      let%map output =
-                       Async.Process.run () ~prog:"bash" ~args:["-c"; command]
+                       (* This double-wrapping of [try_with]s is protection
+                          against both immediate exceptions in process setup
+                          and exceptions in the 'deferred' part of setup.
+                          We also attach 'tags' to the errors below, so that we
+                          we have information about which of these different
+                          kinds of exception were seen, if any.
+                       *)
+                       Deferred.Or_error.try_with_join (fun () ->
+                           Or_error.try_with (fun () ->
+                               Async.Process.run () ~prog:"bash"
+                                 ~args:["-c"; command]
+                               |> Deferred.Result.map_error
+                                    ~f:(Error.tag ~tag:__LOC__) )
+                           |> Result.map_error ~f:(Error.tag ~tag:__LOC__)
+                           |> Deferred.return |> Deferred.Or_error.join )
                      in
                      ( match output with
                      | Ok _result ->

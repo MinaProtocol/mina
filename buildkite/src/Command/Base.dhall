@@ -172,12 +172,14 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
                     })
                     -- per https://buildkite.com/docs/agent/v3#exit-codes:
                     ([
-                      -- ensure automatic retries on -1 exit status (infra error)
+                      -- infra error
                       Retry::{ exit_status = -1, limit = Some 2 },
-                      -- automatically retry on 100 exit status (apt-get update race condition error)
+                      -- common/flake error
+                      Retry::{ exit_status = +1, limit = Some 1 },
+                      -- apt-get update race condition error
                       Retry::{ exit_status = +100, limit = Some 2 },
-                      -- automatically retry on 1 exit status (common/flake error)
-                      Retry::{ exit_status = +1, limit = Some 1 }
+                      -- Git checkout error
+                      Retry::{ exit_status = +128, limit = Some 2 }
                     ] #
                     -- and the retries that are passed in (if any)
                     c.retries)
@@ -223,5 +225,5 @@ let build : Config.Type -> B/Command.Type = \(c : Config.Type) ->
       if Prelude.List.null (Map.Entry Text Plugins) allPlugins then None B/Plugins else Some (B/Plugins.Plugins/Type allPlugins)
   }
 
-in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey}
+in {Config = Config, build = build, Type = B/Command.Type, TaggedKey = TaggedKey, Retry = Retry}
 

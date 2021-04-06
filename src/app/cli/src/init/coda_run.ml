@@ -213,7 +213,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: acquired and wrote status" ;
   (*coda logs*)
-  let coda_log = conf_dir ^/ "coda.log" in
+  let coda_log = conf_dir ^/ "mina.log" in
   let () =
     match Core.Sys.file_exists coda_log with
     | `Yes ->
@@ -300,6 +300,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
           return (Mina_commands.reset_trust_status coda ip_address) )
+    ; implement Daemon_rpcs.Chain_id_inputs.rpc (fun () () ->
+          return (Mina_commands.chain_id_inputs coda) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
             ( Mina_commands.verify_payment coda aid tx proof
@@ -396,8 +398,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
-    ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
-          Telemetry.get_telemetry_data_from_peers (Mina_lib.net coda) peers )
+    ; implement Daemon_rpcs.Get_node_status.rpc (fun () peers ->
+          Node_status.get_node_status_from_peers (Mina_lib.net coda) peers )
     ; implement Daemon_rpcs.Get_object_lifetime_statistics.rpc (fun () () ->
           return
             (Yojson.Safe.pretty_to_string @@ Allocation_functor.Table.dump ())
@@ -461,6 +463,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           in
           let lift x = `Response x in
           match Uri.path uri with
+          | "/" ->
+              let body =
+                "This page is intentionally left blank. The graphql endpoint \
+                 can be found at `/graphql`."
+              in
+              Server.respond_string ~status:`OK body >>| lift
           | "/graphql" ->
               [%log debug] "Received graphql request. Uri: $uri"
                 ~metadata:
@@ -564,11 +572,11 @@ let coda_crash_message ~log_issue ~action ~error =
   let followup =
     if log_issue then
       sprintf
-        !{err| The Coda Protocol developers would like to know why!
+        !{err| The Mina Protocol developers would like to know why!
 
     Please:
       Open an issue:
-        <https://github.com/CodaProtocol/coda/issues/new>
+        <https://github.com/MinaProtocol/mina/issues/new>
 
       Briefly describe what you were doing and %s
 
@@ -578,13 +586,13 @@ let coda_crash_message ~log_issue ~action ~error =
   in
   sprintf !{err|
 
-  ☠  Coda Daemon %s.
+  ☠  Mina Daemon %s.
   %s
 %!|err} error followup
 
 let no_report exn_json status =
   sprintf
-    "include the last 20 lines from .coda-config/coda.log and then paste the \
+    "include the last 20 lines from .mina-config/mina.log and then paste the \
      following:\n\
      Summary:\n\
      %s\n\
@@ -659,7 +667,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                  coda_crash_message
                    ~error:"failed to initialize the genesis state"
                    ~action:
-                     "include the last 50 lines from .coda-config/coda.log"
+                     "include the last 50 lines from .mina-config/mina.log"
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
@@ -690,7 +698,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
             [("coda_run", `String "Program was killed by signal")]
         in
         [%log info]
-          !"Coda process was interrupted by $signal"
+          !"Mina process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
         (* causes async shutdown and at_exit handlers to run *)
         Async.shutdown 130 ))

@@ -47,15 +47,20 @@ spec:
         image: {{ $.Values.coda.image }}
         args: [ "daemon",
           "-log-level", "Debug",
-          "-log-precomputed-blocks", "true",
           "-log-json",
           "-log-snark-work-gossip", "true",
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
           "-external-port", "$(DAEMON_EXTERNAL_PORT)",
           "-metrics-port", "$(DAEMON_METRICS_PORT)",
           "-enable-peer-exchange", "true",
+          {{- if $.Values.coda.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
+          {{- if $.Values.coda.maxConnections }}
+          "--max-connections", {{ $.Values.coda.maxConnections | quote }},
+          {{- end -}}
           {{- if $.Values.coda.seedPeersURL }}
           "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end -}}
@@ -72,6 +77,9 @@ spec:
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
+          {{- if $config.enableArchive }}
+          "-archive-address", {{ $config.archiveAddress }},
+          {{- end }}
           "-seed"
         ]
         env:
@@ -87,6 +95,12 @@ spec:
           value: "10.0.0.0/8"
         - name: CONNECT_PRIVATE_IPS
           value: "true"
+        - name: GCLOUD_KEYFILE
+          value: "/gcloud/keyfile.json"
+        - name: NETWORK_NAME
+          value: {{ $.Values.testnetName }}
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
+          value: "mina_network_block_data"
         - name: DAEMON_EXTERNAL_PORT
           value: {{ default $.Values.coda.ports.p2p $config.externalPort | quote }}
         {{- if $config.libp2pSecret }}
@@ -184,5 +198,21 @@ spec:
   - name: tcp-p2p
     port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
+---
+{{- if $.Values.coda.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-graphql
+spec:
+  type: NodePort
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: {{ $.Values.coda.ports.graphql }}
+{{- end }}
 ---
 {{ end }}

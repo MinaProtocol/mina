@@ -16,7 +16,7 @@ module Get_coinbase_and_genesis =
       }
       protocolState {
         blockchainState {
-          utcDate
+          date
         }
       }
       stateHash
@@ -627,7 +627,7 @@ module Specific = struct
             ; winner= `Pk (genesisBlock#winnerAccount)#publicKey
             ; timestamp=
                 Int64.of_string
-                  ((genesisBlock#protocolState)#blockchainState)#utcDate
+                  ((genesisBlock#protocolState)#blockchainState)#date
             ; internal_info= []
             ; user_commands= [] }
         else env.db_block query

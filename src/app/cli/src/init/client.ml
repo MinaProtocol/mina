@@ -763,6 +763,45 @@ let cancel_transaction_graphql =
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment |> unwrap_user_command)#id ))
 
+let send_rosetta_transactions_graphql =
+  Command.async
+    ~summary:
+      "Dispatch one or more transactions, provided to stdin in rosetta format"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let jsons = Yojson.Basic.stream_from_channel In_channel.stdin in
+         match%bind
+           Deferred.Or_error.try_with (fun () ->
+               (* TODO: There must be a better way to stream from yojson *and*
+                  do the async calls, surely?
+               *)
+               let prev = ref (Deferred.return ()) in
+               Caml.Stream.iter
+                 (fun transaction_json ->
+                   prev :=
+                     let%bind () = !prev in
+                     let%map response =
+                       Graphql_client.query_exn
+                         (Graphql_queries.Send_rosetta_transaction.make
+                            ~transaction:transaction_json ())
+                         graphql_endpoint
+                     in
+                     let (`UserCommand user_command) =
+                       (response#sendRosettaTransaction)#userCommand
+                     in
+                     printf "Dispatched command with TRANSACTION_ID %s\n"
+                       user_command#id )
+                 jsons ;
+               don't_wait_for !prev ;
+               !prev )
+         with
+         | Ok () ->
+             Deferred.return ()
+         | Error err ->
+             Format.eprintf "Error:@.%s@.@."
+               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+             Core_kernel.exit 1 ))
+
 module Export_logs = struct
   let pp_export_result tarfile = printf "Exported logs to %s\n%!" tarfile
 
@@ -1221,11 +1260,49 @@ let set_staking_graphql =
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
          print_message
-           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+           "❌ Failed to start staking with keys (try `mina accounts unlock` \
             first)"
            (result#setStaking)#lockedPublicKeys ;
          print_message "Started staking with"
            (result#setStaking)#currentStakingKeys ))
+
+let set_coinbase_receiver_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let open Graphql_lib in
+  let pk_flag =
+    choose_one ~if_nothing_chosen:`Raise
+      [ flag "--public-key" ~aliases:["public-key"]
+          ~doc:"PUBLICKEY Public key of account to send coinbase rewards to"
+          (optional public_key_compressed)
+        |> map ~f:(Option.map ~f:Option.some)
+      ; flag "--block-producer" ~aliases:["block-producer"]
+          ~doc:"Send coinbase rewards to the block producer's public key"
+          no_arg
+        |> map ~f:(function true -> Some None | false -> None) ]
+  in
+  Command.async ~summary:"Set the coinbase receiver"
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint public_key_opt ->
+         let print_pk_opt () = function
+           | None ->
+               "block producer"
+           | Some pk ->
+               "public key " ^ Public_key.Compressed.to_base58_check pk
+         in
+         let%map result =
+           Graphql_client.query_exn
+             (Graphql_queries.Set_coinbase_receiver.make
+                ~public_key:
+                  (Option.value_map ~f:Encoders.public_key public_key_opt
+                     ~default:`Null)
+                ())
+             graphql_endpoint
+         in
+         printf
+           "Was sending coinbases to the %a\nNow sending coinbases to the %a\n"
+           print_pk_opt (result#setCoinbaseReceiver)#lastCoinbaseReceiver
+           print_pk_opt (result#setCoinbaseReceiver)#currentCoinbaseReceiver ))
 
 let set_snark_worker =
   let open Command.Param in
@@ -1424,7 +1501,7 @@ let list_accounts =
          | [||] ->
              printf
                "😢 You have no tracked accounts!\n\
-                You can make a new one using `coda accounts create`\n"
+                You can make a new one using `mina accounts create`\n"
          | accounts ->
              Array.iteri accounts ~f:(fun i w ->
                  printf
@@ -1764,24 +1841,24 @@ let compile_time_constants =
          in
          Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
 
-let telemetry =
+let node_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
     flag "--daemon-peers" ~aliases:["daemon-peers"] no_arg
-      ~doc:"Get telemetry data for peers known to the daemon"
+      ~doc:"Get node statuses for peers known to the daemon"
   in
   let peers_flag =
     flag "--peers" ~aliases:["peers"]
       (optional (Arg_type.comma_separated string))
-      ~doc:"CSV-LIST Peer multiaddrs for obtaining telemetry data"
+      ~doc:"CSV-LIST Peer multiaddrs for obtaining node status"
   in
   let show_errors_flag =
     flag "--show-errors" ~aliases:["show-errors"] no_arg
       ~doc:"Include error responses in output"
   in
   let flags = Args.zip3 daemon_peers_flag peers_flag show_errors_flag in
-  Command.async ~summary:"Get telemetry data for a set of peers"
+  Command.async ~summary:"Get node statuses for a set of peers"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (daemon_peers, peers, show_errors) ->
          if
@@ -1796,23 +1873,23 @@ let telemetry =
                List.map peers ~f:Mina_net2.Multiaddr.of_string )
          in
          match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_node_status.rpc
              peer_ids_opt port
          with
-         | Ok all_telem_data ->
-             let all_telem_data =
-               if show_errors then all_telem_data
+         | Ok all_status_data ->
+             let all_status_data =
+               if show_errors then all_status_data
                else
-                 List.filter all_telem_data ~f:(fun td ->
+                 List.filter all_status_data ~f:(fun td ->
                      match td with Ok _ -> true | Error _ -> false )
              in
-             List.iter all_telem_data ~f:(fun peer_telem_data ->
+             List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_telemetry_data
-                      .response_to_yojson peer_telem_data ) )
+                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                        peer_status_data ) )
          | Error err ->
-             printf "Failed to get telemetry data: %s\n%!"
+             printf "Failed to get node status: %s\n%!"
                (Error.to_string_hum err) ))
 
 let next_available_token_cmd =
@@ -1915,7 +1992,7 @@ let archive_blocks =
                  Graphql_client.query (graphql_make ~block ()) graphql_endpoint
                  |> Deferred.Result.map_error ~f:(function
                       | `Failed_request e ->
-                          Error.create "Unable to connect to Coda daemon" ()
+                          Error.create "Unable to connect to Mina daemon" ()
                             (fun () ->
                               Sexp.List
                                 [ List
@@ -2025,7 +2102,7 @@ let receipt_chain_hash =
        let previous_hash =
          Receipt.Chain_hash.of_base58_check_exn previous_hash
        in
-       (* What we call transation IDs in GraphQL are just base58_check-encoded
+       (* What we call transaction IDs in GraphQL are just base58_check-encoded
          transactions. It's easy to handle, and we return it from the
          transaction commands above, so lets use this format.
       *)
@@ -2035,6 +2112,52 @@ let receipt_chain_hash =
            previous_hash
        in
        printf "%s\n" (Receipt.Chain_hash.to_base58_check hash))
+
+let chain_id_inputs =
+  let open Deferred.Let_syntax in
+  Command.async ~summary:"Print the inputs that yield the current chain id"
+    (Cli_lib.Background_daemon.rpc_init (Command.Param.all_unit [])
+       ~f:(fun port () ->
+         let open Daemon_rpcs in
+         match%map Client.dispatch Chain_id_inputs.rpc () port with
+         | Ok (genesis_state_hash, genesis_constants, snark_keys) ->
+             let open Format in
+             printf "Genesis state hash: %s@."
+               (State_hash.to_base58_check genesis_state_hash) ;
+             printf "Genesis_constants:@." ;
+             printf "  Protocol:          %s@."
+               ( Genesis_constants.Protocol.to_yojson genesis_constants.protocol
+               |> Yojson.Safe.to_string ) ;
+             printf "  Txn pool max size: %d@."
+               genesis_constants.txpool_max_size ;
+             printf "  Num accounts:      %s@."
+               ( match genesis_constants.num_accounts with
+               | Some n ->
+                   Int.to_string n
+               | None ->
+                   "None" ) ;
+             printf "Snark keys:@." ;
+             List.iter snark_keys ~f:(printf "  %s@.")
+         | Error err ->
+             Format.eprintf "Could not get chain id inputs: %s@."
+               (Error.to_string_hum err) ))
+
+let hash_transaction =
+  let open Command.Let_syntax in
+  Command.basic
+    ~summary:"Compute the hash of a transaction from its transaction ID"
+    (let%map_open transaction =
+       flag "--transaction-id" ~doc:"ID ID of the transaction to hash"
+         (required string)
+     in
+     fun () ->
+       let signed_command =
+         Signed_command.of_base58_check transaction |> Or_error.ok_exn
+       in
+       let hash =
+         Transaction_hash.hash_command (Signed_command signed_command)
+       in
+       printf "%s\n" (Transaction_hash.to_base58_check hash))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -2075,7 +2198,7 @@ module Visualization = struct
   end
 
   let command_group =
-    Command.group ~summary:"Visualize data structures special to Coda"
+    Command.group ~summary:"Visualize data structures special to Mina"
       [ (Frontier.name, Frontier.command)
       ; (Registered_masks.name, Registered_masks.command) ]
 end
@@ -2137,19 +2260,23 @@ let advanced =
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
-    ; ("telemetry", telemetry)
+    ; ("node-status", node_status)
     ; ("visualization", Visualization.command_group)
     ; ("verify-receipt", verify_receipt)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("validate-keypair", Cli_lib.Commands.validate_keypair)
     ; ("validate-transaction", Cli_lib.Commands.validate_transaction)
+    ; ("send-rosetta-transactions", send_rosetta_transactions_graphql)
     ; ("next-available-token", next_available_token_cmd)
     ; ("time-offset", get_time_offset_graphql)
     ; ("get-peers", get_peers_graphql)
     ; ("add-peers", add_peers_graphql)
     ; ("object-lifetime-statistics", object_lifetime_statistics)
     ; ("archive-blocks", archive_blocks)
-    ; ("compute-receipt-chain-hash", receipt_chain_hash) ]
+    ; ("compute-receipt-chain-hash", receipt_chain_hash)
+    ; ("hash-transaction", hash_transaction)
+    ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
+    ; ("chain-id-inputs", chain_id_inputs) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"

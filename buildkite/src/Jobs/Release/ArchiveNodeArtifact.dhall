@@ -27,7 +27,8 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-          S.strictlyStart (S.contains "src/app/archive"),
+          S.strictly (S.contains "Makefile"),
+          S.strictlyStart (S.contains "src"),
           S.strictlyStart (S.contains "scripts/archive"),
           S.strictlyStart (S.contains "automation"),
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/ArchiveNodeArtifact")
@@ -61,7 +62,7 @@ Pipeline.build
           target = Size.XLarge,
           artifact_paths = [ S.contains "./*.deb" ],
           depends_on = [
-            { name = "ArchiveRedundancyTools", key = "archive-redundancy-missing_subchain" },
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-extract_blocks" },
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-build_archive" },
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-archive_blocks" },
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-missing_blocks_auditor" }

@@ -550,11 +550,11 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    Peer.to_multiaddr_string) ) ;
       t
 
-    let set_telemetry_data t data =
-      !(t.net2) >>= Fn.flip Mina_net2.set_telemetry_data data
+    let set_node_status t data =
+      !(t.net2) >>= Fn.flip Mina_net2.set_node_status data
 
-    let get_peer_telemetry_data t peer =
-      !(t.net2) >>= Fn.flip Mina_net2.get_peer_telemetry_data peer
+    let get_peer_node_status t peer =
+      !(t.net2) >>= Fn.flip Mina_net2.get_peer_node_status peer
 
     let initial_peers t = t.config.initial_peers
 

@@ -58,7 +58,7 @@ end
 Therefore, one could either use compiled ledgers or generate a new json list using the Testnet SDK from coda_automation.
 Note: Timing and token id are new fields added to the genesis account configuration that is needed to test time locked accounts and accounts with non-default token ids.
 
-These configurations could be hardcoded in each test but not in coda daemon. The aim is to have a generic coda binary that that would accept the runtime configuration defined for each test
+These configurations could be hardcoded in each test but not in mina daemon. The aim is to have a generic coda binary that that would accept the runtime configuration defined for each test
 
 2.Network config: the configuration for the network the integration test will run on.
 
@@ -149,13 +149,13 @@ end
 A node will encapsulate all the information needed to connect to it and make requests such as sending payments, retrieving a node's status, and so on. These requests implemented by the network manager could be using graphql commands. Given our intention to make all the cli commands use graphql queries, cli commands that do not currently have a graphql query should have that implemented first.
 Also, care should be taken to not add any test-specific queries/mutations/subscriptions that would not be used by users.
 
-The interface should also implement functions to start and stop a node that can be triggered at any time by the test program. This is particularly needed for testing functionalities like bootstrap and catchup. The network infrastructure should facilitate stopping and restarting coda daemon containers (with or w/o persisting the config directory). Currently a pod or a container within a pod is restarted automatically every time the daemon terminates. This behavior should be changed to support restarting a node on request.
+The interface should also implement functions to start and stop a node that can be triggered at any time by the test program. This is particularly needed for testing functionalities like bootstrap and catchup. The network infrastructure should facilitate stopping and restarting mina daemon containers (with or w/o persisting the config directory). Currently a pod or a container within a pod is restarted automatically every time the daemon terminates. This behavior should be changed to support restarting a node on request.
 
 The following are some of the options to enable restart on request:
-    1. Have another process as the root of the container that initiates or terminates coda daemon based on a request from the network manager.
+    1. Have another process as the root of the container that initiates or terminates mina daemon based on a request from the network manager.
     2. Deleting and redeploying helm releases for stop and start requests from the network manager with stateful sets implemented.
 
-Option 1 requires implementing and maintaining another application but is independent of the infrastructure and decoupled from the test executive. It does not change the state of the pod due to containers exiting with zero or non-zero codes and therefore once deployed, no changes are made to the deployment until it is destroyed after the test execution. The main process of the container would always be running starting/stopping the local coda daemon process as per requests from the executive. However, it is generally not considered as container best practice to include multiple services within a container.
+Option 1 requires implementing and maintaining another application but is independent of the infrastructure and decoupled from the test executive. It does not change the state of the pod due to containers exiting with zero or non-zero codes and therefore once deployed, no changes are made to the deployment until it is destroyed after the test execution. The main process of the container would always be running starting/stopping the local mina daemon process as per requests from the executive. However, it is generally not considered as container best practice to include multiple services within a container.
 Option 2 requires implementing stateful sets (which is to be implemented for testnet deployment anyway) and having coda-automation support redeploying specific nodes during the test execution. Option two provides a better architecture in terms managing the lifecycle of the nodes. However, these are currently not implemented and in the interest of having the test framework up and running to test the interactions between various components in the framework, we would implement a fairly simple puppeteering service while continuing to design the solution that uses stateful sets and incremental deployment.
 
 ##### Log engine

@@ -17,19 +17,19 @@ module Snark_worker_lib = Snark_worker
 module Timeout = Timeout_lib.Core_time
 
 type Structured_log_events.t += Connecting
-  [@@deriving register_event {msg= "Coda daemon is connecting"}]
+  [@@deriving register_event {msg= "Mina daemon is connecting"}]
 
 type Structured_log_events.t += Listening
-  [@@deriving register_event {msg= "Coda daemon is listening"}]
+  [@@deriving register_event {msg= "Mina daemon is listening"}]
 
 type Structured_log_events.t += Bootstrapping
-  [@@deriving register_event {msg= "Coda daemon is bootstrapping"}]
+  [@@deriving register_event {msg= "Mina daemon is bootstrapping"}]
 
 type Structured_log_events.t += Ledger_catchup
-  [@@deriving register_event {msg= "Coda daemon is doing ledger catchup"}]
+  [@@deriving register_event {msg= "Mina daemon is doing ledger catchup"}]
 
 type Structured_log_events.t += Synced
-  [@@deriving register_event {msg= "Coda daemon is synced"}]
+  [@@deriving register_event {msg= "Mina daemon is synced"}]
 
 type Structured_log_events.t +=
   | Rebroadcast_transition of {state_hash: State_hash.t}
@@ -82,6 +82,16 @@ type pipes =
            -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
               , string )
               Result.t)
+        * (Account_id.t -> Account.t option Participating_state.T.t)
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
+  ; user_command_writer:
+      ( User_command.t list
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -102,7 +112,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; coinbase_receiver: Consensus.Coinbase_receiver.t
+  ; coinbase_receiver: Consensus.Coinbase_receiver.t ref
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t
@@ -136,6 +146,19 @@ let client_port t =
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
   let public_keys, _ = Agent.get t.block_production_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
+
+let coinbase_receiver t = !(t.coinbase_receiver)
+
+let replace_coinbase_receiver t coinbase_receiver =
+  [%log' info t.config.logger]
+    "Changing the coinbase receiver for produced blocks from $old_receiver to \
+     $new_receiver"
+    ~metadata:
+      [ ( "old_receiver"
+        , Consensus.Coinbase_receiver.to_yojson !(t.coinbase_receiver) )
+      ; ( "new_receiver"
+        , Consensus.Coinbase_receiver.to_yojson coinbase_receiver ) ] ;
+  t.coinbase_receiver := coinbase_receiver
 
 let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
@@ -173,6 +196,8 @@ module Snark_worker = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
     in
+    Child_processes.Termination.wait_for_process_log_errors ~logger
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
     don't_wait_for
       ( match%bind
           Monitor.try_with (fun () -> Process.wait snark_worker_process)
@@ -738,11 +763,14 @@ let get_current_nonce t aid =
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    ( uc_inputs
-    , ( if Ivar.is_full result_ivar then
-          [%log' error t.config.logger] "Ivar.fill bug is here!" ;
-        Ivar.fill result_ivar )
-    , get_current_nonce t )
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
+
+let add_full_transactions t user_command =
+  let result_ivar = Ivar.create () in
+  Strict_pipe.Writer.write t.pipes.user_command_writer
+    (user_command, Ivar.fill result_ivar)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -779,7 +807,7 @@ let next_epoch_ledger t =
   in
   if
     Mina_numbers.Length.(
-      equal root_epoch best_tip_epoch || equal root_epoch zero)
+      equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -1081,10 +1109,10 @@ let create ?wallets (config : Config.t) =
                 in
                 f ~frontier input )
           in
-          (* knot-tying hacks so we can pass a get_telemetry function before net, Mina_lib.t created *)
+          (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
-          let get_telemetry_data _env =
+          let get_node_status _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
             in
@@ -1093,40 +1121,43 @@ let create ?wallets (config : Config.t) =
               Option.value_map peer_opt ~default:"<UNKNOWN>" ~f:(fun peer ->
                   peer.peer_id )
             in
-            if config.disable_telemetry then
+            if config.disable_node_status then
               Deferred.return
               @@ Error
                    (Error.of_string
                       (sprintf
                          !"Node with IP address=%{sexp: Unix.Inet_addr.t}, \
-                           peer ID=%s, telemetry is disabled"
+                           peer ID=%s, node status is disabled"
                          node_ip_addr node_peer_id))
             else
               match !net_ref with
               | None ->
                   (* should be unreachable; without a network, we wouldn't receive this RPC call *)
                   [%log' info config.logger]
-                    "Network not instantiated when telemetry data requested" ;
+                    "Network not instantiated when node status requested" ;
                   Deferred.return
                   @@ Error
                        (Error.of_string
                           (sprintf
                              !"Node with IP address=%{sexp: \
                                Unix.Inet_addr.t}, peer ID=%s, network not \
-                               instantiated when telemetry data requested"
+                               instantiated when node status requested"
                              node_ip_addr node_peer_id))
               | Some net ->
-                  let protocol_state_hash, k_block_hashes_and_timestamps =
+                  let ( protocol_state_hash
+                      , best_tip_opt
+                      , k_block_hashes_and_timestamps ) =
                     match
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     with
                     | None ->
                         ( config.precomputed_values.protocol_state_with_hash
                             .hash
+                        , None
                         , [] )
                     | Some frontier ->
+                        let tip = Transition_frontier.best_tip frontier in
                         let protocol_state_hash =
-                          let tip = Transition_frontier.best_tip frontier in
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
@@ -1147,7 +1178,9 @@ let create ?wallets (config : Config.t) =
                                     (Time.to_string_iso8601_basic
                                        ~zone:Time.Zone.utc) ) )
                         in
-                        (protocol_state_hash, k_block_hashes_and_timestamps)
+                        ( protocol_state_hash
+                        , Some tip
+                        , k_block_hashes_and_timestamps )
                   in
                   let%bind peers = Mina_networking.peers net in
                   let open Deferred.Or_error.Let_syntax in
@@ -1180,7 +1213,23 @@ let create ?wallets (config : Config.t) =
                       ~f:Fn.id
                       ~default:(Float.to_int minutes_float)
                   in
-                  Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                  let block_height_opt =
+                    match best_tip_opt with
+                    | None ->
+                        None
+                    | Some tip ->
+                        let state =
+                          Transition_frontier.Breadcrumb.protocol_state tip
+                        in
+                        let consensus_state =
+                          state |> Mina_state.Protocol_state.consensus_state
+                        in
+                        Some
+                          ( Mina_numbers.Length.to_int
+                          @@ Consensus.Data.Consensus_state.blockchain_length
+                               consensus_state )
+                  in
+                  Mina_networking.Rpcs.Get_node_status.Node_status.
                     { node_ip_addr
                     ; node_peer_id
                     ; sync_status
@@ -1190,7 +1239,8 @@ let create ?wallets (config : Config.t) =
                     ; ban_statuses
                     ; k_block_hashes_and_timestamps
                     ; git_commit
-                    ; uptime_minutes }
+                    ; uptime_minutes
+                    ; block_height_opt }
           in
           let get_some_initial_peers _ =
             match !net_ref with
@@ -1273,7 +1323,7 @@ let create ?wallets (config : Config.t) =
                      in
                      { proof_with_data with
                        data= With_hash.data proof_with_data.data } ))
-              ~get_telemetry_data
+              ~get_node_status
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->
@@ -1318,9 +1368,10 @@ let create ?wallets (config : Config.t) =
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (input_list, result_cb, get_current_nonce) ->
+            ~f:(fun (input_list, result_cb, get_current_nonce, get_account) ->
               match%bind
                 User_command_input.to_user_commands ~get_current_nonce
+                  ~get_account ~constraint_constants ~logger:config.logger
                   input_list
               with
               | Ok user_commands ->
@@ -1631,10 +1682,11 @@ let create ?wallets (config : Config.t) =
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
                 ; user_command_input_writer
+                ; user_command_writer= local_txns_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
-            ; coinbase_receiver= config.coinbase_receiver
+            ; coinbase_receiver= ref config.coinbase_receiver
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status

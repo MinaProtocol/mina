@@ -43,6 +43,8 @@ import (
 	mplex "github.com/libp2p/go-mplex"
 )
 
+const NodeStatusTimeout = 1000 * time.Millisecond
+
 func parseCIDR(cidr string) gonet.IPNet {
 	_, ipnet, err := gonet.ParseCIDR(cidr)
 	if err != nil {
@@ -52,6 +54,8 @@ func parseCIDR(cidr string) gonet.IPNet {
 }
 
 type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
+
+const numPxConnectionWorkers int = 8
 
 var (
 	logger      = logging.Logger("codanet.Helper")
@@ -67,8 +71,8 @@ var (
 		"169.254.0.0/16",
 	}
 
-	pxProtocolID        = protocol.ID("/mina/peer-exchange")
-	TelemetryProtocolID = protocol.ID("/mina/telemetry")
+	pxProtocolID         = protocol.ID("/mina/peer-exchange")
+	NodeStatusProtocolID = protocol.ID("/mina/node-status")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -159,10 +163,6 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
 
-	if !cm.minaPeerExchange {
-		return
-	}
-
 	info := cm.GetInfo()
 	if len(net.Peers()) <= info.HighWater {
 		return
@@ -171,6 +171,10 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	cm.TrimOpenConns(context.Background())
 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
+
+	if !cm.minaPeerExchange {
+		return
+	}
 
 	defer func() {
 		go func() {
@@ -237,7 +241,8 @@ type Helper struct {
 	BandwidthCounter  *metrics.BandwidthCounter
 	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
-	TelemetryData     string
+	NodeStatus        string
+	pxDiscoveries     chan peer.AddrInfo
 }
 
 type MessageStats struct {
@@ -563,37 +568,57 @@ func (h *Helper) handlePxStreams(s network.Stream) {
 	}
 
 	for _, p := range peers {
-		go func(p peer.AddrInfo) {
-			connInfo := h.ConnectionManager.GetInfo()
-			if connInfo.ConnCount < connInfo.LowWater {
-				err = h.Host.Connect(h.Ctx, p)
-				if err != nil {
-					logger.Debugf("failed to connect to peer %v err=%s", p, err)
-				} else {
-					logger.Debugf("connected to peer! %v", p)
-				}
-			} else {
-				h.Host.Peerstore().AddAddrs(p.ID, p.Addrs, peerstore.ConnectedAddrTTL)
-			}
-		}(p)
+		select {
+		case h.pxDiscoveries <- p:
+		default:
+			logger.Debugf("peer discoveries channel full; dropping peer %v", p)
+		}
 	}
 }
 
-func (h *Helper) handleTelemetryStreams(s network.Stream) {
+func (h *Helper) handleNodeStatusStreams(s network.Stream) {
 	defer func() {
-		_ = s.Close()
+		err := s.Close()
+		if err != nil {
+			logger.Error("failed to close write side of stream", err)
+			return
+		}
+
+		<-time.After(NodeStatusTimeout)
+
+		err = s.Reset()
+		if err != nil {
+			logger.Error("failed to reset stream", err)
+		}
 	}()
 
-	n, err := s.Write([]byte(h.TelemetryData))
+	n, err := s.Write([]byte(h.NodeStatus))
 	if err != nil {
 		logger.Error("failed to write to stream", err)
 		return
-	} else if n != len(h.TelemetryData) {
+	} else if n != len(h.NodeStatus) {
 		logger.Error("failed to write all data to stream")
 		return
 	}
 
-	logger.Debugf("wrote telemetry data to stream %s", s.Protocol())
+	logger.Debugf("wrote node status to stream %s", s.Protocol())
+}
+
+func (h Helper) pxConnectionWorker() {
+	for peer := range h.pxDiscoveries {
+		connInfo := h.ConnectionManager.GetInfo()
+		if connInfo.ConnCount < connInfo.LowWater {
+			err := h.Host.Connect(h.Ctx, peer)
+			if err != nil {
+				logger.Debugf("failed to connect to peer %v err=%s", peer, err)
+			} else {
+				logger.Debugf("connected to peer! %v", peer)
+			}
+		} else {
+			logger.Debugf("discovered peer (%v) via peer exchange, but already have too many connections; adding to peerstore, but refusing to connect", peer)
+			h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
+		}
+	}
 }
 
 // MakeHelper does all the initialization to run one host
@@ -692,16 +717,22 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		BandwidthCounter:  bandwidthCounter,
 		MsgStats:          &MessageStats{min: math.MaxUint64},
 		Seeds:             seeds,
+		pxDiscoveries:     nil,
 	}
 
 	if !minaPeerExchange {
 		return h, nil
 	}
 
+	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections * 3)
+	for w := 0; w < numPxConnectionWorkers; w++ {
+		go h.pxConnectionWorker()
+	}
+
 	connManager.getRandomPeers = h.getRandomPeers
 	connManager.ctx = ctx
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
-	h.Host.SetStreamHandler(TelemetryProtocolID, h.handleTelemetryStreams)
+	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil
 }

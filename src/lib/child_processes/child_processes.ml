@@ -146,7 +146,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
           | Error exn ->
               [%log warn]
                 !"Couldn't delete lock file for %s (pid $childPid) after \
-                  killing it. If another Coda daemon was already running it \
+                  killing it. If another Mina daemon was already running it \
                   may have cleaned it up for us. ($exn)"
                 name
                 ~metadata:
@@ -279,6 +279,8 @@ let start_custom :
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
+  Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
+    ~location:__LOC__ ;
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ Async.Writer.save lock_path

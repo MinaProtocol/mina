@@ -43,7 +43,7 @@ module Party = struct
       module Stable = struct
         module V1 = struct
           type ('state_element, 'pk, 'vk, 'perms) t =
-            { app_state: 'state_element Snapp_state.Stable.V1.t
+            { app_state: 'state_element Snapp_state.V.Stable.V1.t
             ; delegate: 'pk
             ; verification_key: 'vk
             ; permissions: 'perms }
@@ -1148,6 +1148,13 @@ let check (t : t) : unit Or_error.t =
       assert_
         (not (is_neg one.data.body.delta && two_is_neg))
         "both accounts negative"
+    in
+    let%bind () =
+      assert_
+        (List.for_all (accounts_accessed t) ~f:(fun aid ->
+             Account_id.public_key aid |> Public_key.decompress
+             |> Option.is_some ))
+        "public keys for all accounts involved in the transaction must be valid"
     in
     fee_checks ~excess ~token_id ~fee_payment
   in

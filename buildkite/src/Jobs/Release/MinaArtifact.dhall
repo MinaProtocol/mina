@@ -32,6 +32,9 @@ Pipeline.build
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
           S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
+          S.exactly "dockerfiles/Dockerfile-coda-daemon" "",
+          S.exactly "dockerfiles/Dockerfile-coda-daemon-puppeteered" "",
+          S.exactly "dockerfiles/coda_daemon_puppeteer" "py",
           S.exactly "dockerfiles/scripts/healthcheck-utilities" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
@@ -47,13 +50,16 @@ Pipeline.build
             "DUNE_PROFILE=testnet_postake_medium_curves",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
+            "CODA_BRANCH=$BUILDKITE_BRANCH",
+            "CODA_COMMIT_SHA1=$BUILDKITE_COMMIT",
             -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
           label = "Build Mina daemon debian package",
           key = "build-deb-pkg",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "_build/*.deb" ]
+          artifact_paths = [ S.contains "_build/*.deb" ],
+          retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
         },
 
       -- daemon image
