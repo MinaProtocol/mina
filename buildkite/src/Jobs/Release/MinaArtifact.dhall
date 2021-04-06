@@ -32,6 +32,9 @@ Pipeline.build
           S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
           S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
+          S.exactly "dockerfiles/Dockerfile-coda-daemon" "",
+          S.exactly "dockerfiles/Dockerfile-coda-daemon-puppeteered" "",
+          S.exactly "dockerfiles/coda_daemon_puppeteer" "py",
           S.exactly "dockerfiles/scripts/healthcheck-utilities" "sh",
           S.strictlyStart (S.contains "scripts")
         ],

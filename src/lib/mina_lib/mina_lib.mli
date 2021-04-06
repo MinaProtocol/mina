@@ -35,6 +35,10 @@ val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 val replace_block_production_keypairs :
   t -> Keypair.And_compressed_pk.Set.t -> unit
 
+val coinbase_receiver : t -> Consensus.Coinbase_receiver.t
+
+val replace_coinbase_receiver : t -> Consensus.Coinbase_receiver.t -> unit
+
 val next_producer_timing :
   t -> Daemon_rpcs.Types.Status.Next_producer_timing.t option
 
@@ -97,6 +101,8 @@ val add_full_transactions :
   -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
+
+val get_account : t -> Account_id.t -> Account.t option Participating_state.T.t
 
 val get_inferred_nonce_from_transaction_pool_and_ledger :
   t -> Account_id.t -> Account.Nonce.t option Participating_state.t

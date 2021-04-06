@@ -73,6 +73,9 @@ val to_user_command :
                         -> ( [`Min of Account_nonce.t] * Account_nonce.t
                            , string )
                            Result.t)
+  -> get_account:(Account_id.t -> Account.t option Participating_state.T.t)
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> logger:Logger.t
   -> t
   -> (Signed_command.t * (Account.Nonce.t * Account.Nonce.t) Account_id.Map.t)
      Deferred.Or_error.t
@@ -83,5 +86,8 @@ val to_user_commands :
                         -> ( [`Min of Account_nonce.t] * Account_nonce.t
                            , string )
                            Result.t)
+  -> get_account:(Account_id.t -> Account.t option Participating_state.T.t)
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> logger:Logger.t
   -> t list
   -> Signed_command.t list Deferred.Or_error.t

@@ -300,6 +300,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
           return (Mina_commands.reset_trust_status coda ip_address) )
+    ; implement Daemon_rpcs.Chain_id_inputs.rpc (fun () () ->
+          return (Mina_commands.chain_id_inputs coda) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
             ( Mina_commands.verify_payment coda aid tx proof
@@ -461,6 +463,12 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           in
           let lift x = `Response x in
           match Uri.path uri with
+          | "/" ->
+              let body =
+                "This page is intentionally left blank. The graphql endpoint \
+                 can be found at `/graphql`."
+              in
+              Server.respond_string ~status:`OK body >>| lift
           | "/graphql" ->
               [%log debug] "Received graphql request. Uri: $uri"
                 ~metadata:
@@ -564,11 +572,11 @@ let coda_crash_message ~log_issue ~action ~error =
   let followup =
     if log_issue then
       sprintf
-        !{err| The Coda Protocol developers would like to know why!
+        !{err| The Mina Protocol developers would like to know why!
 
     Please:
       Open an issue:
-        <https://github.com/CodaProtocol/coda/issues/new>
+        <https://github.com/MinaProtocol/mina/issues/new>
 
       Briefly describe what you were doing and %s
 
@@ -578,7 +586,7 @@ let coda_crash_message ~log_issue ~action ~error =
   in
   sprintf !{err|
 
-  ☠  Coda Daemon %s.
+  ☠  Mina Daemon %s.
   %s
 %!|err} error followup
 
@@ -690,7 +698,7 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
             [("coda_run", `String "Program was killed by signal")]
         in
         [%log info]
-          !"Coda process was interrupted by $signal"
+          !"Mina process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
         (* causes async shutdown and at_exit handlers to run *)
         Async.shutdown 130 ))

@@ -1,7 +1,7 @@
 (executable
- (package missing_subchain)
- (name missing_subchain)
- (public_name missing_subchain)
+ (package extract_blocks)
+ (name extract_blocks)
+ (public_name extract_blocks)
  (libraries
    async
    core_kernel
