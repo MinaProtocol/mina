@@ -53,8 +53,7 @@ module ArithmeticSponge
     { mutable state: 'f Array.t
     ; mutable sponge_state: sponge_state }
     
-  type tp = Field.t t
-  let st: tp = {state = Array.init 5 ~f:(fun _ -> Field.zero); sponge_state= Absorbed 0;}
+  let st: Field.t t = {state = Array.init 5 ~f:(fun _ -> Field.zero); sponge_state= Absorbed 0;}
 
   let add_assign ~state i x = Field.(state.(i) <- (state.(i) + x))
 

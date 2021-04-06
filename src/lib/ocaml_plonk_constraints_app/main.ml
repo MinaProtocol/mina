@@ -16,7 +16,8 @@ let%test_module "backend test" =
       let authentication x () =
 
         Random.full_init [|7|];
-        let ptl = 1000 + Random.int 1000 in
+        (*let ptl = 1000 + Random.int 1000 in*)
+        let ptl = 1592 in
         let blocks = (ptl + 15 ) / 16 in
         let ec = Array.init blocks ~f:(fun _ -> Array.init 16 ~f:(fun _ -> Impl.Field.of_int (Random.int 255))) in
         let h = Array.init 16 ~f:(fun _ -> Impl.Field.of_int (Random.int 255)) in
@@ -38,14 +39,12 @@ let%test_module "backend test" =
         let ptlb = ptl * 8 in
         let len = Array.init 16 ~f:(fun i -> Impl.Field.of_int ((ptlb lsr (i*8)) land 255)) in
         let ht = tag (Array.init 16 ~f:(fun _ -> Impl.Field.zero)) (Array.append ctp len) in
-        let ht = Array.init 4 ~f:(fun i -> (Bytes.b4tof ht.(i*4) ht.(i*4+1) ht.(i*4+2) ht.(i*4+3))) in
-        let ht = Bytes.b16tof ht.(0) ht.(1) ht.(2) ht.(3) in
+        let hb = Array.map ~f:(fun x -> Bytes.b16tof x) (Array.append ec [|ht|]) in
 
-        let open Field in
         let module Sponge = Plonk.Poseidon.ArithmeticSponge (Impl) (Params) in
-        Sponge.absorb x;
-        let y = Sponge.squeeze in
-        assert_ (Snarky.Constraint.equal y y);
+        Array.iter ~f:(fun x -> Sponge.absorb x) hb;
+        let x = Sponge.squeeze in
+        assert_ (Snarky.Constraint.equal x x);
 
         ()
 
