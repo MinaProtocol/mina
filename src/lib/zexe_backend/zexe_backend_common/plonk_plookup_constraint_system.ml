@@ -692,6 +692,13 @@ struct
               sys ;
             (Fp.one, `Var res) )
 
+  let f1 = Fp.of_int 256
+  let f2 = Fp.of_int 65536
+  let f3 = Fp.of_int 16777216
+  let f4 = Fp.of_int 4294967296
+  let f8 = Fp.square f4
+  let f12 = Fp.(f4 * f8)
+
   let add_constraint ?label:_ sys
       (constr :
         ( Fp.t Snarky_backendless.Cvar.t
@@ -991,7 +998,7 @@ struct
           (wire sys row.(2) sys.next_row O)
           (wire sys row.(3) sys.next_row Q)
           (wire sys row.(4) sys.next_row P)
-          [|Fp.one; Fp.of_int 256; Fp.of_int 65536; Fp.of_int 16777216; Fp.(negate one); Fp.zero; Fp.zero|] ;
+          [|Fp.one; f1; f2; f3; Fp.(negate one); Fp.zero; Fp.zero|] ;
         ()
     | Plonk_constraint.T (Bytes16_tof {bytes}) ->
         let row =
@@ -999,8 +1006,6 @@ struct
             bytes
             ~f:(fun x -> reduce_to_v x)
         in
-        let f4 = Fp.of_string "4294967296" in
-        let f8 = Fp.square f4 in
         add_row sys
           (Array.map row ~f:(fun x -> Some x))
           Generic
@@ -1013,7 +1018,7 @@ struct
             Fp.one;
             f4;
             f8;
-            Fp.(f4 * f8);
+            f12;
             Fp.(negate one);
             Fp.zero;
             Fp.zero
