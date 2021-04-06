@@ -82,6 +82,9 @@ else
         master)
             CODENAME='release'
             ;;
+        master-qa)
+            CODENAME='pre-release'
+            ;;
         *)
             CODENAME='unstable'
             ;;
