@@ -7,7 +7,7 @@ Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consens
 
 Samasika extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.  The name Samasika comes from the Sanskrit word, meaning small or succinct.
 
-This documents specifies the protocol and related structures.
+This documents specifies its structures, algorithms and protocol.
 
 **Table of Contents**
 * [1 Constants](#1-constants)
@@ -16,6 +16,7 @@ This documents specifies the protocol and related structures.
   * [2.2 `Protocol_state`](#22-protocol_state)
   * [2.3 `Consensus_state`](#23-consensus_state)
   * [2.4 `Epoch_data`](#24-epoch_data)
+  * [2.5 Example block](#25-example-block)
 * [3 Algorithms](#3-algorithms)
   * [3.1 Common](#31-common)
     * [3.1.1 `epochSlot`](#311-epochslot)
@@ -69,17 +70,17 @@ The main structures used in Mina consensus are as follows
 
 ## 2.1 `External_transition`
 
-This is Mina's block structure.
+This is Mina's block structure.  In Mina blocks are synonymous with transitions.  A block received from a peer is referred to as an external transition and a block generated and applied locally is referred to as an internal transition.
 
 | Field                           | Type                               | Description |
 | - | - | - |
 | `version`                       | `u8` (= 0x01)                      | Block structure version |
-| `protocol_state`                | `Protocol_state.Value.Stable.V1.t` | |
-| `protocol_state_proof`          | `Proof.Stable.V1.t sexp_opaque` | |
-| `staged_ledger_diff`            | `Staged_ledger_diff.Stable.V1.t` | |
-| `delta_transition_chain_proof`  | `State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list` | |
-| `current_protocol_version`      | `Protocol_version.Stable.V1.t`        | |
-| `proposed_protocol_version_opt` | `Protocol_version.Stable.V1.t option` | |
+| `protocol_state`                | `Protocol_state.Value.Stable.V1.t` | The blockchain state, including consensus and the ledger |
+| `protocol_state_proof`          | `Proof.Stable.V1.t sexp_opaque`    | Proof that the protocol state and entire history of the chain is valid |
+| `staged_ledger_diff`            | `Staged_ledger_diff.Stable.V1.t`   | Diff of the proposed next state of the blockchain |
+| `delta_transition_chain_proof`  | `State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list` | Proof that the block was produced within the allotted slot time |
+| `current_protocol_version`      | `Protocol_version.Stable.V1.t`        | Current protocol version |
+| `proposed_protocol_version_opt` | `Protocol_version.Stable.V1.t option` | Proposed protocol version |
 
 ## 2.2 `Protocol_state`
 
@@ -88,7 +89,7 @@ This structure can be thought of like the block header.  It contains the most es
 | Field                 | Type                     | Description |
 | - | - | - |
 | `version`             | `u8` (= 0x01)            | Block structure version      |
-| `previous_state_hash` | `State_hash.Stable.V1.t` | Commitment to previous block |
+| `previous_state_hash` | `State_hash.Stable.V1.t` | Commitment to previous block (hash of previous protocol state hash and body hash)|
 | `body`                | `Protocol_state.Body.Value.Stable.V1` | The body of the protocol state |
 
 ### 2.2.1 `Protocol_state.Body`
@@ -96,10 +97,10 @@ This structure can be thought of like the block header.  It contains the most es
 | Field                 | Type                     | Description |
 | - | - | - |
 | `version`             | `u8` (= 0x01)            | Block structure version |
-| `genesis_state_hash`  | `State_hash.Stable.V1.t` | Used for hardforks |
-| `blockchain_state`    | `Blockchain_state.Value.Stable.V1.t` | |
-| `consensus_state`     | `Consensus.Data.Consensus_state.Value.Stable.V1.t` | |
-| `constants`           | `Protocol_constants_checked.Value.Stable.V1.t` | |
+| `genesis_state_hash`  | `State_hash.Stable.V1.t` | Genesis protocol state hash (used for hardforks) |
+| `blockchain_state`    | `Blockchain_state.Value.Stable.V1.t` | Ledger related state |
+| `consensus_state`     | `Consensus.Data.Consensus_state.Value.Stable.V1.t` | Consensus related state |
+| `constants`           | `Protocol_constants_checked.Value.Stable.V1.t` | Consensus constants |
 
 ## 2.3 `Consensus_state`
 
@@ -134,6 +135,99 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | `start_checkpoint` | `State_hash.Stable.V1.t` | State hash of _first block_ of epoch (see [Section 3.3](#33-decentralized-checkpointing))|
 | `lock_checkpoint`  | `State_hash.Stable.V1.t` | State hash of _last known block in the first 2/3 of epoch_ (see [Section 3.3](#33-decentralized-checkpointing))|
 | `epoch_length`     | `Length.Stable.V1.t` | |
+
+## 2.5 Example block
+
+This is an example of a Mina block in JSON format
+
+```json
+{
+  "external_transition": {
+    "protocol_state": {
+      "previous_state_hash": "3NLKJLNbD7rBAbGdjZz3tfNBPYxUJJaLmwCP9jMKR65KSz4RKV6b",
+      "body": {
+        "genesis_state_hash": "3NLxYrjb7zmHdoFgBrubCN8ijM8v7eT8kvLiPLc9DHt3M8XrDDEG",
+        "blockchain_state": {
+          "staged_ledger_hash": {
+            "non_snark": {
+              "ledger_hash": "jxV4SS44wHUVrGEucCsfxLisZyUC5QddsiokGH3kz5xm2hJWZ25",
+              "aux_hash": "UmosfM82dH5xzqdckXgA1JoAvJ5tLxch2wsty4sXmiEPKnPTPq",
+              "pending_coinbase_aux": "WLo8mDN6oBUTSyBkFCy7Fky7Na5fN4R6oGq4HMf3YoHCAj4cwY"
+            },
+            "pending_coinbase_hash": "2mze7iXKwA9JAqVDC1MVvgWfJDgvbgSexKtuShdkgqMfv1tjATQQ"
+          },
+          "snarked_ledger_hash": "jx9171AbMApHNG1guAcKct1E6nyUFweA7M4ZPCjBZpgNNrE21Nj",
+          "genesis_ledger_hash": "jxX6VJ84HaafrKozFRA4qjnni4aPXqXC2H5vQLKSryNpKTXuz1R",
+          "snarked_next_available_token": "2",
+          "timestamp": "1611691710000"
+        },
+        "consensus_state": {
+          "blockchain_length": "3852",
+          "epoch_count": "1",
+          "min_window_density": "1",
+          "sub_window_densities": [
+            "3",
+            "1",
+            "3",
+            "1",
+            "4",
+            "2",
+            "1",
+            "2",
+            "2",
+            "4",
+            "5"
+          ],
+          "last_vrf_output": "g_1vrXSXLhvn1e4Ap1Ey5e8yh3PFMJT0vZyhZLlTBAA=",
+          "total_currency": "167255800000001000",
+          "curr_global_slot": {
+            "slot_number": "12978",
+            "slots_per_epoch": "7140"
+          },
+          "global_slot_since_genesis": "12978",
+          "staking_epoch_data": {
+            "ledger": {
+              "hash": "jxX6VJ84HaafrKozFRA4qjnni4aPXqXC2H5vQLKSryNpKTXuz1R",
+              "total_currency": "165950000000001000"
+            },
+            "seed": "2vb1Mjvydod6sEwn7qpbejKCfRqugMgyG3MHXXRKcAkwQLRs9fj8",
+            "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+            "lock_checkpoint": "3NK5G8Xqn1Prh3XoTyZ2tqntJC6X2nVwruv5mEJCL3GaTk7jKUNo",
+            "epoch_length": "1769"
+          },
+          "next_epoch_data": {
+            "ledger": {
+              "hash": "jx7XXjRfJj2mGXmiHQmpm6ZgTxz14udpugyFtw4DefJFpie7apN",
+              "total_currency": "166537000000001000"
+            },
+            "seed": "2vavBR2GfJWvWkpC7yGJQFnts18nHaFjdVEr84r1Y9DQXvnJRhmd",
+            "start_checkpoint": "3NLdAqxtBRYxYbCWMXxGu6j1hGDrpQwGkBDF9QvGxmtpziXQDADu",
+            "lock_checkpoint": "3NL4Eis1pS1yrPdfCbiJcpCCYsHuXY3ZgEzHojPnFWfMK9gKmhZh",
+            "epoch_length": "2084"
+          },
+          "has_ancestor_in_same_checkpoint_window": true,
+          "block_stake_winner": "B62qpBrUYW8SHcKTFWLbHKD7d3FqYFvGRBaWRLQCgsr3V9pwsPSd7Ms",
+          "block_creator": "B62qpBrUYW8SHcKTFWLbHKD7d3FqYFvGRBaWRLQCgsr3V9pwsPSd7Ms",
+          "coinbase_receiver": "B62qpBrUYW8SHcKTFWLbHKD7d3FqYFvGRBaWRLQCgsr3V9pwsPSd7Ms",
+          "supercharge_coinbase": true
+        },
+        "constants": {
+          "k": "290",
+          "slots_per_epoch": "7140",
+          "slots_per_sub_window": "7",
+          "delta": "0",
+          "genesis_state_timestamp": "1609355670000"
+        }
+      }
+    },
+    "protocol_state_proof": "<opaque>",
+    "staged_ledger_diff": "<opaque>",
+    "delta_transition_chain_proof": "<opaque>",
+    "current_protocol_version": "1.1.0",
+    "proposed_protocol_version": "<None>"
+  }
+}
+```
 
 # 3. Algorithms
 
@@ -292,7 +386,7 @@ fn updateCheckpoints(P, B) -> ()
     }
 }
 ```
-Specifically, if the slot (`SB.slot`) of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
+Specifically, if `epochSlot(SB.curr_global_slot)` of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
 
 ### 3.3.3 `isShortRange`
 
@@ -395,7 +489,7 @@ fn shiftWindow(D) -> D'
 
 ### 3.4.3 `initSubWindowDensities`
 
-This algorithm initializes the sub-window densities for genesis block `G`
+This algorithm initializes the sub-window densities and minimm window density for genesis block `G`
 
 ```rust
 fn initSubWindowDensities(G) -> ()
@@ -405,7 +499,22 @@ fn initSubWindowDensities(G) -> ()
 }
 ```
 
-### 3.4.4 `getMinDen`
+### 3.4.4 `updateSubWindowDensities`
+
+This algorithm updates the sub-window densities of the block being created `B` based on its parent block `P`.  It inputs the blocks `P` and `B` and updates `B`'s sub window densities according to the description in [Section 3.4](#34-window-min-density).
+
+```rust
+fn updateSubWindowDensities(P, B) -> ()
+{
+    prev = P.protocol_state.body.consensus_state
+    curr = P.protocol_state.body.consensus_state
+    if prev.curr_global_slot
+    curr.sub_window_densities;
+    curr.min_window_density;
+}
+```
+
+### 3.4.5 `getMinDen`
 
 As mentioned in [Section 3.2.2](#322-long-range-fork-rule), this function returns the current minimum density of a chain `C`.
 
@@ -449,10 +558,10 @@ Things a peer MUST do to initialize consensus includes
 
 ## 4.2 Select chain
 
-Chain selection is triggered anytime a block is added to any of a peer's chains.  This section specifies how peers are required to apply the fork rules from the [Chain Selection Rules Section](#32-chain-selection).  The chain selection algorithm is the same as that of Ouroboros Genesis, except that it uses the `selectBestChain` algorithm.
+A chain selection event is triggered anytime a block is added to any of a peer's chains.  The peer must apply the fork rules from the [Chain Selection Rules Section](#32-chain-selection).
 
 ```rust
-fn selectChain(Peer, Chains) -> ()
+fn Peer.selectChain(Chains) -> ()
 {
     // Discard invalid chains
     for chain in Chains {
