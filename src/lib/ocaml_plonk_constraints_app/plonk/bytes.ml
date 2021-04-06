@@ -168,14 +168,14 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
   exception BlockArith of string
   
   let xor (b1 : Field.t array) (b2 : Field.t array) : Field.t array =
-    let module Constrained = Constraints (Intf) in
+    let module Constraints = Constraints (Intf) in
     let open Field in
     if (Array.length b1) <> 16 || (Array.length b2) <> 16 then
       raise (BlockArith "Incorrect block size");
-    Array.init 16 ~f:(fun i -> Constrained.xor b1.(i) b2.(i))
+    Array.init 16 ~f:(fun i -> Constraints.xor b1.(i) b2.(i))
   
   let mul (b1 : Field.t array) (b2 : Field.t array) : Field.t array =
-    let module Constrained = Constraints (Intf) in
+    let module Constraints = Constraints (Intf) in
     if (Array.length b1) <> 16 || (Array.length b2) <> 16 then
       raise (BlockArith "Incorrect block size");
 
@@ -183,37 +183,37 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     for i = 0 to 15 do
         for j = 0 to 15 do
             let k = i + j in
-            let m0, m1 = Constrained.mul b1.(i) b2.(j) in
+            let m0, m1 = Constraints.mul b1.(i) b2.(j) in
 
             if k < 15 then
             (
-                z.(k) <- Constrained.xor z.(k) m0;
-                z.(k+1) <- Constrained.xor z.(k+1) m1;
+                z.(k) <- Constraints.xor z.(k) m0;
+                z.(k+1) <- Constraints.xor z.(k+1) m1;
             )
             else if k = 15 then
             (
-                let r0, r1 = Constrained.xtimesp m1 in
-                z.(0) <- Constrained.xor z.(0) r0;
-                z.(1) <- Constrained.xor z.(1) r1;
-                z.(15) <- Constrained.xor z.(15) m0;
+                let r0, r1 = Constraints.xtimesp m1 in
+                z.(0) <- Constraints.xor z.(0) r0;
+                z.(1) <- Constraints.xor z.(1) r1;
+                z.(15) <- Constraints.xor z.(15) m0;
             )
             else if k < 30 then
             (
-                let r00, r01 = Constrained.xtimesp m0 in
-                let r10, r11 = Constrained.xtimesp m1 in
-                z.(k-16) <- Constrained.xor z.(k-16) r00;
-                z.(k-15) <- Constrained.xor z.(k-15) (Constrained.xor r01 r10);
-                z.(k-14) <- Constrained.xor z.(k-14) r11;
+                let r00, r01 = Constraints.xtimesp m0 in
+                let r10, r11 = Constraints.xtimesp m1 in
+                z.(k-16) <- Constraints.xor z.(k-16) r00;
+                z.(k-15) <- Constraints.xor z.(k-15) (Constraints.xor r01 r10);
+                z.(k-14) <- Constraints.xor z.(k-14) r11;
             )
             else
             (
-                let r00, r01 = Constrained.xtimesp m0 in
-                let r10, r11 = Constrained.xtimesp m1 in
-                let r20, r21 = Constrained.xtimesp r11 in
-                z.(0) <- Constrained.xor z.(0) r20;
-                z.(1) <- Constrained.xor z.(1) r21;
-                z.(14) <- Constrained.xor z.(14) r00;
-                z.(15) <- Constrained.xor z.(15) (Constrained.xor r01 r10);
+                let r00, r01 = Constraints.xtimesp m0 in
+                let r10, r11 = Constraints.xtimesp m1 in
+                let r20, r21 = Constraints.xtimesp r11 in
+                z.(0) <- Constraints.xor z.(0) r20;
+                z.(1) <- Constraints.xor z.(1) r21;
+                z.(14) <- Constraints.xor z.(14) r00;
+                z.(15) <- Constraints.xor z.(15) (Constraints.xor r01 r10);
             )
         done;
     done;

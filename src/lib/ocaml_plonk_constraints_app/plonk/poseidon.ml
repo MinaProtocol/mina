@@ -1,11 +1,10 @@
 open Core
 open Snarky
-open Sponge
 open Zexe_backend_common.Plonk_plookup_constraint_system
 
 module Constraints
     (Intf : Snark_intf.Run with type prover_state = unit)
-    (Params : sig val params : Intf.field Params.t end)
+    (Params : sig val params : Intf.field Sponge.Params.t end)
 = struct
   open Intf
 
@@ -37,21 +36,56 @@ module Constraints
       }];
     state.(rounds)
 
-  let poseidon_block_cipher (start : Field.t array) : Field.t array =
+  let block_cipher (start : Field.t array) : Field.t array =
     permute start 31
 end
 
 module ArithmeticSponge
     (Intf : Snark_intf.Run with type prover_state = unit)
-    (Params : sig val params : Intf.field Params.t end)
+    (Params : sig val params : Intf.field Sponge.Params.t end)
 = struct
   open Intf
 
   type sponge_state = Absorbed of int | Squeezed of int [@@deriving sexp]
+  let rate = 4
 
-  let state = Array.init 5 ~f:(fun _ -> Field.zero)
+  type 'f t =
+    { mutable state: 'f Array.t
+    ; mutable sponge_state: sponge_state }
+    
+  type tp = Field.t t
+  let st: tp = {state = Array.init 5 ~f:(fun _ -> Field.zero); sponge_state= Absorbed 0;}
 
-  let absorb (start : Field.t array) = ()
+  let add_assign ~state i x = Field.(state.(i) <- (state.(i) + x))
 
-  let squeze (start : Field.t array) = ()
+  let absorb x =
+    let module Constraints = Constraints (Intf) (Params) in
+    match st.sponge_state with
+    | Absorbed n ->
+        if n = rate then (
+          st.state <- Constraints.block_cipher st.state ;
+          add_assign ~state:st.state 0 x ;
+          st.sponge_state <- Absorbed 1 )
+        else (
+          add_assign ~state:st.state n x ;
+          st.sponge_state <- Absorbed (n + 1) )
+    | Squeezed _ ->
+        add_assign ~state:st.state 0 x ;
+        st.sponge_state <- Absorbed 1
+
+  let squeeze =
+    let module Constraints = Constraints (Intf) (Params) in
+    match st.sponge_state with
+    | Squeezed n ->
+        if n = rate then (
+          st.state <- Constraints.block_cipher st.state ;
+          st.sponge_state <- Squeezed 1 ;
+          st.state.(0) )
+        else (
+          st.sponge_state <- Squeezed (n + 1) ;
+          st.state.(n) )
+    | Absorbed _ ->
+        st.state <- Constraints.block_cipher st.state ;
+        st.sponge_state <- Squeezed 1 ;
+        st.state.(0)
 end

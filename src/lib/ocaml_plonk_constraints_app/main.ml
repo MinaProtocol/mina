@@ -41,12 +41,12 @@ let%test_module "backend test" =
         let ht = Array.init 4 ~f:(fun i -> (Bytes.b4tof ht.(i*4) ht.(i*4+1) ht.(i*4+2) ht.(i*4+3))) in
         let ht = Bytes.b16tof ht.(0) ht.(1) ht.(2) ht.(3) in
 
-(*
         let open Field in
-        let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
-        let perm = Poseidon.poseidon_block_cipher [|x; x+one; x-one; square x; square x|] in
-        assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
-*)
+        let module Sponge = Plonk.Poseidon.ArithmeticSponge (Impl) (Params) in
+        Sponge.absorb x;
+        let y = Sponge.squeeze in
+        assert_ (Snarky.Constraint.equal y y);
+
         ()
 
       let input () = Impl.Data_spec.[Impl.Field.typ]
@@ -106,7 +106,7 @@ let%test_module "backend test" =
           (***** POSEIDON PERMUTATION *****)
 
           let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
-          let perm = Poseidon.poseidon_block_cipher [|x; x+one; x-one; square x; square x|] in
+          let perm = Poseidon.block_cipher [|x; x+one; x-one; square x; square x|] in
           assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
 
           (***** EC ARITHMETIC *****)
