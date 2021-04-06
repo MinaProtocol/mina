@@ -37,12 +37,12 @@ type t =
 
 let catchup_tree t = t.catchup_tree
 
-type Structured_log_events.t += Added_breadcrumb_user_commands
+type Structured_log_events.t +=
+  | Added_breadcrumb_user_commands of
+      { user_commands: User_command.Valid.t With_status.t list }
   [@@deriving register_event]
 
-(* There is no Diff.Full.E.of_yojson, so we store raw Yojson.Safe.t here so that
- * we can still deserialize something to inspect *)
-type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
+type Structured_log_events.t += Applying_diffs of {diffs: Diff.Repr.t list}
   [@@deriving register_event {msg= "Applying diffs: $diffs"}]
 
 let genesis_root_data ~precomputed_values =
@@ -325,7 +325,7 @@ let add_breadcrumb_exn t breadcrumb =
         ) ]
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
-    (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
+    (Applying_diffs {diffs= List.map ~f:(fun (E x) -> Diff.to_repr x) diffs}) ;
   Catchup_tree.apply_diffs t.catchup_tree diffs ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
@@ -353,12 +353,8 @@ let add_breadcrumb_exn t breadcrumb =
     (* N.B.: surprisingly, the JSON does not contain a tag indicating whether we have a signed
        command or snapp command
     *)
-    [%str_log' trace t.logger] Added_breadcrumb_user_commands
-      ~metadata:
-        [ ( "user_commands"
-          , `List
-              (List.map user_cmds
-                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
+    [%str_log' trace t.logger]
+      (Added_breadcrumb_user_commands {user_commands= user_cmds}) ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

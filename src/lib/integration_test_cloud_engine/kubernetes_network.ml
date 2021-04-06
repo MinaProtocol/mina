@@ -11,6 +11,7 @@ module Node = struct
     ; cluster: string
     ; namespace: string
     ; pod_id: string
+    ; container_id: string (* name of the container inside the pod *)
     ; graphql_enabled: bool
     ; network_keypair: Network_keypair.t option }
 
@@ -20,18 +21,17 @@ module Node = struct
 
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
-  let run_in_postgresql_container node ~n ~cmd =
+  let run_in_postgresql_container node ~cmd =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
-      Printf.sprintf
-        "%s -c archive-%d-postgresql exec -i archive-%d-postgresql-0 -- %s"
-        base_kube_cmd n n cmd
+      Printf.sprintf "%s -c %s exec -i %s-0 -- %s" base_kube_cmd
+        node.container_id node.container_id cmd
     in
     let%bind cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
 
-  let get_logs_in_container container node =
+  let get_logs_in_container node =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let pod_cmd =
@@ -40,7 +40,7 @@ module Node = struct
     let%bind cwd = Unix.getcwd () in
     let%bind pod = Util.run_cmd_exn cwd "sh" ["-c"; pod_cmd] in
     let kubectl_cmd =
-      Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd container
+      Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd node.container_id
         node.namespace pod
     in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -50,8 +50,8 @@ module Node = struct
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
       Printf.sprintf
-        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
-        base_kube_cmd base_kube_cmd node.pod_id cmd
+        "%s -c %s exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
+        base_kube_cmd node.container_id base_kube_cmd node.pod_id cmd
     in
     let%bind.Deferred.Let_syntax cwd = Unix.getcwd () in
     Malleable_error.return (Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd])
@@ -178,6 +178,16 @@ module Node = struct
         }
       }
     |}]
+
+    module Best_chain =
+    [%graphql
+    {|
+      query {
+        bestChain {
+          stateHash
+        }
+      }
+    |}]
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
@@ -274,6 +284,20 @@ module Node = struct
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
+  let best_chain ~logger t =
+    let open Malleable_error.Let_syntax in
+    let query = Graphql.Best_chain.make () in
+    let%bind result =
+      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
+        ~query_name:"best_chain" query
+    in
+    match result#bestChain with
+    | None | Some [||] ->
+        Malleable_error.of_string_hard_error "failed to get best chains"
+    | Some chain ->
+        Malleable_error.return
+        @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
+
   let get_balance ~logger t ~account_id =
     let open Malleable_error.Let_syntax in
     [%log info] "Getting account balance"
@@ -347,9 +371,11 @@ module Node = struct
 
   let dump_archive_data ~logger (t : t) ~data_file =
     let open Malleable_error.Let_syntax in
+    [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
+      t.container_id ;
     let%map data =
       Deferred.bind ~f:Malleable_error.return
-        (run_in_postgresql_container t ~n:1
+        (run_in_postgresql_container t
            ~cmd:
              "pg_dump --create --no-owner \
               postgres://postgres:foobar@localhost:5432/archive")
@@ -360,8 +386,10 @@ module Node = struct
 
   let dump_container_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      t.pod_id t.container_id ;
     let%map logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container "coda" t)
+      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -369,9 +397,11 @@ module Node = struct
 
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping precomputed blocks from logs for node %s" t.pod_id ;
+    [%log info]
+      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
+      t.pod_id t.container_id ;
     let%bind logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container "coda" t)
+      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -435,9 +465,10 @@ module Node = struct
                 "File already exists for precomputed block with state hash %s"
                 state_hash
           | _ ->
-              [%log info] "Dumping precomputed block with state hash %s"
-                state_hash ;
-              Out_channel.with_file (state_hash ^ ".json") ~f:(fun out_ch ->
+              [%log info]
+                "Dumping precomputed block with state hash %s to file %s"
+                state_hash filename ;
+              Out_channel.with_file filename ~f:(fun out_ch ->
                   Out_channel.output_string out_ch block ) )
     in
     Malleable_error.return ()

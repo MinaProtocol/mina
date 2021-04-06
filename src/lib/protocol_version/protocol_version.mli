@@ -7,6 +7,10 @@ module Stable : sig
   end
 end]
 
+val to_yojson : t -> Yojson.Safe.t
+
+val of_yojson : Yojson.Safe.t -> (t, string) Core_kernel.Result.t
+
 val create_exn : major:int -> minor:int -> patch:int -> t
 
 val create_opt : major:int -> minor:int -> patch:int -> t option
