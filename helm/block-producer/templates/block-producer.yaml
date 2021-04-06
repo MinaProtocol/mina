@@ -177,6 +177,9 @@ spec:
           {{- if $.Values.coda.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}
+          {{- if $.Values.coda.logPrecomputedBlocks }}
+          "-log-precomputed-blocks", "true",
+          {{- end -}}
           {{- if $config.isolated }}
           "-isolate-network", "true",
           {{- end -}}
@@ -352,5 +355,21 @@ spec:
   - name: tcp-p2p
     port: {{ default $.Values.coda.ports.p2p $config.externalPort }}
     targetPort: external-port
+---
+{{- if $.Values.coda.exposeGraphql }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $config.name }}-graphql
+spec:
+  type: NodePort
+  publishNotReadyAddresses: true
+  selector:
+    app: {{ $config.name }}
+  ports:
+  - name: http-graphql
+    protocol: TCP
+    port: {{ $.Values.coda.ports.graphql }}
+{{- end }}
 ---
 {{ end }}

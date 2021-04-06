@@ -23,6 +23,7 @@ module Transactions = struct
             ( User_command.Stable.V1.t
             , Transaction_hash.Stable.V1.t )
             With_hash.Stable.V1.t
+            With_status.Stable.V1.t
             list
         ; fee_transfers:
             (Fee_transfer.Single.Stable.V1.t * Fee_transfer_type.Stable.V1.t)
@@ -70,12 +71,12 @@ let participants ~next_available_token
   let _next_available_token, user_command_set =
     List.fold commands ~init:(next_available_token, empty)
       ~f:(fun (next_available_token, set) user_command ->
-        ( User_command.next_available_token user_command.data
+        ( User_command.next_available_token user_command.data.data
             next_available_token
         , union set
             ( of_list
             @@ User_command.accounts_accessed ~next_available_token
-                 user_command.data ) ) )
+                 user_command.data.data ) ) )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
@@ -95,7 +96,7 @@ let participant_pks
         union set @@ of_list
         @@ List.map ~f:Account_id.public_key
         @@ User_command.accounts_accessed
-             ~next_available_token:Token_id.invalid user_command.data )
+             ~next_available_token:Token_id.invalid user_command.data.data )
   in
   let fee_transfer_participants =
     List.fold fee_transfers ~init:empty ~f:(fun set (ft, _) ->
@@ -144,7 +145,7 @@ let of_transition external_transition tracked_participants
         , next_available_token )
       ~f:(fun (acc_transactions, next_available_token) -> function
         | {data= Command (Snapp_command _); _} -> failwith "Not implemented"
-        | {data= Command command; _} -> (
+        | {data= Command command; status} -> (
             let command = (command :> User_command.t) in
             let should_include_transaction command participants =
               List.exists
@@ -165,8 +166,10 @@ let of_transition external_transition tracked_participants
                 (* Should include this command. *)
                 ( { acc_transactions with
                     commands=
-                      { With_hash.data= command
-                      ; hash= Transaction_hash.hash_command command }
+                      { With_status.data=
+                          { With_hash.data= command
+                          ; hash= Transaction_hash.hash_command command }
+                      ; status }
                       :: acc_transactions.commands }
                 , User_command.next_available_token command
                     next_available_token ) )

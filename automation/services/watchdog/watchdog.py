@@ -1,5 +1,5 @@
 # Example of running locally
-# SEED_PEERS_URL=https://raw.githubusercontent.com/MinaProtocol/coda-automation/bug-bounty-net/terraform/testnets/testworld/peers.txt LOCAL_KUBERNETES=true KUBERNETES_NAMESPACE=watchdog-test METRICS_PORT=8000 python3 watchdog.py
+# SEED_PEERS_URL=https://storage.googleapis.com/seed-lists/mainnet_seeds.txt LOCAL_KUBERNETES=true KUBERNETES_NAMESPACE=watchdog-test METRICS_PORT=8000 python3 watchdog.py
 
 from prometheus_client import start_http_server, Summary
 import time
@@ -27,6 +27,7 @@ def main():
 
   nodes_synced_near_best_tip = Gauge('Coda_watchdog_nodes_synced_near_best_tip', 'Description of gauge')
   nodes_synced = Gauge('Coda_watchdog_nodes_synced', 'Description of gauge')
+  nodes_queried = Gauge('Coda_watchdog_nodes_queried', 'Number of nodes that responded to the last status query')
   prover_errors = Counter('Coda_watchdog_prover_errors', 'Description of gauge')
   pods_with_no_new_logs = Gauge('Coda_watchdog_pods_with_no_new_logs', 'Number of nodes whose latest log is older than 10 minutes')
 
@@ -37,7 +38,7 @@ def main():
 
   fns = [
     ( lambda: metrics.collect_cluster_crashes(v1, namespace, cluster_crashes), 30*60 ),
-    ( lambda: metrics.collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors), 60*60 ),
+    ( lambda: metrics.collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, prover_errors), 60*60 ),
     ( lambda: metrics.check_seed_list_up(v1, namespace, seeds_reachable), 60*60 ),
     ( lambda: metrics.pods_with_no_new_logs(v1, namespace, pods_with_no_new_logs), 60*10 ),
   ]
