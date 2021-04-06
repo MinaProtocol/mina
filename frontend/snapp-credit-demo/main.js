@@ -9,7 +9,7 @@ const isDev = process.env.NODE_ENV !== "production" ? true : false;
 const isMac = process.platform === "darwin" ? true : false;
 let mainWindow;
 
-const createMainWindow = async () => {
+const createMainWindow = () => {
   mainWindow = new BrowserWindow({
     title: "SNAPP Credit Check",
     width: isDev ? 1200 : 600,
@@ -21,7 +21,6 @@ const createMainWindow = async () => {
       nodeIntegration: true,
     },
   });
-
   if (isDev) {
     mainWindow.webContents.openDevTools();
   }
@@ -87,6 +86,12 @@ app.on("window-all-closed", () => {
   }
 });
 
+/**
+ * Initiate the main workflow of the application. We start by attempting to log
+ * the user into the credit provider to web scrape. If that is done successfully,
+ * we attempt to generate a SNAPP proof in addition to showing a message to the user.
+ * If this process fails, we show an error message to the user.
+ */
 ipcMain.on(LOGIN, (_, { ethAddress, email, password, domain }) => {
   scrape({ email, password, mainWindow, domain })
     .then((creditScore) => {
