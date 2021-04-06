@@ -180,7 +180,9 @@ LIMIT 1
       match (last_relevant_command_info_opt, timing_info_opt) with
       | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
-          (* TODO: This means they requested a block from before account creation. Should it error instead? Need to clarify with Coinbase team. *)
+          (* This means they requested a block from before account creation;
+           * this is ambiguous in the spec but Coinbase confirmed we can return 0.
+           * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), None ->
           (* This account has no special vesting, so just use its last known balance *)
