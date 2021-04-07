@@ -1629,6 +1629,7 @@ let generate_libp2p_keypair =
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd
+              ~pids:(Child_processes.Termination.create_pid_table ())
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
           with
