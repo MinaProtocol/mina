@@ -367,3 +367,22 @@ let commands (t : t) =
 let completed_works (t : t) =
   (fst t.diff).completed_works
   @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
+
+let net_return (t : t) =
+  let open Currency in
+  let commands_return =
+    List.fold ~init:Fee.zero (commands t) ~f:(fun sum cmd ->
+        try
+          Option.value_exn
+            (Fee.( + ) sum (User_command.fee_exn (With_status.data cmd)))
+        with _ -> sum )
+  in
+  let completed_works_fees =
+    List.fold ~init:Fee.zero (completed_works t) ~f:(fun sum work ->
+        try Option.value_exn (Fee.( + ) sum work.Transaction_snark_work.fee)
+        with _ -> sum )
+  in
+  Amount.(
+    Signed.(
+      of_unsigned (of_fee commands_return)
+      + negate (of_unsigned (of_fee completed_works_fees))))
