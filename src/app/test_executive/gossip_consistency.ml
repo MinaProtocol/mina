@@ -37,7 +37,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let n = List.length producers in
     List.mapi producers ~f:(fun i node ->
         let%map () = wait_for t (Wait_condition.node_to_initialize node) in
-        [%log info] "Block producer %d (of %d) initialized" (i + 1) n ;
+        [%log info]
+          "gossip_consistency test: Block producer %d (of %d) initialized"
+          (i + 1) n ;
         () )
     |> Malleable_error.all_unit
 
@@ -48,23 +50,35 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       if n = 0 then return ()
       else
         let%bind () =
-          Network.Node.must_send_payment ~retry_on_graphql_error:false ~logger
-            ~sender_pub_key ~receiver_pub_key ~amount ~fee node
+          let%map () =
+            Network.Node.must_send_payment ~retry_on_graphql_error:false ~logger
+              ~sender_pub_key ~receiver_pub_key ~amount ~fee node
+          in
+          [%log info] "gossip_consistency test: payment #%d sent." n ;
+          ()
         in
         go (n - 1)
     in
     go n
 
-  let wait_for_payments ~dsl ~sender_pub_key ~receiver_pub_key ~amount n =
+  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount
+      n =
     let open Malleable_error.Let_syntax in
     let rec go n =
       if n = 0 then return ()
       else
         (* confirm payment *)
         let%bind () =
-          wait_for dsl
-            (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
-               ~receiver_pub_key ~amount)
+          let%map () =
+            wait_for dsl
+              (Wait_condition.payment_to_be_included_in_frontier
+                 ~sender_pub_key ~receiver_pub_key ~amount)
+          in
+          [%log info]
+            "gossip_consistency test: payment #%d successfully included in \
+             frontier."
+            n ;
+          ()
         in
         go (n - 1)
     in
@@ -73,24 +87,32 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
+    [%log info] "gossip_consistency test: starting..." ;
     let%bind () = wait_for_all_to_initialize ~logger network t in
+    [%log info] "gossip_consistency test: done waiting for initializations" ;
     let receiver_bp = Caml.List.nth (Network.block_producers network) 0 in
     let%bind receiver_pub_key = Util.pub_key_of_node receiver_bp in
     let sender_bp =
       Core_kernel.List.nth_exn (Network.block_producers network) 1
     in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let num_payments = 10 in
+    let num_payments = 5 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in
+    [%log info] "gossip_consistency test: will now send %d payments"
+      num_payments ;
     let%bind () =
       send_payments ~logger ~sender_pub_key ~receiver_pub_key ~node:sender_bp
         ~fee ~amount num_payments
     in
+    [%log info]
+      "gossip_consistency test: sending payments done. will now wait for \
+       payments" ;
     let%bind () =
-      wait_for_payments ~dsl:t ~sender_pub_key ~receiver_pub_key ~amount
-        num_payments
+      wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key
+        ~amount num_payments
     in
+    [%log info] "gossip_consistency test: waiting for payments done" ;
     let gossip_states = (network_state t).gossip_received in
     let ratio =
       Gossip_state.consistency_ratio Transactions_gossip
@@ -104,17 +126,42 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Set.(size (union ss))
     in
-    [%log info] "Transactions seen %d" num_transactions_seen ;
-    [%log info] "Consistency ratio %f" ratio ;
+    [%log info] "gossip_consistency test: Transactions seen %d"
+      num_transactions_seen ;
+    [%log info] "gossip_consistency test: Consistency ratio %f" ratio ;
     let%bind () =
-      if num_transactions_seen < 9 then
-        Malleable_error.soft_error_string ~value:()
-          (Printf.sprintf "transactions seen = %d < 9" num_transactions_seen)
+      if num_transactions_seen < num_payments - 1 then (
+        let result =
+          Malleable_error.soft_error_string ~value:()
+            (Printf.sprintf
+               "transactions seen = %d, which is less than (numpayments = %d) \
+                - 1"
+               num_transactions_seen (num_payments - 1))
+        in
+        [%log info]
+          "gossip_consistency test: test failure.  transactions seen = %d, \
+           which is less than (numpayments = %d) - 1"
+          num_transactions_seen num_payments ;
+        result )
       else Malleable_error.ok_unit
     in
+    [%log info] "gossip_consistency test: num transactions OK" ;
     let threshold = 0.95 in
-    if ratio < threshold then
-      Malleable_error.soft_error_string ~value:()
-        (Printf.sprintf "consistency ratio = %f < %f" ratio threshold)
-    else Malleable_error.ok_unit
+    if ratio < threshold then (
+      let result =
+        Malleable_error.soft_error_string ~value:()
+          (Printf.sprintf
+             "consistency ratio = %f, which is less than threshold = %f" ratio
+             threshold)
+      in
+      [%log info]
+        "gossip_consistency test: test failure. consistency ratio = %f, which \
+         is less than threshold = %f"
+        ratio threshold ;
+      result )
+    else
+      let result = Malleable_error.ok_unit in
+      [%log info] "gossip_consistency test: num transactions OK" ;
+      [%log info] "gossip_consistency test: test finished successfully!!" ;
+      result
 end
