@@ -820,18 +820,24 @@ module Rejected_blocks = struct
   let subsystem = "Rejected_blocks"
 
   let no_common_ancestor =
-    let help = "The number of rejected blocks due to no common ancestor" in
+    let help = "The number of blocks rejected due to no common ancestor" in
     Counter.v "no_common_ancestor" ~help ~namespace ~subsystem
 
   let invalid_proof =
-    let help = "The number of rejected blocks due to invalid proof" in
+    let help = "The number of blocks rejected due to invalid proof" in
     Counter.v "invalid_proof" ~help ~namespace ~subsystem
 
   let received_late =
     let help =
-      "The number of rejected blocks due to blocks being received too late"
+      "The number of blocks rejected due to blocks being received too late"
     in
     Counter.v "received_late" ~help ~namespace ~subsystem
+
+  let received_early =
+    let help =
+      "The number of blocks rejected due to blocks being received too early"
+    in
+    Counter.v "received_early" ~help ~namespace ~subsystem
 end
 
 module Object_lifetime_statistics = struct

@@ -99,6 +99,15 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                      ] ) )
          | Error `Disconnected ->
              Mina_metrics.(Counter.inc_one Rejected_blocks.no_common_ancestor) ;
+             [%log error]
+               ~metadata:
+                 [ ("state_hash", State_hash.to_yojson transition_hash)
+                 ; ("reason", `String "disconnected block")
+                 ; ( "protocol_state"
+                   , External_transition.protocol_state transition
+                     |> Protocol_state.value_to_yojson ) ]
+               "Validation error: external transition with state hash \
+                $state_hash was rejected for reason $reason" ;
              Trust_system.record_envelope_sender trust_system logger sender
                ( Trust_system.Actions.Disconnected_chain
                , Some
