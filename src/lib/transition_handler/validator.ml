@@ -98,6 +98,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                      ; ("transition", External_transition.to_yojson transition)
                      ] ) )
          | Error `Disconnected ->
+             Mina_metrics.(Counter.inc_one Rejected_blocks.no_common_ancestor) ;
              Trust_system.record_envelope_sender trust_system logger sender
                ( Trust_system.Actions.Disconnected_chain
                , Some

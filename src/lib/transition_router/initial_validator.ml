@@ -87,6 +87,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
   | `Invalid_proof ->
+      Mina_metrics.(Counter.inc_one Rejected_blocks.invalid_proof) ;
       punish Sent_invalid_proof None
   | `Invalid_delta_transition_chain_proof ->
       punish Sent_invalid_transition_chain_merkle_proof None
@@ -95,6 +96,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
   | `Invalid_genesis_protocol_state ->
       punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
+      Mina_metrics.(Counter.inc_one Rejected_blocks.received_late) ;
       punish
         (Gossiped_old_transition (slot_diff, delta))
         (Some
