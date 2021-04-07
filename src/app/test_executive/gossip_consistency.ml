@@ -114,10 +114,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "gossip_consistency test: waiting for payments done" ;
     let gossip_states = (network_state t).gossip_received in
-    let ratio =
-      Gossip_state.consistency_ratio Transactions_gossip
-        (Map.data (network_state t).gossip_received)
-    in
     let num_transactions_seen =
       let open Gossip_state in
       let ss =
@@ -126,9 +122,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       in
       Set.(size (union ss))
     in
-    [%log info] "gossip_consistency test: Transactions seen %d"
+    [%log info] "gossip_consistency test: num_transactions_seen = %d"
       num_transactions_seen ;
-    [%log info] "gossip_consistency test: Consistency ratio %f" ratio ;
     let%bind () =
       if num_transactions_seen < num_payments - 1 then (
         let result =
@@ -136,32 +131,41 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             (Printf.sprintf
                "transactions seen = %d, which is less than (numpayments = %d) \
                 - 1"
-               num_transactions_seen (num_payments - 1))
+               num_transactions_seen num_payments)
         in
         [%log info]
-          "gossip_consistency test: test failure.  transactions seen = %d, \
+          "gossip_consistency test: TEST FAILURE.  transactions seen = %d, \
            which is less than (numpayments = %d) - 1"
           num_transactions_seen num_payments ;
         result )
-      else Malleable_error.ok_unit
+      else
+        let result = Malleable_error.ok_unit in
+        [%log info] "gossip_consistency test: num_transactions_seen OK" ;
+        result
     in
-    [%log info] "gossip_consistency test: num transactions OK" ;
+    let ratio =
+      Gossip_state.consistency_ratio Transactions_gossip
+        (Map.data (network_state t).gossip_received)
+    in
+    [%log info] "gossip_consistency test: consistency ratio = %f" ratio ;
     let threshold = 0.95 in
-    if ratio < threshold then (
-      let result =
-        Malleable_error.soft_error_string ~value:()
-          (Printf.sprintf
-             "consistency ratio = %f, which is less than threshold = %f" ratio
-             threshold)
-      in
-      [%log info]
-        "gossip_consistency test: test failure. consistency ratio = %f, which \
-         is less than threshold = %f"
-        ratio threshold ;
-      result )
-    else
-      let result = Malleable_error.ok_unit in
-      [%log info] "gossip_consistency test: num transactions OK" ;
-      [%log info] "gossip_consistency test: test finished successfully!!" ;
-      result
+    let%map () =
+      if ratio < threshold then (
+        let result =
+          Malleable_error.soft_error_string ~value:()
+            (Printf.sprintf
+               "consistency ratio = %f, which is less than threshold = %f"
+               ratio threshold)
+        in
+        [%log info]
+          "gossip_consistency test: TEST FAILURE. consistency ratio = %f, \
+           which is less than threshold = %f"
+          ratio threshold ;
+        result )
+      else
+        let result = Malleable_error.ok_unit in
+        [%log info] "gossip_consistency test: consistency ratio OK" ;
+        result
+    in
+    [%log info] "gossip_consistency test: test finished!!"
 end
