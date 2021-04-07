@@ -116,7 +116,7 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let precomputed_values = Precomputed_values.compiled
+let precomputed_values = Precomputed_values.compiled_inputs
 
 let state_body =
   Mina_state.(

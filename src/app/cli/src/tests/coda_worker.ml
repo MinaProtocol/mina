@@ -354,7 +354,7 @@ module T = struct
           ()
       in
       let%bind precomputed_values, _runtime_config =
-        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:true
           ~proof_level:None runtime_config
         >>| Or_error.ok_exn
       in
