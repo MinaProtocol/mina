@@ -1420,6 +1420,8 @@ let internal_commands logger =
           let%bind verifier =
             Verifier.create ~logger
               ~proof_level:Genesis_constants.Proof_level.compiled
+              ~constraint_constants:
+                Genesis_constants.Constraint_constants.compiled
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
           in
           let%bind result =

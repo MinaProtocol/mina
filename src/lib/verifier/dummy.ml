@@ -6,7 +6,7 @@ type t = unit
 
 type ledger_proof = Ledger_proof.t
 
-let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
+let create ~logger:_ ~proof_level ~constraint_constants:_ ~pids:_ ~conf_dir:_ =
   match proof_level with
   | Genesis_constants.Proof_level.Full ->
       failwith "Unable to handle proof-level=Full"
