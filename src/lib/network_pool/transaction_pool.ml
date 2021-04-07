@@ -1697,6 +1697,7 @@ let%test_module _ =
                   List.map ~f:mk_with_status @@ List.take independent_cmds 2
               ; reorg_best_tip= true }
           in
+          (*first cmd from removed_commands gets replaced by cmd2 (same sender), cmd1 is invalid because of insufficient balance, and so only the second cmd from removed_commands is expected to be in the pool*)
           assert_pool_txs [List.nth_exn independent_cmds' 1] ;
           Deferred.unit )
 

@@ -634,7 +634,9 @@ let handle_committed_txn :
           |> Fn.flip remove_all_by_fee_and_hash_and_expiration_exn first_cmd
         in
         let new_queued_cmds, currency_reserved'', dropped_cmds =
-          if Mina_base.Account.Nonce.equal first_nonce fee_payer_nonce then
+          (*removed the first cmd, check if there are anymore committed transactions from the fee payer*)
+          if Mina_base.Account.Nonce.(equal (succ first_nonce) fee_payer_nonce)
+          then
             (* remove user_commands that consume more currency than what the latest fee_payer_balance is*)
             drop_until_sufficient_balance ~constraint_constants
               (rest_cmds, currency_reserved')
