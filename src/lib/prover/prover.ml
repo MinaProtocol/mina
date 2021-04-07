@@ -158,7 +158,7 @@ module Worker_state = struct
                      (Protocol_state.hash next_state)
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Precomputed_values.compiled_base_proof )
+                            ~proof:Mina_base.Proof.blockchain_dummy )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
