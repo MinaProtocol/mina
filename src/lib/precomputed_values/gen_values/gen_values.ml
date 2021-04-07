@@ -32,25 +32,32 @@ module type S = sig
 
   val blockchain_verification : Parsetree.expression
 
-  val key_hashes : Parsetree.expression
+  val key_hashes : Parsetree.expression Lazy.t
 end
 
 let hashes =
-  let module E = Ppxlib.Ast_builder.Make (struct
-    let loc = Location.none
-  end) in
-  let open E in
-  let f (_, x) = estring (Core.Md5.to_hex x) in
-  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let proof_level = Genesis_constants.Proof_level.compiled in
-  let ts =
-    Transaction_snark.constraint_system_digests ~constraint_constants ()
-  in
-  let bs =
-    Blockchain_snark.Blockchain_snark_state.constraint_system_digests
-      ~proof_level ~constraint_constants ()
-  in
-  elist (List.map ts ~f @ List.map bs ~f)
+  lazy
+    (let constraint_constants =
+       Genesis_constants.Constraint_constants.compiled
+     in
+     let proof_level = Genesis_constants.Proof_level.compiled in
+     let ts =
+       Transaction_snark.constraint_system_digests ~constraint_constants ()
+     in
+     let bs =
+       Blockchain_snark.Blockchain_snark_state.constraint_system_digests
+         ~proof_level ~constraint_constants ()
+     in
+     ts @ bs)
+
+let hashes_to_expr hashes =
+  let open Ppxlib.Ast_builder.Default in
+  let loc = Location.none in
+  elist ~loc
+  @@ List.map hashes ~f:(fun (x, y) ->
+         [%expr
+           [%e estring ~loc x]
+           , Core.Md5.of_hex_exn [%e estring ~loc (Core.Md5.to_hex y)]] )
 
 module Dummy = struct
   let loc = Ppxlib.Location.none
@@ -69,7 +76,7 @@ module Dummy = struct
   let blockchain_verification =
     [%expr fun () -> Lazy.force Pickles.Verification_key.dummy]
 
-  let key_hashes = hashes
+  let key_hashes = Lazy.map ~f:hashes_to_expr hashes
 end
 
 module Make_real () = struct
@@ -83,6 +90,8 @@ module Make_real () = struct
 
   module T = Transaction_snark.Make (struct
     let constraint_constants = Genesis_constants.Constraint_constants.compiled
+
+    let proof_level = Genesis_constants.Proof_level.compiled
   end)
 
   module B = Blockchain_snark.Blockchain_snark_state.Make (struct
@@ -93,7 +102,8 @@ module Make_real () = struct
     let proof_level = Genesis_constants.Proof_level.compiled
   end)
 
-  let key_hashes = hashes
+  let key_hashes =
+    Lazy.map ~f:hashes_to_expr (Genesis_proof.digests (module T) (module B))
 
   let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
@@ -111,6 +121,7 @@ module Make_real () = struct
 
   let compiled_values =
     Genesis_proof.create_values
+      (module T)
       (module B)
       { runtime_config= Runtime_config.default
       ; constraint_constants
@@ -120,6 +131,7 @@ module Make_real () = struct
       ; genesis_epoch_data
       ; consensus_constants
       ; protocol_state_with_hash
+      ; constraint_system_digests= None
       ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id) }
 
   let blockchain_proof_system_id =
@@ -225,9 +237,8 @@ let main () =
            ; genesis_epoch_data= Consensus.Genesis_epoch_data.for_unit_tests
            ; consensus_constants= Lazy.force Consensus.Constants.for_unit_tests
            ; protocol_state_with_hash
+           ; constraint_system_digests= lazy [%e Lazy.force M.key_hashes]
            ; genesis_proof= Mina_base.Proof.blockchain_dummy })
-
-      let key_hashes = [%e M.key_hashes]
 
       let blockchain_verification = [%e M.blockchain_verification]
 
@@ -257,6 +268,7 @@ let main () =
            ; genesis_epoch_data
            ; consensus_constants
            ; protocol_state_with_hash
+           ; constraint_system_digests= Some [%e Lazy.force M.key_hashes]
            ; blockchain_proof_system_id= Some (blockchain_proof_system_id ())
            })
 
@@ -274,6 +286,7 @@ let main () =
                  ; genesis_epoch_data= inputs.genesis_epoch_data
                  ; consensus_constants= inputs.consensus_constants
                  ; protocol_state_with_hash= inputs.protocol_state_with_hash
+                 ; constraint_system_digests= lazy [%e Lazy.force M.key_hashes]
                  ; genesis_proof= compiled_base_proof }) )
         | None ->
             None]
