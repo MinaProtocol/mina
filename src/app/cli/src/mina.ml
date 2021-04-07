@@ -184,6 +184,14 @@ let setup_daemon logger =
         (sprintf
            "WAIT-TIME in ms before a snark-work is reassigned (default: %dms)"
            Cli_lib.Default.work_reassignment_wait)
+  and block_reward_threshold =
+    flag "--minimum-block-reward" ~aliases:["minimum-block-reward"]
+      ~doc:
+        "AMOUNT Minimum reward a block produced by the node should have. \
+         Empty blocks are created if the rewards are lower than the specified \
+         threshold (default: No threshold, transactions and coinbase will be \
+         included as long as the required snark work is included)"
+      (optional txn_amount)
   and enable_tracing =
     flag "--tracing" ~aliases:["tracing"] no_arg
       ~doc:"Trace into $config-directory/trace/$pid.trace"
@@ -1082,7 +1090,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
-             ~upload_blocks_to_gcloud ())
+             ~upload_blocks_to_gcloud ~block_reward_threshold ())
       in
       { Coda_initialization.coda
       ; client_trustlist
