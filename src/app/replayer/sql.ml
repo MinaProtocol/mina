@@ -3,24 +3,34 @@
 open Core_kernel
 
 module Block_info = struct
+  type t =
+    {id: int; global_slot: int64; state_hash: string; ledger_hash: string}
+  [@@deriving hlist]
+
+  let typ =
+    let open Archive_lib.Processor.Caqti_type_spec in
+    let spec = Caqti_type.[int; int64; string; string] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
   (* find all blocks, working back from block with given state hash *)
   let query =
-    Caqti_request.collect Caqti_type.string
-      Caqti_type.(tup3 int int64 string)
+    Caqti_request.collect Caqti_type.string typ
       {sql| WITH RECURSIVE chain AS (
 
-              SELECT id,parent_id,global_slot,ledger_hash FROM blocks b WHERE b.state_hash = ?
+              SELECT id,parent_id,global_slot,state_hash,ledger_hash FROM blocks b WHERE b.state_hash = ?
 
               UNION ALL
 
-              SELECT b.id,b.parent_id,b.global_slot,b.ledger_hash FROM blocks b
+              SELECT b.id,b.parent_id,b.global_slot,b.state_hash,b.ledger_hash FROM blocks b
 
               INNER JOIN chain
 
               ON b.id = chain.parent_id AND chain.id <> chain.parent_id
            )
 
-           SELECT id,global_slot,ledger_hash FROM chain c
+           SELECT id,global_slot,state_hash,ledger_hash FROM chain c
 
       |sql}
 
