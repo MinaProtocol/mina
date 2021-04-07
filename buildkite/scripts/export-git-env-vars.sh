@@ -12,7 +12,6 @@ export GITTAG=$(git describe --abbrev=0 | sed 's!/!-!g; s!_!-!g')
 # Identify All Artifacts by Branch and Git Hash
 set +u
 
-# export PVKEYHASH=$(/workdir/_build/default/src/app/cli/src/mina.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 
 # Everything that uses this is doing a testnet_postake_medium_curves build, and
