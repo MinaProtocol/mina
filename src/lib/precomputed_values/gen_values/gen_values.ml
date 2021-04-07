@@ -20,10 +20,13 @@ let use_dummy_values = true
 
 [%%endif]
 
+[%%inject
+"generate_genesis_proof", generate_genesis_proof]
+
 module type S = sig
   val blockchain_proof_system_id : Parsetree.expression
 
-  val base_proof_expr : Parsetree.expression Async.Deferred.t
+  val base_proof_expr : Parsetree.expression Async.Deferred.t option
 
   val transaction_verification : Parsetree.expression
 
@@ -52,7 +55,10 @@ let hashes =
 module Dummy = struct
   let loc = Ppxlib.Location.none
 
-  let base_proof_expr = Async.return [%expr Mina_base.Proof.blockchain_dummy]
+  let base_proof_expr =
+    if generate_genesis_proof then
+      Some (Async.return [%expr Mina_base.Proof.blockchain_dummy])
+    else None
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
@@ -159,15 +165,18 @@ module Make_real () = struct
       fun () -> Lazy.force t]
 
   let base_proof_expr =
-    let%map.Async compiled_values = compiled_values in
-    [%expr
-      Core.Binable.of_string
-        (module Mina_base.Proof.Stable.Latest)
-        [%e
-          estring
-            (Binable.to_string
-               (module Mina_base.Proof.Stable.Latest)
-               compiled_values.genesis_proof)]]
+    if generate_genesis_proof then
+      Some
+        (let%map.Async compiled_values = compiled_values in
+         [%expr
+           Core.Binable.of_string
+             (module Mina_base.Proof.Stable.Latest)
+             [%e
+               estring
+                 (Binable.to_string
+                    (module Mina_base.Proof.Stable.Latest)
+                    compiled_values.genesis_proof)]])
+    else None
 end
 
 open Async
@@ -179,7 +188,14 @@ let main () =
   let (module M) =
     if use_dummy_values then (module Dummy : S) else (module Make_real () : S)
   in
-  let%bind base_proof_expr = M.base_proof_expr in
+  let%bind base_proof_expr =
+    match M.base_proof_expr with
+    | Some expr ->
+        let%map expr = expr in
+        [%expr Some [%e expr]]
+    | None ->
+        Deferred.return [%expr None]
+  in
   let structure =
     [%str
       module T = Genesis_proof.T
@@ -217,7 +233,7 @@ let main () =
 
       let transaction_verification = [%e M.transaction_verification]
 
-      let compiled =
+      let compiled_inputs =
         lazy
           (let constraint_constants =
              Genesis_constants.Constraint_constants.compiled
@@ -233,7 +249,7 @@ let main () =
                ~genesis_ledger:Test_genesis_ledger.t ~genesis_epoch_data
                ~constraint_constants ~consensus_constants
            in
-           { runtime_config= Runtime_config.default
+           { Genesis_proof.Inputs.runtime_config= Runtime_config.default
            ; constraint_constants
            ; proof_level= Genesis_constants.Proof_level.compiled
            ; genesis_constants
@@ -241,7 +257,26 @@ let main () =
            ; genesis_epoch_data
            ; consensus_constants
            ; protocol_state_with_hash
-           ; genesis_proof= compiled_base_proof })]
+           ; blockchain_proof_system_id= Some (blockchain_proof_system_id ())
+           })
+
+      let compiled =
+        match compiled_base_proof with
+        | Some compiled_base_proof ->
+            Some
+              ( lazy
+                (let inputs = Lazy.force compiled_inputs in
+                 { runtime_config= inputs.runtime_config
+                 ; constraint_constants= inputs.constraint_constants
+                 ; proof_level= inputs.proof_level
+                 ; genesis_constants= inputs.genesis_constants
+                 ; genesis_ledger= inputs.genesis_ledger
+                 ; genesis_epoch_data= inputs.genesis_epoch_data
+                 ; consensus_constants= inputs.consensus_constants
+                 ; protocol_state_with_hash= inputs.protocol_state_with_hash
+                 ; genesis_proof= compiled_base_proof }) )
+        | None ->
+            None]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
