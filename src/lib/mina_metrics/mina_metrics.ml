@@ -820,7 +820,10 @@ module Rejected_blocks = struct
   let subsystem = "Rejected_blocks"
 
   let no_common_ancestor =
-    let help = "The number of blocks rejected due to no common ancestor" in
+    let help =
+      "The number of blocks rejected due to the blocks are not select over \
+       the current root transition"
+    in
     Counter.v "no_common_ancestor" ~help ~namespace ~subsystem
 
   let invalid_proof =
