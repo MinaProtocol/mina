@@ -391,11 +391,7 @@ module Network_manager = struct
     in
     let archive_nodes =
       List.init network_config.terraform.archive_node_count ~f:(fun i ->
-<<<<<<< HEAD
           cons_node (sprintf "archive-%d" (i + 1)) "archive" None )
-=======
-          cons_node (sprintf "archive-%d-postgresql" (i + 1)) None )
->>>>>>> debugging
     in
     let nodes_by_app_id =
       let all_nodes =
