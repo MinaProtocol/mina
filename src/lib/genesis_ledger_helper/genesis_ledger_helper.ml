@@ -910,35 +910,42 @@ module Genesis_proof = struct
     ; genesis_epoch_data
     ; consensus_constants
     ; protocol_state_with_hash
+    ; constraint_system_digests= None
     ; genesis_constants }
 
   let blockchain_snark_state (inputs : Genesis_proof.Inputs.t) :
-      (module Blockchain_snark.Blockchain_snark_state.S) =
+      (module Transaction_snark.S)
+      * (module Blockchain_snark.Blockchain_snark_state.S) =
     let module T = Transaction_snark.Make (struct
       let constraint_constants = inputs.constraint_constants
+
+      let proof_level = inputs.proof_level
     end) in
-    ( module Blockchain_snark.Blockchain_snark_state.Make (struct
+    let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
       let tag = T.tag
 
       let constraint_constants = inputs.constraint_constants
 
       let proof_level = inputs.proof_level
-    end) )
+    end) in
+    ((module T), (module B))
 
   let generate b (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
-        let (module B) =
+        let (module T), (module B) =
           match b with Some b -> b | None -> blockchain_snark_state inputs
         in
         let computed_values =
           Genesis_proof.create_values
+            (module T)
             (module B)
             { genesis_ledger= inputs.genesis_ledger
             ; genesis_epoch_data= inputs.genesis_epoch_data
             ; runtime_config= inputs.runtime_config
             ; proof_level= inputs.proof_level
             ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id)
+            ; constraint_system_digests= None
             ; protocol_state_with_hash= inputs.protocol_state_with_hash
             ; genesis_constants= inputs.genesis_constants
             ; consensus_constants= inputs.consensus_constants
@@ -946,6 +953,21 @@ module Genesis_proof = struct
         in
         computed_values
     | _ ->
+        let constraint_system_digests =
+          match inputs.constraint_system_digests with
+          | Some digests ->
+              lazy digests
+          | None ->
+              lazy
+                (let (module T), (module B) =
+                   match b with
+                   | Some b ->
+                       b
+                   | None ->
+                       blockchain_snark_state inputs
+                 in
+                 Lazy.force @@ Genesis_proof.digests (module T) (module B))
+        in
         Deferred.return
           { Genesis_proof.runtime_config= inputs.runtime_config
           ; constraint_constants= inputs.constraint_constants
@@ -955,6 +977,7 @@ module Genesis_proof = struct
           ; genesis_epoch_data= inputs.genesis_epoch_data
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; constraint_system_digests
           ; genesis_proof= Mina_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
@@ -983,7 +1006,7 @@ module Genesis_proof = struct
       | Some id, _ ->
           (None, id)
       | None, Full ->
-          let ((module B) as b) = blockchain_snark_state inputs in
+          let ((_, (module B)) as b) = blockchain_snark_state inputs in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
           (None, Pickles.Verification_key.Id.dummy ())
@@ -1002,6 +1025,21 @@ module Genesis_proof = struct
       | Some file -> (
           match%map load file with
           | Ok genesis_proof ->
+              let constraint_system_digests =
+                match inputs.constraint_system_digests with
+                | Some digests ->
+                    lazy digests
+                | None ->
+                    lazy
+                      (let (module T), (module B) =
+                         match b with
+                         | Some b ->
+                             b
+                         | None ->
+                             blockchain_snark_state inputs
+                       in
+                       Lazy.force @@ Genesis_proof.digests (module T) (module B))
+              in
               Some
                 ( { Genesis_proof.runtime_config= inputs.runtime_config
                   ; constraint_constants= inputs.constraint_constants
@@ -1011,6 +1049,7 @@ module Genesis_proof = struct
                   ; genesis_epoch_data= inputs.genesis_epoch_data
                   ; consensus_constants= inputs.consensus_constants
                   ; protocol_state_with_hash= inputs.protocol_state_with_hash
+                  ; constraint_system_digests
                   ; genesis_proof }
                 , file )
           | Error err ->
@@ -1048,6 +1087,7 @@ module Genesis_proof = struct
           ; genesis_epoch_data= inputs.genesis_epoch_data
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; constraint_system_digests= compiled.constraint_system_digests
           ; genesis_proof= compiled.genesis_proof }
         in
         let%map () =
