@@ -92,6 +92,8 @@ module Worker_state = struct
              ( module struct
                module T = Transaction_snark.Make (struct
                  let constraint_constants = constraint_constants
+
+                 let proof_level = proof_level
                end)
 
                module B = Blockchain_snark.Blockchain_snark_state.Make (struct

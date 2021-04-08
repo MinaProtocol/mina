@@ -1,3 +1,4 @@
+open Core_kernel
 open Mina_base
 open Mina_state
 
@@ -12,6 +13,7 @@ module Inputs = struct
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
+    ; constraint_system_digests: (string * Md5_lib.t) list option
     ; blockchain_proof_system_id:
         (* This is only used for calculating the hash to lookup the genesis
            proof with. It is re-calculated when building the blockchain prover,
@@ -79,6 +81,7 @@ module T = struct
     ; consensus_constants: Consensus.Constants.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
+    ; constraint_system_digests: (string * Md5_lib.t) list Lazy.t
     ; genesis_proof: Proof.t }
 
   let runtime_config {runtime_config; _} = runtime_config
@@ -181,7 +184,14 @@ let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S)
     [(prev_state, blockchain_dummy); (dummy_txn_stmt, txn_dummy)]
     t.protocol_state_with_hash.data
 
-let create_values b (t : Inputs.t) =
+let digests (module T : Transaction_snark.S)
+    (module B : Blockchain_snark.Blockchain_snark_state.S) =
+  let open Lazy.Let_syntax in
+  let%bind txn_digests = T.constraint_system_digests in
+  let%map blockchain_digests = B.constraint_system_digests in
+  txn_digests @ blockchain_digests
+
+let create_values txn b (t : Inputs.t) =
   let%map.Async genesis_proof = base_proof b t in
   { runtime_config= t.runtime_config
   ; constraint_constants= t.constraint_constants
@@ -191,4 +201,5 @@ let create_values b (t : Inputs.t) =
   ; genesis_epoch_data= t.genesis_epoch_data
   ; consensus_constants= t.consensus_constants
   ; protocol_state_with_hash= t.protocol_state_with_hash
+  ; constraint_system_digests= digests txn b
   ; genesis_proof }

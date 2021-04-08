@@ -1031,6 +1031,8 @@ let create ?wallets (config : Config.t) =
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
                       ~proof_level:config.precomputed_values.proof_level
+                      ~constraint_constants:
+                        config.precomputed_values.constraint_constants
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
