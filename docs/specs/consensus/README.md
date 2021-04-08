@@ -7,7 +7,7 @@ Mina uses [Ouroboros Samasika](https://eprint.iacr.org/2020/352.pdf) for consens
 
 Samasika extends the ideas from [Ouroboros Genesis](https://eprint.iacr.org/2018/378.pdf) and [Ouroboros Praos](https://eprint.iacr.org/2017/573.pdf) to the succinct blockchain setting, where the complexity of fully verifying the entire blockchain is independent of chain length.  The name Samasika comes from the Sanskrit word, meaning small or succinct.
 
-This documents specifies its structures, algorithms and protocol.
+This documents specifies required structures, algorithms and protocol details.
 
 **Table of Contents**
 * [1 Constants](#1-constants)
@@ -531,7 +531,7 @@ fn getMinDen(C) -> density
 
 # 4 Protocol
 
-This section specifies the consensus protocol in terms of events and prescribed actions that MUST be implemented by a compatible peer.  The supported set of consensus events are:
+This section specifies the consensus protocol in terms of events and how they MUST be implemented by a compatible peer.  The required events are:
 * [`Initialize consensus`](#41-initialize-consensus)
 * [`Select chain`](#42-select-chain)
 * [`Produce block`](#43-produce-block)
@@ -541,24 +541,24 @@ Additionally there are certain local data members that all peers MUST maintain i
 | Parameter   | Description |
 | - | - |
 | `genesis_block` | The initial block in the blockchain |
-| `neighbors` | Set of connections to neighboring peers |
-| `chains`    | Set of known (succinct) candidate chains |
-| `chain`     | Currently selected chain according to the chain selection algorithm (i.e. secure chain) |
+| `neighbors`     | Set of connections to neighboring peers |
+| `chains`        | Set of known (succinct) candidate chains |
+| `tip`           | Currently selected chain according to the chain selection algorithm (i.e. secure chain) |
 
 How these are represented is up to the implementation, but careful consideration must be given to scalability.
 
-In the following description we use _dot notation_ to refer the local data members of peers. For example, given peer `P`, we use `P.genesis_block` and `P.chain`, to refer to the genesis block and currently selected chain, respectively.
+In the following description we use _dot notation_ to refer the local data members of peers. For example, given peer `P`, we use `P.genesis_block` and `P.tip`, to refer to the genesis block and currently selected chain, respectively.
 
 ## 4.1 Initialize consensus
 
 Things a peer MUST do to initialize consensus includes
 * Load the genesis block
 * Get head of the current chain
-* Decide if we should bootstrap or sync
+* Decide if peer should bootstrap or sync
 
 ## 4.2 Select chain
 
-A chain selection event is triggered anytime a block is added to any of a peer's chains.  The peer must apply the fork rules from the [Chain Selection Rules Section](#32-chain-selection).
+A chain selection event is triggered each time a block is added to one of the peer's chains.  The peer must apply the fork rules from the [Chain Selection Rules Section](#32-chain-selection) to determine which is the best chain.  It is important that any invalid chains are discarded.
 
 ```rust
 fn Peer.selectChain(Chains) -> ()
