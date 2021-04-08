@@ -162,9 +162,11 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             if Currency.Amount.(net_return >= threshold) then diff
             else (
               [%log info]
-                "Block reward is less than the min-block-reward $threshold, \
-                 creating empty block"
-                ~metadata:[("threshold", Currency.Amount.to_yojson threshold)] ;
+                "Block reward $reward is less than the min-block-reward \
+                 $threshold, creating empty block"
+                ~metadata:
+                  [ ("threshold", Currency.Amount.to_yojson threshold)
+                  ; ("reward", Currency.Amount.to_yojson net_return) ] ;
               Ok Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff )
         | _ ->
             diff
