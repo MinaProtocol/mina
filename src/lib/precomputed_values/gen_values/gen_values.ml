@@ -28,10 +28,6 @@ module type S = sig
 
   val base_proof_expr : Parsetree.expression Async.Deferred.t option
 
-  val transaction_verification : Parsetree.expression
-
-  val blockchain_verification : Parsetree.expression
-
   val key_hashes : Parsetree.expression Lazy.t
 end
 
@@ -69,12 +65,6 @@ module Dummy = struct
 
   let blockchain_proof_system_id =
     [%expr fun () -> Pickles.Verification_key.Id.dummy ()]
-
-  let transaction_verification =
-    [%expr fun () -> Lazy.force Pickles.Verification_key.dummy]
-
-  let blockchain_verification =
-    [%expr fun () -> Lazy.force Pickles.Verification_key.dummy]
 
   let key_hashes = Lazy.map ~f:hashes_to_expr hashes
 end
@@ -148,34 +138,6 @@ module Make_real () = struct
       in
       fun () -> Lazy.force t]
 
-  let transaction_verification =
-    [%expr
-      let t =
-        lazy
-          (Core.Binable.of_string
-             (module Pickles.Verification_key.Stable.Latest)
-             [%e
-               estring
-                 (Binable.to_string
-                    (module Pickles.Verification_key.Stable.Latest)
-                    (Lazy.force T.verification_key))])
-      in
-      fun () -> Lazy.force t]
-
-  let blockchain_verification =
-    [%expr
-      let t =
-        lazy
-          (Core.Binable.of_string
-             (module Pickles.Verification_key.Stable.Latest)
-             [%e
-               estring
-                 (Binable.to_string
-                    (module Pickles.Verification_key.Stable.Latest)
-                    (Lazy.force B.Proof.verification_key))])
-      in
-      fun () -> Lazy.force t]
-
   let base_proof_expr =
     if generate_genesis_proof then
       Some
@@ -239,10 +201,6 @@ let main () =
            ; protocol_state_with_hash
            ; constraint_system_digests= lazy [%e Lazy.force M.key_hashes]
            ; genesis_proof= Mina_base.Proof.blockchain_dummy })
-
-      let blockchain_verification = [%e M.blockchain_verification]
-
-      let transaction_verification = [%e M.transaction_verification]
 
       let compiled_inputs =
         lazy
