@@ -19,11 +19,15 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-let chain_id ~genesis_state_hash ~genesis_constants =
+let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
+    =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
+  let all_snark_keys =
+    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
+    |> String.concat ~sep:""
+  in
   let b2 =
     Blake2.digest_string
       (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
@@ -1020,6 +1024,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       let chain_id =
         chain_id ~genesis_state_hash
           ~genesis_constants:precomputed_values.genesis_constants
+          ~constraint_system_digests:
+            (Lazy.force precomputed_values.constraint_system_digests)
       in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
@@ -1285,11 +1291,20 @@ let snark_hashes =
       let json = Cli_lib.Flag.json in
       let print = Core.printf "%s\n%!" in
       fun () ->
-        if json then
-          print
-            (Yojson.Safe.to_string
-               (Hashes.to_yojson Precomputed_values.key_hashes))
-        else List.iter Precomputed_values.key_hashes ~f:print]
+        let hashes =
+          match Precomputed_values.compiled with
+          | Some compiled ->
+              (Lazy.force compiled).constraint_system_digests |> Lazy.force
+              |> List.map ~f:(fun (_constraint_system_id, digest) ->
+                     (* Throw away the constraint system ID to avoid changing the
+                    format of the output here.
+                 *)
+                     Md5.to_hex digest )
+          | None ->
+              []
+        in
+        if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
+        else List.iter hashes ~f:print]
 
 let internal_commands logger =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
@@ -1405,6 +1420,8 @@ let internal_commands logger =
           let%bind verifier =
             Verifier.create ~logger
               ~proof_level:Genesis_constants.Proof_level.compiled
+              ~constraint_constants:
+                Genesis_constants.Constraint_constants.compiled
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
           in
           let%bind result =

@@ -1339,9 +1339,17 @@ let%test_module _ =
 
     let consensus_constants = precomputed_values.consensus_constants
 
+    let proof_level = precomputed_values.proof_level
+
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
@@ -1415,8 +1423,6 @@ let%test_module _ =
       in
       ()
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
-
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
@@ -1427,12 +1433,7 @@ let%test_module _ =
         Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
       in
       let trust_system = Trust_system.null () in
-      let%bind config =
-        let%map verifier =
-          Verifier.create ~logger ~proof_level
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~conf_dir:None
-        in
+      let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
       let pool =
@@ -1868,12 +1869,7 @@ let%test_module _ =
             Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
           in
           let trust_system = Trust_system.null () in
-          let%bind config =
-            let%map verifier =
-              Verifier.create ~logger ~proof_level
-                ~pids:(Child_processes.Termination.create_pid_table ())
-                ~conf_dir:None
-            in
+          let config =
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
               ~verifier
           in
