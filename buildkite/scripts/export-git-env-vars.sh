@@ -13,7 +13,13 @@ export GITTAG=$(git describe --abbrev=0 | sed 's!/!-!g; s!_!-!g')
 set +u
 
 
-export PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
+
+# Everything that uses this is doing a testnet_postake_medium_curves build, and
+# we generate packages with different signatures there. Instead of trying to
+# infer a name and ending up with a silly mina-mainnet-testnet package, lets
+# just call them mina-dev.
+export PROJECT="mina-dev"
+# export PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 export BUILD_NUM=${BUILDKITE_BUILD_NUM}
 export BUILD_URL=${BUILDKITE_BUILD_URL}
