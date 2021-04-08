@@ -166,9 +166,9 @@ let main () =
     match M.base_proof_expr with
     | Some expr ->
         let%map expr = expr in
-        [%expr Some [%e expr]]
+        Some expr
     | None ->
-        Deferred.return [%expr None]
+        Deferred.return None
   in
   let structure =
     [%str
@@ -176,8 +176,6 @@ let main () =
       include T
 
       let blockchain_proof_system_id = [%e M.blockchain_proof_system_id]
-
-      let compiled_base_proof = [%e base_proof_expr]
 
       let for_unit_tests =
         lazy
@@ -231,23 +229,27 @@ let main () =
            })
 
       let compiled =
-        match compiled_base_proof with
-        | Some compiled_base_proof ->
-            Some
-              ( lazy
-                (let inputs = Lazy.force compiled_inputs in
-                 { runtime_config= inputs.runtime_config
-                 ; constraint_constants= inputs.constraint_constants
-                 ; proof_level= inputs.proof_level
-                 ; genesis_constants= inputs.genesis_constants
-                 ; genesis_ledger= inputs.genesis_ledger
-                 ; genesis_epoch_data= inputs.genesis_epoch_data
-                 ; consensus_constants= inputs.consensus_constants
-                 ; protocol_state_with_hash= inputs.protocol_state_with_hash
-                 ; constraint_system_digests= lazy [%e Lazy.force M.key_hashes]
-                 ; genesis_proof= compiled_base_proof }) )
-        | None ->
-            None]
+        [%e
+          match base_proof_expr with
+          | Some compiled_base_proof ->
+              [%expr
+                Some
+                  ( lazy
+                    (let inputs = Lazy.force compiled_inputs in
+                     { runtime_config= inputs.runtime_config
+                     ; constraint_constants= inputs.constraint_constants
+                     ; proof_level= inputs.proof_level
+                     ; genesis_constants= inputs.genesis_constants
+                     ; genesis_ledger= inputs.genesis_ledger
+                     ; genesis_epoch_data= inputs.genesis_epoch_data
+                     ; consensus_constants= inputs.consensus_constants
+                     ; protocol_state_with_hash=
+                         inputs.protocol_state_with_hash
+                     ; constraint_system_digests=
+                         lazy [%e Lazy.force M.key_hashes]
+                     ; genesis_proof= [%e compiled_base_proof] }) )]
+          | None ->
+              [%expr None]]]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
