@@ -112,7 +112,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key
         ~amount num_payments
     in
-    [%log info] "gossip_consistency test: waiting for payments done" ;
+    [%log info] "gossip_consistency test: finished waiting for payments" ;
     let gossip_states = (network_state t).gossip_received in
     let num_transactions_seen =
       let open Gossip_state in

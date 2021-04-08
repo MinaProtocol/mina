@@ -322,6 +322,12 @@ let existential_of_string_exn = function
       Event_type Block_produced
   | "Breadcrumb_added" ->
       Event_type Breadcrumb_added
+  | "Block_gossip" ->
+      Event_type Block_gossip
+  | "Snark_work_gossip" ->
+      Event_type Snark_work_gossip
+  | "Transactions_gossip" ->
+      Event_type Transactions_gossip
   | _ ->
       failwith "invalid event type string"
 
@@ -354,7 +360,10 @@ let all_event_types =
   ; Event_type Node_initialization
   ; Event_type Transition_frontier_diff_application
   ; Event_type Block_produced
-  ; Event_type Breadcrumb_added ]
+  ; Event_type Breadcrumb_added
+  ; Event_type Block_gossip
+  ; Event_type Snark_work_gossip
+  ; Event_type Transactions_gossip ]
 
 let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
     = function
@@ -428,6 +437,12 @@ let dispatch_exn : type a b c. a t -> a -> b t -> (b -> c) -> c =
   | Block_produced, Block_produced ->
       h e
   | Breadcrumb_added, Breadcrumb_added ->
+      h e
+  | Block_gossip, Block_gossip ->
+      h e
+  | Snark_work_gossip, Snark_work_gossip ->
+      h e
+  | Transactions_gossip, Transactions_gossip ->
       h e
   | _ ->
       failwith "TODO: better error message :)"
