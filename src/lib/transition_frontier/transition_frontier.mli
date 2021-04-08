@@ -20,12 +20,10 @@ module Catchup_hash_tree = Catchup_hash_tree
 
 include Frontier_intf.S
 
-type Structured_log_events.t +=
-  | Added_breadcrumb_user_commands of
-      { user_commands: User_command.Valid.t With_status.t list }
+type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
 
-type Structured_log_events.t += Applying_diffs of {diffs: Diff.Repr.t list}
+type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
   [@@deriving register_event]
 
 val max_catchup_chunk_length : int
@@ -93,21 +91,21 @@ module For_tests : sig
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
-    -> ?verifier:Verifier.t
+    -> verifier:Verifier.t
     -> precomputed_values:Precomputed_values.t
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t
 
   val gen_persistence :
        ?logger:Logger.t
-    -> ?verifier:Verifier.t
+    -> verifier:Verifier.t
     -> precomputed_values:Precomputed_values.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
-    -> ?verifier:Verifier.t
+    -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t
@@ -125,7 +123,7 @@ module For_tests : sig
 
   val gen_with_branch :
        ?logger:Logger.t
-    -> ?verifier:Verifier.t
+    -> verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> precomputed_values:Precomputed_values.t

@@ -32,19 +32,33 @@ module Worker_state = struct
   type init_arg =
     { conf_dir: string option
     ; logger: Logger.Stable.Latest.t
-    ; proof_level: Genesis_constants.Proof_level.Stable.Latest.t }
+    ; proof_level: Genesis_constants.Proof_level.Stable.Latest.t
+    ; constraint_constants:
+        Genesis_constants.Constraint_constants.Stable.Latest.t }
   [@@deriving bin_io_unversioned]
 
   type t = (module S)
 
-  let create {logger; proof_level; _} : t Deferred.t =
+  let create {logger; proof_level; constraint_constants; _} : t Deferred.t =
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
         Deferred.return
-          (let bc_vk = Precomputed_values.blockchain_verification ()
-           and tx_vk = Precomputed_values.transaction_verification () in
-           let module M = struct
+          (let module M = struct
+             module T = Transaction_snark.Make (struct
+               let constraint_constants = constraint_constants
+
+               let proof_level = proof_level
+             end)
+
+             module B = Blockchain_snark_state.Make (struct
+               let tag = T.tag
+
+               let constraint_constants = constraint_constants
+
+               let proof_level = proof_level
+             end)
+
              let verify_commands (cs : User_command.Verifiable.t list) : _ list
                  =
                let cs = List.map cs ~f:Common.check in
@@ -70,14 +84,10 @@ module Worker_state = struct
                  | `Valid_assuming (c, xs) ->
                      if all_verified then `Valid c else `Valid_assuming xs )
 
-             let verify_blockchain_snarks ts =
-               Blockchain_snark.Blockchain_snark_state.verify ts ~key:bc_vk
+             let verify_blockchain_snarks = B.Proof.verify
 
              let verify_transaction_snarks ts =
-               match
-                 Or_error.try_with (fun () ->
-                     Transaction_snark.verify ~key:tx_vk ts )
-               with
+               match Or_error.try_with (fun () -> T.verify ts) with
                | Ok result ->
                    result
                | Error e ->
@@ -87,7 +97,7 @@ module Worker_state = struct
                       snark" ;
                    failwith "Verifier crashed"
            end in
-           (module M : S))
+          (module M : S))
     | Check | None ->
         Deferred.return
         @@ ( module struct
@@ -195,7 +205,8 @@ module Worker = struct
                   list]
               , verify_commands ) }
 
-      let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
+      let init_worker_state
+          Worker_state.{conf_dir; logger; proof_level; constraint_constants} =
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
           let num_rotate = 1 in
@@ -206,7 +217,8 @@ module Worker = struct
                  ~directory:(Option.value_exn conf_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
-        Worker_state.create {conf_dir; logger; proof_level}
+        Worker_state.create
+          {conf_dir; logger; proof_level; constraint_constants}
 
       let init_connection_state ~connection:_ ~worker_state:_ () =
         Deferred.unit
@@ -258,7 +270,8 @@ let wait_safe process =
       Deferred.Or_error.fail err
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
+let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
+    t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
       ~metadata:[("err", Error_json.error_to_yojson err)] ;
@@ -289,7 +302,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
           Worker.spawn_in_foreground_exn
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
             ~shutdown_on:Disconnect ~connection_state_init_arg:()
-            {conf_dir; logger; proof_level} )
+            {conf_dir; logger; proof_level; constraint_constants} )
       >>| Result.ok_exn
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger process

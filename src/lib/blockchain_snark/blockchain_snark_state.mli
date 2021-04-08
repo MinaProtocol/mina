@@ -47,6 +47,8 @@ module type S = sig
        , Protocol_state.Value.t
        , Proof.t Async.Deferred.t )
        Pickles.Prover.t
+
+  val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
 end
 
 module Make (T : sig
