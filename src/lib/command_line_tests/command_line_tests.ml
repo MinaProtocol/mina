@@ -106,7 +106,8 @@ let%test_module "Command line tests" =
                 | Error _ when retries_remaining > 0 ->
                     Core.Printf.printf
                       "Daemon not responding.. retrying (%i/%i)\n"
-                      (retry_attempts - retries_remaining) retry_attempts ;
+                      (retry_attempts - retries_remaining)
+                      retry_attempts ;
                     let%bind () = after @@ Time.Span.of_sec retry_delay in
                     go (retries_remaining - 1)
                 | ret ->
