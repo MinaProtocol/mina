@@ -20,9 +20,9 @@ apt-get install --allow-downgrades -y curl ${PROJECT}-noprovingkeys=${VERSION}
 mina daemon --seed --proof-level none --rest-port 8080 &
 
 # Update the graphql schema
-num_retries=5
+num_retries=15
 for ((i=1;i<=$num_retries;i++)); do
-  sleep 10s
+  sleep 15s
   set +e
   make update-graphql
   status_exit_code=$?
