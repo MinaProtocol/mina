@@ -350,7 +350,8 @@ let setup_daemon logger =
         "AMOUNT Minimum reward a block produced by the node should have. \
          Empty blocks are created if the rewards are lower than the specified \
          threshold (default: No threshold, transactions and coinbase will be \
-         included as long as the required snark work is included)"
+         included as long as the required snark work is available and can be \
+         paid for)"
       (optional txn_amount)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
