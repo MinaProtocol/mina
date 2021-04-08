@@ -827,14 +827,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               None)
       ; Some Genesis_constants.Proof_level.compiled ]
   in
-  let ( constraint_constants
-      , generated_constraint_constants
-      , blockchain_proof_system_id ) =
+  let constraint_constants, blockchain_proof_system_id =
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
         ( Genesis_constants.Constraint_constants.compiled
-        , false
         , Some (Precomputed_values.blockchain_proof_system_id ()) )
     | Some config ->
         [%log info]
@@ -851,32 +848,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         in
         ( make_constraint_constants
             ~default:Genesis_constants.Constraint_constants.compiled config
-        , true
         , blockchain_proof_system_id )
   in
   let%bind () =
     match (proof_level, Genesis_constants.Proof_level.compiled) with
-    | Full, Full ->
-        if generated_constraint_constants then
-          if
-            Genesis_constants.Constraint_constants.(equal compiled)
-              constraint_constants
-          then (
-            [%log warn]
-              "This binary only supports the compiled proof constants for \
-               proof_level= Full. The 'proof' field in the configuration file \
-               should be removed." ;
-            return () )
-          else (
-            [%log fatal]
-              "This binary only supports the compiled proof constants for \
-               proof_level= Full. The 'proof' field in the configuration file \
-               does not match." ;
-            Deferred.Or_error.errorf
-              "The compiled proof constants do not match the constants in the \
-               configuration file" )
-        else return ()
-    | (Check | None), _ ->
+    | _, Full | (Check | None), _ ->
         return ()
     | Full, ((Check | None) as compiled) ->
         let str = Genesis_constants.Proof_level.to_string in
