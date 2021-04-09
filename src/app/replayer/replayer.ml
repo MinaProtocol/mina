@@ -77,8 +77,9 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_genesis_ledger
   ; target_epoch_data }
 
-(* map from global slots to expected ledger hashes *)
-let global_slot_ledger_hash_tbl : (Int64.t, Ledger_hash.t) Hashtbl.t =
+(* map from global slots to state hash, ledger hash pairs *)
+let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t
+    =
   Int64.Table.create ()
 
 (* cache of account keys *)
@@ -184,12 +185,12 @@ let epoch_data_of_id ~logger pool epoch_data_id =
       failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
         epoch_data_id (Caqti_error.show msg) ()
 
-let process_block_info_of_state_hash ~logger pool state_hash ~f =
+let process_block_infos_of_state_hash ~logger pool state_hash ~f =
   match%bind
     Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
   with
-  | Ok block_info ->
-      f block_info
+  | Ok block_infos ->
+      f block_infos
   | Error msg ->
       [%log error] "Error getting block information for state hash"
         ~metadata:
@@ -398,25 +399,20 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
     cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
   in
-  let undo_or_error =
+  let applied_or_error =
     Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
       fee_transfer
   in
-  match undo_or_error with
-  | Ok _undo ->
-      (* in Transaction_log.process_transfer_fee, when the fee transfer has two components,
-         as here, the balance depends only on the first transfer if the receiver is the same
-         in both components
-
-         because of the way fee transfers are synthesized, the receivers here are expected never
-         to be the same
-      *)
-      let cmd =
-        if Int.equal cmd1.receiver_id cmd2.receiver_id then cmd1 else cmd2
+  match applied_or_error with
+  | Ok _ ->
+      let%bind () =
+        verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
+          ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
+          ~token_int64:cmd1.token
       in
-      verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer"
-        ~balance_id:cmd.receiver_balance ~pk_id:cmd.receiver_id
-        ~token_int64:cmd.token
+      verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
+        ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
+        ~token_int64:cmd2.token
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -638,23 +634,26 @@ let main ~input_file ~output_file ~archive_uri () =
       let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
-        process_block_info_of_state_hash ~logger pool fork_state_hash
-          ~f:(fun block_info ->
-            let ids =
-              List.map block_info ~f:(fun (id, _global_slot, _hash) -> id)
-            in
-            (* build mapping from global slots to ledger hashes *)
-            List.iter block_info ~f:(fun (_id, global_slot, hash) ->
-                Hashtbl.add_exn global_slot_ledger_hash_tbl ~key:global_slot
-                  ~data:(Ledger_hash.of_string hash) ) ;
+        process_block_infos_of_state_hash ~logger pool fork_state_hash
+          ~f:(fun block_infos ->
+            let ids = List.map block_infos ~f:(fun {id; _} -> id) in
+            (* build mapping from global slots to state and ledger hashes *)
+            List.iter block_infos
+              ~f:(fun {global_slot; state_hash; ledger_hash; _} ->
+                Hashtbl.add_exn global_slot_hashes_tbl ~key:global_slot
+                  ~data:
+                    ( State_hash.of_string state_hash
+                    , Ledger_hash.of_string ledger_hash ) ) ;
             return (Int.Set.of_list ids) )
       in
       (* check that genesis block is in chain to target hash
          assumption: genesis block occupies global slot 0
       *)
-      if Int64.Table.mem global_slot_ledger_hash_tbl Int64.zero then
+      if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
         [%log info]
-          "Block chain leading to target state hash includes genesis block"
+          "Block chain leading to target state hash includes genesis block, \
+           length = %d"
+          (Int.Set.length block_ids)
       else (
         [%log fatal]
           "Block chain leading to target state hash does not include genesis \
@@ -774,8 +773,8 @@ let main ~input_file ~output_file ~archive_uri () =
             next_epoch_ledger_hash
         in
         let log_ledger_hash_after_last_slot () =
-          let expected_ledger_hash =
-            Hashtbl.find_exn global_slot_ledger_hash_tbl last_global_slot
+          let _state_hash, expected_ledger_hash =
+            Hashtbl.find_exn global_slot_hashes_tbl last_global_slot
           in
           if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
           then
@@ -795,9 +794,21 @@ let main ~input_file ~output_file ~archive_uri () =
               last_global_slot ;
             Core_kernel.exit 1 )
         in
+        let log_state_hash_on_next_slot curr_global_slot =
+          let state_hash, _ledger_hash =
+            Hashtbl.find_exn global_slot_hashes_tbl curr_global_slot
+          in
+          [%log info]
+            ~metadata:
+              [("state_hash", `String (State_hash.to_base58_check state_hash))]
+            "Starting processing of commands in block with state_hash \
+             $state_hash at global slot %Ld"
+            curr_global_slot
+        in
         let log_on_slot_change curr_global_slot =
-          if Int64.( > ) curr_global_slot last_global_slot then
-            log_ledger_hash_after_last_slot ()
+          if Int64.( > ) curr_global_slot last_global_slot then (
+            log_ledger_hash_after_last_slot () ;
+            log_state_hash_on_next_slot curr_global_slot )
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
