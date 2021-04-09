@@ -51,8 +51,9 @@ let tests : test list =
     , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
   *)
   ; ("peers", (module Peers_test.Make : Intf.Test.Functor_intf))
+  ; ("common-prefix", (module Common_prefix.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
-  ]
+  ; ("common-prefix", (module Common_prefix.Make : Intf.Test.Functor_intf)) ]
 
 let report_test_errors error_set
     (missing_event_reprs : Structured_log_events.repr list) =

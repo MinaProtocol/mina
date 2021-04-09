@@ -1563,7 +1563,7 @@ let set_connection_gating_config net (config : connection_gating) =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~on_unexpected_termination ~logger ~conf_dir =
+let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1638,6 +1638,8 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
               CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
+      Child_processes.register_process ~termination_expected:true pids
+        subprocess Libp2p_helper ;
       let t : Helper.t =
         { subprocess
         ; conf_dir
@@ -1718,6 +1720,8 @@ let%test_module "coda network tests" =
       "This is a test. This is a test of the Outdoor Warning System. This is \
        only a test."
 
+    let pids = Child_processes.Termination.create_pid_table ()
+
     let setup_two_nodes network_id =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
@@ -1725,7 +1729,7 @@ let%test_module "coda network tests" =
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
-          ~conf_dir:a_tmp
+          ~conf_dir:a_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1733,7 +1737,7 @@ let%test_module "coda network tests" =
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
-          ~conf_dir:b_tmp
+          ~conf_dir:b_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1741,7 +1745,7 @@ let%test_module "coda network tests" =
       let%bind c =
         create
           ~logger:(Logger.extend logger [("name", `String "c")])
-          ~conf_dir:c_tmp
+          ~conf_dir:c_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn

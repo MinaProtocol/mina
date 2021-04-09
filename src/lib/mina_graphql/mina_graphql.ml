@@ -1812,6 +1812,8 @@ module Types = struct
     module type Numeric_type = sig
       type t
 
+      val to_string : t -> string
+
       val of_string : string -> t
 
       val of_int : int -> t
@@ -1828,9 +1830,38 @@ module Types = struct
               is a string, it must represent the number in base 10"
              lower_name) ~coerce:(fun key ->
           match key with
-          | `String s ->
-              result_of_exn Numeric.of_string s
-                ~error:(sprintf "Could not decode %s." lower_name)
+          | `String s -> (
+            try
+              let n = Numeric.of_string s in
+              let s' = Numeric.to_string n in
+              (* Here, we check that the string that was passed converts to
+                   the numeric type, and that it is in range, by converting
+                   back to a string and checking that it is equal to the one
+                   passed. This prevents the following weirdnesses in the
+                   [Unsigned.UInt*] parsers:
+                   * if the absolute value is greater than [max_int], the value
+                     returned is [max_int]
+                     - ["99999999999999999999999999999999999"] is [max_int]
+                     - ["-99999999999999999999999999999999999"] is [max_int]
+                   * if otherwise the value is negative, the value returned is
+                     [max_int - (x - 1)]
+                     - ["-1"] is [max_int]
+                   * if there is a non-numeric character part-way through the
+                     string, the numeric prefix is treated as a number
+                     - ["1_000_000"] is [1]
+                     - ["-1_000_000"] is [max_int]
+                     - ["1.1"] is [1]
+                     - ["0x15"] is [0]
+                   * leading spaces are ignored
+                     - [" 1"] is [1]
+                   This is annoying to document, none of these behaviors are
+                   useful to users, and unexpectedly triggering one of them
+                   could have nasty consequences. Thus, we raise an error
+                   rather than silently misinterpreting their input.
+                *)
+              assert (String.equal s s') ;
+              Ok n
+            with _ -> Error (sprintf "Could not decode %s." lower_name) )
           | `Int n ->
               if n < 0 then
                 Error
@@ -2606,9 +2637,17 @@ module Mutations = struct
                      ; hash= Transaction_hash.hash_command transaction } })
         | Error err ->
             Error (Error.to_string_hum err)
-        | _ ->
-            (* TODO: Be better here, we actually have more info. *)
-            Error "Transaction could not be entered into the pool" )
+        | Ok ([], [(_, diff_error)]) ->
+            let diff_error =
+              Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+              .to_string_hum diff_error
+            in
+            Error
+              (sprintf "Transaction could not be entered into the pool: %s"
+                 diff_error)
+        | Ok _ ->
+            Error
+              "Internal error: response from transaction pool was malformed" )
 
   let export_logs =
     io_field "exportLogs" ~doc:"Export daemon logs to tar archive"

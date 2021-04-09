@@ -6,7 +6,7 @@ open Async
 open Core_kernel
 include Hashable.Make_binable (Pid)
 
-type process_kind = Prover | Verifier
+type process_kind = Prover | Verifier | Libp2p_helper
 [@@deriving show {with_path= false}, yojson]
 
 type data = {kind: process_kind; termination_expected: bool}

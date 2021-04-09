@@ -214,6 +214,7 @@ end
 val create :
      on_unexpected_termination:(unit -> unit Deferred.t)
   -> logger:Logger.t
+  -> pids:Child_processes.Termination.t
   -> conf_dir:string
   -> net Deferred.Or_error.t
 

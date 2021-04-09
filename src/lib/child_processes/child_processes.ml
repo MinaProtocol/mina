@@ -264,8 +264,10 @@ let start_custom :
     Deferred.map ~f:Or_error.return
     @@ maybe_kill_and_unlock name lock_path logger
   in
-  [%log debug] "Starting custom child process %s with args $args" name
-    ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
+  [%log debug] "Starting custom child process $name with args $args"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a))) ] ;
   let%bind mina_binary_path = get_mina_binary () in
   let relative_to_root =
     get_project_root ()
@@ -280,6 +282,11 @@ let start_custom :
          ; Some ("mina-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
+  [%log info] "Custom child process $name started with pid $pid"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a)))
+      ; ("pid", `Int (Process.pid process |> Pid.to_int)) ] ;
   Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
     ~location:__LOC__ ;
   let%bind () =
@@ -372,6 +379,11 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
               "No such process running. This should be impossible." )
   | Some _ ->
       Deferred.Or_error.error_string "already terminated"
+
+let register_process ?termination_expected (termination : Termination.t)
+    (process : t) kind =
+  Termination.register_process ?termination_expected termination
+    process.process kind
 
 let%test_module _ =
   ( module struct
