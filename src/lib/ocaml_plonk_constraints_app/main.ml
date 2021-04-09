@@ -14,43 +14,96 @@ let%test_module "backend test" =
       open Impl
 
       let authentication x () =
+        let module Block = Plonk.Bytes.Block (Impl) in
+        let module Bytes = Plonk.Bytes.Constraints (Impl) in
+        let module Sponge = Plonk.Poseidon.ArithmeticSponge (Impl) (Params) in
+        let module Ecc = Plonk.Ecc.Constraints (Impl) in
+        let module Ec = Ecc.Basic in
 
         Random.full_init [|7|];
+
+        (* SIGNATURE SCHEME PARAMETERS EC BASE POINT *)
+        let rec ecp () =
+        (
+          let x = Field.Constant.random () in
+          if Field.Constant.(is_square (x*x*x + (of_int 5))) = true then x
+          else ecp ()
+        ) in
+        let px = ecp () in
+        let py = Field.Constant.(sqrt (px*px*px + (of_int 5))) in
+        let p = (Field.constant px), (Field.constant py) in
+        (* NOTARY SECRET KEY *)
+        let a = Int.(Random.int max_value) in
+        printf "%d\n" a;
+        (* NOTARY PUBLIC KEY *)
+        let q = Ec.mul (px, py) a in
+        let qc = (Field.constant (fst q)), (Field.constant (snd q)) in
+
+        let qcc = Ecc.scale_pack p (Field.of_int a) in
+        assert_ (Snarky.Constraint.equal (fst qc) (fst qcc));
+        assert_ (Snarky.Constraint.equal (snd qc) (snd qcc));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        (* PLAINTEXT *)
         (*let ptl = 1000 + Random.int 1000 in*)
-        let ptl = 1592 in
+        let ptl = 1593 in
         let blocks = (ptl + 15 ) / 16 in
-        let ec = Array.init blocks ~f:(fun _ -> Array.init 16 ~f:(fun _ -> Impl.Field.of_int (Random.int 255))) in
-        let h = Array.init 16 ~f:(fun _ -> Impl.Field.of_int (Random.int 255)) in
+        let pt = Array.init ptl ~f:(fun _ -> Field.of_int (Random.int 255)) in
+        (* AES ENCRYPTED COUNTERS *)
+        let ec = Array.init blocks ~f:(fun _ -> Array.init 16 ~f:(fun _ -> Field.of_int (Random.int 255))) in
+        (* GCM HASH TAG *)
+        let h = Array.init 16 ~f:(fun _ -> Field.of_int (Random.int 255)) in
 
-        let pt = Array.init ptl ~f:(fun _ -> Impl.Field.of_int (Random.int 255)) in
-
-        let module Bytes = Plonk.Bytes.Constraints (Impl) in
-        
+        (* encrypt plaintext into the ciphertext *)
         let ct = Array.init ptl ~f:(fun i -> Bytes.xor ec.(i/16).(i%16) pt.(i)) in
-        let ctp = Array.append ct (Array.init (blocks*16-ptl) ~f:(fun _ -> Impl.Field.zero)) in
+        (* pad ciphertext to the block boundary *)
+        let ctp = Array.append ct (Array.init (blocks*16-ptl) ~f:(fun _ -> Field.zero)) in
         
-        let module Block = Plonk.Bytes.Block (Impl) in
-        
+        (* compute GCM ciphertext authentication tag *)
         let rec tag ht ct =
           if Array.length ct <= 0 then ht
           else Block.mul (Block.xor (tag ht (Array.sub ct 0 (Array.length ct - 16))) (Array.sub ct (Array.length ct - 16) 16)) h
         in
+        let len = Array.init 16 ~f:(fun i -> Field.of_int ((ptl lsr (i*8-3)) land 255)) in
+        let at = tag (Array.init 16 ~f:(fun _ -> Field.zero)) (Array.append ctp len) in
 
-        let ptlb = ptl * 8 in
-        let len = Array.init 16 ~f:(fun i -> Impl.Field.of_int ((ptlb lsr (i*8)) land 255)) in
-        let ht = tag (Array.init 16 ~f:(fun _ -> Impl.Field.zero)) (Array.append ctp len) in
-        let hb = Array.map ~f:(fun x -> Bytes.b16tof x) (Array.append ec [|ht|]) in
+        (* notary computing the signature *)
+        let k = Int.(Random.int max_value) in
+        printf "%d\n" k;
+        let r = Ec.mul (px, py) k in
+        let rc = (Field.constant (fst r)), (Field.constant (snd r)) in
+        (* hash the data to be signed *)
+        let hb = Array.map ~f:(fun x -> Bytes.b16tof x) (Array.append ec [|at|]) in
+        Array.iter ~f:(fun x -> Sponge.absorb x) (Array.append hb [|fst rc; snd rc;|]);
+        let e = Sponge.squeeze in
+        let s = Field.((of_int k) + (of_int a) * e) in
 
-        let module Sponge = Plonk.Poseidon.ArithmeticSponge (Impl) (Params) in
-        Array.iter ~f:(fun x -> Sponge.absorb x) hb;
-        let x = Sponge.squeeze in
-        assert_ (Snarky.Constraint.equal x x);
+        (* signature as computed by notary *)
+        let sign = (rc, s) in
+
+        (* prover signature verification *)
+        let lpt = Ecc.add (Ecc.scale_pack qc e) (fst sign) in
+        let rpt = Ecc.scale_pack p (snd sign) in
+        assert_ (Snarky.Constraint.equal (fst lpt) (fst rpt));
+        assert_ (Snarky.Constraint.equal (snd lpt) (snd rpt));
 
         ()
 
-      let input () = Impl.Data_spec.[Impl.Field.typ]
+      let input () = Impl.Data_spec.[Field.typ]
       let keys = Impl.generate_keypair ~exposing:(input ()) authentication
-      let statement = Impl.Field.Constant.of_int 97531013579
+      let statement = Field.Constant.of_int 97531013579
       let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) authentication () statement
       let%test_unit "check backend GcmAuthentication proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)
@@ -70,14 +123,14 @@ let%test_module "backend test" =
         let module Bytes = Plonk.Bytes.Constraints (Impl) in
 
         Random.full_init [|7|];
-        let rec add x n = if n < 1 then x else add (Bytes.xor x (Impl.Field.of_int (Random.int 255))) Int.(n - 1) in
+        let rec add x n = if n < 1 then x else add (Bytes.xor x (Field.of_int (Random.int 255))) Int.(n - 1) in
         let rec mul (x, y) n = if n < 1 then (x, y) else mul (Bytes.mul x y) Int.(n - 1) in
 
-        let y = add (Impl.Field.of_int (Random.int 255)) 35537 in
-        let a, b = mul (y, (Impl.Field.of_int (Random.int 255))) 75359 in
+        let y = add (Field.of_int (Random.int 255)) 35537 in
+        let a, b = mul (y, (Field.of_int (Random.int 255))) 75359 in
 
         for i = 0 to 255 do
-          let a, b = Bytes.xtimesp (Impl.Field.of_int i) in
+          let a, b = Bytes.xtimesp (Field.of_int i) in
           let a = Bytes.aesLookup a Plonk.Gcm.sboxInd in
           let a = Bytes.aesLookup a Plonk.Gcm.invsboxInd in
           let a = Bytes.aesLookup a Plonk.Gcm.xtime2sboxInd in
@@ -86,7 +139,7 @@ let%test_module "backend test" =
           let a = Bytes.aesLookup a Plonk.Gcm.xtimebInd in
           let a = Bytes.aesLookup a Plonk.Gcm.xtimedInd in
           let a = Bytes.aesLookup a Plonk.Gcm.xtimeeInd + b +
-            Bytes.aesLookup (Impl.Field.of_int (i mod 10)) Plonk.Gcm.rconInd in
+            Bytes.aesLookup (Field.of_int (i mod 10)) Plonk.Gcm.rconInd in
           assert_ (Snarky.Constraint.equal a a);
         done;
 
@@ -104,40 +157,52 @@ let%test_module "backend test" =
 
           (***** POSEIDON PERMUTATION *****)
 
-          let module Poseidon = Plonk.Poseidon.Constraints (Impl) (Params) in
-          let perm = Poseidon.block_cipher [|x; x+one; x-one; square x; square x|] in
-          assert_ (Snarky.Constraint.equal perm.(0) perm.(0));
+          let module Sponge = Plonk.Poseidon.ArithmeticSponge (Impl) (Params) in
+          Sponge.absorb x;
+          let x = Sponge.squeeze in
+          assert_ (Snarky.Constraint.equal x x);
 
           (***** EC ARITHMETIC *****)
 
           let module Ecc = Plonk.Ecc.Constraints (Impl) in
-          let y = sqrt (x*x*x + (Impl.Field.of_int 5)) in 
+          Random.full_init [|7|];
+          let x = exists (Field.typ) ~compute:As_prover.(fun () ->
+            let rec ecp () =
+            (
+              let x = Field.Constant.random () in
+              if Field.Constant.(is_square (x*x*x + (of_int 5))) = true then x
+              else ecp ()
+            ) in
+            ecp ()
+          ) in
+          let y = sqrt (x*x*x + (Field.of_int 5)) in 
 
           let rec double (x, y) n = if n < 1 then (x, y) else double (Ecc.double (x, y)) Int.(n - 1) in
           let xd, yd = double (x, y) (Array.length bits) in
           
           let x1, y1 = Ecc.add (Ecc.scale (x, y) bits) (xd, negate yd) in
-          assert_ (Snarky.Constraint.equal (y1*y1) (x1*x1*x1 + (Impl.Field.of_int 5)));
+          assert_ (Snarky.Constraint.equal (y1*y1) (x1*x1*x1 + (Field.of_int 5)));
 
+          let bits = Pack.unpack x in
           let x1, y1 = Ecc.scale (x, y) bits in
-          assert_ (Snarky.Constraint.equal (y1*y1) (x1*x1*x1 + (Impl.Field.of_int 5)));
+          assert_ (Snarky.Constraint.equal (y1*y1) (x1*x1*x1 + (Field.of_int 5)));
           let x2, y2 = Ecc.scale_pack (x, y) x in
-          assert_ (Snarky.Constraint.equal (y2*y2) (x2*x2*x2 + (Impl.Field.of_int 5)));
+          assert_ (Snarky.Constraint.equal (y2*y2) (x2*x2*x2 + (Field.of_int 5)));
           assert_ (Snarky.Constraint.equal x1 x2);
           assert_ (Snarky.Constraint.equal y1 y2);
 
           let x3, y3 = Ecc.scale_pack (x2, y2) y in
-          assert_ (Snarky.Constraint.equal (y3*y3) (x3*x3*x3 + (Impl.Field.of_int 5)));
+          assert_ (Snarky.Constraint.equal (y3*y3) (x3*x3*x3 + (Field.of_int 5)));
           let x4, y4 = Ecc.endoscale (x3, y3) bits in
-          assert_ (Snarky.Constraint.equal (y4*y4) (x4*x4*x4 + (Impl.Field.of_int 5)));
+          assert_ (Snarky.Constraint.equal (y4*y4) (x4*x4*x4 + (Field.of_int 5)));
 
         done;
 
         ()
 
-      let input () = Impl.Data_spec.[Impl.Field.typ]
+      let input () = Impl.Data_spec.[Field.typ]
       let keys = Impl.generate_keypair ~exposing:(input ()) computation
-      let statement = Impl.Field.Constant.of_int 97531013579
+      let statement = Field.Constant.of_int 97531013579
       let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) computation () statement
       let%test_unit "check backend ComputationExample proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) statement)

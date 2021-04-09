@@ -14,18 +14,70 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     let threehalfs = of_int 3 / of_int 2
 
     let add ((x1, y1) : field * field) ((x2, y2) : field * field) : (field * field) * field  =
-      let r = one / (x2 - x1) in
-      let s = (y2 - y1) * r in
-      let x3 = square s - x1 - x2 in
-      let y3 = (x1 - x3) * s - y1 in
-      ((x3, y3), r)
+      if x1 = zero && y1 = zero then ((x2, y2), zero)
+      else if x2 = zero && y2 = zero then ((x1, y1), zero)
+      else
+      (
+        let r = one / (x2 - x1) in
+        let s = (y2 - y1) * r in
+        let x3 = square s - x1 - x2 in
+        let y3 = (x1 - x3) * s - y1 in
+        ((x3, y3), r)
+      )
 
     let double ((x, y) : field * field) : (field * field) * field =
-      let r = one / y in
-      let s = square x * threehalfs * r in
-      let x1 = square s - x * of_int 2 in
-      let y1 = s * (x - x1) - y in
-      ((x1, y1), r)
+      if x = zero && y = zero then ((zero, zero), zero)
+      else
+      (
+        let r = one / y in
+        let s = square x * threehalfs * r in
+        let x1 = square s - x * of_int 2 in
+        let y1 = s * (x - x1) - y in
+        ((x1, y1), r)
+      )
+
+    let add1 ((x1, y1) : field * field) ((x2, y2) : field * field) : field * field  =
+      if x1 = zero && y1 = zero then x2, y2
+      else if x2 = zero && y2 = zero then x1, y1
+      else if x2 = x1 then zero, zero
+      else
+      (
+        let s = (y2 - y1) / (x2 - x1) in
+        let x3 = square s - x1 - x2 in
+        let y3 = (x1 - x3) * s - y1 in
+        x3, y3
+      )
+
+    let double1 ((x, y) : field * field) : field * field =
+      if y = zero then zero, zero
+      else
+      (
+        let s = square x * threehalfs / y in
+        let x1 = square s - x * of_int 2 in
+        let y1 = s * (x - x1) - y in
+        x1, y1
+      )
+
+    (*
+      N ← P
+      Q ← 0
+      for i from 0 to m do
+        if di = 1 then
+            Q ← point_add(Q, N)
+        N ← point_double(N)
+      return Q
+    *)
+    let mul ((x, y) : field * field) (s: int): (field * field) =
+      let rec doubleadd n q s =
+        if s = 0 then n, q, s
+        else
+        (
+          if (s land 1) = 1 then doubleadd (double1 n) (add1 q n) (s lsr 1)
+          else doubleadd (double1 n) q (s lsr 1)
+        )
+      in
+      let n, q, s = doubleadd (x, y) (zero, zero) s in
+      q
   end
 
   let add (p1 : t * t) (p2 : t * t) : t * t  =
