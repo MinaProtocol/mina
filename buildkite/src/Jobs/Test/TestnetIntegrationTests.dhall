@@ -11,7 +11,7 @@ let dependsOn = [
     -- { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
 ]
 
-let dependsOnArchive = dependsOn :: { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
+let dependsOnArchive = dependsOn :: { name = "ArchiveNodeArtifact", key = "archive-docker-puppeteered-image" }
 
 in Pipeline.build Pipeline.Config::{
   spec =
