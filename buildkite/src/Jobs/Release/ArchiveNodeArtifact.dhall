@@ -65,7 +65,9 @@ Pipeline.build
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-extract_blocks" },
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-build_archive_all_sigs" },
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-archive_blocks" },
-            { name = "ArchiveRedundancyTools", key = "archive-redundancy-missing_blocks_auditor" }
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-missing_blocks_auditor" },
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-replayer" },
+            { name = "ArchiveRedundancyTools", key = "archive-redundancy-swap_bad_balances" }
           ]
         },
       DockerImage.generateStep spec
