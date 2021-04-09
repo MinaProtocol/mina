@@ -20,7 +20,7 @@ let spec_docker = DockerImage.ReleaseSpec::{
     step_key="archive-docker-image"
 }
 let spec_docker_puppeteered = DockerImage.ReleaseSpec::{
-    deps=dependsOn :: { name = "Artifact", key = "archive-docker-image" },
+    deps=dependsOn # [{ name = "Artifact", key = "archive-docker-image" }],
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
     step_key="archive-docker-puppeteered-image"
 }
