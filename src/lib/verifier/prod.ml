@@ -459,7 +459,7 @@ let verify_transaction_snarks {worker; logger} ts =
         |> Deferred.Or_error.map ~f:(fun x -> `Continue x) )
   in
   upon res (fun x ->
-      [%log trace] "verify $n transaction_snarks (after)!"
+      [%log trace] "verify $n transaction_snarks (after)"
         ~metadata:
           ( ("result", `String (Sexp.to_string ([%sexp_of: bool Or_error.t] x)))
           :: metadata () ) ) ;
