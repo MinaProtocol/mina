@@ -6,8 +6,7 @@ use crate::lookup_table::*;
 
 pub fn init_table() -> Vec<Fp>
 {
-    let z = Fp::zero();
-    let mut table = vec![z; DOMAIN_SIZE];
+    let mut table = vec![Fp::zero(); DOMAIN_SIZE];
 
     // init GF(2^8) XOR and GF(2^128) multiplication tables
     for x in 0..0x100 {for y in 0..0x100

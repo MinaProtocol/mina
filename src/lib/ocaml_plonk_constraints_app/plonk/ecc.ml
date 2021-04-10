@@ -84,7 +84,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     let (p3, r) = exists Typ.((typ * typ) * typ) ~compute:As_prover.(fun () ->
         (Basic.add (read_var (fst p1), read_var (snd p1)) (read_var (fst p2), read_var (snd p2))))
     in
-    Intf.assert_
+    assert_
       [{
         basic= Plonk_constraint.T (EC_add { p1; p2; p3; r }) ;
         annotation= None
@@ -95,7 +95,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     let (p2, r) = exists Typ.((typ * typ) * typ) ~compute:As_prover.(fun () ->
         (Basic.double (read_var (fst p1), read_var (snd p1))))
     in
-    Intf.assert_
+    assert_
       [{
         basic= Plonk_constraint.T (EC_double { p1; p2; r }) ;
         annotation= None
@@ -152,7 +152,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
           ));
           state.(0).xp <- xp;
           state.(0).yp <- yp;
-          Intf.assert_
+          assert_
             [{
               basic= Plonk_constraint.T (EC_scale { state }) ;
               annotation= None
@@ -161,7 +161,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
           finish.xs, finish.ys
       in
       let xtp, ytp = add (xp, yp) (xt, negate yt) in
-      let b = Intf.Boolean.of_field scalar.(0) in
+      let b = Boolean.of_field scalar.(0) in
       if_ b ~then_:xp ~else_:xtp, if_ b ~then_:yp ~else_:ytp
 
   (* this function constrains computation of [2^n + k]T with unpacking *)
@@ -174,66 +174,70 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
           Acc := (Acc + Q) + Acc
       return (k0 = 0) ? (Acc - T) : Acc
     *)
-    let n = Int.(Field.size_in_bits + 1) in
+    let n = Field.size_in_bits in
+    (*let n = 2 in*)
 
     let xp, yp = add (double (xt, yt)) (xt, yt) in
     let xp, yp, bit =
       let state = exists (Snarky.Typ.array ~length:Int.(n - 1) (Scale_pack_round_5_wires.typ typ)) ~compute:As_prover.(fun () ->
           (
-            let half = Field.Constant.inv (Field.Constant.of_int 2) in
-            let bits =  Field.Constant.unpack (read_var scalar) |> List.rev |> Array.of_list in
-            let padlen = Int.(n - (Array.length bits)) in
-            let bits = Array.init n ~f:(fun i -> (if i < padlen then false else bits.(Int.(i - padlen)))) |>
-              Array.map ~f:(fun x -> if x = true then Field.Constant.one else Field.Constant.zero)
-            in
+            let bits =  Constant.unpack (read_var scalar) |> Array.of_list |>
+              Array.map ~f:(fun x -> if x = true then Constant.one else Constant.zero) in
 
             let state = ref [] in
             let xpl, ypl = ref (read_var xp), ref (read_var yp) in
             let xtl, ytl = read_var xt, read_var yt in
-            let n1l = ref (read_var scalar) in
+            let n2l = ref zero in
 
             for i = Int.(n - 2) downto 0 do
               let bit = bits.(Int.(i + 1)) in
               let ((xtmp, ytmp), _) = Basic.add (!xpl, !ypl) (xtl, ytl * (bit+bit-one)) in
               let ((xsl, ysl), _) = Basic.add (!xpl, !ypl) (xtmp, ytmp) in
-              let n2l = ((!n1l)-bit)*half in
+              let n1l = (!n2l) * (Constant.of_int 2) + bit in
               let round = Scale_pack_round_5_wires.
               {
                 xt=xtl; b=bit; yt=ytl; xp=(!xpl);
                 l1=(!ypl-(ytl * (bit+bit-one)))/(!xpl-xtl);
                 yp=(!ypl); xs=xsl; ys=ysl;
-                n1=(!n1l);
-                n2=n2l
+                n1=n1l;
+                n2=(!n2l)
               } in
               state := !state @ [round];
               xpl := xsl;
               ypl := ysl;
-              n1l := n2l;
+              n2l := n1l;
             done;
             Array.of_list !state
           ))
+      in
+      let bit = exists (typ) ~compute:As_prover.(fun () ->
+      (
+        let bits = Bigint.of_field (read_var scalar) in
+        if Bigint.test_bit bits 0 then one else zero
+      ))
       in
       Array.iteri state ~f:(fun i s ->
       (
         if i > 0 then
         (
-          s.n1 <- state.(Int.(i-1)).n2;
+          s.n2 <- state.(Int.(i-1)).n1;
           s.xp <- state.(Int.(i-1)).xs;
           s.yp <- state.(Int.(i-1)).ys;
         )
       ));
       state.(0).xp <- xp;
       state.(0).yp <- yp;
-      Intf.assert_
+      assert_
         [{
           basic= Plonk_constraint.T (EC_scale_pack { state }) ;
           annotation= None
         }];
       let finish = state.(Int.(n - 2)) in
-      finish.xs, finish.ys, finish.b
+      assert_ (Constraint.equal scalar (finish.n1 * (Field.of_int 2) + bit));
+      finish.xs, finish.ys, bit
     in
     let xtp, ytp = add (xp, yp) (xt, negate yt) in
-    let b = Intf.Boolean.of_field bit in
+    let b = Boolean.of_field bit in
     if_ b ~then_:xp ~else_:xtp, if_ b ~then_:yp ~else_:ytp
 
   let endoscale ((xt, yt) : t * t) (scalar : t array) : t * t =
@@ -262,7 +266,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
 
           for i = Int.(n - 1) downto 0 do
             let b1l = read_var scalar.(Int.(2 * i)) in
-            let b2l = Int.(if 2*i+1 < (Array.length scalar) then read_var scalar.(2*i+1) else Field.Constant.zero) in
+            let b2l = Int.(if 2*i+1 < (Array.length scalar) then read_var scalar.(2*i+1) else Constant.zero) in
             let xql =  (one + (endo - one) * b2l) * xtl in
             let ((xtmp, ytmp), _) = Basic.add (!xpl, !ypl) (xql, ytl * (b1l+b1l-one)) in
             let ((xsl, ysl), _) = Basic.add (!xpl, !ypl) (xtmp, ytmp) in
@@ -290,7 +294,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     ));
     state.(0).xp <- xp;
     state.(0).yp <- yp;
-    Intf.assert_
+    assert_
       [{
         basic= Plonk_constraint.T (EC_endoscale { state }) ;
         annotation= None

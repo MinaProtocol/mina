@@ -20,41 +20,28 @@ let%test_module "backend test" =
         let module Ecc = Plonk.Ecc.Constraints (Impl) in
         let module Ec = Ecc.Basic in
 
-        Random.full_init [|7|];
+        Random.full_init [|5|];
+        let n = Field.size_in_bits in
 
         (* SIGNATURE SCHEME PARAMETERS EC BASE POINT *)
         let rec ecp () =
         (
-          let x = Field.Constant.random () in
+          let x = Int64.(Random.int64 max_value) in
+          let x = Field.Constant.of_string (Int64.to_string x) in
           if Field.Constant.(is_square (x*x*x + (of_int 5))) = true then x
           else ecp ()
         ) in
         let px = ecp () in
         let py = Field.Constant.(sqrt (px*px*px + (of_int 5))) in
+        let rec double (x, y) n = if n < 1 then (x, y) else double (Ec.double1 (x, y)) Int.(n - 1) in
+        let pxn, pyn = double (px, py) n in
         let p = (Field.constant px), (Field.constant py) in
+        let pn = (Field.constant pxn), (Field.constant (Field.Constant.negate pyn)) in
         (* NOTARY SECRET KEY *)
         let a = Int.(Random.int max_value) in
-        printf "%d\n" a;
         (* NOTARY PUBLIC KEY *)
         let q = Ec.mul (px, py) a in
         let qc = (Field.constant (fst q)), (Field.constant (snd q)) in
-
-        let qcc = Ecc.scale_pack p (Field.of_int a) in
-        assert_ (Snarky.Constraint.equal (fst qc) (fst qcc));
-        assert_ (Snarky.Constraint.equal (snd qc) (snd qcc));
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         (* PLAINTEXT *)
         (*let ptl = 1000 + Random.int 1000 in*)
@@ -81,7 +68,6 @@ let%test_module "backend test" =
 
         (* notary computing the signature *)
         let k = Int.(Random.int max_value) in
-        printf "%d\n" k;
         let r = Ec.mul (px, py) k in
         let rc = (Field.constant (fst r)), (Field.constant (snd r)) in
         (* hash the data to be signed *)
@@ -169,7 +155,7 @@ let%test_module "backend test" =
           let x = exists (Field.typ) ~compute:As_prover.(fun () ->
             let rec ecp () =
             (
-              let x = Field.Constant.random () in
+              let x = Field.Constant.of_int (Int.(Random.int max_value)) in
               if Field.Constant.(is_square (x*x*x + (of_int 5))) = true then x
               else ecp ()
             ) in

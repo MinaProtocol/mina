@@ -1170,23 +1170,13 @@ struct
              ; Some round.b
              ; Some round.n1 |]
             Vbmul2 xt yt l1 b n1 [||] ;
-          if last = false then
-            add_row sys
-              [| Some round.xs
-               ; Some round.ys
-               ; Some round.xp
-               ; Some round.yp
-               ; Some round.n2 |]
-              Zero xs ys xp yp n2 [||]
-          else
-            add_row sys
-              [| Some round.xs
-               ; Some round.ys
-               ; Some round.xp
-               ; Some round.yp
-               ; Some round.n2 |]
-              Generic xs ys xp yp n2
-              [|Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.one; Fp.zero; Fp.zero|]
+          add_row sys
+            [| Some round.xs
+              ; Some round.ys
+              ; Some round.xp
+              ; Some round.yp
+              ; Some round.n2 |]
+            Zero xs ys xp yp n2 [||]
         in
         Array.iteri
           ~f:(fun i round ->
