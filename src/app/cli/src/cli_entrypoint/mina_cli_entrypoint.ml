@@ -15,8 +15,6 @@ module YJ = Yojson.Safe
 [%%if
 record_async_backtraces]
 
-let _ = Dummy.x
-
 let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
