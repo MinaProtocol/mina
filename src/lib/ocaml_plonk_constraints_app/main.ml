@@ -33,10 +33,10 @@ let%test_module "backend test" =
         ) in
         let px = ecp () in
         let py = Field.Constant.(sqrt (px*px*px + (of_int 5))) in
-        let rec double (x, y) n = if n < 1 then (x, y) else double (Ec.double1 (x, y)) Int.(n - 1) in
-        let pxn, pyn = double (px, py) n in
+          let rec double (x, y) n = if n < 1 then (x, y) else double (Ec.double1 (x, y)) Int.(n - 1) in
+          let pxn, pyn = double (px, py) n in
         let p = (Field.constant px), (Field.constant py) in
-        let pn = (Field.constant pxn), (Field.constant (Field.Constant.negate pyn)) in
+          let pn = (Field.constant pxn), (Field.constant (Field.Constant.negate pyn)) in
         (* NOTARY SECRET KEY *)
         let a = Int.(Random.int max_value) in
         (* NOTARY PUBLIC KEY *)
