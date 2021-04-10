@@ -91,7 +91,10 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
       }];
     p3
 
-  let double (p1 : t * t) : t * t  =
+  let sub ((x1, y1) : t * t) ((x2, y2) : t * t) : t * t =
+    add (x1, y1) (x2, (Field.negate y2))
+
+  let double (p1 : t * t) : t * t =
     let (p2, r) = exists Typ.((typ * typ) * typ) ~compute:As_prover.(fun () ->
         (Basic.double (read_var (fst p1), read_var (snd p1))))
     in
@@ -183,7 +186,6 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
           (
             let bits =  Constant.unpack (read_var scalar) |> Array.of_list |>
               Array.map ~f:(fun x -> if x = true then Constant.one else Constant.zero) in
-
             let state = ref [] in
             let xpl, ypl = ref (read_var xp), ref (read_var yp) in
             let xtl, ytl = read_var xt, read_var yt in
@@ -239,6 +241,11 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
     let xtp, ytp = add (xp, yp) (xt, negate yt) in
     let b = Boolean.of_field bit in
     if_ b ~then_:xp ~else_:xtp, if_ b ~then_:yp ~else_:ytp
+
+  (* this function constrains computation of [k]T with unpacking *)
+  let mul ((xt, yt) : t * t) (scalar : t) : t * t =
+    let rec dbl q n = if n < 1 then q else dbl (double q) Int.(n - 1) in
+    sub (scale_pack (xt, yt) scalar) (dbl (xt, yt) Field.size_in_bits)
 
   let endoscale ((xt, yt) : t * t) (scalar : t array) : t * t =
 

@@ -20,7 +20,7 @@ let%test_module "backend test" =
         let module Ecc = Plonk.Ecc.Constraints (Impl) in
         let module Ec = Ecc.Basic in
 
-        Random.full_init [|5|];
+        Random.full_init [|7|];
         let n = Field.size_in_bits in
 
         (* SIGNATURE SCHEME PARAMETERS EC BASE POINT *)
@@ -33,15 +33,15 @@ let%test_module "backend test" =
         ) in
         let px = ecp () in
         let py = Field.Constant.(sqrt (px*px*px + (of_int 5))) in
-          let rec double (x, y) n = if n < 1 then (x, y) else double (Ec.double1 (x, y)) Int.(n - 1) in
-          let pxn, pyn = double (px, py) n in
         let p = (Field.constant px), (Field.constant py) in
-          let pn = (Field.constant pxn), (Field.constant (Field.Constant.negate pyn)) in
         (* NOTARY SECRET KEY *)
         let a = Int.(Random.int max_value) in
         (* NOTARY PUBLIC KEY *)
         let q = Ec.mul (px, py) a in
         let qc = (Field.constant (fst q)), (Field.constant (snd q)) in
+        let rec double (x, y) n = if n < 1 then (x, y) else double (Ec.double1 (x, y)) Int.(n - 1) in
+        let pxn, pyn = double (px, py) n in
+        let pn = (Field.constant pxn), (Field.constant pyn) in
 
         (* PLAINTEXT *)
         (*let ptl = 1000 + Random.int 1000 in*)
@@ -74,14 +74,16 @@ let%test_module "backend test" =
         let hb = Array.map ~f:(fun x -> Bytes.b16tof x) (Array.append ec [|at|]) in
         Array.iter ~f:(fun x -> Sponge.absorb x) (Array.append hb [|fst rc; snd rc;|]);
         let e = Sponge.squeeze in
+        (* FIXIT: the following arithmetic has to be done in the scalar field of the curve *)
+        let e = Field.of_int (Int.(Random.int max_value)) in
         let s = Field.((of_int k) + (of_int a) * e) in
 
         (* signature as computed by notary *)
         let sign = (rc, s) in
 
         (* prover signature verification *)
-        let lpt = Ecc.add (Ecc.scale_pack qc e) (fst sign) in
-        let rpt = Ecc.scale_pack p (snd sign) in
+        let lpt = Ecc.add (Ecc.mul qc e) (fst sign) in
+        let rpt = Ecc.sub (Ecc.scale_pack p s) pn in
         assert_ (Snarky.Constraint.equal (fst lpt) (fst rpt));
         assert_ (Snarky.Constraint.equal (snd lpt) (snd rpt));
 
