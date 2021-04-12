@@ -95,7 +95,8 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
           hostPort: {{ .Values.coda.ports.p2p }}
-{{$data := dict "config" $config "healthcheck" $.Values.healthcheck }}
+{{$name := include "archive-node.fullname" . }}    
+{{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts: 

@@ -50,12 +50,12 @@ variable "fish_count" {
 }
 
 variable "seed_count" {
-  default     = 3
+  default     = 1
 }
 
 locals {
   testnet_name = "test-labels"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-devnet-master-qa-devnet-0f2032c"
+  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.5-compatible-be67bed-test-labels-425db71"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.4-8202b60"
   seed_region = "us-central1"
   seed_zone = "us-central1-b"
@@ -70,7 +70,7 @@ locals {
   make_report_accounts = ""
 }
 
-module "testnet_east" {
+module "testlabels" {
   providers = { google.gke = google.google-us-central1 }
   source    = "../../modules/o1-testnet"
 
@@ -94,7 +94,7 @@ module "testnet_east" {
   archive_configs       = [
     {
       name = "archive-1"
-      enableLocalDaemon = false
+      enableLocalDaemon = true
       enablePostgresDB  = true
       postgresHost      = "archive-1-postgresql"
     },
