@@ -150,15 +150,14 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
           |> Result.map_error ~f:(fun err ->
                  Staged_ledger.Staged_ledger_error.Pre_diff err )
         in
-        match diff with
-        | Ok d when Option.is_some block_reward_threshold ->
+        match (diff, block_reward_threshold) with
+        | Ok d, Some threshold ->
             let net_return =
               Option.value ~default:Currency.Amount.zero
                 (Staged_ledger_diff.net_return ~constraint_constants
                    ~supercharge_coinbase
                    (Staged_ledger_diff.forget d))
             in
-            let threshold = Option.value_exn block_reward_threshold in
             if Currency.Amount.(net_return >= threshold) then diff
             else (
               [%log info]
