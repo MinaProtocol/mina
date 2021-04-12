@@ -36,6 +36,8 @@ module Inputs = struct
             Some
               ( module Transaction_snark.Make (struct
                 let constraint_constants = constraint_constants
+
+                let proof_level = proof_level
               end)
               : S )
         | Check | None ->
