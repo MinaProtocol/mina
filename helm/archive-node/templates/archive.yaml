@@ -17,7 +17,7 @@ spec:
         role: archive-node
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
         {{- if .Values.archive.enableLocalDaemon }}
-        syncStatus: init
+        syncStatus: INIT
         {{- end }}
       annotations:
         prometheus.io/scrape: 'true'
@@ -95,7 +95,7 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
           hostPort: {{ .Values.coda.ports.p2p }}
-{{$name := include "archive-node.fullname" . }}    
+{{$name := include "archive-node.fullname" . }}
 {{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
 {{- include "healthcheck.daemon.allChecks" $data | indent 8 }}
         imagePullPolicy: Always

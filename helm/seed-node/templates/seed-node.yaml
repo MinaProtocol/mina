@@ -18,7 +18,7 @@ spec:
         role: seed
         class: {{ default "undefined" $config.class }}
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
-        syncStatus: init
+        syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
