@@ -49,6 +49,8 @@ scrape_configs:
         target_label: testnet
       - source_labels: [__meta_ec2_tag_role]
         target_label: role
+      - source_labels: [__meta_ec2_tag_status]
+        target_label: status
 
   - job_name: 'coda-us-west-1'
     scrape_interval: "5s"
@@ -70,6 +72,8 @@ scrape_configs:
         target_label: testnet
       - source_labels: [__meta_ec2_tag_role]
         target_label: role
+      - source_labels: [__meta_ec2_tag_status]
+        target_label: status
 
   - job_name: 'coda-us-east-1'
     scrape_interval: "5s"
@@ -91,6 +95,8 @@ scrape_configs:
         target_label: testnet
       - source_labels: [__meta_ec2_tag_role]
         target_label: role
+      - source_labels: [__meta_ec2_tag_status]
+        target_label: status
 
   - job_name: 'coda-us-east-2'
     scrape_interval: "5s"
@@ -112,6 +118,8 @@ scrape_configs:
         target_label: testnet
       - source_labels: [__meta_ec2_tag_role]
         target_label: role
+      - source_labels: [__meta_ec2_tag_status]
+        target_label: status
 
 {% if CODA_METRICS_URI is defined %}
   - job_name: "coda"

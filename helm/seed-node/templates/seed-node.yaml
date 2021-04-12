@@ -18,6 +18,7 @@ spec:
         role: seed
         class: {{ default "undefined" $config.class }}
         version: {{ trunc 6 (split ":" $.Values.coda.image)._1 | trimSuffix "-" }}
+        syncStatus: init
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{ $.Values.coda.ports.metrics | quote }}
@@ -121,7 +122,8 @@ spec:
           protocol: TCP 
           containerPort: {{ default $.Values.coda.ports.p2p $config.externalPort }}
           hostPort: {{ default $.Values.coda.ports.external $config.externalPort }}
-{{- include "healthcheck.seed.allChecks" $.Values | indent 8 }}
+{{$data := dict "config" $config "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.seed.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
         volumeMounts:
         {{- if $config.libp2pSecret }}
