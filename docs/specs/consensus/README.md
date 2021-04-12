@@ -19,11 +19,14 @@ This documents specifies required structures, algorithms and protocol details.
   * [2.5 Example block](#25-example-block)
 * [3 Algorithms](#3-algorithms)
   * [3.1 Common](#31-common)
-    * [3.1.1 `epochSlot`](#311-epochslot)
-  * [3.2 Chain selection](#32-chain-selection)
+    * [3.1.1 `top`](#311-top)
+    * [3.1.2 `globalSlot`](#312-globalslot)
+    * [3.1.3 `epochSlot`](#313-epochslot)
+    * [3.1.4 `lastVRF`](#314-lastvrf)
+    * [3.1.5 `stateHash`](#315-statehash)
+  * [3.2 Chain selection](#32-chain-selection-rules)
     * [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
     * [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
-    * [3.2.3 `selectSecureChain`](#323-selectsecurechain)
   * [3.3 Decentralized checkpointing](#33-decentralized-checkpointing)
     * [3.3.1 `initCheckpoints`](#331-initcheckpoints)
     * [3.3.2 `updateCheckpoints`](#332-updatecheckpoints)
@@ -32,7 +35,8 @@ This documents specifies required structures, algorithms and protocol details.
     * [3.4.1 `isWindowStop`](#341-iswindowstop)
     * [3.4.2 `shiftWindow`](#342-shiftwindow)
     * [3.4.3 `initSubWindowDensities`](#343-initsubwindowdensities)
-    * [3.4.4 `getMinDen`](#344-getminden)
+    * [3.4.4 `updateSubWindowDensities`](#344-updatesubwindowdensities)
+    * [3.4.5 `getMinDen`](#345-getminden)
 * [4 Protocol](#4-protocol)
   * [4.1 Initialize consensus](#41-initialize-consensus)
   * [4.2 Select chain](#42-select-chain)
@@ -237,14 +241,58 @@ This section outlines the main algorithms and constructs used by Samasikia.
 
 This section outlines some commonly used helpers.
 
-### 3.1.1 `epochSlot`
+### 3.1.1 `top`
 
-The algorithm computes the _epoch slot number_ from the global slot number.  The input is the global slot number `g` and the output is the local slot number in `[0, slots_per_epoch]`.
+This function returns the last block of a given chain.  The input is a chain `C` and the output is last block of `C` (i.e. the block with greatest height).
+
+```rust
+fn top(C) -> Block
+{
+   return last block of C
+}
+```
+
+### 3.1.2 `globalSlot`
+
+The function returns the _global slot number_ of a chain.  The input is the global chain `C` and the output is the global slot number.
+
+```rust
+fn globalSlot(C) -> u64
+{
+   return top(C).protocol_state.body.consensus_state.curr_global_slot
+}
+```
+
+### 3.1.3 `epochSlot`
+
+The function computes the _epoch slot number_ from the global slot number.  The input is the global slot number `g` and the output is the local slot number in `[0, slots_per_epoch]`.
 
 ```rust
 fn epochSlot(g) -> u32
 {
    return g mod slots_per_epoch
+}
+```
+
+### 3.1.4 `lastVRF`
+
+This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
+
+```rust
+fn lastVRF(C) -> String
+{
+   return Digest(Blake2b(top(C).protocol_state.body.consensus_state.last_vrf_output))
+}
+```
+
+### 3.1.5 `stateHash`
+
+This function returns hash of the top block's consensus state for a given chain.  The input is a chain `C` and the output is the hash.
+
+```rust
+fn stateHash(C) -> Hash
+{
+   return Blake2b(top(C).protocol_state.body.consensus_state)
 }
 ```
 
@@ -270,16 +318,14 @@ As a succint blockchain, Mina does not have a chain into which it can look back 
 
 Samasika overcomes this problem by storing a succinct summary of a sliding window of slots over each chain and then tracks the *minimum* of all densities observed for each sliding window.  The intuition is that if the adversary manages to increase the density on the dishonest chain, the tracked minimum density still points to the critical window following the fork.
 
-[Section 3.4](#34-window-min-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the long-range fork rule.
+[Section 3.4](#34-window-min-density) specifies how the sliding windows are tracked and how the minimum density is computed.  For now, we assume that each chain contains the minimum window density and describe the main idea of the long-range fork rule.
 
-The minimum window density is stored in each block, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.3](#23-consensus_state)).
+Given chain `C` let `C.min_density` be the minimum density observed in `C` so far.
 
-The function [`getMinDen(C)`](#344-getminden) outputs the minimum chain density observed so far in chain `C`. In other words, it simply outputs the value of the `min_window_density` field of the top block of `C`.
-
-Let `C1` be the local chain and `C2` be a [valid](../verification/README.md#1.1-isvalidchain) alternative chain; the _long-range fork rule_ is
+Let `C1` be the local chain and `C2` be a [valid](../verification/README.md#1.1-isvalidchain) alternative chain; the main idea of the _long-range fork rule_ is
 
 ```rust
-if getMinDen(C2) > getMinDen(C1) {
+if C2.min_density > C1.min_density {
     Select C2
 }
 else {
@@ -287,36 +333,7 @@ else {
 }
 ```
 
-We specify the chain selection algorithm in more detail next.
-
-### 3.2.3 `selectSecureChain`
-
-This is the chain selection algorithm for choosing the secure chain from among a set of chains.  It takes as input the current chain `Curr` and a set of chains `Chains` and outputs the most secure chain according to the chain rules described above.
-
-```rust
-fn selectSecureChain(Curr, Chains) -> Chain
-{
-    // Compare Current to each candidate in Chains
-    secure_chain = Curr
-    for chain in Chains {
-        if isShortRange(chain, best_chain) {
-            // short-range fork
-            if chain.length > best_chain.length {
-                secure_chain = chain
-            }
-        }
-        else {
-            // long-range fork
-            if getMinDen(chain) > getMinDen(best_chain) {
-                secure_chain = chain
-            }
-        }
-    }
-    return secure_chain
-}
-```
-
-It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#344-getminden) algorithms described in Sections 3.3.3 and 3.4.4.
+The above pseudocode is only to provide intuition about how the chain selection rules work.  The actual chain selection algorithm is specified in [Section 4.2](#42-select-chain) and is designed to handle more complex cases
 
 ## 3.3 Decentralized checkpointing
 
@@ -449,6 +466,8 @@ The values stored in `sub_window_densities` have this format.
 | `k - 1` | Previous window density |
 | `k` | Current window density |
 
+Each block also stores the minimum window density, found in the `min_window_density` field of the `Consensus_state` (see [Section 2.3](#23-consensus_state)).
+
 ### 3.4.1 `isWindowStop`
 
 This algorithm detects whether we have reached the end of a sub-window.  It is used to decide if we must perform a `v`-shift.  It takes as input the current local slot number `s`, the shift parameter `v` and outputs `true` if we have reached the end of a sub-window and `false` otherwise.
@@ -519,13 +538,12 @@ fn updateSubWindowDensities(P, B) -> ()
 As mentioned in [Section 3.2.2](#322-long-range-fork-rule), this function returns the current minimum density of a chain `C`.
 
 ```rust
-fn getMinDen(C) -> density
+fn getMinDen(C, max_slot) -> density
 {
-    B = last block of C
-    if B is genesis block then
+    if top(C) is genesis block then
         return 0
     else
-        return min(B.protocol_state.body.consensus_state.sub_window_densities)
+        return top(C).protocol_state.body.consensus_state.min_window_density
 }
 ```
 
@@ -558,19 +576,66 @@ Things a peer MUST do to initialize consensus includes
 
 ## 4.2 Select chain
 
-A chain selection event is triggered each time a block is added to one of the peer's chains.  The peer must apply the fork rules from the [Chain Selection Rules Section](#32-chain-selection) to determine which is the best chain.  It is important that any invalid chains are discarded.
+The _select chain_ event occurs every time a peer's chains are updated.  A chain is said to be _updated_ anytime a valid block is added or removed from its head.  All compatible peers MUST select chains as described here.
+
+Assuming an update to either `P.tip` or `P.chains`, the peer `P` must update its `tip` like this
 
 ```rust
-fn Peer.selectChain(Chains) -> ()
+P.tip = selectSecureChain(P.tip, P.chains)
+```
+The `selectSecureChain` algorithm takes as input the peer's current best chain `P.tip` and its set of known valid chains `P.chains` and outputs the most secure chain according to the [Chain Selection Rules Section](#32-chain-selection-rules) described in [Section 3.2](#32-chain-selection-rules).
+
+In addition to the high-level idea given in Section 3.2, the algorithm employs some additional tiebreak logic when comparing chains of equal length or equal minimum density.
+
+```rust
+fn selectSecureChain(tip, chains) -> Chain
 {
-    // Discard invalid chains
-    for chain in Chains {
-        if not isValidChain(Peer.chain, chain) {
-            Discard chain from Chains
+    // Compare each candidate in chains with best tip
+    for candidate in chains {
+        if isShortRange(candidate, tip) {
+            // short-range fork, select longer chain
+            tip = selectLongerChain(tip, candidate)
+        }
+        else {
+            // long-range fork, compare minimum window densities
+            max_slot = max(globalSlot(tip), globalSlot(candidate))
+            if getMinDen(candidate, max_slot) > getMinDen(tip, max_slot) {
+                tip = candidate
+            }
+            else if getMinDen(candidate, max_slot) == getMinDen(tip, max_slot) {
+                // tiebreak
+                tip = selectLongerChain(tip, candidate)
+            }
         }
     }
-    // Select the best chain
-    Peer.chain = selectSecureChain(Peer.chain, Chains)
+
+    return tip
+}
+```
+
+It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#345-getminden) algorithms described in Section 3.3.3 and Section 3.4.4.
+
+```rust
+fn selectLongerChain(tip, candidate) -> Chain
+{
+    if tip.length < candidate.length {
+        return candidate
+    }
+    // tiebreak logic
+    else if tip.length == candidate.length {
+        // compare last VRF digests lexographically
+        if lastVRF(candidate) > lastVRF(tip) {
+            return candidate
+        }
+        else if lastVRF(candidate) == lastVRF(tip) {
+            // compare consensus state hashes lexographically
+            if stateHash(candidate) > stateHash(tip) {
+                return candidate
+            }
+        }
+    }
+
+    return tip
 }
 ```
 
