@@ -60,7 +60,7 @@ Pipeline.build
             #
 
             [
-              Cmd.run "artifact-cache-helper.sh ./${spec.deploy_env_file} --upload"
+              Cmd.run "artifact-cache-helper.sh ./${spec_docker.deploy_env_file} --upload"
             ],
           label = "Build Archive node debian package",
           key = "build-archive-deb-pkg",
@@ -76,6 +76,6 @@ Pipeline.build
           ]
         },
       DockerImage.generateStep spec_docker,
-      DockerImage.generateStep spec_puppeteered
+      DockerImage.generateStep spec_docker_puppeteered
     ]
   }
