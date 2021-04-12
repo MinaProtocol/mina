@@ -425,8 +425,8 @@ struct
           in
           let work = One_or_two.map proofs ~f:snd in
           if not prover_account_ok then (
-            [%log' debug t.logger] "Prover did not have sufficient balance"
-              ~metadata ;
+            [%log' debug t.logger]
+              "Prover $prover did not have sufficient balance" ~metadata ;
             return false )
           else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
