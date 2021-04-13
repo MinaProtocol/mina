@@ -153,6 +153,7 @@ struct
         type t =
           { trust_system: Trust_system.t sexp_opaque
           ; verifier: Verifier.t sexp_opaque
+          ; reject_free_snark_work: bool
           ; disk_location: string }
         [@@deriving sexp, make]
       end
@@ -238,17 +239,18 @@ struct
 
       let fee_is_sufficient t ~fee ~prover ~best_tip_ledger =
         let open Mina_base in
-        Currency.Fee.(fee >= t.account_creation_fee)
-        ||
-        match best_tip_ledger with
-        | None ->
-            false
-        | Some l ->
-            Option.(
-              is_some
-                ( Base_ledger.location_of_account l
-                    (Account_id.create prover Token_id.default)
-                >>= Base_ledger.get l ))
+        ((not t.config.reject_free_snark_work) || Currency.Fee.(equal zero fee))
+        && ( Currency.Fee.(fee >= t.account_creation_fee)
+           ||
+           match best_tip_ledger with
+           | None ->
+               false
+           | Some l ->
+               Option.(
+                 is_some
+                   ( Base_ledger.location_of_account l
+                       (Account_id.create prover Token_id.default)
+                   >>= Base_ledger.get l )) )
 
       let handle_transition_frontier_diff u t =
         match u with
@@ -685,7 +687,7 @@ let%test_module "random set test" =
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~reject_free_snark_work:false ~disk_location:"/tmp/snark-pool"
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in

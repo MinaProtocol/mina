@@ -206,6 +206,7 @@ let run_test () : unit Deferred.t =
                  ; shutdown_on_disconnect= true
                  ; num_threads= None }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
+             ~reject_free_snark_work:false
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")

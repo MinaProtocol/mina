@@ -95,6 +95,12 @@ let setup_daemon logger =
          producing blocks). If not provided, coinbase rewards will be sent to \
          the producer of a block."
       (optional public_key_compressed)
+  and reject_free_snark_work =
+    flag "--reject-free-snark-work" ~aliases:["reject-free-snark-work"]
+      ~doc:
+        "true/false Whether to reject free snark work to be used in blocks \
+         (default: false)"
+      (optional_with_default false bool)
   and genesis_dir =
     flag "--genesis-ledger-dir" ~aliases:["genesis-ledger-dir"]
       ~doc:
@@ -1105,6 +1111,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                ; num_threads= snark_worker_parallelism_flag }
              ~snark_coordinator_key:run_snark_coordinator_flag
              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+             ~reject_free_snark_work
              ~wallets_disk_location:(conf_dir ^/ "wallets")
              ~persistent_root_location:(conf_dir ^/ "root")
              ~persistent_frontier_location:(conf_dir ^/ "frontier")

@@ -53,5 +53,6 @@ type t =
   ; precomputed_blocks_path: string option
   ; log_precomputed_blocks: bool
   ; upload_blocks_to_gcloud: bool
-  ; block_reward_threshold: Currency.Amount.t option [@default None] }
+  ; block_reward_threshold: Currency.Amount.t option [@default None]
+  ; reject_free_snark_work: bool }
 [@@deriving make]

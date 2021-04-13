@@ -469,6 +469,7 @@ module T = struct
                      ; shutdown_on_disconnect= true
                      ; num_threads= None }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~reject_free_snark_work:false
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~epoch_ledger_location

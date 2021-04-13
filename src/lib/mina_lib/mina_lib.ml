@@ -1580,6 +1580,7 @@ let create ?wallets (config : Config.t) =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
               ~disk_location:config.snark_pool_disk_location
+              ~reject_free_snark_work:config.reject_free_snark_work
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config
