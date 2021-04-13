@@ -17,11 +17,13 @@ let dependsOn = [ { name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" 
 let spec_docker = DockerImage.ReleaseSpec::{
     deps=dependsOn,
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+    service="coda-archive",
     step_key="archive-docker-image"
 }
 let spec_docker_puppeteered = DockerImage.ReleaseSpec::{
     deps=dependsOn # [{ name = "ArchiveNodeArtifact", key = "archive-docker-image" }],
     deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+    service="coda-archive-puppeteered",
     step_key="archive-docker-puppeteered-image"
 }
 
