@@ -261,6 +261,26 @@ groups:
       summary: "{{ $labels.testnet }} block production is critically low (there has been less than 1 block in the last hour)"
       description: "{{ $value }} blocks have been produced on network {{ $labels.testnet }} in the last hour (according to some node)."
 
+
+  - alert: LowDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 disconnected blocks in the last hour"
+      description: "{{ $value }} blocks have been produced on remote side chains on network {{ $labels.test }} in the last hour."
+
+
+  - alert: HighDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 5
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 5 disconnected blocks in the last hour"
+      description: "{{ $value }} blocks have been produced on remote side chains on network {{ $labels.test }} in the last hour."
+
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alert_timeframe}])) < 1
     for: ${alert_evaluation_duration}
