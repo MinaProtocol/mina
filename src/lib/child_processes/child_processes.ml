@@ -279,7 +279,8 @@ let start_custom :
          [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
          ; Some (Filename.dirname mina_binary_path ^/ name)
-         ; Some ("mina-" ^ name) ])
+         ; Some ("mina-" ^ name)
+         ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
   [%log info] "Custom child process $name started with pid $pid"
