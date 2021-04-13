@@ -979,7 +979,8 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values ;
+    ~precomputed_values:t.config.precomputed_values
+    ~block_reward_threshold:t.config.block_reward_threshold ;
   perform_compaction t ;
   Snark_worker.start t
 

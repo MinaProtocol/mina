@@ -351,6 +351,15 @@ let setup_daemon logger =
     flag "--log-precomputed-blocks" ~aliases:["log-precomputed-blocks"]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and block_reward_threshold =
+    flag "--minimum-block-reward" ~aliases:["minimum-block-reward"]
+      ~doc:
+        "AMOUNT Minimum reward a block produced by the node should have. \
+         Empty blocks are created if the rewards are lower than the specified \
+         threshold (default: No threshold, transactions and coinbase will be \
+         included as long as the required snark work is available and can be \
+         paid for)"
+      (optional txn_amount)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:["upload-blocks-to-gcloud"]
@@ -1104,7 +1113,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
-             ~upload_blocks_to_gcloud ())
+             ~upload_blocks_to_gcloud ~block_reward_threshold ())
       in
       { Coda_initialization.coda
       ; client_trustlist
