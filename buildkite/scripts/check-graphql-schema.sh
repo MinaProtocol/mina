@@ -15,14 +15,14 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get install -y apt-transport-https ca-certificates make
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
-apt-get install --allow-downgrades -y curl ${PROJECT}=${VERSION}
+apt-get install --allow-downgrades -y curl ${PROJECT}-noprovingkeys=${VERSION}
 
 mina daemon --seed --proof-level none --rest-port 8080 &
 
 # Update the graphql schema
-num_retries=5
+num_retries=15
 for ((i=1;i<=$num_retries;i++)); do
-  sleep 10s
+  sleep 15s
   set +e
   make update-graphql
   status_exit_code=$?

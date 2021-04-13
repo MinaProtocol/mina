@@ -5,29 +5,6 @@ open Mina_state
 open Mina_transition
 open Network_peer
 
-module Repr = struct
-  module T = struct
-    type t = Time.t
-
-    let to_yojson t =
-      `String (Time.to_string_iso8601_basic ~zone:Time.Zone.utc t)
-
-    let of_yojson j =
-      match j with
-      | `String s -> (
-        try Ok (Time.of_string_fix_proto `Utc s)
-        with e -> Error (Exn.to_string e) )
-      | _ ->
-          Error "expected string"
-  end
-
-  type t =
-    { validated_transition: External_transition.Repr.t
-    ; just_emitted_a_proof: bool
-    ; transition_receipt_time: T.t option }
-  [@@deriving yojson]
-end
-
 module T = struct
   let id = "breadcrumb"
 
@@ -37,16 +14,6 @@ module T = struct
     ; just_emitted_a_proof: bool
     ; transition_receipt_time: Time.t option }
   [@@deriving sexp, fields]
-
-  let to_repr
-      { validated_transition
-      ; staged_ledger= _
-      ; just_emitted_a_proof
-      ; transition_receipt_time } =
-    { Repr.validated_transition=
-        External_transition.to_repr (validated_transition |> fst).data
-    ; just_emitted_a_proof
-    ; transition_receipt_time }
 
   type 'a creator =
        validated_transition:External_transition.Validated.t
@@ -68,13 +35,26 @@ module T = struct
     ; just_emitted_a_proof
     ; transition_receipt_time }
 
-  let to_yojson = Fn.compose Repr.to_yojson to_repr
+  let to_yojson
+      { validated_transition
+      ; staged_ledger= _
+      ; just_emitted_a_proof
+      ; transition_receipt_time } =
+    `Assoc
+      [ ( "validated_transition"
+        , External_transition.Validated.to_yojson validated_transition )
+      ; ("staged_ledger", `String "<opaque>")
+      ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
+      ; ( "transition_receipt_time"
+        , `String
+            (Option.value_map transition_receipt_time
+               ~default:"<not available>"
+               ~f:(Time.to_string_iso8601_basic ~zone:Time.Zone.utc)) ) ]
 end
 
 [%%define_locally
 T.
   ( validated_transition
-  , to_repr
   , staged_ledger
   , just_emitted_a_proof
   , transition_receipt_time
@@ -305,20 +285,10 @@ module For_tests = struct
         Signed_command.sign sender_keypair payload )
 
   let gen ?(logger = Logger.null ())
-      ~(precomputed_values : Precomputed_values.t) ?verifier
+      ~(precomputed_values : Precomputed_values.t) ~verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let verifier =
-      match verifier with
-      | Some verifier ->
-          verifier
-      | None ->
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger
-                ~proof_level:precomputed_values.proof_level ~conf_dir:None
-                ~pids:(Child_processes.Termination.create_pid_table ()) )
-    in
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%bind make_next_consensus_state =
       Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
@@ -478,21 +448,21 @@ module For_tests = struct
       | Error (`Invalid_staged_ledger_hash e) ->
           failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
-  let gen_non_deferred ?logger ~precomputed_values ?verifier ?trust_system
+  let gen_non_deferred ?logger ~precomputed_values ~verifier ?trust_system
       ~accounts_with_secret_keys =
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
-      gen ?logger ?verifier ~precomputed_values ?trust_system
+      gen ?logger ~verifier ~precomputed_values ?trust_system
         ~accounts_with_secret_keys
     in
     fun x -> Async.Thread_safe.block_on_async_exn (fun () -> make_deferred x)
 
-  let gen_seq ?logger ~precomputed_values ?verifier ?trust_system
+  let gen_seq ?logger ~precomputed_values ~verifier ?trust_system
       ~accounts_with_secret_keys n =
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n
-        (gen ?logger ~precomputed_values ?verifier ?trust_system
+        (gen ?logger ~precomputed_values ~verifier ?trust_system
            ~accounts_with_secret_keys)
     in
     let%map breadcrumbs_constructors = gen_list in

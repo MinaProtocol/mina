@@ -21,7 +21,7 @@ def peer_to_multiaddr(peer):
     peer['libp2p_port'],
     peer['peer_id'] )
 
-def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, prover_errors):
+def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, prover_errors):
   print('collecting node status metrics')
 
   pods = v1.list_namespaced_pod(namespace, watch=False)
@@ -38,8 +38,11 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   peers = crawl_for_peers(v1, namespace, seed, seed_daemon_port)
 
-  synced_fraction = sum([ p['sync_status'] == 'Synced' for p in peers.values() ]) / len(peers.values())
+  num_peers = len(peers.values())
 
+  synced_fraction = sum([ p['sync_status'] == 'Synced' for p in peers.values() ]) / num_peers
+
+  nodes_queried.set(num_peers)
   nodes_synced.set(synced_fraction)
 
   # -------------------------------------------------

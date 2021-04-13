@@ -979,7 +979,8 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values ;
+    ~precomputed_values:t.config.precomputed_values
+    ~block_reward_threshold:t.config.block_reward_threshold ;
   perform_compaction t ;
   Snark_worker.start t
 
@@ -1031,6 +1032,8 @@ let create ?wallets (config : Config.t) =
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
                       ~proof_level:config.precomputed_values.proof_level
+                      ~constraint_constants:
+                        config.precomputed_values.constraint_constants
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
@@ -1112,6 +1115,15 @@ let create ?wallets (config : Config.t) =
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
+          let block_production_keypairs =
+            Agent.create
+              ~f:(fun kps ->
+                Keypair.Set.to_list kps
+                |> List.map ~f:(fun kp ->
+                       (kp, Public_key.compress kp.Keypair.public_key) )
+                |> Keypair.And_compressed_pk.Set.of_list )
+              config.initial_block_production_keypairs
+          in
           let get_node_status _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -1193,10 +1205,9 @@ let create ?wallets (config : Config.t) =
                           (Mina_incremental.Status.Observer.value status)
                   in
                   let block_producers =
-                    config.initial_block_production_keypairs
-                    |> Keypair.Set.to_list
-                    |> List.map ~f:(fun {Keypair.public_key; _} ->
-                           Public_key.compress public_key )
+                    let public_keys, _ = Agent.get block_production_keypairs in
+                    Public_key.Compressed.Set.map public_keys ~f:snd
+                    |> Set.to_list
                   in
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
@@ -1597,15 +1608,6 @@ let create ?wallets (config : Config.t) =
                 ~f:(fun x ->
                   Mina_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
-          let block_production_keypairs =
-            Agent.create
-              ~f:(fun kps ->
-                Keypair.Set.to_list kps
-                |> List.map ~f:(fun kp ->
-                       (kp, Public_key.compress kp.Keypair.public_key) )
-                |> Keypair.And_compressed_pk.Set.of_list )
-              config.initial_block_production_keypairs
-          in
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]

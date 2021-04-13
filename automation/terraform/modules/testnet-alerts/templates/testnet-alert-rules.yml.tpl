@@ -65,7 +65,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Nodes-not-synced-34e4d4eeaeaf47e381de660bab9ce7b7"
 
   - alert: NodesOutOfSync
-    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alert_timeframe}])) < .6
+    expr: min by (testnet) (avg_over_time(Coda_watchdog_nodes_synced_near_best_tip ${rule_filter} [${alert_timeframe}])) < .6
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
