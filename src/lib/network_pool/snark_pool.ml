@@ -382,13 +382,16 @@ struct
             sender
         in
         let is_local = Envelope.Sender.(equal Local sender) in
+        let metadata =
+          [ ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
+          ; ("fee", Currency.Fee.to_yojson fee)
+          ; ("sender", Envelope.Sender.to_yojson sender) ]
+        in
         let log_and_punish ?(punish = true) statement e =
           let metadata =
-            [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
-            ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
-            ; ("fee", Currency.Fee.to_yojson fee)
-            ; ("error", Error_json.error_to_yojson e)
-            ; ("sender", Envelope.Sender.to_yojson sender) ]
+            [ ("error", Error_json.error_to_yojson e)
+            ; ("work_id", `Int (Transaction_snark.Statement.hash statement)) ]
+            @ metadata
           in
           [%log' error t.logger] ~metadata
             "Error verifying transaction snark from $sender: $error" ;
@@ -412,7 +415,7 @@ struct
                 else
                   let e = Error.of_string "Statement and proof do not match" in
                   if is_local then
-                    [%log' debug t.logger]
+                    [%log' debug t.logger] ~metadata
                       !"Statement and proof mismatch. Proof statement: \
                         %{sexp:Transaction_snark.Statement.t} Statement \
                         %{sexp: Transaction_snark.Statement.t}"
@@ -422,15 +425,16 @@ struct
           in
           let work = One_or_two.map proofs ~f:snd in
           if not prover_account_ok then (
-            [%log' debug t.logger] "Prover did not have sufficient balance"
-              ~metadata:[] ;
+            [%log' debug t.logger]
+              "Prover $prover did not have sufficient balance" ~metadata ;
             return false )
           else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
               ~metadata:
-                [ ( "stmt"
+                ( ( "stmt"
                   , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      work ) ] ;
+                      work )
+                :: metadata ) ;
             return false )
           else
             match statement_check with
@@ -479,7 +483,12 @@ struct
             verify pairs
         | Error e ->
             [%log' error t.logger]
-              ~metadata:[("error", Error_json.error_to_yojson e)]
+              ~metadata:
+                ( [ ("error", Error_json.error_to_yojson e)
+                  ; ( "work_ids"
+                    , Transaction_snark_work.Statement.compact_json statements
+                    ) ]
+                @ metadata )
               "One_or_two length mismatch: $error" ;
             Deferred.return false
     end
