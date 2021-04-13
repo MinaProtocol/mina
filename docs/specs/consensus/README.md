@@ -22,8 +22,9 @@ This documents specifies required structures, algorithms and protocol details.
     * [3.1.1 `top`](#311-top)
     * [3.1.2 `globalSlot`](#312-globalslot)
     * [3.1.3 `epochSlot`](#313-epochslot)
-    * [3.1.4 `lastVRF`](#314-lastvrf)
-    * [3.1.5 `stateHash`](#315-statehash)
+    * [3.1.4 `length`](#314-length)
+    * [3.1.5 `lastVRF`](#315-lastvrf)
+    * [3.1.6 `stateHash`](#316-statehash)
   * [3.2 Chain selection](#32-chain-selection-rules)
     * [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
     * [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
@@ -274,7 +275,18 @@ fn epochSlot(g) -> u32
 }
 ```
 
-### 3.1.4 `lastVRF`
+### 3.1.4 `length`
+
+The function the length of a chain.  The input is the global chain `C` and the output is the length of the chain in blocks.
+
+```rust
+fn length(C) -> u64
+{
+   return top(C).protocol_state.body.consensus_state.blockchain_length
+}
+```
+
+### 3.1.5 `lastVRF`
 
 This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
 
@@ -285,7 +297,7 @@ fn lastVRF(C) -> String
 }
 ```
 
-### 3.1.5 `stateHash`
+### 3.1.6 `stateHash`
 
 This function returns hash of the top block's consensus state for a given chain.  The input is a chain `C` and the output is the hash.
 
@@ -410,11 +422,11 @@ Specifically, if `epochSlot(SB.curr_global_slot)` of the new block `B` is the st
 This algorithm uses the checkpoints to determine if the fork of two chains is short-range or long-range.  It inputs two chains with a fork `C1` and `C2` and outputs `true` if the fork is short-range, otherwise the fork is long-range and it outputs `false`.
 
 ```rust
-fn isShortRange(C1,C2) -> bool
+fn isShortRange(C1, C2) -> bool
 {
-    B1 = last block of C1
-    B2 = last block of C2
-    if B1.staking_epoch_data.lock_checkpoint == B2.staking_epoch_data.lock_checkpoint {
+    state1 = top(C1).protocol_state.body.consensus_state
+    state2 = top(C2).protocol_state.body.consensus_state
+    if state1.staking_epoch_data.lock_checkpoint == state2.staking_epoch_data.lock_checkpoint {
         return true
     }
     else {
@@ -513,8 +525,8 @@ This algorithm initializes the sub-window densities and minimm window density fo
 ```rust
 fn initSubWindowDensities(G) -> ()
 {
-    G.protocol_state.body.consensus_state.sub_window_densities = [0]
-    G.protocol_state.body.consensus_state.min_window_density = ω ?
+    G.protocol_state.body.consensus_state.sub_window_densities = [0, slots_per_window, ..., slots_per_window]
+    G.protocol_state.body.consensus_state.min_window_density = slots_per_window
 }
 ```
 
@@ -535,15 +547,17 @@ fn updateSubWindowDensities(P, B) -> ()
 
 ### 3.4.5 `getMinDen`
 
-As mentioned in [Section 3.2.2](#322-long-range-fork-rule), this function returns the current minimum density of a chain `C`.
+This function returns the current minimum density of a chain.  It inputs a chain `C` and the .
 
 ```rust
 fn getMinDen(C, max_slot) -> density
 {
-    if top(C) is genesis block then
-        return 0
-    else
+    if globalSlot(C) == max_slot {
         return top(C).protocol_state.body.consensus_state.min_window_density
+    }
+    else {
+
+    }
 }
 ```
 
@@ -618,11 +632,11 @@ It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#345-getm
 ```rust
 fn selectLongerChain(tip, candidate) -> Chain
 {
-    if tip.length < candidate.length {
+    if length(tip) < length(candidate) {
         return candidate
     }
     // tiebreak logic
-    else if tip.length == candidate.length {
+    else if length(tip) == length(candidate) {
         // compare last VRF digests lexographically
         if lastVRF(candidate) > lastVRF(tip) {
             return candidate
