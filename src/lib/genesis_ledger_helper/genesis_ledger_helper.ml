@@ -910,35 +910,42 @@ module Genesis_proof = struct
     ; genesis_epoch_data
     ; consensus_constants
     ; protocol_state_with_hash
+    ; constraint_system_digests= None
     ; genesis_constants }
 
   let blockchain_snark_state (inputs : Genesis_proof.Inputs.t) :
-      (module Blockchain_snark.Blockchain_snark_state.S) =
+      (module Transaction_snark.S)
+      * (module Blockchain_snark.Blockchain_snark_state.S) =
     let module T = Transaction_snark.Make (struct
       let constraint_constants = inputs.constraint_constants
+
+      let proof_level = inputs.proof_level
     end) in
-    ( module Blockchain_snark.Blockchain_snark_state.Make (struct
+    let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
       let tag = T.tag
 
       let constraint_constants = inputs.constraint_constants
 
       let proof_level = inputs.proof_level
-    end) )
+    end) in
+    ((module T), (module B))
 
   let generate b (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
-        let (module B) =
+        let (module T), (module B) =
           match b with Some b -> b | None -> blockchain_snark_state inputs
         in
         let computed_values =
           Genesis_proof.create_values
+            (module T)
             (module B)
             { genesis_ledger= inputs.genesis_ledger
             ; genesis_epoch_data= inputs.genesis_epoch_data
             ; runtime_config= inputs.runtime_config
             ; proof_level= inputs.proof_level
             ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id)
+            ; constraint_system_digests= None
             ; protocol_state_with_hash= inputs.protocol_state_with_hash
             ; genesis_constants= inputs.genesis_constants
             ; consensus_constants= inputs.consensus_constants
@@ -946,6 +953,21 @@ module Genesis_proof = struct
         in
         computed_values
     | _ ->
+        let constraint_system_digests =
+          match inputs.constraint_system_digests with
+          | Some digests ->
+              lazy digests
+          | None ->
+              lazy
+                (let (module T), (module B) =
+                   match b with
+                   | Some b ->
+                       b
+                   | None ->
+                       blockchain_snark_state inputs
+                 in
+                 Lazy.force @@ Genesis_proof.digests (module T) (module B))
+        in
         Deferred.return
           { Genesis_proof.runtime_config= inputs.runtime_config
           ; constraint_constants= inputs.constraint_constants
@@ -955,6 +977,7 @@ module Genesis_proof = struct
           ; genesis_epoch_data= inputs.genesis_epoch_data
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; constraint_system_digests
           ; genesis_proof= Mina_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
@@ -983,25 +1006,40 @@ module Genesis_proof = struct
       | Some id, _ ->
           (None, id)
       | None, Full ->
-          let ((module B) as b) = blockchain_snark_state inputs in
+          let ((_, (module B)) as b) = blockchain_snark_state inputs in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
           (None, Pickles.Verification_key.Id.dummy ())
     in
-    let compiled = Precomputed_values.compiled in
+    let compiled_inputs = Precomputed_values.compiled_inputs in
     let base_hash =
       Base_hash.create ~id ~state_hash:inputs.protocol_state_with_hash.hash
     in
     let compiled_base_hash =
       Base_hash.create
         ~id:(Precomputed_values.blockchain_proof_system_id ())
-        ~state_hash:(Lazy.force compiled).protocol_state_with_hash.hash
+        ~state_hash:(Lazy.force compiled_inputs).protocol_state_with_hash.hash
     in
     let%bind found_proof =
       match%bind find_file ~logger ~base_hash ~genesis_dir with
       | Some file -> (
           match%map load file with
           | Ok genesis_proof ->
+              let constraint_system_digests =
+                match inputs.constraint_system_digests with
+                | Some digests ->
+                    lazy digests
+                | None ->
+                    lazy
+                      (let (module T), (module B) =
+                         match b with
+                         | Some b ->
+                             b
+                         | None ->
+                             blockchain_snark_state inputs
+                       in
+                       Lazy.force @@ Genesis_proof.digests (module T) (module B))
+              in
               Some
                 ( { Genesis_proof.runtime_config= inputs.runtime_config
                   ; constraint_constants= inputs.constraint_constants
@@ -1011,6 +1049,7 @@ module Genesis_proof = struct
                   ; genesis_epoch_data= inputs.genesis_epoch_data
                   ; consensus_constants= inputs.consensus_constants
                   ; protocol_state_with_hash= inputs.protocol_state_with_hash
+                  ; constraint_system_digests
                   ; genesis_proof }
                 , file )
           | Error err ->
@@ -1026,8 +1065,12 @@ module Genesis_proof = struct
     | Some found_proof ->
         return (Ok found_proof)
     | None
-      when Base_hash.equal base_hash compiled_base_hash || not proof_needed ->
-        let compiled = Lazy.force compiled in
+      when Option.is_some Precomputed_values.compiled
+           && (Base_hash.equal base_hash compiled_base_hash || not proof_needed)
+      ->
+        let compiled =
+          Lazy.force (Option.value_exn Precomputed_values.compiled)
+        in
         [%log info]
           "Base hash $computed_hash matches compile-time $compiled_hash, \
            using precomputed genesis proof"
@@ -1044,6 +1087,7 @@ module Genesis_proof = struct
           ; genesis_epoch_data= inputs.genesis_epoch_data
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
+          ; constraint_system_digests= compiled.constraint_system_digests
           ; genesis_proof= compiled.genesis_proof }
         in
         let%map () =
@@ -1227,8 +1271,8 @@ let load_config_file filename =
       | Error err ->
           Or_error.error_string err )
 
-let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate ~proof_level (config : Runtime_config.t) =
+let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~proof_level (config : Runtime_config.t) =
   let ledger_name_json =
     match
       let open Option.Let_syntax in
@@ -1333,6 +1377,8 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
            ; name= None
            ; add_genesis_winner= None })
   in
+  [%log info] "Loaded genesis ledger from $ledger_file"
+    ~metadata:[("ledger_file", `String ledger_file)] ;
   let%bind genesis_epoch_data, genesis_epoch_data_config =
     Epoch_data.load ~proof_level ~genesis_dir ~logger ~constraint_constants
       config.epoch_data
@@ -1342,7 +1388,7 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ledger= Option.map config.ledger ~f:(fun _ -> ledger_config)
     ; epoch_data= genesis_epoch_data_config }
   in
-  let%bind genesis_constants =
+  let%map genesis_constants =
     Deferred.return
     @@ make_genesis_constants ~logger ~default:genesis_constants config
   in
@@ -1351,15 +1397,28 @@ let init_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
       ~ledger:genesis_ledger ~constraint_constants ~genesis_constants
       ~blockchain_proof_system_id ~genesis_epoch_data
   in
+  (proof_inputs, config)
+
+let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
+    ~may_generate proof_inputs =
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
     Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
       proof_inputs
   in
-  [%log info]
-    "Loaded ledger from $ledger_file and genesis proof from $proof_file"
-    ~metadata:
-      [("ledger_file", `String ledger_file); ("proof_file", `String proof_file)] ;
+  [%log info] "Loaded genesis proof from $proof_file"
+    ~metadata:[("proof_file", `String proof_file)] ;
+  values
+
+let init_from_config_file ?genesis_dir ~logger ~may_generate ~proof_level
+    (config : Runtime_config.t) =
+  let open Deferred.Or_error.Let_syntax in
+  let%bind inputs, config =
+    inputs_from_config_file ?genesis_dir ~logger ~proof_level config
+  in
+  let%map values =
+    init_from_inputs ?genesis_dir ~logger ~may_generate inputs
+  in
   (values, config)
 
 let upgrade_old_config ~logger filename json =
