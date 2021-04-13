@@ -1,0 +1,9 @@
+(executable
+ (name generate_config))
+
+(rule
+ (targets config_rule.sexp)
+ (mode promote)
+ (action (run %{exe:generate_config.exe})))
+
+(include config_rule.sexp)
