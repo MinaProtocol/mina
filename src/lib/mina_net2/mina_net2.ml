@@ -232,6 +232,18 @@ module Go_log = struct
       ; event_id= None }
 end
 
+(** Set of peers, represented as a host/port pair. We ignore the peer ID so
+    that the same node restarting and attaining a new peer ID will not be
+    double (or triple, etc.) counted.
+*)
+module Peers_no_ids = struct
+  module T = struct
+    type t = {libp2p_port: int; host: string} [@@deriving sexp, compare]
+  end
+
+  module Set = Set.Make (T)
+end
+
 module Helper = struct
   type t =
     { subprocess: Child_processes.t
@@ -256,6 +268,7 @@ module Helper = struct
     ; subscriptions: (int, erased_magic subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
+    ; mutable all_peers_seen: Peers_no_ids.Set.t
     ; mutable banned_ips: Unix.Inet_addr.t list
     ; mutable peer_connected_callback: (string -> unit) option
     ; mutable peer_disconnected_callback: (string -> unit) option
@@ -1027,6 +1040,12 @@ module Helper = struct
         let%bind m = Incoming_stream.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
         let protocol = m.protocol in
+        t.all_peers_seen
+        <- Set.add t.all_peers_seen
+             {libp2p_port= m.peer.libp2p_port; host= m.peer.host} ;
+        Mina_metrics.(
+          Gauge.set Network.all_peers
+            (Set.length t.all_peers_seen |> Int.to_float)) ;
         let stream = make_stream t stream_idx protocol m.peer in
         match Hashtbl.find t.protocol_handlers protocol with
         | Some ph ->
@@ -1651,6 +1670,7 @@ let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
         ; streams= Hashtbl.create (module Int)
+        ; all_peers_seen= Peers_no_ids.Set.empty
         ; peer_connected_callback= None
         ; peer_disconnected_callback= None
         ; protocol_handlers= Hashtbl.create (module String)
