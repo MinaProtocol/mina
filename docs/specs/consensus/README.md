@@ -50,6 +50,8 @@ This documents specifies required structures, algorithms and protocol details.
 
 **Notations**
 * `a⌢b` - Concatenation of `a` and `b`
+* `T[N]` - Array of type `T` containing `N` elements
+* `T[v; N]` - Array of type `T` containing `N` elements of value `v`
 * `x[i]` - Element `i` of array `x`, starting at index `0`
 * `x[a..b]` - Slice of vector `x` containing elements from indexes `[a, b)`
 
@@ -255,12 +257,15 @@ fn top(C) -> Block
 
 ### 3.1.2 `globalSlot`
 
-The function returns the _global slot number_ of a chain.  The input is the global chain `C` and the output is the global slot number.
+The function returns the _global slot number_ of a chain or block.  The input `X` is either a chain or block and the output is the global slot number.
 
 ```rust
-fn globalSlot(C) -> u64
+fn globalSlot(X) -> u64
 {
-   return top(C).protocol_state.body.consensus_state.curr_global_slot
+    match X {
+        Block => X.protocol_state.body.consensus_state.curr_global_slot,
+        Chain => globalSlot(top(C))
+    }
 }
 ```
 
@@ -525,7 +530,7 @@ This algorithm initializes the sub-window densities and minimm window density fo
 ```rust
 fn initSubWindowDensities(G) -> ()
 {
-    G.protocol_state.body.consensus_state.sub_window_densities = [0, slots_per_window, ..., slots_per_window]
+    G.protocol_state.body.consensus_state.sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1]
     G.protocol_state.body.consensus_state.min_window_density = slots_per_window
 }
 ```
@@ -538,8 +543,8 @@ This algorithm updates the sub-window densities of the block being created `B` b
 fn updateSubWindowDensities(P, B) -> ()
 {
     prev = P.protocol_state.body.consensus_state
-    curr = P.protocol_state.body.consensus_state
-    if prev.curr_global_slot
+    curr = B.protocol_state.body.consensus_state
+    if globalSlot(P).curr_global_slot
     curr.sub_window_densities;
     curr.min_window_density;
 }
