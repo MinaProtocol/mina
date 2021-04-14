@@ -24,6 +24,8 @@ RUN apt-get -y update && \
     apt-transport-https \
     ca-certificates \
     dnsutils \
+    google-cloud-sdk \
+    kubectl \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 

@@ -8,10 +8,6 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
 
 RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
 
-RUN apt-get update && apt-get install -y google-cloud-sdk
-
-RUN apt-get update && apt-get install -y kubectl
-
 ARG COMMIT_HASH=master
 ARG TESTNET_NAME=testworld
 ARG CONFIG_FILE="/root/daemon.json"
