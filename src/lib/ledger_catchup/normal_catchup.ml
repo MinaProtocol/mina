@@ -588,6 +588,34 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                         [%log info]
                           "Could not download state hashes using random peers"
                           ~metadata:[("error", Error_json.error_to_yojson err)] ;
+                        let transitions =
+                          List.concat_map subtrees ~f:Rose_tree.flatten
+                        in
+                        List.iter transitions ~f:(fun cached_transition ->
+                            let transition =
+                              Cached.peek cached_transition
+                              |> Envelope.Incoming.data
+                            in
+                            let transition_hash =
+                              External_transition.Initial_validated.state_hash
+                                transition
+                            in
+                            [%log error]
+                              ~metadata:
+                                [ ( "state_hash"
+                                  , State_hash.to_yojson transition_hash )
+                                ; ("reason", `String "disconnected block")
+                                ; ( "protocol_state"
+                                  , External_transition.Initial_validated
+                                    .protocol_state transition
+                                    |> Mina_state.Protocol_state
+                                       .value_to_yojson ) ]
+                              "Validation error: external transition with \
+                               state hash $state_hash was rejected for reason \
+                               $reason" ) ;
+                        Mina_metrics.(
+                          Counter.inc Rejected_blocks.no_common_ancestor
+                            (Float.of_int @@ List.length transitions)) ;
                         return (Error err) )
               in
               let num_of_missing_transitions =

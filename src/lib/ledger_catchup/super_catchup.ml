@@ -952,7 +952,28 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              [%log debug]
                ~metadata:
                  [("target_hash", State_hash.to_yojson target_parent_hash)]
-               "Failed to download state hashes for $target_hash"
+               "Failed to download state hashes for $target_hash" ;
+             let transitions = List.concat_map forest ~f:Rose_tree.flatten in
+             List.iter transitions ~f:(fun cached_transition ->
+                 let transition =
+                   Cached.peek cached_transition |> Envelope.Incoming.data
+                 in
+                 let transition_hash =
+                   External_transition.Initial_validated.state_hash transition
+                 in
+                 [%log error]
+                   ~metadata:
+                     [ ("state_hash", State_hash.to_yojson transition_hash)
+                     ; ("reason", `String "disconnected block")
+                     ; ( "protocol_state"
+                       , External_transition.Initial_validated.protocol_state
+                           transition
+                         |> Mina_state.Protocol_state.value_to_yojson ) ]
+                   "Validation error: external transition with state hash \
+                    $state_hash was rejected for reason $reason" ) ;
+             Mina_metrics.(
+               Counter.inc Rejected_blocks.no_common_ancestor
+                 (Float.of_int @@ List.length transitions))
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
