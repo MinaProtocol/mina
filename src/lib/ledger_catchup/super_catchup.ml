@@ -253,38 +253,18 @@ let find_map_ok ?how xs ~f =
   Ivar.read res
 
 type download_state_hashes_error =
-  [ `Peer_moves_too_fast of Error.t
-  | `No_common_ancestor of Error.t
-  | `Failed_to_download_merkle_path of Error.t
-  | `Invalid_merkle_path of Error.t ]
-
-let display_error = function
-  | `Peer_moves_too_fast err ->
-      Error.to_string_hum err
-  | `No_common_ancestor err ->
-      Error.to_string_hum err
-  | `Failed_to_download_merkle_path err ->
-      Error.to_string_hum err
-  | `Invalid_merkle_path err ->
-      Error.to_string_hum err
+  [ `Peer_moves_too_fast
+  | `No_common_ancestor
+  | `Failed_to_download_merkle_path
+  | `Invalid_merkle_path ]
 
 let rec contains_no_common_ancestor = function
   | [] ->
       false
-  | `No_common_ancestor _ :: _ ->
+  | `No_common_ancestor :: _ ->
       true
   | _ :: errors ->
       contains_no_common_ancestor errors
-
-let to_error = function
-  | `Peer_moves_too_fast err ->
-      err
-  | `No_common_ancestor err ->
-      err
-  | `Failed_to_download_merkle_path err ->
-      err
-  | `Invalid_merkle_path err ->
-      err
 
 let try_to_connect_hash_chain t hashes ~frontier
     ~blockchain_length_of_target_hash =
@@ -327,15 +307,8 @@ let try_to_connect_hash_chain t hashes ~frontier
       if
         Unsigned.UInt32.compare blockchain_length blockchain_length_of_root
         <= 0
-      then
-        Result.fail
-        @@ `No_common_ancestor
-             (Error.of_string
-                "Requested block doesn't have a path to the root of our \
-                 frontier")
-      else
-        Result.fail
-        @@ `Peer_moves_too_fast (Error.of_string "Peer moves too fast") )
+      then Result.fail `No_common_ancestor
+      else Result.fail `Peer_moves_too_fast )
 
 module Downloader = struct
   module Key = struct
@@ -400,8 +373,8 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
           Mina_networking.get_transition_chain_proof
             ~timeout:(Time.Span.of_sec 10.) network peer target_hash
         with
-        | Error err ->
-            Result.fail @@ `Failed_to_download_merkle_path err
+        | Error _ ->
+            Result.fail `Failed_to_download_merkle_path
         | Ok transition_chain_proof ->
             Result.return transition_chain_proof
       in
@@ -428,8 +401,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
                     , Some (error_msg, []) )) ;
-            Deferred.Result.fail
-            @@ `Invalid_merkle_path (Error.of_string error_msg)
+            Deferred.Result.fail `Invalid_merkle_path
       in
       Deferred.return
         ( match
