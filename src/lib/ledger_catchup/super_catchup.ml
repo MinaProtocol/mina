@@ -249,15 +249,54 @@ let find_map_ok ?how xs ~f =
              | `Ok (Error e) ->
                  errs := e :: !errs )
      in
-     Ivar.fill_if_empty res (Error (Error.of_list !errs))) ;
+     Ivar.fill_if_empty res (Error !errs)) ;
   Ivar.read res
 
-let try_to_connect_hash_chain t hashes ~frontier =
+type download_state_hashes_error =
+  [ `Peer_moves_too_fast of Error.t
+  | `No_common_ancestor of Error.t
+  | `Failed_to_download_merkle_path of Error.t
+  | `Invalid_merkle_path of Error.t ]
+
+let display_error = function
+  | `Peer_moves_too_fast err ->
+      Error.to_string_hum err
+  | `No_common_ancestor err ->
+      Error.to_string_hum err
+  | `Failed_to_download_merkle_path err ->
+      Error.to_string_hum err
+  | `Invalid_merkle_path err ->
+      Error.to_string_hum err
+
+let rec contains_no_common_ancestor = function
+  | [] ->
+      false
+  | `No_common_ancestor _ :: _ ->
+      true
+  | _ :: errors ->
+      contains_no_common_ancestor errors
+
+let to_error = function
+  | `Peer_moves_too_fast err ->
+      err
+  | `No_common_ancestor err ->
+      err
+  | `Failed_to_download_merkle_path err ->
+      err
+  | `Invalid_merkle_path err ->
+      err
+
+let try_to_connect_hash_chain t hashes ~frontier
+    ~blockchain_length_of_target_hash =
   let logger = t.logger in
+  let blockchain_length_of_root =
+    Transition_frontier.root frontier
+    |> Transition_frontier.Breadcrumb.blockchain_length
+  in
   List.fold_until
     (Non_empty_list.to_list hashes)
-    ~init:[]
-    ~f:(fun acc hash ->
+    ~init:(blockchain_length_of_target_hash, [])
+    ~f:(fun (blockchain_length, acc) hash ->
       let f x = Continue_or_stop.Stop (Ok (x, acc)) in
       match
         (Hashtbl.find t.nodes hash, Transition_frontier.find frontier hash)
@@ -270,8 +309,8 @@ let try_to_connect_hash_chain t hashes ~frontier =
       | None, Some b ->
           f (`Breadcrumb b)
       | None, None ->
-          Continue (hash :: acc) )
-    ~finish:(fun acc ->
+          Continue (Unsigned.UInt32.pred blockchain_length, hash :: acc) )
+    ~finish:(fun (blockchain_length, acc) ->
       let module T = struct
         type t = State_hash.t list [@@deriving to_yojson]
       end in
@@ -285,7 +324,18 @@ let try_to_connect_hash_chain t hashes ~frontier =
           ; ("hashes", T.to_yojson acc)
           ; ("all_hashes", T.to_yojson all_hashes) ]
         "Finishing download_state_hashes with $n $hashes. with $all_hashes" ;
-      Or_error.errorf !"Peer moves too fast" )
+      if
+        Unsigned.UInt32.compare blockchain_length blockchain_length_of_root
+        <= 0
+      then
+        Result.fail
+        @@ `No_common_ancestor
+             (Error.of_string
+                "Requested block doesn't have a path to the root of our \
+                 frontier")
+      else
+        Result.fail
+        @@ `Peer_moves_too_fast (Error.of_string "Peer moves too fast") )
 
 module Downloader = struct
   module Key = struct
@@ -334,7 +384,7 @@ let with_lengths hs ~target_length =
 
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes t ~logger ~trust_system ~network ~frontier
-    ~target_hash ~target_length ~downloader =
+    ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash =
   [%log debug]
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
@@ -342,11 +392,18 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
     (* TODO: Find some preferred peers, e.g., whoever told us about this target_hash *)
     Mina_networking.peers network >>| List.permute
   in
-  let open Deferred.Or_error.Let_syntax in
+  let open Deferred.Result.Let_syntax in
   find_map_ok ~how:(`Max_concurrent_jobs 12) peers ~f:(fun peer ->
       let%bind transition_chain_proof =
-        Mina_networking.get_transition_chain_proof
-          ~timeout:(Time.Span.of_sec 10.) network peer target_hash
+        let open Deferred.Let_syntax in
+        match%map
+          Mina_networking.get_transition_chain_proof
+            ~timeout:(Time.Span.of_sec 10.) network peer target_hash
+        with
+        | Error err ->
+            Result.fail @@ `Failed_to_download_merkle_path err
+        | Ok transition_chain_proof ->
+            Result.return transition_chain_proof
       in
       let now = Time.now () in
       (* a list of state_hashes from new to old *)
@@ -358,7 +415,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
             let ks = with_lengths hs ~target_length in
             Downloader.update_knowledge downloader peer (`Some ks) ;
             Downloader.mark_preferred downloader peer ~now ;
-            Deferred.Or_error.return hs
+            Deferred.Result.return hs
         | None ->
             let error_msg =
               sprintf
@@ -371,10 +428,14 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
                     , Some (error_msg, []) )) ;
-            Deferred.Or_error.error_string error_msg
+            Deferred.Result.fail
+            @@ `Invalid_merkle_path (Error.of_string error_msg)
       in
       Deferred.return
-        ( match try_to_connect_hash_chain t hashes ~frontier with
+        ( match
+            try_to_connect_hash_chain t hashes ~frontier
+              ~blockchain_length_of_target_hash
+          with
         | Ok x ->
             Downloader.mark_preferred downloader peer ~now ;
             Ok x
@@ -916,6 +977,14 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              in
              Option.value_exn (Length.sub len (Length.of_int 1))
            in
+           let blockchain_length_of_target_hash =
+             let blockchain_length_of_dangling_block =
+               List.hd_exn forest |> Rose_tree.root |> Cached.peek
+               |> Envelope.Incoming.data
+               |> External_transition.Initial_validated.blockchain_length
+             in
+             Unsigned.UInt32.pred blockchain_length_of_dangling_block
+           in
            match
              List.find_map (List.concat_map ~f:Rose_tree.flatten forest)
                ~f:(fun c ->
@@ -938,43 +1007,48 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                      ~transition_chain_proof:
                        (External_transition.state_hash root, path)
                  in
-                 Result.ok (try_to_connect_hash_chain t p ~frontier) )
+                 Result.ok
+                   (try_to_connect_hash_chain t p ~frontier
+                      ~blockchain_length_of_target_hash) )
            with
            | None ->
                download_state_hashes t ~logger ~trust_system ~network ~frontier
                  ~downloader ~target_length ~target_hash:target_parent_hash
+                 ~blockchain_length_of_target_hash
            | Some res ->
                [%log debug] "Succeeded in using cache." ;
-               Deferred.return (Ok res)
+               Deferred.Result.return res
          in
          match%map state_hashes with
-         | Error _ ->
+         | Error errors ->
              [%log debug]
                ~metadata:
                  [("target_hash", State_hash.to_yojson target_parent_hash)]
                "Failed to download state hashes for $target_hash" ;
-             let transitions = List.concat_map forest ~f:Rose_tree.flatten in
-             List.iter transitions ~f:(fun cached_transition ->
-                 let transition =
-                   Cached.peek cached_transition |> Envelope.Incoming.data
-                 in
-                 let transition_hash =
-                   External_transition.Initial_validated.state_hash transition
-                 in
-                 [%log error]
-                   ~metadata:
-                     [ ("state_hash", State_hash.to_yojson transition_hash)
-                     ; ( "reason"
-                       , `String "no common ancestor with current root" )
-                     ; ( "protocol_state"
-                       , External_transition.Initial_validated.protocol_state
-                           transition
-                         |> Mina_state.Protocol_state.value_to_yojson ) ]
-                   "Validation error: external transition with state hash \
-                    $state_hash was rejected for reason $reason" ) ;
-             Mina_metrics.(
-               Counter.inc Rejected_blocks.no_common_ancestor
-                 (Float.of_int @@ List.length transitions))
+             if contains_no_common_ancestor errors then (
+               let transitions = List.concat_map forest ~f:Rose_tree.flatten in
+               List.iter transitions ~f:(fun cached_transition ->
+                   let transition =
+                     Cached.peek cached_transition |> Envelope.Incoming.data
+                   in
+                   let transition_hash =
+                     External_transition.Initial_validated.state_hash
+                       transition
+                   in
+                   [%log error]
+                     ~metadata:
+                       [ ("state_hash", State_hash.to_yojson transition_hash)
+                       ; ( "reason"
+                         , `String "no common ancestor with current root" )
+                       ; ( "protocol_state"
+                         , External_transition.Initial_validated.protocol_state
+                             transition
+                           |> Mina_state.Protocol_state.value_to_yojson ) ]
+                     "Validation error: external transition with state hash \
+                      $state_hash was rejected for reason $reason" ) ;
+               Mina_metrics.(
+                 Counter.inc Rejected_blocks.no_common_ancestor
+                   (Float.of_int @@ List.length transitions)) )
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
