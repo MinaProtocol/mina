@@ -1,5 +1,7 @@
 (executable
- (name generate_config))
+ (name generate_config)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version)))
 
 (rule
  (targets config_rule.sexp)
