@@ -1696,3 +1696,6 @@ let create ?wallets (config : Config.t) =
             ; block_production_status= ref `Free } ) )
 
 let net {components= {net; _}; _} = net
+
+let runtime_config {config= {precomputed_values; _}; _} =
+  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values

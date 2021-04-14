@@ -2994,6 +2994,16 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "JSON",
+          "description": "Arbitrary JSON",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "INPUT_OBJECT",
           "name": "SignatureInput",
           "description": "A cryptographic signature -- you must provide either field+scalar or rawSignature",
@@ -9209,6 +9219,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "runtimeConfig",
+              "description": "The runtime configuration passed to the daemon at start-up",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "JSON",
                   "ofType": null
                 }
               },

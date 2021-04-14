@@ -255,6 +255,11 @@ let validate_time time_str =
          %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for \
          UTC-08:00 timezone"
 
+let genesis_timestamp_to_string time =
+  Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
+  |> Core.Time.to_string_iso8601_basic
+       ~zone:(Core.Time.Zone.of_utc_offset ~hours:(-8))
+
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
   module Poly = struct
