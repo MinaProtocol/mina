@@ -604,7 +604,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                               ~metadata:
                                 [ ( "state_hash"
                                   , State_hash.to_yojson transition_hash )
-                                ; ("reason", `String "disconnected block")
+                                ; ( "reason"
+                                  , `String
+                                      "no common ancestor with current root" )
                                 ; ( "protocol_state"
                                   , External_transition.Initial_validated
                                     .protocol_state transition

@@ -819,10 +819,17 @@ end
 module Rejected_blocks = struct
   let subsystem = "Rejected_blocks"
 
+  let worse_than_root =
+    let help =
+      "The number of blocks rejected due to the blocks are not selected over \
+       our root"
+    in
+    Counter.v "worse_than_root" ~help ~namespace ~subsystem
+
   let no_common_ancestor =
     let help =
-      "The number of blocks rejected due to the blocks are not select over \
-       the current root transition"
+      "The number of blocks rejected due to the blocks do not share a common \
+       ancestor with our root"
     in
     Counter.v "no_common_ancestor" ~help ~namespace ~subsystem
 
