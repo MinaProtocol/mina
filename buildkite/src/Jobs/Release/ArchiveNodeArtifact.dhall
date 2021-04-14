@@ -22,7 +22,7 @@ let spec_docker = DockerImage.ReleaseSpec::{
 }
 let spec_docker_puppeteered = DockerImage.ReleaseSpec::{
     deps=dependsOn # [{ name = "ArchiveNodeArtifact", key = "archive-docker-image" }],
-    deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+    deploy_env_file="DOCKER_DEPLOY_ENV",
     service="coda-archive-puppeteered",
     step_key="archive-docker-puppeteered-image"
 }
