@@ -55,7 +55,7 @@ groups:
       description: "{{ $value }} Prover errors on network {{ $labels.testnet }}."
 
   - alert: NodesNotSynced
-    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced ${rule_filter} [${alert_timeframe}])) <= .5
+    expr: min by (testnet) (Coda_watchdog_nodes_synced ${rule_filter}) <= .5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -118,7 +118,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/No-Transactions-In-Several-Blocks-55ca13df38dd4c3491e11d8ea8020c08"
 
   - alert: NoCoinbaseInBlocks
-    expr: min by (testnet) (min_over_time(Coda_Transition_frontier_best_tip_coinbase ${rule_filter} [10m])) < 1
+    expr: min by (testnet) (Coda_Transition_frontier_best_tip_coinbase ${rule_filter}) < 1
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -168,7 +168,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NoNewTransactions-27dbeafab8ea4d659ee6f748acb2fd6c"
 
   - alert: HighUnparentedBlockCount
-    expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alert_timeframe}])) > 30
+    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 30
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -179,7 +179,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: HighMissingBlockCount
-    expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alert_timeframe}])) > 30
+    expr: max by (testnet) (Coda_Archive_missing_blocks ${rule_filter}) > 30
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -222,7 +222,7 @@ groups:
       description: "Fork of length {{ $value }} on network {{ $labels.testnet }}."
 
   - alert: NoTransactionsInAtLeastOneBlock
-    expr: max by (testnet) (max_over_time(Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter} [${alert_timeframe}])) > 0
+    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -242,7 +242,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
 
   - alert: SeedListDegraded
-    expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alert_timeframe}])) <= 0.5
+    expr: min by (testnet) (Coda_watchdog_seeds_reachable ${rule_filter}) <= 0.5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -273,7 +273,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: UnparentedBlocksObserved
-    expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alert_timeframe}])) > 1
+    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter})) > 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -284,7 +284,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: MissingBlocksObserved
-    expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alert_timeframe}])) > 0
+    expr: max by (testnet) (Coda_Archive_missing_blocks ${rule_filter}) > 0
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
