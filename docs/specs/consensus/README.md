@@ -20,11 +20,12 @@ This documents specifies required structures, algorithms and protocol details.
 * [3 Algorithms](#3-algorithms)
   * [3.1 Common](#31-common)
     * [3.1.1 `top`](#311-top)
-    * [3.1.2 `globalSlot`](#312-globalslot)
-    * [3.1.3 `epochSlot`](#313-epochslot)
-    * [3.1.4 `length`](#314-length)
-    * [3.1.5 `lastVRF`](#315-lastvrf)
-    * [3.1.6 `stateHash`](#316-statehash)
+    * [3.1.2 `cState`](#312-cstate)
+    * [3.1.3 `globalSlot`](#313-globalslot)
+    * [3.1.4 `epochSlot`](#314-epochslot)
+    * [3.1.5 `length`](#315-length)
+    * [3.1.6 `lastVRF`](#316-lastvrf)
+    * [3.1.7 `stateHash`](#317-statehash)
   * [3.2 Chain selection](#32-chain-selection-rules)
     * [3.2.1 Short-range fork rule](#321-short-range-fork-rule)
     * [3.2.2 Long-range fork rule](#322-long-range-fork-rule)
@@ -45,7 +46,7 @@ This documents specifies required structures, algorithms and protocol details.
 
 **Conventions**
 * We use the terms _top_ and _last_ interchangeably to refer to the block with the greatest height on a given chain
-* We use the terms _local or epoch slot number_ to refer to the intra-epoch slot number that resets to 1 every epoch
+* We use the term _epoch slot number_ to refer to the intra-epoch slot number that resets to 1 every epoch
 * We use _global slot number_ to refer to the global slot number since genesis starting at 1
 
 **Notations**
@@ -255,61 +256,74 @@ fn top(C) -> Block
 }
 ```
 
-### 3.1.2 `globalSlot`
+### 3.1.2 `cState`
+
+The function returns the consensus state of a block or chain.  The input is a block or chain `X` and the output is the consensus state.
+
+```rust
+fn cState(X) -> Consensus_state
+{
+    match X {
+        Block => X.protocol_state.body.consensus_state,
+        Chain => {
+            cState(last block of X)
+        }
+    }
+}
+```
+
+### 3.1.3 `globalSlot`
 
 The function returns the _global slot number_ of a chain or block.  The input `X` is either a chain or block and the output is the global slot number.
 
 ```rust
 fn globalSlot(X) -> u64
 {
-    match X {
-        Block => X.protocol_state.body.consensus_state.curr_global_slot,
-        Chain => globalSlot(top(C))
-    }
+    return cState(X).curr_global_slot
 }
 ```
 
-### 3.1.3 `epochSlot`
+### 3.1.4 `epochSlot`
 
-The function computes the _epoch slot number_ from the global slot number.  The input is the global slot number `g` and the output is the local slot number in `[0, slots_per_epoch]`.
+The function computes the _epoch slot number_ of a block.  The input is the block `B` and the output is the epoch slot number in `[0, slots_per_epoch]`.
 
 ```rust
-fn epochSlot(g) -> u32
+fn epochSlot(B) -> u32
 {
-   return g mod slots_per_epoch
+   return globalSlot(B) mod slots_per_epoch
 }
 ```
 
-### 3.1.4 `length`
+### 3.1.5 `length`
 
 The function the length of a chain.  The input is the global chain `C` and the output is the length of the chain in blocks.
 
 ```rust
 fn length(C) -> u64
 {
-   return top(C).protocol_state.body.consensus_state.blockchain_length
+   return cState(C).blockchain_length
 }
 ```
 
-### 3.1.5 `lastVRF`
+### 3.1.6 `lastVRF`
 
 This function returns the hex digest of the hash of the last VRF output of a given chain.  The input is a chain `C` and the output is the hash digest.
 
 ```rust
 fn lastVRF(C) -> String
 {
-   return Digest(Blake2b(top(C).protocol_state.body.consensus_state.last_vrf_output))
+   return Digest(Blake2b(cState(C).last_vrf_output))
 }
 ```
 
-### 3.1.6 `stateHash`
+### 3.1.7 `stateHash`
 
 This function returns hash of the top block's consensus state for a given chain.  The input is a chain `C` and the output is the hash.
 
 ```rust
 fn stateHash(C) -> Hash
 {
-   return Blake2b(top(C).protocol_state.body.consensus_state)
+   return Blake2b(cState(C))
 }
 ```
 
@@ -393,12 +407,11 @@ This algorithm initializes the checkpoints for genesis block `G`
 ```rust
 fn initCheckpoints(G) -> ()
 {
-    S = G.protocol_state.body.consensus_state
     state_hash = hash(latest state ϵ S.next_epoch_data.seed's update range) ?
-    S.staking_epoch_data.lock_checkpoint = 0 (or empty hash?)
-    S.staking_epoch_data.start_checkpoint = 0 ?
-    S.next_epoch_data.start_checkpoint = state_hash ?
-    S.next_epoch_data.lock_checkpoint =  state_hash ?
+    cState(G).staking_epoch_data.lock_checkpoint = 0 (or empty hash?)
+    cState(G).staking_epoch_data.start_checkpoint = 0 ?
+    cState(G).next_epoch_data.start_checkpoint = state_hash ?
+    cState(G).next_epoch_data.lock_checkpoint =  state_hash ?
 }
 ```
 
@@ -409,18 +422,16 @@ This algorithm updates the checkpoints of the block being created `B` based on i
 ```rust
 fn updateCheckpoints(P, B) -> ()
 {
-    SP = P.protocol_state.body.consensus_state
-    SB = B.protocol_state.body.consensus_state
     state_hash = hash(latest state ϵ SP.next_epoch_data.seed's update range) ?
-    if epochSlot(SB.curr_global_slot) == 0 then
-        SB.next_epoch_data.start_checkpoint = state_hash
+    if epochSlot(B) == 0 then
+        cState(B).next_epoch_data.start_checkpoint = state_hash
 
-    if 0 ≤ epochSlot(SB.curr_global_slot) < 2/3*slots_per_epoch {
-        SB.next_epoch_data.lock_checkpoint = state_hash
+    if 0 ≤ epochSlot(B) < 2/3*slots_per_epoch {
+        cState(B).next_epoch_data.lock_checkpoint = state_hash
     }
 }
 ```
-Specifically, if `epochSlot(SB.curr_global_slot)` of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
+Specifically, if the epoch slot of the new block `B` is the start of a new epoch, then the `start_checkpoint` of the current epoch data (`next_epoch_data`) is updated to the state hash from the previous block `P`.  Next, if the the new block's slot is also within the first `2/3` of the slots in the epoch ([`slots_per_epoch`](#1-constants)), then the `lock_checkpoint` of the current epoch data is also updated to the same value.
 
 ### 3.3.3 `isShortRange`
 
@@ -429,9 +440,7 @@ This algorithm uses the checkpoints to determine if the fork of two chains is sh
 ```rust
 fn isShortRange(C1, C2) -> bool
 {
-    state1 = top(C1).protocol_state.body.consensus_state
-    state2 = top(C2).protocol_state.body.consensus_state
-    if state1.staking_epoch_data.lock_checkpoint == state2.staking_epoch_data.lock_checkpoint {
+    if cState(C1).staking_epoch_data.lock_checkpoint == cState(C2).staking_epoch_data.lock_checkpoint {
         return true
     }
     else {
@@ -487,7 +496,7 @@ Each block also stores the minimum window density, found in the `min_window_dens
 
 ### 3.4.1 `isWindowStop`
 
-This algorithm detects whether we have reached the end of a sub-window.  It is used to decide if we must perform a `v`-shift.  It takes as input the current local slot number `s`, the shift parameter `v` and outputs `true` if we have reached the end of a sub-window and `false` otherwise.
+This algorithm detects whether we have reached the end of a sub-window.  It is used to decide if we must perform a `v`-shift.  It takes as input the current epoch slot number `s`, the shift parameter `v` and outputs `true` if we have reached the end of a sub-window and `false` otherwise.
 
 ```rust
 fn isWindowStop(s, v) -> bool
@@ -530,8 +539,8 @@ This algorithm initializes the sub-window densities and minimm window density fo
 ```rust
 fn initSubWindowDensities(G) -> ()
 {
-    G.protocol_state.body.consensus_state.sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1]
-    G.protocol_state.body.consensus_state.min_window_density = slots_per_window
+    cState(G).sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1]
+    cState(G).min_window_density = slots_per_window
 }
 ```
 
@@ -542,11 +551,8 @@ This algorithm updates the sub-window densities of the block being created `B` b
 ```rust
 fn updateSubWindowDensities(P, B) -> ()
 {
-    prev = P.protocol_state.body.consensus_state
-    curr = B.protocol_state.body.consensus_state
-    if globalSlot(P).curr_global_slot
-    curr.sub_window_densities;
-    curr.min_window_density;
+    cState(B).sub_window_densities = cState(B).sub_window_densities
+    cState(B).sub_window_densities[-1] += 1
 }
 ```
 
@@ -558,7 +564,7 @@ This function returns the current minimum density of a chain.  It inputs a chain
 fn getMinDen(C, max_slot) -> density
 {
     if globalSlot(C) == max_slot {
-        return top(C).protocol_state.body.consensus_state.min_window_density
+        return cState(C).min_window_density
     }
     else {
 
