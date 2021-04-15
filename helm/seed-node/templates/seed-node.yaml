@@ -59,6 +59,9 @@ spec:
           {{- if $.Values.coda.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
           {{- end -}}
+          {{- if $.Values.coda.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
           {{- if $.Values.coda.maxConnections }}
           "--max-connections", {{ $.Values.coda.maxConnections | quote }},
           {{- end -}}
@@ -110,16 +113,16 @@ spec:
         {{- end }}
         ports:
         - name: client-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ default $.Values.coda.ports.p2p $config.externalPort }}
           hostPort: {{ default $.Values.coda.ports.external $config.externalPort }}
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}

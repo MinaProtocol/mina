@@ -18,6 +18,7 @@ locals {
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     logPrecomputedBlocks = var.log_precomputed_blocks
+    log_txn_pool_gossip = var.log_txn_pool_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
@@ -40,6 +41,7 @@ locals {
       seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
+      log_txn_pool_gossip = var.log_txn_pool_gossip
       ports = {
         client  = "8301"
         graphql = "3085"
