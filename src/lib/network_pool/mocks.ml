@@ -6,7 +6,6 @@ open Mina_base
 let trust_system = Trust_system.null ()
 
 module Transaction_snark_work = Transaction_snark_work
-module Ledger_proof = Ledger_proof.Debug
 
 module Base_ledger = struct
   type t = Account.t Account_id.Map.t [@@deriving sexp]

@@ -27,14 +27,15 @@ kind: Service
 metadata:
   name: {{ tpl .Values.coordinator.fullname . }}-graphql
 spec:
-  type: NodePort
+  type: ClusterIP
   publishNotReadyAddresses: true
   selector:
     app: {{ tpl .Values.coordinator.fullname . }}
   ports:
   - name: http-graphql
     protocol: TCP
-    port: {{ .Values.coda.ports.graphql }}
+    port: 80
+    targetPort: {{ .Values.coda.ports.graphql }}
 {{- end }}
 ---
 {{ end }}

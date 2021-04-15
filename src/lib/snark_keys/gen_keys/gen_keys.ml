@@ -128,13 +128,15 @@ let str ~proof_level ~constraint_constants ~loc =
   if Genesis_constants.Proof_level.equal Full proof_level then
     let module T = Transaction_snark.Make (struct
       let constraint_constants = constraint_constants
+
+      let proof_level = proof_level
     end) in
     let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
       let tag = T.tag
 
       let constraint_constants = constraint_constants
 
-      let proof_level = Genesis_constants.Proof_level.compiled
+      let proof_level = proof_level
     end) in
     let%map () =
       handle_dirty

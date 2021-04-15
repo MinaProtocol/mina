@@ -1197,6 +1197,10 @@ module Block = struct
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
+                (* balances.receiver1_balance is for receiver of head of fee_transfers
+                   balances.receiver2_balance, if it exists, is for receiver of
+                     next element of fee_transfers
+                *)
                 let%bind fee_transfer_infos =
                   deferred_result_list_fold fee_transfers ~init:[]
                     ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
@@ -1208,11 +1212,12 @@ module Block = struct
                       (id, secondary_sequence_no, fee_transfer.receiver_pk)
                       :: acc )
                 in
-                let fee_transfer_infos =
+                let fee_transfer_infos_with_balances =
                   match fee_transfer_infos with
                   | [id] ->
                       [(id, balances.receiver1_balance)]
-                  | [id1; id2] ->
+                  | [id2; id1] ->
+                      (* the fold reverses the order of the infos from the fee transfers *)
                       [ (id1, balances.receiver1_balance)
                       ; (id2, Option.value_exn balances.receiver2_balance) ]
                   | _ ->
@@ -1221,7 +1226,8 @@ module Block = struct
                          transfer transaction"
                 in
                 let%map () =
-                  deferred_result_list_fold fee_transfer_infos ~init:()
+                  deferred_result_list_fold fee_transfer_infos_with_balances
+                    ~init:()
                     ~f:(fun ()
                        ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
                        , balance )
