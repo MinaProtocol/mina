@@ -17,7 +17,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let block_producer_balance = "1000" (* 1_000_000_000_000 *)
 
   let config =
-    let n = 5 in
+    let n = 3 in
     let open Test_config in
     { default with
       requires_graphql= true
@@ -96,7 +96,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Core_kernel.List.nth_exn (Network.block_producers network) 1
     in
     let%bind sender_pub_key = Util.pub_key_of_node sender_bp in
-    let num_payments = 5 in
+    let num_payments = 3 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let amount = Currency.Amount.of_int 10_000_000 in
     [%log info] "gossip_consistency test: will now send %d payments"
@@ -143,9 +143,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [%log info] "gossip_consistency test: num_transactions_seen OK" ;
         result
     in
-    let ratio =
-      Gossip_state.consistency_ratio Transactions_gossip
+    let `Seen_by_all inter, `Seen_by_some union =
+      Gossip_state.stats Transactions_gossip
         (Map.data (network_state t).gossip_received)
+    in
+    [%log info] "gossip_consistency test: inter =  %d; union = %d " inter union ;
+    let ratio =
+      if union = 0 then 1. else Float.of_int inter /. Float.of_int union
+      (* Gossip_state.consistency_ratio Transactions_gossip
+        (Map.data (network_state t).gossip_received) *)
     in
     [%log info] "gossip_consistency test: consistency ratio = %f" ratio ;
     let threshold = 0.95 in
