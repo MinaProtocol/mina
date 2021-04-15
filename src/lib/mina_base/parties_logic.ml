@@ -124,7 +124,7 @@ module Eff = struct
         'party
         -> ('token_id, < party: 'party ; token_id: 'token_id ; .. >) t
     | Check_auth_and_update_account :
-        'party * 'account * 'all_parties * 'ip
+        [`Is_first | `Is_not_first] * 'party * 'account * 'all_parties * 'ip
         -> ( 'account * 'bool
            , < inclusion_proof: 'ip
              ; bool: 'bool
@@ -192,16 +192,16 @@ module Make (Inputs : Inputs_intf) = struct
       h.perform (Check_predicate (party, a, global_state))
     in
     let a', update_permitted =
-      let parties_for_auth =
+      let which, parties_for_auth =
         match step_or_start with
         | `Step ->
-            local_state.all_parties
+            (`Is_first, local_state.all_parties)
         | `Start parties ->
-            parties
+            (`Is_not_first, parties)
       in
       h.perform
         (Check_auth_and_update_account
-           (party, a, parties_for_auth, inclusion_proof))
+           (which, party, a, parties_for_auth, inclusion_proof))
     in
     let party_succeeded = Bool.( && ) predicate_satisfied update_permitted in
     let local_state =
