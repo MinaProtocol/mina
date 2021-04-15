@@ -41,7 +41,7 @@ locals {
       seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
-      log_txn_pool_gossip = var.log_txn_pool_gossip
+      logTxnPoolGossip = var.log_txn_pool_gossip
       ports = {
         client  = "8301"
         graphql = "3085"
