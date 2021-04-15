@@ -563,7 +563,7 @@ fn updateSubWindowDensities(P, B) -> ()
 
 ### 3.4.5 `getMinDen`
 
-This function returns the current minimum density of a chain.  It inputs a chain `C` and the .
+This function returns the current minimum density of a chain.  It inputs a chain `C` and the `max_slot` observed between `C`  and the alternative chain (See [selectSecureChain](#42-select-chain)).
 
 ```rust
 fn getMinDen(C, max_slot) -> density
@@ -572,8 +572,20 @@ fn getMinDen(C, max_slot) -> density
         return cState(C).min_window_density
     }
     else {
+        prev_global_sub_window = globalSlot(C) / slots_per_sub_window
+        prev_relative_sub_window = prev_global_sub_window mod sub_windows_per_window
 
-    }
+        next_global_sub_window = max_slot / slots_per_sub_window
+        next_relative_sub_window = next_global_sub_window mod sub_windows_per_window
+
+        if prev_global_sub_window == next_relative_sub_window {
+            // Same sub window
+        }
+
+        if prev_global_sub_window + sub_windows_per_window >= next_global_sub_window {
+            // Same window
+        }
+     }
 }
 ```
 
