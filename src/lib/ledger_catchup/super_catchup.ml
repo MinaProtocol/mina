@@ -255,8 +255,8 @@ let find_map_ok ?how xs ~f =
 type download_state_hashes_error =
   [ `Peer_moves_too_fast
   | `No_common_ancestor
-  | `Failed_to_download_merkle_path
-  | `Invalid_merkle_path ]
+  | `Failed_to_download_transition_chain_proof
+  | `Invalid_transition_chain_proof ]
 
 let rec contains_no_common_ancestor = function
   | [] ->
@@ -374,7 +374,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
             ~timeout:(Time.Span.of_sec 10.) network peer target_hash
         with
         | Error _ ->
-            Result.fail `Failed_to_download_merkle_path
+            Result.fail `Failed_to_download_transition_chain_proof
         | Ok transition_chain_proof ->
             Result.return transition_chain_proof
       in
@@ -401,7 +401,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
                     , Some (error_msg, []) )) ;
-            Deferred.Result.fail `Invalid_merkle_path
+            Deferred.Result.fail `Invalid_transition_chain_proof
       in
       Deferred.return
         ( match
@@ -997,30 +997,47 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                ~metadata:
                  [("target_hash", State_hash.to_yojson target_parent_hash)]
                "Failed to download state hashes for $target_hash" ;
-             if contains_no_common_ancestor errors then (
-               let transitions = List.concat_map forest ~f:Rose_tree.flatten in
-               List.iter transitions ~f:(fun cached_transition ->
-                   let transition =
-                     Cached.peek cached_transition |> Envelope.Incoming.data
+             if contains_no_common_ancestor errors then
+               List.iter forest ~f:(fun subtree ->
+                   let root_transition =
+                     Rose_tree.root subtree |> Cached.peek
+                     |> Envelope.Incoming.data
                    in
-                   let transition_hash =
-                     External_transition.Initial_validated.state_hash
-                       transition
+                   let children_transitions =
+                     List.concat_map
+                       (Rose_tree.children subtree)
+                       ~f:Rose_tree.flatten
+                   in
+                   let children_state_hashes =
+                     List.map children_transitions ~f:(fun cached_transition ->
+                         Cached.peek cached_transition
+                         |> Envelope.Incoming.data
+                         |> External_transition.Initial_validated.state_hash )
                    in
                    [%log error]
                      ~metadata:
-                       [ ("state_hash", State_hash.to_yojson transition_hash)
+                       [ ( "state_hashes_of_children"
+                         , `List
+                             (List.map children_state_hashes
+                                ~f:State_hash.to_yojson) )
+                       ; ( "state_hash_of_root"
+                         , State_hash.to_yojson
+                           @@ External_transition.Initial_validated.state_hash
+                                root_transition )
                        ; ( "reason"
-                         , `String "no common ancestor with current root" )
-                       ; ( "protocol_state"
+                         , `String
+                             "no common ancestor with our transition frontier"
+                         )
+                       ; ( "protocol_state_of_root"
                          , External_transition.Initial_validated.protocol_state
-                             transition
+                             root_transition
                            |> Mina_state.Protocol_state.value_to_yojson ) ]
                      "Validation error: external transition with state hash \
-                      $state_hash was rejected for reason $reason" ) ;
-               Mina_metrics.(
-                 Counter.inc Rejected_blocks.no_common_ancestor
-                   (Float.of_int @@ List.length transitions)) )
+                      $state_hash was rejected for reason $reason" ;
+                   Mina_metrics.(
+                     Counter.inc Rejected_blocks.no_common_ancestor
+                       (Float.of_int @@ (1 + List.length children_transitions)))
+               )
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:

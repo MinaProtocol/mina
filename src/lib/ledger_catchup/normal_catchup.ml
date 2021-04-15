@@ -189,17 +189,17 @@ let find_map_ok l ~f =
 type download_state_hashes_error =
   [ `Peer_moves_too_fast of Error.t
   | `No_common_ancestor of Error.t
-  | `Failed_to_download_merkle_path of Error.t
-  | `Invalid_merkle_path of Error.t ]
+  | `Failed_to_download_transition_chain_proof of Error.t
+  | `Invalid_transition_chain_proof of Error.t ]
 
 let display_error = function
   | `Peer_moves_too_fast err ->
       Error.to_string_hum err
   | `No_common_ancestor err ->
       Error.to_string_hum err
-  | `Failed_to_download_merkle_path err ->
+  | `Failed_to_download_transition_chain_proof err ->
       Error.to_string_hum err
-  | `Invalid_merkle_path err ->
+  | `Invalid_transition_chain_proof err ->
       Error.to_string_hum err
 
 let rec contains_no_common_ancestor = function
@@ -215,9 +215,9 @@ let to_error = function
       err
   | `No_common_ancestor err ->
       err
-  | `Failed_to_download_merkle_path err ->
+  | `Failed_to_download_transition_chain_proof err ->
       err
-  | `Invalid_merkle_path err ->
+  | `Invalid_transition_chain_proof err ->
       err
 
 (* returns a list of state-hashes with the older ones at the front *)
@@ -238,7 +238,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
           Mina_networking.get_transition_chain_proof network peer target_hash
         with
         | Error err ->
-            Result.fail @@ `Failed_to_download_merkle_path err
+            Result.fail @@ `Failed_to_download_transition_chain_proof err
         | Ok transition_chain_proof ->
             Result.return transition_chain_proof
       in
@@ -262,7 +262,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                     ( Sent_invalid_transition_chain_merkle_proof
                     , Some (error_msg, []) )) ;
             Deferred.Result.fail
-            @@ `Invalid_merkle_path (Error.of_string error_msg)
+            @@ `Invalid_transition_chain_proof (Error.of_string error_msg)
       in
       Deferred.return
       @@ List.fold_until
@@ -680,38 +680,52 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                               , `List
                                   (List.map errors ~f:(fun err ->
                                        `String (display_error err) )) ) ] ;
-                        if contains_no_common_ancestor errors then (
-                          let transitions =
-                            List.concat_map subtrees ~f:Rose_tree.flatten
-                          in
-                          List.iter transitions ~f:(fun cached_transition ->
-                              let transition =
-                                Cached.peek cached_transition
+                        if contains_no_common_ancestor errors then
+                          List.iter subtrees ~f:(fun subtree ->
+                              let root_transition =
+                                Rose_tree.root subtree |> Cached.peek
                                 |> Envelope.Incoming.data
                               in
-                              let transition_hash =
-                                External_transition.Initial_validated
-                                .state_hash transition
+                              let children_transitions =
+                                List.concat_map
+                                  (Rose_tree.children subtree)
+                                  ~f:Rose_tree.flatten
+                              in
+                              let children_state_hashes =
+                                List.map children_transitions
+                                  ~f:(fun cached_transition ->
+                                    Cached.peek cached_transition
+                                    |> Envelope.Incoming.data
+                                    |> External_transition.Initial_validated
+                                       .state_hash )
                               in
                               [%log error]
                                 ~metadata:
-                                  [ ( "state_hash"
-                                    , State_hash.to_yojson transition_hash )
+                                  [ ( "state_hashes_of_children"
+                                    , `List
+                                        (List.map children_state_hashes
+                                           ~f:State_hash.to_yojson) )
+                                  ; ( "state_hash_of_root"
+                                    , State_hash.to_yojson
+                                      @@ External_transition.Initial_validated
+                                         .state_hash root_transition )
                                   ; ( "reason"
                                     , `String
                                         "no common ancestor with our \
                                          transition frontier" )
-                                  ; ( "protocol_state"
+                                  ; ( "protocol_state_of_root"
                                     , External_transition.Initial_validated
-                                      .protocol_state transition
+                                      .protocol_state root_transition
                                       |> Mina_state.Protocol_state
                                          .value_to_yojson ) ]
                                 "Validation error: external transition with \
                                  state hash $state_hash was rejected for \
-                                 reason $reason" ) ;
-                          Mina_metrics.(
-                            Counter.inc Rejected_blocks.no_common_ancestor
-                              (Float.of_int @@ List.length transitions)) ) ;
+                                 reason $reason" ;
+                              Mina_metrics.(
+                                Counter.inc Rejected_blocks.no_common_ancestor
+                                  ( Float.of_int
+                                  @@ (1 + List.length children_transitions) ))
+                          ) ;
                         return
                           (Error (Error.of_list @@ List.map errors ~f:to_error))
                     )
