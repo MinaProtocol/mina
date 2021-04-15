@@ -117,8 +117,8 @@ This structure encapsulates the succinct state of the consensus protocol.  The s
 | Field                                    | Type                     | Description |
 | - | - | - |
 | `version`                                | `u8` (= 0x01)            | Block structure version |
-| `blockchain_length`                      | `Length.Stable.V1.t` | Height of block ? |
-| `epoch_count`                            | `Length.Stable.V1.t` | Epoch number ? |
+| `blockchain_length`                      | `Length.Stable.V1.t` | Height of block |
+| `epoch_count`                            | `Length.Stable.V1.t` | Epoch number |
 | `min_window_density`                     | `Length.Stable.V1.t` | Minimum windows density observed on this chain (see [Section 3.2.2](#322-long-range-fork-rule)) |
 | `sub_window_densities`                   | `Length.Stable.V1.t list` | Current sliding window of densities (see [Section 3.4](#34-window-min-density)) |
 | `last_vrf_output`                        | `Vrf.Output.Truncated.Stable.V1.t` | Additional VRS output from leader (for seeding Random Oracle) |
@@ -536,10 +536,15 @@ fn shiftWindow(D) -> D'
 
 This algorithm initializes the sub-window densities and minimm window density for genesis block `G`
 
+<!-- cState(G).sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1] -->
+
 ```rust
 fn initSubWindowDensities(G) -> ()
 {
-    cState(G).sub_window_densities = u32[0]⌢u32[slots_per_window; sub_windows_per_window - 1]
+    cState(G).sub_window_densities = u32[0, slots_per_window, slots_per_window, ..., slots_per_window]
+    //                                      \_______________________________________________________/
+    //                                                   sub_windows_per_window - 1 times
+
     cState(G).min_window_density = slots_per_window
 }
 ```
@@ -551,7 +556,7 @@ This algorithm updates the sub-window densities of the block being created `B` b
 ```rust
 fn updateSubWindowDensities(P, B) -> ()
 {
-    cState(B).sub_window_densities = cState(B).sub_window_densities
+    cState(B).sub_window_densities = cState(P).sub_window_densities
     cState(B).sub_window_densities[-1] += 1
 }
 ```
@@ -608,7 +613,7 @@ Assuming an update to either `P.tip` or `P.chains`, the peer `P` must update its
 ```rust
 P.tip = selectSecureChain(P.tip, P.chains)
 ```
-The `selectSecureChain` algorithm takes as input the peer's current best chain `P.tip` and its set of known valid chains `P.chains` and outputs the most secure chain according to the [Chain Selection Rules Section](#32-chain-selection-rules) described in [Section 3.2](#32-chain-selection-rules).
+The `selectSecureChain` algorithm, presented below, takes as input the peer's current best chain `P.tip` and its set of known valid chains `P.chains` and outputs the most secure chain according to the [Chain Selection Rules Section](#32-chain-selection-rules) described in [Section 3.2](#32-chain-selection-rules).
 
 In addition to the high-level idea given in Section 3.2, the algorithm employs some additional tiebreak logic when comparing chains of equal length or equal minimum density.
 
@@ -638,7 +643,7 @@ fn selectSecureChain(tip, chains) -> Chain
 }
 ```
 
-It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#345-getminden) algorithms described in Section 3.3.3 and Section 3.4.4.
+It relies on the [`isShortRange`](#333-isshortrange) and [`getMinDen`](#345-getminden) algorithms (Section 3.3.3 and Section 3.4.5) and the `selectLongerChain` algorithm below.
 
 ```rust
 fn selectLongerChain(tip, candidate) -> Chain
