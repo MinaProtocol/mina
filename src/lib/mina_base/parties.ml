@@ -61,6 +61,8 @@ module Virtual = struct
   module Bool = struct
     type t = bool
 
+    let true_ = true
+
     let assert_ _ = ()
 
     let equal = Bool.equal
