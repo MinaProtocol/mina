@@ -178,7 +178,7 @@ let str ~proof_level ~constraint_constants ~loc =
 
 let main () =
   (* Wrap any junk we print to stdout in a comment.. *)
-  Format.printf "(*@.";
+  Format.printf "(*@." ;
   let config_file =
     (* TODO-someday: Use a proper argument parser. *)
     match Array.findi Sys.argv (fun _ -> String.equal "--config-file") with
@@ -222,7 +222,7 @@ let main () =
     Key_cache.set_downloads_enabled true ;
   let%bind str = str ~proof_level ~constraint_constants ~loc:Location.none in
   (* End comment started at the top of this function *)
-  Format.printf "*)@.";
+  Format.printf "*)@." ;
   Pprintast.top_phrase Format.std_formatter (Ptop_def str) ;
   exit 0
 
