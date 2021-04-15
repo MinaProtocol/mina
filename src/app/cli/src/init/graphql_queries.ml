@@ -365,3 +365,9 @@ mutation ($transaction: RosettaTransaction!) {
   }
 }
 |}]
+
+module Runtime_config = [%graphql {|
+query {
+  runtimeConfig
+}
+|}]

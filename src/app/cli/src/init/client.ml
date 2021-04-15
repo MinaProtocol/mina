@@ -2160,6 +2160,39 @@ let hash_transaction =
        in
        printf "%s\n" (Transaction_hash.to_base58_check hash))
 
+let runtime_config =
+  Command.async
+    ~summary:"Compute the runtime configuration used by a running daemon"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%bind runtime_config =
+           Graphql_client.query
+             (Graphql_queries.Runtime_config.make ())
+             graphql_endpoint
+           |> Deferred.Result.map_error ~f:(function
+                | `Failed_request e ->
+                    Error.create "Unable to connect to Mina daemon" ()
+                      (fun () ->
+                        Sexp.List
+                          [ List
+                              [ Atom "uri"
+                              ; Atom (Uri.to_string graphql_endpoint.value) ]
+                          ; List [Atom "uri_flag"; Atom graphql_endpoint.name]
+                          ; List [Atom "error_message"; Atom e] ] )
+                | `Graphql_error e ->
+                    Error.createf "GraphQL error: %s" e )
+         in
+         match runtime_config with
+         | Ok runtime_config ->
+             Format.printf "%s@."
+               (Yojson.Basic.pretty_to_string runtime_config#runtimeConfig) ;
+             return ()
+         | Error err ->
+             Format.eprintf
+               "Failed to retrieve runtime configuration. Error:@.%s@."
+               (Error.to_string_hum err) ;
+             exit 1 ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2277,7 +2310,8 @@ let advanced =
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
-    ; ("chain-id-inputs", chain_id_inputs) ]
+    ; ("chain-id-inputs", chain_id_inputs)
+    ; ("runtime-config", runtime_config) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"
