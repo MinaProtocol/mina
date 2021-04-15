@@ -351,6 +351,12 @@ let setup_daemon logger =
         "true|false upload blocks to gcloud storage. Requires the environment \
          variables GCLOUD_KEYFILE, NETWORK_NAME, and \
          GCLOUD_BLOCK_UPLOAD_BUCKET"
+  and all_peers_seen_metric =
+    flag "--all-peers-seen-metric" ~aliases:["all-peers-seen-metric"]
+      (optional_with_default false bool)
+      ~doc:
+        "true|false whether to track the set of all peers ever seen for the \
+         all_peers metric (default: false)"
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -1024,7 +1030,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; max_connections
           ; validation_queue_size
           ; isolate= Option.value ~default:false isolate
-          ; keypair= libp2p_keypair }
+          ; keypair= libp2p_keypair
+          ; all_peers_seen_metric }
       in
       let net_config =
         { Mina_networking.Config.logger
