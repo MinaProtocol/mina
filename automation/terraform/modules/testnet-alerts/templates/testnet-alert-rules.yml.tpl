@@ -294,7 +294,7 @@ groups:
     expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
-      severity: warning
+      severity: critical
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
       description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
