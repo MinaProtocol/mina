@@ -21,7 +21,7 @@ def peer_to_multiaddr(peer):
     peer['libp2p_port'],
     peer['peer_id'] )
 
-def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, prover_errors):
+def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, nodes_responded, nodes_errored, context_deadline_exceeded, failed_security_protocol_negotiation, connection_refused_errors, size_limit_exceeded_errors, timed_out_errors, stream_reset_errors, other_connection_errors, prover_errors):
   print('collecting node status metrics')
 
   pods = v1.list_namespaced_pod(namespace, watch=False)
@@ -36,13 +36,56 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
   seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
 
-  peers = crawl_for_peers(v1, namespace, seed, seed_daemon_port)
+  peers, response_count, errored_responses = crawl_for_peers(v1, namespace, seed, seed_daemon_port)
+
+  err_context_deadline = 0
+  err_negotiate_security_protocol = 0
+  err_connection_refused = 0
+  err_time_out = 0
+  err_stream_reset = 0
+  err_size_limit_exceeded = 0
+  err_others = 0
+
+  for p in errored_responses:
+    try:
+      error_str = p['error']['string']
+      if 'context deadline exceeded' in error_str:
+        #{'error': {'commit_id': 'baffb589965aa0a8552dca15e209d2a011af3d21', 'string': 'RPC #369385 failed: "context deadline exceeded"'}}
+        err_context_deadline += 1
+      elif 'failed to negotiate security protocol' in error_str:
+        #{'error': {'commit_id': 'baffb589965aa0a8552dca15e209d2a011af3d21', 'string': 'RPC #369384 failed: "failed to dial 12D3KooWEsc3KyWrxmDt8J8cBXBwztRrLcYrPKdJXWU4YLdC8z5z: all dials failed\\n  * [/ip4/185.25.49.250/tcp/8302] failed to negotiate security protocol: peer id mismatch: expected 12D3KooWEsc3KyWrxmDt8J8cBXBwztRrLcYrPKdJXWU4YLdC8z5z, but remote key matches 12D3KooWBLcxkHd3KQGeLiNgwVQ8ViEb5EYg3cmSjQs5tDDXQfQb"'}}
+        err_negotiate_security_protocol += 1
+      elif 'connection refused' in error_str:
+        #{'error': {'commit_id': 'baffb589965aa0a8552dca15e209d2a011af3d21', 'string': 'RPC #369418 failed: "failed to dial 12D3KooWKWzRb7BN7J3zXF6PkRn3sJMRBxvq58ujoTHSUHcNmWdc: all dials failed\\n  * [/ip4/178.170.47.23/tcp/35592] dial tcp4 178.170.47.23:35592: connect: connection refused"'}}
+        err_connection_refused +=1
+      elif 'timed out requesting node status data from peer' in error_str:
+        err_time_out += 1
+      elif 'node status data was greater than' in error_str:
+        print("Errored response: {}".format(error_str))
+        err_size_limit_exceeded +=1
+      elif 'stream reset' in error_str:
+        err_stream_reset += 1
+      else:
+        print("Errored response: {}".format(error_str))
+        err_others += 1
+    except _:
+      print("Errored response: {}".format(error_str))
+      err_others += 1
 
   num_peers = len(peers.values())
 
   synced_fraction = sum([ p['sync_status'] == 'Synced' for p in peers.values() ]) / num_peers
 
-  nodes_queried.set(num_peers)
+  nodes_queried.set(response_count)
+  nodes_responded.set(num_peers)
+  nodes_errored.set(len(errored_responses))
+  context_deadline_exceeded.set(err_context_deadline)
+  failed_security_protocol_negotiation.set(err_negotiate_security_protocol)
+  connection_refused_errors.set(err_connection_refused)
+  stream_reset_errors.set(err_stream_reset)
+  size_limit_exceeded_errors.set(err_size_limit_exceeded)
+  timed_out_errors.set(err_time_out)
+  other_connection_errors.set(err_others)
   nodes_synced.set(synced_fraction)
 
   # -------------------------------------------------
@@ -121,6 +164,8 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
 
   queried_peers = set()
   unqueried_peers = {}
+  error_resps = []
+  all_resps = []
 
   def contains_error(resp):
     try:
@@ -137,7 +182,8 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
     resps = [ ast.literal_eval(s) for s in resp.split('\n') if s != '' ]
 
     peers = list(filter(no_error,resps))
-    error_resps = list(filter(contains_error,resps))
+    error_resps.extend(list(filter(contains_error,resps)))
+    all_resps.extend(resps)
 
     key_value_peers = [ ((p['node_ip_addr'], p['node_peer_id']), p) for p in peers ]
 
@@ -170,6 +216,6 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
 
     requests += 1
 
-  return peer_table
+  return (peer_table, len(all_resps), error_resps)
 
 # ========================================================================
