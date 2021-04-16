@@ -78,6 +78,16 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
       in
       let n, q, s = doubleadd (x, y) (zero, zero) s in
       q
+
+      let rec random () =
+      (
+        let x = Int64.(Random.int64 max_value) in
+        let x = Field.Constant.of_string (Int64.to_string x) in
+        let y = Field.Constant.(x*x*x + (of_int 5)) in
+        if is_square y = true then (x, y)
+        else random ()
+      )
+    
   end
 
   let add (p1 : t * t) (p2 : t * t) : t * t  =

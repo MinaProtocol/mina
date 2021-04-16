@@ -62,7 +62,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         basic= Plonk_constraint.T (Bytes_lookup { bytes }) ;
         annotation= None
       }];
-    (bytes.(2), bytes.(3))
+    (bytes.(3), bytes.(2))
   
   let xtimesp (b : Field.t) : (Field.t * Field.t) =
     let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
@@ -73,15 +73,9 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         if Intf.Bigint.test_bit bits i then
           x := Int.(!x + (1 lsl i));
       done;
-      let b23 = of_int Gcm.table.(2).(!x) in
-      let bits = Intf.Bigint.of_field b23 in
-      let b3 = ref Int.(0) in
-      for i = 0 to 7 do
-        if Intf.Bigint.test_bit bits Int.(i + 8) then
-          b3 := Int.(!b3 + (1 lsl i));
-      done;
-      let b3 = of_int !b3 in
-      let b2 = b23 - (b3 * of_int 256) in
+      let b23 = Gcm.table.(2).(!x) in
+      let b2 = of_int (b23 land 255) in
+      let b3 = of_int (b23 lsr 8) in
       [|of_int 2; b; b2; b3; of_int 2 + b*f1 + b2*f2 + b3*f3|]
     )
     in
@@ -91,7 +85,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         basic= Plonk_constraint.T (Bytes_lookup { bytes }) ;
         annotation= None
       }];
-    (bytes.(2), bytes.(3))
+    (bytes.(3), bytes.(2))
   
   let aesLookup (b : Field.t) (ind: int) : Field.t =
     let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
