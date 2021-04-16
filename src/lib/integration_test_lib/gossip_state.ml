@@ -53,16 +53,20 @@ end
 open Event_type.Gossip
 
 type t =
-  { blocks: Block.r Set.t By_direction.t
+  { node_id: string
+  ; blocks: Block.r Set.t By_direction.t
   ; transactions: Transactions.r Set.t By_direction.t
   ; snark_work: Snark_work.r Set.t By_direction.t }
 [@@deriving to_yojson, fields]
 
-let create () : t =
+let create node_id : t =
   let f create =
     {By_direction.sent= create (); By_direction.received= create ()}
   in
-  {blocks= f Set.create; transactions= f Set.create; snark_work= f Set.create}
+  { node_id
+  ; blocks= f Set.create
+  ; transactions= f Set.create
+  ; snark_work= f Set.create }
 
 let add (gossip_state : t) (type a)
     (event_type : a Event_type.Gossip.With_direction.t Event_type.t)
@@ -89,7 +93,7 @@ let add (gossip_state : t) (type a)
 (* each gossip_state in the input list gossip_states corresponds to a node *)
 let stats (type a)
     (event_type : a Event_type.Gossip.With_direction.t Event_type.t)
-    (gossip_states : t list) =
+    (gossip_states : t list) ~(exclusion_list : string list) =
   match gossip_states with
   | [] ->
       (`Seen_by_all 0, `Seen_by_some 0)
@@ -103,8 +107,16 @@ let stats (type a)
         | Snark_work_gossip ->
             snark_work
       in
+      let gossip_states_filtered =
+        List.filter_map gossip_states ~f:(fun gos_state ->
+            if
+              List.exists exclusion_list ~f:(fun id ->
+                  String.equal id gos_state.node_id )
+            then None
+            else Some gos_state )
+      in
       let event_type_gossip_states =
-        List.map gossip_states ~f:(fun gos_state ->
+        List.map gossip_states_filtered ~f:(fun gos_state ->
             let event_type_gossip_state_by_direction = getter_func gos_state in
             Set.union
               [ event_type_gossip_state_by_direction.sent
@@ -113,8 +125,8 @@ let stats (type a)
       ( `Seen_by_all (Set.size (Set.inter event_type_gossip_states))
       , `Seen_by_some (Set.size (Set.union event_type_gossip_states)) )
 
-let consistency_ratio event_type gossip_states =
+let consistency_ratio event_type gossip_states ~exclusion_list =
   let `Seen_by_all inter, `Seen_by_some union =
-    stats event_type gossip_states
+    stats event_type gossip_states ~exclusion_list
   in
   if union = 0 then 1. else Float.of_int inter /. Float.of_int union

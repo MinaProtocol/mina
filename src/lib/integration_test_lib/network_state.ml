@@ -97,7 +97,7 @@ module Make
                          let gossip_state =
                            match gossip_state_opt with
                            | None ->
-                               Gossip_state.create ()
+                               Gossip_state.create (Node.id node)
                            | Some state ->
                                state
                          in
