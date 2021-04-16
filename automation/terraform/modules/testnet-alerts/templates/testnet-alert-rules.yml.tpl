@@ -281,7 +281,7 @@ groups:
       summary: "{{ $labels.testnet }} has more than 3 blocks that have been produced on a remote side chains in the last hour"
       description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
 
-  - alert: OldBlocksPerHour
+  - alert: LowOldBlocksPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root ${rule_filter} [${alert_timeframe}])) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -289,6 +289,16 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 blocks that are not selected over the root of our transition frontier in the last hour"
       description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+
+  - alert: HighOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root ${rule_filter} [${alert_timeframe}])) > 5
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 5 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+
 
   - alert: InvalidProofPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 0
