@@ -12503,6 +12503,77 @@
               "deprecationReason": null
             },
             {
+              "name": "pooledSnappCommands",
+              "description": "Retrieve all the snapp user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
+              "args": [
+                {
+                  "name": "ids",
+                  "description": "Ids of UserCommands",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "ID",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "hashes",
+                  "description": "Hashes of the commands to find in the pool",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "String",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "publicKey",
+                  "description": "Public key of sender of pooled user commands",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "PublicKey",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "SnappCommand",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "transactionStatus",
               "description": "Get the status of a transaction",
               "args": [

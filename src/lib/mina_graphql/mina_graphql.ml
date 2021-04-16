@@ -4327,6 +4327,95 @@ module Queries = struct
                | Snapp_command _ ->
                    None ) )
 
+  let pooled_snapp_commands =
+    field "pooledSnappCommands"
+      ~doc:
+        "Retrieve all the scheduled snapp commands for a specified sender \
+         that the current daemon sees in their transaction pool. All \
+         scheduled commands are queried if no sender is specified"
+      ~typ:(non_null @@ list @@ non_null Types.SnappCommand.typ)
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of sender of pooled user commands"
+              ~typ:Types.Input.public_key_arg
+          ; arg "hashes" ~doc:"Hashes of the commands to find in the pool"
+              ~typ:(list (non_null string))
+          ; arg "ids" ~typ:(list (non_null guid)) ~doc:"Ids of UserCommands" ]
+      ~resolve:(fun {ctx= coda; _} () opt_pk opt_hashes opt_txns ->
+        let transaction_pool = Mina_lib.transaction_pool coda in
+        let resource_pool =
+          Network_pool.Transaction_pool.resource_pool transaction_pool
+        in
+        ( match (opt_pk, opt_hashes, opt_txns) with
+        | None, None, None ->
+            Network_pool.Transaction_pool.Resource_pool.get_all resource_pool
+        | Some pk, None, None ->
+            let account_id = Account_id.create pk Token_id.default in
+            Network_pool.Transaction_pool.Resource_pool.all_from_account
+              resource_pool account_id
+        | _ -> (
+            let hashes_txns =
+              (* Transactions identified by hashes. *)
+              match opt_hashes with
+              | Some hashes ->
+                  List.filter_map hashes ~f:(fun hash ->
+                      hash |> Transaction_hash.of_base58_check |> Result.ok
+                      |> Option.bind
+                           ~f:
+                             (Network_pool.Transaction_pool.Resource_pool
+                              .find_by_hash resource_pool) )
+              | None ->
+                  []
+            in
+            let txns =
+              (* Transactions as identified by IDs.
+                 This is a little redundant, but it makes our API more
+                 consistent.
+              *)
+              match opt_txns with
+              | Some txns ->
+                  List.filter_map txns ~f:(fun serialized_txn ->
+                      Snapp_command.of_base58_check serialized_txn
+                      |> Result.map ~f:(fun signed_command ->
+                             (* These commands get piped through [forget_check]
+                                below; this is just to make the types work
+                                without extra unnecessary mapping in the other
+                                branches above.
+                             *)
+                             let (`If_this_is_used_it_should_have_a_comment_justifying_it
+                                   cmd) =
+                               User_command.to_valid_unsafe
+                                 (Snapp_command signed_command)
+                             in
+                             Transaction_hash.User_command_with_valid_signature
+                             .create cmd )
+                      |> Result.ok )
+              | None ->
+                  []
+            in
+            let all_txns = hashes_txns @ txns in
+            match opt_pk with
+            | None ->
+                all_txns
+            | Some pk ->
+                (* Only return commands paid for by the given public key. *)
+                List.filter all_txns ~f:(fun txn ->
+                    txn
+                    |> Transaction_hash.User_command_with_valid_signature
+                       .command |> User_command.fee_payer
+                    |> Account_id.public_key
+                    |> Public_key.Compressed.equal pk ) ) )
+        |> List.filter_map ~f:(fun x ->
+               let x =
+                 Transaction_hash.User_command_with_valid_signature
+                 .forget_check x
+               in
+               match x.data with
+               | Snapp_command data ->
+                   Some data
+               | Signed_command _ ->
+                   None ) )
+
   let sync_status =
     io_field "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
@@ -4839,6 +4928,7 @@ module Queries = struct
     ; initial_peers
     ; get_peers
     ; pooled_user_commands
+    ; pooled_snapp_commands
     ; transaction_status
     ; snapp_status
     ; trust_status
