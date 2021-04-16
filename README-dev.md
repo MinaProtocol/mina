@@ -143,8 +143,25 @@ NOTE: all of the `test-*` targets (including `test-all`) won't run in the contai
 Coda has a variety of opam and system dependencies.
 
 You can see [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) for how we
-install them all in the container. To get all the opam dependencies
-you need, you run `opam switch import src/opam.export`.
+install them all in the container. 
+
+### Ocaml environment 
+
+First, you need to create a local [opam switch](https://opam.ocaml.org/blog/opam-20-tips/#Local-switches) in order to use a custom ocaml compiler (to detect memory issues), a specific version of the ocaml compiler, and specific dependencies needed to build the project.
+You can do that by running the following:
+
+```
+$ opam switch import src/opam.export --switch . 
+```
+
+You can confirm that it worked by running:
+
+```
+$ opam switch show --safe 2>/dev/null | sed 's|.*/|*|'
+*mina
+```
+
+Otherwise, you might have to enable [shell hooks](https://opam.ocaml.org/blog/opam-20-tips/#How-local-switches-are-handled).
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
@@ -167,13 +184,14 @@ the submodule's repository, it will be automatically re-pinned in CI.
 If you add a new package in the Coda repository or as a submodule, you must do all of the following:
 
 1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required; there are
-   comments that distinguish the treatment of submodules from other packages
-2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
-3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
-4. Commit your changes
-5. Rebuild the container with `make docker-toolchain`.
-6. Re-render the jinja template `make update-deps`
-7. Commit your changes again
+   comments that distinguish the treatment of submodules from other packages.
+1. Update [`scripts/macos-setup-brew.sh`](scripts/macos-setup-brew.sh) with the required commands for Darwin systems.
+1. Update [`scripts/setup-opam`](scripts/setup-opam.sh).
+1. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
+1. Commit your changes.
+1. Rebuild the container with `make docker-toolchain`.
+1. Re-render the jinja template `make update-deps`.
+1. Commit your changes again.
 
 Rebuilding the docker toolchain will take a long time. Running circleci for
 macos once you've busted the cache will also take a long time. However, only
