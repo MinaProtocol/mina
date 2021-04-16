@@ -682,7 +682,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                        `String (display_error err) )) ) ] ;
                         if contains_no_common_ancestor errors then
                           List.iter subtrees ~f:(fun subtree ->
-                              let root_transition =
+                              let transition =
                                 Rose_tree.root subtree |> Cached.peek
                                 |> Envelope.Incoming.data
                               in
@@ -705,22 +705,22 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                     , `List
                                         (List.map children_state_hashes
                                            ~f:State_hash.to_yojson) )
-                                  ; ( "state_hash_of_root"
+                                  ; ( "state_hash"
                                     , State_hash.to_yojson
                                       @@ External_transition.Initial_validated
-                                         .state_hash root_transition )
+                                         .state_hash transition )
                                   ; ( "reason"
                                     , `String
                                         "no common ancestor with our \
                                          transition frontier" )
-                                  ; ( "protocol_state_of_root"
+                                  ; ( "protocol_state"
                                     , External_transition.Initial_validated
-                                      .protocol_state root_transition
+                                      .protocol_state transition
                                       |> Mina_state.Protocol_state
                                          .value_to_yojson ) ]
                                 "Validation error: external transition with \
-                                 state hash $state_hash was rejected for \
-                                 reason $reason" ;
+                                 state hash $state_hash and its children were \
+                                 rejected for reason $reason" ;
                               Mina_metrics.(
                                 Counter.inc Rejected_blocks.no_common_ancestor
                                   ( Float.of_int
