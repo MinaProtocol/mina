@@ -48,7 +48,7 @@ let%test_module "backend test" =
 
         Random.full_init [|7|];
         (* PLAINTEXT *)
-        let ptl = 1500 in
+        let ptl = Array.length Test.pt in
         let blocks = (ptl + 15 ) / 16 in
         let pt = Array.init ptl ~f:(fun i -> Field.of_int Test.pt.(i)) in
 
@@ -81,7 +81,7 @@ let%test_module "backend test" =
         Array.iter ~f:(fun x -> Sponge.absorb x) (Array.append hb [|fst rc; snd rc;|]);
         let e = Sponge.squeeze in
 
-        (* prover signature verification *)
+        (* verify TlsNotary signature *)
         let lpt = Ecc.add (Ecc.mul q e) rc in
         let rpt = Ecc.sub (Ecc.scale_pack p s) pn in
         assert_ (Snarky.Constraint.equal (fst lpt) (fst rpt));
