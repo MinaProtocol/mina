@@ -238,9 +238,11 @@ end
 *)
 module Peers_no_ids = struct
   module T = struct
-    type t = {libp2p_port: int; host: string} [@@deriving sexp, compare]
+    type t = {libp2p_port: int; host: string}
+    [@@deriving sexp, compare, yojson]
   end
 
+  include T
   module Set = Set.Make (T)
 end
 
@@ -1736,6 +1738,34 @@ let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
                   ; ("err", Error_json.error_to_yojson e) ] ) ;
           Deferred.unit )
       |> don't_wait_for ;
+      ( if all_peers_seen_metric then
+        let log_all_peers_interval = Time.Span.of_hr 2.0 in
+        let log_message_batch_size = 50 in
+        every log_all_peers_interval (fun () ->
+            Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
+                let num_batches, num_in_batch, batches, batch =
+                  Set.fold_right all_peers_seen ~init:(0, 0, [], [])
+                    ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
+                      if num_in_batch >= log_message_batch_size then
+                        (num_batches + 1, 1, batch :: batches, [peer])
+                      else
+                        (num_batches, num_in_batch + 1, batches, peer :: batch)
+                  )
+                in
+                let num_batches, batches =
+                  if num_in_batch > 0 then (num_batches + 1, batch :: batches)
+                  else (num_batches, batches)
+                in
+                List.iteri batches ~f:(fun batch_num batch ->
+                    [%log info]
+                      "All peers seen by this node, batch \
+                       $batch_num/$num_batches"
+                      ~metadata:
+                        [ ("batch_num", `Int batch_num)
+                        ; ("num_batches", `Int num_batches)
+                        ; ( "peers"
+                          , `List (List.map ~f:Peers_no_ids.to_yojson batch) )
+                        ] ) ) ) ) ;
       Deferred.Or_error.return t
 
 let%test_module "coda network tests" =
