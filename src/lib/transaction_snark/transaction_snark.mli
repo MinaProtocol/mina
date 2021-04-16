@@ -245,6 +245,8 @@ module Verification : sig
     val verification_key : Pickles.Verification_key.t Lazy.t
 
     val verify_against_digest : t -> bool
+
+    val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
   end
 end
 
@@ -342,6 +344,8 @@ end
 
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
 end) : S
 
 val constraint_system_digests :

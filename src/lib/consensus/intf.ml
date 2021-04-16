@@ -570,6 +570,7 @@ module type S = sig
     *)
 
     type t = [`Producer | `Other of Public_key.Compressed.t]
+    [@@deriving yojson]
   end
 
   module Hooks : sig

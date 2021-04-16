@@ -1,19 +1,5 @@
-[%%import
-"/src/config.mlh"]
-
 module Intf = Intf
-module Prod = Prod
-
-[%%if
-proof_level = "full"]
-
 module Inputs = Prod.Inputs
-
-[%%else]
-
-module Inputs = Debug.Inputs
-
-[%%endif]
 
 module Worker = struct
   include Functor.Make (Inputs)

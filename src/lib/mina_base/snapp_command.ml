@@ -1149,6 +1149,13 @@ let check (t : t) : unit Or_error.t =
         (not (is_neg one.data.body.delta && two_is_neg))
         "both accounts negative"
     in
+    let%bind () =
+      assert_
+        (List.for_all (accounts_accessed t) ~f:(fun aid ->
+             Account_id.public_key aid |> Public_key.decompress
+             |> Option.is_some ))
+        "public keys for all accounts involved in the transaction must be valid"
+    in
     fee_checks ~excess ~token_id ~fee_payment
   in
   match t with

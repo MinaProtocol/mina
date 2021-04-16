@@ -17,7 +17,9 @@ type constants =
 [@@deriving to_yojson]
 
 type t =
-  { k: int
+  { (* temporary flag to enable/disable graphql ingress deployments *)
+    requires_graphql: bool
+  ; k: int
   ; delta: int
   ; slots_per_epoch: int
   ; slots_per_sub_window: int
@@ -31,14 +33,15 @@ type t =
   ; snark_worker_public_key: string }
 
 let default =
-  { k= 20
+  { requires_graphql= false
+  ; k= 20
   ; slots_per_epoch= 3 * 8 * 20
   ; slots_per_sub_window= 2
   ; delta= 0
   ; proof_level= Full
   ; txpool_max_size= 3000
   ; block_producers= []
-  ; num_snark_workers= 2
+  ; num_snark_workers= 0
   ; num_archive_nodes= 0
   ; log_precomputed_blocks= false
   ; snark_worker_fee= "0.025"

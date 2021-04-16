@@ -7,7 +7,8 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifact", key = "puppeteered-docker-image" }
+    { name = "MinaArtifact", key = "puppeteered-docker-image" },
+    { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{
@@ -25,6 +26,7 @@ in Pipeline.build Pipeline.Config::{
     TestExecutive.execute "block-prod" dependsOn,
     TestExecutive.execute "bootstrap" dependsOn,
     TestExecutive.execute "peers" dependsOn,
-    TestExecutive.execute "send-payment" dependsOn
+    TestExecutive.execute "send-payment" dependsOn,
+    TestExecutive.execute "common-prefix" dependsOn
   ]
 }

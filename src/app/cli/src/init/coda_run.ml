@@ -300,6 +300,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Mina_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
           return (Mina_commands.reset_trust_status coda ip_address) )
+    ; implement Daemon_rpcs.Chain_id_inputs.rpc (fun () () ->
+          return (Mina_commands.chain_id_inputs coda) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
             ( Mina_commands.verify_payment coda aid tx proof

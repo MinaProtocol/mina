@@ -30,7 +30,7 @@ type inputs =
   { test_inputs: test_inputs_with_cli_inputs
   ; test: test
   ; coda_image: string
-  ; archiver_image: string
+  ; archive_image: string
   ; debug: bool }
 
 let validate_inputs {coda_image; _} =
@@ -51,8 +51,9 @@ let tests : test list =
     , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
   *)
   ; ("peers", (module Peers_test.Make : Intf.Test.Functor_intf))
+  ; ("common-prefix", (module Common_prefix.Make : Intf.Test.Functor_intf))
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
-  ]
+  ; ("common-prefix", (module Common_prefix.Make : Intf.Test.Functor_intf)) ]
 
 let report_test_errors error_set
     (missing_event_reprs : Structured_log_events.repr list) =
@@ -219,7 +220,7 @@ let main inputs =
   let logger = Logger.create () in
   let images =
     { Test_config.Container_images.coda= inputs.coda_image
-    ; archive_node= inputs.archiver_image
+    ; archive_node= inputs.archive_image
     ; user_agent= "codaprotocol/coda-user-agent:0.1.5"
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
@@ -303,6 +304,7 @@ let main inputs =
         let%bind network, dsl =
           Deferred.bind init_result ~f:Malleable_error.of_or_error_hard
         in
+        let%bind () = Engine.Network.initialize ~logger network in
         T.run network dsl )
   in
   let exit_reason, test_result =
@@ -341,13 +343,13 @@ let coda_image_arg =
     & opt (some string) None
     & info ["coda-image"] ~env ~docv:"CODA_IMAGE" ~doc)
 
-let archiver_image_arg =
+let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
-  let env = Arg.env_var "ARCHIVER_IMAGE" ~doc in
+  let env = Arg.env_var "ARCHIVE_IMAGE" ~doc in
   Arg.(
     value
       ( opt string "unused"
-      & info ["archiver-image"] ~env ~docv:"ARCHIVER_IMAGE" ~doc ))
+      & info ["archive-image"] ~env ~docv:"ARCHIVE_IMAGE" ~doc ))
 
 let debug_arg =
   let doc =
@@ -371,12 +373,12 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test coda_image archiver_image debug =
-      {test_inputs; test; coda_image; archiver_image; debug}
+    let cons_inputs test_inputs test coda_image archive_image debug =
+      {test_inputs; test; coda_image; archive_image; debug}
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ coda_image_arg $ archiver_image_arg $ debug_arg)
+      $ coda_image_arg $ archive_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

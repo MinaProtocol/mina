@@ -17,13 +17,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
   let config =
     let open Test_config in
     { default with
-      (* a few block producers, where few = 4 *)
-      block_producers=
+      requires_graphql= true (* a few block producers, where few = 4 *)
+    ; block_producers=
         [ {balance= "4000"; timing= Untimed}
         ; {balance= "9000"; timing= Untimed}
         ; {balance= "8000"; timing= Untimed}
         ; {balance= "17000"; timing= Untimed} ]
     ; num_archive_nodes= 1
+    ; num_snark_workers= 0
     ; log_precomputed_blocks= true }
 
   let expected_error_event_reprs = []

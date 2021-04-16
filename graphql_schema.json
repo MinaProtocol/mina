@@ -546,6 +546,75 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "SetCoinbaseReceiverInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "publicKey",
+              "description": "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "publicKey",
+              "description": "Public key of the account to receive coinbases. Block production keys will receive the coinbases if none is given",
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SetCoinbaseReceiverPayload",
+          "description": null,
+          "fields": [
+            {
+              "name": "lastCoinbaseReceiver",
+              "description": "Returns the public key that was receiving coinbases previously, or none if it was the block producer",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "currentCoinbaseReceiver",
+              "description": "Returns the public key that will receive coinbase, or none if it will be the block producer",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "SetStakingInput",
           "description": null,
           "fields": [
@@ -4826,6 +4895,37 @@
               "deprecationReason": null
             },
             {
+              "name": "setCoinbaseReceiver",
+              "description": "Set the key to receive coinbases",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "SetCoinbaseReceiverInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SetCoinbaseReceiverPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "setSnarkWorker",
               "description": "Set key you wish to snark work with or disable snark working",
               "args": [
@@ -5211,7 +5311,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of coda to send to to receiver",
+              "description": "Amount of mina to send to receiver",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -5317,7 +5417,7 @@
             },
             {
               "name": "amount",
-              "description": "Amount of coda to send to to receiver",
+              "description": "Amount of mina to send to receiver",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -9189,7 +9289,7 @@
             },
             {
               "name": "coinbase",
-              "description": "Amount of coda granted to the producer of this block",
+              "description": "Amount of mina granted to the producer of this block",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10179,7 +10279,7 @@
           "fields": [
             {
               "name": "total",
-              "description": "The amount of coda owned by the account",
+              "description": "The amount of mina owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10195,7 +10295,7 @@
             },
             {
               "name": "unknown",
-              "description": "The amount of coda owned by the account whose origin is currently unknown",
+              "description": "The amount of mina owned by the account whose origin is currently unknown",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -10211,7 +10311,7 @@
             },
             {
               "name": "liquid",
-              "description": "The amount of coda owned by the account which is currently available. Can be null if bootstrapping.",
+              "description": "The amount of mina owned by the account which is currently available. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -10223,7 +10323,7 @@
             },
             {
               "name": "locked",
-              "description": "The amount of coda owned by the account which is currently locked. Can be null if bootstrapping.",
+              "description": "The amount of mina owned by the account which is currently locked. Can be null if bootstrapping.",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -10423,7 +10523,7 @@
             },
             {
               "name": "balance",
-              "description": "The amount of coda owned by the account",
+              "description": "The amount of mina owned by the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -11768,6 +11868,18 @@
               "deprecationReason": null
             },
             {
+              "name": "coinbaseReceiver",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "histograms",
               "description": null,
               "args": [],
@@ -12323,6 +12435,24 @@
               "name": "pooledUserCommands",
               "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
+                {
+                  "name": "ids",
+                  "description": "Ids of UserCommands",
+                  "type": {
+                    "kind": "LIST",
+                    "name": null,
+                    "ofType": {
+                      "kind": "NON_NULL",
+                      "name": null,
+                      "ofType": {
+                        "kind": "SCALAR",
+                        "name": "ID",
+                        "ofType": null
+                      }
+                    }
+                  },
+                  "defaultValue": null
+                },
                 {
                   "name": "hashes",
                   "description": "Hashes of the commands to find in the pool",

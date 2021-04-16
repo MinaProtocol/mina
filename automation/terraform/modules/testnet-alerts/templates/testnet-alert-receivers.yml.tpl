@@ -18,3 +18,8 @@ route:
     - receiver: pagerduty-testnet-primary
       match_re:
         testnet: ^(${pagerduty_alert_filter})$
+        severity: critical
+    - receiver: discord-alert-default
+      match_re:
+        testnet: ^(${pagerduty_alert_filter})$
+        severity: warning

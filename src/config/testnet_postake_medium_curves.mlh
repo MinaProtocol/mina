@@ -33,6 +33,7 @@
 [%%define force_updates false]
 
 [%%define download_snark_keys true]
+[%%define generate_genesis_proof false]
 
 [%%define print_versioned_types false]
 
