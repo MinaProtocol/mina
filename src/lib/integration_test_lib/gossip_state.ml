@@ -64,51 +64,57 @@ let create () : t =
   in
   {blocks= f Set.create; transactions= f Set.create; snark_work= f Set.create}
 
-let add (t : t) (type a)
-    (type_ : a Event_type.Gossip.With_direction.t Event_type.t)
-    ((x : a), (dir : Event_type.Gossip.Direction.t)) : unit =
-  let f =
+let add (gossip_state : t) (type a)
+    (event_type : a Event_type.Gossip.With_direction.t Event_type.t)
+    ((gossip_message : a), (dir : Event_type.Gossip.Direction.t)) : unit =
+  let set : a Set.t By_direction.t =
+    match event_type with
+    | Block_gossip ->
+        gossip_state.blocks
+    | Transactions_gossip ->
+        gossip_state.transactions
+    | Snark_work_gossip ->
+        gossip_state.snark_work
+  in
+  let directional_set =
     match dir with
     | Sent ->
-        By_direction.sent
+        By_direction.sent set
     | Received ->
-        By_direction.received
+        By_direction.received set
   in
-  let tbls : a Set.t By_direction.t =
-    match type_ with
-    | Block_gossip ->
-        t.blocks
-    | Transactions_gossip ->
-        t.transactions
-    | Snark_work_gossip ->
-        t.snark_work
-  in
-  Set.add (f tbls) type_ x
+  Set.add directional_set event_type gossip_message
 
-(* The number of messages seen by some node but not by all nodes. *)
-let stats (type a) (type_ : a Event_type.Gossip.With_direction.t Event_type.t)
-    (ts : t list) =
-  match ts with
+(* this function returns a tuple: (number of messages seen by all nodes, number of messages seen by at least one node ) *)
+(* each gossip_state in the input list gossip_states corresponds to a node *)
+let stats (type a)
+    (event_type : a Event_type.Gossip.With_direction.t Event_type.t)
+    (gossip_states : t list) =
+  match gossip_states with
   | [] ->
       (`Seen_by_all 0, `Seen_by_some 0)
-  | _ :: _ ->
-      let ss =
-        let f : t -> a Set.t By_direction.t =
-          match type_ with
-          | Block_gossip ->
-              blocks
-          | Transactions_gossip ->
-              transactions
-          | Snark_work_gossip ->
-              snark_work
-        in
-        List.map ts ~f:(fun t ->
-            let s = f t in
-            Set.union [s.sent; s.received] )
+  | _ ->
+      let getter_func : t -> a Set.t By_direction.t =
+        match event_type with
+        | Block_gossip ->
+            blocks
+        | Transactions_gossip ->
+            transactions
+        | Snark_work_gossip ->
+            snark_work
       in
-      ( `Seen_by_all (Set.size (Set.inter ss))
-      , `Seen_by_some (Set.size (Set.union ss)) )
+      let event_type_gossip_states =
+        List.map gossip_states ~f:(fun gos_state ->
+            let event_type_gossip_state_by_direction = getter_func gos_state in
+            Set.union
+              [ event_type_gossip_state_by_direction.sent
+              ; event_type_gossip_state_by_direction.received ] )
+      in
+      ( `Seen_by_all (Set.size (Set.inter event_type_gossip_states))
+      , `Seen_by_some (Set.size (Set.union event_type_gossip_states)) )
 
-let consistency_ratio type_ ts =
-  let `Seen_by_all inter, `Seen_by_some union = stats type_ ts in
+let consistency_ratio event_type gossip_states =
+  let `Seen_by_all inter, `Seen_by_some union =
+    stats event_type gossip_states
+  in
   if union = 0 then 1. else Float.of_int inter /. Float.of_int union

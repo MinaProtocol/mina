@@ -85,22 +85,33 @@ module Make
                        ~data:new_best_tip
                    in
                    {state with best_tips_by_node= best_tips_by_node'} ) ) )) ;
-    let handle_gossip_received event =
+    let handle_gossip_received event_type =
       ignore
-        (Event_router.on event_router event ~f:(fun node k ->
+        (Event_router.on event_router event_type
+           ~f:(fun node gossip_with_direction ->
              update ~f:(fun state ->
                  { state with
                    gossip_received=
                      Map.update state.gossip_received (Node.id node)
-                       ~f:(fun s ->
-                         let s =
-                           match s with
+                       ~f:(fun gossip_state_opt ->
+                         let gossip_state =
+                           match gossip_state_opt with
                            | None ->
                                Gossip_state.create ()
-                           | Some s ->
-                               s
+                           | Some state ->
+                               state
                          in
-                         Gossip_state.add s event k ; s ) } ) ))
+                         [%log debug] "GOSSIP RECEIVED by $node"
+                           ~metadata:[("node", `String (Node.id node))] ;
+                         [%log debug] "GOSSIP RECEIVED recevied event: $event"
+                           ~metadata:
+                             [ ( "event"
+                               , Event_type.event_to_yojson
+                                   (Event_type.Event
+                                      (event_type, gossip_with_direction)) ) ] ;
+                         Gossip_state.add gossip_state event_type
+                           gossip_with_direction ;
+                         gossip_state ) } ) ))
     in
     handle_gossip_received Block_gossip ;
     handle_gossip_received Snark_work_gossip ;

@@ -147,7 +147,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Gossip_state.stats Transactions_gossip
         (Map.data (network_state t).gossip_received)
     in
-    [%log info] "gossip_consistency test: inter =  %d; union = %d " inter union ;
+    [%log info] "gossip_consistency test: inter = %d; union = %d " inter union ;
     let ratio =
       if union = 0 then 1. else Float.of_int inter /. Float.of_int union
       (* Gossip_state.consistency_ratio Transactions_gossip
