@@ -1,0 +1,10 @@
+(library
+ (name bin_prot_layouts)
+ (public_name bin_prot_layouts)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries ppx_version.runtime)
+ (preprocess
+  (pps ppx_version ppx_jane ppx_deriving.std))
+ (instrumentation (backend bisect_ppx))
+ (synopsis "Bin_prot layouts"))

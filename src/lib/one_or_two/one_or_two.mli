@@ -3,21 +3,17 @@ open Core
 
 open Async
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type 'a t = 'a Intfs.t
-    [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
+    type 'a t = 'a Intfs.t [@@deriving compare, equal, hash, sexp, yojson]
 
     val to_latest : ('a -> 'b) -> 'a t -> 'b t
 
     val of_latest :
       ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
   end
-
-  module Latest = V1
-end
-
-type 'a t = 'a Intfs.t [@@deriving compare, equal, hash, sexp, yojson]
+end]
 
 val length : 'a t -> int
 

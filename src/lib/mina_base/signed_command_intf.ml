@@ -153,14 +153,16 @@ module type S = sig
 
   module With_valid_signature : sig
     module Stable : sig
-      module Latest : sig
+      module V1 : sig
         type nonrec t = private t
         [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
+
+        val layout_t : Ppx_version_runtime.Bin_prot_layout.t
 
         include Gen_intf with type t := t
       end
 
-      module V1 = Latest
+      module Latest = V1
     end
 
     type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]

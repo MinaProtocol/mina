@@ -104,6 +104,15 @@ struct
 
         exception Invalid_curve_point of t
 
+        (* TODO : what's the actual rule? *)
+        let layout_t =
+          { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+          ; version_opt= None
+          ; type_decl=
+              "t = BaseField.Stable.Latest.t * BaseField.Stable.Latest.t"
+          ; bin_io_derived= false
+          ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
+
         include Binable.Of_binable
                   (T)
                   (struct

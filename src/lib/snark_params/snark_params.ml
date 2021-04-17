@@ -79,6 +79,9 @@ module Make_inner_curve_scalar
 struct
   module T = Other_impl.Field
 
+  (* TODO : what's the real layout? *)
+  let layout_t = Bin_prot_layouts.inet_addr_v1_layout
+
   include (
     T :
       module type of T with module Var := T.Var and module Checked := T.Checked )
@@ -183,6 +186,14 @@ module Tick = struct
     include Tick0.Field
     include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
+
+    (* TODO : what's the actual rule? *)
+    let layout_t =
+      { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+      ; version_opt= None
+      ; type_decl= "Tick.Field.t"
+      ; bin_io_derived= false
+      ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
   end

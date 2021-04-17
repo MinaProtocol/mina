@@ -124,6 +124,8 @@ module type S_with_version = sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving version, sexp, bin_io, compare, yojson, hash, eq]
+
+      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1
@@ -146,6 +148,14 @@ module Make (F : Input_intf) :
   module Stable = struct
     module V1 = struct
       type t = F.t [@@deriving version {asserted}]
+
+      (* TODO: is a Bigint here actually that the actual rule? *)
+      let layout_t =
+        { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+        ; version_opt= None
+        ; type_decl= "F.t"
+        ; bin_io_derived= false
+        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
 
       include Binable.Of_binable
                 (Bigint)

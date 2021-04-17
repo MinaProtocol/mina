@@ -9,6 +9,8 @@ module Single : sig
         ; fee: Currency.Fee.Stable.V1.t
         ; fee_token: Token_id.Stable.V1.t }
       [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+
+      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1
@@ -50,7 +52,9 @@ end
 module Stable : sig
   module V1 : sig
     type t = private Single.Stable.V1.t One_or_two.Stable.V1.t
-    [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+    [@@deriving bin_io, sexp, compare, eq, yojson, hash, version]
+
+    val layout_t : Ppx_version_runtime.Bin_prot_layout.t
   end
 
   module Latest = V1

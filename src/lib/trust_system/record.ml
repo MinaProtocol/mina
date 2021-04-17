@@ -1,13 +1,23 @@
 open Core
 
+let time_option_layout =
+  { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+  ; version_opt= None
+  ; type_decl= "Core.Time.Stable.V1.t Core_kernel.Option.Stable.V1.t"
+  ; bin_io_derived= true
+  ; bin_prot_rule=
+      Ppx_version_runtime.Bin_prot_rule.(
+        Option Bin_prot_layouts.core_time_stable_v1.bin_prot_rule) }
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t =
       { trust: float
       ; trust_last_updated: Core.Time.Stable.V1.t
+            [@layout Bin_prot_layouts.core_time_stable_v1]
       ; banned_until_opt: Core.Time.Stable.V1.t Core_kernel.Option.Stable.V1.t
-      }
+            [@layout time_option_layout] }
 
     let to_latest = Fn.id
   end

@@ -2,24 +2,16 @@ open Core
 open Import
 module Fee_transfer = Coinbase_fee_transfer
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t = private
       { receiver: Public_key.Compressed.Stable.V1.t
       ; amount: Currency.Amount.Stable.V1.t
       ; fee_transfer: Fee_transfer.Stable.V1.t option }
-    [@@deriving sexp, bin_io, compare, eq, version, hash, yojson]
+    [@@deriving sexp, compare, eq, hash, yojson]
   end
-
-  module Latest = V1
-end
-
-(* bin_io intentionally omitted in deriving list *)
-type t = Stable.Latest.t = private
-  { receiver: Public_key.Compressed.t
-  ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.t option }
-[@@deriving sexp, compare, eq, hash, yojson]
+end]
 
 include Codable.Base58_check_intf with type t := t
 

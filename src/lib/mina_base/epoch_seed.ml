@@ -10,6 +10,8 @@ end)
 
 [%%versioned
 module Stable = struct
+  [@@@no_toplevel_latest_type]
+
   module V1 = struct
     module T = struct
       type t = Snark_params.Tick.Field.t
@@ -27,3 +29,5 @@ module Stable = struct
     include Hashable.Make_binable (T)
   end
 end]
+
+type _unused = unit constraint Stable.Latest.t = t

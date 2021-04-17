@@ -58,7 +58,8 @@ module Hex64 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = T.t [@@deriving compare, sexp, yojson, hash, equal]
+      type t = (T.t[@layout Bin_prot_layouts.int64])
+      [@@deriving compare, sexp, yojson, hash, equal]
 
       let to_latest = Fn.id
     end

@@ -123,8 +123,6 @@ module Data = struct
   module Epoch_seed = struct
     include Mina_base.Epoch_seed
 
-    type _unused = unit constraint t = Stable.Latest.t
-
     let initial : t = of_hash Outside_hash_image.t
 
     let update (seed : t) vrf_result =
@@ -4103,7 +4101,7 @@ let%test_module "Proof of stake tests" =
     let default_slot_fill_rate_delta = 0.15
 
     (** A root epoch of a block refers the epoch from which we can begin
-     *  simulating information for that block. Because we need to simulate 
+     *  simulating information for that block. Because we need to simulate
      *  both the staking epoch and the next staking epoch, the root epoch
      *  is the staking epoch. The root epoch position this function generates
      *  is the epoch number of the staking epoch and the block height the

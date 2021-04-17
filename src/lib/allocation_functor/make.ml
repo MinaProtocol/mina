@@ -105,6 +105,8 @@ module Versioned_v1 = struct
   end = struct
     module Stable = struct
       module V1 = struct
+        let layout_t = M.Stable.V1.layout_t
+
         include Bin_io (struct
           let id = M.id
 
@@ -134,6 +136,8 @@ module Versioned_v1 = struct
   end = struct
     module Stable = struct
       module V1 = struct
+        let layout_t = M.Stable.V1.layout_t
+
         include Bin_io_and_sexp (struct
           let id = M.id
 
@@ -163,6 +167,8 @@ module Versioned_v1 = struct
   end = struct
     module Stable = struct
       module V1 = struct
+        let layout_t = M.Stable.V1.layout_t
+
         include Bin_io_and_yojson (struct
           let id = M.id
 
@@ -193,6 +199,8 @@ module Versioned_v1 = struct
   end = struct
     module Stable = struct
       module V1 = struct
+        let layout_t = M.Stable.V1.layout_t
+
         include Full (struct
           let id = M.id
 
@@ -238,6 +246,8 @@ module Versioned_v1 = struct
   end = struct
     module Stable = struct
       module V1 = struct
+        let layout_t = M.Stable.V1.layout_t
+
         include Full (struct
           let id = M.id
 

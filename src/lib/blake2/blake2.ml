@@ -39,7 +39,9 @@ module Make () = struct
         [%%define_locally T1.(to_string, of_string)]
       end
 
-      include Binable.Of_stringable (Arg)
+      include Binable.Of_stringable (Arg [@layout
+                                           Bin_prot_layouts
+                                           .core_kernel_string_stable_v1])
     end
   end]
 

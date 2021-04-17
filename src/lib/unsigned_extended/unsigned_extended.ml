@@ -103,6 +103,13 @@ module UInt64 = struct
         , to_yojson
         , of_yojson )]
 
+      let layout_t =
+        { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+        ; version_opt= Some 1
+        ; type_decl= "Unsigned.UInt64.t"
+        ; bin_io_derived= false
+        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Int64 }
+
       include Bin_prot.Utils.Make_binable (struct
         module Binable = Int64
 
@@ -152,6 +159,13 @@ module UInt32 = struct
         , t_of_sexp
         , to_yojson
         , of_yojson )]
+
+      let layout_t =
+        { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+        ; version_opt= Some 1
+        ; type_decl= "Unsigned.UInt32.t"
+        ; bin_io_derived= false
+        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Int32 }
 
       include Bin_prot.Utils.Make_binable (struct
         module Binable = Int32

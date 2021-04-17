@@ -9,6 +9,7 @@
    async_extra
    base58_check
    bignum_bigint
+   bin_prot_layouts
    block_time
    mina_compile_config
    genesis_constants

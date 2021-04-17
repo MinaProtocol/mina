@@ -6,7 +6,11 @@ module Bigstring = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Core_kernel.Bigstring.Stable.V1.t [@@deriving sexp, compare]
+      type t =
+        (Core_kernel.Bigstring.Stable.V1.t[@layout
+                                            Bin_prot_layouts
+                                            .core_kernel_bigstring_v1])
+      [@@deriving sexp, compare]
 
       let to_latest = Fn.id
 

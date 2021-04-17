@@ -4,6 +4,8 @@ open Pickles_types
 module Stable : sig
   module V1 : sig
     type t [@@deriving sexp, sexp, compare, yojson, hash, equal]
+
+    val layout_t : Ppx_version_runtime.Bin_prot_layout.t
   end
 end]
 

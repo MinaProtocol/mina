@@ -570,6 +570,7 @@ module Rpcs = struct
         module V2 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+                  [@layout Bin_prot_layouts.inet_addr_v1_layout]
                   [@to_yojson
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
                   [@of_yojson
@@ -604,6 +605,7 @@ module Rpcs = struct
         module V1 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+                  [@layout Bin_prot_layouts.inet_addr_v1_layout]
                   [@to_yojson
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
                   [@of_yojson

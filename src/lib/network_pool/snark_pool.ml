@@ -10,11 +10,13 @@ module Snark_tables = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-          * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
-            | `Not_rebroadcastable ] )
-          Transaction_snark_work.Statement.Stable.V1.Table.t
+          (( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+             Priced_proof.Stable.V1.t
+           * [ `Rebroadcastable of Core.Time.Stable.With_utc_sexp.V2.t
+             | `Not_rebroadcastable ] )
+           Transaction_snark_work.Statement.Stable.V1.Table.t[@layout
+                                                               Bin_prot_layouts
+                                                               .snark_work_statement_v1_table])
         [@@deriving sexp]
 
         let to_latest = Fn.id

@@ -80,6 +80,8 @@ module Stack_id : sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving bin_io, sexp, to_yojson, compare, version]
+
+      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1
@@ -149,6 +151,8 @@ module Coinbase_stack = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       module T = struct
         type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
@@ -207,6 +211,8 @@ module Stack_hash = struct
 
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       module T = struct
         type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]

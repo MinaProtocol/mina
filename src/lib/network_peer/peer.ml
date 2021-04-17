@@ -27,6 +27,7 @@ module Stable = struct
   module V1 = struct
     type t =
       { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
+            [@layout Bin_prot_layouts.inet_addr_v1_layout]
       ; libp2p_port: int (* TCP *)
       ; peer_id: Id.Stable.V1.t }
     [@@deriving compare, sexp]

@@ -108,7 +108,9 @@ module Result = struct
       type ('spec, 'single) t =
         { proofs: 'single One_or_two.Stable.V1.t
         ; metrics:
-            (Core.Time.Stable.Span.V1.t * [`Transition | `Merge])
+            ( (Core.Time.Stable.Span.V1.t[@layout
+                                           Bin_prot_layouts.core_time_stable_v1])
+            * [`Transition | `Merge] )
             One_or_two.Stable.V1.t
         ; spec: 'spec
         ; prover: Signature_lib.Public_key.Compressed.Stable.V1.t }

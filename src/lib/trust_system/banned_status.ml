@@ -4,7 +4,9 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     (* there's no Time.Stable.Vn, assert version and test for changes in serialization *)
-    type t = Unbanned | Banned_until of Time.t
+    type t =
+      | Unbanned
+      | Banned_until of (Time.t[@layout Bin_prot_layouts.core_kernel_time])
 
     let to_latest = Fn.id
 

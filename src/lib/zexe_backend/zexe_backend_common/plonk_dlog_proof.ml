@@ -5,6 +5,8 @@ module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
       type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
+
+      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1

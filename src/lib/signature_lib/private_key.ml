@@ -17,7 +17,9 @@ open Snark_params_nonconsensus
 [%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    type t = Inner_curve.Scalar.t
+    (* TODO : what's the real layout? *)
+    type t =
+      (Inner_curve.Scalar.t[@layout Bin_prot_layouts.inet_addr_v1_layout])
 
     let to_latest = Fn.id
 

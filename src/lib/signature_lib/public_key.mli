@@ -14,18 +14,14 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
-type t = Field.t * Field.t [@@deriving sexp, hash]
-
-include Codable.S with type t := t
-
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+    type t = Field.t * Field.t [@@deriving sexp, compare, eq, hash, yojson]
   end
+end]
 
-  module Latest = V1
-end
+include Codable.S with type t := t
 
 include Comparable.S_binable with type t := t
 
@@ -58,19 +54,16 @@ module Compressed : sig
       with type ('field, 'boolean) V1.t = ('field, 'boolean) t
   end
 
-  type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
-
-  include Codable.S with type t := t
-
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, version]
+      type t = (Field.t, bool) Poly.t [@@deriving sexp, eq, compare, hash]
 
       include Codable.S with type t := t
     end
+  end]
 
-    module Latest = V1
-  end
+  include Codable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 

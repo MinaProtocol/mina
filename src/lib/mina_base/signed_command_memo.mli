@@ -14,16 +14,12 @@ exception Too_long_user_memo_input
 
 exception Too_long_digestible_string
 
-type t [@@deriving sexp, eq, compare, hash, yojson]
-
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    type t [@@deriving sexp, eq, compare, hash, yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 [%%ifdef consensus_mechanism]
 

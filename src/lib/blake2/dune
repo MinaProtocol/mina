@@ -7,5 +7,6 @@
  (libraries
    core_kernel
    digestif
+   bin_prot_layouts
    ppx_version.runtime
 ))

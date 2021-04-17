@@ -275,7 +275,9 @@ module Protocol = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Int64.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
+      type t =
+        (int, int, (Int64.t[@layout Bin_prot_layouts.int64])) Poly.Stable.V1.t
+      [@@deriving eq, ord, hash]
 
       let to_latest = Fn.id
 

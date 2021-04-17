@@ -3,7 +3,10 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {checksum: Core_kernel.Md5.Stable.V1.t; data: 'a}
+    type 'a t =
+      { checksum: Core_kernel.Md5.Stable.V1.t
+            [@layout Bin_prot_layouts.core_kernel_md5_stable_v1]
+      ; data: 'a }
   end
 end]
 

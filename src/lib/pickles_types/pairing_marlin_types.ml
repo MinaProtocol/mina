@@ -231,7 +231,8 @@ module Accumulator = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type 'a t = 'a Shift.Map.t
+          type 'a t =
+            ('a Shift.Map.t[@layout Bin_prot_layouts.unshifted_accumulators])
           [@@deriving sexp, version {asserted}, compare]
 
           let to_yojson f t = Alist.to_yojson f (Map.to_alist t)

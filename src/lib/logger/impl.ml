@@ -48,7 +48,9 @@ module Metadata = struct
             Error "Unexpected object"
 
       include Binable.Of_binable
-                (Core_kernel.String.Stable.V1)
+                (Core_kernel.String.Stable.V1 [@layout
+                                                Bin_prot_layouts
+                                                .core_kernel_string_stable_v1])
                 (struct
                   type nonrec t = t
 
