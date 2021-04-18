@@ -904,7 +904,7 @@ struct
               [|Fp.zero; s2; Fp.zero; Fp.zero; Fp.zero; Fp.zero; Fp.negate s1|]
               sys
         | `Constant, `Constant ->
-            assert (Fp.(equal s2 s2)) )
+            assert (Fp.(equal s1 s2)) )
     | Plonk_constraint.T (Basic {l; r; o; m; c}) ->
         (* 0
          = l.s * l.x
