@@ -48,7 +48,7 @@ module ArithmeticSponge
     state.(rounds)
 
   let block_cipher (start : Field.t array) : Field.t array =
-    permute start 31
+    permute start 57
 
   let absorb x =
     match st.sponge_state with

@@ -196,4 +196,104 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     done;
     z
 
+  (*
+    exchanges columns in each of 4 rows
+    row0 - unchanged, row1- shifted left 1, 
+    row2 - shifted left 2 and row3 - shifted left 3
+  *)
+  let shiftRows (state : Field.t array) : Field.t array =
+    if (Array.length state) <> 16 then
+      raise (BlockArith "Incorrect block size");
+    let module Constraints = Constraints (Intf) in
+    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.sboxInd in
+    (* just substitute row 0 *)
+    state.(0) <- sbox state.(0); state.(4) <- sbox state.(4);
+    state.(8) <- sbox state.(8); state.(12) <- sbox state.(12);
+    (* rotate row 1 *)
+    let tmp = sbox state.(1) in state.(1) <- sbox state.(5);
+    state.(5) <- sbox state.(9); state.(9) <- sbox state.(13); state.(13) <- tmp;
+    (* rotate row 2 *)
+    let tmp = sbox state.(2) in state.(2) <- sbox state.(10); state.(10) <- tmp;
+    let tmp = sbox state.(6) in state.(6) <- sbox state.(14); state.(14) <- tmp;
+    (* rotate row 3 *)
+    let tmp = sbox state.(15) in state.(15) <- sbox state.(11);
+    state.(11) <- sbox state.(7); state.(7) <- sbox state.(3); state.(3) <- tmp;
+    state
+
+  (* recombine and mix each row in a column *)
+  let mixSubColumns (state : Field.t array) : Field.t array =
+    if (Array.length state) <> 16 then
+      raise (BlockArith "Incorrect block size");
+    let module Constraints = Constraints (Intf) in
+    let xor4 (b1 : Field.t) (b2 : Field.t) (b3 : Field.t) (b4 : Field.t) : Field.t =
+      Constraints.xor (Constraints.xor b1 b2) (Constraints.xor b3 b4) in
+    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.sboxInd in
+    let xtime2Sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.xtime2sboxInd in
+    let xtime3Sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.xtime3sboxInd in
+    let ret = Array.init 16 ~f:(fun _ -> Field.zero) in
+    (* mixing column 0 *)
+    ret.(0) <- xor4 (xtime2Sbox state.(0)) (xtime3Sbox state.(5)) (sbox state.(10)) (sbox state.(15));
+    ret.(1) <- xor4 (sbox state.(0)) (xtime2Sbox state.(5)) (xtime3Sbox state.(10)) (sbox state.(15));
+    ret.(2) <- xor4 (sbox state.(0)) (sbox state.(5)) (xtime2Sbox state.(10)) (xtime3Sbox state.(15));
+    ret.(3) <- xor4 (xtime3Sbox state.(0)) (sbox state.(5)) (sbox state.(10)) (xtime2Sbox state.(15));
+    (* mixing column 1 *)
+    ret.(4) <- xor4 (xtime2Sbox state.(4)) (xtime3Sbox state.(9)) (sbox state.(14)) (sbox state.(3));
+    ret.(5) <- xor4 (sbox state.(4)) (xtime2Sbox state.(9)) (xtime3Sbox state.(14)) (sbox state.(3));
+    ret.(6) <- xor4 (sbox state.(4)) (sbox state.(9)) (xtime2Sbox state.(14)) (xtime3Sbox state.(3));
+    ret.(7) <- xor4 (xtime3Sbox state.(4)) (sbox state.(9)) (sbox state.(14)) (xtime2Sbox state.(3));
+    (* mixing column 2 *)
+    ret.(8) <- xor4 (xtime2Sbox state.(8)) (xtime3Sbox state.(13)) (sbox state.(2)) (sbox state.(7));
+    ret.(9) <- xor4 (sbox state.(8)) (xtime2Sbox state.(13)) (xtime3Sbox state.(2)) (sbox state.(7));
+    ret.(10) <- xor4 (sbox state.(8)) (sbox state.(13)) (xtime2Sbox state.(2)) (xtime3Sbox state.(7));
+    ret.(11) <- xor4 (xtime3Sbox state.(8)) (sbox state.(13)) (sbox state.(2)) (xtime2Sbox state.(7));
+    (* mixing column 3 *)
+    ret.(12) <- xor4 (xtime2Sbox state.(12)) (xtime3Sbox state.(1)) (sbox state.(6)) (sbox state.(11));
+    ret.(13) <- xor4 (sbox state.(12)) (xtime2Sbox state.(1)) (xtime3Sbox state.(6)) (sbox state.(11));
+    ret.(14) <- xor4 (sbox state.(12)) (sbox state.(1)) (xtime2Sbox state.(6)) (xtime3Sbox state.(11));
+    ret.(15) <- xor4 (xtime3Sbox state.(12)) (sbox state.(1)) (sbox state.(6)) (xtime2Sbox state.(11));
+    ret
+
+  (* encrypt one 128 bit block *)
+  let encryptBlock (state : Field.t array) (ks : Field.t array array) : Field.t array =
+    if (Array.length state) <> 16 || (Array.length ks) <> 11 || (Array.length ks.(0)) <> 16 then
+      raise (BlockArith "Incorrect block size");
+    let rec round state n =
+      if n > 10 then
+        state
+      else if n = 10 then
+        round (xor (shiftRows state) ks.(n)) 11
+      else
+        round (xor (mixSubColumns state) ks.(n)) Int.(n + 1)
+    in
+    round (xor state ks.(0)) 1
+
+  (* compute AES key schedule *)
+  let expandKey (key : Field.t array) : Field.t array array =
+    if (Array.length key) <> 16 then
+      raise (BlockArith "Incorrect block size");
+    let module Constraints = Constraints (Intf) in
+    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.sboxInd in
+    let expkey = Array.init 176 ~f:(fun _ -> Field.zero) in
+    let tmp = Array.init 5 ~f:(fun _ -> Field.zero) in
+    Array.iteri key ~f:(fun i x -> expkey.(i) <- key.(i));
+    for idx = 4 to 43 do
+      tmp.(0) <- expkey.(4*idx - 4);
+      tmp.(1) <- expkey.(4*idx - 3);
+      tmp.(2) <- expkey.(4*idx - 2);
+      tmp.(3) <- expkey.(4*idx - 1);
+      if idx % 4 = 0 then
+      (
+          tmp.(4) <- tmp.(3);
+          tmp.(3) <- sbox tmp.(0);
+          tmp.(0) <- Constraints.xor (sbox tmp.(1)) (Constraints.aesLookup (Field.of_int (idx/4)) Gcm.rconInd);
+          tmp.(1) <- sbox tmp.(2);
+          tmp.(2) <- sbox tmp.(4);
+      );
+      expkey.(4*idx+0) <- Constraints.xor expkey.(4*idx - 16 + 0) tmp.(0);
+      expkey.(4*idx+1) <- Constraints.xor expkey.(4*idx - 16 + 1) tmp.(1);
+      expkey.(4*idx+2) <- Constraints.xor expkey.(4*idx - 16 + 2) tmp.(2);
+      expkey.(4*idx+3) <- Constraints.xor expkey.(4*idx - 16 + 3) tmp.(3);
+    done;
+    Array.init 11 ~f:(fun i -> Array.init 16 ~f:(fun j -> expkey.(16*i+j)))
+
 end

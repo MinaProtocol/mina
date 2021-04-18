@@ -2,7 +2,7 @@ open Core
 open Snarky
 open Marlin_plonk_bindings
 
-module Vector (Intf : Snark_intf.Run with type prover_state = unit and type field = Pasta_fp.t) = struct
+module Public_input (Intf : Snark_intf.Run with type prover_state = unit and type field = Pasta_fp.t) = struct
   open Intf
   open Typ
   module Ecc = Plonk.Ecc.Constraints (Intf)
