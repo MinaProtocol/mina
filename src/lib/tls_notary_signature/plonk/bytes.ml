@@ -197,9 +197,10 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     z
 
   (*
-    exchanges columns in each of 4 rows
-    row0 - unchanged, row1- shifted left 1, 
-    row2 - shifted left 2 and row3 - shifted left 3
+    The functions below Snarky-adapt the following optimized AES implementation:
+    "byte-oriented-aes – A public domain byte-oriented implementation of AES in C – Google Project Hosting".
+    Archived from the original on 2013-07-20. Retrieved 2012-12-23.
+    https://code.google.com/p/byte-oriented-aes
   *)
   let shiftRows (state : Field.t array) : Field.t array =
     if (Array.length state) <> 16 then
