@@ -7,7 +7,7 @@ module Rounds = struct
 
   module Wrap : Add.Intf_transparent = N18
 
-  module Step : Add.Intf_transparent = N18
+  module Step : Add.Intf_transparent = N17
 end
 
 module Bigint256 =

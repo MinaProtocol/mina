@@ -168,6 +168,8 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
       in
       Array.iteri state ~f:(fun i s ->
       (
+        s.xt <- xt;
+        s.yt <- yt;
         if i > 0 then
         (
           s.n2 <- state.(Int.(i-1)).n1;
