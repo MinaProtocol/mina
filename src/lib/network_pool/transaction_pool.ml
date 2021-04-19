@@ -1562,9 +1562,10 @@ struct
                    no need to check balances here *)
                 ~fee_payer_balance:Currency.Amount.max_int
                 ~fee_payer_nonce:
-                  ( Transaction_hash.User_command_with_valid_signature.command
+                  (*( Transaction_hash.User_command_with_valid_signature.command
                       cmd
-                  |> User_command.nonce_exn )
+                  |> User_command.nonce_exn )*)
+                  Mina_numbers.Account_nonce.zero
             with
             | Ok (t, _) ->
                 Some (cmd, t)
