@@ -272,6 +272,15 @@ groups:
       description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
+  - alert: OneOfNodeRestarted
+    expr: min by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter}) < 60000
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "At least one of the nodes on {{ $lables.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+
   - alert: UnparentedBlocksObserved
     expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter})) > 1
     for: ${alert_evaluation_duration}
