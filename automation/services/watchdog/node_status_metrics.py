@@ -29,14 +29,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   seeds = [ p for p in pod_names if 'seed' in p ]
 
-  seed = random.choice(seeds)
-
-  seed_pod = [ p for p in pods.to_dict()['items'] if p['metadata']['name'] == seed ][0]
-  seed_daemon_container = [ c for c in seed_pod['spec']['containers'] if c['args'][0] == 'daemon' ][0]
-  seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
-  seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
-
-  peers, response_count, errored_responses = crawl_for_peers(v1, namespace, seed, seed_daemon_port)
+  resp_count, valid_resps, error_resps = collect_node_status(v1, namespace, seeds, pods)
 
   err_context_deadline = 0
   err_negotiate_security_protocol = 0
@@ -46,7 +39,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   err_size_limit_exceeded = 0
   err_others = 0
 
-  for p in errored_responses:
+  for p in error_resps:
     try:
       error_str = p['error']['string']
       if 'context deadline exceeded' in error_str:
@@ -72,13 +65,13 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
       print("Errored response: {}".format(error_str))
       err_others += 1
 
-  num_peers = len(peers.values())
+  num_peers = len(valid_resps)
 
-  synced_fraction = sum([ p['sync_status'] == 'Synced' for p in peers.values() ]) / num_peers
+  synced_fraction = sum([ p['sync_status'] == 'Synced' for p in valid_resps ]) / num_peers
 
-  nodes_queried.set(response_count)
+  nodes_queried.set(resp_count)
   nodes_responded.set(num_peers)
-  nodes_errored.set(len(errored_responses))
+  nodes_errored.set(len(error_resps))
   context_deadline_exceeded.set(err_context_deadline)
   failed_security_protocol_negotiation.set(err_negotiate_security_protocol)
   connection_refused_errors.set(err_connection_refused)
@@ -95,7 +88,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   # -------------------------------------------------
 
   # note: k_block_hashes_and_timestamps is most recent last
-  chains = [ p['k_block_hashes_and_timestamps'] for p in peers.values() ]
+  chains = [ p['k_block_hashes_and_timestamps'] for p in valid_resps ]
 
   tree = {}
   parents = {}
@@ -106,9 +99,6 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
       tree.setdefault(parent, set())
       tree[parent].add(child)
       parents[child] = parent
-
-  blocks = set(itertools.chain(tree.keys(), *tree.values()))
-  roots = [ b for b in blocks if b not in parents.keys() ]
 
   def get_deepest_child(p):
     children_and_depths = []
@@ -134,7 +124,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   n = 3
   last_n_protocol_states = [ most_common_best_protocol_state ]
-  for i in range(n):
+  for _ in range(n):
     parent = last_n_protocol_states[-1]
     if parent in parents:
       last_n_protocol_states.append(parents[parent])
@@ -143,14 +133,14 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   any_hash_in_last_n = lambda peer: any([ p_hash in last_n_protocol_states for p_hash, _ in peer['k_block_hashes_and_timestamps'][-n:] ])
 
-  synced_near_best_tip_num = [ any_hash_in_last_n(p) for p in peers.values() if p['sync_status'] == 'Synced' ]
+  synced_near_best_tip_num = [ any_hash_in_last_n(p) for p in valid_resps if p['sync_status'] == 'Synced' ]
 
   #don't include nodes that are in catchup or bootstrap state
-  all_synced_peers = [ p['sync_status'] == 'Synced' for p in peers.values() ]
+  all_synced_peers = [ p['sync_status'] == 'Synced' for p in valid_resps ]
 
   synced_near_best_tip_fraction = sum(synced_near_best_tip_num) / sum(all_synced_peers)
 
-  peers_out_of_sync=[("peer-id:"+p['node_peer_id'], "state-hash:"+p['protocol_state_hash'], "status:"+p['sync_status']) for p in peers.values() if not any_hash_in_last_n(p) and p['sync_status'] == 'Synced']
+  peers_out_of_sync=[("peer-id:"+p['node_peer_id'], "state-hash:"+p['protocol_state_hash'], "status:"+p['sync_status']) for p in valid_resps if not any_hash_in_last_n(p) and p['sync_status'] == 'Synced']
 
   print("Number of  peers with 'Synced' status: {}\nPeers not synced near the best tip: {}".format(sum(all_synced_peers), peers_out_of_sync))
 
@@ -158,14 +148,10 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
 # ========================================================================
 
-def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10):
-
+def collect_node_status(v1, namespace, seeds, pods):
   peer_table = {}
-
-  queried_peers = set()
-  unqueried_peers = {}
   error_resps = []
-  all_resps = []
+  resp_count = 0
 
   def contains_error(resp):
     try:
@@ -177,45 +163,32 @@ def crawl_for_peers(v1, namespace, seed, seed_daemon_port, max_crawl_requests=10
   def no_error(resp):
     return (not (contains_error(resp)))
 
-  def add_resp(resp, direct_queried_peers):
-    # we use ast instead of json to handle properties with single quotes instead of double quotes (which the response seems to often contain)
-    resps = [ ast.literal_eval(s) for s in resp.split('\n') if s != '' ]
+  def add_resp(raw):
+    all_resps = [ ast.literal_eval(s) for s in raw.split('\n') if s != '' ]
+    
+    resp_count = resp_count + len(all_resps)
+    valid_resps = list(filter(no_error, all_resps))
+    error_resps.extend(list(filter(contains_error, all_resps)))
 
-    peers = list(filter(no_error,resps))
-    error_resps.extend(list(filter(contains_error,resps)))
-    all_resps.extend(resps)
+    peer_resp_map = [ ((r['node_ip_addr'], r['node_peer_id']), r) for r in valid_resps ]
 
-    key_value_peers = [ ((p['node_ip_addr'], p['node_peer_id']), p) for p in peers ]
+    for (p, r) in peer_resp_map:
+      if p not in peer_table:
+        peer_table[p] = r
 
-    for (k,v) in key_value_peers:
-      if k not in peer_table:
-        peer_table[k] = v
+  for seed in seeds:
+    seed_pod = [ p for p in pods.to_dict()['items'] if p['metadata']['name'] == seed ][0]
+    seed_daemon_container = [ c for c in seed_pod['spec']['containers'] if c['args'][0] == 'daemon' ][0]
+    seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
+    seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
 
-    queried_peers.update([ p['node_peer_id'] for p in peers ])
-    queried_peers.update([ p['peer_id'] for p in direct_queried_peers ])
-    for p in itertools.chain(*[ p['peers'] for p in peers ]):
-      unqueried_peers[p['peer_id']] = p
-    for p in queried_peers:
-      if p in unqueried_peers:
-        del unqueried_peers[p]
+    cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
+    resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
 
-  cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
-  resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
-  add_resp(resp, [])
+    add_resp(resp)
 
-  requests = 0
+  valid_resps = peer_table.values()
 
-  while len(unqueried_peers) > 0 and requests < max_crawl_requests:
-    peers_to_query = list(unqueried_peers.values())
-    peers = ','.join(peer_to_multiaddr(p) for p in peers_to_query)
-
-    print ('Queried ' + str(len(queried_peers)) + ' peers. Gathering node status on %s unqueried peers'%(str(len(unqueried_peers))))
-
-    resp = util.exec_on_pod(v1, namespace, seed, 'coda', "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + peers + " -show-errors")
-    add_resp(resp, peers_to_query)
-
-    requests += 1
-
-  return (peer_table, len(all_resps), error_resps)
+  return (resp_count, valid_resps, error_resps)
 
 # ========================================================================
