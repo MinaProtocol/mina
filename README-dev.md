@@ -30,7 +30,7 @@ The short version:
 ### Developer Setup (MacOS)
 
 - Invoke `make macos-setup`
-  - If this is your first time using OCaml, be sure to run `eval $(opam config env`
+  - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
 - Invoke `rustup default 1.45.2`
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#dev-env)
