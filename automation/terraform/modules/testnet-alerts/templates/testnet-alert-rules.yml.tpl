@@ -299,15 +299,24 @@ groups:
       summary: "{{ $labels.testnet }} has more than 5 blocks that are not selected over the root of our transition frontier in the last hour"
       description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
 
-
-  - alert: InvalidProofPerHour
+  - alert: LowInvalidProofPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+
+  - alert: HighInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 3
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
+      summary: "{{ $labels.testnet }} has more than 3 blocks that contains an invalid blockchain snark proof in last hour"
       description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+
 
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alert_timeframe}])) < 1
