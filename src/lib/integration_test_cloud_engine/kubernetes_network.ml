@@ -110,11 +110,11 @@ module Node = struct
 
   module Graphql = struct
     let ingress_uri node =
-      Uri.make ~scheme:"http"
-        ~host:
-          (Printf.sprintf "%s.%s.graphql.o1test.net" node.pod_id
-             node.testnet_name)
-        ~path:"/graphql" ~port:80 ()
+      let host =
+        Printf.sprintf "%s.graphql.test.o1test.net" node.testnet_name
+      in
+      let path = Printf.sprintf "/%s/graphql" node.pod_id in
+      Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct
       let preprocess_variables_string = Fn.id
@@ -284,7 +284,7 @@ module Node = struct
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
-  let best_chain ~logger t =
+  let get_best_chain ~logger t =
     let open Malleable_error.Let_syntax in
     let query = Graphql.Best_chain.make () in
     let%bind result =

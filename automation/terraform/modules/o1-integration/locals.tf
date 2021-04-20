@@ -1,5 +1,5 @@
 locals {
-  base_graphql_dns = "${var.testnet_name}.graphql.o1test.net"
+  graphql_ingress_dns = "${var.testnet_name}.graphql.test.o1test.net"
   snark_worker_host_port            = 10001
   block_producer_starting_host_port = 10010
 
