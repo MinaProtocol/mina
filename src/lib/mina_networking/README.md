@@ -16,11 +16,10 @@ In the context of this document, we will describe query and response types using
 - `block` == an entire block (contains `protocol_state` and the staged ledger diff for that block)
 - `staged_ledger` == the data structure which represents the intermediate (unsnarked) ledger state of the network (large)
 - `pending_coinbase` == a auxilliary hash which identifies some state related to the staged ledger
-
-- `sync_ledger_query` == ...
-- `sync_ledger_response` == ...
-- `transaction_pool_diff` == ...
-- `snark_pool_diff` == ...
+- `sync_ledger_query` == queries for performing sync ledger protocol (requests for hashes or batches of subtrees of a merkle tree)
+- `sync_ledger_response` == responses for handling sync ledger protocol (responses of hashes or batches of subtrees of a merkle tree)
+- `transaction_pool_diff` == a bundle of multiple transactions to be included into the blockchain
+- `snark_pool_diff` == a bundle of 1-2 snark works to be included into the blockchain
 - `node_status` == a bundle of information about the status of a node (used for telemetry)
 
 ## Broadcast Messages
