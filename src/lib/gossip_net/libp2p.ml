@@ -44,7 +44,11 @@ end
 module type S = sig
   include Intf.Gossip_net_intf
 
-  val create : Config.t -> Rpc_intf.rpc_handler list -> t Deferred.t
+  val create :
+       Config.t
+    -> pids:Child_processes.Termination.t
+    -> Rpc_intf.rpc_handler list
+    -> t Deferred.t
 end
 
 let rpc_transport_proto = "coda/rpcs/0.0.1"
@@ -132,7 +136,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
     (* Creates just the helper, making sure to register everything
        BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar ~added_seeds ~on_unexpected_termination =
+        high_connectivity_ivar ~added_seeds ~pids ~on_unexpected_termination =
       let%bind seeds_from_url =
         match config.seed_peer_list_url with
         | None ->
@@ -149,7 +153,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~rest:`Raise (fun () ->
             trace "mina_net2" (fun () ->
-                Mina_net2.create ~logger:config.logger ~conf_dir
+                Mina_net2.create ~logger:config.logger ~conf_dir ~pids
                   ~on_unexpected_termination ) )
       with
       | Ok (Ok net2) -> (
@@ -418,7 +422,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers t = !(t.net2) >>= Mina_net2.peers
 
-    let create (config : Config.t) rpc_handlers =
+    let create (config : Config.t) ~pids rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
       let message_reader, message_writer =
@@ -471,12 +475,14 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         and on_unexpected_termination () =
           on_libp2p_create
             (create_libp2p config rpc_handlers first_peer_ivar
-               high_connectivity_ivar ~added_seeds ~on_unexpected_termination) ;
+               high_connectivity_ivar ~added_seeds ~pids
+               ~on_unexpected_termination) ;
           Deferred.unit
         in
         let res =
           create_libp2p config rpc_handlers first_peer_ivar
-            high_connectivity_ivar ~added_seeds ~on_unexpected_termination
+            high_connectivity_ivar ~added_seeds ~pids
+            ~on_unexpected_termination
         in
         on_libp2p_create res ;
         don't_wait_for

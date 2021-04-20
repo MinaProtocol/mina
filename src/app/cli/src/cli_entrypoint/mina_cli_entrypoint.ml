@@ -19,11 +19,15 @@ let () = Async.Scheduler.set_record_backtraces true
 
 [%%endif]
 
-let chain_id ~genesis_state_hash ~genesis_constants =
+let chain_id ~constraint_system_digests ~genesis_state_hash ~genesis_constants
+    =
   (* if this changes, also change Mina_commands.chain_id_inputs *)
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let genesis_constants_hash = Genesis_constants.hash genesis_constants in
-  let all_snark_keys = String.concat ~sep:"" Precomputed_values.key_hashes in
+  let all_snark_keys =
+    List.map constraint_system_digests ~f:(fun (_, digest) -> Md5.to_hex digest)
+    |> String.concat ~sep:""
+  in
   let b2 =
     Blake2.digest_string
       (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
@@ -332,8 +336,11 @@ let setup_daemon logger =
   and may_generate =
     flag "--generate-genesis-proof" ~aliases:["generate-genesis-proof"]
       ~doc:
-        "true|false Generate a new genesis proof for the current \
-         configuration if none is found (default: false)"
+        (sprintf
+           "true|false Generate a new genesis proof for the current \
+            configuration if none is found (default: %s)"
+           ( if Mina_compile_config.generate_genesis_proof then "false"
+           else "true" ))
       (optional bool)
   and disable_node_status =
     flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
@@ -352,6 +359,15 @@ let setup_daemon logger =
     flag "--log-precomputed-blocks" ~aliases:["log-precomputed-blocks"]
       (optional_with_default false bool)
       ~doc:"true|false Include precomputed blocks in the log (default: false)"
+  and block_reward_threshold =
+    flag "--minimum-block-reward" ~aliases:["minimum-block-reward"]
+      ~doc:
+        "AMOUNT Minimum reward a block produced by the node should have. \
+         Empty blocks are created if the rewards are lower than the specified \
+         threshold (default: No threshold, transactions and coinbase will be \
+         included as long as the required snark work is available and can be \
+         paid for)"
+      (optional txn_amount)
   and upload_blocks_to_gcloud =
     flag "--upload-blocks-to-gcloud"
       ~aliases:["upload-blocks-to-gcloud"]
@@ -507,7 +523,13 @@ let setup_daemon logger =
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
-    let may_generate = Option.value ~default:false may_generate in
+    let may_generate =
+      (* Default is [true] if there is no compile-time genesis proof to fall
+         back on, or [false] otherwise.
+      *)
+      Option.value may_generate
+        ~default:(not Mina_compile_config.generate_genesis_proof)
+    in
     (* FIXME adapt to new system, move into child_processes lib *)
     let pids = Child_processes.Termination.create_pid_table () in
     let rec terminated_child_loop () =
@@ -1019,6 +1041,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       let chain_id =
         chain_id ~genesis_state_hash
           ~genesis_constants:precomputed_values.genesis_constants
+          ~constraint_system_digests:
+            (Lazy.force precomputed_values.constraint_system_digests)
       in
       let gossip_net_params =
         Gossip_net.Libp2p.Config.
@@ -1052,8 +1076,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         ; is_seed
         ; creatable_gossip_net=
             Mina_networking.Gossip_net.(
-              Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
-        }
+              Any.Creatable
+                ((module Libp2p), Libp2p.create ~pids gossip_net_params)) }
       in
       (* log terminated child processes *)
       O1trace.trace_task "terminated child loop" terminated_child_loop ;
@@ -1098,7 +1122,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
              ~archive_process_location ~log_block_creation ~precomputed_values
              ~start_time ?precomputed_blocks_path ~log_precomputed_blocks
-             ~upload_blocks_to_gcloud ())
+             ~upload_blocks_to_gcloud ~block_reward_threshold ())
       in
       { Coda_initialization.coda
       ; client_trustlist
@@ -1285,11 +1309,20 @@ let snark_hashes =
       let json = Cli_lib.Flag.json in
       let print = Core.printf "%s\n%!" in
       fun () ->
-        if json then
-          print
-            (Yojson.Safe.to_string
-               (Hashes.to_yojson Precomputed_values.key_hashes))
-        else List.iter Precomputed_values.key_hashes ~f:print]
+        let hashes =
+          match Precomputed_values.compiled with
+          | Some compiled ->
+              (Lazy.force compiled).constraint_system_digests |> Lazy.force
+              |> List.map ~f:(fun (_constraint_system_id, digest) ->
+                     (* Throw away the constraint system ID to avoid changing the
+                    format of the output here.
+                 *)
+                     Md5.to_hex digest )
+          | None ->
+              []
+        in
+        if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
+        else List.iter hashes ~f:print]
 
 let internal_commands logger =
   [ (Snark_worker.Intf.command_name, Snark_worker.command)
@@ -1405,6 +1438,8 @@ let internal_commands logger =
           let%bind verifier =
             Verifier.create ~logger
               ~proof_level:Genesis_constants.Proof_level.compiled
+              ~constraint_constants:
+                Genesis_constants.Constraint_constants.compiled
               ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
           in
           let%bind result =

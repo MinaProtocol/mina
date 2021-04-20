@@ -354,7 +354,7 @@ module T = struct
           ()
       in
       let%bind precomputed_values, _runtime_config =
-        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:true
           ~proof_level:None runtime_config
         >>| Or_error.ok_exn
       in
@@ -444,7 +444,8 @@ module T = struct
             ; creatable_gossip_net=
                 Mina_networking.Gossip_net.(
                   Any.Creatable
-                    ((module Libp2p), Libp2p.create gossip_net_params)) }
+                    ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =

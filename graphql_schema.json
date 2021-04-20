@@ -6326,6 +6326,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "stagedLedgerProofEmitted",
+              "description": "Block finished a staged ledger, and a proof was emitted from it and included into this block's proof. If there is no transition frontier available or no block found, this will return null.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
