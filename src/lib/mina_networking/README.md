@@ -2,7 +2,7 @@
 
 ## Typing Conventions
 
-In the context of this document, we will describe query and response types using a psuedo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throught this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
+In the context of this document, we will describe query and response types using a psuedo type-system. Tuples of data are in the form `(a, ..., b)`, lists are in the form `[a]`, and polymorphic types are represented as functions returning types. For example, we use the standard polymorphic types `optional :: type -> type` and `result :: type -> type -> type` throughout this document. The `optional` type constructor means that a value can be null, and a `result` type constructor means that there is 1 of 2 possible return types (typically a success type and an error type). For example, `optional int` might be an int or null, where as `result int error` is either an int or an error.
 
 ### Relevant types
 
