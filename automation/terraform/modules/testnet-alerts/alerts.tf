@@ -3,9 +3,10 @@
 data "template_file" "testnet_alerts" {
   template = file("${path.module}/templates/testnet-alert-rules.yml.tpl")
   vars = {
-    rule_namespace     = var.rule_namespace
-    rule_filter        = var.rule_filter
-    alerting_timeframe = var.rule_timeframe
+    rule_namespace            = var.rule_namespace
+    rule_filter               = var.rule_filter
+    alert_timeframe           = var.alert_timeframe
+    alert_evaluation_duration = var.alert_duration
   }
 }
 
@@ -19,40 +20,37 @@ data "template_file" "testnet_alert_receivers" {
   }
 }
 
-# Lint alerting config
+# Setup
 
-resource "docker_container" "lint_rules_config" {
-  name  = "cortex_lint"
-  image = local.cortex_image
-  command = [
-    "rules",
-    "lint",
-    "--rule-files=/config/rules.yml"
-  ]
-
-  upload {
-    content = data.template_file.testnet_alerts.rendered
-    file    = "/config/rules.yml"
-  }
-
-  rm = true
+resource "local_file" "alert_rules_config" {
+  content  = data.template_file.testnet_alerts.rendered
+  filename = "${path.cwd}/alert_rules.yml"
 }
 
-resource "docker_container" "check_rules_config" {
-  name  = "cortex_rules_check"
-  image = local.cortex_image
-  command = [
-    "rules",
-    "check",
-    "--rule-files=/config/rules.yml",
-  ]
+resource "null_resource" "download_cortextool" {
+  provisioner "local-exec" {
+    working_dir = path.cwd
+    command     = "curl --fail --show-error --location --output /tmp/cortextool ${local.cortextool_download_url} && chmod a+x /tmp/cortextool"
+  }
+}
 
-  upload {
-    content = data.template_file.testnet_alerts.rendered
-    file    = "/config/rules.yml"
+# Lint alerting config
+
+resource "null_resource" "alert_rules_lint" {
+  provisioner "local-exec" {
+    working_dir = path.cwd
+    command     = "/tmp/cortextool rules lint --rule-files alert_rules.yml"
   }
 
-  rm = true
+  depends_on = [local_file.alert_rules_config, null_resource.download_cortextool]
+}
+
+resource "null_resource" "alert_rules_check" {
+  provisioner "local-exec" {
+    command = "/tmp/cortextool rules check --rule-files alert_rules.yml"
+  }
+
+  depends_on = [local_file.alert_rules_config, null_resource.download_cortextool]
 }
 
 resource "docker_container" "verify_alert_receivers" {
@@ -89,7 +87,7 @@ resource "docker_container" "sync_alert_rules" {
   }
 
   rm         = true
-  depends_on = [docker_container.check_rules_config, docker_container.lint_rules_config]
+  depends_on = [null_resource.alert_rules_lint, null_resource.alert_rules_check]
 }
 
 resource "docker_container" "update_alert_receivers" {

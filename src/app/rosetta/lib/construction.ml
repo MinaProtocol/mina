@@ -289,14 +289,24 @@ module Metadata = struct
           account#nonce
         |> Option.value ~default:Unsigned.UInt32.zero
       in
+      let suggested_fee =
+        Amount_of.coda
+          (MinaCurrency.Fee.to_uint64
+             Mina_compile_config.default_transaction_fee)
+      in
+      let amount_metadata =
+        `Assoc
+          [ ( "minimum_fee"
+            , Amount.to_yojson
+                (Amount_of.coda
+                   (MinaCurrency.Fee.to_uint64
+                      Mina_compile_config.minimum_user_command_fee)) ) ]
+      in
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
           |> Metadata_data.to_yojson
-      ; suggested_fee=
-          [ Amount_of.coda
-              (MinaCurrency.Fee.to_uint64
-                 Mina_compile_config.default_transaction_fee) ] }
+      ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
   end
 
   module Real = Impl (Deferred.Result)

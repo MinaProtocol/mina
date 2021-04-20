@@ -112,7 +112,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; coinbase_receiver: Consensus.Coinbase_receiver.t
+  ; coinbase_receiver: Consensus.Coinbase_receiver.t ref
   ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; snark_job_state: Work_selector.State.t
@@ -146,6 +146,19 @@ let client_port t =
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
   let public_keys, _ = Agent.get t.block_production_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
+
+let coinbase_receiver t = !(t.coinbase_receiver)
+
+let replace_coinbase_receiver t coinbase_receiver =
+  [%log' info t.config.logger]
+    "Changing the coinbase receiver for produced blocks from $old_receiver to \
+     $new_receiver"
+    ~metadata:
+      [ ( "old_receiver"
+        , Consensus.Coinbase_receiver.to_yojson !(t.coinbase_receiver) )
+      ; ( "new_receiver"
+        , Consensus.Coinbase_receiver.to_yojson coinbase_receiver ) ] ;
+  t.coinbase_receiver := coinbase_receiver
 
 let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
@@ -183,6 +196,8 @@ module Snark_worker = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
     in
+    Child_processes.Termination.wait_for_process_log_errors ~logger
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
     don't_wait_for
       ( match%bind
           Monitor.try_with (fun () -> Process.wait snark_worker_process)
@@ -792,7 +807,7 @@ let next_epoch_ledger t =
   in
   if
     Mina_numbers.Length.(
-      equal root_epoch best_tip_epoch || equal root_epoch zero)
+      equal root_epoch best_tip_epoch || equal best_tip_epoch zero)
   then
     (*root is in the same epoch as the best tip and so the next epoch ledger in the local state will be updated by Proof_of_stake.frontier_root_transition. Next epoch ledger in genesis epoch is the genesis ledger*)
     `Finalized
@@ -964,7 +979,8 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~precomputed_values:t.config.precomputed_values ;
+    ~precomputed_values:t.config.precomputed_values
+    ~block_reward_threshold:t.config.block_reward_threshold ;
   perform_compaction t ;
   Snark_worker.start t
 
@@ -1016,6 +1032,8 @@ let create ?wallets (config : Config.t) =
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
                       ~proof_level:config.precomputed_values.proof_level
+                      ~constraint_constants:
+                        config.precomputed_values.constraint_constants
                       ~pids:config.pids ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
@@ -1097,6 +1115,15 @@ let create ?wallets (config : Config.t) =
           (* knot-tying hacks so we can pass a get_node_status function before net, Mina_lib.t created *)
           let net_ref = ref None in
           let sync_status_ref = ref None in
+          let block_production_keypairs =
+            Agent.create
+              ~f:(fun kps ->
+                Keypair.Set.to_list kps
+                |> List.map ~f:(fun kp ->
+                       (kp, Public_key.compress kp.Keypair.public_key) )
+                |> Keypair.And_compressed_pk.Set.of_list )
+              config.initial_block_production_keypairs
+          in
           let get_node_status _env =
             let node_ip_addr =
               config.gossip_net_params.addrs_and_ports.external_ip
@@ -1129,17 +1156,20 @@ let create ?wallets (config : Config.t) =
                                instantiated when node status requested"
                              node_ip_addr node_peer_id))
               | Some net ->
-                  let protocol_state_hash, k_block_hashes_and_timestamps =
+                  let ( protocol_state_hash
+                      , best_tip_opt
+                      , k_block_hashes_and_timestamps ) =
                     match
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     with
                     | None ->
                         ( config.precomputed_values.protocol_state_with_hash
                             .hash
+                        , None
                         , [] )
                     | Some frontier ->
+                        let tip = Transition_frontier.best_tip frontier in
                         let protocol_state_hash =
-                          let tip = Transition_frontier.best_tip frontier in
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
@@ -1160,7 +1190,9 @@ let create ?wallets (config : Config.t) =
                                     (Time.to_string_iso8601_basic
                                        ~zone:Time.Zone.utc) ) )
                         in
-                        (protocol_state_hash, k_block_hashes_and_timestamps)
+                        ( protocol_state_hash
+                        , Some tip
+                        , k_block_hashes_and_timestamps )
                   in
                   let%bind peers = Mina_networking.peers net in
                   let open Deferred.Or_error.Let_syntax in
@@ -1173,10 +1205,9 @@ let create ?wallets (config : Config.t) =
                           (Mina_incremental.Status.Observer.value status)
                   in
                   let block_producers =
-                    config.initial_block_production_keypairs
-                    |> Keypair.Set.to_list
-                    |> List.map ~f:(fun {Keypair.public_key; _} ->
-                           Public_key.compress public_key )
+                    let public_keys, _ = Agent.get block_production_keypairs in
+                    Public_key.Compressed.Set.map public_keys ~f:snd
+                    |> Set.to_list
                   in
                   let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
@@ -1193,6 +1224,22 @@ let create ?wallets (config : Config.t) =
                       ~f:Fn.id
                       ~default:(Float.to_int minutes_float)
                   in
+                  let block_height_opt =
+                    match best_tip_opt with
+                    | None ->
+                        None
+                    | Some tip ->
+                        let state =
+                          Transition_frontier.Breadcrumb.protocol_state tip
+                        in
+                        let consensus_state =
+                          state |> Mina_state.Protocol_state.consensus_state
+                        in
+                        Some
+                          ( Mina_numbers.Length.to_int
+                          @@ Consensus.Data.Consensus_state.blockchain_length
+                               consensus_state )
+                  in
                   Mina_networking.Rpcs.Get_node_status.Node_status.
                     { node_ip_addr
                     ; node_peer_id
@@ -1203,7 +1250,8 @@ let create ?wallets (config : Config.t) =
                     ; ban_statuses
                     ; k_block_hashes_and_timestamps
                     ; git_commit
-                    ; uptime_minutes }
+                    ; uptime_minutes
+                    ; block_height_opt }
           in
           let get_some_initial_peers _ =
             match !net_ref with
@@ -1560,15 +1608,6 @@ let create ?wallets (config : Config.t) =
                 ~f:(fun x ->
                   Mina_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
-          let block_production_keypairs =
-            Agent.create
-              ~f:(fun kps ->
-                Keypair.Set.to_list kps
-                |> List.map ~f:(fun kp ->
-                       (kp, Public_key.compress kp.Keypair.public_key) )
-                |> Keypair.And_compressed_pk.Set.of_list )
-              config.initial_block_production_keypairs
-          in
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
               [%log' info config.logger]
@@ -1649,7 +1688,7 @@ let create ?wallets (config : Config.t) =
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
-            ; coinbase_receiver= config.coinbase_receiver
+            ; coinbase_receiver= ref config.coinbase_receiver
             ; snark_job_state= snark_jobs_state
             ; subscriptions
             ; sync_status

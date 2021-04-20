@@ -26,7 +26,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; vesting_increment= Amount.of_int 50_000_000_000 }
     in
     { default with
-      block_producers=
+      requires_graphql= true
+    ; block_producers=
         [ {balance= "1000"; timing}
         ; {balance= "1000"; timing}
         ; {balance= "1000"; timing} ]

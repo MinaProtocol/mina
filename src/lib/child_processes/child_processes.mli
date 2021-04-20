@@ -72,3 +72,10 @@ val kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t
 (* val start_rpc_worker : ... *)
 
 module Termination : module type of Termination
+
+val register_process :
+     ?termination_expected:bool
+  -> Termination.t
+  -> t
+  -> Termination.process_kind
+  -> unit
