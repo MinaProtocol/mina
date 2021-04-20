@@ -1,17 +1,17 @@
 # $: pagerduty_service_key - service integration key to trigger PagerDuty pages
 # $: pagerduty_alert_filter - regular expression indicating set of testnets to monitor/alert via PagerDuty
-# $: discord_alert_webhook - Discord integration webhook for sending alert messages
+# $: slack_alert_webhook - Slack integration webhook for sending mainnet and devnet warnings and for all non-(mainnet|devnet) alerting
 
 global: {}
 receivers:
   - name: pagerduty-testnet-primary
     pagerduty_configs:
       - service_key: ${pagerduty_service_key}
-  - name: discord-alert-default
+  - name: slack-alert-default
     webhook_configs:
-      - url: ${discord_alert_webhook}
+      - url: ${slack_alert_webhook}
 route:
-  receiver: discord-alert-default
+  receiver: slack-alert-default
   group_by:
     - testnet
   routes:
@@ -19,7 +19,7 @@ route:
       match_re:
         testnet: ^(${pagerduty_alert_filter})$
         severity: critical
-    - receiver: discord-alert-default
+    - receiver: slack-alert-default
       match_re:
         testnet: ^(${pagerduty_alert_filter})$
         severity: warning
