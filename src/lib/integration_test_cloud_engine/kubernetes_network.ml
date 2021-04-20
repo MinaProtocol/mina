@@ -284,7 +284,7 @@ module Node = struct
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
-  let best_chain ~logger t =
+  let get_best_chain ~logger t =
     let open Malleable_error.Let_syntax in
     let query = Graphql.Best_chain.make () in
     let%bind result =

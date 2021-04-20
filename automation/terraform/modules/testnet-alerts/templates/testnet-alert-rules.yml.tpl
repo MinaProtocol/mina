@@ -274,7 +274,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: UnparentedBlocksObserved
-    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter})) > 1
+    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
