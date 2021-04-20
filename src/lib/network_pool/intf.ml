@@ -281,6 +281,8 @@ module type Transaction_pool_diff_intf = sig
       | Expired
       | Overloaded
     [@@deriving sexp, yojson]
+
+    val to_string_hum : t -> string
   end
 
   module Rejected : sig

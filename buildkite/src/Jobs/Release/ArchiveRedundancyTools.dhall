@@ -40,9 +40,11 @@ Pipeline.build
         name = "ArchiveRedundancyTools"
       },
     steps = [
-      buildToolCmd "build_archive" Size.Medium,
+      buildToolCmd "build_archive_all_sigs" Size.Medium,
       buildToolCmd "extract_blocks" Size.Medium,
       buildToolCmd "missing_blocks_auditor" Size.Medium,
-      buildToolCmd "archive_blocks" Size.Medium
+      buildToolCmd "archive_blocks" Size.Medium,
+      buildToolCmd "replayer" Size.Medium,
+      buildToolCmd "swap_bad_balances" Size.Medium
     ]
   }

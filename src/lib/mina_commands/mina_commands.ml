@@ -148,7 +148,10 @@ let chain_id_inputs (t : Mina_lib.t) =
     Precomputed_values.genesis_state_hash precomputed_values
   in
   let genesis_constants = precomputed_values.genesis_constants in
-  let snark_keys = Precomputed_values.key_hashes in
+  let snark_keys =
+    Lazy.force precomputed_values.constraint_system_digests
+    |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
+  in
   (genesis_state_hash, genesis_constants, snark_keys)
 
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
