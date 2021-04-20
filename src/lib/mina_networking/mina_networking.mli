@@ -91,7 +91,7 @@ module Rpcs : sig
     module Node_status : sig
       [%%versioned:
       module Stable : sig
-        module V1 : sig
+        module V2 : sig
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
             ; node_peer_id: Peer.Id.Stable.V1.t
@@ -107,7 +107,8 @@ module Rpcs : sig
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
-            ; uptime_minutes: int }
+            ; uptime_minutes: int
+            ; block_height_opt: int option }
         end
       end]
     end
