@@ -40,6 +40,8 @@ module type Field_intf = sig
   module Stable : sig
     module Latest : sig
       type t [@@deriving bin_io, eq, sexp, compare, yojson, hash]
+
+      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
   end
 

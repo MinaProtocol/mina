@@ -147,15 +147,7 @@ module Make (F : Input_intf) :
 
   module Stable = struct
     module V1 = struct
-      type t = F.t [@@deriving version {asserted}]
-
-      (* TODO: is a Bigint here actually that the actual rule? *)
-      let layout_t =
-        { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
-        ; version_opt= None
-        ; type_decl= "F.t"
-        ; bin_io_derived= false
-        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
+      type t = F.t [@@deriving version {binable}]
 
       include Binable.Of_binable
                 (Bigint)
@@ -167,6 +159,21 @@ module Make (F : Input_intf) :
                   let of_binable = of_bigint
                 end)
 
+      (* ordinarily, [%%versioned_binable] would generate the layout
+         from the first arg to `Of_binable`
+
+         we dare not use that here, because it would change the
+         serialization of keys
+      *)
+
+      let layout_t =
+        (* TODO : what's the actual rule? *)
+        { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+        ; version_opt= None
+        ; type_decl= "Bigint.t"
+        ; bin_io_derived= false
+        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
+
       include Sexpable.Of_sexpable
                 (Bigint)
                 (struct
@@ -176,6 +183,8 @@ module Make (F : Input_intf) :
 
                   let of_sexpable = of_bigint
                 end)
+
+      let to_latest = Fn.id
 
       let to_bignum_bigint n =
         let rec go i two_to_the_i acc =

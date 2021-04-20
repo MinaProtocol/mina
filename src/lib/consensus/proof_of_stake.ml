@@ -2687,10 +2687,22 @@ module Hooks = struct
           type query = Mina_base.Ledger_hash.Stable.V1.t
           [@@deriving bin_io, version {rpc}]
 
+          let response_layout =
+            { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+            ; version_opt= Some 1
+            ; type_decl=
+                "( Mina_base.Sparse_ledger.Stable.V1.t , string ) \
+                 Result.Stable.V1.t"
+            ; bin_io_derived= true
+            ; bin_prot_rule=
+                Bin_prot_layouts.make_result_v1_rule
+                  ~ok:Mina_base.Sparse_ledger.Stable.V1.layout_t.bin_prot_rule
+                  ~error:String }
+
           type response =
-            ( Mina_base.Sparse_ledger.Stable.V1.t
-            , string )
-            Core_kernel.Result.Stable.V1.t
+            (( Mina_base.Sparse_ledger.Stable.V1.t
+             , string )
+             Core_kernel.Result.Stable.V1.t[@layout response_layout])
           [@@deriving bin_io, version {rpc}]
 
           let query_of_caller_model = Fn.id

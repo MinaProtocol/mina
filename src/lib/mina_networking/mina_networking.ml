@@ -203,8 +203,18 @@ module Rpcs = struct
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
+        let response_layout =
+          { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+          ; version_opt= None
+          ; type_decl= "Sync_ledger.Answer.Stable.V1.t Or_error.Stable.V1.t"
+          ; bin_io_derived= true
+          ; bin_prot_rule=
+              Bin_prot_layouts.make_or_error_v1_rule
+                ~ok:Sync_ledger.Answer.Stable.V1.layout_t.bin_prot_rule }
+
         type response =
-          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+          (Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t[@layout
+                                                                     response_layout])
         [@@deriving bin_io, sexp, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -477,7 +487,8 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Core.Time.Stable.V1.t
+        type query =
+          (Core.Time.Stable.V1.t[@layout Bin_prot_layouts.core_time_stable_v1])
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response = unit [@@deriving bin_io, version {rpc}]
@@ -683,8 +694,18 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
+        let response_layout : Ppx_version_runtime.Bin_prot_layout.t =
+          { layout_loc= __LOC__
+          ; version_opt= None
+          ; type_decl= "Node_status.Stable.V2.t Or_error.Stable.V1.t"
+          ; bin_io_derived= true
+          ; bin_prot_rule=
+              Bin_prot_layouts.make_or_error_v1_rule
+                ~ok:Node_status.Stable.V2.layout_t.bin_prot_rule }
+
         type response =
-          Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t
+          (Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t[@layout
+                                                                     response_layout])
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -711,8 +732,18 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
+        let response_layout : Ppx_version_runtime.Bin_prot_layout.t =
+          { layout_loc= __LOC__
+          ; version_opt= None
+          ; type_decl= "Node_status.Stable.V1.t Or_error.Stable.V1.t"
+          ; bin_io_derived= true
+          ; bin_prot_rule=
+              Bin_prot_layouts.make_or_error_v1_rule
+                ~ok:Node_status.Stable.V1.layout_t.bin_prot_rule }
+
         type response =
-          Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+          (Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t[@layout
+                                                                     response_layout])
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id

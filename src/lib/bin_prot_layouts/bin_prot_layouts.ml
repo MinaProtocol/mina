@@ -90,3 +90,13 @@ let snark_work_statement_v1_table =
   ; bin_prot_rule=
       Ppx_version_runtime.Bin_prot_rule.(
         Hashtable {key_rule= String; value_rule= String}) }
+
+let make_result_v1_rule ~ok ~error =
+  Ppx_version_runtime.Bin_prot_rule.Sum
+    [ {ctor_name= "Ok"; index= 0; ctor_args= [ok]}
+    ; {ctor_name= "Error"; index= 1; ctor_args= [error]} ]
+
+(* TODO: real rule is a sum (see base/info.ml, which is included in base/error.ml) *)
+let error_rule = Ppx_version_runtime.Bin_prot_rule.String
+
+let make_or_error_v1_rule ~ok = make_result_v1_rule ~ok ~error:error_rule
