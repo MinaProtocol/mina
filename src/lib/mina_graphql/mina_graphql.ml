@@ -3496,10 +3496,12 @@ module Queries = struct
         return
           (Ok
              (Types.UserCommand.mk_user_command
-                { With_hash.data= signed_command
-                ; hash=
-                    Transaction_hash.hash_command
-                      (User_command.Signed_command signed_command) })) )
+                { data=
+                    { With_hash.data= signed_command
+                    ; hash=
+                        Transaction_hash.hash_command
+                          (User_command.Signed_command signed_command) }
+                ; status= Unknown })) )
 
   let commands =
     [ sync_status
