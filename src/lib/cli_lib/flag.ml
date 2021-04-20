@@ -273,7 +273,7 @@ module Uri = struct
         (Resolve_with_default default)
 
     let rest_graphql_opt =
-      create ~name:"rest-server" ~aliases:["rest-server"]
+      create ~name:"--rest-server" ~aliases:["rest-server"]
         ~arg_type:(arg_type ~path:"graphql") doc_builder Optional
   end
 
