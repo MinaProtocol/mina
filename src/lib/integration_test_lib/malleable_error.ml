@@ -362,8 +362,8 @@ let%test_module "malleable error unit tests" =
               ; soft_errors=
                   { Error_accumulator.empty with
                     from_current_context=
-                      [ Test_error.internal_error (Error.of_string "a")
-                      ; Test_error.internal_error (Error.of_string "b") ] } }
+                      [ Test_error.internal_error (Error.of_string "b")
+                      ; Test_error.internal_error (Error.of_string "a") ] } }
           in
           [%test_eq: string inner] ~equal:(equal_inner String.equal) actual
             expected )

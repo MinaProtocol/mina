@@ -96,6 +96,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
     in
     section "network is fully connected after one node is restarted"
-      (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 30.0)) in
+      (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 60.0)) in
        check_peers ~logger all_nodes)
 end
