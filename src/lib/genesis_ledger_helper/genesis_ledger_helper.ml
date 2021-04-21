@@ -619,6 +619,7 @@ module Genesis_proof = struct
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; constraint_system_digests
+          ; blockchain_proof_system_id= Pickles.Verification_key.Id.dummy ()
           ; genesis_proof= Mina_base.Proof.blockchain_dummy }
 
   let store ~filename proof =
@@ -652,34 +653,52 @@ module Genesis_proof = struct
       | _ ->
           (None, Pickles.Verification_key.Id.dummy ())
     in
-    let compiled_inputs = Precomputed_values.compiled_inputs in
     let base_hash =
       Base_hash.create ~id ~state_hash:inputs.protocol_state_with_hash.hash
     in
-    let compiled_base_hash =
-      Base_hash.create
-        ~id:(Precomputed_values.blockchain_proof_system_id ())
-        ~state_hash:(Lazy.force compiled_inputs).protocol_state_with_hash.hash
+    let use_precomputed_values base_hash =
+      match Precomputed_values.compiled with
+      | Some _ when not proof_needed ->
+          true
+      | Some compiled ->
+          let compiled = Lazy.force compiled in
+          let compiled_base_hash =
+            Base_hash.create ~id:compiled.blockchain_proof_system_id
+              ~state_hash:compiled.protocol_state_with_hash.hash
+          in
+          Base_hash.equal base_hash compiled_base_hash
+      | None ->
+          false
     in
     let%bind found_proof =
       match%bind find_file ~logger ~base_hash ~genesis_dir with
       | Some file -> (
           match%map load file with
           | Ok genesis_proof ->
+              let b =
+                lazy
+                  ( match b with
+                  | Some b ->
+                      b
+                  | None ->
+                      blockchain_snark_state inputs )
+              in
               let constraint_system_digests =
                 match inputs.constraint_system_digests with
                 | Some digests ->
                     lazy digests
                 | None ->
                     lazy
-                      (let (module T), (module B) =
-                         match b with
-                         | Some b ->
-                             b
-                         | None ->
-                             blockchain_snark_state inputs
-                       in
+                      (let (module T), (module B) = Lazy.force b in
                        Lazy.force @@ Genesis_proof.digests (module T) (module B))
+              in
+              let blockchain_proof_system_id =
+                match inputs.blockchain_proof_system_id with
+                | Some id ->
+                    id
+                | None ->
+                    let _, (module B) = Lazy.force b in
+                    Lazy.force B.Proof.id
               in
               Some
                 ( { Genesis_proof.runtime_config= inputs.runtime_config
@@ -691,6 +710,7 @@ module Genesis_proof = struct
                   ; consensus_constants= inputs.consensus_constants
                   ; protocol_state_with_hash= inputs.protocol_state_with_hash
                   ; constraint_system_digests
+                  ; blockchain_proof_system_id
                   ; genesis_proof }
                 , file )
           | Error err ->
@@ -705,12 +725,13 @@ module Genesis_proof = struct
     match found_proof with
     | Some found_proof ->
         return (Ok found_proof)
-    | None
-      when Option.is_some Precomputed_values.compiled
-           && (Base_hash.equal base_hash compiled_base_hash || not proof_needed)
-      ->
+    | None when use_precomputed_values base_hash ->
         let compiled =
           Lazy.force (Option.value_exn Precomputed_values.compiled)
+        in
+        let compiled_base_hash =
+          Base_hash.create ~id:compiled.blockchain_proof_system_id
+            ~state_hash:compiled.protocol_state_with_hash.hash
         in
         [%log info]
           "Base hash $computed_hash matches compile-time $compiled_hash, \
@@ -729,6 +750,7 @@ module Genesis_proof = struct
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; constraint_system_digests= compiled.constraint_system_digests
+          ; blockchain_proof_system_id= compiled.blockchain_proof_system_id
           ; genesis_proof= compiled.genesis_proof }
         in
         let%map () =
@@ -827,15 +849,12 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
               None)
       ; Some Genesis_constants.Proof_level.compiled ]
   in
-  let ( constraint_constants
-      , generated_constraint_constants
-      , blockchain_proof_system_id ) =
+  let constraint_constants, blockchain_proof_system_id =
     match config.proof with
     | None ->
         [%log info] "Using the compiled constraint constants" ;
         ( Genesis_constants.Constraint_constants.compiled
-        , false
-        , Some (Precomputed_values.blockchain_proof_system_id ()) )
+        , Some (Pickles.Verification_key.Id.dummy ()) )
     | Some config ->
         [%log info]
           "Using the constraint constants from the configuration file" ;
@@ -851,32 +870,11 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
         in
         ( make_constraint_constants
             ~default:Genesis_constants.Constraint_constants.compiled config
-        , true
         , blockchain_proof_system_id )
   in
   let%bind () =
     match (proof_level, Genesis_constants.Proof_level.compiled) with
-    | Full, Full ->
-        if generated_constraint_constants then
-          if
-            Genesis_constants.Constraint_constants.(equal compiled)
-              constraint_constants
-          then (
-            [%log warn]
-              "This binary only supports the compiled proof constants for \
-               proof_level= Full. The 'proof' field in the configuration file \
-               should be removed." ;
-            return () )
-          else (
-            [%log fatal]
-              "This binary only supports the compiled proof constants for \
-               proof_level= Full. The 'proof' field in the configuration file \
-               does not match." ;
-            Deferred.Or_error.errorf
-              "The compiled proof constants do not match the constants in the \
-               configuration file" )
-        else return ()
-    | (Check | None), _ ->
+    | _, Full | (Check | None), _ ->
         return ()
     | Full, ((Check | None) as compiled) ->
         let str = Genesis_constants.Proof_level.to_string in
