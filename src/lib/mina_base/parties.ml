@@ -104,10 +104,18 @@ module Virtual = struct
       match y.sgn with Pos -> y.magnitude | Neg -> failwith "add_signed"
   end
 
-  module Token_id = Token_id
+  module Token_id = struct
+    include Token_id
+
+    let if_ = value_if
+  end
 
   module Parties = struct
+    let if_ = value_if
+
     type t = Party.t list
+
+    let empty = []
 
     type party = Party.t
 
