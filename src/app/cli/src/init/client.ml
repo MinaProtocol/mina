@@ -1405,7 +1405,7 @@ let import_key =
            let rec go () =
              match !initial_password with
              | None ->
-                 Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+                 Secrets.Keypair.Terminal_stdin.read_exn ~which:"mina keypair"
                    privkey_path
              | Some password -> (
                  (* We've already asked for the password once for a failed
@@ -1422,7 +1422,7 @@ let import_key =
                      initial_password := None ;
                      go ()
                  | Error err ->
-                     Secrets.Privkey_error.raise ~which:"coda keypair" err )
+                     Secrets.Privkey_error.raise ~which:"mina keypair" err )
            in
            go ()
          in
@@ -1583,7 +1583,7 @@ let list_accounts =
            | [||] ->
                printf
                  "😢 You have no tracked accounts!\n\
-                  You can make a new one using `coda accounts create`\n" ;
+                  You can make a new one using `mina accounts create`\n" ;
                Ok ()
            | accounts ->
                Array.iteri accounts ~f:(fun i w ->
