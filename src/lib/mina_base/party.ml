@@ -218,6 +218,19 @@ module Predicate = struct
       let to_latest = Fn.id
     end
   end]
+
+  let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
+    Typ.transport
+      (Snapp_predicate.Account.typ ())
+      ~there:(function
+        | Full s ->
+            s
+        | Nonce n ->
+            { Snapp_predicate.Account.accept with
+              nonce= Check {lower= n; upper= n} }
+        | Accept ->
+            Snapp_predicate.Account.accept )
+      ~back:(fun s -> Full s)
 end
 
 module Predicated = struct
@@ -229,10 +242,6 @@ module Predicated = struct
         [@@deriving hlist, sexp, eq, yojson, hash, compare]
       end
     end]
-
-    let typ spec =
-      Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
   [%%versioned
@@ -244,6 +253,13 @@ module Predicated = struct
       let to_latest = Fn.id
     end
   end]
+
+  let typ () : (_, t) Typ.t =
+    let open Poly in
+    Typ.of_hlistable
+      [Body.typ (); Predicate.typ ()]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   module Proved = struct
     [%%versioned
@@ -277,6 +293,14 @@ module Predicated = struct
       end
     end]
 
+    let to_input ?protocol_state ({body; predicate= nonce} : t) =
+      List.reduce_exn ~f:Random_oracle_input.append
+        ( [Body.to_input body; Account.Nonce.to_input nonce]
+        @ Option.(
+            to_list
+              (map protocol_state ~f:Snapp_predicate.Protocol_state.to_input))
+        )
+
     module Digested = struct
       type t = (Body.Digested.t, Account_nonce.t) Poly.t
 
@@ -288,8 +312,6 @@ module Predicated = struct
     module Checked = struct
       type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
     end
-
-    let typ : (Checked.t, t) Typ.t = Poly.typ [Body.typ (); Account_nonce.typ]
 
     let dummy : t = {body= Body.dummy; predicate= Account_nonce.zero}
   end
@@ -344,6 +366,15 @@ module Signed = struct
       let to_latest = Fn.id
     end
   end]
+
+  let account_id (t : t) : Account_id.t =
+    Account_id.create t.data.body.pk t.data.body.token_id
+
+  let create ?protocol_state ~private_key (t : Predicated.Signed.t) : t =
+    let s =
+      Schnorr.sign private_key (Predicated.Signed.to_input ?protocol_state t)
+    in
+    {authorization= s; data= t}
 end
 
 module Empty = struct
@@ -372,3 +403,13 @@ end]
 
 let account_id (t : t) : Account_id.t =
   Account_id.create t.data.body.pk t.data.body.token_id
+
+let of_signed ({data; authorization} : Signed.t) : t =
+  { authorization= Signature authorization
+  ; data= {data with predicate= Nonce data.predicate} }
+
+(*
+
+let account_id (t : ((Body.t, _) Predicated.Poly.t, _) Poly.t) : Account_id.t =
+  Account_id.create t.data.body.pk t.data.body.token_id
+*)

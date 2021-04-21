@@ -45,6 +45,14 @@ let fee_lower_bound_exn (t : t) : Currency.Fee.t =
   | Pos ->
       assert false
 
+let fee_payer_party ({fee_payer; _} : t) = fee_payer
+
+let fee_payer (t : t) = Party.Signed.account_id (fee_payer_party t)
+
+let nonce (t : t) : Account.Nonce.t = (fee_payer_party t).data.predicate
+
+let fee_token (t : t) = (fee_payer_party t).data.body.token_id
+
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
       Account_id.create p.data.body.pk p.data.body.token_id )
@@ -110,18 +118,28 @@ module Virtual = struct
   end
 
   module Parties = struct
-    let if_ = value_if
-
     type t = Party.t list
 
-    let empty = []
+    let if_ = value_if
 
     type party = Party.t
+
+    let empty = []
 
     let is_empty = List.is_empty
 
     let pop (t : t) = match t with [] -> failwith "pop" | p :: t -> (p, t)
   end
+end
+
+module With_hashes = struct
+  type 'a t = ('a * Random_oracle.Digest.t) list
+
+  let empty = Outside_hash_image.t
+
+  let cons ({hash; data} : ('a, 'h) With_hash.t) (t : 'a t) : 'a t =
+    let h_tl = match t with [] -> empty | (_, h_tl) :: _ -> h_tl in
+    (data, Random_oracle.hash [|hash; h_tl|]) :: t
 end
 
 let valid_interval (t : t) =

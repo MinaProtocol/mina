@@ -43,6 +43,7 @@ end]
 
 module Tag = struct
   type t = Proof | Signature | Both | None_given
+  [@@deriving eq, compare, sexp]
 end
 
 let tag : t -> Tag.t = function
