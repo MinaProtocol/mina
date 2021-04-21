@@ -5,8 +5,15 @@ open Core_kernel
 let optional ~f = function `Null -> None | json -> Some (f json)
 
 let public_key json =
-  Yojson.Basic.Util.to_string json
-  |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  let pk =
+    Yojson.Basic.Util.to_string json
+    |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  in
+  match Signature_lib.Public_key.decompress pk with
+  | Some _ ->
+      pk
+  | None ->
+      failwith "invalid public key: Failed to decompress"
 
 let public_key_array = Array.map ~f:public_key
 
