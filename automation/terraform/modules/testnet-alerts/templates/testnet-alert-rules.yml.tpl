@@ -16,6 +16,36 @@ groups:
       summary: "{{ $labels.testnet }} cluster nodes have crashed"
       description: "{{ $value }} Cluster nodes have crashed on network {{ $labels.testnet }}."
 
+  - alert: HighDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 3
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 3 blocks that have been produced on a remote side chains in the last hour"
+      description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+      runbook: "https://www.notion.so/minaprotocol/HighDisconnectedBlocksPerHour-14da6dc40386439799eb2a573d077ecb"
+
+  - alert: HighOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root ${rule_filter} [${alert_timeframe}])) > 5
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 5 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+      runbook: "https://www.notion.so/minaprotocol/HighOldBlocksPerHour-134ba51aef4d482bb065ce7a02dd8fb7"
+
+  - alert: HighInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 3
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 3 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+      runbook: "https://www.notion.so/minaprotocol/HighInvalidProofPerHour-8ff715ccf9564b6e8a27b5a9dc65ef77"
+
   - alert: WatchdogNoNewLogs
     expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) > 0
     labels:
@@ -272,6 +302,35 @@ groups:
     annotations:
       summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
+
+
+  - alert: LowDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that have been produced on a remote side chains in the last hour"
+      description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+
+
+  - alert: LowOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+
+  - alert: LowInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
 
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alert_timeframe}])) < 1
