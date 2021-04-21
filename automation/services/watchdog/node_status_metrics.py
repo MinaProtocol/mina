@@ -151,7 +151,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 def collect_node_status(v1, namespace, seeds, pods):
   peer_table = {}
   error_resps = []
-  resp_count = 0
+  all_resps = []
 
   def contains_error(resp):
     try:
@@ -164,11 +164,11 @@ def collect_node_status(v1, namespace, seeds, pods):
     return (not (contains_error(resp)))
 
   def add_resp(raw):
-    all_resps = [ ast.literal_eval(s) for s in raw.split('\n') if s != '' ]
+    resps = [ ast.literal_eval(s) for s in raw.split('\n') if s != '' ]
     
-    resp_count = resp_count + len(all_resps)
-    valid_resps = list(filter(no_error, all_resps))
-    error_resps.extend(list(filter(contains_error, all_resps)))
+    valid_resps = list(filter(no_error, resps))
+    error_resps.extend(list(filter(contains_error, resps)))
+    all_resps.extend(resps)
 
     peer_resp_map = [ ((r['node_ip_addr'], r['node_peer_id']), r) for r in valid_resps ]
 
@@ -189,6 +189,6 @@ def collect_node_status(v1, namespace, seeds, pods):
 
   valid_resps = peer_table.values()
 
-  return (resp_count, valid_resps, error_resps)
+  return (len(all_resps), valid_resps, error_resps)
 
 # ========================================================================
