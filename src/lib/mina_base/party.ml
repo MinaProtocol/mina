@@ -25,6 +25,10 @@ open Currency
 open Pickles_types
 module Digest = Random_oracle.Digest
 
+module type Type = sig
+  type t
+end
+
 module Update = struct
   module Poly = struct
     [%%versioned
@@ -307,14 +311,8 @@ module Predicated = struct
   end
 end
 
-module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type ('data, 'auth) t = {data: 'data; authorization: 'auth}
-      [@@deriving hlist, sexp, eq, yojson, hash, compare]
-    end
-  end]
+module Poly (Data : Type) (Auth : Type) = struct
+  type t = {data: Data.t; authorization: Auth.t}
 end
 
 module Proved = struct
@@ -322,9 +320,11 @@ module Proved = struct
   module Stable = struct
     module V1 = struct
       type t =
-        ( Predicated.Proved.Stable.V1.t
-        , Pickles.Side_loaded.Proof.Stable.V1.t )
-        Poly.Stable.V1.t
+            Poly(Predicated.Proved.Stable.V1)
+              (Pickles.Side_loaded.Proof.Stable.V1)
+            .t =
+        { data: Predicated.Proved.Stable.V1.t
+        ; authorization: Pickles.Side_loaded.Proof.Stable.V1.t }
       [@@deriving sexp, eq, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -336,8 +336,9 @@ module Signed = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        (Predicated.Signed.Stable.V1.t, Signature.Stable.V1.t) Poly.Stable.V1.t
+      type t = Poly(Predicated.Signed.Stable.V1)(Signature.Stable.V1).t =
+        { data: Predicated.Signed.Stable.V1.t
+        ; authorization: Signature.Stable.V1.t }
       [@@deriving sexp, eq, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -349,7 +350,8 @@ module Empty = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = (Predicated.Empty.Stable.V1.t, unit) Poly.Stable.V1.t
+      type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
+        {data: Predicated.Empty.Stable.V1.t; authorization: unit}
       [@@deriving sexp, eq, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -360,7 +362,8 @@ end
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = (Predicated.Stable.V1.t, Control.Stable.V1.t) Poly.Stable.V1.t
+    type t = Poly(Predicated.Stable.V1)(Control.Stable.V1).t =
+      {data: Predicated.Stable.V1.t; authorization: Control.Stable.V1.t}
     [@@deriving sexp, eq, yojson, hash, compare]
 
     let to_latest = Fn.id
