@@ -4,7 +4,8 @@ open Core
 module Stable = struct
   module V1 = struct
     type t =
-      { parties: Party.Signed.Stable.V1.t * Party.Stable.V1.t list
+      { fee_payer: Party.Signed.Stable.V1.t
+      ; other_parties: Party.Stable.V1.t list
       ; protocol_state: Snapp_predicate.Protocol_state.Stable.V1.t }
     [@@deriving sexp, compare, eq, hash, yojson]
 
@@ -25,19 +26,19 @@ module Valid = struct
 end
 
 let check (t : t) =
-  let p, _ = t.parties in
+  let p = t.fee_payer in
   Token_id.(equal default) p.data.body.token_id
   && Sgn.(equal Neg) p.data.body.delta.sgn
 
 let parties (t : t) : Party.t list =
-  let p, ps = t.parties in
+  let p = t.fee_payer in
   { authorization= Control.Signature p.authorization
   ; data= {p.data with predicate= Party.Predicate.Nonce p.data.predicate} }
-  :: ps
+  :: t.other_parties
 
-let fee_lower_bound (t : t) : Currency.Fee.t =
-  let p, _ = t.parties in
-  let x = p.data.body.delta in
+(** [fee_lower_bound_exn t] may raise if [check t = false] *)
+let fee_lower_bound_exn (t : t) : Currency.Fee.t =
+  let x = t.fee_payer.data.body.delta in
   match x.sgn with
   | Neg ->
       Currency.Amount.to_fee x.magnitude
@@ -49,9 +50,7 @@ let accounts_accessed (t : t) =
       Account_id.create p.data.body.pk p.data.body.token_id )
   |> List.dedup_and_sort ~compare:Account_id.compare
 
-let fee_payer_pk (t : t) =
-  let p, _ = t.parties in
-  p.data.body.pk
+let fee_payer_pk (t : t) = t.fee_payer.data.body.pk
 
 let value_if b ~then_ ~else_ = if b then then_ else else_
 
