@@ -37,7 +37,8 @@ module Config = struct
     ; seed_peer_list_url: Uri.t option
     ; max_connections: int
     ; validation_queue_size: int
-    ; mutable keypair: Mina_net2.Keypair.t option }
+    ; mutable keypair: Mina_net2.Keypair.t option
+    ; all_peers_seen_metric: bool }
   [@@deriving make]
 end
 
@@ -153,7 +154,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~rest:`Raise (fun () ->
             trace "mina_net2" (fun () ->
-                Mina_net2.create ~logger:config.logger ~conf_dir ~pids
+                Mina_net2.create
+                  ~all_peers_seen_metric:config.all_peers_seen_metric
+                  ~logger:config.logger ~conf_dir ~pids
                   ~on_unexpected_termination ) )
       with
       | Ok (Ok net2) -> (
