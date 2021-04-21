@@ -125,20 +125,6 @@ module Virtual = struct
   end
 end
 
-let fee_excess (t : t) =
-  let module M = Parties_logic.Make (Virtual) in
-  let _init : _ Parties_logic.Local_state.t =
-    { parties= t
-    ; all_parties= t
-    ; token_id= Token_id.invalid
-    ; excess= Currency.Amount.zero
-    ; ledger= ()
-    ; success= true
-    ; will_succeed= true }
-  in
-  Or_error.try_with (fun () ->
-      List.fold (parties t) ~init:Currency.Fee.Signed.zero )
-
 let valid_interval (t : t) =
   let open Snapp_predicate.Closed_interval in
   match t.protocol_state.curr_global_slot with
