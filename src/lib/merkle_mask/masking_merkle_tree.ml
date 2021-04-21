@@ -763,11 +763,6 @@ module Make (Inputs : Inputs_intf.S) = struct
       | Some location ->
           Ok (`Existed, location)
 
-    let get_or_create_account_exn t account_id account =
-      get_or_create_account t account_id account
-      |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
-      |> Result.ok_exn
-
     let sexp_of_location = Location.sexp_of_t
 
     let location_of_sexp = Location.t_of_sexp

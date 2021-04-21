@@ -195,7 +195,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             , is_new_stack
             , pending_coinbase_update )
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-          raise (Error.to_exn e)
+          [%log error] "Failed to apply the diff: $error"
+            ~metadata:[("error", Error_json.error_to_yojson e)] ;
+          None
       | Error e ->
           ( match diff with
           | Ok diff ->
