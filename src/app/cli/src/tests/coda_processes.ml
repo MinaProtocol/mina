@@ -11,7 +11,9 @@ type ports = {communication_port: int; discovery_port: int; libp2p_port: int}
 let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
-        Mina_net2.create ~logger:(Logger.create ()) ~conf_dir:tmpd
+        Mina_net2.create
+          ~pids:(Child_processes.Termination.create_pid_table ())
+          ~logger:(Logger.create ()) ~conf_dir:tmpd
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
       in
@@ -68,7 +70,7 @@ let local_configs ?block_production_interval
       | Some timestamp ->
           Genesis_constants.genesis_timestamp_of_string timestamp
       | None ->
-          (Lazy.force Precomputed_values.compiled).consensus_constants
+          (Lazy.force Precomputed_values.compiled_inputs).consensus_constants
             .genesis_state_timestamp |> Block_time.to_time
     in
     Core.Time.(diff (now ())) genesis_state_timestamp
