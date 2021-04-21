@@ -198,7 +198,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let local_state = {local_state with parties= remaining} in
     let a, inclusion_proof =
-      (* Also checks the inclusion proof. *)
       h.perform (Get_account (party, local_state.ledger))
     in
     h.perform (Check_inclusion (local_state.ledger, a, inclusion_proof)) ;
@@ -276,7 +275,8 @@ module Make (Inputs : Inputs_intf) = struct
     let global_state =
       let curr_is_default = Token_id.(equal default) local_state.token_id in
       let should_perform_second_excess_merge =
-        Bool.( && ) curr_is_default is_last_party
+        (* The first party's fee always gets merged in *)
+        Bool.(curr_is_default && (is_last_party || is_start))
       in
       h.perform
         (Modify_global_excess
