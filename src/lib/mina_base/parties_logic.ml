@@ -39,9 +39,7 @@ module type Amount_intf = sig
 end
 
 module type Token_id_intf = sig
-  type bool
-
-  type t
+  include Iffable
 
   val equal : t -> t -> bool
 
@@ -49,9 +47,9 @@ module type Token_id_intf = sig
 end
 
 module Local_state = struct
-  type ('parties, 'parties_hash, 'token_id, 'excess, 'ledger, 'bool) t =
+  type ('parties, 'token_id, 'excess, 'ledger, 'bool) t =
     { parties: 'parties
-    ; all_parties: 'parties_hash
+    ; all_parties: 'parties
     ; token_id: 'token_id
     ; excess: 'excess
     ; ledger: 'ledger
@@ -61,11 +59,11 @@ module Local_state = struct
 end
 
 module type Parties_intf = sig
-  type bool
+  include Iffable
 
   type party
 
-  type t
+  val empty : t
 
   val is_empty : t -> bool
 
@@ -93,12 +91,13 @@ module Eff = struct
            , < ledger: 'ledger ; inclusion_proof: 'inclusion_proof ; .. > )
            t
     | Check_predicate :
-        'party * 'account * 'global_state
+        'party * 'account * 'global_state * 'protocol_state_predicate option
         -> ( 'bool
            , < bool: 'bool
              ; party: 'party
              ; account: 'account
              ; global_state: 'global_state
+             ; protocol_state_predicate: 'protocol_state_predicate
              ; .. > )
            t
     | Set_account_if :
@@ -124,13 +123,19 @@ module Eff = struct
         'party
         -> ('token_id, < party: 'party ; token_id: 'token_id ; .. >) t
     | Check_auth_and_update_account :
-        [`Is_first | `Is_not_first] * 'party * 'account * 'all_parties * 'ip
+        { is_start: 'bool
+        ; protocol_state_predicate: 'protocol_state_predicate option
+        ; party: 'party
+        ; account: 'account
+        ; all_parties: 'all_parties
+        ; inclusion_proof: 'ip }
         -> ( 'account * 'bool
            , < inclusion_proof: 'ip
              ; bool: 'bool
              ; party: 'party
              ; all_parties: 'all_parties
              ; account: 'account
+             ; protocol_state_predicate: 'protocol_state_predicate
              ; .. > )
            t
     | Balance :
@@ -159,28 +164,37 @@ end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
+  module Ps = Inputs.Parties
 
   let apply (type global_state)
-      (step_or_start : [`Start of Inputs.Parties.t | `Step])
+      (* (step_or_start : [`Start of Inputs.Parties.t | `Step]) *)
+      start_parties protocol_state_predicate
       (h :
-        (< global_state: global_state ; amount: Amount.t ; bool: Bool.t ; .. >
+        (< global_state: global_state
+         ; all_parties: Ps.t
+         ; amount: Amount.t
+         ; bool: Bool.t
+         ; .. >
          as
          'env)
         handler)
       ((global_state : global_state), (local_state : _ Local_state.t)) =
     let open Inputs in
+    let is_start = Ps.is_empty local_state.parties in
     let (party, remaining), local_state =
-      match step_or_start with
-      | `Step ->
-          (Inputs.Parties.pop local_state.parties, local_state)
-      | `Start parties ->
-          let prev_finished = Inputs.Parties.is_empty local_state.parties in
-          Bool.assert_ prev_finished ;
-          let init_party, parties = Inputs.Parties.pop parties in
-          ( (init_party, parties)
-          , (* The initiator party is omitted from the all_parties list. *)
-            {local_state with all_parties= parties; token_id= Token_id.default}
-          )
+      let to_pop =
+        Ps.if_ is_start ~then_:start_parties ~else_:local_state.parties
+      in
+      let party, remaining = Ps.pop to_pop in
+      let local_state =
+        { local_state with
+          all_parties=
+            Ps.if_ is_start ~then_:remaining ~else_:local_state.parties
+        ; token_id=
+            Token_id.if_ is_start ~then_:Token_id.default
+              ~else_:local_state.token_id }
+      in
+      ((party, remaining), local_state)
     in
     let local_state = {local_state with parties= remaining} in
     let a, inclusion_proof =
@@ -189,19 +203,21 @@ module Make (Inputs : Inputs_intf) = struct
     in
     h.perform (Check_inclusion (local_state.ledger, a, inclusion_proof)) ;
     let predicate_satisfied : Bool.t =
-      h.perform (Check_predicate (party, a, global_state))
+      h.perform
+        (Check_predicate (party, a, global_state, protocol_state_predicate))
     in
     let a', update_permitted =
-      let which, parties_for_auth =
-        match step_or_start with
-        | `Step ->
-            (`Is_first, local_state.all_parties)
-        | `Start parties ->
-            (`Is_not_first, parties)
+      let parties_for_auth =
+        Ps.if_ is_start ~then_:start_parties ~else_:local_state.all_parties
       in
       h.perform
         (Check_auth_and_update_account
-           (which, party, a, parties_for_auth, inclusion_proof))
+           { is_start
+           ; party
+           ; account= a
+           ; all_parties= parties_for_auth
+           ; protocol_state_predicate
+           ; inclusion_proof })
     in
     let party_succeeded = Bool.( && ) predicate_satisfied update_permitted in
     let local_state =
@@ -244,18 +260,12 @@ module Make (Inputs : Inputs_intf) = struct
       The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      let should_apply =
-        match step_or_start with
-        | `Start _ ->
-            Bool.true_
-        | `Step ->
-            local_state.will_succeed
-      in
+      let should_apply = Bool.( || ) is_start local_state.will_succeed in
       h.perform
         (Set_account_if (should_apply, local_state.ledger, a', inclusion_proof))
     in
     let local_state = {local_state with ledger= new_ledger} in
-    let is_last_party = Inputs.Parties.is_empty remaining in
+    let is_last_party = Ps.is_empty remaining in
     h.perform (Finalize_local_state (is_last_party, local_state)) ;
     (*
        In the SNARK, this will be
@@ -286,7 +296,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (global_state, local_state)
 
-  let step h state = apply `Step h state
+  let step h state = apply Ps.empty None h state
 
-  let start parties h state = apply (`Start parties) h state
+  let start ~protocol_state parties h state =
+    apply parties (Some protocol_state) h state
 end
