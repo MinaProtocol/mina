@@ -55,7 +55,7 @@ groups:
       description: "{{ $value }} Prover errors on network {{ $labels.testnet }}."
 
   - alert: NodesNotSynced
-    expr: min by (testnet) (min_over_time(Coda_watchdog_nodes_synced ${rule_filter} [${alert_timeframe}])) <= .5
+    expr: min by (testnet) (Coda_watchdog_nodes_synced ${rule_filter}) <= .5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -72,6 +72,17 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has < 60% of nodes that are synced on the same best tip"
       description: "< 60% of nodes that are synced are on the same best tip for  network {{ $labels.testnet }} with rate of {{ $value }}."
+      runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
+
+  - alert: O1NodesOutOfSync
+    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alert_timeframe}])) < 1
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last hour)"
+      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
       runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
 
   - alert: LowPeerCount
@@ -118,7 +129,8 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/No-Transactions-In-Several-Blocks-55ca13df38dd4c3491e11d8ea8020c08"
 
   - alert: NoCoinbaseInBlocks
-    expr: min by (testnet) (min_over_time(Coda_Transition_frontier_best_tip_coinbase ${rule_filter} [10m])) < 1
+    expr: min by (testnet) (Coda_Transition_frontier_best_tip_coinbase ${rule_filter}) < 1
+    for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -168,7 +180,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/NoNewTransactions-27dbeafab8ea4d659ee6f748acb2fd6c"
 
   - alert: HighUnparentedBlockCount
-    expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alert_timeframe}])) > 30
+    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 30
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -179,7 +191,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: HighMissingBlockCount
-    expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alert_timeframe}])) > 30
+    expr: max by (testnet) (Coda_Archive_missing_blocks ${rule_filter}) > 30
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -222,7 +234,7 @@ groups:
       description: "Fork of length {{ $value }} on network {{ $labels.testnet }}."
 
   - alert: NoTransactionsInAtLeastOneBlock
-    expr: max by (testnet) (max_over_time(Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter} [${alert_timeframe}])) > 0
+    expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -242,7 +254,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/LowMinWindowDensity-Runbook-7908635be4754b44a862d9bec8edc239"
 
   - alert: SeedListDegraded
-    expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alert_timeframe}])) <= 0.5
+    expr: min by (testnet) (Coda_watchdog_seeds_reachable ${rule_filter}) <= 0.5
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
@@ -252,14 +264,14 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/SeedListDown-d8d4e14609884c63a7086309336f3462"
 
   - alert: FewBlocksPerHour
-    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alert_timeframe}])) < 1
+    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [30m])) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
     annotations:
-      summary: "{{ $labels.testnet }} block production is critically low (there has been less than 1 block in the last hour)"
-      description: "{{ $value }} blocks have been produced on network {{ $labels.testnet }} in the last hour (according to some node)."
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
+      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
 
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alert_timeframe}])) < 1
@@ -273,7 +285,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: UnparentedBlocksObserved
-    expr: max by (testnet) (max_over_time(Coda_Archive_unparented_blocks ${rule_filter} [${alert_timeframe}])) > 1
+    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
@@ -284,7 +296,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: MissingBlocksObserved
-    expr: max by (testnet) (max_over_time(Coda_Archive_missing_blocks ${rule_filter} [${alert_timeframe}])) > 0
+    expr: max by (testnet) (Coda_Archive_missing_blocks ${rule_filter}) > 0
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"

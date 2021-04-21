@@ -26,7 +26,7 @@ resource "helm_release" "seeds" {
   name       = "${var.testnet_name}-seeds"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/seed-node" : "seed-node"
-  version    = "1.0.3"
+  version    = "1.0.4"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.seed_vars)
@@ -47,7 +47,7 @@ resource "helm_release" "block_producers" {
   name       = "${var.testnet_name}-block-producers"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/block-producer" : "block-producer"
-  version    = "1.0.1"
+  version    = "1.0.3"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.block_producer_vars)
@@ -66,7 +66,7 @@ resource "helm_release" "snark_workers" {
   name       = "${var.testnet_name}-snark-worker"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/snark-worker" : "snark-worker"
-  version    = "1.0.1"
+  version    = "1.0.2"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.snark_worker_vars)
@@ -85,7 +85,7 @@ resource "helm_release" "archive_node" {
   name       = "archive-${count.index + 1}"
   repository = var.use_local_charts ? "" : local.mina_helm_repo
   chart      = var.use_local_charts ? "../../../../helm/archive-node" : "archive-node"
-  version    = "1.0.1"
+  version    = "1.0.3"
   namespace  = kubernetes_namespace.testnet_namespace.metadata[0].name
   values = [
     yamlencode(local.archive_vars[count.index])
