@@ -82,6 +82,7 @@ module T = struct
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
     ; constraint_system_digests: (string * Md5_lib.t) list Lazy.t
+    ; blockchain_proof_system_id: Pickles.Verification_key.Id.t
     ; genesis_proof: Proof.t }
 
   let runtime_config {runtime_config; _} = runtime_config
@@ -202,4 +203,7 @@ let create_values txn b (t : Inputs.t) =
   ; consensus_constants= t.consensus_constants
   ; protocol_state_with_hash= t.protocol_state_with_hash
   ; constraint_system_digests= digests txn b
+  ; blockchain_proof_system_id=
+      (let (module B) = b in
+       Lazy.force B.Proof.id)
   ; genesis_proof }
