@@ -230,7 +230,8 @@ module Db = struct
         let currency_balance = Currency.Balance.of_int balance in
         List.iter account_ids ~f:(fun aid ->
             let account = Account.create aid currency_balance in
-            get_or_create_account ledger aid account |> ignore ) ;
+            get_or_create_account ledger aid account
+            |> Or_error.ok_exn |> ignore ) ;
         (ledger, account_ids)
     end
 
