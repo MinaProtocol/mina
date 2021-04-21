@@ -1,3 +1,5 @@
+let mul = 0
+let xor = 1
 let xtimesp = 2
 let sboxInd = 3
 let invsboxInd = 4
@@ -8,6 +10,8 @@ let xtimebInd = 8
 let xtimedInd = 9
 let xtimeeInd = 10
 let rconInd = 11
+let asciiDigit = 12
+let scoreRange = 13
 
 let table =
 [|[|

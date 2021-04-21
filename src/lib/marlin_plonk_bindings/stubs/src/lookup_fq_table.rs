@@ -81,5 +81,17 @@ pub fn init_table() -> Vec<Fq>
         let mul: u64 = 11 + ((x as u64) << 8) + ((Rcon[x as usize] as u64) << 16);
         table[x as usize + 0x20900] = Fq::from(mul);
     }
+    // ascii digits
+    for x in 0..10
+    {
+        let mul: u64 = 12 + (((x + 0x30) as u64) << 8) + ((x as u64) << 16);
+        table[x as usize + 0x2090B] = Fq::from(mul);
+    }
+    // admissible score range 800-850
+    for x in 0..50
+    {
+        let mul: u64 = 13 + (((x + 800) as u64) << 8);
+        table[x as usize + 0x20915] = Fq::from(mul);
+    }
     table
 }

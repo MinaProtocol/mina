@@ -126,8 +126,6 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
       return (k0 = 0) ? (Acc - T) : Acc
     *)
     let n = Field.size_in_bits in
-    (*let n = 2 in*)
-
     let xp, yp = add (double (xt, yt)) (xt, yt) in
     let xp, yp, bit =
       let state = exists (Snarky.Typ.array ~length:Int.(n - 1) (Scale_pack_round_5_wires.typ typ)) ~compute:As_prover.(fun () ->

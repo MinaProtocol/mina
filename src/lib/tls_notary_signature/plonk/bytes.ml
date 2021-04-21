@@ -1,7 +1,7 @@
 open Core
 open Snarky
 open Zexe_backend_common.Plonk_plookup_constraint_system
-open Gcm
+open Lookup
 
 exception BlockArith of string
 
@@ -32,8 +32,8 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
     let bytes = exists (Snarky.Typ.array 5 typ) ~compute:As_prover.(fun () ->
       let b1 = read_var b1 in
       let b2 = read_var b2 in
-      let b3 = of_int Gcm.table.(0).(f2ind b1 b2) in
-      [|one; b1; b2; b3; one + b1*f1 + b2*f2 + b3*f3|]
+      let b3 = of_int Lookup.table.(0).(f2ind b1 b2) in
+      [|of_int Lookup.xor; b1; b2; b3; of_int Lookup.xor + b1*f1 + b2*f2 + b3*f3|]
     )
     in
     bytes.(1) <- b1;
@@ -49,7 +49,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
     let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
       let b1 = read_var b1 in
       let b2 = read_var b2 in
-      let mul = Gcm.table.(1).(f2ind b1 b2) in
+      let mul = Lookup.table.(1).(f2ind b1 b2) in
       let b3 = of_int (mul land 255) in
       let b4 = of_int (mul lsr 8) in
       [|b1; b2; b3; b4; b1 + b2*f1 + (of_int mul)*f2|]
@@ -73,10 +73,10 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         if Intf.Bigint.test_bit bits i then
           x := Int.(!x + (1 lsl i));
       done;
-      let b23 = Gcm.table.(2).(!x) in
+      let b23 = Lookup.table.(2).(!x) in
       let b2 = of_int (b23 land 255) in
       let b3 = of_int (b23 lsr 8) in
-      [|of_int 2; b; b2; b3; of_int 2 + b*f1 + b2*f2 + b3*f3|]
+      [|of_int Lookup.xtimesp; b; b2; b3; of_int Lookup.xtimesp + b*f1 + b2*f2 + b3*f3|]
     )
     in
     bytes.(1) <- b;
@@ -96,7 +96,7 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         if Intf.Bigint.test_bit bits i then
           x := Int.(!x + (1 lsl i));
       done;
-      let r = of_int Gcm.table.(ind).(!x) in
+      let r = of_int Lookup.table.(ind).(!x) in
       [|of_int ind; b; r; zero; of_int ind + b*f1 + r*f2|]
     )
     in
@@ -107,6 +107,35 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit) = struc
         annotation= None
       }];
     bytes.(2)
+
+  let asciiDigit (digit : Field.t) : Field.t =
+    let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
+      let d = read_var digit in
+      let v = d - (of_int 0x30) in
+      [|of_int Lookup.asciiDigit; d; v; zero; of_int Lookup.asciiDigit + d*f1 + v*f2|]
+    )
+    in
+    bytes.(1) <- digit;
+    Intf.assert_
+      [{
+        basic= Plonk_constraint.T (Bytes_lookup { bytes }) ;
+        annotation= None
+      }];
+    bytes.(2)
+
+  let assertScore (score : Field.t) =
+    let bytes = exists (Snarky.Typ.array 5 Field.typ) ~compute:As_prover.(fun () ->
+      let s = read_var score in
+      [|of_int Lookup.scoreRange; s; zero; zero; of_int Lookup.scoreRange + s*f1|]
+    )
+    in
+    bytes.(1) <- score;
+    Intf.assert_
+      [{
+        basic= Plonk_constraint.T (Bytes_lookup { bytes }) ;
+        annotation= None
+      }];
+    ()
 
   let b4tof (b : Field.t array) : (Field.t) =
     if (Array.length b) <> 4 then
@@ -206,7 +235,7 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     if (Array.length state) <> 16 then
       raise (BlockArith "Incorrect block size");
     let module Constraints = Constraints (Intf) in
-    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.sboxInd in
+    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Lookup.sboxInd in
     (* just substitute row 0 *)
     state.(0) <- sbox state.(0); state.(4) <- sbox state.(4);
     state.(8) <- sbox state.(8); state.(12) <- sbox state.(12);
@@ -228,9 +257,9 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     let module Constraints = Constraints (Intf) in
     let xor4 (b1 : Field.t) (b2 : Field.t) (b3 : Field.t) (b4 : Field.t) : Field.t =
       Constraints.xor (Constraints.xor b1 b2) (Constraints.xor b3 b4) in
-    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.sboxInd in
-    let xtime2Sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.xtime2sboxInd in
-    let xtime3Sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.xtime3sboxInd in
+    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Lookup.sboxInd in
+    let xtime2Sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Lookup.xtime2sboxInd in
+    let xtime3Sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Lookup.xtime3sboxInd in
     let ret = Array.init 16 ~f:(fun _ -> Field.zero) in
     (* mixing column 0 *)
     ret.(0) <- xor4 (xtime2Sbox state.(0)) (xtime3Sbox state.(5)) (sbox state.(10)) (sbox state.(15));
@@ -273,7 +302,7 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
     if (Array.length key) <> 16 then
       raise (BlockArith "Incorrect block size");
     let module Constraints = Constraints (Intf) in
-    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Gcm.sboxInd in
+    let sbox (ind : Field.t) : Field.t = Constraints.aesLookup ind Lookup.sboxInd in
     let expkey = Array.init 176 ~f:(fun _ -> Field.zero) in
     let tmp = Array.init 5 ~f:(fun _ -> Field.zero) in
     Array.iteri key ~f:(fun i x -> expkey.(i) <- key.(i));
@@ -286,7 +315,7 @@ module Block (Intf : Snark_intf.Run with type prover_state = unit) = struct
       (
           tmp.(4) <- tmp.(3);
           tmp.(3) <- sbox tmp.(0);
-          tmp.(0) <- Constraints.xor (sbox tmp.(1)) (Constraints.aesLookup (Field.of_int (idx/4)) Gcm.rconInd);
+          tmp.(0) <- Constraints.xor (sbox tmp.(1)) (Constraints.aesLookup (Field.of_int (idx/4)) Lookup.rconInd);
           tmp.(1) <- sbox tmp.(2);
           tmp.(2) <- sbox tmp.(4);
       );
