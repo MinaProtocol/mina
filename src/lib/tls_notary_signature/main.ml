@@ -115,8 +115,8 @@ let%test_module "TLS Notary test" =
         (* verify TlsNotary signature *)
         let lpt = Ecc.add (Ecc.mul q e) rc in
         let rpt = Ecc.sub (Ecc.scale_pack p s) pn in
-        assert_ (Snarky.Constraint.equal (fst lpt) (fst lpt));
-        assert_ (Snarky.Constraint.equal (snd rpt) (snd rpt));
+        assert_ (Snarky.Constraint.equal (fst lpt) (fst rpt));
+        assert_ (Snarky.Constraint.equal (snd lpt) (snd rpt));
         ()
 
       module Public_input = Test.Public_input (Impl)
