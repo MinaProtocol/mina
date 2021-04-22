@@ -1353,27 +1353,75 @@ let set_snark_work_fee =
                (Unsigned.UInt64.to_int (response#setSnarkWorkFee)#lastFee) ) )
 
 let import_key =
-  let privkey_path = Cli_lib.Flag.privkey_read_path in
-  let conf_dir = Cli_lib.Flag.conf_dir in
-  let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon.\n\
        Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
-    (Cli_lib.Background_daemon.graphql_init flags
-       ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
-         let open Deferred.Let_syntax in
-         let%bind home = Sys.home_directory () in
-         let conf_dir =
-           Option.value
-             ~default:(home ^/ Cli_lib.Default.conf_dir_name)
-             conf_dir
+    (let%map_open.Command.Let_syntax access_method =
+       choose_one
+         ~if_nothing_chosen:(`Default_to `None)
+         [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
+           |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
+         ; Cli_lib.Flag.conf_dir
+           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir)) ]
+     and privkey_path = Cli_lib.Flag.privkey_read_path in
+     fun () ->
+       let open Deferred.Let_syntax in
+       let initial_password = ref None in
+       let do_graphql graphql_endpoint =
+         let%bind password =
+           match Sys.getenv Secrets.Keypair.env with
+           | Some password ->
+               Deferred.return (Bytes.of_string password)
+           | None ->
+               let password =
+                 Secrets.Password.read_hidden_line ~error_help_message:""
+                   "Secret key password: "
+               in
+               initial_password := Some password ;
+               password
          in
+         let graphql =
+           Graphql_queries.Import_account.make ~path:privkey_path
+             ~password:(Bytes.to_string password) ()
+         in
+         match%map Graphql_client.query graphql graphql_endpoint with
+         | Ok res ->
+             let res = res#importAccount in
+             if res#already_imported then Ok (`Already_imported res#public_key)
+             else Ok (`Imported res#public_key)
+         | Error (`Failed_request _ as err) ->
+             Error err
+         | Error (`Graphql_error _ as err) ->
+             Ok err
+       in
+       let do_local conf_dir =
          let wallets_disk_location = conf_dir ^/ "wallets" in
          let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
-             privkey_path
+           let rec go () =
+             match !initial_password with
+             | None ->
+                 Secrets.Keypair.Terminal_stdin.read_exn ~which:"mina keypair"
+                   privkey_path
+             | Some password -> (
+                 (* We've already asked for the password once for a failed
+                   GraphQL query, try that one instead of asking again.
+                *)
+                 match%bind
+                   Secrets.Keypair.read ~privkey_path
+                     ~password:(Lazy.return password)
+                 with
+                 | Ok res ->
+                     return res
+                 | Error `Incorrect_password_or_corrupted_privkey ->
+                     printf "Wrong password! Please try again\n" ;
+                     initial_password := None ;
+                     go ()
+                 | Error err ->
+                     Secrets.Privkey_error.raise ~which:"mina keypair" err )
+           in
+           go ()
          in
          let pk = Public_key.compress public_key in
          let%bind wallets =
@@ -1383,26 +1431,52 @@ let import_key =
          (* Either we already are tracking it *)
          match Secrets.Wallets.check_locked wallets ~needle:pk with
          | Some _ ->
-             printf
-               !"Key already present, no need to import : %s\n"
-               (Public_key.Compressed.to_base58_check
-                  (Public_key.compress public_key)) ;
-             Deferred.unit
+             Deferred.return (`Already_imported pk)
          | None ->
              (* Or we import it *)
-             let%bind _ =
+             let%map pk =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
-             (* Attempt to reload, but if you can't connect to daemon, it's ok *)
-             let%map _response =
-               Graphql_client.query
-                 (Graphql_queries.Reload_accounts.make ())
-                 graphql_endpoint
-             in
+             `Imported pk
+       in
+       let print_result = function
+         | `Already_imported public_key ->
+             printf
+               !"Key already present, no need to import : %s\n"
+               (Public_key.Compressed.to_base58_check public_key)
+         | `Imported public_key ->
              printf
                !"\n😄 Imported account!\nPublic key: %s\n"
-               (Public_key.Compressed.to_base58_check
-                  (Public_key.compress public_key)) ))
+               (Public_key.Compressed.to_base58_check public_key)
+         | `Graphql_error _ as e ->
+             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn e)
+       in
+       match access_method with
+       | `GraphQL graphql_endpoint -> (
+           match%map do_graphql graphql_endpoint with
+           | Ok res ->
+               print_result res
+           | Error err ->
+               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err)
+           )
+       | `Conf_dir conf_dir ->
+           let%map res = do_local conf_dir in
+           print_result res
+       | `None -> (
+           let default_graphql_endpoint =
+             Cli_lib.Flag.(Uri.Client.{Types.name; value= default})
+           in
+           match%bind do_graphql default_graphql_endpoint with
+           | Ok res ->
+               Deferred.return (print_result res)
+           | Error _res ->
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               eprintf
+                 "%sWarning: Could not connect to a running daemon.\n\
+                  Importing to local directory %s%s\n"
+                 Bash_colors.orange conf_dir Bash_colors.none ;
+               let%map res = do_local conf_dir in
+               print_result res ))
 
 let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
@@ -1485,31 +1559,87 @@ let export_key =
              Deferred.unit ))
 
 let list_accounts =
-  let open Command.Param in
   Command.async ~summary:"List all owned accounts"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun graphql_endpoint () ->
-         let%map response =
-           Graphql_client.query_exn
+    (let%map_open.Command.Let_syntax access_method =
+       choose_one
+         ~if_nothing_chosen:(`Default_to `None)
+         [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
+           |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
+         ; Cli_lib.Flag.conf_dir
+           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir)) ]
+     in
+     fun () ->
+       let do_graphql graphql_endpoint =
+         match%map
+           Graphql_client.query
              (Graphql_queries.Get_tracked_accounts.make ())
              graphql_endpoint
+         with
+         | Ok response -> (
+           match response#trackedAccounts with
+           | [||] ->
+               printf
+                 "😢 You have no tracked accounts!\n\
+                  You can make a new one using `mina accounts create`\n" ;
+               Ok ()
+           | accounts ->
+               Array.iteri accounts ~f:(fun i w ->
+                   printf
+                     "Account #%d:\n\
+                     \  Public key: %s\n\
+                     \  Balance: %s\n\
+                     \  Locked: %b\n"
+                     (i + 1)
+                     (Public_key.Compressed.to_base58_check w#public_key)
+                     (Currency.Balance.to_formatted_string (w#balance)#total)
+                     (Option.value ~default:true w#locked) ) ;
+               Ok () )
+         | Error (`Failed_request _ as err) ->
+             Error err
+         | Error (`Graphql_error _ as err) ->
+             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
+             Ok ()
+       in
+       let do_local conf_dir =
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let%map wallets =
+           Secrets.Wallets.load ~logger:(Logger.create ())
+             ~disk_location:wallets_disk_location
          in
-         match response#trackedAccounts with
-         | [||] ->
+         match wallets |> Secrets.Wallets.pks with
+         | [] ->
              printf
                "😢 You have no tracked accounts!\n\
                 You can make a new one using `mina accounts create`\n"
          | accounts ->
-             Array.iteri accounts ~f:(fun i w ->
-                 printf
-                   "Account #%d:\n\
-                   \  Public key: %s\n\
-                   \  Balance: %s\n\
-                   \  Locked: %b\n"
-                   (i + 1)
-                   (Public_key.Compressed.to_base58_check w#public_key)
-                   (Currency.Balance.to_formatted_string (w#balance)#total)
-                   (Option.value ~default:true w#locked) ) ))
+             List.iteri accounts ~f:(fun i public_key ->
+                 printf "Account #%d:\n  Public key: %s\n" (i + 1)
+                   (Public_key.Compressed.to_base58_check public_key) )
+       in
+       match access_method with
+       | `GraphQL graphql_endpoint -> (
+           match%map do_graphql graphql_endpoint with
+           | Ok () ->
+               ()
+           | Error err ->
+               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err)
+           )
+       | `Conf_dir conf_dir ->
+           do_local conf_dir
+       | `None -> (
+           let default_graphql_endpoint =
+             Cli_lib.Flag.(Uri.Client.{Types.name; value= default})
+           in
+           match%bind do_graphql default_graphql_endpoint with
+           | Ok () ->
+               Deferred.unit
+           | Error _res ->
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               eprintf
+                 "%sWarning: Could not connect to a running daemon.\n\
+                  Listing from local directory %s%s\n"
+                 Bash_colors.orange conf_dir Bash_colors.none ;
+               do_local conf_dir ))
 
 let create_account =
   let open Command.Param in
