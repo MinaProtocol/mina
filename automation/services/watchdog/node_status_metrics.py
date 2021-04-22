@@ -25,7 +25,8 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
   print('collecting node status metrics')
 
   pods = v1.list_namespaced_pod(namespace, watch=False)
-  pod_names = [ p['metadata']['name'] for p in pods.to_dict()['items'] ]
+
+  pod_names = [ p['metadata']['name'] for p in pods.to_dict()['items'] if p['status']['phase'] == 'Running' ]
 
   seeds = [ p for p in pod_names if 'seed' in p ]
 
@@ -61,7 +62,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
       else:
         print("Errored response: {}".format(error_str))
         err_others += 1
-    except _:
+    except:
       print("Errored response: {}".format(error_str))
       err_others += 1
 

@@ -21,7 +21,7 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
   print('collecting cluster crashes / restarts')
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
-  containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items ]))
+  containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items if pod.status.phase == 'Running' ]))
   mina_containers = list(filter(lambda c: c['name'] in [ 'coda', 'seed', 'coordinator', 'archive' ], containers))
 
   def restarted_recently(c):
