@@ -890,7 +890,7 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
           ~item:"unparented ids"
       in
       let genesis_block_id =
-        match unparented_ids with
+        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
         | [id] ->
             id
         | _ ->
