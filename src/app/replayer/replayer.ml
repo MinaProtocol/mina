@@ -35,6 +35,8 @@ type output =
   ; target_epoch_data: Runtime_config.Epoch_data.t }
 [@@deriving yojson]
 
+let error_count = ref 0
+
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
@@ -77,8 +79,9 @@ let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
   ; target_genesis_ledger
   ; target_epoch_data }
 
-(* map from global slots to expected ledger hashes *)
-let global_slot_ledger_hash_tbl : (Int64.t, Ledger_hash.t) Hashtbl.t =
+(* map from global slots to state hash, ledger hash pairs *)
+let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t
+    =
   Int64.Table.create ()
 
 (* cache of account keys *)
@@ -109,6 +112,21 @@ let pk_of_pk_id pool pk_id : Account.key Deferred.t =
       | Error msg ->
           failwithf "Error retrieving public key with id %d, error: %s" pk_id
             (Caqti_error.show msg) () )
+
+let balance_of_id_and_pk_id pool ~id ~pk_id : Currency.Balance.t Deferred.t =
+  let open Deferred.Let_syntax in
+  match%map
+    Caqti_async.Pool.use (fun db -> Sql.Balance.run db ~id ~pk_id) pool
+  with
+  | Ok (Some balance) ->
+      balance |> Unsigned.UInt64.of_int64 |> Currency.Balance.of_uint64
+  | Ok None ->
+      failwithf "Could not find balance with id %d and public key %d" id pk_id
+        ()
+  | Error msg ->
+      failwithf
+        "Error retrieving balance with id %d and public key %d, error: %s" id
+        pk_id (Caqti_error.show msg) ()
 
 let state_hash_of_epoch_ledgers_state_hash ~logger pool
     epoch_ledgers_state_hash =
@@ -169,12 +187,12 @@ let epoch_data_of_id ~logger pool epoch_data_id =
       failwithf "Error retrieving epoch data for epoch data id %d, error: %s"
         epoch_data_id (Caqti_error.show msg) ()
 
-let process_block_info_of_state_hash ~logger pool state_hash ~f =
+let process_block_infos_of_state_hash ~logger pool state_hash ~f =
   match%bind
     Caqti_async.Pool.use (fun db -> Sql.Block_info.run db state_hash) pool
   with
-  | Ok block_info ->
-      f block_info
+  | Ok block_infos ->
+      f block_infos
   | Error msg ->
       [%log error] "Error getting block information for state hash"
         ~metadata:
@@ -258,7 +276,41 @@ let cache_fee_transfer_via_coinbase pool
   | _ ->
       Deferred.unit
 
-let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
+let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
+    ~continue_on_error =
+  let%bind pk = pk_of_pk_id pool pk_id in
+  let%map claimed_balance =
+    balance_of_id_and_pk_id pool ~id:balance_id ~pk_id
+  in
+  let token = token_int64 |> Unsigned.UInt64.of_int64 |> Token_id.of_uint64 in
+  let account_id = Account_id.create pk token in
+  let actual_balance =
+    match Ledger.location_of_account ledger account_id with
+    | Some loc -> (
+      match Ledger.get ledger loc with
+      | Some account ->
+          account.balance
+      | None ->
+          failwithf
+            "Could not find account in ledger for public key %s and token id %s"
+            (Signature_lib.Public_key.Compressed.to_base58_check pk)
+            (Token_id.to_string token) () )
+    | None ->
+        failwithf
+          "Could not get location of account for public key %s and token id %s"
+          (Signature_lib.Public_key.Compressed.to_base58_check pk)
+          (Token_id.to_string token) ()
+  in
+  if not (Currency.Balance.equal actual_balance claimed_balance) then (
+    [%log error] "Claimed balance does not match actual balance in ledger"
+      ~metadata:
+        [ ("who", `String who)
+        ; ("claimed_balance", Currency.Balance.to_yojson claimed_balance)
+        ; ("actual_balance", Currency.Balance.to_yojson actual_balance) ] ;
+    if continue_on_error then incr error_count else Core_kernel.exit 1 )
+
+let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
+    ~continue_on_error =
   [%log info]
     "Applying internal command (%s) with global slot %Ld, sequence number %d, \
      and secondary sequence number %d"
@@ -276,6 +328,9 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       [%sexp_of: (string * int64) * (string * int)]
     |> Error.raise
   in
+  let pk_id = cmd.receiver_id in
+  let balance_id = cmd.receiver_balance in
+  let token_int64 = cmd.token in
   let open Mina_base.Ledger in
   match cmd.type_ with
   | "fee_transfer" -> (
@@ -288,7 +343,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       in
       match undo_or_error with
       | Ok _undo ->
-          Deferred.unit
+          verify_balance ~logger ~pool ~ledger ~who:"fee transfer receiver"
+            ~balance_id ~pk_id ~token_int64 ~continue_on_error
       | Error err ->
           fail_on_error err )
   | "coinbase" -> (
@@ -311,7 +367,8 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
       in
       match undo_or_error with
       | Ok _undo ->
-          Deferred.unit
+          verify_balance ~logger ~pool ~ledger ~who:"coinbase receiver"
+            ~balance_id ~pk_id ~token_int64 ~continue_on_error
       | Error err ->
           fail_on_error err )
   | "fee_transfer_via_coinbase" ->
@@ -320,7 +377,7 @@ let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t) =
   | _ ->
       failwithf "Unknown internal command \"%s\"" cmd.type_ ()
 
-let apply_combined_fee_transfer ~logger ~pool ~ledger
+let apply_combined_fee_transfer ~logger ~pool ~ledger ~continue_on_error
     (cmd1 : Sql.Internal_command.t) (cmd2 : Sql.Internal_command.t) =
   [%log info] "Applying combined fee transfers with sequence number %d"
     cmd1.sequence_no ;
@@ -346,13 +403,20 @@ let apply_combined_fee_transfer ~logger ~pool ~ledger
     cmd2.txn_global_slot |> Unsigned.UInt32.of_int64
     |> Mina_numbers.Global_slot.of_uint32
   in
-  let undo_or_error =
+  let applied_or_error =
     Ledger.apply_fee_transfer ~constraint_constants ~txn_global_slot ledger
       fee_transfer
   in
-  match undo_or_error with
-  | Ok _undo ->
-      Deferred.unit
+  match applied_or_error with
+  | Ok _ ->
+      let%bind () =
+        verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (1)"
+          ~balance_id:cmd1.receiver_balance ~pk_id:cmd1.receiver_id
+          ~token_int64:cmd1.token ~continue_on_error
+      in
+      verify_balance ~logger ~pool ~ledger ~who:"combined fee transfer (2)"
+        ~balance_id:cmd2.receiver_balance ~pk_id:cmd2.receiver_id
+        ~token_int64:cmd2.token ~continue_on_error
   | Error err ->
       Error.tag_arg err "Error applying combined fee transfer"
         ("sequence number", cmd1.sequence_no)
@@ -406,13 +470,14 @@ let body_of_sql_user_cmd pool
   | _ ->
       failwithf "Invalid user command type: %s" type_ ()
 
-let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
+let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
+    ~continue_on_error =
   [%log info]
     "Applying user command (%s) with nonce %Ld, global slot %Ld, and sequence \
      number %d"
     cmd.type_ cmd.nonce cmd.global_slot cmd.sequence_no ;
   let%bind body = body_of_sql_user_cmd pool cmd in
-  let%map fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
+  let%bind fee_payer_pk = pk_of_pk_id pool cmd.fee_payer_id in
   let memo = Signed_command_memo.of_string cmd.memo in
   let valid_until =
     Option.map cmd.valid_until ~f:(fun slot ->
@@ -447,9 +512,41 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t) =
       valid_signed_cmd
   with
   | Ok _undo ->
-      ()
+      (* verify balances in database against current ledger *)
+      let token_int64 =
+        (* if the command is "create token", the token for the command is 0 (meaning unused),
+         and the balance is for source/receiver account using the new token
+      *)
+        match (cmd.token, cmd.created_token) with
+        | 0L, Some token ->
+            token
+        | n, Some m ->
+            failwithf "New token %Ld in user command with nonzero token %Ld" n
+              m ()
+        | _, None ->
+            cmd.token
+      in
+      let%bind () =
+        match cmd.source_balance with
+        | Some balance_id ->
+            verify_balance ~logger ~pool ~ledger ~who:"source" ~balance_id
+              ~pk_id:cmd.source_id ~token_int64 ~continue_on_error
+        | None ->
+            return ()
+      in
+      let%bind () =
+        match cmd.receiver_balance with
+        | Some balance_id ->
+            verify_balance ~logger ~pool ~ledger ~who:"receiver" ~balance_id
+              ~pk_id:cmd.receiver_id ~token_int64 ~continue_on_error
+        | None ->
+            return ()
+      in
+      verify_balance ~logger ~pool ~ledger ~who:"fee payer"
+        ~balance_id:cmd.fee_payer_balance ~pk_id:cmd.fee_payer_id
+        ~token_int64:cmd.fee_token ~continue_on_error
   | Error err ->
-      Error.tag_arg err "User command failed on replace"
+      Error.tag_arg err "User command failed on replay"
         (("global slot", cmd.global_slot), ("sequence number", cmd.sequence_no))
         [%sexp_of: (string * int64) * (string * int)]
       |> Error.raise
@@ -461,7 +558,7 @@ let unquoted_string_of_yojson json =
   let s = Yojson.Safe.to_string json in
   String.sub s ~pos:1 ~len:(String.length s - 2)
 
-let main ~input_file ~output_file ~archive_uri () =
+let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
@@ -542,23 +639,26 @@ let main ~input_file ~output_file ~archive_uri () =
       let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
-        process_block_info_of_state_hash ~logger pool fork_state_hash
-          ~f:(fun block_info ->
-            let ids =
-              List.map block_info ~f:(fun (id, _global_slot, _hash) -> id)
-            in
-            (* build mapping from global slots to ledger hashes *)
-            List.iter block_info ~f:(fun (_id, global_slot, hash) ->
-                Hashtbl.add_exn global_slot_ledger_hash_tbl ~key:global_slot
-                  ~data:(Ledger_hash.of_string hash) ) ;
+        process_block_infos_of_state_hash ~logger pool fork_state_hash
+          ~f:(fun block_infos ->
+            let ids = List.map block_infos ~f:(fun {id; _} -> id) in
+            (* build mapping from global slots to state and ledger hashes *)
+            List.iter block_infos
+              ~f:(fun {global_slot; state_hash; ledger_hash; _} ->
+                Hashtbl.add_exn global_slot_hashes_tbl ~key:global_slot
+                  ~data:
+                    ( State_hash.of_string state_hash
+                    , Ledger_hash.of_string ledger_hash ) ) ;
             return (Int.Set.of_list ids) )
       in
       (* check that genesis block is in chain to target hash
          assumption: genesis block occupies global slot 0
       *)
-      if Int64.Table.mem global_slot_ledger_hash_tbl Int64.zero then
+      if Int64.Table.mem global_slot_hashes_tbl Int64.zero then
         [%log info]
-          "Block chain leading to target state hash includes genesis block"
+          "Block chain leading to target state hash includes genesis block, \
+           length = %d"
+          (Int.Set.length block_ids)
       else (
         [%log fatal]
           "Block chain leading to target state hash does not include genesis \
@@ -678,8 +778,8 @@ let main ~input_file ~output_file ~archive_uri () =
             next_epoch_ledger_hash
         in
         let log_ledger_hash_after_last_slot () =
-          let expected_ledger_hash =
-            Hashtbl.find_exn global_slot_ledger_hash_tbl last_global_slot
+          let _state_hash, expected_ledger_hash =
+            Hashtbl.find_exn global_slot_hashes_tbl last_global_slot
           in
           if Ledger_hash.equal (Ledger.merkle_root ledger) expected_ledger_hash
           then
@@ -697,11 +797,23 @@ let main ~input_file ~output_file ~archive_uri () =
                 ; ( "expected_ledger_hash"
                   , Ledger_hash.to_yojson expected_ledger_hash ) ]
               last_global_slot ;
-            Core_kernel.exit 1 )
+            if continue_on_error then incr error_count else Core_kernel.exit 1 )
+        in
+        let log_state_hash_on_next_slot curr_global_slot =
+          let state_hash, _ledger_hash =
+            Hashtbl.find_exn global_slot_hashes_tbl curr_global_slot
+          in
+          [%log info]
+            ~metadata:
+              [("state_hash", `String (State_hash.to_base58_check state_hash))]
+            "Starting processing of commands in block with state_hash \
+             $state_hash at global slot %Ld"
+            curr_global_slot
         in
         let log_on_slot_change curr_global_slot =
-          if Int64.( > ) curr_global_slot last_global_slot then
-            log_ledger_hash_after_last_slot ()
+          if Int64.( > ) curr_global_slot last_global_slot then (
+            log_ledger_hash_after_last_slot () ;
+            log_state_hash_on_next_slot curr_global_slot )
         in
         let combine_or_run_internal_cmds (ic : Sql.Internal_command.t)
             (ics : Sql.Internal_command.t list) =
@@ -716,13 +828,17 @@ let main ~input_file ~output_file ~archive_uri () =
               *)
               log_on_slot_change ic.global_slot ;
               let%bind () =
-                apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
+                apply_combined_fee_transfer ~logger ~pool ~ledger
+                  ~continue_on_error ic ic2
               in
               apply_commands ics2 user_cmds ~last_global_slot:ic.global_slot
                 ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
           | _ ->
               log_on_slot_change ic.global_slot ;
-              let%bind () = run_internal_command ~logger ~pool ~ledger ic in
+              let%bind () =
+                run_internal_command ~logger ~pool ~ledger ~continue_on_error
+                  ic
+              in
               apply_commands ics user_cmds ~last_global_slot:ic.global_slot
                 ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
         in
@@ -737,20 +853,24 @@ let main ~input_file ~output_file ~archive_uri () =
             log_ledger_hash_after_last_slot () ;
             let found_staking = Option.is_some staking_epoch_ledger_opt in
             let found_next = Option.is_some next_epoch_ledger_opt in
+            let epoch_ledger_error () =
+              if continue_on_error then incr error_count
+              else Core_kernel.exit 1
+            in
             ( match (found_staking, found_next) with
             | false, false ->
                 [%log error]
                   "Replayed all commands, found neither staking epoch ledger \
                    nor next epoch ledger" ;
-                Core_kernel.exit 1
+                epoch_ledger_error ()
             | false, true ->
                 [%log error]
                   "Replayed all commands, did not find staking epoch ledger" ;
-                Core_kernel.exit 1
+                epoch_ledger_error ()
             | true, false ->
                 [%log error]
                   "Replayed all commands, did not find next epoch ledger" ;
-                Core_kernel.exit 1
+                epoch_ledger_error ()
             | true, true ->
                 () ) ;
             Deferred.return
@@ -758,12 +878,16 @@ let main ~input_file ~output_file ~archive_uri () =
               , Option.value_exn next_epoch_ledger_opt )
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot ;
-            let%bind () = run_user_command ~logger ~pool ~ledger uc in
+            let%bind () =
+              run_user_command ~logger ~pool ~ledger ~continue_on_error uc
+            in
             apply_commands [] ucs ~last_global_slot:uc.global_slot
               ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
             log_on_slot_change uc.global_slot ;
-            let%bind () = run_user_command ~logger ~pool ~ledger uc in
+            let%bind () =
+              run_user_command ~logger ~pool ~ledger ~continue_on_error uc
+            in
             apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
               ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
         | ic :: ics, [] ->
@@ -783,23 +907,27 @@ let main ~input_file ~output_file ~archive_uri () =
           ~last_global_slot:0L ~staking_epoch_ledger_opt:None
           ~next_epoch_ledger_opt:None
       in
-      [%log info] "Writing output to $output_file"
-        ~metadata:[("output_file", `String output_file)] ;
-      let output =
-        create_output
-          ~target_epoch_ledgers_state_hash:
-            input.target_epoch_ledgers_state_hash
-          ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
-          ~ledger ~staking_epoch_ledger
-          ~staking_seed:(Epoch_seed.to_string staking_seed)
-          ~next_epoch_ledger
-          ~next_seed:(Epoch_seed.to_string next_seed)
-          input.genesis_ledger
-        |> output_to_yojson |> Yojson.Safe.to_string
-      in
-      let%map writer = Async_unix.Writer.open_file output_file in
-      Async.fprintf writer "%s\n" output ;
-      ()
+      if Int.equal !error_count 0 then (
+        [%log info] "Writing output to $output_file"
+          ~metadata:[("output_file", `String output_file)] ;
+        let output =
+          create_output
+            ~target_epoch_ledgers_state_hash:
+              input.target_epoch_ledgers_state_hash
+            ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
+            ~ledger ~staking_epoch_ledger
+            ~staking_seed:(Epoch_seed.to_string staking_seed)
+            ~next_epoch_ledger
+            ~next_seed:(Epoch_seed.to_string next_seed)
+            input.genesis_ledger
+          |> output_to_yojson |> Yojson.Safe.to_string
+        in
+        let%map writer = Async_unix.Writer.open_file output_file in
+        Async.fprintf writer "%s\n" output ;
+        () )
+      else (
+        [%log error] "There were %d errors, not writing output" !error_count ;
+        exit 1 )
 
 let () =
   Command.(
@@ -818,7 +946,10 @@ let () =
            Param.flag "--archive-uri"
              ~doc:
                "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER:$USER@localhost:5432/archiver)"
+                postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
+         and continue_on_error =
+           Param.flag "--continue-on-error"
+             ~doc:"Continue processing after errors" Param.no_arg
          in
-         main ~input_file ~output_file ~archive_uri)))
+         main ~input_file ~output_file ~archive_uri ~continue_on_error)))

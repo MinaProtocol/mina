@@ -20,7 +20,7 @@ type t =
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
   ; is_seed: bool
-  ; disable_telemetry: bool
+  ; disable_node_status: bool
   ; super_catchup: bool
   ; initial_block_production_keypairs: Keypair.Set.t
   ; coinbase_receiver: Consensus.Coinbase_receiver.t
@@ -52,5 +52,6 @@ type t =
   ; start_time: Time.t
   ; precomputed_blocks_path: string option
   ; log_precomputed_blocks: bool
-  ; upload_blocks_to_gcloud: bool }
+  ; upload_blocks_to_gcloud: bool
+  ; block_reward_threshold: Currency.Amount.t option [@default None] }
 [@@deriving make]

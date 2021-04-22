@@ -2,9 +2,12 @@
 
 open Core_kernel
 open Async
-open Rosetta_models
 open Rosetta_lib
 open Lib
+
+(* Rosetta_models.Currency shadows our Currency so we "save" it as MinaCurrency first *)
+module MinaCurrency = Currency
+open Rosetta_models
 
 module Error = struct
   include Error
@@ -14,7 +17,9 @@ end
 
 let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
 
-let snark_pk = "B62qiWSQiF5Q9CsAHgjMHoEEyR2kJnnCvN9fxRps2NXULU15EeXbzPf"
+let snark_pk = "B62qjnkjj3zDxhEfxbn1qZhUawVeLsUr2GCzEz8m1MDztiBouNsiMUL"
+
+let timelocked_pk = "B62qpJDprqj1zjNLf4wSpFC6dqmLzyokMy6KtMLSvkU8wfdL1midEb4"
 
 let wait span = Async.after span |> Deferred.map ~f:Result.return
 
@@ -35,6 +40,27 @@ let keep_trying ~step ~retry_count ~initial_delay ~each_delay ~failure_reason =
   in
   let%bind () = wait initial_delay in
   go retry_count
+
+let get_last_block_index ~rosetta_uri ~network_response ~logger =
+  let open Core.Time in
+  let open Deferred.Result.Let_syntax in
+  keep_trying
+    ~step:(fun () ->
+      let%map block_r =
+        Peek.Block.newest_block ~rosetta_uri ~network_response ~logger
+      in
+      match
+        Result.map block_r ~f:(fun block ->
+            (Option.value_exn block.Block_response.block).block_identifier
+              .index )
+      with
+      | Error _ ->
+          `Failed
+      | Ok index ->
+          `Succeeded index )
+    ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
+    ~each_delay:(Span.of_ms 250.0)
+    ~failure_reason:"Took too long for the last block to be fetched"
 
 let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
     ~network_response ~txn_hash ~operation_expectations =
@@ -87,23 +113,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
   in
   [%log info] "Verified mempool operations" ;
   let%bind last_block_index =
-    keep_trying
-      ~step:(fun () ->
-        let%map block_r =
-          Peek.Block.newest_block ~rosetta_uri ~network_response ~logger
-        in
-        match
-          Result.map block_r ~f:(fun block ->
-              (Option.value_exn block.Block_response.block).block_identifier
-                .index )
-        with
-        | Error _ ->
-            `Failed
-        | Ok index ->
-            `Succeeded index )
-      ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
-      ~each_delay:(Span.of_ms 250.0)
-      ~failure_reason:"Took too long for the last block to be fetched"
+    get_last_block_index ~rosetta_uri ~network_response ~logger
   in
   [%log debug]
     ~metadata:[("index", `Intlit (Int64.to_string last_block_index))]
@@ -493,6 +503,142 @@ let construction_api_create_token_account_through_mempool =
           ; _type= "fee_payer_dec"
           ; target= `Check None } ]
 
+let get_consensus_constants ~logger :
+    Consensus.Constants.t Or_error.t Deferred.t =
+  let open Deferred.Or_error.Let_syntax in
+  let conf_dir = "/tmp" in
+  let genesis_dir =
+    let home = Core.Sys.home_directory () in
+    Filename.concat home ".coda-config"
+  in
+  let config_file =
+    match Sys.getenv "CODA_CONFIG_FILE" with
+    | Some config_file ->
+        config_file
+    | None ->
+        Filename.concat conf_dir "config.json"
+  in
+  let%bind config =
+    let%map config_json = Genesis_ledger_helper.load_config_json config_file in
+    match Runtime_config.of_yojson config_json with
+    | Ok config ->
+        config
+    | Error err ->
+        failwithf "Could not parse configuration: %s" err ()
+  in
+  let%map proof, _ =
+    Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
+      ~may_generate:true ~proof_level:None config
+  in
+  Precomputed_values.consensus_constants proof
+
+let historical_balance_check ~logger ~rosetta_uri ~network_response =
+  let open Core.Time in
+  let open Deferred.Result.Let_syntax in
+  let%bind consensus_constants =
+    Deferred.Result.map_error (get_consensus_constants ~logger) ~f:(fun _ ->
+        Errors.create ~context:"Failed to get consensus constants"
+          `Invariant_violation )
+  in
+  let%bind last_block_index =
+    get_last_block_index ~rosetta_uri ~network_response ~logger
+  in
+  (* TODO(omerzach): We need to test for more complex accounts that involve
+   *   internal and user commands too *)
+  let account_identifier = Account_identifier.create timelocked_pk in
+  let index_to_slot (index : int64) =
+    keep_trying
+      ~step:(fun () ->
+        let%map block_r =
+          Peek.Block.block_at_index ~index ~rosetta_uri ~network_response
+            ~logger
+        in
+        let block_r : (Block_response.t, Rosetta_models.Error.t) result =
+          block_r
+        in
+        match
+          Result.map block_r ~f:(fun block ->
+              let block = Option.value_exn block.Block_response.block in
+              let block_time : Block_time.t =
+                Block_time.of_int64 block.timestamp
+              in
+              let consensus_time : Consensus.Data.Consensus_time.t =
+                Consensus.Data.Consensus_time.of_time_exn
+                  ~constants:consensus_constants block_time
+              in
+              Consensus.Data.Consensus_time.to_global_slot consensus_time )
+        with
+        | Error _ ->
+            `Failed
+        | Ok slot ->
+            `Succeeded slot )
+      ~retry_count:10 ~initial_delay:(Span.of_ms 0.0)
+      ~each_delay:(Span.of_ms 250.0)
+      ~failure_reason:
+        (sprintf "Took too long for block %s to be fetched"
+           (Int64.to_string index))
+  in
+  let expected_balance_at_slot (slot : int64) =
+    let open Unsigned in
+    let global_slot = UInt32.of_int (Int.of_int64_exn slot) in
+    let cliff_time = UInt32.of_int 20 in
+    let cliff_amount = MinaCurrency.Amount.of_int 2_000_000_000_000 in
+    let vesting_period = Unsigned.UInt32.of_int 5 in
+    let vesting_increment = MinaCurrency.Amount.of_int 10_000_000_000 in
+    let initial_minimum_balance =
+      MinaCurrency.Balance.of_int 5_000_000_000_000
+    in
+    let total_balance = 10_000_000_000_000 in
+    let min_balance_at_slot =
+      Mina_base.Account.min_balance_at_slot ~global_slot ~cliff_time
+        ~cliff_amount ~vesting_period ~vesting_increment
+        ~initial_minimum_balance
+      |> MinaCurrency.Balance.to_int
+    in
+    total_balance - min_balance_at_slot
+  in
+  let check_balance_at_index (index : int64) ~logger =
+    let open Deferred.Result.Let_syntax in
+    let%bind slot = index_to_slot index in
+    let slot = slot |> Unsigned.UInt32.to_int64 |> Int64.of_int64 in
+    let expected_balance = expected_balance_at_slot slot in
+    let%bind actual_balance =
+      keep_trying
+        ~step:(fun () ->
+          let%map balance_r =
+            Peek.Account_balance.balance_at_index ~account_identifier ~index
+              ~rosetta_uri ~network_response ~logger
+          in
+          match balance_r with
+          | Ok {balances= [{value; _}]; _} ->
+              `Succeeded
+                ( value |> MinaCurrency.Balance.of_string
+                |> MinaCurrency.Balance.to_int )
+          | _ ->
+              `Failed )
+        ~retry_count:5 ~initial_delay:(Span.of_ms 100.0)
+        ~each_delay:(Span.of_sec 3.0)
+        ~failure_reason:
+          (sprintf "Took too long to look up balance for index %s"
+             (Int64.to_string index))
+    in
+    assert (Int.(expected_balance = actual_balance)) ;
+    Deferred.Result.return ()
+  in
+  let rec check_balances_until ~(until_index : int64)
+      ~(last_index_checked : int64) =
+    if Int64.(last_index_checked >= until_index) then Deferred.Result.return ()
+    else
+      let next_index = Int64.(last_index_checked + of_int 1) in
+      let%bind () = check_balance_at_index next_index ~logger in
+      let%bind () =
+        check_balances_until ~until_index ~last_index_checked:next_index
+      in
+      Deferred.Result.return ()
+  in
+  check_balances_until ~until_index:last_block_index
+    ~last_index_checked:(Int64.of_int 0)
+
 (* for each possible user command, run the command via GraphQL, check that
     the command is in the transaction pool
 *)
@@ -592,6 +738,11 @@ let check_new_account_user_commands ~logger ~rosetta_uri ~graphql_uri =
       ~graphql_uri ~network_response
   in
   [%log info] "Created token account using construction and waited" ;
+  [%log info] "Starting historical balance check" ;
+  let%bind _ =
+    historical_balance_check ~logger ~rosetta_uri ~network_response
+  in
+  [%log info] "Finished historical balance check" ;
   (* Stop staking *)
   (* Success *)
   return ()
@@ -618,19 +769,20 @@ let run ~logger ~rosetta_uri ~graphql_uri ~don't_exit =
 let command =
   let open Command.Let_syntax in
   let%map_open rosetta_uri =
-    flag "rosetta-uri" ~doc:"URI of Rosetta endpoint to connect to"
-      Cli.required_uri
+    flag "--rosetta-uri" ~aliases:["rosetta-uri"]
+      ~doc:"URI of Rosetta endpoint to connect to" Cli.required_uri
   and graphql_uri =
-    flag "graphql-uri" ~doc:"URI of Coda GraphQL endpoint to connect to"
-      Cli.required_uri
+    flag "--graphql-uri" ~aliases:["graphql-uri"]
+      ~doc:"URI of Coda GraphQL endpoint to connect to" Cli.required_uri
   and log_json =
-    flag "log-json" ~doc:"Print log output as JSON (default: plain text)"
-      no_arg
+    flag "--log-json" ~aliases:["log-json"]
+      ~doc:"Print log output as JSON (default: plain text)" no_arg
   and log_level =
-    flag "log-level" ~doc:"Set log level (default: Info)" Cli.log_level
+    flag "--log-level" ~aliases:["log-level"]
+      ~doc:"Set log level (default: Info)" Cli.log_level
   and don't_exit =
-    flag "dont-exit" ~doc:"Don't exit after tests finish (default: do exit)"
-      no_arg
+    flag "--dont-exit" ~aliases:["dont-exit"]
+      ~doc:"Don't exit after tests finish (default: do exit)" no_arg
   in
   let open Deferred.Let_syntax in
   fun () ->

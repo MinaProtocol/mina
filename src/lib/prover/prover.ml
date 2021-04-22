@@ -92,6 +92,8 @@ module Worker_state = struct
              ( module struct
                module T = Transaction_snark.Make (struct
                  let constraint_constants = constraint_constants
+
+                 let proof_level = proof_level
                end)
 
                module B = Blockchain_snark.Blockchain_snark_state.Make (struct
@@ -158,7 +160,7 @@ module Worker_state = struct
                      (Protocol_state.hash next_state)
                    |> Or_error.map ~f:(fun () ->
                           Blockchain_snark.Blockchain.create ~state:next_state
-                            ~proof:Precomputed_values.compiled_base_proof )
+                            ~proof:Mina_base.Proof.blockchain_dummy )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
@@ -266,7 +268,7 @@ module Worker = struct
           ~processor:(Logger.Processor.raw ())
           ~transport:
             (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
-               ~log_filename:"coda-prover.log" ~max_size ~num_rotate) ;
+               ~log_filename:"mina-prover.log" ~max_size ~num_rotate) ;
         [%log info] "Prover started" ;
         Worker_state.create
           {conf_dir; logger; proof_level; constraint_constants}

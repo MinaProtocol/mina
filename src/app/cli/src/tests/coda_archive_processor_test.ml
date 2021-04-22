@@ -8,7 +8,7 @@ let main () =
   let postgres_address =
     Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
   in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
   let constraint_constants = precomputed_values.constraint_constants in
   let%bind conn =
     match%map Caqti_async.connect postgres_address with
@@ -18,15 +18,15 @@ let main () =
         failwith @@ Caqti_error.show e
   in
   let logger = Logger.create () in
-  Archive_lib.Processor.setup_server ~logger ~constraint_constants
-    ~postgres_address
+  Archive_lib.Processor.setup_server ~metrics_server_port:None
+    ~missing_blocks_width:None ~logger ~constraint_constants ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
     ~delete_older_than:None
     ~runtime_config_opt:
       (Some (Lazy.force Runtime_config.Test_configs.transactions))
   |> don't_wait_for ;
   let public_key =
-    Precomputed_values.largest_account_pk_exn precomputed_values
+    Genesis_proof.Inputs.largest_account_pk_exn precomputed_values
   in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in

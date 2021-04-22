@@ -116,7 +116,7 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let precomputed_values = Precomputed_values.compiled
+let precomputed_values = Precomputed_values.compiled_inputs
 
 let state_body =
   Mina_state.(
@@ -322,6 +322,8 @@ let main num_transactions repeats preeval () =
       let module T = Transaction_snark.Make (struct
         let constraint_constants =
           Genesis_constants.Constraint_constants.compiled
+
+        let proof_level = Genesis_constants.Proof_level.Full
       end) in
       run (profile (module T)) num_transactions repeats preeval )
 
@@ -337,25 +339,25 @@ let command =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler"
     (let%map_open n =
-       flag "k"
+       flag "-k"
          ~doc:
            "count count = log_2(number of transactions to snark) or none for \
             the mocked ones"
          (optional int)
      and repeats =
-       flag "repeat" ~doc:"count number of times to repeat the profile"
-         (optional int)
+       flag "--repeat" ~aliases:["repeat"]
+         ~doc:"count number of times to repeat the profile" (optional int)
      and preeval =
-       flag "preeval"
+       flag "--preeval" ~aliases:["preeval"]
          ~doc:
            "true/false whether to pre-evaluate the checked computation to \
             cache interpreter and computation state"
          (optional bool)
      and check_only =
-       flag "check-only"
+       flag "--check-only" ~aliases:["check-only"]
          ~doc:"Just check base snarks, don't keys or time anything" no_arg
      and witness_only =
-       flag "witness-only"
+       flag "--witness-only" ~aliases:["witness-only"]
          ~doc:"Just generate the witnesses for the base snarks" no_arg
      in
      let num_transactions =

@@ -140,6 +140,20 @@ module Receipt_chain_verifier = Merkle_list_verifier.Make (struct
     Receipt.Chain_hash.cons p parent_hash
 end)
 
+let chain_id_inputs (t : Mina_lib.t) =
+  (* these are the inputs to Blake2.digest_string in Mina.chain_id *)
+  let config = Mina_lib.config t in
+  let precomputed_values = config.precomputed_values in
+  let genesis_state_hash =
+    Precomputed_values.genesis_state_hash precomputed_values
+  in
+  let genesis_constants = precomputed_values.genesis_constants in
+  let snark_keys =
+    Lazy.force precomputed_values.constraint_system_digests
+    |> List.map ~f:(fun (_, digest) -> Md5.to_hex digest)
+  in
+  (genesis_state_hash, genesis_constants, snark_keys)
+
 let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
     (init_receipt, proof) =
   let open Participating_state.Let_syntax in
@@ -196,6 +210,13 @@ let get_status ~flag t =
   in
   let snark_work_fee = Currency.Fee.to_int @@ Mina_lib.snark_work_fee t in
   let block_production_keys = Mina_lib.block_production_pubkeys t in
+  let coinbase_receiver =
+    match Mina_lib.coinbase_receiver t with
+    | `Producer ->
+        None
+    | `Other pk ->
+        Some pk
+  in
   let consensus_mechanism = Consensus.name in
   let time_controller = config.time_controller in
   let consensus_time_now =
@@ -324,16 +345,7 @@ let get_status ~flag t =
           ; consensus_time_best_tip= None
           ; global_slot_since_genesis_best_tip= None } )
   in
-  let next_block_production =
-    let open Block_time in
-    Option.map (Mina_lib.next_producer_timing t) ~f:(function
-      | `Produce_now _ ->
-          `Produce_now
-      | `Produce (time, _, _) ->
-          `Produce (time |> Span.of_ms |> of_span_since_epoch)
-      | `Check_again time ->
-          `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
-  in
+  let next_block_production = Mina_lib.next_producer_timing t in
   let addrs_and_ports =
     Node_addrs_and_ports.to_display config.gossip_net_params.addrs_and_ports
   in
@@ -355,6 +367,8 @@ let get_status ~flag t =
   ; highest_block_length_received=
       (*if this function is not called until after catchup max_block_height will be 1 and most_recent_valid_transition pipe might have the genesis block as the latest transition in which case return the best tip length*)
       max (Option.value ~default:1 blockchain_length) !max_block_height
+  ; highest_unvalidated_block_length_received=
+      !Mina_metrics.Transition_frontier.max_unvalidated_blocklength_observed
   ; uptime_secs
   ; ledger_merkle_root
   ; state_hash
@@ -370,6 +384,8 @@ let get_status ~flag t =
   ; block_production_keys=
       Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
+  ; coinbase_receiver=
+      Option.map ~f:Public_key.Compressed.to_base58_check coinbase_receiver
   ; histograms
   ; next_block_production
   ; consensus_time_now

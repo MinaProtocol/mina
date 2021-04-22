@@ -2,6 +2,8 @@ open Core
 
 val json : bool Command.Spec.param
 
+val plaintext : bool Command.Spec.param
+
 val performance : bool Command.Spec.param
 
 val privkey_write_path : string Command.Spec.param
@@ -32,6 +34,12 @@ module Uri : sig
 
   module Client : sig
     val rest_graphql : Uri.t Types.with_name Command.Spec.param
+
+    val rest_graphql_opt : Uri.t Types.with_name option Command.Spec.param
+
+    val name : string
+
+    val default : Uri.t
   end
 
   module Archive : sig
@@ -48,6 +56,8 @@ module Port : sig
 
     val rest_server :
       int Types.with_name_and_displayed_default Command.Spec.param
+
+    val limited_graphql_server : int option Types.with_name Command.Spec.param
   end
 
   module Archive : sig

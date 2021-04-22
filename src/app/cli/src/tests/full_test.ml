@@ -83,7 +83,7 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
   let constraint_constants = precomputed_values.constraint_constants in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
@@ -137,7 +137,9 @@ let run_test () : unit Deferred.t =
           ; chain_id
           ; flooding= false
           ; direct_peers= []
+          ; seed_peer_list_url= None
           ; peer_exchange= true
+          ; mina_peer_exchange= true
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
@@ -165,8 +167,8 @@ let run_test () : unit Deferred.t =
               ; new_state= false }
           ; creatable_gossip_net=
               Mina_networking.Gossip_net.(
-                Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
-          }
+                Any.Creatable
+                  ((module Libp2p), Libp2p.create ~pids gossip_net_params)) }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -181,11 +183,16 @@ let run_test () : unit Deferred.t =
         if with_snark then (fee 0, fee 0) else (fee 100, fee 200)
       in
       let start_time = Time.now () in
+      let%bind precomputed_values =
+        Deferred.Or_error.ok_exn
+        @@ Genesis_ledger_helper.init_from_inputs ~logger ~may_generate:true
+             precomputed_values
+      in
       let%bind coda =
         Mina_lib.create
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~is_seed:true ~disable_telemetry:true
+             ~gossip_net_params ~is_seed:true ~disable_node_status:true
              ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None ~super_catchup:true
              ~work_selection_method:

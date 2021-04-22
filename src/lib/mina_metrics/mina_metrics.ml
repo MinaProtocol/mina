@@ -5,6 +5,9 @@ open Core_kernel
 open Prometheus
 open Namespace
 open Metric_generators
+open Async_kernel
+
+let time_offset_sec = 1609459200.
 
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
@@ -297,11 +300,15 @@ module Bootstrap = struct
     Gauge.v "bootstrap_time_ms" ~help ~namespace ~subsystem
 end
 
-(* TODO:
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
+
+  let useful_transactions_received_time_sec : Gauge.t =
+    let help =
+      "Time at which useful transactions were seen (seconds since 1/1/1970)"
+    in
+    Gauge.v "useful_transactions_received_time_sec" ~help ~namespace ~subsystem
 end
-*)
 
 module Metric_map (Metric : sig
   type t
@@ -397,6 +404,12 @@ end
 
 module Snark_work = struct
   let subsystem = "Snark_work"
+
+  let useful_snark_work_received_time_sec : Gauge.t =
+    let help =
+      "Time at which useful snark work was seen (seconds since 1/1/1970)"
+    in
+    Gauge.v "useful_snark_work_received_time_sec" ~help ~namespace ~subsystem
 
   let completed_snark_work_received_gossip : Counter.t =
     let help = "# of completed snark work bundles received from peers" in
@@ -562,9 +575,29 @@ module Transition_frontier = struct
       @@ Int.to_float blockchain_length ;
       max_blocklength_observed := blockchain_length )
 
+  let max_unvalidated_blocklength_observed = ref 0
+
+  let max_unvalidated_blocklength_observed_metrics : Gauge.t =
+    let help = "max unvalidated blocklength observed by the system" in
+    Gauge.v "max_unvalidated_blocklength_observed" ~help ~namespace ~subsystem
+
+  let update_max_unvalidated_blocklength_observed : int -> unit =
+   fun blockchain_length ->
+    if blockchain_length > !max_unvalidated_blocklength_observed then (
+      Gauge.set max_unvalidated_blocklength_observed_metrics
+      @@ Int.to_float blockchain_length ;
+      max_unvalidated_blocklength_observed := blockchain_length )
+
   let slot_fill_rate : Gauge.t =
-    let help = "number of blocks / total slots since genesis" in
+    let help =
+      "fill rate for the last k slots (or fewer if there have not been k \
+       slots between the best tip and the frontier root)"
+    in
     Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
+
+  let min_window_density : Gauge.t =
+    let help = "min window density for the best tip" in
+    Gauge.v "min_window_density" ~help ~namespace ~subsystem
 
   let active_breadcrumbs : Gauge.t =
     let help = "current # of breadcrumbs in the transition frontier" in
@@ -618,6 +651,37 @@ module Transition_frontier = struct
   let best_tip_user_txns : Gauge.t =
     let help = "# of transactions in the current best tip" in
     Gauge.v "best_tip_user_txns" ~help ~namespace ~subsystem
+
+  let best_tip_coinbase : Gauge.t =
+    let help =
+      "0 if there is no coinbase in the current best tip, 1 otherwise"
+    in
+    let t = Gauge.v "best_tip_coinbase" ~help ~namespace ~subsystem in
+    Gauge.set t 1. ; t
+
+  let longest_fork : Gauge.t =
+    let help = "Length of the longest path in the frontier" in
+    Gauge.v "longest_fork" ~help ~namespace ~subsystem
+
+  let empty_blocks_at_best_tip : Gauge.t =
+    let help =
+      "Number of blocks at the best tip that have no user-commands in them"
+    in
+    Gauge.v "empty_blocks_at_best_tip" ~help ~namespace ~subsystem
+
+  let accepted_block_slot_time_sec : Gauge.t =
+    let help =
+      "Slot time (seconds since 1/1/1970) corresponding to the most recently \
+       accepted block"
+    in
+    Gauge.v "accepted_block_slot_time_sec" ~help ~namespace ~subsystem
+
+  let best_tip_slot_time_sec : Gauge.t =
+    let help =
+      "Slot time (seconds since 1/1/1970) corresponding to the most recent \
+       best tip"
+    in
+    Gauge.v "best_tip_slot_time_sec" ~help ~namespace ~subsystem
 
   (* TODO:
   let recently_finalized_snarked_txns : Gauge.t =
@@ -752,6 +816,40 @@ module Block_latency = struct
       ()
 end
 
+module Rejected_blocks = struct
+  let subsystem = "Rejected_blocks"
+
+  let worse_than_root =
+    let help =
+      "The number of blocks rejected due to the blocks are not selected over \
+       our root"
+    in
+    Counter.v "worse_than_root" ~help ~namespace ~subsystem
+
+  let no_common_ancestor =
+    let help =
+      "The number of blocks rejected due to the blocks do not share a common \
+       ancestor with our root"
+    in
+    Counter.v "no_common_ancestor" ~help ~namespace ~subsystem
+
+  let invalid_proof =
+    let help = "The number of blocks rejected due to invalid proof" in
+    Counter.v "invalid_proof" ~help ~namespace ~subsystem
+
+  let received_late =
+    let help =
+      "The number of blocks rejected due to blocks being received too late"
+    in
+    Counter.v "received_late" ~help ~namespace ~subsystem
+
+  let received_early =
+    let help =
+      "The number of blocks rejected due to blocks being received too early"
+    in
+    Counter.v "received_early" ~help ~namespace ~subsystem
+end
+
 module Object_lifetime_statistics = struct
   let subsystem = "Object_lifetime_statistics"
 
@@ -816,7 +914,7 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
-let server ~port ~logger =
+let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
@@ -828,8 +926,33 @@ let server ~port ~logger =
     let uri = Request.uri req in
     match (Request.meth req, Uri.path uri) with
     | `GET, "/metrics" ->
-        let data = CollectorRegistry.(collect default) in
+        let%bind other_data =
+          match forward_uri with
+          | Some uri ->
+              let%bind resp, body = Client.get uri in
+              let status = Response.status resp in
+              if Code.is_success (Code.code_of_status status) then
+                let%map body = Body.to_string body in
+                Some body
+              else (
+                [%log error] "Could not forward request to $url, got: $status"
+                  ~metadata:
+                    [ ("url", `String (Uri.to_string uri))
+                    ; ("status_code", `Int (Code.code_of_status status))
+                    ; ("status", `String (Code.string_of_status status)) ] ;
+                return None )
+          | None ->
+              return None
+        in
+        let data = CollectorRegistry.(collect registry) in
         let body = Fmt.to_to_string TextFormat_0_0_4.output data in
+        let body =
+          match other_data with
+          | Some other_data ->
+              body ^ "\n" ^ other_data
+          | None ->
+              body
+        in
         let headers =
           Header.init_with "Content-Type" "text/plain; version=0.0.4"
         in
@@ -840,6 +963,55 @@ let server ~port ~logger =
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
     (Async_extra.Tcp.Where_to_listen.of_port port)
     callback
+
+let server ?forward_uri ~port ~logger () =
+  generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
+    ()
+
+module Archive = struct
+  type t =
+    {registry: CollectorRegistry.t; gauge_metrics: (string, Gauge.t) Hashtbl.t}
+
+  let subsystem = "Archive"
+
+  let find_or_add t ~name ~help ~subsystem =
+    match Hashtbl.find t.gauge_metrics name with
+    | None ->
+        let g =
+          Gauge.v name ~help ~namespace ~subsystem ~registry:t.registry
+        in
+        Hashtbl.add_exn t.gauge_metrics ~key:name ~data:g ;
+        g
+    | Some m ->
+        m
+
+  let unparented_blocks t : Gauge.t =
+    let help = "Number of blocks without a parent" in
+    let name = "unparented_blocks" in
+    find_or_add t ~name ~help ~subsystem
+
+  let max_block_height t : Gauge.t =
+    let help = "Max block height recorded in the archive database" in
+    let name = "max_block_height" in
+    find_or_add t ~name ~help ~subsystem
+
+  let missing_blocks t : Gauge.t =
+    let help =
+      "Number of missing blocks in the last n (n = 2000 by default) blocks. A \
+       block for a specific height is missing if there is no entry in the \
+       blocks table for that height"
+    in
+    let name = "missing_blocks" in
+    find_or_add t ~name ~help ~subsystem
+
+  let create_archive_server ?forward_uri ~port ~logger () =
+    let open Async_kernel.Deferred.Let_syntax in
+    let archive_registry = CollectorRegistry.create () in
+    let%map _ =
+      generic_server ?forward_uri ~port ~logger ~registry:archive_registry ()
+    in
+    {registry= archive_registry; gauge_metrics= Hashtbl.create (module String)}
+end
 
 (* re-export a constrained subset of prometheus to keep consumers of this module abstract over implementation *)
 include (

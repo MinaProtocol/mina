@@ -112,7 +112,7 @@ end
     - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
 *)
 module Multiaddr : sig
-  type t [@@deriving compare]
+  type t [@@deriving compare, bin_io]
 
   val to_string : t -> string
 
@@ -126,6 +126,8 @@ module Multiaddr : sig
        be used as a peer by libp2p
   *)
   val valid_as_peer : t -> bool
+
+  val of_file_contents : contents:string -> t list
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -212,6 +214,7 @@ end
 val create :
      on_unexpected_termination:(unit -> unit Deferred.t)
   -> logger:Logger.t
+  -> pids:Child_processes.Termination.t
   -> conf_dir:string
   -> net Deferred.Or_error.t
 
@@ -248,6 +251,7 @@ val configure :
   -> flooding:bool
   -> direct_peers:Multiaddr.t list
   -> peer_exchange:bool
+  -> mina_peer_exchange:bool
   -> seed_peers:Multiaddr.t list
   -> initial_gating_config:connection_gating
   -> max_connections:int
@@ -262,6 +266,12 @@ val me : net -> Keypair.t Deferred.t
 
 (** List of all peers we know about. *)
 val peers : net -> Peer.t list Deferred.t
+
+(** Set node status to be served to peers requesting node status. *)
+val set_node_status : net -> string -> unit Deferred.Or_error.t
+
+(** Get node status from given peer. *)
+val get_peer_node_status : net -> Peer.t -> string Deferred.Or_error.t
 
 (** Try to connect to a peer ID, returning a [Peer.t]. *)
 val lookup_peerid : net -> Peer.Id.t -> Peer.t Deferred.Or_error.t
@@ -366,7 +376,7 @@ val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
 (** Connect to a peer, ensuring it enters our peerbook and DHT.
 
     This can fail if the connection fails. *)
-val add_peer : net -> Multiaddr.t -> unit Deferred.Or_error.t
+val add_peer : net -> Multiaddr.t -> seed:bool -> unit Deferred.Or_error.t
 
 (** Join the DHT and announce our existence.
 

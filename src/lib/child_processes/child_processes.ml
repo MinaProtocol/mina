@@ -1,4 +1,4 @@
-(** Management of starting, tracking, and killing child processes. *)
+(* child_processes.ml -- management of starting, tracking, and killing child processes. *)
 
 open Core
 open Async
@@ -30,8 +30,8 @@ let stdin : t -> Writer.t = fun t -> t.stdin
 let termination_status : t -> Unix.Exit_or_signal.t Or_error.t option =
  fun t -> Ivar.peek t.terminated_ivar
 
-(** Try running [f] until it returns [Ok], returning the first [Ok] or [Error]
-    if all attempts fail. *)
+(* Try running [f] until it returns [Ok], returning the first [Ok] or [Error]
+   if all attempts fail. *)
 let keep_trying :
     f:('a -> 'b Deferred.Or_error.t) -> 'a list -> 'b Deferred.Or_error.t =
  fun ~f xs ->
@@ -72,7 +72,7 @@ let get_project_root () =
    - argv[0] might have been deleted (this is quite common with jenga)
    - `cp /proc/PID/exe dst` works as expected while `cp /proc/self/exe dst` does
      not *)
-let get_coda_binary () =
+let get_mina_binary () =
   let open Async in
   let open Deferred.Or_error.Let_syntax in
   let%bind os = Process.run ~prog:"uname" ~args:["-s"] () in
@@ -146,7 +146,7 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
           | Error exn ->
               [%log warn]
                 !"Couldn't delete lock file for %s (pid $childPid) after \
-                  killing it. If another Coda daemon was already running it \
+                  killing it. If another Mina daemon was already running it \
                   may have cleaned it up for us. ($exn)"
                 name
                 ~metadata:
@@ -162,9 +162,10 @@ type output_handling =
   * [`Pipe | `No_pipe]
   * [`Keep_empty | `Filter_empty]
 
-(** Given a Reader.t coming from a process output, optionally log the lines
-    coming from it and return a strict pipe that will get the lines if the
-    argument is `Pipe and be empty if it's `No_pipe. *)
+(* Given a Reader.t coming from a process output, optionally log the lines
+   coming from it and return a strict pipe that will get the lines if the
+   argument is `Pipe and be empty if it's `No_pipe.
+*)
 let reader_to_strict_pipe_with_logging :
        Reader.t
     -> string
@@ -263,9 +264,11 @@ let start_custom :
     Deferred.map ~f:Or_error.return
     @@ maybe_kill_and_unlock name lock_path logger
   in
-  [%log debug] "Starting custom child process %s with args $args" name
-    ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
-  let%bind coda_binary_path = get_coda_binary () in
+  [%log debug] "Starting custom child process $name with args $args"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a))) ] ;
+  let%bind mina_binary_path = get_mina_binary () in
   let relative_to_root =
     get_project_root ()
     |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
@@ -275,10 +278,18 @@ let start_custom :
       (List.filter_opt
          [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
-         ; Some (Filename.dirname coda_binary_path ^/ name)
+         ; Some (Filename.dirname mina_binary_path ^/ name)
+         ; Some ("mina-" ^ name)
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~stdin:"" ~prog ~args ())
   in
+  [%log info] "Custom child process $name started with pid $pid"
+    ~metadata:
+      [ ("name", `String name)
+      ; ("args", `List (List.map args ~f:(fun a -> `String a)))
+      ; ("pid", `Int (Process.pid process |> Pid.to_int)) ] ;
+  Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
+    ~location:__LOC__ ;
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ Async.Writer.save lock_path
@@ -369,6 +380,11 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
               "No such process running. This should be impossible." )
   | Some _ ->
       Deferred.Or_error.error_string "already terminated"
+
+let register_process ?termination_expected (termination : Termination.t)
+    (process : t) kind =
+  Termination.register_process ?termination_expected termination
+    process.process kind
 
 let%test_module _ =
   ( module struct

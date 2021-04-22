@@ -354,7 +354,7 @@ module T = struct
           ()
       in
       let%bind precomputed_values, _runtime_config =
-        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
+        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:true
           ~proof_level:None runtime_config
         >>| Or_error.ok_exn
       in
@@ -416,6 +416,7 @@ module T = struct
               ; conf_dir
               ; chain_id
               ; logger
+              ; seed_peer_list_url= None
               ; unsafe_no_trust_ip= true
               ; isolate= false
               ; trust_system
@@ -424,6 +425,7 @@ module T = struct
               ; max_connections= 50
               ; validation_queue_size= 150
               ; peer_exchange= true
+              ; mina_peer_exchange= true
               ; keypair= Some libp2p_keypair }
           in
           let net_config =
@@ -442,7 +444,8 @@ module T = struct
             ; creatable_gossip_net=
                 Mina_networking.Gossip_net.(
                   Any.Creatable
-                    ((module Libp2p), Libp2p.create gossip_net_params)) }
+                    ((module Libp2p), Libp2p.create gossip_net_params ~pids))
+            }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -452,8 +455,9 @@ module T = struct
           let coda_deferred () =
             Mina_lib.create
               (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~chain_id ~is_seed ~disable_telemetry:true ~super_catchup:true
-                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
+                 ~chain_id ~is_seed ~disable_node_status:true
+                 ~super_catchup:true ~coinbase_receiver:`Producer ~net_config
+                 ~gossip_net_params
                  ~initial_protocol_version:Protocol_version.zero
                  ~proposed_protocol_version_opt:None
                  ~work_selection_method:

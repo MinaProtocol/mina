@@ -1,9 +1,5 @@
-# Control Vars
-
-# when set to true, this module generates and uploads artifacts from `genesis_ledger.json`
-variable "generate_and_upload_artifacts" {
-  type = bool
-  default = true
+terraform {
+  experiments = [module_variable_optional_attrs]
 }
 
 # K8s Cluster Vars
@@ -25,6 +21,26 @@ variable "k8s_context" {
 
 # Global Vars
 
+variable "expose_graphql" {
+  type    = bool
+  default = false
+}
+
+variable "use_local_charts" {
+  type    = bool
+  default = false
+}
+
+variable "healthcheck_enabled" {
+  type    = bool
+  default = true
+}
+
+variable "deploy_watchdog" {
+  type    = bool
+  default = true
+}
+
 variable "coda_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
@@ -36,8 +52,13 @@ variable "coda_archive_image" {
 }
 
 variable "mina_archive_schema" {
-  type = string
+  type    = string
   default = ""
+}
+
+variable "archive_node_count" {
+  type    = number
+  default = 0
 }
 
 variable "coda_agent_image" {
@@ -61,7 +82,7 @@ variable "coda_points_image" {
 }
 
 variable "watchdog_image" {
-  type = string
+  type    = string
   default = "gcr.io/o1labs-192920/watchdog:latest"
 }
 
@@ -82,17 +103,11 @@ variable "testnet_name" {
   default = "coda-testnet"
 }
 
-variable "additional_seed_peers" {
-  type    = list
+variable "additional_peers" {
+  type    = list(any)
   default = []
 }
 
-variable "archive_node_count" {
-  type    = number
-  default = 0
-}
-
-# only used if `generate_and_upload_artifacts` is set to false
 variable "runtime_config" {
   type    = string
   default = ""
@@ -116,7 +131,7 @@ variable "seed_zone" {
 }
 
 variable "seed_discovery_keypairs" {
-  type = list
+  type = list(any)
   default = [
     "CAESQNf7ldToowe604aFXdZ76GqW/XVlDmnXmBT+otorvIekBmBaDWu/6ZwYkZzqfr+3IrEh6FLbHQ3VSmubV9I9Kpc=,CAESIAZgWg1rv+mcGJGc6n6/tyKxIehS2x0N1Uprm1fSPSqX,12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr",
     "CAESQKtOnmYHQacRpNvBZDrGLFw/tVB7V4I14Y2xtGcp1sEsEyfcsNoFi7NnUX0T2lQDGQ31KvJRXJ+u/f9JQhJmLsI=,CAESIBMn3LDaBYuzZ1F9E9pUAxkN9SryUVyfrv3/SUISZi7C,12D3KooWB79AmjiywL1kMGeKHizFNQE9naThM2ooHgwFcUzt6Yt1"
@@ -125,22 +140,17 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
-variable "whale_count" {
-  type    = number
-  default = 1
-}
-
-variable "fish_count" {
-  type    = number
-  default = 1
-}
-
 variable "log_level" {
   type    = string
   default = "Trace"
 }
 
 variable "log_snark_work_gossip" {
+  type    = bool
+  default = false
+}
+
+variable "log_precomputed_blocks" {
   type    = bool
   default = false
 }
@@ -154,23 +164,37 @@ variable "block_producer_key_pass" {
   type = string
 }
 
-variable "block_producer_starting_host_port" {
-  type    = number
-  default = 10000
-}
-
 variable "block_producer_configs" {
   type = list(
     object({
-      name = string,
-      class = string,
-      private_key_secret = string,
-      libp2p_secret = string,
+      name                   = string,
+      class                  = string,
+      private_key_secret     = string,
+      external_port          = number,
+      libp2p_secret          = string,
       enable_gossip_flooding = bool,
-      enable_peer_exchange = bool,
-      isolated = bool,
-      run_with_user_agent = bool,
-      run_with_bots = bool
+      enable_peer_exchange   = bool,
+      isolated               = bool,
+      run_with_user_agent    = bool,
+      run_with_bots          = bool,
+      enableArchive          = bool,
+      archiveAddress         = string
+    })
+  )
+  default = []
+}
+
+variable "seed_configs" {
+  type = list(
+    object({
+      name               = string,
+      class              = string,
+      libp2p_secret      = string,
+      external_port      = number,
+      external_ip        = string,
+      private_key_secret = string,
+      enableArchive      = bool,
+      archiveAddress     = string
     })
   )
   default = []
@@ -229,7 +253,7 @@ variable "agent_send_every_mins" {
 }
 
 variable "gcloud_seeds" {
-  type    = list
+  type    = list(any)
   default = []
 }
 
@@ -241,12 +265,12 @@ variable "restart_nodes" {
 }
 
 variable "restart_nodes_every_mins" {
-  type = string
+  type    = string
   default = "60"
 }
 
 variable "make_report_every_mins" {
-  type = string
+  type    = string
   default = "30"
 }
 
@@ -265,34 +289,41 @@ variable "make_report_accounts" {
   default = ""
 }
 
-# Archive-Postgres Vars
+# Archive | Postgres Vars
 
-variable "archive_persistence_enabled" {
-  type    = bool
-  default = true
-}
+variable "archive_configs" {
+  type = list(
+    object({
+      name                    = string
+      image                   = string
+      serverPort              = string
+      externalPort            = string
+      enableLocalDaemon       = bool
+      enablePostgresDB        = bool
 
-variable "archive_persistence_class" {
-  type    = string
-  default = "ssd"
-}
+      postgresHost            = string
+      postgresPort            = string
+      postgresqlUsername      = string
+      postgresqlPassword      = string
+      postgresDB              = string
+      remoteSchemaFile        = string
 
-variable "archive_persistence_reclaim_policy" {
-  type    = string
-  default = "retain"
-}
-
-variable "archive_persistence_access_modes" {
-  type    = list
-  default = ["ReadWriteOnce"]
-}
-
-variable "archive_persistence_size" {
-  type    = string
-  default = "8Gi"
+      persistenceEnabled      = bool
+      persistenceSize         = string
+      persistenceStorageClass = string
+      persistenceAccessModes  = list(string)
+      preemptibleAllowed     = string
+    })
+  )
+  default = []
 }
 
 variable "upload_blocks_to_gcloud" {
   type    = bool
   default = false
+}
+
+variable "seed_peers_url" {
+  type    = string
+  default = ""
 }

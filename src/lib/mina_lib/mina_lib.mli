@@ -35,13 +35,21 @@ val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 val replace_block_production_keypairs :
   t -> Keypair.And_compressed_pk.Set.t -> unit
 
-val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
+val coinbase_receiver : t -> Consensus.Coinbase_receiver.t
+
+val replace_coinbase_receiver : t -> Consensus.Coinbase_receiver.t -> unit
+
+val next_producer_timing :
+  t -> Daemon_rpcs.Types.Status.Next_producer_timing.t option
 
 val staking_ledger :
   t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t option
 
 val next_epoch_ledger :
-  t -> Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     t
+  -> [ `Finalized of Consensus.Data.Local_state.Snapshot.Ledger_snapshot.t
+     | `Notfinalized ]
+     option
 
 val current_epoch_delegators :
   t -> pk:Public_key.Compressed.t -> Mina_base.Account.t list option
@@ -86,6 +94,15 @@ val add_transactions :
   -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
+
+val add_full_transactions :
+     t
+  -> User_command.t list
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
+val get_account : t -> Account_id.t -> Account.t option Participating_state.T.t
 
 val get_inferred_nonce_from_transaction_pool_and_ledger :
   t -> Account_id.t -> Account.Nonce.t option Participating_state.t

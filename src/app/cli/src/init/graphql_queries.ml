@@ -128,6 +128,17 @@ mutation ($public_key: PublicKey) {
   }
 |}]
 
+module Set_coinbase_receiver =
+[%graphql
+{|
+mutation ($public_key: PublicKey) {
+  setCoinbaseReceiver(input : {publicKey: $public_key}) {
+    lastCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
+    currentCoinbaseReceiver @bsDecoder(fn: "Decoders.optional_public_key")
+    }
+  }
+|}]
+
 module Set_snark_worker =
 [%graphql
 {|
@@ -314,8 +325,8 @@ query get_peers {
 module Add_peers =
 [%graphql
 {|
-mutation ($peers: [NetworkPeer!]!) {
-  addPeers(peers: $peers) {
+mutation ($peers: [NetworkPeer!]!, $seed: Boolean) {
+  addPeers(peers: $peers, seed: $seed) {
     host
     libp2pPort
     peerId
@@ -339,6 +350,30 @@ module Archive_extensional_block =
 mutation ($block: ExtensionalBlock!) {
   archiveExtensionalBlock(block: $block) {
       applied
+  }
+}
+|}]
+
+module Send_rosetta_transaction =
+[%graphql
+{|
+mutation ($transaction: RosettaTransaction!) {
+  sendRosettaTransaction(input: $transaction) {
+    userCommand {
+      id
+    }
+  }
+}
+|}]
+
+module Import_account =
+[%graphql
+{|
+mutation ($path: String!, $password: String!) {
+  importAccount (path: $path, password: $password) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+    already_imported: alreadyImported
+    success
   }
 }
 |}]

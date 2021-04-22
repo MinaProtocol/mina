@@ -40,6 +40,10 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
 
   let peers (Any ((module M), t)) = M.peers t
 
+  let set_node_status (Any ((module M), t)) = M.set_node_status t
+
+  let get_peer_node_status (Any ((module M), t)) = M.get_peer_node_status t
+
   let add_peer (Any ((module M), t)) xs = M.add_peer t xs
 
   let initial_peers (Any ((module M), t)) = M.initial_peers t

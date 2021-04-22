@@ -14,6 +14,8 @@ source "buildkite/scripts/export-git-env-vars.sh"
 PROJECT="mina-archive"
 BUILD_DIR="deb_build"
 
+###### archiver deb
+
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PROJECT}
@@ -41,6 +43,11 @@ pwd
 ls
 cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
+cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
+cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
+cp ./_build/default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
+cp ./_build/default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILD_DIR}/usr/local/bin/mina-swap-bad-balances"
+chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -50,6 +57,98 @@ find "${BUILD_DIR}"
 # Build the package
 echo "------------------------------------------------------------"
 dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${VERSION}.deb
+ls -lh mina*.deb
+
+###### archiver deb with testnet signatures
+
+rm -r "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}/DEBIAN"
+cat << EOF > "${BUILD_DIR}/DEBIAN/control"
+Package: ${PROJECT}-testnet
+Version: ${VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: O(1)Labs <build@o1labs.org>
+Description: Mina Archive Process
+ Compatible with Mina Daemon
+ Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILD_DIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
+# Binaries
+mkdir -p "${BUILD_DIR}/usr/local/bin"
+pwd
+ls
+cp ./_build/default/src/app/archive/archive_testnet_signatures.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
+cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
+cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
+cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
+cp ./_build/default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
+cp ./_build/default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILD_DIR}/usr/local/bin/mina-swap-bad-balances"
+chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILD_DIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-testnet_${VERSION}.deb
+ls -lh mina*.deb
+
+###### archiver deb with mainnet signatures
+
+rm -r "${BUILD_DIR}"
+mkdir -p "${BUILD_DIR}/DEBIAN"
+cat << EOF > "${BUILD_DIR}/DEBIAN/control"
+Package: ${PROJECT}-mainnet
+Version: ${VERSION}
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
+License: Apache-2.0
+Homepage: https://minaprotocol.com/
+Maintainer: O(1)Labs <build@o1labs.org>
+Description: Mina Archive Process
+ Compatible with Mina Daemon
+ Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
+EOF
+
+echo "------------------------------------------------------------"
+echo "Control File:"
+cat "${BUILD_DIR}/DEBIAN/control"
+
+echo "------------------------------------------------------------"
+# Binaries
+mkdir -p "${BUILD_DIR}/usr/local/bin"
+pwd
+ls
+cp ./_build/default/src/app/archive/archive_mainnet_signatures.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
+cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
+cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
+cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
+cp ./_build/default/src/app/replayer/replayer.exe "${BUILD_DIR}/usr/local/bin/mina-replayer"
+cp ./_build/default/src/app/swap_bad_balances/swap_bad_balances.exe "${BUILD_DIR}/usr/local/bin/mina-swap-bad-balances"
+chmod --recursive +rx "${BUILD_DIR}/usr/local/bin"
+
+# echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
+find "${BUILD_DIR}"
+
+# Build the package
+echo "------------------------------------------------------------"
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-mainnet_${VERSION}.deb
 ls -lh mina*.deb
 
 ###
@@ -78,6 +177,9 @@ else
     case $GITBRANCH in
         master)
             CODENAME='release'
+            ;;
+        master-qa)
+            CODENAME='pre-release'
             ;;
         *)
             CODENAME='unstable'

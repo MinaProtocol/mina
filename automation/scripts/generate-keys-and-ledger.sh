@@ -7,9 +7,10 @@ RESET=false
 
 WHALE_COUNT=1
 FISH_COUNT=1
+SEED_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.1.1-feature-pasta-up-to-date-235a404"
+CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-a46b9ef"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -33,13 +34,23 @@ while [ $# -gt 0 ]; do
     --fc=*)
       FISH_COUNT="${1#*=}"
       ;;
+    --sc=*)
+      SEED_COUNT="${1#*=}"
+      ;;
     --efc=*)
       EXTRA_COUNT="${1#*=}"
+      ;;
+    --artifact-path=*)
+      ARTIFACT_PATH="${1#*=}"
       ;;
   esac
   shift
 done
 
+# if override not provided, default to testnets DIR
+if [[ ! $ARTIFACT_PATH ]]; then
+  ARTIFACT_PATH="terraform/testnets/${TESTNET}"
+fi
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -78,11 +89,11 @@ function generate_key_files {
     docker run \
       -v "${output_dir}:/keys:z" \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_PRIVKEY_PASS='${privkey_pass}' coda advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
+      -c "CODA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
       --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_LIBP2P_PASS='${privkey_pass}' coda advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
+      -c "CODA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container
@@ -132,6 +143,10 @@ function generate_keyset_from_file {
 }
 # ================================================================================
 
+# prep dir for copied libp2psecrets
+LIBP2PPEERS="$(pwd)/keys/libp2p/${TESTNET}/"
+mkdir -p $LIBP2PPEERS
+
 if [[ -s "keys/testnet-keys/${TESTNET}_online-whale-keyfiles/online_whale_account_1.pub" ]]; then
 echo "using existing whale keys"
 else
@@ -144,7 +159,11 @@ else
   build_keyset_from_testnet_keys $online_output_dir "online-whales"
   build_keyset_from_testnet_keys $offline_output_dir "offline-whales"
 
+
 fi
+
+online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-whale-keyfiles"
+cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
 
 echo "Online Whale Keyset:"
 cat "keys/keysets/${TESTNET}_online-whales"
@@ -163,12 +182,60 @@ else
 
   build_keyset_from_testnet_keys $online_output_dir "online-fish"
   build_keyset_from_testnet_keys $offline_output_dir "offline-fish"
+
 fi
+
+online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_online-fish-keyfiles"
+cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
+
 echo "Online Fish Keyset:"
 cat keys/keysets/${TESTNET}_online-fish
 echo "Offline Fish Keyset:"
 cat keys/keysets/${TESTNET}_offline-fish
 echo
+
+# TODO make this just check libp2p instead of unnecessarily generating seed public keys
+if [[ -s "keys/testnet-keys/${TESTNET}_seed-keyfiles/online_seeds_account_1.pub" ]]; then
+echo "using existing seed keys"
+else
+  online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_seed-keyfiles"
+
+  generate_key_files $SEED_COUNT "online_seeds" $online_output_dir
+
+  build_keyset_from_testnet_keys $online_output_dir "online-seeds"
+
+fi
+
+online_output_dir="$(pwd)/keys/testnet-keys/${TESTNET}_seed-keyfiles"
+cp ${online_output_dir}/*libp2p*.peerid ${LIBP2PPEERS}
+
+if [[ -s "keys/libp2p/${TESTNET}/seed-1" ]]; then
+  echo "libp2p keys prepped"
+else
+  echo "Prepping libp2p peers for consumption"
+  for p2p in $LIBP2PPEERS*; do
+    f="${p2p%.*}"
+    base=$(basename $p2p)
+
+    if [[ "$base" == *"fish"* ]]; then
+      splitP2P=(${f//_/ })
+      outputP2P="${splitP2P[1]}-block-producer-${splitP2P[3]}"
+      mv ${p2p} ${LIBP2PPEERS}${outputP2P}
+    fi
+
+    if [[ "$base" == *"whale"* ]]; then
+      splitP2P=(${f//_/ })
+      outputP2P="${splitP2P[1]}-block-producer-${splitP2P[3]}"
+      mv ${p2p} ${LIBP2PPEERS}${outputP2P}
+    fi
+
+    if [[ "$base" == *"seeds"* ]]; then
+      splitP2P=(${f//_/ })
+      outputP2P="seed-${splitP2P[3]}"
+      mv ${p2p} ${LIBP2PPEERS}${outputP2P}
+    fi
+  done
+fi
 
 # ================================================================================
 
@@ -313,12 +380,15 @@ done < <(echo -n "$PROMPT_KEYSETS") | coda-network genesis
 GENESIS_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Fix the ledger format for ease of use
-echo "Rewriting ./keys/genesis/* as terraform/testnets/${TESTNET}/genesis_ledger.json in the proper format for daemon consumption..."
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${WHALE_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "terraform/testnets/${TESTNET}/whales.json"
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${FISH_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "terraform/testnets/${TESTNET}/fish.json"
-cat ./keys/genesis/* | jq '.[] | select(.balance=="'${COMMUNITY_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000"), timing: { initial_minimum_balance: "60000", cliff_time:"150", cliff_amount:"12000", vesting_period:"6", vesting_increment:"150"}}' | cat > "terraform/testnets/${TESTNET}/community_fast_locked_keys.json"
+echo "Rewriting ./keys/genesis/* as ${ARTIFACT_PATH}/genesis_ledger.json in the proper format for daemon consumption..."
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${WHALE_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/whales.accounts.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${FISH_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000") }' | cat > "${ARTIFACT_PATH}/fish.accounts.json"
+cat ./keys/genesis/* | jq '.[] | select(.balance=="'${COMMUNITY_AMOUNT}'") | . + { sk: null, delegate: .delegate, balance: (.balance + ".000000000"), timing: { initial_minimum_balance: "60000", cliff_time:"150", cliff_amount:"12000", vesting_period:"6", vesting_increment:"150"}}' | cat > "${ARTIFACT_PATH}/community_fast_unlock.accounts.json"
 
-NUM_ACCOUNTS=$(jq -s 'length'  terraform/testnets/${TESTNET}/*.json)
-jq -s '{ genesis: { genesis_state_timestamp: "'${GENESIS_TIMESTAMP}'" }, ledger: { name: "'${TESTNET}'", num_accounts: '${NUM_ACCOUNTS}', accounts: [ .[] ] } }' terraform/testnets/${TESTNET}/*.json > "terraform/testnets/${TESTNET}/genesis_ledger.json"
+echo "Determining total accounts based on partial ledgers..."
+NUM_ACCOUNTS=$(jq -s 'length'  ${ARTIFACT_PATH}/*.json)
+
+echo "Merging partial ledgers into genesis_ledger..."
+jq -s '{ genesis: { genesis_state_timestamp: "'${GENESIS_TIMESTAMP}'" }, ledger: { name: "'${TESTNET}'", num_accounts: '${NUM_ACCOUNTS}', accounts: [ .[] ] } }' ${ARTIFACT_PATH}/*.accounts.json > "${ARTIFACT_PATH}/genesis_ledger.json"
 
 echo "Keys and genesis ledger generated successfully, $TESTNET is ready to deploy!"

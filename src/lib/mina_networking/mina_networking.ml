@@ -563,26 +563,25 @@ module Rpcs = struct
     end
   end
 
-  module Get_telemetry_data = struct
-    module Telemetry_data = struct
-      let yojson_of_ban_status (peer, peer_status) =
-        `Assoc
-          [ ("IP_address", `String (Unix.Inet_addr.to_string peer.Peer.host))
-          ; ("peer_id", `String peer.peer_id)
-          ; ("peer_status", Trust_system.Peer_status.to_yojson peer_status) ]
-
-      let yojson_of_ban_statuses ban_statuses =
-        `List (List.map ban_statuses ~f:yojson_of_ban_status)
-
+  module Get_node_status = struct
+    module Node_status = struct
       [%%versioned
       module Stable = struct
-        module V1 = struct
+        module V2 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
                   [@to_yojson
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
+                  [@of_yojson
+                    function
+                    | `String s ->
+                        Ok (Unix.Inet_addr.of_string s)
+                    | _ ->
+                        Error "expected string"]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
                   [@to_yojson fun peer_id -> `String peer_id]
+                  [@of_yojson
+                    function `String s -> Ok s | _ -> Error "expected string"]
             ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
@@ -592,25 +591,70 @@ module Rpcs = struct
                 ( Network_peer.Peer.Stable.V1.t
                 * Trust_system.Peer_status.Stable.V1.t )
                 list
-                  [@to_yojson yojson_of_ban_statuses]
+            ; k_block_hashes_and_timestamps:
+                (State_hash.Stable.V1.t * string) list
+            ; git_commit: string
+            ; uptime_minutes: int
+            ; block_height_opt: int option [@default None] }
+          [@@deriving to_yojson, of_yojson]
+
+          let to_latest = Fn.id
+        end
+
+        module V1 = struct
+          type t =
+            { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+                  [@to_yojson
+                    fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
+                  [@of_yojson
+                    function
+                    | `String s ->
+                        Ok (Unix.Inet_addr.of_string s)
+                    | _ ->
+                        Error "expected string"]
+            ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
+                  [@to_yojson fun peer_id -> `String peer_id]
+                  [@of_yojson
+                    function `String s -> Ok s | _ -> Error "expected string"]
+            ; sync_status: Sync_status.Stable.V1.t
+            ; peers: Network_peer.Peer.Stable.V1.t list
+            ; block_producers:
+                Signature_lib.Public_key.Compressed.Stable.V1.t list
+            ; protocol_state_hash: State_hash.Stable.V1.t
+            ; ban_statuses:
+                ( Network_peer.Peer.Stable.V1.t
+                * Trust_system.Peer_status.Stable.V1.t )
+                list
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int }
-          [@@deriving to_yojson]
+          [@@deriving to_yojson, of_yojson]
 
-          let to_latest = Fn.id
+          let to_latest status : Latest.t =
+            { node_ip_addr= status.node_ip_addr
+            ; node_peer_id= status.node_peer_id
+            ; sync_status= status.sync_status
+            ; peers= status.peers
+            ; block_producers= status.block_producers
+            ; protocol_state_hash= status.protocol_state_hash
+            ; ban_statuses= status.ban_statuses
+            ; k_block_hashes_and_timestamps=
+                status.k_block_hashes_and_timestamps
+            ; git_commit= status.git_commit
+            ; uptime_minutes= status.uptime_minutes
+            ; block_height_opt= None }
         end
       end]
     end
 
     module Master = struct
-      let name = "get_telemetry_data"
+      let name = "get_node_status"
 
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        type response = Telemetry_data.t Or_error.t
+        type response = Node_status.t Or_error.t
       end
 
       module Caller = T
@@ -623,8 +667,8 @@ module Rpcs = struct
 
     let response_to_yojson response =
       match response with
-      | Ok telem ->
-          Telemetry_data.Stable.V1.to_yojson telem
+      | Ok status ->
+          Node_status.Stable.Latest.to_yojson status
       | Error err ->
           `Assoc [("error", Error_json.error_to_yojson err)]
 
@@ -633,12 +677,12 @@ module Rpcs = struct
       include Master
     end)
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
-          Telemetry_data.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+          Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -648,6 +692,53 @@ module Rpcs = struct
         let response_of_callee_model = Fn.id
 
         let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response =
+          Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = function
+          | Error err ->
+              Error err
+          | Ok (status : Node_status.Stable.Latest.t) ->
+              Ok
+                { Node_status.Stable.V1.node_ip_addr= status.node_ip_addr
+                ; node_peer_id= status.node_peer_id
+                ; sync_status= status.sync_status
+                ; peers= status.peers
+                ; block_producers= status.block_producers
+                ; protocol_state_hash= status.protocol_state_hash
+                ; ban_statuses= status.ban_statuses
+                ; k_block_hashes_and_timestamps=
+                    status.k_block_hashes_and_timestamps
+                ; git_commit= status.git_commit
+                ; uptime_minutes= status.uptime_minutes }
+
+        let caller_model_of_response = function
+          | Error err ->
+              Error err
+          | Ok (status : Node_status.Stable.V1.t) ->
+              Ok (Node_status.Stable.V1.to_latest status)
       end
 
       module T' =
@@ -686,8 +777,6 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_telemetry_data
-        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
@@ -718,8 +807,6 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
-    | Get_telemetry_data ->
-        (module Get_telemetry_data)
     | Consensus_rpc rpc ->
         Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
@@ -746,8 +833,6 @@ module Rpcs = struct
     | Ban_notify, Ban_notify ->
         Some (do_ f)
     | Get_best_tip, Get_best_tip ->
-        Some (do_ f)
-    | Get_telemetry_data, Get_telemetry_data ->
         Some (do_ f)
     | Consensus_rpc rpc_a, Consensus_rpc rpc_b ->
         Consensus.Hooks.Rpcs.match_handler
@@ -847,9 +932,9 @@ let create (config : Config.t)
     ~(get_best_tip :
           Rpcs.Get_best_tip.query Envelope.Incoming.t
        -> Rpcs.Get_best_tip.response Deferred.t)
-    ~(get_telemetry_data :
-          Rpcs.Get_telemetry_data.query Envelope.Incoming.t
-       -> Rpcs.Get_telemetry_data.response Deferred.t)
+    ~(get_node_status :
+          Rpcs.Get_node_status.query Envelope.Incoming.t
+       -> Rpcs.Get_node_status.response Deferred.t)
     ~(get_transition_chain_proof :
           Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
        -> Rpcs.Get_transition_chain_proof.response Deferred.t)
@@ -1039,16 +1124,6 @@ let create (config : Config.t)
           result
         else None
   in
-  let get_telemetry_data_rpc conn ~version:_ query =
-    [%log debug] "Sending telemetry data to $peer" ~metadata:(md conn) ;
-    let action_msg = "Telemetry_data" in
-    let msg_args = [] in
-    (* if peer doesn't return telemetry data, don't change trust score *)
-    let%map result, _sender =
-      run_for_rpc_result conn query ~f:get_telemetry_data action_msg msg_args
-    in
-    result
-  in
   let get_transition_chain_proof_rpc conn ~version:_ query =
     [%log info] "Sending transition_chain_proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
@@ -1131,11 +1206,6 @@ let create (config : Config.t)
         ; budget= (3, `Per minute)
         ; cost= unit }
     ; Rpc_handler
-        { rpc= Get_telemetry_data
-        ; f= get_telemetry_data_rpc
-        ; budget= (12, `Per minute)
-        ; cost= unit }
-    ; Rpc_handler
         { rpc= Get_ancestry
         ; f= get_ancestry_rpc
         ; budget= (5, `Per minute)
@@ -1172,6 +1242,21 @@ let create (config : Config.t)
   let%map gossip_net =
     Gossip_net.Any.create config.creatable_gossip_net rpc_handlers
   in
+  (* The node status RPC is implemented directly in go, serving a string which
+     is periodically updated. This is so that one can make this RPC on a node even
+     if that node is at its connection limit. *)
+  let fake_time = Time.now () in
+  Clock.every' (Time.Span.of_min 1.) (fun () ->
+      match%bind
+        get_node_status {data= (); sender= Local; received_at= fake_time}
+      with
+      | Error _ ->
+          Deferred.unit
+      | Ok data ->
+          Gossip_net.Any.set_node_status gossip_net
+            ( Rpcs.Get_node_status.Node_status.to_yojson data
+            |> Yojson.Safe.to_string )
+          >>| ignore ) ;
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
@@ -1252,6 +1337,20 @@ include struct
   let lift f {gossip_net; _} = f gossip_net
 
   let peers = lift peers
+
+  let get_peer_node_status t peer =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind s = get_peer_node_status t.gossip_net peer in
+    Or_error.try_with (fun () ->
+        match
+          Rpcs.Get_node_status.Node_status.of_yojson
+            (Yojson.Safe.from_string s)
+        with
+        | Ok x ->
+            x
+        | Error e ->
+            failwith e )
+    |> Deferred.return
 
   let add_peer = lift add_peer
 

@@ -27,10 +27,21 @@ WORKDIR /tmp/watchman
 RUN ./autogen.sh && ./configure --enable-statedir=/tmp
 RUN make && make install && mv watchman /usr/local/bin/watchman
 
+WORKDIR /root
+
+RUN wget https://golang.org/dl/go1.15.7.linux-amd64.tar.gz
+RUN tar -C /usr/local -xf go1.15.7.linux-amd64.tar.gz
+ENV PATH="${PATH}:/usr/local/go/bin"
+
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 
 COPY . /code
 COPY ./scripts /scripts
+
+WORKDIR /code/check_libp2p
+RUN go mod download
+RUN go build
+
 
 # TODO: find better mechanism for sharing files across repo DIRs
 ADD https://raw.githubusercontent.com/MinaProtocol/mina/develop/automation/scripts/random_restart.py /scripts/random_restart.py

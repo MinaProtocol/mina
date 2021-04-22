@@ -17,6 +17,7 @@ spec:
         testnet: {{ .Values.testnetName }}
         role: snark-coordinator
         version: {{ trunc 6 (split ":" .Values.coda.image)._1 | trimSuffix "-" }}
+        syncStatus: INIT
       annotations:
         prometheus.io/scrape: 'true'
         prometheus.io/port: {{ .Values.coda.ports.metrics | quote }}
@@ -33,7 +34,7 @@ spec:
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
-          "-config-directory", "/root/.coda-config",
+          "-config-directory", "/root/.mina-config",
           "-log-snark-work-gossip", "true",
           "-client-port", "$(DAEMON_CLIENT_PORT)",
           "-rest-port", "$(DAEMON_REST_PORT)",
@@ -49,7 +50,13 @@ spec:
           {{- range $.Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end }}
-          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }}
+          {{- if $.Values.coda.seedPeersURL }}
+          "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
+          {{- end }}
+          "-generate-genesis-proof", {{ .Values.coda.generateGenesisProof | quote }},
+          {{- if $.Values.coda.enableArchive }}
+          "-archive-address", {{ $.Values.coda.archiveAddress }}
+          {{- end -}}
         ]
         env:
         - name: "RAYON_NUM_THREADS"
@@ -86,7 +93,9 @@ spec:
           protocol: TCP 
           containerPort: {{ .Values.coda.ports.p2p }}
           hostPort: {{ .Values.coda.ports.p2p }}
-{{- include "healthcheck.snarkCoordinator.allChecks" .Values | indent 8 }}
+{{$name := tpl .Values.coordinator.fullname . }}
+{{$data := dict "name" $name "healthcheck" $.Values.healthcheck }}
+{{- include "healthcheck.snarkCoordinator.allChecks" $data | indent 8 }}
         imagePullPolicy: Always
       {{- if .Values.coda.runtimeConfig }}
         volumeMounts:

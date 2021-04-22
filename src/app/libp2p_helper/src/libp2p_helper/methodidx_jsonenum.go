@@ -28,6 +28,8 @@ var (
 		"findPeer":            findPeer,
 		"listPeers":           listPeers,
 		"setGatingConfig":     setGatingConfig,
+		"setNodeStatus":       setNodeStatus,
+		"getPeerNodeStatus":   getPeerNodeStatus,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -50,6 +52,8 @@ var (
 		findPeer:            "findPeer",
 		listPeers:           "listPeers",
 		setGatingConfig:     "setGatingConfig",
+		setNodeStatus:       "setNodeStatus",
+		getPeerNodeStatus:   "getPeerNodeStatus",
 	}
 )
 
@@ -76,6 +80,8 @@ func init() {
 			interface{}(findPeer).(fmt.Stringer).String():            findPeer,
 			interface{}(listPeers).(fmt.Stringer).String():           listPeers,
 			interface{}(setGatingConfig).(fmt.Stringer).String():     setGatingConfig,
+			interface{}(setNodeStatus).(fmt.Stringer).String():       setNodeStatus,
+			interface{}(getPeerNodeStatus).(fmt.Stringer).String():   getPeerNodeStatus,
 		}
 	}
 }

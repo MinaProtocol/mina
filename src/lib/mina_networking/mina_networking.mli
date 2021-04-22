@@ -87,11 +87,11 @@ module Rpcs : sig
       option
   end
 
-  module Get_telemetry_data : sig
-    module Telemetry_data : sig
+  module Get_node_status : sig
+    module Node_status : sig
       [%%versioned:
       module Stable : sig
-        module V1 : sig
+        module V2 : sig
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
             ; node_peer_id: Peer.Id.Stable.V1.t
@@ -107,14 +107,15 @@ module Rpcs : sig
             ; k_block_hashes_and_timestamps:
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
-            ; uptime_minutes: int }
+            ; uptime_minutes: int
+            ; block_height_opt: int option }
         end
       end]
     end
 
     type query = unit [@@deriving sexp, to_yojson]
 
-    type response = Telemetry_data.t Or_error.t [@@deriving to_yojson]
+    type response = Node_status.t Or_error.t [@@deriving to_yojson]
   end
 
   module Get_some_initial_peers : sig
@@ -147,8 +148,6 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
-    | Get_telemetry_data
-        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -185,7 +184,13 @@ val states :
 
 val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val add_peer : t -> Network_peer.Peer.t -> unit Deferred.Or_error.t
+val get_peer_node_status :
+     t
+  -> Network_peer.Peer.t
+  -> Rpcs.Get_node_status.Node_status.t Deferred.Or_error.t
+
+val add_peer :
+  t -> Network_peer.Peer.t -> seed:bool -> unit Deferred.Or_error.t
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -323,8 +328,8 @@ val create :
                    -> Rpcs.Get_ancestry.response Deferred.t)
   -> get_best_tip:(   Rpcs.Get_best_tip.query Envelope.Incoming.t
                    -> Rpcs.Get_best_tip.response Deferred.t)
-  -> get_telemetry_data:(   Rpcs.Get_telemetry_data.query Envelope.Incoming.t
-                         -> Rpcs.Get_telemetry_data.response Deferred.t)
+  -> get_node_status:(   Rpcs.Get_node_status.query Envelope.Incoming.t
+                      -> Rpcs.Get_node_status.response Deferred.t)
   -> get_transition_chain_proof:(   Rpcs.Get_transition_chain_proof.query
                                     Envelope.Incoming.t
                                  -> Rpcs.Get_transition_chain_proof.response

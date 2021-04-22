@@ -431,7 +431,8 @@ module Helper = struct
         ; gating_config: Set_gater_config.input
         ; seed_peers: string list
         ; max_connections: int
-        ; validation_queue_size: int }
+        ; validation_queue_size: int
+        ; mina_peer_exchange: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -488,7 +489,7 @@ module Helper = struct
     end
 
     module Add_peer = struct
-      type input = {multiaddr: string} [@@deriving yojson]
+      type input = {multiaddr: string; seed: bool} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -509,6 +510,22 @@ module Helper = struct
       type output = peer_info list [@@deriving yojson]
 
       let name = "listPeers"
+    end
+
+    module Set_node_status = struct
+      type input = {data: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "setNodeStatus"
+    end
+
+    module Get_peer_node_status = struct
+      type input = {peer_multiaddr: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "getPeerNodeStatus"
     end
 
     module Find_peer = struct
@@ -1139,7 +1156,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string [@@deriving compare]
+  type t = string [@@deriving compare, bin_io_unversioned]
 
   let to_string t = t
 
@@ -1164,6 +1181,17 @@ module Multiaddr = struct
         true
     | _ ->
         false
+
+  let of_file_contents ~(contents : string) : t list =
+    String.split ~on:'\n' contents
+    |> List.filter ~f:(fun s ->
+           if valid_as_peer s then true
+           else if String.is_empty s then false
+           else (
+             [%log' error (Logger.create ())]
+               "Invalid peer $peer found in peers list"
+               ~metadata:[("peer", `String s)] ;
+             false ) )
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -1304,6 +1332,20 @@ end
 
 let me (net : Helper.t) = Ivar.read net.me_keypair
 
+let set_node_status net data =
+  match%map Helper.do_rpc net (module Helper.Rpcs.Set_node_status) {data} with
+  | Ok "setNodeStatus success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: setNodeStatus got %s" v ()
+  | Error e ->
+      Error e
+
+let get_peer_node_status net peer =
+  Helper.do_rpc net
+    (module Helper.Rpcs.Get_peer_node_status)
+    {peer_multiaddr= Peer.to_multiaddr_string peer}
+
 let list_peers net =
   match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
   | Ok peers ->
@@ -1325,8 +1367,8 @@ let list_peers net =
 (* `on_new_peer` fires whenever a peer connects OR disconnects *)
 let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     ~metrics_port ~on_peer_connected ~on_peer_disconnected ~unsafe_no_trust_ip
-    ~flooding ~direct_peers ~peer_exchange ~seed_peers ~initial_gating_config
-    ~max_connections ~validation_queue_size =
+    ~flooding ~direct_peers ~peer_exchange ~mina_peer_exchange ~seed_peers
+    ~initial_gating_config ~max_connections ~validation_queue_size =
   net.Helper.peer_connected_callback
   <- Some (fun peer_id -> on_peer_connected (Peer.Id.unsafe_of_string peer_id)) ;
   net.Helper.peer_disconnected_callback
@@ -1346,6 +1388,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
       ; direct_peers= List.map ~f:Multiaddr.to_string direct_peers
       ; seed_peers= List.map ~f:Multiaddr.to_string seed_peers
       ; peer_exchange
+      ; mina_peer_exchange
       ; max_connections
       ; validation_queue_size
       ; gating_config=
@@ -1476,10 +1519,12 @@ let open_stream net ~protocol peer =
   | Error e ->
       Error e
 
-let add_peer net maddr =
+let add_peer net maddr ~seed =
   match%map
     Helper.(
-      do_rpc net (module Rpcs.Add_peer) {multiaddr= Multiaddr.to_string maddr})
+      do_rpc net
+        (module Rpcs.Add_peer)
+        {multiaddr= Multiaddr.to_string maddr; seed})
   with
   | Ok "addPeer success" ->
       Ok ()
@@ -1518,7 +1563,7 @@ let set_connection_gating_config net (config : connection_gating) =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~on_unexpected_termination ~logger ~conf_dir =
+let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1593,6 +1638,8 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
               CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
+      Child_processes.register_process ~termination_expected:true pids
+        subprocess Libp2p_helper ;
       let t : Helper.t =
         { subprocess
         ; conf_dir
@@ -1673,6 +1720,8 @@ let%test_module "coda network tests" =
       "This is a test. This is a test of the Outdoor Warning System. This is \
        only a test."
 
+    let pids = Child_processes.Termination.create_pid_table ()
+
     let setup_two_nodes network_id =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
@@ -1680,7 +1729,7 @@ let%test_module "coda network tests" =
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
-          ~conf_dir:a_tmp
+          ~conf_dir:a_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1688,7 +1737,7 @@ let%test_module "coda network tests" =
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
-          ~conf_dir:b_tmp
+          ~conf_dir:b_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1696,7 +1745,7 @@ let%test_module "coda network tests" =
       let%bind c =
         create
           ~logger:(Logger.extend logger [("name", `String "c")])
-          ~conf_dir:c_tmp
+          ~conf_dir:c_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1707,8 +1756,8 @@ let%test_module "coda network tests" =
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
         configure a ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_a
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
@@ -1725,8 +1774,8 @@ let%test_module "coda network tests" =
       [%log error] ~metadata:[("peer", `String seed_peer)] "Seed_peer: $peer" ;
       let%bind () =
         configure b ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_b
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150
@@ -1735,8 +1784,8 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       and () =
         configure c ~logger ~external_maddr:(List.hd_exn maddrs) ~me:kp_c
-          ~maddrs ~network_id ~peer_exchange:true ~direct_peers:[]
-          ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
+          ~maddrs ~network_id ~peer_exchange:true ~mina_peer_exchange:true
+          ~direct_peers:[] ~seed_peers:[seed_peer] ~on_peer_connected:Fn.ignore
           ~on_peer_disconnected:Fn.ignore ~flooding:false ~metrics_port:None
           ~unsafe_no_trust_ip:true ~max_connections:50
           ~validation_queue_size:150

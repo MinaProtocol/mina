@@ -35,7 +35,9 @@ module Variant = struct
     | `Public_key_format_not_valid
     | `No_options_provided
     | `Exception of string
-    | `Signature_invalid ]
+    | `Signature_invalid
+    | `Memo_invalid
+    | `Graphql_uri_not_set ]
   [@@deriving yojson, show, eq, to_enum, to_representatives]
 end
 
@@ -101,6 +103,10 @@ end = struct
         "Exception"
     | `Signature_invalid ->
         "Invalid signature"
+    | `Memo_invalid ->
+        "Invalid memo"
+    | `Graphql_uri_not_set ->
+        "No GraphQL URI set"
 
   let context = function
     | `Sql msg ->
@@ -161,6 +167,10 @@ end = struct
         Some (sprintf "Exception when processing request: %s" s)
     | `Signature_invalid ->
         None
+    | `Memo_invalid ->
+        None
+    | `Graphql_uri_not_set ->
+        None
 
   let retriable = function
     | `Sql _ ->
@@ -197,6 +207,10 @@ end = struct
         false
     | `Signature_invalid ->
         false
+    | `Memo_invalid ->
+        false
+    | `Graphql_uri_not_set ->
+        false
 
   (* Unlike message above, description can be updated whenever we see fit *)
   let description = function
@@ -232,8 +246,13 @@ end = struct
         "Your request is missing a signature."
     | `Signature_invalid ->
         "Your request has an invalid signature."
+    | `Memo_invalid ->
+        "Your request has an invalid memo."
     | `No_options_provided ->
         "Your request is missing options."
+    | `Graphql_uri_not_set ->
+        "This Rosetta instance is running without a GraphQL URI set but this \
+         request requires one."
     | `Exception _ ->
         "We encountered an internal exception while processing your request. \
          (That means you found a bug!)"

@@ -47,6 +47,7 @@ automation/keys/keypairs/*
 automation/keys/keysets/*
 automation/keys/api-keys/*
 automation/keys/testnet-keys/*
+automation/keys/libp2p/*
 automation/src/*.js
 automation/node_modules/
 
@@ -69,3 +70,9 @@ automation/daemon.json
 automation/discord_webhook_url.txt
 automation/*-accounts.csv
 automation/block_tree.gv.png
+automation/gcloud-keyfile.json
+automation/services/watchdog/check_libp2p/check_libp2p
+
+*.backup
+
+*.terraform.lock.hcl

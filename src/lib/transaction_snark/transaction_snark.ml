@@ -401,12 +401,10 @@ module Statement = struct
 end
 
 module Proof = struct
-  module T = Pickles.Proof.Make (Nat.N2) (Nat.N2)
-
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = T.t
+      type t = Pickles.Proof.Branching_2.Stable.V1.t
       [@@deriving version {asserted}, yojson, bin_io, compare, sexp]
 
       let to_latest = Fn.id
@@ -2933,10 +2931,10 @@ module Merge = struct
       ; Token_id.Checked.Assert.equal s2.next_available_token_after
           s.next_available_token_after ]
 
-  let rule self : _ Pickles.Inductive_rule.t =
+  let rule ~proof_level self : _ Pickles.Inductive_rule.t =
     let prev_should_verify =
-      match Genesis_constants.Proof_level.compiled with
-      | Full ->
+      match proof_level with
+      | Genesis_constants.Proof_level.Full ->
           true
       | _ ->
           false
@@ -2967,7 +2965,7 @@ let time lab f =
   printf "%s: %s\n%!" lab (Time.Span.to_string_hum (Time.diff stop start)) ;
   x
 
-let system ~constraint_constants =
+let system ~proof_level ~constraint_constants =
   time "Transaction_snark.system" (fun () ->
       Pickles.compile ~cache:Cache_dir.cache
         (module Statement.With_sok.Checked)
@@ -2980,7 +2978,7 @@ let system ~constraint_constants =
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants)
         ~choices:(fun ~self ->
-          [Base.rule ~constraint_constants; Merge.rule self] ) )
+          [Base.rule ~constraint_constants; Merge.rule ~proof_level self] ) )
 
 module Verification = struct
   module type S = sig
@@ -2993,6 +2991,8 @@ module Verification = struct
     val verification_key : Pickles.Verification_key.t Lazy.t
 
     val verify_against_digest : t -> bool
+
+    val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
   end
 end
 
@@ -3324,14 +3324,32 @@ let verify (ts : (t * _) list) ~key =
        key
        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
 
+let constraint_system_digests ~constraint_constants () =
+  let digest = Tick.R1CS_constraint_system.digest in
+  [ ( "transaction-merge"
+    , digest
+        Merge.(
+          Tick.constraint_system ~exposing:[Statement.With_sok.typ] (fun x ->
+              let open Tick in
+              let%bind x1 = exists Statement.With_sok.typ in
+              let%bind x2 = exists Statement.With_sok.typ in
+              main [x1; x2] x )) )
+  ; ( "transaction-base"
+    , digest
+        Base.(
+          Tick.constraint_system ~exposing:[Statement.With_sok.typ]
+            (main ~constraint_constants)) ) ]
+
 module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
+
+  val proof_level : Genesis_constants.Proof_level.t
 end) =
 struct
   open Inputs
 
   let tag, cache_handle, p, Pickles.Provers.[base; merge] =
-    system ~constraint_constants
+    system ~proof_level ~constraint_constants
 
   module Proof = (val p)
 
@@ -3491,6 +3509,9 @@ struct
       merge [(x12.statement, x12.proof); (x23.statement, x23.proof)] s
     in
     Ok {statement= s; proof}
+
+  let constraint_system_digests =
+    lazy (constraint_system_digests ~constraint_constants ())
 end
 
 let%test_module "transaction_snark" =
@@ -3499,6 +3520,8 @@ let%test_module "transaction_snark" =
       Genesis_constants.Constraint_constants.for_unit_tests
 
     let genesis_constants = Genesis_constants.for_unit_tests
+
+    let proof_level = Genesis_constants.Proof_level.for_unit_tests
 
     let consensus_constants =
       Consensus.Constants.create ~constraint_constants
@@ -3585,6 +3608,8 @@ let%test_module "transaction_snark" =
 
     include Make (struct
       let constraint_constants = constraint_constants
+
+      let proof_level = proof_level
     end)
 
     let state_body =
@@ -3796,7 +3821,7 @@ let%test_module "transaction_snark" =
       let acct2 = wallets.(j) in
       let open Snapp_command in
       let open Snapp_basic in
-      let new_state : _ Snapp_state.t =
+      let new_state : _ Snapp_state.V.t =
         Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
       in
       let data1 : Party.Predicated.Signed.t =
@@ -6070,19 +6095,3 @@ let%test_module "account timing check" =
       | _ ->
           false
   end )
-
-let constraint_system_digests ~constraint_constants () =
-  let digest = Tick.R1CS_constraint_system.digest in
-  [ ( "transaction-merge"
-    , digest
-        Merge.(
-          Tick.constraint_system ~exposing:[Statement.With_sok.typ] (fun x ->
-              let open Tick in
-              let%bind x1 = exists Statement.With_sok.typ in
-              let%bind x2 = exists Statement.With_sok.typ in
-              main [x1; x2] x )) )
-  ; ( "transaction-base"
-    , digest
-        Base.(
-          Tick.constraint_system ~exposing:[Statement.With_sok.typ]
-            (main ~constraint_constants)) ) ]
