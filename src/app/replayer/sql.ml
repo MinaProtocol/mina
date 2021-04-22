@@ -66,6 +66,26 @@ let find_command_ids_query s =
      |sql}
     s s
 
+module Block = struct
+  let state_hash_query =
+    Caqti_request.find Caqti_type.int Caqti_type.string
+      {sql| SELECT state_hash FROM blocks
+            WHERE id = ?
+      |sql}
+
+  let get_state_hash (module Conn : Caqti_async.CONNECTION) id =
+    Conn.find state_hash_query id
+
+  let unparented_query =
+    Caqti_request.collect Caqti_type.unit Caqti_type.int
+      {sql| SELECT id FROM blocks
+            WHERE parent_id IS NULL
+      |sql}
+
+  let get_unparented (module Conn : Caqti_async.CONNECTION) () =
+    Conn.collect_list unparented_query ()
+end
+
 module User_command_ids = struct
   let query =
     Caqti_request.collect Caqti_type.string Caqti_type.int
@@ -187,7 +207,7 @@ module Internal_command = struct
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
-  (* the transaction global slot is taken from the user command's parent block, mirroring
+  (* the transaction global slot is taken from the internal command's parent block, mirroring
      the call to Staged_ledger.apply in Block_producer
   *)
   let query =
@@ -278,9 +298,9 @@ module Epoch_data = struct
     Conn.find query_next_epoch_data_id state_hash
 end
 
-module Fork_block = struct
+module Parent_block = struct
   (* fork block is parent of block with the given state hash *)
-  let query_state_hash =
+  let query_parent_state_hash =
     Caqti_request.find Caqti_type.string Caqti_type.string
       {sql| SELECT parent.state_hash FROM blocks AS parent
 
@@ -291,9 +311,9 @@ module Fork_block = struct
             ON epoch_ledgers_block.parent_id = parent.id
       |sql}
 
-  let get_state_hash (module Conn : Caqti_async.CONNECTION)
+  let get_parent_state_hash (module Conn : Caqti_async.CONNECTION)
       epoch_ledgers_state_hash =
-    Conn.find query_state_hash epoch_ledgers_state_hash
+    Conn.find query_parent_state_hash epoch_ledgers_state_hash
 end
 
 module Balance = struct
