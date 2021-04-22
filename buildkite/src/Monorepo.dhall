@@ -31,7 +31,7 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
           ${Cmd.format trigger}
         fi;;
       stable)
-        echo "Triggering ${job.name} because buildkite this is a stable buildkite run"
+        echo "Triggering ${job.name} because this is a stable buildkite run"
         ${Cmd.format trigger};;
     esac
   ''
