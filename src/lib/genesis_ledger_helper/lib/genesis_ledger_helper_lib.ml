@@ -8,20 +8,20 @@ module Accounts = struct
         Runtime_config.Accounts.Single.t -> Mina_base.Account.t Or_error.t =
      fun t ->
       let open Or_error.Let_syntax in
-      let check_public_key pk =
-        Signature_lib.Public_key.of_base58_check_decompress_exn pk
-      in
       let%bind pk =
         match t.pk with
         | Some pk ->
-            Ok (check_public_key pk)
+            Ok (Signature_lib.Public_key.Compressed.of_base58_check_exn pk)
         | None ->
             Or_error.errorf
               !"No public key to create the account from runtime config \
                 %{sexp: Runtime_config.Accounts.Single.t}"
               t
       in
-      let delegate = Option.map ~f:check_public_key t.delegate in
+      let delegate =
+        Option.map ~f:Signature_lib.Public_key.Compressed.of_base58_check_exn
+          t.delegate
+      in
       let token_id =
         Option.value_map t.token ~default:Token_id.default
           ~f:Mina_base.Token_id.of_uint64
