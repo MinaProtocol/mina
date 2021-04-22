@@ -23,16 +23,8 @@ let public_key_compressed =
           (Public_key.Compressed.to_base58_check random) ;
         exit 1
       in
-      match Public_key.Compressed.of_base58_check s with
-      | Error e ->
-          error_string e
-      | Ok key -> (
-        match Public_key.decompress key with
-        | Some _ ->
-            key
-        | None ->
-            error_string (Error.of_string "Invalid key: failed to decompress")
-        ) )
+      try Public_key.of_base58_check_decompress_exn s
+      with e -> error_string (Error.of_exn e) )
 
 (* Hack to allow us to deprecate a value without needing to add an mli
  * just for this. We only want to have one "kind" of public key in the
