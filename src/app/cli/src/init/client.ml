@@ -890,9 +890,11 @@ let dump_keypair =
 
 let handle_export_ledger_response ~json = function
   | Error e ->
-      Daemon_rpcs.Client.print_rpc_error e
+      Daemon_rpcs.Client.print_rpc_error e ;
+      exit 1
   | Ok (Error e) ->
-      printf !"Ledger not found: %s\n" (Error.to_string_hum e)
+      printf !"Ledger not found: %s\n" (Error.to_string_hum e) ;
+      exit 1
   | Ok (Ok accounts) ->
       if json then (
         Yojson.Safe.pretty_print Format.std_formatter
@@ -900,7 +902,8 @@ let handle_export_ledger_response ~json = function
              (List.map accounts ~f:(fun a ->
                   Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
         printf "\n" )
-      else printf !"%{sexp:Account.t list}\n" accounts
+      else printf !"%{sexp:Account.t list}\n" accounts ;
+      return ()
 
 let export_ledger =
   let state_hash_flag =
@@ -954,7 +957,7 @@ let export_ledger =
                (* unreachable *)
                failwithf "Unknown ledger kind: %s" ledger_kind ()
          in
-         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+         response >>= handle_export_ledger_response ~json:(not plaintext) ))
 
 let hash_ledger =
   let open Command.Let_syntax in
