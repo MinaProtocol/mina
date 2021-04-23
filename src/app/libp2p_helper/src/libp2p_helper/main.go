@@ -712,9 +712,12 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				return
 			}
 
+			msgType := msgBytes[0]
+			_ = msgType // TODO: use message type
+
 			app.writeMsg(incomingMsgUpcall{
 				Upcall:    "incomingStreamMsg",
-				Data:      codaEncode(msgBytes),
+				Data:      codaEncode(msgBytes[1:]),
 				StreamIdx: idx,
 			})
 			app.writeMsg(streamReadCompleteUpcall{
@@ -818,8 +821,9 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 }
 
 type sendStreamMsgMsg struct {
-	StreamIdx int    `json:"stream_idx"`
-	Data      string `json:"data"`
+	StreamIdx   int    `json:"stream_idx"`
+	MessageType byte   `json:"msg_type"`
+	Data        string `json:"data"`
 }
 
 func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
@@ -830,6 +834,8 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badRPC(err)
 	}
+
+	data = append([]byte{cs.MessageType}, data...)
 
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
