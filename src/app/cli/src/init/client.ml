@@ -482,6 +482,9 @@ let batch_send_payments =
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
           let signer_pk = Public_key.compress keypair.public_key in
+          let receiver_pk =
+            Public_key.of_base58_check_decompress_exn receiver
+          in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
@@ -489,8 +492,7 @@ let batch_send_payments =
             ~body:
               (Payment
                  { source_pk= signer_pk
-                 ; receiver_pk=
-                     Public_key.Compressed.of_base58_check_exn receiver
+                 ; receiver_pk
                  ; token_id= Token_id.default
                  ; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
