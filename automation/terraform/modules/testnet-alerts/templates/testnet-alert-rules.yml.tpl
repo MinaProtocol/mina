@@ -48,6 +48,7 @@ groups:
 
   - alert: WatchdogNoNewLogs
     expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) > 0
+    for: 12m
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
