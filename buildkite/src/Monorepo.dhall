@@ -33,6 +33,9 @@ let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
       stable)
         echo "Triggering ${job.name} because this is a stable buildkite run"
         ${Cmd.format trigger};;
+      *)
+        echo "Invalid BUILDKITE_PIPELINE_TYPE: $BUILDKITE_PIPELINE_TYPE"
+        exit 1;;
     esac
   ''
 
