@@ -12,8 +12,8 @@ open Core_kernel
 open Import
 open Types
 open Pickles_types
+open Poly_types
 open Hlist
-open Pickles_types
 open Common
 open Backend
 module Backend = Backend
