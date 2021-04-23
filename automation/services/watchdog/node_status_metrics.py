@@ -63,7 +63,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
         print("Errored response: {}".format(error_str))
         err_others += 1
     except:
-      print("Errored response: {}".format(error_str))
+      print("Errored response: {}".format(p))
       err_others += 1
 
   num_peers = len(valid_resps)
