@@ -186,7 +186,8 @@ def collect_node_status(v1, namespace, seeds, pods):
     cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
     resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
 
-    add_resp(resp)
+    if not 'Error: Unable to connect to Mina Daemon.' in resp:
+      add_resp(resp)
 
   valid_resps = peer_table.values()
 
