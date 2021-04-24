@@ -1633,6 +1633,21 @@ module Types = struct
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
+    let import_account =
+      obj "ImportAccountPayload" ~fields:(fun _ ->
+          [ field "publicKey" ~doc:"The public key of the imported account"
+              ~typ:(non_null public_key)
+              ~args:Arg.[]
+              ~resolve:(fun _ -> fst)
+          ; field "alreadyImported"
+              ~doc:"True if the account had already been imported"
+              ~typ:(non_null bool)
+              ~args:Arg.[]
+              ~resolve:(fun _ -> snd)
+          ; field "success" ~typ:(non_null bool)
+              ~args:Arg.[]
+              ~resolve:(fun _ _ -> true) ] )
+
     let string_of_banned_status = function
       | Trust_system.Banned_status.Unbanned ->
           None
@@ -1825,8 +1840,9 @@ module Types = struct
         ~coerce:(fun key ->
           match key with
           | `String s ->
-              Public_key.Compressed.of_base58_check s
-              |> Result.map_error ~f:(fun _ -> "Could not decode public key.")
+              Result.try_with (fun () ->
+                  Public_key.of_base58_check_decompress_exn s )
+              |> Result.map_error ~f:(fun e -> Exn.to_string e)
           | _ ->
               Error "Invalid format for public key." )
 
@@ -2392,6 +2408,39 @@ module Mutations = struct
       ~args:Arg.[]
       ~resolve:reload_account_resolver
 
+  let import_account =
+    io_field "importAccount"
+      ~doc:"Reload tracked account information from disk"
+      ~typ:(non_null Types.Payload.import_account)
+      ~args:
+        Arg.
+          [ arg "path"
+              ~doc:
+                "Path to the wallet file, relative to the daemon's current \
+                 working directory."
+              ~typ:(non_null string)
+          ; arg "password" ~doc:"Password for the account to import"
+              ~typ:(non_null string) ]
+      ~resolve:(fun {ctx= coda; _} () privkey_path password ->
+        let open Deferred.Result.Let_syntax in
+        let password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
+        let%bind ({Keypair.public_key; _} as keypair) =
+          Secrets.Keypair.read ~privkey_path ~password
+          |> Deferred.Result.map_error ~f:Secrets.Privkey_error.to_string
+        in
+        let pk = Public_key.compress public_key in
+        let wallets = Mina_lib.wallets coda in
+        match Secrets.Wallets.check_locked wallets ~needle:pk with
+        | Some _ ->
+            return (pk, true)
+        | None ->
+            let%map.Async pk =
+              Secrets.Wallets.import_keypair wallets keypair ~password
+            in
+            Ok (pk, false) )
+
   let reset_trust_status =
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for all peers at a given IP address"
@@ -2904,6 +2953,7 @@ module Mutations = struct
     ; delete_account
     ; delete_wallet
     ; reload_accounts
+    ; import_account
     ; reload_wallets
     ; send_payment
     ; send_delegation
