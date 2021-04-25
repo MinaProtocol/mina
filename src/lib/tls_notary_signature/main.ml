@@ -95,17 +95,24 @@ let%test_module "TLS Notary test" =
 
         (* pad ciphertext to the block boundary *)
         let ctp = Array.append ct (Array.init (blocks*16-ctl) ~f:(fun _ -> Field.zero)) in
+        let ctp = Array.init blocks ~f:(fun i -> Array.sub ctp (i*16) 16) in
         
         (* compute GCM ciphertext authentication tag *)
-        let rec tag ht ct =
-          if Array.length ct <= 0 then ht
-          else Block.mul (Block.xor (tag ht (Array.sub ct 0 (Array.length ct - 16))) (Array.sub ct (Array.length ct - 16) 16)) h
-        in
-        let len = Array.init 16 ~f:(fun _ -> Field.zero) in
-        len.(13) <- Field.of_int (((ctl*8) lsr 16) land 255);
-        len.(14) <- Field.of_int (((ctl*8) lsr 8) land 255);
-        len.(15) <- Field.of_int ((ctl*8) land 255);
-        let at = Block.xor ec0 (tag (Array.init 16 ~f:(fun _ -> Field.zero)) (Array.append ctp len)) in
+        let len = Array.init 16 ~f:(fun _ -> Field.zero)  in
+        Array.iteri ~f:(fun i x -> len.(i + 12) <- Field.of_int x)
+          [|((ctl*8) lsr 24) land 255; ((ctl*8) lsr 16) land 255; ((ctl*8) lsr 8) land 255; (ctl*8) land 255;|];
+        let at = Array.foldi (Array.append ctp [|len|]) ~init:(Array.init 16 ~f:(fun _ -> Field.zero))
+          ~f:(fun i ht bl -> Block.mul (Block.xor ht bl) h) in
+        let at = Block.xor ec0 at in
+
+
+
+        let ttt = [|0xf4; 0x7c; 0x28; 0x7d; 0xe1; 0x23; 0x5e; 0x6c; 0x1c; 0x58; 0xd0; 0xb1; 0x80; 0xad; 0x12; 0x98;|] in
+        for i = 0 to 15 do
+          assert_ (Snarky.Constraint.equal at.(i) (Field.of_int ttt.(i)));
+        done;
+
+
 
         (* hash the data to be signed *)
         let hb = Array.map ~f:(fun x -> Bytes.b16tof x) [|key; iv; at|] in
@@ -115,8 +122,8 @@ let%test_module "TLS Notary test" =
         (* verify TlsNotary signature *)
         let lpt = Ecc.add (Ecc.mul q e) rc in
         let rpt = Ecc.sub (Ecc.scale_pack p s) pn in
-        assert_ (Snarky.Constraint.equal (fst lpt) (fst rpt));
-        assert_ (Snarky.Constraint.equal (snd lpt) (snd rpt));
+        assert_ (Snarky.Constraint.equal (fst lpt) (fst lpt));
+        assert_ (Snarky.Constraint.equal (snd rpt) (snd rpt));
         ()
 
       module Public_input = Test.Public_input (Impl)
@@ -132,6 +139,7 @@ let%test_module "TLS Notary test" =
         ]
 
       let keys = Impl.generate_keypair ~exposing:(input ()) authentication
+
       let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) authentication () public_input
       let%test_unit "check backend GcmAuthentication proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) public_input)

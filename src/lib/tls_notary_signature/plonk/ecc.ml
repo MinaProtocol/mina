@@ -164,19 +164,27 @@ module Constraints (Intf : Snark_intf.Run with type prover_state = unit and type
         if Bigint.test_bit bits 0 then one else zero
       ))
       in
-      Array.iteri state ~f:(fun i s ->
+      let state = Array.mapi state ~f:(fun i s ->
       (
-        s.xt <- xt;
-        s.yt <- yt;
         if i > 0 then
-        (
-          s.n2 <- state.(Int.(i-1)).n1;
-          s.xp <- state.(Int.(i-1)).xs;
-          s.yp <- state.(Int.(i-1)).ys;
-        )
-      ));
-      state.(0).xp <- xp;
-      state.(0).yp <- yp;
+        {
+          s with
+          xt = xt;
+          yt = yt;
+          n2 = state.(Int.(i-1)).n1;
+          xp = state.(Int.(i-1)).xs;
+          yp = state.(Int.(i-1)).ys;
+        }
+        else
+        {
+          s with
+          xt = xt;
+          yt = yt;
+          xp = xp;
+          yp = yp;
+        }
+      ))
+      in
       assert_
         [{
           basic= Plonk_constraint.T (EC_scale_pack { state }) ;

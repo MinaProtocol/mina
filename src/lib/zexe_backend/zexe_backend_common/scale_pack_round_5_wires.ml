@@ -3,7 +3,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {mutable xt: 'a; b: 'a; mutable yt: 'a; mutable xp: 'a; l1: 'a; mutable yp: 'a; xs: 'a; ys: 'a; n1: 'a; mutable n2: 'a}
+    type 'a t = {xt: 'a; b: 'a; yt: 'a; xp: 'a; l1: 'a; yp: 'a; xs: 'a; ys: 'a; n1: 'a; n2: 'a}
     [@@deriving sexp, fields, hlist]
   end
 end]
