@@ -1,0 +1,42 @@
+ui:
+  image: gcr.io/mina-mainnet-303900/leaderboard-ui:unsafe-baked-creds
+  port: 80
+
+cron:
+  image: gcr.io/mina-mainnet-303900/leaderboard-bot:unsafe-baked-creds
+
+email:
+  image: gcr.io/mina-mainnet-303900/leaderboard-bot:unsafe-baked-creds
+
+leaderboard:
+  enableLocalDaemon: true
+  enablePostgresDB: true
+
+fullnameOverride: "leaderboard"
+
+postgresql:
+  image:
+    pullPolicy: Always
+    registry: gcr.io
+    repository: mina-mainnet-303900/postgres
+    tag: unsafe-baked-creds
+  postgresqlPassword: "t8nnLEkiwkjH94TLseVs2Np"
+  postgresqlUsername: "leaderboard"
+  postgresqlDatabase: "leaderboard"
+  #postgresqlDataDir: "/data/pgdata"
+  fullnameOverride: "pg"
+  persistence:
+    enabled: true
+   # mountPath: "/data/"
+  securityContext:
+    enabled: true
+    fsGroup: 70
+    runAsUser: 70
+  volumePermissions:
+    securityContext:
+      enabled: true
+      fsGroup: 70
+      runAsUser: 70
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 70

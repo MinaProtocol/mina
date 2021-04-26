@@ -1,0 +1,15 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: "leaderboard-cron"
+spec:
+  schedule: "*/10 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: cron
+              image: {{ .Values.cron.image }}
+              imagePullPolicy: Always
+          restartPolicy: OnFailure
