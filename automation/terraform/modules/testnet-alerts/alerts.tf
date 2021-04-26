@@ -17,6 +17,7 @@ data "template_file" "testnet_alert_receivers" {
     pagerduty_alert_filter = var.pagerduty_alert_filter
 
     discord_alert_webhook = data.aws_secretsmanager_secret_version.discord_testnet_alerts_webhook.secret_string
+    slack_alert_webhook = data.aws_secretsmanager_secret_version.slack_testnet_alerts_webhook.secret_string
   }
 }
 
