@@ -47,7 +47,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Malleable_error.Let_syntax in
     let%bind nodes_and_responses =
       Malleable_error.List.map nodes ~f:(fun node ->
-          let%map response = Network.Node.get_peer_id ~logger node in
+          let%map response = Network.Node.must_get_peer_id ~logger node in
           (node, response) )
     in
     let nodes_by_peer_id =

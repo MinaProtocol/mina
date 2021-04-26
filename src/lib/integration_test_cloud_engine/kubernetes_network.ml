@@ -240,7 +240,7 @@ module Node = struct
       let%bind () = after (Time.Span.of_sec initial_delay_sec) in
       retry num_tries
 
-  let get_peer_id' ~logger t =
+  let get_peer_id ~logger t =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:
@@ -266,7 +266,10 @@ module Node = struct
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
-  let get_best_chain' ~logger t =
+  let must_get_peer_id ~logger t =
+    get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_best_chain ~logger t =
     let open Deferred.Or_error.Let_syntax in
     let query = Graphql.Best_chain.make () in
     let%bind result =
@@ -280,7 +283,10 @@ module Node = struct
         return
         @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
 
-  let get_balance' ~logger t ~account_id =
+  let must_get_best_chain ~logger t =
+    get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_balance ~logger t ~account_id =
     let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
@@ -307,9 +313,13 @@ module Node = struct
     | Some acc ->
         return (acc#balance)#total
 
+  let must_get_balance ~logger t ~account_id =
+    get_balance ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment' ?(retry_on_graphql_error = true) ~logger t ~sender
-      ~receiver ~amount ~fee =
+  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
+      ~amount ~fee =
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
@@ -347,19 +357,9 @@ module Node = struct
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
 
-  let get_peer_id ~logger t =
-    get_peer_id' ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  let get_best_chain ~logger t =
-    get_best_chain' ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  let get_balance ~logger t ~account_id =
-    get_balance' ~logger t ~account_id
-    |> Deferred.bind ~f:Malleable_error.or_hard_error
-
-  let send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver ~amount
-      ~fee =
-    send_payment' ?retry_on_graphql_error ~logger t ~sender ~receiver ~amount
+  let must_send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver
+      ~amount ~fee =
+    send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver ~amount
       ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
