@@ -8,7 +8,7 @@
 # swapped combined fee transfer balances
 
 # use the URI for your archive db
-ARCHIVE_URI=postgres://postgres@localhost:5432/archive
+ARCHIVE_URI=${ARCHIVE_URI:-postgres://postgres@localhost:5432/archive}
 
 SWAPPER=mina-swap-bad-balances
 
