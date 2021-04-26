@@ -27,7 +27,10 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
       label = "Prepare monorepo triage",
       key = "monorepo",
       target = Size.Small,
-      docker = Some Docker::{ image = (./Constants/ContainerImages.dhall).toolchainBase }
+      docker = Some Docker::{
+        image = (./Constants/ContainerImages.dhall).toolchainBase,
+        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_PIPELINE_TYPE"]
+      }
     }
   ]
 }
