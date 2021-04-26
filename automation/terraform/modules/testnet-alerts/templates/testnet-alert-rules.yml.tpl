@@ -16,6 +16,15 @@ groups:
       summary: "{{ $labels.testnet }} cluster nodes have crashed"
       description: "{{ $value }} Cluster nodes have crashed on network {{ $labels.testnet }}."
 
+  - alert: MultipleNodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total{testnet=~"mainnet|devnet2|snappnet"} < 600000) > 2
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "At least 3 nodes on {{ $lables.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+
   - alert: WatchdogNoNewLogs
     expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) > 0
     labels:
@@ -279,15 +288,6 @@ groups:
       severity: warning
     annotations:
       summary: "At least one of the nodes on {{ $lables.testnet }} restarted"
-      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
-
-  - alert: MultipleNodeRestarted
-    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total{testnet=~"mainnet|devnet2|snappnet"} < 600000) > 2
-    labels:
-      testnet: "{{ $labels.testnet }}"
-      severity: critical
-    annotations:
-      summary: "At least 3 nodes on {{ $lables.testnet }} restarted"
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: UnparentedBlocksObserved
