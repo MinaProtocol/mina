@@ -1,4 +1,5 @@
 open Integration_test_lib
+open Async_kernel
 open Core_kernel
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
@@ -42,10 +43,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [ {balance= block_producer_balance; timing= timing1}
         ; {balance= block_producer_balance; timing= timing2} ] }
 
-  let expected_error_event_reprs =
-    let open Network_pool.Transaction_pool in
-    [rejecting_command_for_reason_structured_events_repr]
-
   let run network t =
     let open Network in
     let open Malleable_error.Let_syntax in
@@ -63,22 +60,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let fee = Currency.Fee.of_int 10_000_000 in
     [%log info] "Sending payment, should succeed" ;
     let amount = Currency.Amount.of_int 300_000_000_000 in
-    let payment_or_error =
+    let%bind () =
       Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
         ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount ~fee
     in
-    let%bind () =
-      match%bind.Async_kernel.Deferred.Let_syntax payment_or_error with
-      | Ok {computation_result= _; soft_errors= _} ->
-          [%log info] "Payment succeeded, as expected" ;
-          Malleable_error.return ()
-      | Error {hard_error= {error; _}; soft_errors= _} ->
-          let err_str = Error.to_string_mach error in
-          [%log error] "Unexpected payment failure in GraphQL"
-            ~metadata:[("error", `String err_str)] ;
-          Malleable_error.of_string_hard_error_format
-            "Unexpected payment failure in GraphQL: %s" err_str
-    in
+    [%log info] "Payment succeeded, as expected" ;
     [%log info] "Waiting for payment to appear in breadcrumb" ;
     let%bind () =
       wait_for t
@@ -89,19 +75,21 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info]
       "Sending payment, should fail because of minimum balance violation" ;
     let amount' = Currency.Amount.of_int 600_000_000_000 in
-    let payment_or_error =
-      Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
-        ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount:amount' ~fee
-    in
     let%map () =
-      match%bind.Async_kernel.Deferred.Let_syntax payment_or_error with
-      | Ok {computation_result= _; soft_errors= _} ->
-          [%log error]
+      (* TODO: refactor this using new [expect] dsl when it's available *)
+      (* TODO: consider making [send_payment'] for a non-malleable version that we can assert on *)
+      let open Deferred.Let_syntax in
+      match%bind
+        Node.send_payment' ~retry_on_graphql_error:false ~logger sender_bp
+          ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount:amount'
+          ~fee
+      with
+      (* TODO: this currently relies on the returned error being a soft error and not a hard error *)
+      | Ok () ->
+          Malleable_error.soft_error_string ()
             "Payment succeeded, but expected it to fail because of a minimum \
-             balance violation" ;
-          Malleable_error.of_string_hard_error
-            "Payment succeeded when it should have failed"
-      | Error {hard_error= {error; _}; soft_errors= _} ->
+             balance violation"
+      | Error error ->
           (* expect GraphQL error due to insufficient funds *)
           let err_str = Error.to_string_mach error in
           let err_str_lowercase = String.lowercase err_str in
@@ -115,7 +103,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             [%log error]
               "Payment failed in GraphQL, but for unexpected reason: %s"
               err_str ;
-            Malleable_error.of_string_hard_error_format
+            Malleable_error.soft_error_format ()
               "Payment failed for unexpected reason: %s" err_str )
     in
     [%log info] "Payment test with timed accounts completed"

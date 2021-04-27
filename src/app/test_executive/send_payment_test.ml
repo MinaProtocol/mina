@@ -20,8 +20,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [{balance= "4000"; timing= Untimed}; {balance= "3000"; timing= Untimed}]
     ; num_snark_workers= 0 }
 
-  let expected_error_event_reprs = []
-
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in

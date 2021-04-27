@@ -22,8 +22,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; {balance= "1000"; timing= Untimed} ]
     ; num_snark_workers= 0 }
 
-  let expected_error_event_reprs = []
-
   let check_common_prefixes ?number_of_blocks:(n = 3) ~logger chains =
     let recent_chains =
       List.map chains ~f:(fun chain ->
