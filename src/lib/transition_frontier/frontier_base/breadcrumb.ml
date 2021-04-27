@@ -258,9 +258,10 @@ module For_tests = struct
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
           let status, account_location =
-            Ledger.get_or_create_account_exn ledger
+            Ledger.get_or_create_account ledger
               (Account.identifier sender_account)
               sender_account
+            |> Or_error.ok_exn
           in
           assert (status = `Existed) ;
           (Option.value_exn (Ledger.get ledger account_location)).nonce

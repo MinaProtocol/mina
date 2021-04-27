@@ -20,8 +20,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [{balance= "4000"; timing= Untimed}; {balance= "3000"; timing= Untimed}]
     ; num_snark_workers= 0 }
 
-  let expected_error_event_reprs = []
-
   let run network t =
     let open Malleable_error.Let_syntax in
     let logger = Logger.create () in
@@ -40,7 +38,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
-      Network.Node.send_payment ~logger sender_bp ~sender:sender_pub_key
+      Network.Node.must_send_payment ~logger sender_bp ~sender:sender_pub_key
         ~receiver:receiver_pub_key ~amount ~fee
     in
     (* confirm payment *)

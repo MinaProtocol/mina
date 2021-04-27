@@ -87,6 +87,14 @@ let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t
 (* cache of account keys *)
 let pk_tbl : (int, Account.key) Hashtbl.t = Int.Table.create ()
 
+let query_db pool ~f ~item =
+  match%bind Caqti_async.Pool.use f pool with
+  | Ok v ->
+      return v
+  | Error msg ->
+      failwithf "Error getting %s from db, error: %s" item
+        (Caqti_error.show msg) ()
+
 let pk_of_pk_id pool pk_id : Account.key Deferred.t =
   let open Deferred.Let_syntax in
   match Hashtbl.find pk_tbl pk_id with
@@ -127,24 +135,6 @@ let balance_of_id_and_pk_id pool ~id ~pk_id : Currency.Balance.t Deferred.t =
       failwithf
         "Error retrieving balance with id %d and public key %d, error: %s" id
         pk_id (Caqti_error.show msg) ()
-
-let state_hash_of_epoch_ledgers_state_hash ~logger pool
-    epoch_ledgers_state_hash =
-  match%map
-    Caqti_async.Pool.use
-      (fun db -> Sql.Fork_block.get_state_hash db epoch_ledgers_state_hash)
-      pool
-  with
-  | Ok state_hash ->
-      [%log info]
-        "Given epoch ledgers state hash %s, found state hash %s for fork block"
-        epoch_ledgers_state_hash state_hash ;
-      state_hash
-  | Error msg ->
-      failwithf
-        "Error retrieving state hash for fork block, given epoch ledgers \
-         state hash %s, error: %s"
-        epoch_ledgers_state_hash (Caqti_error.show msg) ()
 
 let epoch_staking_id_of_state_hash ~logger pool state_hash =
   match%map
@@ -200,48 +190,91 @@ let process_block_infos_of_state_hash ~logger pool state_hash ~f =
           ; ("state_hash", `String state_hash) ] ;
       exit 1
 
-let update_epoch_ledger ~logger ~name ledger epoch_ledger_opt epoch_ledger_hash
-    =
-  match epoch_ledger_opt with
-  | Some _ ->
-      (* already have this epoch ledger *)
-      epoch_ledger_opt
-  | None ->
-      let curr_ledger_hash = Ledger.merkle_root ledger in
-      if Frozen_ledger_hash.equal epoch_ledger_hash curr_ledger_hash then (
-        [%log info]
-          "Creating %s epoch ledger from ledger with Merkle root matching \
-           epoch ledger hash %s"
-          name
-          (Ledger_hash.to_string epoch_ledger_hash) ;
-        (* Ledger.copy doesn't actually copy, roll our own here *)
-        let accounts = Ledger.to_list ledger in
-        let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
-        List.iter accounts ~f:(fun account ->
-            let pk = Account.public_key account in
-            let token = Account.token account in
-            let account_id = Account_id.create pk token in
-            match
-              Ledger.get_or_create_account epoch_ledger account_id account
-            with
-            | Ok (`Added, _loc) ->
-                ()
-            | Ok (`Existed, _loc) ->
-                failwithf
-                  "When creating epoch ledger, account with public key %s and \
-                   token %s already existed"
-                  (Signature_lib.Public_key.Compressed.to_string pk)
-                  (Token_id.to_string token) ()
-            | Error err ->
-                Error.tag_arg err
-                  "When creating epoch ledger, error when adding account"
-                  (("public_key", pk), ("token", token))
-                  [%sexp_of:
-                    (string * Signature_lib.Public_key.Compressed.t)
-                    * (string * Token_id.t)]
-                |> Error.raise ) ;
-        Some epoch_ledger )
-      else None
+let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
+  let old_epoch_ledger_hash = Ledger.merkle_root epoch_ledger in
+  let epoch_ledger_hash = Ledger_hash.of_string epoch_ledger_hash in
+  let curr_ledger_hash = Ledger.merkle_root ledger in
+  if
+    (not (Frozen_ledger_hash.equal old_epoch_ledger_hash epoch_ledger_hash))
+    && Frozen_ledger_hash.equal epoch_ledger_hash curr_ledger_hash
+  then (
+    [%log info]
+      "Creating %s epoch ledger from ledger with Merkle root matching epoch \
+       ledger hash %s"
+      name
+      (Ledger_hash.to_string epoch_ledger_hash) ;
+    (* Ledger.copy doesn't actually copy, roll our own here *)
+    let accounts = Ledger.to_list ledger in
+    let epoch_ledger = Ledger.create ~depth:(Ledger.depth ledger) () in
+    List.iter accounts ~f:(fun account ->
+        let pk = Account.public_key account in
+        let token = Account.token account in
+        let account_id = Account_id.create pk token in
+        match Ledger.get_or_create_account epoch_ledger account_id account with
+        | Ok (`Added, _loc) ->
+            ()
+        | Ok (`Existed, _loc) ->
+            failwithf
+              "When creating epoch ledger, account with public key %s and \
+               token %s already existed"
+              (Signature_lib.Public_key.Compressed.to_string pk)
+              (Token_id.to_string token) ()
+        | Error err ->
+            Error.tag_arg err
+              "When creating epoch ledger, error when adding account"
+              (("public_key", pk), ("token", token))
+              [%sexp_of:
+                (string * Signature_lib.Public_key.Compressed.t)
+                * (string * Token_id.t)]
+            |> Error.raise ) ;
+    epoch_ledger )
+  else epoch_ledger
+
+let update_staking_epoch_data ~logger pool ~ledger ~last_block_id
+    ~staking_epoch_ledger =
+  let%bind state_hash =
+    query_db pool
+      ~f:(fun db -> Sql.Block.get_state_hash db last_block_id)
+      ~item:"block state hash for staking epoch data"
+  in
+  let%bind staking_epoch_id =
+    query_db pool
+      ~f:(fun db -> Sql.Epoch_data.get_staking_epoch_data_id db state_hash)
+      ~item:"staking epoch id"
+  in
+  let%map {epoch_ledger_hash; epoch_data_seed} =
+    query_db pool
+      ~f:(fun db -> Sql.Epoch_data.get_epoch_data db staking_epoch_id)
+      ~item:"staking epoch data"
+  in
+  let ledger =
+    update_epoch_ledger ~logger ~name:"staking" ~ledger
+      ~epoch_ledger:staking_epoch_ledger epoch_ledger_hash
+  in
+  (ledger, epoch_data_seed)
+
+let update_next_epoch_data ~logger pool ~ledger ~last_block_id
+    ~next_epoch_ledger =
+  let%bind state_hash =
+    query_db pool
+      ~f:(fun db -> Sql.Block.get_state_hash db last_block_id)
+      ~item:"block state hash for next epoch data"
+  in
+  let%bind next_epoch_id =
+    query_db pool
+      ~f:(fun db -> Sql.Epoch_data.get_next_epoch_data_id db state_hash)
+      ~item:"next epoch id"
+  in
+  let%map {epoch_ledger_hash; epoch_data_seed} =
+    query_db pool
+      ~f:(fun db -> Sql.Epoch_data.get_epoch_data db next_epoch_id)
+      ~item:"next epoch data"
+  in
+  let ledger =
+    update_epoch_ledger ~logger ~name:"next" ~ledger
+      ~epoch_ledger:next_epoch_ledger epoch_ledger_hash
+  in
+  (ledger, epoch_data_seed)
 
 (* cache of fee transfers for coinbases *)
 module Fee_transfer_key = struct
@@ -605,38 +638,12 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
       in
       [%log info] "Retrieving fork block state_hash" ;
       let%bind fork_state_hash =
-        state_hash_of_epoch_ledgers_state_hash ~logger pool
-          epoch_ledgers_state_hash
+        query_db pool
+          ~f:(fun db ->
+            Sql.Parent_block.get_parent_state_hash db epoch_ledgers_state_hash
+            )
+          ~item:"parent state hash of state hash"
       in
-      [%log info] "Loading epoch ledger data" ;
-      let%bind staking_id_from_epoch_ledgers_state_hash =
-        epoch_staking_id_of_state_hash ~logger pool epoch_ledgers_state_hash
-      in
-      let%bind next_id_from_epoch_ledgers_state_hash =
-        epoch_next_id_of_state_hash ~logger pool epoch_ledgers_state_hash
-      in
-      let%bind next_id_from_fork_state_hash =
-        epoch_next_id_of_state_hash ~logger pool fork_state_hash
-      in
-      let%bind { epoch_ledger_hash= staking_epoch_ledger_hash_str
-               ; epoch_data_seed= staking_seed_str } =
-        epoch_data_of_id ~logger pool staking_id_from_epoch_ledgers_state_hash
-      in
-      let%bind { epoch_ledger_hash= next_epoch_ledger_hash_str
-               ; epoch_data_seed= _ } =
-        epoch_data_of_id ~logger pool next_id_from_epoch_ledgers_state_hash
-      in
-      let%bind {epoch_ledger_hash= _; epoch_data_seed= next_seed_str} =
-        epoch_data_of_id ~logger pool next_id_from_fork_state_hash
-      in
-      let staking_epoch_ledger_hash =
-        Frozen_ledger_hash.of_string staking_epoch_ledger_hash_str
-      in
-      let staking_seed = Epoch_seed.of_string staking_seed_str in
-      let next_epoch_ledger_hash =
-        Frozen_ledger_hash.of_string next_epoch_ledger_hash_str
-      in
-      let next_seed = Epoch_seed.of_string next_seed_str in
       [%log info] "Loading block information using target state hash" ;
       let%bind block_ids =
         process_block_infos_of_state_hash ~logger pool fork_state_hash
@@ -768,14 +775,14 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
       (* apply commands in global slot, sequence order *)
       let rec apply_commands (internal_cmds : Sql.Internal_command.t list)
           (user_cmds : Sql.User_command.t list) ~last_global_slot
-          ~staking_epoch_ledger_opt ~next_epoch_ledger_opt =
-        let staking_epoch_ledger_opt =
-          update_epoch_ledger ~logger ~name:"staking" ledger
-            staking_epoch_ledger_opt staking_epoch_ledger_hash
+          ~last_block_id ~staking_epoch_ledger ~next_epoch_ledger =
+        let%bind staking_epoch_ledger, staking_seed =
+          update_staking_epoch_data ~logger pool ~last_block_id ~ledger
+            ~staking_epoch_ledger
         in
-        let next_epoch_ledger_opt =
-          update_epoch_ledger ~logger ~name:"next" ledger next_epoch_ledger_opt
-            next_epoch_ledger_hash
+        let%bind next_epoch_ledger, next_seed =
+          update_next_epoch_data ~logger pool ~last_block_id ~ledger
+            ~next_epoch_ledger
         in
         let log_ledger_hash_after_last_slot () =
           let _state_hash, expected_ledger_hash =
@@ -832,7 +839,8 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
                   ~continue_on_error ic ic2
               in
               apply_commands ics2 user_cmds ~last_global_slot:ic.global_slot
-                ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
+                ~last_block_id:ic.block_id ~staking_epoch_ledger
+                ~next_epoch_ledger
           | _ ->
               log_on_slot_change ic.global_slot ;
               let%bind () =
@@ -840,7 +848,8 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
                   ic
               in
               apply_commands ics user_cmds ~last_global_slot:ic.global_slot
-                ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
+                ~last_block_id:ic.block_id ~staking_epoch_ledger
+                ~next_epoch_ledger
         in
         (* choose command with least global slot, sequence number *)
         let cmp_ic_uc (ic : Sql.Internal_command.t) (uc : Sql.User_command.t) =
@@ -851,45 +860,24 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
         match (internal_cmds, user_cmds) with
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
-            let found_staking = Option.is_some staking_epoch_ledger_opt in
-            let found_next = Option.is_some next_epoch_ledger_opt in
-            let epoch_ledger_error () =
-              if continue_on_error then incr error_count
-              else Core_kernel.exit 1
-            in
-            ( match (found_staking, found_next) with
-            | false, false ->
-                [%log error]
-                  "Replayed all commands, found neither staking epoch ledger \
-                   nor next epoch ledger" ;
-                epoch_ledger_error ()
-            | false, true ->
-                [%log error]
-                  "Replayed all commands, did not find staking epoch ledger" ;
-                epoch_ledger_error ()
-            | true, false ->
-                [%log error]
-                  "Replayed all commands, did not find next epoch ledger" ;
-                epoch_ledger_error ()
-            | true, true ->
-                () ) ;
             Deferred.return
-              ( Option.value_exn staking_epoch_ledger_opt
-              , Option.value_exn next_epoch_ledger_opt )
+              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot ;
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~continue_on_error uc
             in
             apply_commands [] ucs ~last_global_slot:uc.global_slot
-              ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
+              ~last_block_id:uc.block_id ~staking_epoch_ledger
+              ~next_epoch_ledger
         | ic :: _, uc :: ucs when cmp_ic_uc ic uc > 0 ->
             log_on_slot_change uc.global_slot ;
             let%bind () =
               run_user_command ~logger ~pool ~ledger ~continue_on_error uc
             in
             apply_commands internal_cmds ucs ~last_global_slot:uc.global_slot
-              ~staking_epoch_ledger_opt ~next_epoch_ledger_opt
+              ~last_block_id:uc.block_id ~staking_epoch_ledger
+              ~next_epoch_ledger
         | ic :: ics, [] ->
             combine_or_run_internal_cmds ic ics
         | ic :: ics, uc :: _ when cmp_ic_uc ic uc < 0 ->
@@ -900,12 +888,25 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
                slot %Ld and sequence number %d"
               ic.global_slot ic.sequence_no ()
       in
+      let%bind unparented_ids =
+        query_db pool
+          ~f:(fun db -> Sql.Block.get_unparented db ())
+          ~item:"unparented ids"
+      in
+      let genesis_block_id =
+        match List.filter unparented_ids ~f:(Int.Set.mem block_ids) with
+        | [id] ->
+            id
+        | _ ->
+            failwith "Expected only the genesis block to have an unparented id"
+      in
       [%log info] "At genesis, ledger hash"
         ~metadata:[("ledger_hash", json_ledger_hash_of_ledger ledger)] ;
-      let%bind staking_epoch_ledger, next_epoch_ledger =
+      let%bind staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed
+          =
         apply_commands sorted_internal_cmds sorted_user_cmds
-          ~last_global_slot:0L ~staking_epoch_ledger_opt:None
-          ~next_epoch_ledger_opt:None
+          ~last_global_slot:0L ~last_block_id:genesis_block_id
+          ~staking_epoch_ledger:ledger ~next_epoch_ledger:ledger
       in
       if Int.equal !error_count 0 then (
         [%log info] "Writing output to $output_file"
@@ -915,11 +916,8 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
             ~target_epoch_ledgers_state_hash:
               input.target_epoch_ledgers_state_hash
             ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
-            ~ledger ~staking_epoch_ledger
-            ~staking_seed:(Epoch_seed.to_string staking_seed)
-            ~next_epoch_ledger
-            ~next_seed:(Epoch_seed.to_string next_seed)
-            input.genesis_ledger
+            ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger
+            ~next_seed input.genesis_ledger
           |> output_to_yojson |> Yojson.Safe.to_string
         in
         let%map writer = Async_unix.Writer.open_file output_file in
@@ -933,7 +931,7 @@ let () =
   Command.(
     run
       (let open Let_syntax in
-      Command.async ~summary:"Replay transactions from Coda archive"
+      Command.async ~summary:"Replay transactions from Mina archive"
         (let%map input_file =
            Param.flag "--input-file"
              ~doc:"file File containing the genesis ledger"

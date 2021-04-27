@@ -543,11 +543,18 @@ module Types = struct
             ~typ:(non_null @@ list @@ non_null work_statement)
             ~resolve:(fun _ w -> One_or_two.to_list w) ] )
 
-  let blockchain_state =
+  let blockchain_state :
+      ( 'context
+      , (Mina_state.Blockchain_state.Value.t * State_hash.t) option )
+      typ =
     obj "BlockchainState" ~fields:(fun _ ->
         [ field "date" ~typ:(non_null string) ~doc:(Doc.date "date")
             ~args:Arg.[]
-            ~resolve:(fun _ {Mina_state.Blockchain_state.Poly.timestamp; _} ->
+            ~resolve:(fun _ t ->
+              let blockchain_state, _ = t in
+              let timestamp =
+                Mina_state.Blockchain_state.timestamp blockchain_state
+              in
               Block_time.to_string timestamp )
         ; field "utcDate" ~typ:(non_null string)
             ~doc:
@@ -557,46 +564,84 @@ module Types = struct
                     time instead of genesis time."
                  "utcDate")
             ~args:Arg.[]
-            ~resolve:
-              (fun {ctx= coda; _}
-                   {Mina_state.Blockchain_state.Poly.timestamp; _} ->
+            ~resolve:(fun {ctx= coda; _} t ->
+              let blockchain_state, _ = t in
+              let timestamp =
+                Mina_state.Blockchain_state.timestamp blockchain_state
+              in
               Block_time.to_string_system_time
                 (Mina_lib.time_controller coda)
                 timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
-            ~resolve:
-              (fun _ {Mina_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
+            ~resolve:(fun _ t ->
+              let blockchain_state, _ = t in
+              let snarked_ledger_hash =
+                Mina_state.Blockchain_state.snarked_ledger_hash
+                  blockchain_state
+              in
               Frozen_ledger_hash.to_string snarked_ledger_hash )
         ; field "stagedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the staged ledger"
             ~args:Arg.[]
-            ~resolve:
-              (fun _ {Mina_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
+            ~resolve:(fun _ t ->
+              let blockchain_state, _ = t in
+              let staged_ledger_hash =
+                Mina_state.Blockchain_state.staged_ledger_hash blockchain_state
+              in
               Mina_base.Ledger_hash.to_string
-              @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
+              @@ Staged_ledger_hash.ledger_hash staged_ledger_hash )
+        ; field "stagedLedgerProofEmitted" ~typ:bool
+            ~doc:
+              "Block finished a staged ledger, and a proof was emitted from \
+               it and included into this block's proof. If there is no \
+               transition frontier available or no block found, this will \
+               return null."
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} t ->
+              let open Option.Let_syntax in
+              let _, hash = t in
+              let%bind frontier =
+                Mina_lib.transition_frontier coda
+                |> Pipe_lib.Broadcast_pipe.Reader.peek
+              in
+              match Transition_frontier.find frontier hash with
+              | None ->
+                  None
+              | Some b ->
+                  Some (Transition_frontier.Breadcrumb.just_emitted_a_proof b)
+              ) ] )
 
-  let protocol_state =
+  let protocol_state :
+      ( 'context
+      , (Filtered_external_transition.Protocol_state.t * State_hash.t) option
+      )
+      typ =
     let open Filtered_external_transition.Protocol_state in
     obj "ProtocolState" ~fields:(fun _ ->
         [ field "previousStateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the previous state"
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              State_hash.to_base58_check t.previous_state_hash )
+              let protocol_state, _ = t in
+              State_hash.to_base58_check protocol_state.previous_state_hash )
         ; field "blockchainState"
             ~doc:"State which is agnostic of a particular consensus algorithm"
             ~typ:(non_null blockchain_state)
             ~args:Arg.[]
-            ~resolve:(fun _ t -> t.blockchain_state)
+            ~resolve:(fun _ t ->
+              let protocol_state, state_hash = t in
+              (protocol_state.blockchain_state, state_hash) )
         ; field "consensusState"
             ~doc:
               "State specific to the Codaboros Proof of Stake consensus \
                algorithm"
             ~typ:(non_null @@ Consensus.Data.Consensus_state.graphql_type ())
             ~args:Arg.[]
-            ~resolve:(fun _ t -> t.consensus_state) ] )
+            ~resolve:(fun _ t ->
+              let protocol_state, _ = t in
+              protocol_state.consensus_state ) ] )
 
   let chain_reorganization_status : ('contxt, [`Changed] option) typ =
     enum "ChainReorganizationStatus"
@@ -1484,7 +1529,8 @@ module Types = struct
               State_hash.to_decimal_string hash )
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
-            ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
+            ~resolve:(fun _ {With_hash.data; With_hash.hash; _} ->
+              (data.protocol_state, hash) )
         ; field "protocolStateProof"
             ~typ:(non_null protocol_state_proof)
             ~doc:"Snark proof of blockchain state"
@@ -1586,6 +1632,21 @@ module Types = struct
               ~doc:"True when the reload was successful"
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
+
+    let import_account =
+      obj "ImportAccountPayload" ~fields:(fun _ ->
+          [ field "publicKey" ~doc:"The public key of the imported account"
+              ~typ:(non_null public_key)
+              ~args:Arg.[]
+              ~resolve:(fun _ -> fst)
+          ; field "alreadyImported"
+              ~doc:"True if the account had already been imported"
+              ~typ:(non_null bool)
+              ~args:Arg.[]
+              ~resolve:(fun _ -> snd)
+          ; field "success" ~typ:(non_null bool)
+              ~args:Arg.[]
+              ~resolve:(fun _ _ -> true) ] )
 
     let string_of_banned_status = function
       | Trust_system.Banned_status.Unbanned ->
@@ -1779,8 +1840,9 @@ module Types = struct
         ~coerce:(fun key ->
           match key with
           | `String s ->
-              Public_key.Compressed.of_base58_check s
-              |> Result.map_error ~f:(fun _ -> "Could not decode public key.")
+              Result.try_with (fun () ->
+                  Public_key.of_base58_check_decompress_exn s )
+              |> Result.map_error ~f:(fun e -> Exn.to_string e)
           | _ ->
               Error "Invalid format for public key." )
 
@@ -2346,6 +2408,39 @@ module Mutations = struct
       ~args:Arg.[]
       ~resolve:reload_account_resolver
 
+  let import_account =
+    io_field "importAccount"
+      ~doc:"Reload tracked account information from disk"
+      ~typ:(non_null Types.Payload.import_account)
+      ~args:
+        Arg.
+          [ arg "path"
+              ~doc:
+                "Path to the wallet file, relative to the daemon's current \
+                 working directory."
+              ~typ:(non_null string)
+          ; arg "password" ~doc:"Password for the account to import"
+              ~typ:(non_null string) ]
+      ~resolve:(fun {ctx= coda; _} () privkey_path password ->
+        let open Deferred.Result.Let_syntax in
+        let password =
+          Lazy.return (Deferred.return (Bytes.of_string password))
+        in
+        let%bind ({Keypair.public_key; _} as keypair) =
+          Secrets.Keypair.read ~privkey_path ~password
+          |> Deferred.Result.map_error ~f:Secrets.Privkey_error.to_string
+        in
+        let pk = Public_key.compress public_key in
+        let wallets = Mina_lib.wallets coda in
+        match Secrets.Wallets.check_locked wallets ~needle:pk with
+        | Some _ ->
+            return (pk, true)
+        | None ->
+            let%map.Async pk =
+              Secrets.Wallets.import_keypair wallets keypair ~password
+            in
+            Ok (pk, false) )
+
   let reset_trust_status =
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for all peers at a given IP address"
@@ -2858,6 +2953,7 @@ module Mutations = struct
     ; delete_account
     ; delete_wallet
     ; reload_accounts
+    ; import_account
     ; reload_wallets
     ; send_payment
     ; send_delegation

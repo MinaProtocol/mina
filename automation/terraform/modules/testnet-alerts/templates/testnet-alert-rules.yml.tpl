@@ -17,7 +17,7 @@ groups:
       description: "{{ $value }} Cluster nodes have crashed on network {{ $labels.testnet }}."
 
   - alert: MultipleNodeRestarted
-    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total{testnet=~"mainnet|devnet2|snappnet"} < 600000) > 2
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 600000) > 2
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -25,8 +25,39 @@ groups:
       summary: "At least 3 nodes on {{ $lables.testnet }} restarted"
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
+  - alert: HighDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 3
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 3 blocks that have been produced on a remote side chains in the last hour"
+      description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+      runbook: "https://www.notion.so/minaprotocol/HighDisconnectedBlocksPerHour-14da6dc40386439799eb2a573d077ecb"
+
+  - alert: HighOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root ${rule_filter} [${alert_timeframe}])) > 5
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 5 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+      runbook: "https://www.notion.so/minaprotocol/HighOldBlocksPerHour-134ba51aef4d482bb065ce7a02dd8fb7"
+
+  - alert: HighInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 3
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "{{ $labels.testnet }} has more than 3 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+      runbook: "https://www.notion.so/minaprotocol/HighInvalidProofPerHour-8ff715ccf9564b6e8a27b5a9dc65ef77"
+
   - alert: WatchdogNoNewLogs
     expr: max by (testnet) (Coda_watchdog_pods_with_no_new_logs) > 0
+    for: 12m
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -83,6 +114,17 @@ groups:
       description: "< 60% of nodes that are synced are on the same best tip for  network {{ $labels.testnet }} with rate of {{ $value }}."
       runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
 
+  - alert: O1NodesOutOfSync
+    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alert_timeframe}])) < 1
+    for: ${alert_evaluation_duration}
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last hour)"
+      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
+      runbook: "https://www.notion.so/minaprotocol/Nodes-out-of-sync-0f29c739e47c42e4adabe62a2a0316bd"
+
   - alert: LowPeerCount
     expr: min by (testnet) (Coda_Network_peers ${rule_filter}) < 3
     for: ${alert_evaluation_duration}
@@ -128,6 +170,7 @@ groups:
 
   - alert: NoCoinbaseInBlocks
     expr: min by (testnet) (Coda_Transition_frontier_best_tip_coinbase ${rule_filter}) < 1
+    for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: critical
@@ -261,14 +304,43 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/SeedListDown-d8d4e14609884c63a7086309336f3462"
 
   - alert: FewBlocksPerHour
-    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [${alert_timeframe}])) < 1
+    expr: min by (testnet) (increase(Coda_Transition_frontier_max_blocklength_observed ${rule_filter} [30m])) < 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
     annotations:
-      summary: "{{ $labels.testnet }} block production is critically low (there has been less than 1 block in the last hour)"
-      description: "{{ $value }} blocks have been produced on network {{ $labels.testnet }} in the last hour (according to some node)."
+      summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
+      description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
+
+
+  - alert: LowDisconnectedBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that have been produced on a remote side chains in the last hour"
+      description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+
+
+  - alert: LowOldBlocksPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_worse_than_root ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that are not selected over the root of our transition frontier in the last hour"
+      description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+
+  - alert: LowInvalidProofPerHour
+    expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
+      description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
 
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alert_timeframe}])) < 1
@@ -291,7 +363,7 @@ groups:
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: UnparentedBlocksObserved
-    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter})) > 1
+    expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 1
     for: ${alert_evaluation_duration}
     labels:
       testnet: "{{ $labels.testnet }}"
