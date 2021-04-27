@@ -25,6 +25,17 @@ like it, verifies ledger hashes and account balances after each
 transactions. If the archive database contains gaps or errors, the
 tool will not run successfully.
 
+To use the archive database, you can dump the database locally,
+and then run `psql` to make a copy that works with your local
+Postgresql installation. Example:
+```
+  kubectl exec -n mainnet archive-3-postgresql-0 -- pg_dump --no-owner --create \
+     postgres://postgres:localhost:5432/archive > archive_db.sql
+  sudo bash
+  su postgres
+  psql < archive_db.sql
+```
+
 In the future, we may extend the tool to allow providing a staking
 epoch ledger, rather than the genesis ledger, so that only recent
 epochs need to be checked, which will save time.
