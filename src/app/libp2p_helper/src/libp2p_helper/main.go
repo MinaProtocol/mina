@@ -447,8 +447,9 @@ func (m *listeningAddrsMsg) run(app *app) (interface{}, error) {
 }
 
 type publishMsg struct {
-	Topic string `json:"topic"`
-	Data  string `json:"data"`
+	Topic       string `json:"topic"`
+	MessageType byte   `json:"type`
+	Data        string `json:"data"`
 }
 
 func (t *publishMsg) run(app *app) (interface{}, error) {
@@ -463,6 +464,8 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badRPC(err)
 	}
+
+	data = append([]byte{t.MessageType}, data...)
 
 	var topic *pubsub.Topic
 	var has bool
@@ -553,10 +556,13 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationIgnore
 		}
 
+		msgType := msg.Data[0]
+		_ = msgType
+
 		app.writeMsg(validateUpcall{
 			Sender:     sender,
 			Expiration: deadline.UnixNano(),
-			Data:       codaEncode(msg.Data),
+			Data:       codaEncode(msg.Data[1:]),
 			Seqno:      seqno,
 			Upcall:     "validate",
 			Idx:        s.Subscription,
@@ -920,7 +926,7 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 
 type sendStreamMsgMsg struct {
 	StreamIdx   int    `json:"stream_idx"`
-	MessageType byte   `json:"msg_type"`
+	MessageType byte   `json:"type"`
 	Data        string `json:"data"`
 }
 
