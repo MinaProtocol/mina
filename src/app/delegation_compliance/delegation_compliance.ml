@@ -1122,11 +1122,11 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               return (infos, true)
             else return (payout_infos, updated_at_3500)
         in
-        let%bind staking_epoch_ledger, staking_seed =
+        let%bind staking_epoch_ledger, _staking_seed =
           update_staking_epoch_data ~logger pool ~last_block_id ~ledger
             ~staking_epoch_ledger
         in
-        let%bind next_epoch_ledger, next_seed =
+        let%bind next_epoch_ledger, _next_seed =
           update_next_epoch_data ~logger pool ~last_block_id ~ledger
             ~next_epoch_ledger
         in
@@ -1204,8 +1204,7 @@ let main ~input_file ~archive_uri ~payout_addresses () =
         match (internal_cmds, user_cmds) with
         | [], [] ->
             log_ledger_hash_after_last_slot () ;
-            Deferred.return
-              (staking_epoch_ledger, staking_seed, next_epoch_ledger, next_seed)
+            Deferred.return (updated_at_3500, epoch)
         | [], uc :: ucs ->
             log_on_slot_change uc.global_slot ;
             let%bind () = run_user_command ~logger ~pool ~ledger uc in
@@ -1244,15 +1243,17 @@ let main ~input_file ~archive_uri ~payout_addresses () =
         | _ ->
             failwith "Expected only the genesis block to have an unparented id"
       in
-      let%bind ( _staking_epoch_ledger
-               , _staking_seed
-               , _next_epoch_ledger
-               , _next_seed ) =
+      let%bind updated_at_3500, epoch =
         apply_commands sorted_internal_cmds sorted_user_cmds
           ~last_global_slot:0L ~last_epoch:Unsigned.UInt32.zero
           ~last_block_id:genesis_block_id ~staking_epoch_ledger:ledger
           ~next_epoch_ledger:ledger ~updated_at_3500:false ~payout_infos
       in
+      if not updated_at_3500 then
+        [%log warn]
+          "Did not update payouts at slot 3500 in epoch $epoch, some \
+           delinquencies may not have been logged"
+          ~metadata:[("epoch", Unsigned_extended.UInt32.to_yojson epoch)] ;
       [%log info] "Done" ;
       Deferred.unit
 
