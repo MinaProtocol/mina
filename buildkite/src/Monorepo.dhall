@@ -8,6 +8,7 @@ let Command = ./Command/Base.dhall
 let Docker = ./Command/Docker/Type.dhall
 let JobSpec = ./Pipeline/JobSpec.dhall
 let Pipeline = ./Pipeline/Dsl.dhall
+let PipelineMode = ./Pipeline/Mode.dhall
 let Size = ./Command/Size.dhall
 let triggerCommand = ./Pipeline/TriggerCommand.dhall
 
@@ -22,27 +23,26 @@ let jobs : List JobSpec.Type =
 let makeCommand : JobSpec.Type -> Cmd.Type = \(job : JobSpec.Type) ->
   let dirtyWhen = SelectFiles.compile job.dirtyWhen
   let trigger = triggerCommand "src/Jobs/${job.path}/${job.name}.dhall"
-  in Cmd.quietly ''
-    case "$BUILDKITE_PIPELINE_TYPE" in
-      ""|pull_request)
-        if cat _computed_diff.txt | egrep -q '${dirtyWhen}'; then
-          echo "Triggering ${job.name} for reason:"
-          cat _computed_diff.txt | egrep '${dirtyWhen}'
-          ${Cmd.format trigger}
-        fi;;
-      stable)
-        echo "Triggering ${job.name} because this is a stable buildkite run"
-        ${Cmd.format trigger};;
-      *)
-        echo "Invalid BUILDKITE_PIPELINE_TYPE: $BUILDKITE_PIPELINE_TYPE"
-        exit 1;;
-    esac
-  ''
+  let pipelineType : PipelineMode = env:BUILDKITE_PIPELINE_MODE ? PipelineMode.PullRequest
+  let pipelineHandlers = {
+    PullRequest = ''
+      if cat _computed_diff.txt | egrep -q '${dirtyWhen}'; then
+        echo "Triggering ${job.name} for reason:"
+        cat _computed_diff.txt | egrep '${dirtyWhen}'
+        ${Cmd.format trigger}
+      fi
+    '',
+    Stable = ''
+      echo "Triggering ${job.name} because this is a stable buildkite run"
+      ${Cmd.format trigger}
+    ''
+  }
+  in Cmd.quietly (merge pipelineHandlers pipelineType)
 
 let prefixCommands = [
   Cmd.run "git config --global http.sslCAInfo /etc/ssl/certs/ca-bundle.crt", -- Tell git where to find certs for https connections
   Cmd.run "git fetch origin", -- Freshen the cache
-  Cmd.run "([ -z \"$BUILDKITE_PIPELINE_TYPE\" ] || [ \"$BUILDKITE_PIPELINE_TYPE\" == pull_request ]) && (./buildkite/scripts/generate-diff.sh > _computed_diff.txt)"
+  Cmd.run "./buildkite/scripts/generate-diff.sh > _computed_diff.txt"
 ]
 
 let commands = Prelude.List.map JobSpec.Type Cmd.Type makeCommand jobs
@@ -62,7 +62,7 @@ in Pipeline.build Pipeline.Config::{
       target = Size.Small,
       docker = Some Docker::{
         image = (./Constants/ContainerImages.dhall).toolchainBase,
-        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_INCREMENTAL", "BUILDKITE_PIPELINE_TYPE"]
+        environment = ["BUILDKITE_AGENT_ACCESS_TOKEN", "BUILDKITE_INCREMENTAL"]
       }
     }
   ]
