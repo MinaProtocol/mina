@@ -39,25 +39,37 @@ struct
       soft_timeout= Option.value soft_timeout ~default:t.soft_timeout
     ; hard_timeout= Option.value hard_timeout ~default:t.hard_timeout }
 
-  let node_to_initialize node =
+  (* TODO: does this actually work if it's run twice? I think not *)
+  (*
+   * options:
+   *   - assume nodes have not yet initialized by the time we get here
+   *   - associate additional state to see when initialization was last checked
+   *)
+  let nodes_to_initialize nodes =
     let open Network_state in
     let check () (state : Network_state.t) =
       if
-        String.Map.find state.node_initialization (Node.id node)
-        |> Option.value ~default:false
+        List.for_all nodes ~f:(fun node ->
+            String.Map.find state.node_initialization (Node.id node)
+            |> Option.value ~default:false )
       then Predicate_passed
       else Predicate_continuation ()
     in
-    { description= Printf.sprintf "\"%s\" to initialize" (Node.id node)
+    let description =
+      nodes |> List.map ~f:Node.id |> String.concat ~sep:", "
+      |> Printf.sprintf "[%s] to initialize"
+    in
+    { description
     ; predicate= Network_state_predicate (check (), check)
     ; soft_timeout= Literal (Time.Span.of_min 10.0)
     ; hard_timeout= Literal (Time.Span.of_min 15.0) }
+
+  let node_to_initialize node = nodes_to_initialize [node]
 
   (* let blocks_produced ?(active_stake_percentage = 1.0) n = *)
   let blocks_to_be_produced n =
     let init state = Predicate_continuation state.blocks_generated in
     let check init_blocks_generated state =
-      Printf.printf !"%d\n%!" (state.blocks_generated - init_blocks_generated) ;
       if state.blocks_generated - init_blocks_generated >= n then
         Predicate_passed
       else Predicate_continuation init_blocks_generated
