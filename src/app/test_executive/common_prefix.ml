@@ -80,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "common_prefix test: collecting best chains from nodes" ;
     let%bind chains =
       Malleable_error.List.map block_producers ~f:(fun bp ->
-          Network.Node.get_best_chain ~logger bp )
+          Network.Node.must_get_best_chain ~logger bp )
     in
     [%log info]
       ~metadata:

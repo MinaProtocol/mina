@@ -61,7 +61,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "Sending payment, should succeed" ;
     let amount = Currency.Amount.of_int 300_000_000_000 in
     let%bind () =
-      Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
+      Node.must_send_payment ~retry_on_graphql_error:false ~logger sender_bp
         ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount ~fee
     in
     [%log info] "Payment succeeded, as expected" ;
@@ -80,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       (* TODO: consider making [send_payment'] for a non-malleable version that we can assert on *)
       let open Deferred.Let_syntax in
       match%bind
-        Node.send_payment' ~retry_on_graphql_error:false ~logger sender_bp
+        Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
           ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount:amount'
           ~fee
       with
