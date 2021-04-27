@@ -39,7 +39,7 @@ module Engine = struct
 
       val stop : t -> unit Malleable_error.t
 
-      val send_payment' :
+      val send_payment :
            ?retry_on_graphql_error:bool
         -> logger:Logger.t
         -> t
@@ -49,7 +49,7 @@ module Engine = struct
         -> fee:Currency.Fee.t
         -> unit Deferred.Or_error.t
 
-      val send_payment :
+      val must_send_payment :
            ?retry_on_graphql_error:bool
         -> logger:Logger.t
         -> t
@@ -63,12 +63,26 @@ module Engine = struct
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+
+      val must_get_balance :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Malleable_error.t
 
       val get_peer_id :
+           logger:Logger.t
+        -> t
+        -> (string * string list) Async_kernel.Deferred.Or_error.t
+
+      val must_get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
 
       val get_best_chain :
+        logger:Logger.t -> t -> string list Async_kernel.Deferred.Or_error.t
+
+      val must_get_best_chain :
         logger:Logger.t -> t -> string list Malleable_error.t
 
       val dump_archive_data :

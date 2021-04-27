@@ -38,7 +38,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let amount = Currency.Amount.of_int 200_000_000 in
     let fee = Currency.Fee.of_int 10_000_000 in
     let%bind () =
-      Network.Node.send_payment ~logger sender_bp ~sender:sender_pub_key
+      Network.Node.must_send_payment ~logger sender_bp ~sender:sender_pub_key
         ~receiver:receiver_pub_key ~amount ~fee
     in
     (* confirm payment *)
