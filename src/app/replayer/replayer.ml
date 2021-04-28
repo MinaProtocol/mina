@@ -191,13 +191,9 @@ let process_block_infos_of_state_hash ~logger pool state_hash ~f =
       exit 1
 
 let update_epoch_ledger ~logger ~name ~ledger ~epoch_ledger epoch_ledger_hash =
-  let old_epoch_ledger_hash = Ledger.merkle_root epoch_ledger in
   let epoch_ledger_hash = Ledger_hash.of_string epoch_ledger_hash in
   let curr_ledger_hash = Ledger.merkle_root ledger in
-  if
-    (not (Frozen_ledger_hash.equal old_epoch_ledger_hash epoch_ledger_hash))
-    && Frozen_ledger_hash.equal epoch_ledger_hash curr_ledger_hash
-  then (
+  if Frozen_ledger_hash.equal epoch_ledger_hash curr_ledger_hash then (
     [%log info]
       "Creating %s epoch ledger from ledger with Merkle root matching epoch \
        ledger hash %s"
