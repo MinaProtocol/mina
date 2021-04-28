@@ -7,10 +7,15 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
 
 COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+RUN chmod +x /healthcheck/utilities.sh
+
 COPY scripts/daemon-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-COPY ./entrypoints /entrypoint.d
+COPY scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
+RUN chmod +x /cron_job_dump_ledger.sh
+
+COPY ./auxiliary_entrypoints /entrypoint.d
 
 # Dependencies
 RUN apt-get -y update && \

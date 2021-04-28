@@ -8,10 +8,12 @@ shopt -s nullglob
 # Print all commands executed if DEBUG mode enabled
 [ -n "${DEBUG:-""}" ] && set -x
 
+INPUT_ARGS = ( "$@" )
+
 # Attempt to execute or source custom entrypoint scripts accordingly
 for script in /entrypoint.d/*; do
   if [ -x "$script" ]; then
-    "$script" "$@"
+    "$script" $INPUT_ARGS
   else
     source "$script"
   fi
@@ -25,7 +27,7 @@ touch .mina-config/mina-best-tip.log
 
 while true; do
   rm -f /root/.mina-config/.mina-lock
-  mina "$@" 2>&1 >mina.log &
+  mina $INPUT_ARGS 2>&1 >mina.log &
   coda_pid=$!
 
   tail -q -f mina.log -f .mina-config/mina-prover.log -f .mina-config/mina-verifier.log -f .mina-config/mina-best-tip.log &
