@@ -65,7 +65,7 @@ def pods_with_no_new_logs(v1, namespace, nodes_with_no_new_logs):
         name = pod.metadata.name
         recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=one_hour, container=mina_containers[0].name)
         if len(recent_logs) == 0:
-          print("Pod {} has no logs for the last thirty minutes".format(name))
+          print("Pod {} has no logs for the last hour".format(name))
           count += 1
     else:
       print("Pod {} is not running. Phase: {}, reason: {}".format(pod.metadata.name,pod.status.phase, pod.status.reason))
