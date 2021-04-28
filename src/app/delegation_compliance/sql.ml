@@ -370,18 +370,18 @@ module Block = struct
   let get_unparented (module Conn : Caqti_async.CONNECTION) () =
     Conn.collect_list unparented_query ()
 
-  let creator_slot_bounds_count_query =
-    Caqti_request.find
+  let creator_slot_bounds_query =
+    Caqti_request.collect
       Caqti_type.(tup3 int int64 int64)
       Caqti_type.int
-      {sql| SELECT COUNT (id) FROM blocks
+      {sql| SELECT id FROM blocks
             WHERE creator_id = $1
             AND global_slot >= $2 AND global_slot <= $3
       |sql}
 
-  let get_creator_count_in_slot_bounds (module Conn : Caqti_async.CONNECTION)
-      ~creator ~low_slot ~high_slot =
-    Conn.find creator_slot_bounds_count_query (creator, low_slot, high_slot)
+  let get_block_ids_for_creator_in_slot_bounds
+      (module Conn : Caqti_async.CONNECTION) ~creator ~low_slot ~high_slot =
+    Conn.collect_list creator_slot_bounds_query (creator, low_slot, high_slot)
 end
 
 module Parent_block = struct
