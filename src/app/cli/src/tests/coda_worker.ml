@@ -426,7 +426,8 @@ module T = struct
               ; validation_queue_size= 150
               ; peer_exchange= true
               ; mina_peer_exchange= true
-              ; keypair= Some libp2p_keypair }
+              ; keypair= Some libp2p_keypair
+              ; all_peers_seen_metric= false }
           in
           let net_config =
             { Mina_networking.Config.logger
