@@ -615,13 +615,13 @@ let slot_bounds_for_epoch epoch =
   let high_slot = pred (mul (succ epoch) slots_per_epoch) |> to_int64 in
   (low_slot, high_slot)
 
-let num_blocks_produced_in_epoch pool delegatee_id epoch =
+let block_ids_in_epoch pool delegatee_id epoch =
   let low_slot, high_slot = slot_bounds_for_epoch epoch in
   query_db pool
     ~f:(fun db ->
-      Sql.Block.get_creator_count_in_slot_bounds db ~creator:delegatee_id
-        ~low_slot ~high_slot )
-    ~item:"blocks count for delegatee in epoch"
+      Sql.Block.get_block_ids_for_creator_in_slot_bounds db
+        ~creator:delegatee_id ~low_slot ~high_slot )
+    ~item:"block ids for delegatee in epoch"
 
 let get_payment_total_in_bounds ~low_slot ~high_slot
     (payments : Sql.User_command.t list) =
@@ -943,10 +943,10 @@ let main ~input_file ~archive_uri ~payout_addresses () =
         (List.length sorted_internal_cmds) ;
       let update_to_3500_allocation_opt ~last_global_slot ~payout_info =
         (* at or past slot 3500, check any unmet obligation from previous epoch
-         error if we can't meet the obligation, and zero to_3500 allocation
-         if unmet obligation was 0, zero to_3500 allocation
-         if nonzero. take what we need to meet the obligation, allocate rest to to_3500 allocation
-      *)
+           error if we can't meet the obligation, and zero to_3500 allocation
+           if unmet obligation was 0, zero to_3500 allocation
+           if nonzero. take what we need to meet the obligation, allocate rest to to_3500 allocation
+        *)
         let epoch, _slot = epoch_and_offset_of_global_slot last_global_slot in
         let json_of_float float = `String (Float.to_string float) in
         let new_allocation_opt =
@@ -1010,7 +1010,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
           compute_delegated_stake staking_epoch_ledger payout_info.delegatee
         in
         let delegated_amount =
-          get_account_balance_as_amount ledger payout_info.payout_pk
+          get_account_balance_as_amount staking_epoch_ledger
+            payout_info.payout_pk
         in
         let fraction_of_stake =
           Float.round_decimal ~decimal_digits:5
@@ -1024,7 +1025,13 @@ let main ~input_file ~archive_uri ~payout_addresses () =
         in
         let%bind num_blocks_produced =
           (* blocks produced in previous epoch *)
-          num_blocks_produced_in_epoch pool payout_info.delegatee_id prev_epoch
+          let%map creator_block_ids =
+            block_ids_in_epoch pool payout_info.delegatee_id prev_epoch
+          in
+          let filtered_block_ids =
+            List.filter creator_block_ids ~f:(Int.Set.mem block_ids)
+          in
+          List.length filtered_block_ids
         in
         let payout_obligation =
           Float.( * )
@@ -1057,8 +1064,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               total
           | Some amount ->
               (* some/all of the payments to slot 3500 allocated to earlier obligation,
-             remaining amount we can use here, and any payments after slot 3500
-          *)
+                 remaining amount we can use here, and any payments after slot 3500
+              *)
               Float.( + ) amount
                 ( get_payment_total_past_3500_in_epoch prev_epoch
                     payout_info.payments
@@ -1091,8 +1098,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
           ~staking_epoch_ledger ~next_epoch_ledger ~last_block_id
           ~updated_at_3500 ~payout_infos =
         (* we don't necessarily see commands at slot 0 and 3500 of this epoch
-         track last epoch, detect when we're in a new epoch
-      *)
+           track last epoch, detect when we're in a new epoch
+        *)
         let epoch, offset = epoch_and_offset_of_global_slot last_global_slot in
         let%bind payout_infos, updated_at_3500 =
           let is_new_epoch =
@@ -1177,8 +1184,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                  && String.equal ic.type_ "fee_transfer"
                  && String.equal ic.type_ ic2.type_ ->
               (* combining situation 2
-             two fee transfer commands with same global slot, sequence number
-          *)
+                 two fee transfer commands with same global slot, sequence number
+              *)
               log_on_slot_change ic.global_slot ;
               let%bind () =
                 apply_combined_fee_transfer ~logger ~pool ~ledger ic ic2
