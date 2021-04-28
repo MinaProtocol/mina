@@ -16,6 +16,13 @@ type input =
 
 type delegation_source = O1 | Mina_foundation [@@deriving yojson]
 
+(* unmet obligation is payout obligation from previous epoch
+
+   to_3500_allocation_opt is the amount from current epoch
+    through slot 3500 that can be used to satisfy this epoch's
+    obligation; None means all payments in this epoch
+    can be so used
+*)
 type payout_information =
   { payout_pk: Public_key.Compressed.t
   ; payout_id: int
@@ -23,8 +30,8 @@ type payout_information =
   ; delegatee: Public_key.Compressed.t
   ; delegatee_id: int
   ; payments: Sql.User_command.t list
-  ; mutable unmet_obligation: float
-  ; mutable to_3500_allocation_opt: float option }
+  ; mutable unmet_obligation: Currency.Amount.t
+  ; mutable to_3500_allocation_opt: Currency.Amount.t option }
 [@@deriving yojson]
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
@@ -774,13 +781,44 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               Public_key.Compressed.to_base58_check delegatee
             in
             let%bind delegatee_id = pk_id_of_pk pool delegatee_str in
-            let%bind payments_from_delegatee =
+            let%bind payments_from_delegatee_raw =
               query_db pool
                 ~f:(fun db ->
                   Sql.User_command.run_payments_by_source_and_receiver db
                     ~source_id:delegatee_id ~receiver_id:payout_id )
                 ~item:"payments from delegatee"
             in
+            let compare_by_global_slot p1 p2 =
+              let open Sql.User_command in
+              Int64.compare p1.global_slot p2.global_slot
+            in
+            (* only payments in canonical chain *)
+            let payments_from_delegatee =
+              List.filter payments_from_delegatee_raw ~f:(fun payment ->
+                  Int.Set.mem block_ids payment.block_id )
+              |> List.sort ~compare:compare_by_global_slot
+            in
+            let payment_amount_and_slot (user_cmd : Sql.User_command.t) =
+              `Assoc
+                [ ( "amount"
+                  , Option.value_map user_cmd.amount ~default:`Null
+                      ~f:(fun amt ->
+                        `String
+                          ( Int64.to_string amt |> Currency.Amount.of_string
+                          |> Currency.Amount.to_formatted_string ) ) )
+                ; ( "global_slot"
+                  , `String (Int64.to_string user_cmd.global_slot) ) ]
+            in
+            [%log info]
+              "Direct payments from delegatee $delegatee to payout address \
+               $payout_addr"
+              ~metadata:
+                [ ("delegatee", Public_key.Compressed.to_yojson delegatee)
+                ; ("payout_addr", Public_key.Compressed.to_yojson payout_pk)
+                ; ( "payments"
+                  , `List
+                      (List.map payments_from_delegatee
+                         ~f:payment_amount_and_slot) ) ] ;
             let%bind coinbase_receiver_ids =
               match%map
                 Caqti_async.Pool.use
@@ -797,12 +835,15 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                      the delegatee %s is the block creator, %s"
                     delegatee_str (Caqti_error.show err) ()
             in
-            let%map payments_from_coinbase_receivers =
+            let%map payments_by_coinbase_receivers =
               match%map
                 Archive_lib.Processor.deferred_result_list_fold
                   coinbase_receiver_ids ~init:[]
                   ~f:(fun accum coinbase_receiver_id ->
-                    let%map payments =
+                    let%bind cb_receiver_pk =
+                      pk_of_pk_id pool coinbase_receiver_id
+                    in
+                    let%map payments_raw =
                       query_db pool
                         ~f:(fun db ->
                           Sql.User_command.run_payments_by_source_and_receiver
@@ -814,7 +855,13 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                               payment address"
                              coinbase_receiver_id)
                     in
-                    Ok (payments @ accum) )
+                    let payments =
+                      (* only payments in canonical chain *)
+                      List.filter payments_raw ~f:(fun payment ->
+                          Int.Set.mem block_ids payment.block_id )
+                      |> List.sort ~compare:compare_by_global_slot
+                    in
+                    Ok ((cb_receiver_pk, payments) :: accum) )
               with
               | Ok payments ->
                   payments
@@ -823,13 +870,32 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                     "Error getting payments from coinbase receivers: %s"
                     (Caqti_error.show err) ()
             in
-            let all_payments =
-              payments_from_delegatee @ payments_from_coinbase_receivers
+            if not (List.is_empty payments_by_coinbase_receivers) then
+              [%log info]
+                "Payments from delegatee $delegatee to payout address \
+                 $payout_addr via a coinbase receiver"
+                ~metadata:
+                  [ ("delegatee", Public_key.Compressed.to_yojson delegatee)
+                  ; ("payout_addr", Public_key.Compressed.to_yojson payout_pk)
+                  ; ( "payments_via_coinbase_receivers"
+                    , `List
+                        (List.map payments_by_coinbase_receivers
+                           ~f:(fun (cb_receiver, payments) ->
+                             `Assoc
+                               [ ( "coinbase_receiver"
+                                 , Public_key.Compressed.to_yojson cb_receiver
+                                 )
+                               ; ( "payments"
+                                 , `List
+                                     (List.map payments
+                                        ~f:payment_amount_and_slot) ) ] )) ) ] ;
+            let payments_from_coinbase_receivers =
+              (* to check compliance, don't need to know the payment source *)
+              List.concat_map payments_by_coinbase_receivers
+                ~f:(fun (_cb_receiver, payments) -> payments)
             in
-            (* discard payments not in canonical chain *)
             let payments =
-              List.filter all_payments ~f:(fun uc ->
-                  Int.Set.mem block_ids uc.block_id )
+              payments_from_delegatee @ payments_from_coinbase_receivers
             in
             { payout_pk
             ; payout_id
@@ -837,7 +903,7 @@ let main ~input_file ~archive_uri ~payout_addresses () =
             ; delegatee
             ; delegatee_id
             ; payments
-            ; unmet_obligation= Float.zero
+            ; unmet_obligation= Currency.Amount.zero
             ; to_3500_allocation_opt= None } )
       in
       [%log info] "Loading user command ids" ;
@@ -941,6 +1007,9 @@ let main ~input_file ~archive_uri ~payout_addresses () =
       [%log info] "Applying %d user commands and %d internal commands"
         (List.length sorted_user_cmds)
         (List.length sorted_internal_cmds) ;
+      let json_of_amount amount =
+        `String (Currency.Amount.to_formatted_string amount)
+      in
       let update_to_3500_allocation_opt ~last_global_slot ~payout_info =
         (* at or past slot 3500, check any unmet obligation from previous epoch
            error if we can't meet the obligation, and zero to_3500 allocation
@@ -948,9 +1017,11 @@ let main ~input_file ~archive_uri ~payout_addresses () =
            if nonzero. take what we need to meet the obligation, allocate rest to to_3500 allocation
         *)
         let epoch, _slot = epoch_and_offset_of_global_slot last_global_slot in
-        let json_of_float float = `String (Float.to_string float) in
         let new_allocation_opt =
-          if Float.equal payout_info.unmet_obligation 0.0 then (
+          if
+            Currency.Amount.equal payout_info.unmet_obligation
+              Currency.Amount.zero
+          then (
             [%log info]
               "At slot 3500 in current epoch, no unmet obligation from \
                delegatee to payout address from previous epoch"
@@ -965,39 +1036,51 @@ let main ~input_file ~archive_uri ~payout_addresses () =
           else
             let total_to_3500 =
               get_payment_total_to_3500_in_epoch epoch payout_info.payments
-              |> Int64.to_float
+              |> Int64.to_string |> Currency.Amount.of_string
             in
             let base_metadata =
               [ ( "delegatee"
                 , Public_key.Compressed.to_yojson payout_info.delegatee )
               ; ( "payout_addr"
                 , Public_key.Compressed.to_yojson payout_info.payout_pk )
-              ; ("unmet_obligation", json_of_float payout_info.unmet_obligation)
+              ; ( "unmet_obligation"
+                , json_of_amount payout_info.unmet_obligation )
               ; ("epoch", Unsigned_extended.UInt32.to_yojson epoch)
-              ; ("total_to_slot_3500", json_of_float total_to_3500) ]
+              ; ("total_to_slot_3500", json_of_amount total_to_3500) ]
             in
-            if Float.( < ) total_to_3500 payout_info.unmet_obligation then (
+            if Currency.Amount.( < ) total_to_3500 payout_info.unmet_obligation
+            then (
               [%log error]
                 "DELINQUENCY (reward specification): Delegatee $delegatee has \
-                 not met obligations to payout address $payout_addr"
+                 not met obligations of the previous epoch to payout address \
+                 $payout_addr by slot 3500 of this epoch"
                 ~metadata:base_metadata ;
               (* can't satisfy unmet obligation, nothing to contribute to current epoch obligation *)
-              Some Float.zero )
-            else if Float.equal payout_info.unmet_obligation total_to_3500 then (
+              Some Currency.Amount.zero )
+            else if
+              Currency.Amount.equal payout_info.unmet_obligation total_to_3500
+            then (
               [%log info]
                 "Payments to slot 3500 in this epoch equal to unmet \
                  obligation from previous epoch"
                 ~metadata:base_metadata ;
-              Some Float.zero )
+              Some Currency.Amount.zero )
             else
               let new_allocation =
-                Float.( - ) total_to_3500 payout_info.unmet_obligation
+                match
+                  Currency.Amount.( - ) total_to_3500
+                    payout_info.unmet_obligation
+                with
+                | Some amt ->
+                    amt
+                | None ->
+                    failwith "Underflow when computing allocation to slot 3500"
               in
               [%log info]
                 "Allocating some amount to slot 3500 to unmet obligation from \
                  previous epoch"
                 ~metadata:
-                  ( ("allocation_from_total", json_of_float new_allocation)
+                  ( ("allocation_from_total", json_of_amount new_allocation)
                   :: base_metadata ) ;
               Some new_allocation
         in
@@ -1037,6 +1120,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
           Float.( * )
             (Float.of_int num_blocks_produced)
             payout_obligation_per_block
+          |> Float.to_string_hum ~decimals:9
+          |> Currency.Amount.of_string
         in
         let payout_in_prev_epoch =
           match payout_info.to_3500_allocation_opt with
@@ -1044,11 +1129,11 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               (* all payments in previous epoch *)
               let total =
                 get_payment_total_in_epoch prev_epoch payout_info.payments
-                |> Float.of_int64
+                |> Int64.to_string |> Currency.Amount.of_string
               in
               if
-                Float.( > ) payout_obligation Float.zero
-                && Float.equal Float.zero total
+                Currency.Amount.( > ) payout_obligation Currency.Amount.zero
+                && Currency.Amount.equal Currency.Amount.zero total
               then
                 [%log error]
                   "DELINQUENCY (payment frequency): Delegatee $delegatee made \
@@ -1062,17 +1147,29 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                       , Public_key.Compressed.to_yojson payout_info.payout_pk
                       ) ] ;
               total
-          | Some amount ->
-              (* some/all of the payments to slot 3500 allocated to earlier obligation,
-                 remaining amount we can use here, and any payments after slot 3500
-              *)
-              Float.( + ) amount
+          | Some amount -> (
+            (* some/all of the payments to slot 3500 allocated to earlier obligation,
+               remaining amount we can use here, and any payments after slot 3500
+            *)
+            match
+              Currency.Amount.( + ) amount
                 ( get_payment_total_past_3500_in_epoch prev_epoch
                     payout_info.payments
-                |> Float.of_int64 )
+                |> Int64.to_string |> Currency.Amount.of_string )
+            with
+            | Some sum ->
+                sum
+            | None ->
+                failwith "Overflow when computing payout in previous epoch" )
         in
         let unmet_obligation =
-          Float.max 0.0 (Float.( - ) payout_obligation payout_in_prev_epoch)
+          match
+            Currency.Amount.( - ) payout_obligation payout_in_prev_epoch
+          with
+          | Some diff ->
+              diff
+          | None ->
+              Currency.Amount.zero
         in
         [%log info]
           "Delegation information for payout address $payout_addr in epoch \
@@ -1081,14 +1178,15 @@ let main ~input_file ~archive_uri ~payout_addresses () =
             [ ("epoch", Unsigned_extended.UInt32.to_yojson prev_epoch)
             ; ( "delegatee"
               , Public_key.Compressed.to_yojson payout_info.delegatee )
+            ; ("num_blocks_produced", `Int num_blocks_produced)
             ; ( "payout_addr"
               , Public_key.Compressed.to_yojson payout_info.payout_pk )
             ; ( "delegatee_delegated_stake"
               , Currency.Amount.to_yojson delegated_stake )
             ; ("delegator_fraction_of_stake", `Float fraction_of_stake)
-            ; ("payout_obligation", `Float payout_obligation)
-            ; ("payout_in_prev_epoch", `Float payout_in_prev_epoch)
-            ; ("unmet_obligation", `Float unmet_obligation) ] ;
+            ; ("payout_obligation", json_of_amount payout_obligation)
+            ; ("payout_in_prev_epoch", json_of_amount payout_in_prev_epoch)
+            ; ("unmet_obligation", json_of_amount unmet_obligation) ] ;
         payout_info.unmet_obligation <- unmet_obligation ;
         return payout_info
       in
