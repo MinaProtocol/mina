@@ -697,7 +697,11 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 		for {
 			length, err := readLEB128ToUint64(r)
 			if err == io.EOF {
-				continue
+				app.writeMsg(streamReadCompleteUpcall{
+					Upcall:    "streamReadComplete",
+					StreamIdx: idx,
+				})
+				return
 			} else if err != nil {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
@@ -708,6 +712,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			}
 
 			if length == 0 {
+				// should this be an error? we could be skipping null bytes like this?
 				continue
 			}
 
@@ -726,10 +731,6 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			app.writeMsg(incomingMsgUpcall{
 				Upcall:    "incomingStreamMsg",
 				Data:      codaEncode(msgBytes),
-				StreamIdx: idx,
-			})
-			app.writeMsg(streamReadCompleteUpcall{
-				Upcall:    "streamReadComplete",
 				StreamIdx: idx,
 			})
 		}
