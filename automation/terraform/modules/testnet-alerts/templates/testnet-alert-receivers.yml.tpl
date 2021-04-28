@@ -12,15 +12,13 @@ receivers:
       - api_url: ${slack_alert_webhook}
         channel: '#testnet-warnings'
         send_resolved: true
-        title: |-
-          [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .Labels.testnet }} for {{ .CommonLabels.job }}
         text: >-
+          {{ if eq .Status "firing" }}All active alerts:{{ end }}
+
           {{ range .Alerts -}}
-          *Alert:* {{ .Labels.alertname }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
-
-          *Description:* {{ .Annotations.description }}
-
-          *Runbook:* {{ if .Annotations.runbook }} `{{ .Annotations.runbook }}` {{ end }}
+            *Alert:* {{ .Labels.alertname }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
+            *Description:* {{ .Annotations.description }}
+            *Runbook:* {{ if .Annotations.runbook }} `{{ .Annotations.runbook }}` {{ end }}
 
           {{ end }}
 
