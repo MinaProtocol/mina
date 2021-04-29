@@ -81,8 +81,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Deferred.Let_syntax in
       match%bind
         Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
-          ~sender_pub_key ~receiver_pub_key ~amount:amount'
-          ~fee
+          ~sender_pub_key ~receiver_pub_key ~amount:amount' ~fee
       with
       (* TODO: this currently relies on the returned error being a soft error and not a hard error *)
       | Ok () ->

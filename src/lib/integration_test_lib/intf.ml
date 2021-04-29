@@ -279,7 +279,7 @@ module Dsl = struct
     type t
 
     val section : string -> 'a Malleable_error.t -> 'a Malleable_error.t
-    
+
     val network_state : t -> Network_state.t
 
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t

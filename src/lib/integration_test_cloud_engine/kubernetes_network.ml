@@ -324,7 +324,9 @@ module Node = struct
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let open Deferred.Or_error.Let_syntax in
-    let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender_pub_key in
+    let sender_pk_str =
+      Signature_lib.Public_key.Compressed.to_string sender_pub_key
+    in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
@@ -357,10 +359,10 @@ module Node = struct
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
 
-  let must_send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key ~receiver_pub_key
-      ~amount ~fee =
-    send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key ~receiver_pub_key ~amount
-      ~fee
+  let must_send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
+    send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
