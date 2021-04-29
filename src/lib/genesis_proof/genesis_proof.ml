@@ -247,3 +247,23 @@ let create_values_no_proof (t : Inputs.t) =
         (let txn, b = blockchain_snark_state t in
          Lazy.force (digests txn b))
   ; proof_data= None }
+
+let to_inputs (t : t) : Inputs.t =
+  { runtime_config= t.runtime_config
+  ; constraint_constants= t.constraint_constants
+  ; proof_level= t.proof_level
+  ; genesis_constants= t.genesis_constants
+  ; genesis_ledger= t.genesis_ledger
+  ; genesis_epoch_data= t.genesis_epoch_data
+  ; consensus_constants= t.consensus_constants
+  ; protocol_state_with_hash= t.protocol_state_with_hash
+  ; constraint_system_digests=
+      ( if Lazy.is_val t.constraint_system_digests then
+        Some (Lazy.force t.constraint_system_digests)
+      else None )
+  ; blockchain_proof_system_id=
+      ( match t.proof_data with
+      | Some {blockchain_proof_system_id; _} ->
+          Some blockchain_proof_system_id
+      | None ->
+          None ) }

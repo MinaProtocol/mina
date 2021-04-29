@@ -987,6 +987,22 @@ module Data = struct
 
       let genesis_winner = keypairs.(0)
 
+      let genesis_stake_proof :
+          genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> Stake_proof.t =
+       fun ~genesis_epoch_ledger ->
+        let pk, sk = genesis_winner in
+        let dummy_sparse_ledger =
+          Mina_base.Sparse_ledger.of_ledger_subset_exn
+            (Lazy.force genesis_epoch_ledger)
+            [Mina_base.(Account_id.create pk Token_id.default)]
+        in
+        { delegator= 0
+        ; delegator_pk= pk
+        ; coinbase_receiver_pk= pk
+        ; ledger= dummy_sparse_ledger
+        ; producer_private_key= sk
+        ; producer_public_key= Public_key.decompress_exn pk }
+
       let handler :
              constraint_constants:Genesis_constants.Constraint_constants.t
           -> genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t
@@ -2596,6 +2612,8 @@ module Data = struct
 
   module Prover_state = struct
     include Stake_proof
+
+    let genesis_data = Vrf.Precomputed.genesis_stake_proof
 
     let precomputed_handler = Vrf.Precomputed.handler
 
