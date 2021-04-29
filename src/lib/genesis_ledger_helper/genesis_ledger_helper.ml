@@ -554,73 +554,23 @@ module Genesis_proof = struct
     ; constraint_system_digests= None
     ; genesis_constants }
 
-  let blockchain_snark_state (inputs : Genesis_proof.Inputs.t) :
-      (module Transaction_snark.S)
-      * (module Blockchain_snark.Blockchain_snark_state.S) =
-    let module T = Transaction_snark.Make (struct
-      let constraint_constants = inputs.constraint_constants
-
-      let proof_level = inputs.proof_level
-    end) in
-    let module B = Blockchain_snark.Blockchain_snark_state.Make (struct
-      let tag = T.tag
-
-      let constraint_constants = inputs.constraint_constants
-
-      let proof_level = inputs.proof_level
-    end) in
-    ((module T), (module B))
-
-  let generate b (inputs : Genesis_proof.Inputs.t) =
+  let generate (inputs : Genesis_proof.Inputs.t) =
     match inputs.proof_level with
     | Genesis_constants.Proof_level.Full ->
-        let (module T), (module B) =
-          match b with Some b -> b | None -> blockchain_snark_state inputs
-        in
-        let computed_values =
-          Genesis_proof.create_values
-            (module T)
-            (module B)
-            { genesis_ledger= inputs.genesis_ledger
-            ; genesis_epoch_data= inputs.genesis_epoch_data
-            ; runtime_config= inputs.runtime_config
-            ; proof_level= inputs.proof_level
-            ; blockchain_proof_system_id= Some (Lazy.force B.Proof.id)
-            ; constraint_system_digests= None
-            ; protocol_state_with_hash= inputs.protocol_state_with_hash
-            ; genesis_constants= inputs.genesis_constants
-            ; consensus_constants= inputs.consensus_constants
-            ; constraint_constants= inputs.constraint_constants }
-        in
-        computed_values
-    | _ ->
-        let constraint_system_digests =
-          match inputs.constraint_system_digests with
-          | Some digests ->
-              lazy digests
-          | None ->
-              lazy
-                (let (module T), (module B) =
-                   match b with
-                   | Some b ->
-                       b
-                   | None ->
-                       blockchain_snark_state inputs
-                 in
-                 Lazy.force @@ Genesis_proof.digests (module T) (module B))
-        in
         Deferred.return
-          { Genesis_proof.runtime_config= inputs.runtime_config
-          ; constraint_constants= inputs.constraint_constants
-          ; proof_level= inputs.proof_level
-          ; genesis_constants= inputs.genesis_constants
-          ; genesis_ledger= inputs.genesis_ledger
-          ; genesis_epoch_data= inputs.genesis_epoch_data
-          ; consensus_constants= inputs.consensus_constants
-          ; protocol_state_with_hash= inputs.protocol_state_with_hash
-          ; constraint_system_digests
-          ; blockchain_proof_system_id= Pickles.Verification_key.Id.dummy ()
-          ; genesis_proof= Mina_base.Proof.blockchain_dummy }
+        @@ Genesis_proof.create_values_no_proof
+             { genesis_ledger= inputs.genesis_ledger
+             ; genesis_epoch_data= inputs.genesis_epoch_data
+             ; runtime_config= inputs.runtime_config
+             ; proof_level= inputs.proof_level
+             ; blockchain_proof_system_id= None
+             ; constraint_system_digests= None
+             ; protocol_state_with_hash= inputs.protocol_state_with_hash
+             ; genesis_constants= inputs.genesis_constants
+             ; consensus_constants= inputs.consensus_constants
+             ; constraint_constants= inputs.constraint_constants }
+    | _ ->
+        Deferred.return (Genesis_proof.create_values_no_proof inputs)
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -648,7 +598,9 @@ module Genesis_proof = struct
       | Some id, _ ->
           (None, id)
       | None, Full ->
-          let ((_, (module B)) as b) = blockchain_snark_state inputs in
+          let ((_, (module B)) as b) =
+            Genesis_proof.blockchain_snark_state inputs
+          in
           (Some b, Lazy.force B.Proof.id)
       | _ ->
           (None, Pickles.Verification_key.Id.dummy ())
@@ -660,13 +612,17 @@ module Genesis_proof = struct
       match Precomputed_values.compiled with
       | Some _ when not proof_needed ->
           true
-      | Some compiled ->
+      | Some compiled -> (
           let compiled = Lazy.force compiled in
-          let compiled_base_hash =
-            Base_hash.create ~id:compiled.blockchain_proof_system_id
-              ~state_hash:compiled.protocol_state_with_hash.hash
-          in
-          Base_hash.equal base_hash compiled_base_hash
+          match compiled.proof_data with
+          | Some proof_data ->
+              let compiled_base_hash =
+                Base_hash.create ~id:proof_data.blockchain_proof_system_id
+                  ~state_hash:compiled.protocol_state_with_hash.hash
+              in
+              Base_hash.equal base_hash compiled_base_hash
+          | None ->
+              false )
       | None ->
           false
     in
@@ -681,7 +637,7 @@ module Genesis_proof = struct
                   | Some b ->
                       b
                   | None ->
-                      blockchain_snark_state inputs )
+                      Genesis_proof.blockchain_snark_state inputs )
               in
               let constraint_system_digests =
                 match inputs.constraint_system_digests with
@@ -710,8 +666,8 @@ module Genesis_proof = struct
                   ; consensus_constants= inputs.consensus_constants
                   ; protocol_state_with_hash= inputs.protocol_state_with_hash
                   ; constraint_system_digests
-                  ; blockchain_proof_system_id
-                  ; genesis_proof }
+                  ; proof_data= Some {blockchain_proof_system_id; genesis_proof}
+                  }
                 , file )
           | Error err ->
               [%log error] "Could not load genesis proof from $path: $error"
@@ -729,8 +685,9 @@ module Genesis_proof = struct
         let compiled =
           Lazy.force (Option.value_exn Precomputed_values.compiled)
         in
+        let proof_data = Option.value_exn compiled.proof_data in
         let compiled_base_hash =
-          Base_hash.create ~id:compiled.blockchain_proof_system_id
+          Base_hash.create ~id:proof_data.blockchain_proof_system_id
             ~state_hash:compiled.protocol_state_with_hash.hash
         in
         [%log info]
@@ -750,11 +707,10 @@ module Genesis_proof = struct
           ; consensus_constants= inputs.consensus_constants
           ; protocol_state_with_hash= inputs.protocol_state_with_hash
           ; constraint_system_digests= compiled.constraint_system_digests
-          ; blockchain_proof_system_id= compiled.blockchain_proof_system_id
-          ; genesis_proof= compiled.genesis_proof }
+          ; proof_data= Some proof_data }
         in
         let%map () =
-          match%map store ~filename values.genesis_proof with
+          match%map store ~filename proof_data.genesis_proof with
           | Ok () ->
               [%log info] "Compile-time genesis proof written to $path"
                 ~metadata:[("path", `String filename)]
@@ -772,18 +728,23 @@ module Genesis_proof = struct
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
           ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
-        let%bind values = generate b inputs in
+        let%bind values = generate inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
-          match%map store ~filename values.genesis_proof with
-          | Ok () ->
-              [%log info] "New genesis proof written to $path"
-                ~metadata:[("path", `String filename)]
-          | Error err ->
-              [%log warn] "Genesis proof could not be written to $path: $error"
-                ~metadata:
-                  [ ("path", `String filename)
-                  ; ("error", Error_json.error_to_yojson err) ]
+          match values.proof_data with
+          | None ->
+              return ()
+          | Some proof_data -> (
+              match%map store ~filename proof_data.genesis_proof with
+              | Ok () ->
+                  [%log info] "New genesis proof written to $path"
+                    ~metadata:[("path", `String filename)]
+              | Error err ->
+                  [%log warn]
+                    "Genesis proof could not be written to $path: $error"
+                    ~metadata:
+                      [ ("path", `String filename)
+                      ; ("error", Error_json.error_to_yojson err) ] )
         in
         Ok (values, filename)
     | None ->
