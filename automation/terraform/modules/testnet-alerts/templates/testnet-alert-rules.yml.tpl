@@ -16,6 +16,15 @@ groups:
       summary: "{{ $labels.testnet }} cluster nodes have crashed"
       description: "{{ $value }} Cluster nodes have crashed on network {{ $labels.testnet }}."
 
+  - alert: MultipleNodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 600000) > 2
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "At least 3 nodes on {{ $lables.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+
   - alert: HighDisconnectedBlocksPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 3
     labels:
@@ -343,6 +352,15 @@ groups:
       summary: "{{ $labels.testnet }} rate of archival of network blocks in Postgres DB is lower than expected"
       description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
+  - alert: NodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 360000) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "At least one of the nodes on {{ $lables.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: UnparentedBlocksObserved
     expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 1
