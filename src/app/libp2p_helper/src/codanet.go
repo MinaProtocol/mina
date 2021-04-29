@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
+	"math"
 	"math/rand"
 	gonet "net"
 	"path"
+	"sync"
 	"time"
 
 	dsb "github.com/ipfs/go-ds-badger"
@@ -23,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -237,9 +239,54 @@ type Helper struct {
 	GatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
+	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
 	NodeStatus        string
 	pxDiscoveries     chan peer.AddrInfo
+}
+
+type MessageStats struct {
+	min   uint64
+	avg   uint64
+	max   uint64
+	total uint64
+	sync.RWMutex
+}
+
+func (ms *MessageStats) UpdateMetrics(val uint64) {
+	ms.Lock()
+	defer ms.Unlock()
+	if ms.max < val {
+		ms.max = val
+	}
+
+	if ms.min > val {
+		ms.min = val
+	}
+
+	ms.total++
+	if ms.avg == 0 {
+		ms.avg = val
+	} else {
+		ms.avg = (ms.avg*(ms.total-1) + val) / ms.total
+	}
+}
+
+type safeStats struct {
+	Min float64
+	Max float64
+	Avg float64
+}
+
+func (ms *MessageStats) GetStats() *safeStats {
+	ms.RLock()
+	defer ms.RUnlock()
+
+	return &safeStats{
+		Min: float64(ms.min),
+		Max: float64(ms.max),
+		Avg: float64(ms.avg),
+	}
 }
 
 // this type implements the ConnectionGating interface
@@ -650,6 +697,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
+		MsgStats:          &MessageStats{min: math.MaxUint64},
 		Seeds:             seeds,
 		pxDiscoveries:     nil,
 	}
@@ -658,7 +706,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		return h, nil
 	}
 
-	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections * 3)
+	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections*3)
 	for w := 0; w < numPxConnectionWorkers; w++ {
 		go h.pxConnectionWorker()
 	}
