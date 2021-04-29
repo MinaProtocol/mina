@@ -1007,9 +1007,6 @@ let main ~input_file ~archive_uri ~payout_addresses () =
       [%log info] "Applying %d user commands and %d internal commands"
         (List.length sorted_user_cmds)
         (List.length sorted_internal_cmds) ;
-      let json_of_amount amount =
-        `String (Currency.Amount.to_formatted_string amount)
-      in
       let update_to_3500_allocation_opt ~last_global_slot ~payout_info =
         (* at or past slot 3500, check any unmet obligation from previous epoch
            error if we can't meet the obligation, and zero to_3500 allocation
@@ -1044,9 +1041,10 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               ; ( "payout_addr"
                 , Public_key.Compressed.to_yojson payout_info.payout_pk )
               ; ( "unmet_obligation"
-                , json_of_amount payout_info.unmet_obligation )
+                , Currency.Amount.to_yojson payout_info.unmet_obligation )
               ; ("epoch", Unsigned_extended.UInt32.to_yojson epoch)
-              ; ("total_to_slot_3500", json_of_amount total_to_3500) ]
+              ; ("total_to_slot_3500", Currency.Amount.to_yojson total_to_3500)
+              ]
             in
             if Currency.Amount.( < ) total_to_3500 payout_info.unmet_obligation
             then (
@@ -1080,7 +1078,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                 "Allocating some amount to slot 3500 to unmet obligation from \
                  previous epoch"
                 ~metadata:
-                  ( ("allocation_from_total", json_of_amount new_allocation)
+                  ( ( "allocation_from_total"
+                    , Currency.Amount.to_yojson new_allocation )
                   :: base_metadata ) ;
               Some new_allocation
         in
@@ -1184,9 +1183,11 @@ let main ~input_file ~archive_uri ~payout_addresses () =
             ; ( "delegatee_delegated_stake"
               , Currency.Amount.to_yojson delegated_stake )
             ; ("delegator_fraction_of_stake", `Float fraction_of_stake)
-            ; ("payout_obligation", json_of_amount payout_obligation)
-            ; ("payout_in_prev_epoch", json_of_amount payout_in_prev_epoch)
-            ; ("unmet_obligation", json_of_amount unmet_obligation) ] ;
+            ; ("payout_obligation", Currency.Amount.to_yojson payout_obligation)
+            ; ( "payout_in_prev_epoch"
+              , Currency.Amount.to_yojson payout_in_prev_epoch )
+            ; ("unmet_obligation", Currency.Amount.to_yojson unmet_obligation)
+            ] ;
         payout_info.unmet_obligation <- unmet_obligation ;
         return payout_info
       in
