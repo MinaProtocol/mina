@@ -158,10 +158,10 @@ module User_command = struct
     Caqti_request.collect
       Caqti_type.(tup2 int int)
       typ
-      {sql| SELECT type,fee_payer_id, source_id,receiver_id,fee,fee_token,token,amount,valid_until,memo,nonce,
-                   blocks.id,blocks.global_slot,parent.global_slot_since_genesis,
-                   sequence_no,status,created_token,
-                   fee_payer_balance, source_balance, receiver_balance
+      {sql| SELECT type,fee_payer_id, source_id, receiver_id, fee,fee_token,
+               token, amount, valid_until, memo, nonce, blocks.id, blocks.global_slot,
+               parent.global_slot_since_genesis, sequence_no, status, created_token,
+               fee_payer_balance, source_balance, receiver_balance
 
             FROM (SELECT * FROM user_commands WHERE source_id = $1
                                               AND receiver_id = $2
@@ -178,6 +178,8 @@ module User_command = struct
             INNER JOIN blocks as parent
 
             ON parent.id = blocks.parent_id
+
+            WHERE buc.status = 'applied'
 
        |sql}
 
@@ -408,25 +410,25 @@ module Coinbase_receivers_for_block_creator = struct
   *)
   let query =
     Caqti_request.collect Caqti_type.int Caqti_type.int
-      {sql| SELECT ic.receiver_id
+      {sql| SELECT DISTINCT ic.receiver_id
 
-             FROM blocks b
+            FROM blocks b
 
-             INNER JOIN
+            INNER JOIN
 
-             blocks_internal_commands bic
+            blocks_internal_commands bic
 
-             ON bic.block_id = b.id
+            ON bic.block_id = b.id
 
-             INNER JOIN
+            INNER JOIN
 
-             internal_commands ic
+            internal_commands ic
 
-             ON bic.internal_command_id = ic.id
+            ON bic.internal_command_id = ic.id
 
-             WHERE b.creator_id = ?
-               AND ic.type = 'coinbase'
-               AND ic.receiver_id <> b.creator_id
+            WHERE b.creator_id = ?
+              AND ic.type = 'coinbase'
+              AND ic.receiver_id <> b.creator_id
       |sql}
 
   let run (module Conn : Caqti_async.CONNECTION) ~block_creator_id =
