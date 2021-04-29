@@ -31,20 +31,8 @@ def main():
   prover_errors = Counter('Coda_watchdog_prover_errors', 'Description of gauge')
   pods_with_no_new_logs = Gauge('Coda_watchdog_pods_with_no_new_logs', 'Number of nodes whose latest log is older than 10 minutes')
   nodes_queried=Gauge('Coda_watchdog_nodes_queried', 'Number of nodes that were queried for node-status')
-  seed1_nodes_responded=Gauge('Coda_watchdog_seed1_nodes_responded', 'Number of nodes that responded to the last status query on seed 1')
-  seed2_nodes_responded=Gauge('Coda_watchdog_seed2_nodes_responded', 'Number of nodes that responded to the last status query on seed 2')
-  seed3_nodes_responded=Gauge('Coda_watchdog_seed3_nodes_responded', 'Number of nodes that responded to the last status query on seed 3')
-  seed4_nodes_responded=Gauge('Coda_watchdog_seed4_nodes_responded', 'Number of nodes that responded to the last status query on seed 4')
-  seed5_nodes_responded=Gauge('Coda_watchdog_seed5_nodes_responded', 'Number of nodes that responded to the last status query on seed 5')
-  seed6_nodes_responded=Gauge('Coda_watchdog_seed6_nodes_responded', 'Number of nodes that responded to the last status query on seed 6')
-  nodes_responded_for_seeds=[seed1_nodes_responded, seed2_nodes_responded, seed3_nodes_responded, seed4_nodes_responded, seed5_nodes_responded, seed6_nodes_responded]
-  seed1_nodes_queried=Gauge('Coda_watchdog_seed1_nodes_queried', 'Number of nodes that were queried for node-status on seed 1')
-  seed2_nodes_queried=Gauge('Coda_watchdog_seed2_nodes_queried', 'Number of nodes that were queried for node-status on seed 2')
-  seed3_nodes_queried=Gauge('Coda_watchdog_seed3_nodes_queried', 'Number of nodes that were queried for node-status on seed 3')
-  seed4_nodes_queried=Gauge('Coda_watchdog_seed4_nodes_queried', 'Number of nodes that were queried for node-status on seed 4')
-  seed5_nodes_queried=Gauge('Coda_watchdog_seed5_nodes_queried', 'Number of nodes that were queried for node-status on seed 5')
-  seed6_nodes_queried=Gauge('Coda_watchdog_seed6_nodes_queried', 'Number of nodes that were queried for node-status on seed 6')
-  nodes_queried_for_seeds=[seed1_nodes_queried, seed2_nodes_queried, seed3_nodes_queried, seed4_nodes_queried, seed5_nodes_queried, seed6_nodes_queried]
+  seed_nodes_responded=Gauge('Coda_watchdog_seed1_nodes_responded', 'Number of nodes that responded to the last status query on seed 1', ['seed'])
+  seed_nodes_queried=Gauge('Coda_watchdog_seed1_nodes_queried', 'Number of nodes that were queried for node-status on seed 1', ['seed'])
   context_deadline_exceeded=Gauge('Coda_watchdog_deadline_exceeded', 'Number of nodes that failed with the context-deadline-exceeded error to a node-status query')
   failed_security_protocol_negotiation=Gauge('Coda_watchdog_failed_negotiation', 'Number of nodes that failed with the security-protocol-negotiation error to a node-status query')
   connection_refused_errors=Gauge('Coda_watchdog_connection_refused', 'Number of nodes that failed with the connection-refused error to a node-status query')
@@ -61,7 +49,7 @@ def main():
 
   fns = [
     ( lambda: metrics.collect_cluster_crashes(v1, namespace, cluster_crashes), 30*60 ),
-    ( lambda: metrics.collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, nodes_responded, nodes_queried_for_seeds, nodes_responded_for_seeds, nodes_errored, context_deadline_exceeded, failed_security_protocol_negotiation, connection_refused_errors,size_limit_exceeded_errors, timed_out_errors, stream_reset_errors, other_connection_errors, prover_errors), 10*60 ),
+    ( lambda: metrics.collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, nodes_responded, seed_nodes_queried, seed_nodes_responded, nodes_errored, context_deadline_exceeded, failed_security_protocol_negotiation, connection_refused_errors,size_limit_exceeded_errors, timed_out_errors, stream_reset_errors, other_connection_errors, prover_errors), 10*60 ),
     ( lambda: metrics.check_seed_list_up(v1, namespace, seeds_reachable), 60*60 ),
     ( lambda: metrics.pods_with_no_new_logs(v1, namespace, pods_with_no_new_logs), 60*10 ),
   ]
