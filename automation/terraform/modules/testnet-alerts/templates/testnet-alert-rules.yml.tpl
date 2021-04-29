@@ -354,7 +354,7 @@ groups:
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
 
   - alert: NodeRestarted
-    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total{testnet=~"mainnet|devnet2|snappnet"} < 360000) > 0
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 360000) > 0
     labels:
       testnet: "{{ $labels.testnet }}"
       severity: warning
