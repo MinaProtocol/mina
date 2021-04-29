@@ -1,4 +1,7 @@
 open Marlin_plonk_bindings
+
+exception PayloadLength of string
+
 let%test_module "TLS Notary test" =
 (
     module struct
@@ -44,7 +47,15 @@ let%test_module "TLS Notary test" =
       open Core
       open Impl
 
-      let authentication (p, pn, q) () =
+      type witness =
+      {
+        cipher_text: int array;
+        encryption_key : int array;
+        iv: int array;
+        signature: (Field.Constant.t * Field.Constant.t) * Field.Constant.t
+      }
+
+      let authentication ?witness (p, pn, q) () =
 
         let module Block = Plonk.Bytes.Block (Impl) in
         let module Bytes = Plonk.Bytes.Constraints (Impl) in
@@ -53,18 +64,32 @@ let%test_module "TLS Notary test" =
         let module Ec = Ecc.Basic in
 
         Random.full_init [|7|];
+
         (* CIPHERTEXT *)
+        (*let ctl = Array.length (Option.value_exn witness).cipher_text in*)
         let ctl = Array.length Test.ct in
-        let blocks = (ctl + 15) / 16 in
-        let ct = Array.init ctl ~f:(fun i -> Field.of_int Test.ct.(i)) in
+        let bloks = (ctl + 15) / 16 in
+
+        let int_array_witness ~length f =
+          exists (Typ.array ~length Field.typ)
+            ~compute:(fun () -> Array.map ~f:Field.Constant.of_int (f (Option.value_exn witness)))
+        in
+        let ct =
+          int_array_witness ~length:ctl
+            (fun w -> w.cipher_text)
+        in
+
         (* AES SERVER ENCRYPTION KEY *)
-        let key = Array.init 16 ~f:(fun i -> Field.of_int Test.key.(i)) in
+        let key = int_array_witness ~length:16 (fun w -> w.encryption_key) in
+
         (* AES INITIALIZATION VECTOR *)
-        let iv = Array.init 16 ~f:(fun i -> Field.of_int Test.iv.(i)) in
+        let iv = int_array_witness ~length:16 (fun w -> w.iv) in
+
         (* TLS NOTARY SIGNATURE *)
-        let ((x, y), s) = Test.sign in
-        let ((x, y), s) = Bigint.((to_field (of_decimal_string x), to_field (of_decimal_string y)), to_field (of_decimal_string s)) in
-        let (rc, s) = Field.((constant x, constant y), constant s) in
+        let (rc, s) =
+          exists Typ.( (field * field) * field)
+            ~compute:(fun () -> (Option.value_exn witness).signature)
+        in
 
         (* compute AES key schedule *)
         let ks = Block.expandKey key in
@@ -80,40 +105,44 @@ let%test_module "TLS Notary test" =
         let ec = Array.init ptdl1 ~f:(fun i -> 
         (
           let cnt = Array.copy iv in
-          let i = i + blocks - ptdl1 + 2 in
+          let i = i + bloks - ptdl1 + 2 in
           Array.iteri Int.[|i lsr 24; (i lsr 16) land 255; (i lsr 8) land 255; i land 255;|]
             ~f:(fun j x -> cnt.(j + 12) <- Field.of_int x);
           Block.encryptBlock cnt ks
         )) in
 
         (* decrypt score ciphertext into plaintext and decode *)
-        let score = let offset = ctl-9-(blocks-ptdl1)*16 in Array.mapi (Array.sub ct (ctl-9) 3)
+        let score = let offset = ctl-9-(bloks-ptdl1)*16 in Array.mapi (Array.sub ct (ctl-9) 3)
           ~f:(fun i x -> Bytes.asciiDigit (Bytes.xor ec.((offset+i)/16).((offset+i)%16) x)) in
         
         (* check the score *)
         Bytes.assertScore Field.(score.(0) * (of_int 100) + score.(1) * (of_int 10) + score.(2));
 
         (* pad ciphertext to the block boundary *)
-        let ctp = Array.append ct (Array.init (blocks*16-ctl) ~f:(fun _ -> Field.zero)) in
-        let ctp = Array.init blocks ~f:(fun i -> Array.sub ctp (i*16) 16) in
+        let ctp = Array.append ct (Array.init (bloks*16-ctl) ~f:(fun _ -> Field.zero)) in
+        let ctp = Array.init bloks ~f:(fun i -> Array.sub ctp (i*16) 16) in
         
         (* compute GCM ciphertext authentication tag *)
         let len = Array.init 16 ~f:(fun _ -> Field.zero)  in
         Array.iteri ~f:(fun i x -> len.(i + 12) <- Field.of_int x)
           [|((ctl*8) lsr 24) land 255; ((ctl*8) lsr 16) land 255; ((ctl*8) lsr 8) land 255; (ctl*8) land 255;|];
+        let ctp = Array.append ctp [|len|] in
+
         let at = Array.foldi (Array.append ctp [|len|]) ~init:(Array.init 16 ~f:(fun _ -> Field.zero))
-          ~f:(fun i ht bl -> Block.mul (Block.xor ht bl) h) in
+          ~f:(fun i ht bl ->
+            let htn = Block.mul (Block.xor ht bl) h in
+            if i <= bloks then htn
+            else ht
+          ) in
+        
         let at = Block.xor ec0 at in
 
-
-
+(*      just vrifying the hash-tag correctness
         let ttt = [|0xf4; 0x7c; 0x28; 0x7d; 0xe1; 0x23; 0x5e; 0x6c; 0x1c; 0x58; 0xd0; 0xb1; 0x80; 0xad; 0x12; 0x98;|] in
         for i = 0 to 15 do
           assert_ (Snarky.Constraint.equal at.(i) (Field.of_int ttt.(i)));
         done;
-
-
-
+*)
         (* hash the data to be signed *)
         let hb = Array.map ~f:(fun x -> Bytes.b16tof x) [|key; iv; at|] in
         Array.iter ~f:(fun x -> Sponge.absorb x) (Array.append hb [|fst rc; snd rc;|]);
@@ -140,7 +169,22 @@ let%test_module "TLS Notary test" =
 
       let keys = Impl.generate_keypair ~exposing:(input ()) authentication
 
-      let proof = Impl.prove (Impl.Keypair.pk keys) (input ()) authentication () public_input
+      let proof =
+        let signature =
+          (* Just converting the signature from strings *)
+          let ((x, y), s) = Test.sign in
+          Bigint.((to_field (of_decimal_string x), to_field (of_decimal_string y)), to_field (of_decimal_string s))
+        in
+        Impl.prove (Impl.Keypair.pk keys) (input ())
+          (authentication
+             ~witness:{
+               cipher_text= Test.ct;
+               encryption_key= Test.key;
+               iv= Test.iv;
+               signature
+             } )
+          ()
+          public_input
       let%test_unit "check backend GcmAuthentication proof" =
         assert (Impl.verify proof (Impl.Keypair.vk keys) (input ()) public_input)
     end

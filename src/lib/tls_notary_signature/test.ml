@@ -6,7 +6,7 @@ module Public_input (Intf : Snark_intf.Run with type prover_state = unit and typ
   open Intf
   open Typ
   module Ecc = Plonk.Ecc.Constraints (Intf)
-
+  
   let rec double p n = if n < 1 then p else double (Ecc.Basic.double1 p) Int.(n - 1)
 
   (* SIGNATURE SCHEME EC BASE POINT *)
