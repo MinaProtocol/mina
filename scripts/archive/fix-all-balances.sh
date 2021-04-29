@@ -15,21 +15,19 @@ SWAPPER=mina-swap-bad-balances
 # Read over each line of the LOG_FILE and call SWAPPER on each STATE_HASH, SEQ_NUMBER pair
 while read -r
 do
+  if [[ ${REPLY} != "---------------" ]]; then
 
-  EXTRACTED_HASH=$(printf "%s\n" "$REPLY" | jq -rM .metadata.state_hash)
+    EXTRACTED_HASH=$(printf "%s\n" "$REPLY" | jq -rM .metadata.state_hash)
+    case "$EXTRACTED_HASH" in
+      null)
+        EXTRACTED_MESSAGE=$(printf "%s\n" "$REPLY" | jq -rM .message)
+        SEQ_NUMBER="${EXTRACTED_MESSAGE##* }"
+        echo "---- Swapping balances for state hash ${STATE_HASH} at sequence number ${SEQ_NUMBER} ----"
+        "${SWAPPER}" --archive-uri "${ARCHIVE_URI}" --state-hash "${STATE_HASH}" --sequence-no "${SEQ_NUMBER}"
+        ;;
 
-  case "$EXTRACTED_HASH" in
-
-    null)
-      EXTRACTED_MESSAGE=$(printf "%s\n" "$REPLY" | jq -rM .message)
-      SEQ_NUMBER="${EXTRACTED_MESSAGE##* }"
-      echo "---- Swapping balances for state hash ${STATE_HASH} at sequence number ${SEQ_NUMBER} ----"
-      "${SWAPPER}" --archive-uri "${ARCHIVE_URI}" --state-hash "${STATE_HASH}" --sequence-no "${SEQ_NUMBER}"
-      ;;
-
-    *)
-      STATE_HASH=$EXTRACTED_HASH
-
-  esac
-
+      *)
+        STATE_HASH=$EXTRACTED_HASH
+    esac
+  fi
 done <"$LOG_FILE"
