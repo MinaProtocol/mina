@@ -1591,6 +1591,8 @@ let generate_libp2p_keypair =
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd
+              ~all_peers_seen_metric:false
+              ~pids:(Child_processes.Termination.create_pid_table ())
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
           with
@@ -2114,7 +2116,7 @@ module Visualization = struct
   end
 
   let command_group =
-    Command.group ~summary:"Visualize data structures special to Coda"
+    Command.group ~summary:"Visualize data structures special to Mina"
       [ (Frontier.name, Frontier.command)
       ; (Registered_masks.name, Registered_masks.command) ]
 end

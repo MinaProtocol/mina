@@ -1225,7 +1225,7 @@ type getPeerNodeStatusMsg struct {
 }
 
 func (m *getPeerNodeStatusMsg) run(app *app) (interface{}, error) {
-	ctx, _ := context.WithTimeout(app.Ctx, 400*time.Millisecond)
+	ctx, _ := context.WithTimeout(app.Ctx, codanet.NodeStatusTimeout)
 
 	addrInfo, err := addrInfoOfString(m.PeerMultiaddr)
 	if err != nil {
@@ -1423,7 +1423,7 @@ type successResult struct {
 }
 
 var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "connection_count",
+	Name: "Coda_active_connections_total",
 	Help: "Number of active connections, according to the CodaConnectionManager.",
 })
 

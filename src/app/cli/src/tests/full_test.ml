@@ -149,7 +149,8 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; max_connections= 50
           ; validation_queue_size= 150
-          ; keypair= None }
+          ; keypair= None
+          ; all_peers_seen_metric= false }
       in
       let net_config =
         Mina_networking.Config.
@@ -167,8 +168,8 @@ let run_test () : unit Deferred.t =
               ; new_state= false }
           ; creatable_gossip_net=
               Mina_networking.Gossip_net.(
-                Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
-          }
+                Any.Creatable
+                  ((module Libp2p), Libp2p.create ~pids gossip_net_params)) }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;

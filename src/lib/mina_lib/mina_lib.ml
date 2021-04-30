@@ -82,6 +82,7 @@ type pipes =
            -> ( [`Min of Mina_base.Account.Nonce.t] * Mina_base.Account.Nonce.t
               , string )
               Result.t)
+        * (Account_id.t -> Account.t option Participating_state.T.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -182,6 +183,8 @@ module Snark_worker = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
     in
+    Child_processes.Termination.wait_for_process_log_errors ~logger
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
     don't_wait_for
       ( match%bind
           Monitor.try_with (fun () -> Process.wait snark_worker_process)
@@ -747,7 +750,7 @@ let get_current_nonce t aid =
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t)
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce t, get_account t)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -1128,17 +1131,20 @@ let create ?wallets (config : Config.t) =
                                instantiated when node status requested"
                              node_ip_addr node_peer_id))
               | Some net ->
-                  let protocol_state_hash, k_block_hashes_and_timestamps =
+                  let ( protocol_state_hash
+                      , best_tip_opt
+                      , k_block_hashes_and_timestamps ) =
                     match
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     with
                     | None ->
                         ( config.precomputed_values.protocol_state_with_hash
                             .hash
+                        , None
                         , [] )
                     | Some frontier ->
+                        let tip = Transition_frontier.best_tip frontier in
                         let protocol_state_hash =
-                          let tip = Transition_frontier.best_tip frontier in
                           let state =
                             Transition_frontier.Breadcrumb.protocol_state tip
                           in
@@ -1159,7 +1165,9 @@ let create ?wallets (config : Config.t) =
                                     (Time.to_string_iso8601_basic
                                        ~zone:Time.Zone.utc) ) )
                         in
-                        (protocol_state_hash, k_block_hashes_and_timestamps)
+                        ( protocol_state_hash
+                        , Some tip
+                        , k_block_hashes_and_timestamps )
                   in
                   let%bind peers = Mina_networking.peers net in
                   let open Deferred.Or_error.Let_syntax in
@@ -1192,6 +1200,22 @@ let create ?wallets (config : Config.t) =
                       ~f:Fn.id
                       ~default:(Float.to_int minutes_float)
                   in
+                  let block_height_opt =
+                    match best_tip_opt with
+                    | None ->
+                        None
+                    | Some tip ->
+                        let state =
+                          Transition_frontier.Breadcrumb.protocol_state tip
+                        in
+                        let consensus_state =
+                          state |> Mina_state.Protocol_state.consensus_state
+                        in
+                        Some
+                          ( Mina_numbers.Length.to_int
+                          @@ Consensus.Data.Consensus_state.blockchain_length
+                               consensus_state )
+                  in
                   Mina_networking.Rpcs.Get_node_status.Node_status.
                     { node_ip_addr
                     ; node_peer_id
@@ -1202,7 +1226,8 @@ let create ?wallets (config : Config.t) =
                     ; ban_statuses
                     ; k_block_hashes_and_timestamps
                     ; git_commit
-                    ; uptime_minutes }
+                    ; uptime_minutes
+                    ; block_height_opt }
           in
           let get_some_initial_peers _ =
             match !net_ref with
@@ -1330,9 +1355,10 @@ let create ?wallets (config : Config.t) =
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (input_list, result_cb, get_current_nonce) ->
+            ~f:(fun (input_list, result_cb, get_current_nonce, get_account) ->
               match%bind
                 User_command_input.to_user_commands ~get_current_nonce
+                  ~get_account ~constraint_constants ~logger:config.logger
                   input_list
               with
               | Ok user_commands ->
