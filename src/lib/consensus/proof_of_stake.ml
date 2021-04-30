@@ -387,15 +387,10 @@ module Data = struct
                     ; ("error", `String str) ] ;
                 create_new_uuids ()
           in
-          let both_files_present =
-            Sys.file_exists (ledger_location epoch_ledger_uuids.staking)
-            && Sys.file_exists (ledger_location epoch_ledger_uuids.next)
-          in
           (*If the genesis hash matches and both the files are present. If only one of them is present then it could be stale data and might cause the node to never be able to bootstrap*)
           if
             Mina_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
               genesis_state_hash
-            && both_files_present
           then epoch_ledger_uuids
           else
             (*Clean-up outdated epoch ledgers*)
