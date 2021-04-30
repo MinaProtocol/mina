@@ -327,6 +327,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Mina_lib.get_ledger coda lh )
+    ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
+          Mina_lib.get_snarked_ledger coda lh |> return )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
           ( match which with
           | Next ->

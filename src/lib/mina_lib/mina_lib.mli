@@ -170,6 +170,8 @@ val transition_frontier :
 
 val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
 
+val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+
 val wallets : t -> Secrets.Wallets.t
 
 val subscriptions : t -> Coda_subscriptions.t
