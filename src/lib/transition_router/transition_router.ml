@@ -125,7 +125,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
-  let num_peers = 8 in
+  let num_peers = 16 in
   let%bind peers = Mina_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
   let%map tips =
@@ -317,12 +317,44 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
       [%log info]
         "Successfully loaded frontier, but failed to download best tip from \
          network; starting participation" ;
-      return
-      @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
-           ~network ~time_controller ~producer_transition_reader_ref
-           ~producer_transition_writer_ref ~verified_transition_writer
-           ~clear_reader ~collected_transitions:[] ~transition_reader_ref
-           ~transition_writer_ref ~frontier_w ~precomputed_values frontier
+      let curr_best_tip = Transition_frontier.best_tip frontier in
+      let%map () =
+        match
+          Consensus.Hooks.required_local_state_sync
+            ~constants:precomputed_values.consensus_constants
+            ~consensus_state:
+              (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
+            ~local_state:consensus_local_state
+        with
+        | None ->
+            [%log info] "Local state already in sync" ;
+            Deferred.unit
+        | Some sync_jobs -> (
+            [%log info] "Local state is out of sync; " ;
+            match%map
+              Consensus.Hooks.sync_local_state
+                ~local_state:consensus_local_state ~logger ~trust_system
+                ~random_peers:(Mina_networking.random_peers network)
+                ~query_peer:
+                  { Consensus.Hooks.Rpcs.query=
+                      (fun peer rpc query ->
+                        Mina_networking.(
+                          query_peer network peer.peer_id
+                            (Rpcs.Consensus_rpc rpc) query) ) }
+                ~ledger_depth:
+                  precomputed_values.constraint_constants.ledger_depth
+                sync_jobs
+            with
+            | Error e ->
+                Error.tag e ~tag:"Local state sync failed" |> Error.raise
+            | Ok () ->
+                () )
+      in
+      start_transition_frontier_controller ~logger ~trust_system ~verifier
+        ~network ~time_controller ~producer_transition_reader_ref
+        ~producer_transition_writer_ref ~verified_transition_writer
+        ~clear_reader ~collected_transitions:[] ~transition_reader_ref
+        ~transition_writer_ref ~frontier_w ~precomputed_values frontier
   | Some best_tip, Some frontier ->
       [%log info]
         ~metadata:
