@@ -1,14 +1,14 @@
 #!/bin/bash
 
-mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt --background
+# mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt --background
 
-sleep 480 #wait 8 minutes for the node to, hopefully, come online and fully sync
+# sleep 480 #wait 8 minutes for the node to, hopefully, come online and fully sync
 
 while true; do
   mina ledger export staking-epoch-ledger > staking_epoch_ledger.txt
   if [ "$?" -eq 0 ]; then
     echo "ledger dumped!"
-    cat staking_epoch_ledger.txt
+    # cat staking_epoch_ledger.txt
     break
   else
     echo "waiting for staking ledger to become available, sleeping for 30s"
@@ -16,15 +16,15 @@ while true; do
   fi
 done
 
-STAKING_LEDGER_HASH = mina ledger hash --ledger-file staking_epoch_ledger.txt
+STAKING_LEDGER_HASH=(mina ledger hash --ledger-file staking_epoch_ledger.txt)
 
-DATE = "$(date +%F_%H%M)"
+DATE="$(date +%F_%H%M)"
 mv ./staking_epoch_ledger.txt ./"$DATE"_staking_epoch_ledger_"$STAKING_LEDGER_HASH".txt
 
 # echo STAKING_LEDGER > "$DATE"_staking_epoch_ledger_$(STAKING_LEDGER_HASH).txt
 
 mina ledger export next-epoch-ledger > next_epoch_ledger.txt
-NEXT_LEDGER_HASH = mina ledger hash --ledger-file next_epoch_ledger.txt
+NEXT_LEDGER_HASH=(mina ledger hash --ledger-file next_epoch_ledger.txt)
 mv ./next_epoch_ledger.txt ./"$DATE"_next_epoch_ledger_"$NEXT_LEDGER_HASH".txt
 # echo NEXT_LEDGER > "$DATE"_next_epoch_ledger_$(STAKING_LEDGER_HASH).txt
 
@@ -33,6 +33,6 @@ mv ./next_epoch_ledger.txt ./"$DATE"_next_epoch_ledger_"$NEXT_LEDGER_HASH".txt
 
 #will need service account and some access keys for below to work
 
-gsutil cp $(DATE)_staking_epoch_ledger_$(staking_ledger_hash).txt gs://mina-staking-ledgers
+gsutil cp "$DATE"_staking_epoch_ledger_"$STAKING_LEDGER_HASH".txt gs://mina-staking-ledgers
 
-gsutil cp $(DATE)_next_epoch_ledger$(staking_ledger_hash).txt gs://mina-staking-ledgers
+gsutil cp "$DATE"_next_epoch_ledger_"$NEXT_LEDGER_HASH".txt gs://mina-staking-ledgers
