@@ -934,7 +934,9 @@ let export_ledger =
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
   Command.async
     ~summary:
-      "Print the specified ledger (default: staged ledger at the best tip)"
+      "Print the specified ledger (default: staged ledger at the best tip). \
+       Note: Exporting snarked ledger is an expensive operation and can take \
+       a few seconds"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (state_hash, plaintext, ledger_kind) ->
          let check_for_state_hash () =

@@ -496,34 +496,24 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 let best_ledger = compose_of_option best_ledger_opt
 
 let get_ledger t state_hash_opt =
-  let open Deferred.Or_error.Let_syntax in
+  let open Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
+    Option.value_map state_hash_opt ~f:Or_error.return
       ~default:
         ( match best_tip t with
         | `Active bc ->
-            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
-            Deferred.Or_error.error_string
+            Or_error.error_string
               "get_ledger: can't get staged ledger hash while bootstrapping" )
   in
-  let%bind frontier =
-    Deferred.return (t.components.transition_frontier |> peek_frontier)
-  in
-  match
-    List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
-        let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
-        if
-          State_hash.equal
-            (Transition_frontier.Breadcrumb.state_hash b)
-            state_hash
-        then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
-        else None )
-  with
-  | Some x ->
-      Deferred.Or_error.return x
+  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  match Transition_frontier.find frontier state_hash with
+  | Some b ->
+      let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
+      Ok (Ledger.to_list (Staged_ledger.ledger staged_ledger))
   | None ->
-      Deferred.Or_error.error_string
+      Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
 
 let get_snarked_ledger t state_hash_opt =
@@ -536,8 +526,8 @@ let get_snarked_ledger t state_hash_opt =
             Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
             Or_error.error_string
-              "get_ledger: can't get snarked ledger hash while bootstrapping"
-        )
+              "get_snarked_ledger: can't get snarked ledger hash while \
+               bootstrapping" )
   in
   let%bind frontier = t.components.transition_frontier |> peek_frontier in
   match Transition_frontier.find frontier state_hash with
