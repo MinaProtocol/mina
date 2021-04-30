@@ -920,11 +920,15 @@ let export_ledger =
     let t =
       Command.Param.Arg_type.of_alist_exn
         (List.map
-           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
-           ~f:(fun s -> (s, s)))
+           [ "staged-ledger"
+           ; "snarked-ledger"
+           ; "staking-epoch-ledger"
+           ; "next-epoch-ledger" ] ~f:(fun s -> (s, s)))
     in
     Command.Param.(
-      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
+      anon
+        ( "staged-ledger|snarked-ledger|staking-epoch-ledger|next-epoch-ledger"
+        %: t ))
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
@@ -946,6 +950,12 @@ let export_ledger =
                  Option.map ~f:State_hash.of_base58_check_exn state_hash
                in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+                 state_hash port
+           | "snarked-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
+               in
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
                  state_hash port
            | "staking-epoch-ledger" ->
                check_for_state_hash () ;
