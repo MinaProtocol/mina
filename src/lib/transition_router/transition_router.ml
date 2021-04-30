@@ -125,7 +125,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
-  let num_peers = 16 in
+  let num_peers = 0 in
   let%bind peers = Mina_networking.random_peers network num_peers in
   [%log info] "Requesting peers for their best tip to do initialization" ;
   let%map tips =
