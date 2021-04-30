@@ -27,7 +27,7 @@ command=$1 \n\
 shift \n\
 while true; do\n\
   rm -f /root/.mina-config/.mina-lock\n\
-  mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
+  catchsegv mina "$command" -config-file "'${CONFIG_FILE}'" "$@" 2>&1 >mina.log &\n\
   mina_pid=$!\n\
   tail -q -f mina.log &\n\
   tail_pid=$!\n\
