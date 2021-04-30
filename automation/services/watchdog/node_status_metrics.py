@@ -188,14 +188,17 @@ def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_n
     seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
     seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
 
-    cmd = "mina advanced get-peers"
-    peers = util.exec_on_pod(v1, namespace, seed, 'coda', cmd).rstrip().split('\n')
+    try:
+      cmd = "mina advanced get-peers"
+      peers = util.exec_on_pod(v1, namespace, seed, 'coda', cmd).rstrip().split('\n')
 
-    cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + ",".join(peers) + " -show-errors"
-    resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
+      cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + ",".join(peers) + " -show-errors"
+      resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
 
-    if not 'Error: Unable to connect to Mina Daemon.' in resp:
-      add_resp(resp, peers, seed, seed_nodes_responded, seed_nodes_queried)
+      if not 'Error: Unable to connect to Mina Daemon.' in resp:
+        add_resp(resp, peers, seed, seed_nodes_responded, seed_nodes_queried)
+    except:
+      continue
       
 
   valid_resps = peer_table.values()
