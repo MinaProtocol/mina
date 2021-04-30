@@ -588,8 +588,7 @@ module Genesis_proof = struct
   let id_to_json x =
     `String (Sexp.to_string (Pickles.Verification_key.Id.sexp_of_t x))
 
-  let load_or_generate ~genesis_dir ~logger ~may_generate
-      (inputs : Genesis_proof.Inputs.t) =
+  let load_or_generate ~genesis_dir ~logger (inputs : Genesis_proof.Inputs.t) =
     let proof_needed =
       match inputs.proof_level with Full -> true | _ -> false
     in
@@ -723,7 +722,7 @@ module Genesis_proof = struct
                   ; ("error", Error_json.error_to_yojson err) ]
         in
         Ok (values, filename)
-    | None when may_generate ->
+    | None ->
         [%log info]
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
@@ -747,20 +746,6 @@ module Genesis_proof = struct
                       ; ("error", Error_json.error_to_yojson err) ] )
         in
         Ok (values, filename)
-    | None ->
-        [%log error]
-          "No genesis proof file was found for $base_hash and not allowed to \
-           generate a new genesis proof"
-          ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
-        Deferred.Or_error.of_exn
-          (Mina_user_error.Mina_user_error
-             { where= Some "generating a genesis proof"
-             ; message=
-                 sprintf
-                   "Hint: pass the flag --generate-genesis-proof true. For \
-                    example,\n\
-                    %s daemon --generate-genesis-proof true"
-                   Sys.argv.(0) })
 end
 
 let load_config_json filename =
@@ -883,25 +868,23 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   (proof_inputs, config)
 
 let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
-    ~may_generate proof_inputs =
+    proof_inputs =
   let open Deferred.Or_error.Let_syntax in
   let%map values, proof_file =
-    Genesis_proof.load_or_generate ~genesis_dir ~logger ~may_generate
-      proof_inputs
+    Genesis_proof.load_or_generate ~genesis_dir ~logger proof_inputs
   in
-  [%log info] "Loaded genesis proof from $proof_file"
-    ~metadata:[("proof_file", `String proof_file)] ;
+  if Option.is_some values.proof_data then
+    [%log info] "Loaded genesis proof from $proof_file"
+      ~metadata:[("proof_file", `String proof_file)] ;
   values
 
-let init_from_config_file ?genesis_dir ~logger ~may_generate ~proof_level
+let init_from_config_file ?genesis_dir ~logger ~proof_level
     (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
   let%bind inputs, config =
     inputs_from_config_file ?genesis_dir ~logger ~proof_level config
   in
-  let%map values =
-    init_from_inputs ?genesis_dir ~logger ~may_generate inputs
-  in
+  let%map values = init_from_inputs ?genesis_dir ~logger inputs in
   (values, config)
 
 let upgrade_old_config ~logger filename json =
