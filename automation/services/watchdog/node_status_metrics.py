@@ -197,7 +197,8 @@ def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_n
 
       if not 'Error: Unable to connect to Mina Daemon.' in resp:
         add_resp(resp, peers, seed, seed_nodes_responded, seed_nodes_queried)
-    except:
+    except Exception as e:
+      print("failed to exec command on pod: {}".format(e))
       continue
       
 
