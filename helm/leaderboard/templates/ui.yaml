@@ -24,3 +24,15 @@ spec:
         - name: leaderboard-ui
           protocol: TCP
           containerPort: {{ .Values.ui.port }}
+      {{- if .Values.ui.secret }}
+        volumeMounts:
+          - name: php-creds
+            mountPath: /var/www/html/creds/
+      volumes:
+        - name: php-creds
+          secret:
+            secretName: {{ .Values.ui.secret }}
+            items:
+            - key: connection.php
+              path: connection.php
+      {{- end }}
