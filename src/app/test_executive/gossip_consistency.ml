@@ -133,7 +133,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                 - 1"
                num_transactions_seen num_payments)
         in
-        [%log info]
+        [%log error]
           "gossip_consistency test: TEST FAILURE.  transactions seen = %d, \
            which is less than (numpayments = %d) - 1"
           num_transactions_seen num_payments ;
@@ -164,7 +164,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                "consistency ratio = %f, which is less than threshold = %f"
                ratio threshold)
         in
-        [%log info]
+        [%log error]
           "gossip_consistency test: TEST FAILURE. consistency ratio = %f, \
            which is less than threshold = %f"
           ratio threshold ;

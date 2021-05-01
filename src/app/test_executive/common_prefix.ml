@@ -42,7 +42,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                  recent %d blocks"
                 n))
       in
-      [%log info]
+      [%log error]
         "common_prefix test: TEST FAILURE, Chains don't have any common \
          prefixes among their most recent %d blocks"
         n ;
@@ -56,7 +56,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                   prefixes"
                 length n))
       in
-      [%log info]
+      [%log error]
         "common_prefix test: TEST FAILURE, Chains only have %d common \
          prefixes, expected %d common prefixes"
         length n ;
