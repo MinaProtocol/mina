@@ -5,15 +5,26 @@ kind: CronJob
 metadata:
   name: mainnet-dump-staking-ledger-cronjob
 spec:
-  # schedule: "0 11 * * *"
-  schedule: "*/10 * * * *"
+  schedule: "0 11 * * *"
   jobTemplate:
     spec:
       template:
         spec:
+          volumes:
+            - name: gcloud-keyfile
+              secret:
+                secretName: gcloud-keyfile
+                defaultMode: 256
+                items:
+                - key: keyfile
+                  path: keyfile.json
           containers:
           - name: mainnet-dump-staking-ledger-container
-            image: codaprotocol/coda-daemon:1.1.5-mina-dockerfiles-entrypoints-91989f2
+            # image: codaprotocol/coda-daemon:1.1.5-mina-dockerfiles-entrypoints-91989f2
+            image: codaprotocol/coda-daemon:1.1.5-feature-no-genesis-proof-at-start-a8ee1f9
+            volumeMounts:
+            - name: gcloud-keyfile
+              mountPath: "/gcloud/"
             # command: ["/usr/bin/dumb-init", '/cron_job_dump_ledger.sh']
-            command: ["/usr/bin/dumb-init", 'mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt --background;sleep 480;while true;do mina ledger export staking-epoch-ledger>staking_epoch_ledger.txt;if [ "$?" -eq 0 ];then echo "ledger dumped!";cat staking_epoch_ledger.txt;break;else echo "waiting for staking ledger to become available, sleeping for 30s";sleep 30;fi;done;STAKING_LEDGER_HASH = mina ledger hash --ledger-file staking_epoch_ledger.txt;DATE = "$(date +%F_%H%M)";mv ./staking_epoch_ledger.txt ./$(DATE)_staking_epoch_ledger_$(staking_ledger_hash).txt;mina ledger export next-epoch-ledger>next_epoch_ledger.txt;NEXT_LEDGER_HASH = mina ledger hash --ledger-file next_epoch_ledger.txt;mv ./next_epoch_ledger.txt ./$(DATE)_next_epoch_ledger_$(next_ledger_hash).txt' ]
+            command: ["/bin/bash", "-c", 'mina daemon --generate-genesis-proof true --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt --background;sleep 480;echo "done sleeping";while true;do mina ledger export staking-epoch-ledger>staking_epoch_ledger.txt;if [ "$?" -eq 0 ]&&[ "$(cat staking_epoch_ledger.txt)" != "Ledger not found: current staking ledger not available" ];then echo "staking epoch ledger dumped!";cat staking_epoch_ledger.txt;break;else echo "waiting for staking ledger to become available, sleeping for 30s";sleep 30;fi;done;DATE="$(date +%F_%H%M)";STAKING_LEDGER_HASH=(mina ledger hash --ledger-file staking_epoch_ledger.txt);LEDGER_FILENAME="$DATE"_staking_epoch_ledger_"$STAKING_LEDGER_HASH".txt;mv ./staking_epoch_ledger.txt ./$LEDGER_FILENAME;mina ledger export next-epoch-ledger>next_epoch_ledger.txt;echo "next epoch ledger dumped!";NEXT_LEDGER_HASH=(mina ledger hash --ledger-file next_epoch_ledger.txt);NEXT_LEDGER_FILENAME="$DATE"_next_epoch_ledger_"$NEXT_LEDGER_HASH".txt;mv ./next_epoch_ledger.txt ./$NEXT_LEDGER_FILENAME;echo "upload to a GCP cloud storage bucket";gsutil cp $LEDGER_FILENAME gs://mina-staking-ledgers;gsutil cp $NEXT_LEDGER_FILENAME gs://mina-staking-ledgers' ]
           restartPolicy: Never
