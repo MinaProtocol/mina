@@ -985,6 +985,10 @@ let hash_ledger =
          let constraint_constants =
            Genesis_constants.Constraint_constants.compiled
          in
+         Core.printf "constraint constants %s\n%!"
+           (Yojson.Safe.to_string
+              (Genesis_constants.Constraint_constants.to_yojson
+                 Genesis_constants.Constraint_constants.compiled)) ;
          let packed_ledger =
            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
              ~depth:constraint_constants.ledger_depth accounts

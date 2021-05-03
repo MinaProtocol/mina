@@ -23,6 +23,19 @@ module Scan_state : sig
     type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
   end
 
+  (*All the transactions with undos*)
+  module Staged_undos : sig
+    type t
+
+    val apply :
+         constraint_constants:Genesis_constants.Constraint_constants.t
+      -> t
+      -> Ledger.t
+      -> unit Or_error.t
+  end
+
+  val staged_undos : t -> Staged_undos.t
+
   val hash : t -> Staged_ledger_hash.Aux_hash.t
 
   val empty :

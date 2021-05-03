@@ -531,7 +531,9 @@ struct
 end
 
 module Staged_undos = struct
-  type applied_txn = Ledger.Transaction_applied.t
+  type applied_txn = Transaction_with_witness.t
+
+  (*Ledger.Transaction_applied.t*)
 
   type t = applied_txn list
 
@@ -539,7 +541,26 @@ module Staged_undos = struct
     List.fold_left t ~init:(Ok ()) ~f:(fun acc t ->
         Or_error.bind
           (Or_error.map acc ~f:(fun _ -> t))
-          ~f:(fun u -> Ledger.undo ~constraint_constants ledger u) )
+          ~f:(fun (u : applied_txn) ->
+            let res =
+              Ledger.undo ~constraint_constants ledger u.transaction_with_info
+            in
+            let root = Ledger.merkle_root ledger in
+            if Ledger_hash.equal u.statement.source root then
+              Core.printf "statement source: %s got hash %s \n%!"
+                (Yojson.Safe.to_string
+                   (Ledger_hash.to_yojson u.statement.source))
+                (Yojson.Safe.to_string (Ledger_hash.to_yojson root))
+            else
+              Core.printf
+                "Undo error: transactions: %s statement %s got hash %s \n%!"
+                (Sexp.to_string
+                   (Ledger.Transaction_applied.sexp_of_t
+                      u.transaction_with_info))
+                (Yojson.Safe.to_string
+                   (Transaction_snark.Statement.to_yojson u.statement))
+                (Yojson.Safe.to_string (Ledger_hash.to_yojson root)) ;
+            res ) )
 end
 
 let statement_of_job : job -> Transaction_snark.Statement.t option = function
@@ -639,9 +660,7 @@ let staged_transactions_with_protocol_states t
 
 (*All the staged transactions in the reverse order of their application (Latest first)*)
 let staged_undos t : Staged_undos.t =
-  List.map
-    (Parallel_scan.pending_data t |> List.rev)
-    ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
+  List.map (Parallel_scan.pending_data t |> List.rev) ~f:Fn.id
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in

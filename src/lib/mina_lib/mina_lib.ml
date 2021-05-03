@@ -513,7 +513,7 @@ let get_ledger t state_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
 
-let get_snarked_ledger t state_hash_opt =
+let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
   let open Or_error.Let_syntax in
   let%bind state_hash =
     Option.value_map state_hash_opt ~f:Or_error.return
@@ -529,6 +529,11 @@ let get_snarked_ledger t state_hash_opt =
   let%bind frontier = t.components.transition_frontier |> peek_frontier in
   match Transition_frontier.find frontier state_hash with
   | Some b ->
+      let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
+      let ledger = Staged_ledger.ledger staged_ledger in
+      let mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
+      let new_ledger = Ledger.register_mask ledger mask in
+      (*
       let root_snarked_ledger =
         Transition_frontier.root_snarked_ledger frontier
       in
@@ -589,22 +594,53 @@ let get_snarked_ledger t state_hash_opt =
                     Stop e )
             else Continue (Ok ()) )
           ~finish:Fn.id
+      in*)
+      let staged_undos =
+        Staged_ledger.Scan_state.staged_undos
+          (Staged_ledger.scan_state staged_ledger)
+      in
+      let%bind () =
+        Staged_ledger.Scan_state.Staged_undos.apply
+          ~constraint_constants:
+            t.config.precomputed_values.constraint_constants staged_undos
+          new_ledger
       in
       let snarked_ledger_hash =
         Transition_frontier.Breadcrumb.blockchain_state b
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
-      let merkle_root = Ledger.merkle_root ledger in
+      let merkle_root = Ledger.merkle_root new_ledger in
       if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let res = Ledger.to_list ledger in
-        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
+        let res = Ledger.to_list new_ledger in
+        Core.printf "Ledger_hash %s%!"
+          (Yojson.Safe.to_string
+             (Ledger_hash.to_yojson (Ledger.merkle_root new_ledger))) ;
+        (*let process_accounts accounts =
+          let constraint_constants =
+            Genesis_constants.Constraint_constants.compiled
+          in
+          Core.printf "constraint constants %s\n%!"
+            (Yojson.Safe.to_string
+               (Genesis_constants.Constraint_constants.to_yojson
+                  Genesis_constants.Constraint_constants.compiled)) ;
+          let packed_ledger =
+            Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
+              ~depth:constraint_constants.ledger_depth accounts
+          in
+          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+          Format.printf "%s@."
+            (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+        in
+        process_accounts (Lazy.return (List.map ~f:(fun a -> (None, a)) res)) ;*)
+        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger ;
         Ok res )
-      else
+      else (
+        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger ;
         Or_error.errorf
           "Expected snarked ledger hash %s but got %s for state hash %s"
           (Frozen_ledger_hash.to_string snarked_ledger_hash)
           (Frozen_ledger_hash.to_string merkle_root)
-          (State_hash.to_string state_hash)
+          (State_hash.to_string state_hash) )
   | None ->
       Or_error.error_string
         "get_snarked_ledger: state hash not found in transition frontier"
