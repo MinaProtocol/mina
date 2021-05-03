@@ -508,24 +508,7 @@ struct
     include T
     module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
-    let get_rebroadcastable t ~has_timed_out =
-      Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
-        ~f:(fun ~key:stmt ~data:(_proof, time) ->
-          match has_timed_out time with
-          | `Timed_out ->
-              [%log' debug t.logger]
-                "No longer rebroadcasting SNARK with statement $stmt, it was \
-                 added at $time its rebroadcast period is now expired"
-                ~metadata:
-                  [ ( "stmt"
-                    , One_or_two.to_yojson
-                        Transaction_snark.Statement.to_yojson stmt )
-                  ; ( "time"
-                    , `String (Time.to_string_abs ~zone:Time.Zone.utc time) )
-                  ] ;
-              false
-          | `Ok ->
-              true ) ;
+    let get_rebroadcastable t ~has_timed_out:_ =
       Hashtbl.to_alist t.snark_tables.rebroadcastable
       |> List.map ~f:(fun (stmt, (snark, _time)) ->
              Diff.Add_solved_work (stmt, snark) )
@@ -1111,6 +1094,7 @@ let%test_module "random set test" =
                     assert false )
               [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
               ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ]) ;
+          (* Mark work as included in a block. *)
           let%bind () =
             Mocks.Transition_frontier.completed_work_statements tf
               [stmt1; stmt2]
@@ -1122,11 +1106,14 @@ let%test_module "random set test" =
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable4
             [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+          (* Keep rebroadcasting even after the timeout, as long as the work
+             hasn't appeared in a block yet.
+          *)
           let rebroadcastable5 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Timed_out)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable5 [] ;
+            rebroadcastable5 [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
           Deferred.unit )
   end )
