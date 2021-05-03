@@ -268,7 +268,15 @@ struct
             t.ref_table <- Some refcount_table ;
             t.removed_counter <- t.removed_counter + removed ;
             Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
-              ~f:(fun k -> not (Hashtbl.mem inclusion_table k)) ;
+              ~f:(fun stmt ->
+                [%log' debug t.logger]
+                  "No longer rebroadcasting SNARK with statement $stmt, it \
+                   has been seen in a block"
+                  ~metadata:
+                    [ ( "stmt"
+                      , One_or_two.to_yojson
+                          Transaction_snark.Statement.to_yojson stmt ) ] ;
+                not (Hashtbl.mem inclusion_table stmt) ) ;
             if t.removed_counter < removed_breadcrumb_wait then return ()
             else (
               t.removed_counter <- 0 ;
