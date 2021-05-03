@@ -165,11 +165,13 @@ struct
         { snark_tables: Snark_tables.t
         ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
         ; mutable ref_table: int Statement_table.t option
+        ; mutable best_tip_table:
+            Transaction_snark_work.Statement.Hash_set.t option
         ; config: Config.t
         ; logger: Logger.t sexp_opaque
         ; mutable removed_counter: int
-        ; account_creation_fee: Currency.Fee.t
               (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
+        ; account_creation_fee: Currency.Fee.t
         ; batcher: Batcher.Snark_pool.t }
       [@@deriving sexp]
 
@@ -196,6 +198,7 @@ struct
             constraint_constants
               .Genesis_constants.Constraint_constants.account_creation_fee
         ; ref_table= None
+        ; best_tip_table= None
         ; config
         ; logger
         ; removed_counter= removed_breadcrumb_wait }
@@ -264,8 +267,10 @@ struct
         | `New_refcount_table
             { Extensions.Snark_pool_refcount.removed
             ; refcount_table
-            ; inclusion_table } ->
+            ; inclusion_table
+            ; best_tip_table } ->
             t.ref_table <- Some refcount_table ;
+            t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;
             Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
               ~f:(fun stmt ->
@@ -297,6 +302,7 @@ struct
           ~tf_diff_writer =
         (* start with empty ref table *)
         t.ref_table <- None ;
+        t.best_tip_table <- None ;
         let tf_deferred =
           Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
             | Some tf ->
@@ -320,6 +326,7 @@ struct
                 return ()
             | None ->
                 t.ref_table <- None ;
+                t.best_tip_table <- None ;
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
@@ -336,6 +343,7 @@ struct
           ; logger
           ; config
           ; ref_table= None
+          ; best_tip_table= None
           ; account_creation_fee=
               constraint_constants
                 .Genesis_constants.Constraint_constants.account_creation_fee
@@ -509,9 +517,18 @@ struct
     module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
     let get_rebroadcastable t ~has_timed_out:_ =
+      let in_best_tip_table =
+        match t.best_tip_table with
+        | Some best_tip_table ->
+            Hash_set.mem best_tip_table
+        | None ->
+            Fn.const false
+      in
       Hashtbl.to_alist t.snark_tables.rebroadcastable
-      |> List.map ~f:(fun (stmt, (snark, _time)) ->
-             Diff.Add_solved_work (stmt, snark) )
+      |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
+             if in_best_tip_table stmt then
+               Some (Diff.Add_solved_work (stmt, snark))
+             else None )
 
     let remove_solved_work t work =
       Statement_table.remove t.snark_tables.all work ;
@@ -1008,7 +1025,7 @@ let%test_module "random set test" =
       in
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create (Some tf) in
-      let stmt1, stmt2, stmt3 =
+      let stmt1, stmt2, stmt3, stmt4 =
         let gen_not_any l =
           Quickcheck.Generator.filter
             Mocks.Transaction_snark_work.Statement.gen ~f:(fun x ->
@@ -1019,13 +1036,14 @@ let%test_module "random set test" =
         Quickcheck.random_value ~seed:(`Deterministic "")
           (let%bind a = gen_not_any [] in
            let%bind b = gen_not_any [a] in
-           let%map c = gen_not_any [a; b] in
-           (a, b, c))
+           let%bind c = gen_not_any [a; b] in
+           let%map d = gen_not_any [a; b; c] in
+           (a, b, c, d))
       in
-      let fee1, fee2, fee3 =
+      let fee1, fee2, fee3, fee4 =
         Quickcheck.random_value ~seed:(`Deterministic "")
-          (Quickcheck.Generator.tuple3 Fee_with_prover.gen Fee_with_prover.gen
-             Fee_with_prover.gen)
+          (Quickcheck.Generator.tuple4 Fee_with_prover.gen Fee_with_prover.gen
+             Fee_with_prover.gen Fee_with_prover.gen)
       in
       let fake_sender =
         Envelope.Sender.Remote
@@ -1045,7 +1063,8 @@ let%test_module "random set test" =
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =
-            Mocks.Transition_frontier.refer_statements tf [stmt1; stmt2; stmt3]
+            Mocks.Transition_frontier.refer_statements tf
+              [stmt1; stmt2; stmt3; stmt4]
           in
           let%bind res1 =
             apply_diff ~sender:fake_sender resource_pool stmt1 fee1
@@ -1114,6 +1133,21 @@ let%test_module "random set test" =
               ~has_timed_out:(Fn.const `Timed_out)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable5 [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+            rebroadcastable5
+            [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+          let%bind res6 = apply_diff resource_pool stmt4 fee4 in
+          let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
+          ok_exn res6 |> ignore ;
+          (* Mark best tip as not including stmt3. *)
+          let%bind () =
+            Mocks.Transition_frontier.remove_from_best_tip tf [stmt3]
+          in
+          let rebroadcastable6 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~has_timed_out:(Fn.const `Ok)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable6
+            [Add_solved_work (stmt4, {proof= proof4; fee= fee4})] ;
           Deferred.unit )
   end )

@@ -6,10 +6,14 @@ module T = struct
   type view =
     { removed: int
     ; refcount_table: int Work.Table.t
-    ; inclusion_table: int Work.Table.t }
+    ; inclusion_table: int Work.Table.t
+    ; best_tip_table: Work.Hash_set.t }
   [@@deriving sexp]
 
-  type t = {refcount_table: int Work.Table.t; inclusion_table: int Work.Table.t}
+  type t =
+    { refcount_table: int Work.Table.t
+    ; inclusion_table: int Work.Table.t
+    ; best_tip_table: Work.Hash_set.t }
 
   let get_work = Staged_ledger.Scan_state.all_work_statements_exn
 
@@ -60,7 +64,8 @@ module T = struct
   let create ~logger:_ frontier =
     let t =
       { refcount_table= Work.Table.create ()
-      ; inclusion_table= Work.Table.create () }
+      ; inclusion_table= Work.Table.create ()
+      ; best_tip_table= Work.Hash_set.create () }
     in
     let () =
       let breadcrumb = Full_frontier.root frontier in
@@ -75,15 +80,16 @@ module T = struct
     ( t
     , { removed= 0
       ; refcount_table= t.refcount_table
-      ; inclusion_table= t.inclusion_table } )
+      ; inclusion_table= t.inclusion_table
+      ; best_tip_table= t.best_tip_table } )
 
   type diff_update = {num_removed: int; is_added: bool}
 
-  let handle_diffs t _frontier diffs_with_mutants =
+  let handle_diffs t frontier diffs_with_mutants =
     let open Diff.Full.With_mutant in
     let {num_removed; is_added} =
       List.fold diffs_with_mutants ~init:{num_removed= 0; is_added= false}
-        ~f:(fun ({num_removed; is_added} as init) -> function
+        ~f:(fun {num_removed; is_added} -> function
         | E (New_node (Full breadcrumb), _) ->
             let scan_state =
               Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
@@ -115,14 +121,24 @@ module T = struct
                   acc + delta )
             in
             {num_removed= num_removed + extra_num_removed; is_added}
-        | E (Best_tip_changed _, _) ->
-            init )
+        | E (Best_tip_changed new_best_tip_hash, _) ->
+            let statements =
+              try
+                Full_frontier.find_exn frontier new_best_tip_hash
+                |> Breadcrumb.staged_ledger
+                |> Staged_ledger.all_work_statements_exn
+              with _ -> []
+            in
+            Hash_set.clear t.best_tip_table ;
+            List.iter ~f:(Hash_set.add t.best_tip_table) statements ;
+            {num_removed; is_added= true} )
     in
     if num_removed > 0 || is_added then
       Some
         { removed= num_removed
         ; refcount_table= t.refcount_table
-        ; inclusion_table= t.inclusion_table }
+        ; inclusion_table= t.inclusion_table
+        ; best_tip_table= t.best_tip_table }
     else None
 end
 
