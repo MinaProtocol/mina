@@ -98,26 +98,26 @@ func isPrivateAddr(addr ma.Multiaddr) bool {
 }
 
 type CodaConnectionManager struct {
-	ctx                context.Context
-	host               host.Host
-	p2pManager         *p2pconnmgr.BasicConnMgr
-	minaPeerExchange   bool
-	getRandomPeers     getRandomPeersFunc
-	OnConnect          func(network.Network, network.Conn)
-	OnDisconnect       func(network.Network, network.Conn)
-	consensusNodeCount int64
-	maxConsensusNode   int64
+	ctx                   context.Context
+	host                  host.Host
+	p2pManager            *p2pconnmgr.BasicConnMgr
+	minaPeerExchange      bool
+	getRandomPeers        getRandomPeersFunc
+	OnConnect             func(network.Network, network.Conn)
+	OnDisconnect          func(network.Network, network.Conn)
+	consensusNodeCount    int64
+	minConsensusNodeCount int64
 }
 
-func newCodaConnectionManager(maxConnections int, minaPeerExchange bool, maxConsensusNode int64) *CodaConnectionManager {
+func newCodaConnectionManager(maxConnections int, minaPeerExchange bool, minConsensusNodeCount int64) *CodaConnectionManager {
 	noop := func(net network.Network, c network.Conn) {}
 
 	return &CodaConnectionManager{
-		p2pManager:       p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
-		OnConnect:        noop,
-		OnDisconnect:     noop,
-		minaPeerExchange: minaPeerExchange,
-		maxConsensusNode: maxConsensusNode,
+		p2pManager:            p2pconnmgr.NewConnManager(25, maxConnections, time.Duration(1*time.Millisecond)),
+		OnConnect:             noop,
+		OnDisconnect:          noop,
+		minaPeerExchange:      minaPeerExchange,
+		minConsensusNodeCount: minConsensusNodeCount,
 	}
 }
 
@@ -134,7 +134,7 @@ func (cm *CodaConnectionManager) GetTagInfo(p peer.ID) *connmgr.TagInfo {
 }
 func (cm *CodaConnectionManager) TrimOpenConns(ctx context.Context) { cm.p2pManager.TrimOpenConns(ctx) }
 func (cm *CodaConnectionManager) Protect(p peer.ID, tag string) {
-	if cm.consensusNodeCount >= cm.maxConsensusNode && tag == ConsensusNodeTag {
+	if cm.consensusNodeCount >= cm.minConsensusNodeCount && tag == ConsensusNodeTag {
 		return
 	}
 	cm.p2pManager.Protect(p, tag)
@@ -623,7 +623,8 @@ func (h *Helper) handleHandshakeStream(s network.Stream) {
 
 	data, err := json.Marshal(h.IsConsensusNode)
 	if err != nil {
-		logger.Error("failed to unmarshal Handshake data", err)
+		logger.Error("failed to marshal Handshake data", err)
+		return
 	}
 
 	n, err := s.Write(data)
@@ -656,7 +657,7 @@ func (h Helper) pxConnectionWorker() {
 }
 
 // MakeHelper does all the initialization to run one host
-func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool, maxConsensusNode int64) (*Helper, error) {
+func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string, seeds []peer.AddrInfo, gatingState *CodaGatingState, maxConnections int, minaPeerExchange bool, minConsensusNodeCount int64) (*Helper, error) {
 	me, err := peer.IDFromPrivateKey(pk)
 	if err != nil {
 		return nil, err
@@ -693,7 +694,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	mplex.MaxMessageSize = 1 << 30
 
-	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange, maxConsensusNode)
+	connManager := newCodaConnectionManager(maxConnections, minaPeerExchange, minConsensusNodeCount)
 	bandwidthCounter := metrics.NewBandwidthCounter()
 
 	host, err := p2p.New(ctx,

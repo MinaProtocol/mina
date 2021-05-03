@@ -253,22 +253,22 @@ var (
 )
 
 type configureMsg struct {
-	Statedir            string             `json:"statedir"`
-	Privk               string             `json:"privk"`
-	NetworkID           string             `json:"network_id"`
-	ListenOn            []string           `json:"ifaces"`
-	MetricsPort         string             `json:"metrics_port"`
-	External            string             `json:"external_maddr"`
-	UnsafeNoTrustIP     bool               `json:"unsafe_no_trust_ip"`
-	Flood               bool               `json:"flood"`
-	PeerExchange        bool               `json:"peer_exchange"`
-	DirectPeers         []string           `json:"direct_peers"`
-	SeedPeers           []string           `json:"seed_peers"`
-	GatingConfig        setGatingConfigMsg `json:"gating_config"`
-	MaxConnections      int                `json:"max_connections"`
-	ValidationQueueSize int                `json:"validation_queue_size"`
-	MinaPeerExchange    bool               `json:"mina_peer_exchange"`
-	MaxConsensusNode    int64              `json:"max_consensus_node"`
+	Statedir              string             `json:"statedir"`
+	Privk                 string             `json:"privk"`
+	NetworkID             string             `json:"network_id"`
+	ListenOn              []string           `json:"ifaces"`
+	MetricsPort           string             `json:"metrics_port"`
+	External              string             `json:"external_maddr"`
+	UnsafeNoTrustIP       bool               `json:"unsafe_no_trust_ip"`
+	Flood                 bool               `json:"flood"`
+	PeerExchange          bool               `json:"peer_exchange"`
+	DirectPeers           []string           `json:"direct_peers"`
+	SeedPeers             []string           `json:"seed_peers"`
+	GatingConfig          setGatingConfigMsg `json:"gating_config"`
+	MaxConnections        int                `json:"max_connections"`
+	ValidationQueueSize   int                `json:"validation_queue_size"`
+	MinaPeerExchange      bool               `json:"mina_peer_exchange"`
+	MinConsensusNodeCount int64              `json:"min_consensus_node_count"`
 }
 
 type peerConnectionUpcall struct {
@@ -331,7 +331,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange, m.MaxConsensusNode)
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange, m.MinConsensusNodeCount)
 	if err != nil {
 		return nil, badHelper(err)
 	}

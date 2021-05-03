@@ -63,7 +63,7 @@ func newTestKey(t *testing.T) crypto.PrivKey {
 
 func testStreamHandler(_ net.Stream) {}
 
-func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, maxConns int, maxConsensusNode int64) *app {
+func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool, maxConns int, minConsensusNodeCount int64) *app {
 	dir, err := ioutil.TempDir("", "mina_test_*")
 	require.NoError(t, err)
 
@@ -80,7 +80,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 		codanet.NewCodaGatingState(nil, nil, nil, nil),
 		maxConns,
 		true,
-		maxConsensusNode,
+		minConsensusNodeCount,
 	)
 	require.NoError(t, err)
 	port++
@@ -341,7 +341,7 @@ func TestConfigurationMsg(t *testing.T) {
 }
 
 func TestListenMsg(t *testing.T) {
-	addrStr := "/ip4/127.0.0.2/tcp/8000"
+	addrStr := "/ip4/127.0.0.1/tcp/8000"
 
 	addr, err := ma.NewMultiaddr(addrStr)
 	require.NoError(t, err)
