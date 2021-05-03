@@ -7,7 +7,8 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Transaction_snark.Stable.V1.t [@@deriving compare, sexp, yojson]
+      type t = Transaction_snark.Stable.V1.t
+      [@@deriving compare, sexp, yojson, hash]
 
       let to_latest = Fn.id
 

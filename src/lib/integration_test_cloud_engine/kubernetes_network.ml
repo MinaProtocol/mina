@@ -318,19 +318,21 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
-      ~amount ~fee =
+  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let open Deferred.Or_error.Let_syntax in
-    let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
+    let sender_pk_str =
+      Signature_lib.Public_key.Compressed.to_string sender_pub_key
+    in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
         Graphql.Unlock_account.make ~password:"naughty blue worm"
-          ~public_key:(Graphql_lib.Encoders.public_key sender)
+          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
           ()
       in
       exec_graphql_request ~logger ~node:t
@@ -340,8 +342,8 @@ module Node = struct
     let send_payment_graphql () =
       let send_payment_obj =
         Graphql.Send_payment.make
-          ~sender:(Graphql_lib.Encoders.public_key sender)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver)
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
@@ -357,10 +359,10 @@ module Node = struct
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
 
-  let must_send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver
-      ~amount ~fee =
-    send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver ~amount
-      ~fee
+  let must_send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
+    send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
