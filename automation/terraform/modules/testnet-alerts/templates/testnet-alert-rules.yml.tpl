@@ -22,7 +22,7 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "At least 3 nodes on {{ $lables.testnet }} restarted"
+      summary: "At least 3 nodes on {{ $labels.testnet }} restarted"
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: HighDisconnectedBlocksPerHour
@@ -359,7 +359,7 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: warning
     annotations:
-      summary: "At least one of the nodes on {{ $lables.testnet }} restarted"
+      summary: "At least one of the nodes on {{ $labels.testnet }} restarted"
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: UnparentedBlocksObserved
