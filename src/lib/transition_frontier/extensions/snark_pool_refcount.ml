@@ -122,15 +122,25 @@ module T = struct
             in
             {num_removed= num_removed + extra_num_removed; is_added}
         | E (Best_tip_changed new_best_tip_hash, _) ->
-            let statements =
-              try
-                Full_frontier.find_exn frontier new_best_tip_hash
-                |> Breadcrumb.staged_ledger
-                |> Staged_ledger.all_work_statements_exn
-              with _ -> []
+            let rec update_best_tip_table blocks_remaining state_hash =
+              match Full_frontier.find frontier state_hash with
+              | None ->
+                  ()
+              | Some breadcrumb ->
+                  let statements =
+                    try
+                      Breadcrumb.staged_ledger breadcrumb
+                      |> Staged_ledger.all_work_statements_exn
+                    with _ -> []
+                  in
+                  List.iter ~f:(Hash_set.add t.best_tip_table) statements ;
+                  if blocks_remaining > 0 then
+                    update_best_tip_table (blocks_remaining - 1)
+                      (Breadcrumb.parent_hash breadcrumb)
             in
+            let num_blocks_to_include = 10 in
             Hash_set.clear t.best_tip_table ;
-            List.iter ~f:(Hash_set.add t.best_tip_table) statements ;
+            update_best_tip_table num_blocks_to_include new_best_tip_hash ;
             {num_removed; is_added= true} )
     in
     if num_removed > 0 || is_added then
