@@ -35,28 +35,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let length = Hash_set.length common_prefixes in
     if length = 0 then (
       let result =
-        Malleable_error.soft_error ()
+        Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
                 "Chains don't have any common prefixes among their most \
                  recent %d blocks"
                 n))
       in
-      [%log info]
+      [%log error]
         "common_prefix test: TEST FAILURE, Chains don't have any common \
          prefixes among their most recent %d blocks"
         n ;
       result )
     else if length < n then (
       let result =
-        Malleable_error.soft_error ()
+        Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
                 !"Chains only have %d common prefixes, expected %d common \
                   prefixes"
                 length n))
       in
-      [%log info]
+      [%log error]
         "common_prefix test: TEST FAILURE, Chains only have %d common \
          prefixes, expected %d common prefixes"
         length n ;

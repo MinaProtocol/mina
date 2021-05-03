@@ -91,7 +91,7 @@ include T
 
 let lift = Deferred.bind ~f:return
 
-let soft_error value error =
+let soft_error ~value error =
   error |> Test_error.internal_error |> Error_accumulator.singleton
   |> Result_accumulator.create value
   |> Result.return |> Deferred.return
@@ -117,21 +117,21 @@ let ok_if_true ?(error_type = `Hard) ~error b =
   else
     match error_type with
     | `Soft ->
-        soft_error () error
+        soft_error ~value:() error
     | `Hard ->
         hard_error error
 
-let or_soft_error value or_error =
+let or_soft_error ~value or_error =
   match or_error with
   | Ok x ->
       return x
   | Error error ->
-      soft_error value error
+      soft_error ~value error
 
-let soft_error_string value = Fn.compose (soft_error value) Error.of_string
+let soft_error_string ~value = Fn.compose (soft_error ~value) Error.of_string
 
-let soft_error_format value format =
-  Printf.ksprintf (soft_error_string value) format
+let soft_error_format ~value format =
+  Printf.ksprintf (soft_error_string ~value) format
 
 let or_hard_error or_error =
   match or_error with Ok x -> return x | Error error -> hard_error error
@@ -287,8 +287,8 @@ let%test_module "malleable error unit tests" =
           let open Deferred.Let_syntax in
           let%map actual =
             let open T.Let_syntax in
-            let%bind () = soft_error () (Error.of_string "a") in
-            soft_error "123" (Error.of_string "b")
+            let%bind () = soft_error ~value:() (Error.of_string "a") in
+            soft_error ~value:"123" (Error.of_string "b")
           in
           let expected =
             let errors =
@@ -328,7 +328,7 @@ let%test_module "malleable error unit tests" =
           let open Deferred.Let_syntax in
           let%map actual =
             let open T.Let_syntax in
-            let%bind () = soft_error () (Error.of_string "a") in
+            let%bind () = soft_error ~value:() (Error.of_string "a") in
             let%bind () = hard_error (Error.of_string "xyz") in
             return "hello world"
           in
@@ -350,8 +350,8 @@ let%test_module "malleable error unit tests" =
           let open Deferred.Let_syntax in
           let%map actual =
             let open T.Let_syntax in
-            let%bind () = soft_error () (Error.of_string "a") in
-            let%bind () = soft_error () (Error.of_string "b") in
+            let%bind () = soft_error ~value:() (Error.of_string "a") in
+            let%bind () = soft_error ~value:() (Error.of_string "b") in
             hard_error (Error.of_string "xyz")
           in
           let expected =
