@@ -16,6 +16,15 @@ groups:
       summary: "{{ $labels.testnet }} cluster nodes have crashed"
       description: "{{ $value }} Cluster nodes have crashed on network {{ $labels.testnet }}."
 
+  - alert: MultipleNodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 600000) > 2
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "At least 3 nodes on {{ $labels.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+
   - alert: HighDisconnectedBlocksPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 3
     labels:
@@ -53,8 +62,9 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} has pods which have not logged in 10 minutes"
-      description: "There are no new logs in the last 10 minutes for {{ $value }} pods on network {{ $labels.testnet }}."
+      summary: "{{ $labels.testnet }} has pods which have not logged in an hour"
+      description: "There are no new logs in the last hour for {{ $value }} pods on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/WatchdogNoNewLogs-7ffb7a74bad542c78961abddd9004489"
 
   - alert: SeedListDown
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alert_timeframe}])) == 0
@@ -343,6 +353,15 @@ groups:
       summary: "{{ $labels.testnet }} rate of archival of network blocks in Postgres DB is lower than expected"
       description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
+  - alert: NodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 360000) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "At least one of the nodes on {{ $labels.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: UnparentedBlocksObserved
     expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 1
