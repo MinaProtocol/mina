@@ -132,7 +132,7 @@ module type Transition_frontier_intf = sig
 
   val snark_pool_refcount_pipe :
        t
-    -> (int * int Transaction_snark_work.Statement.Table.t)
+    -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
@@ -158,8 +158,7 @@ struct
       end
 
       type transition_frontier_diff =
-        [ `New_refcount_table of
-          int * int Transaction_snark_work.Statement.Table.t
+        [ `New_refcount_table of Extensions.Snark_pool_refcount.view
         | `New_best_tip of Base_ledger.t ]
 
       type t =
@@ -262,9 +261,14 @@ struct
                   Hashtbl.remove t.snark_tables.rebroadcastable key ;
                 keep ) ;
             return ()
-        | `New_refcount_table (removed, refcount_table) ->
+        | `New_refcount_table
+            { Extensions.Snark_pool_refcount.removed
+            ; refcount_table
+            ; inclusion_table } ->
             t.ref_table <- Some refcount_table ;
             t.removed_counter <- t.removed_counter + removed ;
+            Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
+              ~f:(fun k -> not (Hashtbl.mem inclusion_table k)) ;
             if t.removed_counter < removed_breadcrumb_wait then return ()
             else (
               t.removed_counter <- 0 ;
@@ -1013,18 +1017,24 @@ let%test_module "random set test" =
       in
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create (Some tf) in
-      let stmt1, stmt2 =
+      let stmt1, stmt2, stmt3 =
+        let gen_not_any l =
+          Quickcheck.Generator.filter
+            Mocks.Transaction_snark_work.Statement.gen ~f:(fun x ->
+              List.for_all l ~f:(fun y ->
+                  Mocks.Transaction_snark_work.Statement.compare x y <> 0 ) )
+        in
+        let open Quickcheck.Generator.Let_syntax in
         Quickcheck.random_value ~seed:(`Deterministic "")
-          (Quickcheck.Generator.filter
-             ~f:(fun (a, b) ->
-               Mocks.Transaction_snark_work.Statement.compare a b <> 0 )
-             (Quickcheck.Generator.tuple2
-                Mocks.Transaction_snark_work.Statement.gen
-                Mocks.Transaction_snark_work.Statement.gen))
+          (let%bind a = gen_not_any [] in
+           let%bind b = gen_not_any [a] in
+           let%map c = gen_not_any [a; b] in
+           (a, b, c))
       in
-      let fee1, fee2 =
+      let fee1, fee2, fee3 =
         Quickcheck.random_value ~seed:(`Deterministic "")
-          (Quickcheck.Generator.tuple2 Fee_with_prover.gen Fee_with_prover.gen)
+          (Quickcheck.Generator.tuple3 Fee_with_prover.gen Fee_with_prover.gen
+             Fee_with_prover.gen)
       in
       let fake_sender =
         Envelope.Sender.Remote
@@ -1044,7 +1054,7 @@ let%test_module "random set test" =
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =
-            Mocks.Transition_frontier.refer_statements tf [stmt1; stmt2]
+            Mocks.Transition_frontier.refer_statements tf [stmt1; stmt2; stmt3]
           in
           let%bind res1 =
             apply_diff ~sender:fake_sender resource_pool stmt1 fee1
@@ -1074,11 +1084,41 @@ let%test_module "random set test" =
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable2
             [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
+          let%bind res3 = apply_diff resource_pool stmt3 fee3 in
+          let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
+          ok_exn res3 |> ignore ;
           let rebroadcastable3 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~has_timed_out:(Fn.const `Ok)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable3
+            (let open Mock_snark_pool.Resource_pool.Diff in
+            List.sort
+              ~compare:(fun x y ->
+                match (x, y) with
+                | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
+                    Transaction_snark_work.Statement.compare stmt1 stmt2
+                | _ ->
+                    assert false )
+              [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
+              ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ]) ;
+          let%bind () =
+            Mocks.Transition_frontier.completed_work_statements tf
+              [stmt1; stmt2]
+          in
+          let rebroadcastable4 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~has_timed_out:(Fn.const `Ok)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable4
+            [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+          let rebroadcastable5 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Timed_out)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable3 [] ;
+            rebroadcastable5 [] ;
           Deferred.unit )
   end )
