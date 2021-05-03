@@ -30,7 +30,9 @@ let get_path {path; cache} public_key =
   path ^/ filename
 
 let decode_public_key key file path logger =
-  match Public_key.Compressed.of_base58_check key with
+  match
+    Or_error.try_with (fun () -> Public_key.of_base58_check_decompress_exn key)
+  with
   | Ok pk ->
       Some pk
   | Error e ->

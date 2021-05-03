@@ -1084,14 +1084,7 @@ let genesis ~precomputed_values =
   let protocol_state_proof =
     Precomputed_values.genesis_proof precomputed_values
   in
-  let empty_diff =
-    { Staged_ledger_diff.diff=
-        ( { completed_works= []
-          ; commands= []
-          ; coinbase= Staged_ledger_diff.At_most_two.Zero
-          ; internal_command_balances= [] }
-        , None ) }
-  in
+  let empty_diff = Staged_ledger_diff.empty_diff in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
     Validated.create_unsafe_pre_hashed

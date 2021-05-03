@@ -238,18 +238,21 @@ let fill_in_internal_commands pool block_state_hash =
     query_db
       ~item:
         "internal command id, global_slot, sequence no, secondary sequence \
-         no, receiver_balance" ~f:(fun db ->
+         no, receiver_balance_id" ~f:(fun db ->
         Sql.Blocks_and_internal_commands.run db ~block_id )
   in
   Deferred.List.map internal_cmd_info
     ~f:(fun { internal_command_id
-            ; global_slot
             ; sequence_no
             ; secondary_sequence_no
-            ; receiver_balance }
+            ; receiver_balance_id }
        ->
+      let%bind _pubkey, receiver_balance_int64 =
+        query_db ~item:"receiver balance" ~f:(fun db ->
+            Processor.Balance.load db ~id:receiver_balance_id )
+      in
       let receiver_balance =
-        receiver_balance |> Unsigned.UInt64.of_int64
+        Unsigned.UInt64.of_int64 receiver_balance_int64
         |> Currency.Balance.of_uint64
       in
       (* pieces from the internal_commands table *)
@@ -276,19 +279,6 @@ let fill_in_internal_commands pool block_state_hash =
         ; token
         ; hash }
       in
-      ( if String.equal cmd.typ "fee_transfer_via_coinbase" then
-        match
-          Block.Fee_transfer_via_coinbase.Table.add Block.fee_transfer_tbl
-            ~key:(global_slot, cmd.sequence_no, cmd.secondary_sequence_no)
-            ~data:cmd
-        with
-        | `Ok ->
-            ()
-        | `Duplicate ->
-            failwithf
-              "Duplicate fee transfer via coinbase at global slot = %Ld, \
-               sequence no = %d, secondary sequence no = %d"
-              global_slot cmd.sequence_no cmd.secondary_sequence_no () ) ;
       return cmd )
 
 let check_state_hash ~logger state_hash_opt =
@@ -390,8 +380,9 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
       let%bind extensional_blocks =
         Deferred.List.map blocks ~f:(fill_in_block pool)
       in
-      [%log info] "Found a subchain of length %d"
-        (List.length extensional_blocks) ;
+      let num_blocks = List.length extensional_blocks in
+      if all_blocks then [%log info] "Found %d blocks" num_blocks
+      else [%log info] "Found a subchain of length %d" num_blocks ;
       [%log info] "Querying for user commands in blocks" ;
       let%bind blocks_with_user_cmds =
         Deferred.List.map extensional_blocks ~f:(fun block ->
@@ -450,7 +441,7 @@ let () =
            Param.flag "--archive-uri"
              ~doc:
                "URI URI for connecting to the archive database (e.g., \
-                postgres://$USER:$USER@localhost:5432/archiver)"
+                postgres://$USER@localhost:5432/archiver)"
              Param.(required string)
          and start_state_hash_opt =
            Param.flag "--start-state-hash"

@@ -47,16 +47,43 @@ module Engine = struct
         -> receiver:Signature_lib.Public_key.Compressed.t
         -> amount:Currency.Amount.t
         -> fee:Currency.Fee.t
+        -> unit Deferred.Or_error.t
+
+      val must_send_payment :
+           ?retry_on_graphql_error:bool
+        -> logger:Logger.t
+        -> t
+        -> sender:Signature_lib.Public_key.Compressed.t
+        -> receiver:Signature_lib.Public_key.Compressed.t
+        -> amount:Currency.Amount.t
+        -> fee:Currency.Fee.t
         -> unit Malleable_error.t
 
       val get_balance :
            logger:Logger.t
         -> t
         -> account_id:Mina_base.Account_id.t
+        -> Currency.Balance.t Async_kernel.Deferred.Or_error.t
+
+      val must_get_balance :
+           logger:Logger.t
+        -> t
+        -> account_id:Mina_base.Account_id.t
         -> Currency.Balance.t Malleable_error.t
 
       val get_peer_id :
+           logger:Logger.t
+        -> t
+        -> (string * string list) Async_kernel.Deferred.Or_error.t
+
+      val must_get_peer_id :
         logger:Logger.t -> t -> (string * string list) Malleable_error.t
+
+      val get_best_chain :
+        logger:Logger.t -> t -> string list Async_kernel.Deferred.Or_error.t
+
+      val must_get_best_chain :
+        logger:Logger.t -> t -> string list Malleable_error.t
 
       val dump_archive_data :
         logger:Logger.t -> t -> data_file:string -> unit Malleable_error.t
@@ -250,6 +277,8 @@ module Dsl = struct
 
     type t
 
+    val section : string -> 'a Malleable_error.t -> 'a Malleable_error.t
+
     val wait_for : t -> Wait_condition.t -> unit Malleable_error.t
 
     (* TODO: move this functionality to a more suitable location *)
@@ -260,15 +289,16 @@ module Dsl = struct
       -> network_state_reader:Network_state.t Broadcast_pipe.Reader.t
       -> [`Don't_call_in_tests of t]
 
-    type error_accumulator
+    type log_error_accumulator
 
     val watch_log_errors :
          logger:Logger.t
       -> event_router:Event_router.t
       -> on_fatal_error:(Logger.Message.t -> unit)
-      -> error_accumulator
+      -> log_error_accumulator
 
-    val lift_accumulated_errors : error_accumulator -> Test_error.Set.t
+    val lift_accumulated_log_errors :
+      log_error_accumulator -> Test_error.remote_error Test_error.Set.t
   end
 end
 
@@ -287,8 +317,6 @@ module Test = struct
     type dsl
 
     val config : Test_config.t
-
-    val expected_error_event_reprs : Structured_log_events.repr list
 
     val run : network -> dsl -> unit Malleable_error.t
   end

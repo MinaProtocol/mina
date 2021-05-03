@@ -30,10 +30,7 @@ Pipeline.build
     spec =
       JobSpec::{
         dirtyWhen = [
-            S.strictlyStart (S.contains "src/app/archive"),
-            S.strictlyStart (S.contains "src/app/extract_blocks"),
-            S.strictlyStart (S.contains "src/app/missing_blocks_auditor"),
-            S.strictlyStart (S.contains "src/app/archive_blocks"),
+            S.strictlyStart (S.contains "src"),
             S.strictlyStart (S.contains "scripts/archive"),
             S.strictlyStart (S.contains "automation"),
             S.strictlyStart (S.contains "buildkite/src/Jobs/Release/ArchiveNodeArtifact"),
@@ -43,9 +40,11 @@ Pipeline.build
         name = "ArchiveRedundancyTools"
       },
     steps = [
-      buildToolCmd "build_archive" Size.Medium,
+      buildToolCmd "build_archive_all_sigs" Size.Medium,
       buildToolCmd "extract_blocks" Size.Medium,
       buildToolCmd "missing_blocks_auditor" Size.Medium,
-      buildToolCmd "archive_blocks" Size.Medium
+      buildToolCmd "archive_blocks" Size.Medium,
+      buildToolCmd "replayer" Size.Medium,
+      buildToolCmd "swap_bad_balances" Size.Medium
     ]
   }

@@ -11,6 +11,7 @@ module Node = struct
     ; cluster: string
     ; namespace: string
     ; pod_id: string
+    ; container_id: string (* name of the container inside the pod *)
     ; graphql_enabled: bool
     ; network_keypair: Network_keypair.t option }
 
@@ -20,18 +21,17 @@ module Node = struct
 
   let base_kube_args t = ["--cluster"; t.cluster; "--namespace"; t.namespace]
 
-  let run_in_postgresql_container node ~n ~cmd =
+  let run_in_postgresql_container node ~cmd =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
-      Printf.sprintf
-        "%s -c archive-%d-postgresql exec -i archive-%d-postgresql-0 -- %s"
-        base_kube_cmd n n cmd
+      Printf.sprintf "%s -c %s exec -i %s-0 -- %s" base_kube_cmd
+        node.container_id node.container_id cmd
     in
     let%bind cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
 
-  let get_logs_in_container container node =
+  let get_logs_in_container node =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let pod_cmd =
@@ -40,7 +40,7 @@ module Node = struct
     let%bind cwd = Unix.getcwd () in
     let%bind pod = Util.run_cmd_exn cwd "sh" ["-c"; pod_cmd] in
     let kubectl_cmd =
-      Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd container
+      Printf.sprintf "%s logs -c %s -n %s %s" base_kube_cmd node.container_id
         node.namespace pod
     in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
@@ -50,8 +50,8 @@ module Node = struct
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
       Printf.sprintf
-        "%s -c coda exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
-        base_kube_cmd base_kube_cmd node.pod_id cmd
+        "%s -c %s exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
+        base_kube_cmd node.container_id base_kube_cmd node.pod_id cmd
     in
     let%bind.Deferred.Let_syntax cwd = Unix.getcwd () in
     Malleable_error.return (Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd])
@@ -75,9 +75,10 @@ module Node = struct
     let%bind _ = run_in_container node "ps aux" in
     let%bind _ = run_in_container node "./stop.sh" in
     let%bind _ = run_in_container node "ps aux" in
-    Malleable_error.return ()
+    return ()
 
   let get_pod_name t : string Malleable_error.t =
+    let open Malleable_error.Let_syntax in
     let args =
       List.append (base_kube_args t)
         [ "get"
@@ -88,33 +89,26 @@ module Node = struct
         ; "--no-headers" ]
     in
     let%bind run_result =
-      Deferred.bind ~f:Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.or_hard_error
         (Process.run_lines ~prog:"kubectl" ~args ())
     in
     match run_result with
-    | Ok
-        { Malleable_error.Accumulator.computation_result= [pod_name]
-        ; soft_errors= _ } ->
-        Malleable_error.return pod_name
-    | Ok {Malleable_error.Accumulator.computation_result= []; soft_errors= _}
-      ->
-        Malleable_error.of_string_hard_error "get_pod_name: no result"
-    | Ok _ ->
-        Malleable_error.of_string_hard_error "get_pod_name: too many results"
-    | Error
-        { Malleable_error.Hard_fail.hard_error= e
-        ; Malleable_error.Hard_fail.soft_errors= _ } ->
-        Malleable_error.of_error_hard e.error
+    | [] ->
+        Malleable_error.hard_error_string "get_pod_name: no result"
+    | [pod_name] ->
+        return pod_name
+    | _ ->
+        Malleable_error.hard_error_string "get_pod_name: too many results"
 
   module Decoders = Graphql_lib.Decoders
 
   module Graphql = struct
     let ingress_uri node =
-      Uri.make ~scheme:"http"
-        ~host:
-          (Printf.sprintf "%s.%s.graphql.o1test.net" node.pod_id
-             node.testnet_name)
-        ~path:"/graphql" ~port:80 ()
+      let host =
+        Printf.sprintf "%s.graphql.test.o1test.net" node.testnet_name
+      in
+      let path = Printf.sprintf "/%s/graphql" node.pod_id in
+      Uri.make ~scheme:"http" ~host ~path ~port:80 ()
 
     module Client = Graphql_lib.Client.Make (struct
       let preprocess_variables_string = Fn.id
@@ -178,15 +172,25 @@ module Node = struct
         }
       }
     |}]
+
+    module Best_chain =
+    [%graphql
+    {|
+      query {
+        bestChain {
+          stateHash
+        }
+      }
+    |}]
   end
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
       ?(initial_delay_sec = 30.0) ~logger ~node
       ?(retry_on_graphql_error = false) ~query_name query_obj =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Let_syntax in
     if not node.graphql_enabled then
-      Malleable_error.of_string_hard_error
+      Deferred.Or_error.error_string
         "graphql is not enabled (hint: set `requires_graphql= true` in the \
          test config)"
     else
@@ -201,18 +205,15 @@ module Node = struct
           [%log error]
             "GraphQL request \"$query\" to \"$uri\" failed too many times"
             ~metadata ;
-          Malleable_error.of_string_hard_error_format
+          Deferred.Or_error.errorf
             "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
             (Uri.to_string uri) )
         else
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query query_obj) uri)
-          with
+          match%bind Graphql.Client.query query_obj uri with
           | Ok result ->
               [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
                 ~metadata ;
-              return result
+              Deferred.Or_error.return result
           | Error (`Failed_request err_string) ->
               [%log warn]
                 "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
@@ -221,10 +222,7 @@ module Node = struct
                   ( metadata
                   @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
                   ) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
+              let%bind () = after (Time.Span.of_sec retry_delay_sec) in
               retry (n - 1)
           | Error (`Graphql_error err_string) ->
               [%log error]
@@ -235,21 +233,15 @@ module Node = struct
                   @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
                   ) ;
               if retry_on_graphql_error then
-                let%bind () =
-                  Deferred.bind ~f:Malleable_error.return
-                    (after (Time.Span.of_sec retry_delay_sec))
-                in
+                let%bind () = after (Time.Span.of_sec retry_delay_sec) in
                 retry (n - 1)
-              else Malleable_error.of_string_hard_error err_string
+              else Deferred.Or_error.error_string err_string
       in
-      let%bind () =
-        Deferred.bind ~f:Malleable_error.return
-          (after (Time.Span.of_sec initial_delay_sec))
-      in
+      let%bind () = after (Time.Span.of_sec initial_delay_sec) in
       retry num_tries
 
   let get_peer_id ~logger t =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
@@ -263,19 +255,39 @@ module Node = struct
     let%bind self_id =
       match self_id_obj with
       | None ->
-          Malleable_error.of_string_hard_error "Peer not found"
+          Deferred.Or_error.error_string "Peer not found"
       | Some peer ->
-          Malleable_error.return peer#peerId
+          return peer#peerId
     in
     let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
     let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
     [%log info]
-      "get_peer_id, result of graphql querry (self_id,[peers]) (%s,%s)" self_id
+      "get_peer_id, result of graphql query (self_id,[peers]) (%s,%s)" self_id
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
+  let must_get_peer_id ~logger t =
+    get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_best_chain ~logger t =
+    let open Deferred.Or_error.Let_syntax in
+    let query = Graphql.Best_chain.make () in
+    let%bind result =
+      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
+        ~query_name:"best_chain" query
+    in
+    match result#bestChain with
+    | None | Some [||] ->
+        Deferred.Or_error.error_string "failed to get best chains"
+    | Some chain ->
+        return
+        @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
+
+  let must_get_best_chain ~logger t =
+    get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let get_balance ~logger t ~account_id =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
         [ ("namespace", `String t.namespace)
@@ -283,27 +295,27 @@ module Node = struct
         ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
-    let get_balance () =
-      let get_balance_obj =
-        Graphql.Get_balance.make
-          ~public_key:(Graphql_lib.Encoders.public_key pk)
-          ~token:(Graphql_lib.Encoders.token token)
-          ()
-      in
-      let%bind balance_obj =
-        exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
-          ~query_name:"get_balance_graphql" get_balance_obj
-      in
-      match balance_obj#account with
-      | None ->
-          Malleable_error.of_string_hard_error
-            (sprintf
-               !"Account with %{sexp:Mina_base.Account_id.t} not found"
-               account_id)
-      | Some acc ->
-          Malleable_error.return (acc#balance)#total
+    let get_balance_obj =
+      Graphql.Get_balance.make
+        ~public_key:(Graphql_lib.Encoders.public_key pk)
+        ~token:(Graphql_lib.Encoders.token token)
+        ()
     in
-    get_balance ()
+    let%bind balance_obj =
+      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
+        ~query_name:"get_balance_graphql" get_balance_obj
+    in
+    match balance_obj#account with
+    | None ->
+        Deferred.Or_error.errorf
+          !"Account with %{sexp:Mina_base.Account_id.t} not found"
+          account_id
+    | Some acc ->
+        return (acc#balance)#total
+
+  let must_get_balance ~logger t ~account_id =
+    get_balance ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
   let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
@@ -311,7 +323,7 @@ module Node = struct
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
@@ -345,11 +357,19 @@ module Node = struct
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
 
+  let must_send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver
+      ~amount ~fee =
+    send_payment ?retry_on_graphql_error ~logger t ~sender ~receiver ~amount
+      ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let dump_archive_data ~logger (t : t) ~data_file =
     let open Malleable_error.Let_syntax in
+    [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
+      t.container_id ;
     let%map data =
       Deferred.bind ~f:Malleable_error.return
-        (run_in_postgresql_container t ~n:1
+        (run_in_postgresql_container t
            ~cmd:
              "pg_dump --create --no-owner \
               postgres://postgres:foobar@localhost:5432/archive")
@@ -360,8 +380,10 @@ module Node = struct
 
   let dump_container_logs ~logger (t : t) ~log_file =
     let open Malleable_error.Let_syntax in
+    [%log info] "Dumping container logs from (node: %s, container: %s)"
+      t.pod_id t.container_id ;
     let%map logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container "coda" t)
+      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
     [%log info] "Dumping container log to file %s" log_file ;
     Out_channel.with_file log_file ~f:(fun out_ch ->
@@ -369,9 +391,11 @@ module Node = struct
 
   let dump_precomputed_blocks ~logger (t : t) =
     let open Malleable_error.Let_syntax in
-    [%log info] "Dumping precomputed blocks from logs for node %s" t.pod_id ;
+    [%log info]
+      "Dumping precomputed blocks from logs for (node: %s, container: %s)"
+      t.pod_id t.container_id ;
     let%bind logs =
-      Deferred.bind ~f:Malleable_error.return (get_logs_in_container "coda" t)
+      Deferred.bind ~f:Malleable_error.return (get_logs_in_container t)
     in
     (* kubectl logs may include non-log output, like "Using password from environment variable" *)
     let log_lines =
@@ -435,9 +459,10 @@ module Node = struct
                 "File already exists for precomputed block with state hash %s"
                 state_hash
           | _ ->
-              [%log info] "Dumping precomputed block with state hash %s"
-                state_hash ;
-              Out_channel.with_file (state_hash ^ ".json") ~f:(fun out_ch ->
+              [%log info]
+                "Dumping precomputed block with state hash %s to file %s"
+                state_hash filename ;
+              Out_channel.with_file filename ~f:(fun out_ch ->
                   Out_channel.output_string out_ch block ) )
     in
     Malleable_error.return ()
@@ -528,7 +553,7 @@ let initialize ~logger network =
         "Not all pods were assigned to nodes and ready in time: \
          $bad_pod_statuses"
         ~metadata:[("bad_pod_statuses", bad_pod_statuses_json)] ;
-      Malleable_error.of_string_hard_error_format
+      Malleable_error.hard_error_format
         "Some pods either were not assigned to nodes or did deploy properly \
          (errors: %s)"
         (Yojson.Safe.to_string bad_pod_statuses_json)
