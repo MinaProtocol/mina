@@ -31,6 +31,8 @@ module Group = struct
 
   let to_affine_exn = Inner_curve.to_affine_exn
 
+  let of_affine = Inner_curve.of_affine
+
   module Checked = struct
     include Inner_curve.Checked
 
@@ -250,10 +252,10 @@ module Evaluation_hash = struct
          ; g_to_input g2 |]
     in
     let tick_output =
-    Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_evaluation
-      (Random_oracle.pack_input input)
+      Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_evaluation
+        (Random_oracle.pack_input input)
     in
-    (* This isn't cryptographically ideal.. *)
+    (* This isn't great cryptographic practice.. *)
     Tick.Field.unpack tick_output |> Tick.Inner_curve.Scalar.project
 
   module Checked = struct
@@ -270,16 +272,17 @@ module Evaluation_hash = struct
       in
       let%bind tick_output =
         Tick.make_checked (fun () ->
-          Random_oracle.Checked.hash ~init:Mina_base.Hash_prefix.vrf_evaluation
-            (Random_oracle.Checked.pack_input input))
+            Random_oracle.Checked.hash
+              ~init:Mina_base.Hash_prefix.vrf_evaluation
+              (Random_oracle.Checked.pack_input input) )
       in
-      (* This isn't cryptographically ideal.. *)
+      (* This isn't great cryptographic practice.. *)
       Tick.Field.Checked.unpack_full tick_output
   end
 end
 
 module Output_hash = struct
-  type value = Snark_params.Tick.Field.t
+  type value = Snark_params.Tick.Field.t [@@deriving sexp, compare]
 
   type t = value
 
@@ -320,3 +323,32 @@ struct
               let hash_for_proof = hash_for_proof ~constraint_constants
             end)
 end
+
+let%test_unit "Standalone and integrates vrfs are consistent" =
+  let constraint_constants = Genesis_constants.Constraint_constants.compiled in
+  let module Standalone = Standalone (struct
+    let constraint_constants = constraint_constants
+  end) in
+  let inputs =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind private_key = Signature_lib.Private_key.gen in
+    let%map message = Message.gen ~constraint_constants in
+    (private_key, message)
+  in
+  Quickcheck.test ~seed:(`Deterministic "") inputs
+    ~f:(fun (private_key, message) ->
+      let integrated_vrf =
+        Integrated.eval ~constraint_constants ~private_key message
+      in
+      let standalone_eval = Standalone.Evaluation.create private_key message in
+      let context : Standalone.Context.t =
+        { message
+        ; public_key=
+            Signature_lib.Public_key.of_private_key_exn private_key
+            |> Group.of_affine }
+      in
+      let standalone_vrf =
+        Standalone.Evaluation.verified_output standalone_eval context
+      in
+      [%test_eq: Output_hash.value option] (Some integrated_vrf) standalone_vrf
+  )

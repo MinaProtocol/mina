@@ -13,6 +13,7 @@
  (preprocess
   (pps
     h_list.ppx
+    ppx_assert
     ppx_compare
     ppx_hash
     ppx_inline_test
