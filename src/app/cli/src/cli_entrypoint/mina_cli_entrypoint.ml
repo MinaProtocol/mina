@@ -927,12 +927,8 @@ let setup_daemon logger =
           let monitors = get_monitors [ctx.monitor] ctx.monitor in
           let monitor_infos =
             List.map monitors ~f:(fun monitor ->
-                `Assoc
-                  [ ( "name"
-                    , `String
-                        ( Async_kernel.Monitor.name monitor
-                        |> Info.to_string_hum ) )
-                  ; ("depth", `Int (Async_kernel.Monitor.depth monitor)) ] )
+                `String
+                  (Async_kernel.Monitor.sexp_of_t monitor |> Sexp.to_string) )
           in
           [%log debug]
             ~metadata:
