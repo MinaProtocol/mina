@@ -389,8 +389,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
         | `Available peer -> (
             Hash_set.add busy peer ;
             let%bind res =
-              Deferred.Or_error.try_with_join ~name:"download transitions"
-                ~here:[%here] (fun () ->
+              Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
                   let open Deferred.Or_error.Let_syntax in
                   [%log debug]
                     ~metadata:

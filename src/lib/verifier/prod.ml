@@ -262,8 +262,7 @@ let wait_safe process =
   match
     Or_error.try_with (fun () ->
         let deferred_wait = Process.wait process in
-        Deferred.Or_error.try_with ~name:"wait safe" ~here:[%here] (fun () ->
-            deferred_wait ) )
+        Deferred.Or_error.try_with ~here:[%here] (fun () -> deferred_wait) )
   with
   | Ok x ->
       x

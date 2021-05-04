@@ -116,8 +116,7 @@ module Inputs = struct
                       Sparse_ledger.snapp_accounts w.ledger
                         (Transaction.forget t)
                     in
-                    Deferred.Or_error.try_with ~name:"SNARK worker process"
-                      ~here:[%here] (fun () ->
+                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
                         M.of_transaction ~sok_digest ~snapp_account1
                           ~snapp_account2
                           ~source:input.Transaction_snark.Statement.source

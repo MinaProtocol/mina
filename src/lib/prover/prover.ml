@@ -111,8 +111,7 @@ module Worker_state = struct
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
                    state_for_handler pending_coinbase =
                  let%map.Async res =
-                   Deferred.Or_error.try_with ~name:"prover create"
-                     ~here:[%here] (fun () ->
+                   Deferred.Or_error.try_with ~here:[%here] (fun () ->
                        let t = ledger_proof_opt chain next_state t in
                        let%map.Async proof =
                          B.step

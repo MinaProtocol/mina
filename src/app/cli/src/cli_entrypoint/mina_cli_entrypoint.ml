@@ -997,8 +997,7 @@ let setup_daemon logger =
             return []
         | Some file -> (
             match%bind
-              Monitor.try_with_or_error ~here:[%here]
-                ~name:"peer list from file" (fun () ->
+              Monitor.try_with_or_error ~here:[%here] (fun () ->
                   Reader.file_contents file )
             with
             | Ok contents ->
@@ -1254,7 +1253,7 @@ let rec ensure_testnet_id_still_good logger =
   in
   let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
-    Monitor.try_with_or_error ~name:"ensure testnet" ~here:[%here] (fun () ->
+    Monitor.try_with_or_error ~here:[%here] (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->

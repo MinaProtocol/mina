@@ -11,8 +11,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   let%bind parent_exists =
     let open Deferred.Let_syntax in
     match%bind
-      Monitor.try_with ~name:"secret file open" ~here:[%here] ~extract_exn:true
-        (fun () ->
+      Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
           let%bind stat = Unix.stat dn in
           Deferred.return
           @@
@@ -38,8 +37,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   let%bind () =
     let open Deferred.Let_syntax in
     match%bind
-      Monitor.try_with ~name:"secret file mkdir" ~here:[%here]
-        ~extract_exn:true (fun () ->
+      Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
           if (not parent_exists) && mkdir then
             let%bind () = Unix.mkdir ~p:() dn in
             let%bind () = Unix.chmod dn ~perm:0o700 in
@@ -58,8 +56,8 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
   in
   let open Deferred.Let_syntax in
   match%bind
-    Deferred.Or_error.try_with ~name:"secret file, f path" ~here:[%here]
-      ~extract_exn:true (fun () -> f path)
+    Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
+        f path )
   with
   | Ok x ->
       Deferred.Result.return x

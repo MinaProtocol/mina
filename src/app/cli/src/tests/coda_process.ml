@@ -172,8 +172,7 @@ let disconnect ((conn, proc, _) as t) ~logger =
   (* This kills any straggling snark worker process *)
   let%bind () =
     match%map
-      Monitor.try_with ~name:"disconnnect 1" ~here:[%here] (fun () ->
-          stop_snark_worker t )
+      Monitor.try_with ~here:[%here] (fun () -> stop_snark_worker t)
     with
     | Ok () ->
         ()
@@ -182,10 +181,7 @@ let disconnect ((conn, proc, _) as t) ~logger =
           ~metadata:[("exn", `String (Exn.to_string exn))]
   in
   let%bind () = Coda_worker.Connection.close conn in
-  match%map
-    Monitor.try_with ~name:"disconnect 2" ~here:[%here] (fun () ->
-        Process.wait proc )
-  with
+  match%map Monitor.try_with ~here:[%here] (fun () -> Process.wait proc) with
   | Ok _ ->
       ()
   | Error e ->
