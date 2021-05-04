@@ -195,6 +195,11 @@ let main ~input_file ~archive_uri ~payout_addresses () =
           ~item:"max slot"
       in
       [%log info] "Maximum global slot in blocks is %d" max_slot ;
+      if max_slot < ((input.epoch + 1) * slots_per_epoch) + 3500 then (
+        [%log fatal]
+          "Insufficient archive data: maximum global slot is less than slot \
+           3500 in the succeeding epoch" ;
+        Core_kernel.exit 1 ) ;
       (* find longest canonical chain
          a slot may represent several blocks, only one of which can be on canonical chain
          starting with max slot, look for chain, decrementing slot until chain found
