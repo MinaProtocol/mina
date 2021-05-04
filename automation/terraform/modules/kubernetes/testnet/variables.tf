@@ -113,6 +113,21 @@ variable "runtime_config" {
   default = ""
 }
 
+variable "log_snark_work_gossip" {
+  type    = bool
+  default = false
+}
+
+variable "log_precomputed_blocks" {
+  type    = bool
+  default = false
+}
+
+variable "log_txn_pool_gossip" {
+  type    = bool
+  default = false
+}
+
 # Seed Vars
 
 variable "seed_port" {
@@ -143,21 +158,6 @@ variable "seed_discovery_keypairs" {
 variable "log_level" {
   type    = string
   default = "Trace"
-}
-
-variable "log_snark_work_gossip" {
-  type    = bool
-  default = false
-}
-
-variable "log_precomputed_blocks" {
-  type    = bool
-  default = false
-}
-
-variable "log_txn_pool_gossip" {
-  type    = bool
-  default = false
 }
 
 variable "block_producer_key_pass" {

@@ -39,7 +39,7 @@ module Diff_versioned = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
+      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end

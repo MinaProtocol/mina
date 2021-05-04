@@ -20,6 +20,7 @@ coda:
     metrics: "10001"
     p2p: "10909"
   exposeGraphql: false
+  logTxnPoolGossip: false
 
 worker:
   fullname: "snark-worker-{{ trunc -6 .Values.coordinator.publicKey | lower }}"

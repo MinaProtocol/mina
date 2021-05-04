@@ -38,26 +38,15 @@ module L = struct
   type location = int
 
   let get : t -> location -> Account.t option =
-   fun t loc ->
-    try
-      let account = M.get_exn !t loc in
-      if Public_key.Compressed.(equal empty account.public_key) then None
-      else Some account
-    with _ -> None
+   fun t loc -> Option.try_with (fun () -> M.get_exn !t loc)
 
   let location_of_account : t -> Account_id.t -> location option =
-   fun t id ->
-    try
-      let loc = M.find_index_exn !t id in
-      let account = M.get_exn !t loc in
-      if Public_key.Compressed.(equal empty account.public_key) then None
-      else Some loc
-    with _ -> None
+   fun t id -> Option.try_with (fun () -> M.find_index_exn !t id)
 
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a
 
-  let get_or_create :
+  let get_or_create_exn :
       t -> Account_id.t -> [`Added | `Existed] * Account.t * location =
    fun t id ->
     let loc = M.find_index_exn !t id in
@@ -74,22 +63,21 @@ module L = struct
       (`Added, account', loc) )
     else (`Existed, account, loc)
 
-  let get_or_create_account_exn :
-      t -> Account_id.t -> Account.t -> [`Added | `Existed] * location =
+  let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
+
+  let get_or_create_account :
+         t
+      -> Account_id.t
+      -> Account.t
+      -> ([`Added | `Existed] * location) Or_error.t =
    fun t id to_set ->
-    let loc =
-      let t = !t in
-      try M.find_index_exn t id
-      with _ ->
-        failwithf
-          !"%{sexp: (Account_id.t * int) list} | %{sexp:Account_id.t}"
-          t.indexes id ()
-    in
-    let a = M.get_exn !t loc in
-    if Public_key.Compressed.(equal empty a.public_key) then (
-      set t loc to_set ;
-      (`Added, loc) )
-    else (`Existed, loc)
+    Or_error.try_with (fun () ->
+        let loc = M.find_index_exn !t id in
+        let a = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty a.public_key) then (
+          set t loc to_set ;
+          (`Added, loc) )
+        else (`Existed, loc) )
 
   let remove_accounts_exn : t -> Account_id.t list -> unit =
    fun _t _xs -> failwith "remove_accounts_exn: not implemented"
@@ -163,7 +151,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                 ( Ledger.get ledger loc
                 |> Option.value_exn ?here:None ?error:None ?message:None ) )
         | None ->
-            let path, acct = Ledger.create_empty ledger key in
+            let path, acct = Ledger.create_empty_exn ledger key in
             (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in

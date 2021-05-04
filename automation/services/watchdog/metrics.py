@@ -21,7 +21,7 @@ def collect_cluster_crashes(v1, namespace, cluster_crashes):
   print('collecting cluster crashes / restarts')
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
-  containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items ]))
+  containers = list(itertools.chain(*[ pod.to_dict()['status']['container_statuses'] for pod in pods.items if pod.status.phase == 'Running' ]))
   mina_containers = list(filter(lambda c: c['name'] in [ 'coda', 'seed', 'coordinator', 'archive' ], containers))
 
   def restarted_recently(c):
@@ -52,22 +52,26 @@ def pods_with_no_new_logs(v1, namespace, nodes_with_no_new_logs):
   print('counting pods with no new logs')
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
-  ten_minutes = 10 * 60
+  one_hour = 60 * 60
 
   count = 0
+  total_running_pods = 0
   for pod in pods.items:
-    containers = pod.status.container_statuses
-    mina_containers = list(filter(lambda c: c.name in [ 'coda', 'seed', 'coordinator' ], containers))
-    if len(mina_containers) != 0:
-      name = pod.metadata.name
-      recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=ten_minutes, container=mina_containers[0].name)
-      if len(recent_logs) == 0:
-        count += 1
+    if pod.status.phase == 'Running':
+      total_running_pods += 1
+      containers = pod.status.container_statuses
+      mina_containers = list(filter(lambda c: c.name in [ 'coda', 'seed', 'coordinator' ], containers))
+      if len(mina_containers) != 0:
+        name = pod.metadata.name
+        recent_logs = v1.read_namespaced_pod_log(name=name, namespace=namespace, since_seconds=one_hour, container=mina_containers[0].name)
+        if len(recent_logs) == 0:
+          print("Pod {} has no logs for the last hour".format(name))
+          count += 1
+    else:
+      print("Pod {} is not running. Phase: {}, reason: {}".format(pod.metadata.name,pod.status.phase, pod.status.reason))
 
-  total_count = len(pods.items)
-
-  fraction_no_new_logs = float(count) / float(total_count)
-  print(count, 'of', total_count, 'pods have no logs in the last 10 minutes')
+  fraction_no_new_logs = float(count) / float(total_running_pods)
+  print(count, 'of', total_running_pods, 'pods have no logs in the last 10 minutes')
 
   nodes_with_no_new_logs.set(fraction_no_new_logs)
 

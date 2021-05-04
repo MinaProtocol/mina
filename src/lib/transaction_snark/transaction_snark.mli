@@ -201,7 +201,7 @@ end
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving compare, sexp, yojson]
+    type t [@@deriving compare, sexp, yojson, hash]
   end
 end]
 
