@@ -1,5 +1,5 @@
 {
-    "genesis_ledger": {
+    "staking_ledger": {
         "accounts": [
             {
                 "timing": {

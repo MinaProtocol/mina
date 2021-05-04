@@ -10,7 +10,7 @@ open Async
 open Mina_base
 open Signature_lib
 
-type input = {epoch: int; genesis_ledger: Runtime_config.Ledger.t}
+type input = {epoch: int; staking_ledger: Runtime_config.Ledger.t}
 [@@deriving yojson]
 
 type delegation_source = O1 | Mina_foundation [@@deriving yojson]
@@ -175,7 +175,7 @@ let main ~input_file ~archive_uri ~payout_addresses () =
       let%bind padded_accounts =
         match
           Genesis_ledger_helper.Ledger.padded_accounts_from_runtime_config_opt
-            ~logger ~proof_level input.genesis_ledger
+            ~logger ~proof_level input.staking_ledger
             ~ledger_name_prefix:"genesis_ledger"
         with
         | None ->
