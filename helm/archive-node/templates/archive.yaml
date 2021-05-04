@@ -39,6 +39,9 @@ spec:
           {{- if .Values.coda.logSnarkWorkGossip }}
           "-log-snark-work-gossip", "true",
           {{- end -}}
+          {{- if $.Values.coda.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
           {{- range .Values.coda.seedPeers }}
           "-peer", {{ . | quote }},
           {{- end -}}
