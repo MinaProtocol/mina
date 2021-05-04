@@ -35,7 +35,8 @@ let query query_obj uri =
       [("Content-Type", "application/json"); ("Accept", "application/json")]
   in
   let%bind response, body =
-    Deferred.Or_error.try_with ~extract_exn:true (fun () ->
+    Deferred.Or_error.try_with ~name:"Rosetta query GraphQL" ~here:[%here]
+      ~extract_exn:true (fun () ->
         Cohttp_async.Client.post ~headers
           ~body:(Cohttp_async.Body.of_string body_string)
           uri )

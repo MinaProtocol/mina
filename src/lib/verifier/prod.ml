@@ -262,7 +262,8 @@ let wait_safe process =
   match
     Or_error.try_with (fun () ->
         let deferred_wait = Process.wait process in
-        Deferred.Or_error.try_with (fun () -> deferred_wait) )
+        Deferred.Or_error.try_with ~name:"wait safe" ~here:[%here] (fun () ->
+            deferred_wait ) )
   with
   | Ok x ->
       x
@@ -291,7 +292,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
          [rest] handler for the 'rest' of the errors after the value is
          determined, which logs the errors and then swallows them.
       *)
-      Monitor.try_with ~name:"Verifier RPC worker" ~run:`Now
+      Monitor.try_with ~name:"Verifier RPC worker" ~here:[%here] ~run:`Now
         ~rest:
           (`Call
             (fun exn ->

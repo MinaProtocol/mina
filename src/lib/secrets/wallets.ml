@@ -139,7 +139,8 @@ let create_hd_account t ~hd_index :
 let delete ({cache; _} as t : t) (pk : Public_key.Compressed.t) :
     (unit, [`Not_found]) Deferred.Result.t =
   Hashtbl.remove cache pk ;
-  Deferred.Or_error.try_with (fun () -> Unix.remove (get_path t pk))
+  Deferred.Or_error.try_with ~name:"wallets delete" ~here:[%here] (fun () ->
+      Unix.remove (get_path t pk) )
   |> Deferred.Result.map_error ~f:(fun _ -> `Not_found)
 
 let pks ({cache; _} : t) = Public_key.Compressed.Table.keys cache

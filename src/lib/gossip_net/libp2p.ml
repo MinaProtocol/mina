@@ -151,7 +151,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let conf_dir = config.conf_dir ^/ "mina_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
-        Monitor.try_with ~rest:`Raise (fun () ->
+        Monitor.try_with ~name:"create Mina_net2" ~here:[%here] ~rest:`Raise
+          (fun () ->
             trace "mina_net2" (fun () ->
                 Mina_net2.create ~logger:config.logger ~conf_dir ~pids
                   ~on_unexpected_termination ) )
@@ -596,7 +597,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> q Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout ~rpc_name t peer transport dispatch query ->
       let call () =
-        Monitor.try_with (fun () ->
+        Monitor.try_with ~name:"try call rpc with dispatch" ~here:[%here]
+          (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
             Async_rpc_kernel.Rpc.Connection.with_close
               ~heartbeat_config:

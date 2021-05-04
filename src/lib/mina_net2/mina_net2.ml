@@ -1039,7 +1039,8 @@ module Helper = struct
                   [Tcp.Server.create]. See [handle_protocol] doc comment.
                *)
                 match%map
-                  Monitor.try_with ~extract_exn:true (fun () -> ph.f stream)
+                  Monitor.try_with ~name:"new incoming stream" ~here:[%here]
+                    ~extract_exn:true (fun () -> ph.f stream)
                 with
                 | Ok () ->
                     ()

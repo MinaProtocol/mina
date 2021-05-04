@@ -71,7 +71,10 @@ let wait_for_process_log_errors ~logger process ~module_ ~location =
         *)
         let waiting = Process.wait process in
         don't_wait_for
-          ( match%map Monitor.try_with_or_error (fun () -> waiting) with
+          ( match%map
+              Monitor.try_with_or_error ~name:"wait for process log errors"
+                ~here:[%here] (fun () -> waiting)
+            with
           | Ok _ ->
               ()
           | Error err ->

@@ -297,7 +297,8 @@ let main inputs =
                 (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
            ~test_result:(Malleable_error.return ()))
     in
-    Monitor.try_with ~extract_exn:false (fun () ->
+    Monitor.try_with ~name:"test executive" ~here:[%here] ~extract_exn:false
+      (fun () ->
         let init_result =
           let open Deferred.Or_error.Let_syntax in
           let lift = Deferred.map ~f:Or_error.return in

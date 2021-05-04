@@ -913,12 +913,31 @@ let setup_daemon logger =
             client_trustlist
       in
       Stream.iter
-        (Async.Scheduler.long_cycles
+        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context (t ()))
            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
-        ~f:(fun span ->
+        ~f:(fun (span, ctx) ->
           let secs = Time_ns.Span.to_sec span in
+          let rec get_monitors accum monitor =
+            match Async_kernel.Monitor.parent monitor with
+            | None ->
+                List.rev accum
+            | Some parent ->
+                get_monitors (parent :: accum) parent
+          in
+          let monitors = get_monitors [ctx.monitor] ctx.monitor in
+          let monitor_infos =
+            List.map monitors ~f:(fun monitor ->
+                `Assoc
+                  [ ( "name"
+                    , `String
+                        ( Async_kernel.Monitor.name monitor
+                        |> Info.to_string_hum ) )
+                  ; ("depth", `Int (Async_kernel.Monitor.depth monitor)) ] )
+          in
           [%log debug]
-            ~metadata:[("long_async_cycle", `Float secs)]
+            ~metadata:
+              [ ("long_async_cycle", `Float secs)
+              ; ("monitors", `List monitor_infos) ]
             "Long async cycle, $long_async_cycle seconds" ;
           Mina_metrics.(
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
@@ -982,7 +1001,9 @@ let setup_daemon logger =
             return []
         | Some file -> (
             match%bind
-              Monitor.try_with_or_error (fun () -> Reader.file_contents file)
+              Monitor.try_with_or_error ~here:[%here]
+                ~name:"peer list from file" (fun () ->
+                  Reader.file_contents file )
             with
             | Ok contents ->
                 return (Mina_net2.Multiaddr.of_file_contents ~contents)
@@ -1237,7 +1258,7 @@ let rec ensure_testnet_id_still_good logger =
   in
   let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
-    Monitor.try_with_or_error (fun () ->
+    Monitor.try_with_or_error ~name:"ensure testnet" ~here:[%here] (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->

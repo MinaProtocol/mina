@@ -31,7 +31,10 @@ let register_async_shutdown_handler ~logger ~description
       ~metadata:[("description", `String description)] ;
     let open Deferred.Let_syntax in
     let%map () =
-      match%map Monitor.try_with ~extract_exn:true f with
+      match%map
+        Monitor.try_with ~name:"register async shutdown" ~here:[%here]
+          ~extract_exn:true f
+      with
       | Ok () ->
           ()
       | Error exn ->

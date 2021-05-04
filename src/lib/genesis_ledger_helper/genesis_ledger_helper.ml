@@ -306,7 +306,8 @@ module Ledger = struct
   let load ~proof_level ~genesis_dir ~logger ~constraint_constants
       ?(ledger_name_prefix = "genesis_ledger")
       (config : Runtime_config.Ledger.t) =
-    Monitor.try_with_join_or_error (fun () ->
+    Monitor.try_with_join_or_error ~name:"load genesis ledger" ~here:[%here]
+      (fun () ->
         let padded_accounts_opt =
           padded_accounts_from_runtime_config_opt ~logger ~proof_level
             ~ledger_name_prefix config
@@ -395,7 +396,8 @@ module Ledger = struct
                   in
                   (* Delete the file if it already exists. *)
                   let%bind () =
-                    Deferred.Or_error.try_with (fun () -> Sys.remove link_name)
+                    Deferred.Or_error.try_with ~name:"delete link_name"
+                      ~here:[%here] (fun () -> Sys.remove link_name)
                     |> Deferred.ignore
                   in
                   (* Add a symlink from the named path to the hash path. *)
@@ -624,14 +626,16 @@ module Genesis_proof = struct
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
-    Monitor.try_with_or_error ~extract_exn:true (fun () ->
+    Monitor.try_with_or_error ~name:"store file for genesis ledger"
+      ~here:[%here] ~extract_exn:true (fun () ->
         let%bind wr = Writer.open_file filename in
         Writer.write wr (Proof.Stable.V1.sexp_of_t proof |> Sexp.to_string) ;
         Writer.close wr )
 
   let load filename =
     (* TODO: Use [Reader.load_bin_prot]. *)
-    Monitor.try_with_or_error ~extract_exn:true (fun () ->
+    Monitor.try_with_or_error ~name:"load file for genesis ledger"
+      ~here:[%here] ~extract_exn:true (fun () ->
         Reader.file_contents filename
         >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
 
@@ -803,13 +807,14 @@ module Genesis_proof = struct
 end
 
 let load_config_json filename =
-  Monitor.try_with_or_error (fun () ->
+  Monitor.try_with_or_error ~name:"load config json" ~here:[%here] (fun () ->
       let%map json = Reader.file_contents filename in
       Yojson.Safe.from_string json )
 
 let load_config_file filename =
   let open Deferred.Or_error.Let_syntax in
-  Monitor.try_with_join_or_error (fun () ->
+  Monitor.try_with_join_or_error ~name:"load config file" ~here:[%here]
+    (fun () ->
       let%map json = load_config_json filename in
       match Runtime_config.of_yojson json with
       | Ok config ->
@@ -996,7 +1001,8 @@ let upgrade_old_config ~logger filename json =
           `Assoc (("daemon", `Assoc old_fields) :: remaining_fields)
         in
         let%map () =
-          Deferred.Or_error.try_with (fun () ->
+          Deferred.Or_error.try_with ~name:"upgrade old config" ~here:[%here]
+            (fun () ->
               Writer.with_file filename ~f:(fun w ->
                   Deferred.return
                   @@ Writer.write w
