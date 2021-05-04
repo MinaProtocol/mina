@@ -165,12 +165,26 @@ struct
         { snark_tables: Snark_tables.t
         ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
         ; mutable ref_table: int Statement_table.t option
+              (** Tracks the number of blocks that have each work statement in
+                  their scan state.
+                  Work is included iff it is a member of some block scan state.
+                  Used to filter the pool, ensuring that only work referenced
+                  within the frontier is kept.
+              *)
         ; mutable best_tip_table:
             Transaction_snark_work.Statement.Hash_set.t option
+              (** The set of all snark work statements present in the scan
+                  state for the last 10 blocks in the best chain.
+                  Used to filter broadcasts of locally produced work, so that
+                  irrelevant work is not broadcast.
+              *)
         ; config: Config.t
         ; logger: Logger.t sexp_opaque
         ; mutable removed_counter: int
-              (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
+              (** A counter for transition frontier breadcrumbs removed. When
+                  this reaches a certain value, unreferenced snark work is
+                  removed from ref_table
+              *)
         ; account_creation_fee: Currency.Fee.t
         ; batcher: Batcher.Snark_pool.t }
       [@@deriving sexp]
@@ -272,6 +286,9 @@ struct
             t.ref_table <- Some refcount_table ;
             t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;
+            (* Remove any purchased snark work from the rebroadcast table, to
+               avoid unnecessary messages to the network.
+            *)
             Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
               ~f:(fun stmt ->
                 let drop = Hashtbl.mem inclusion_table stmt in
@@ -475,8 +492,8 @@ struct
                 match Signature_lib.Public_key.decompress prover with
                 | None ->
                     (* We may need to decompress the key when paying the fee
-                 transfer, so check that we can do it now.
-              *)
+                       transfer, so check that we can do it now.
+                    *)
                     [%log' error t.logger]
                       "Proof had an invalid key: $public_key"
                       ~metadata:
@@ -518,6 +535,9 @@ struct
     include T
     module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
+    (** Returns locally-generated snark work for re-broadcast.
+        This is limited to recent work which is yet to appear in a block.
+    *)
     let get_rebroadcastable t ~has_timed_out:_ =
       let in_best_tip_table =
         match t.best_tip_table with

@@ -6,14 +6,38 @@ module T = struct
   type view =
     { removed: int
     ; refcount_table: int Work.Table.t
+          (** Tracks the number of blocks that have each work statement in
+              their scan state.
+              Work is included iff it is a member of some block scan state.
+          *)
     ; inclusion_table: int Work.Table.t
-    ; best_tip_table: Work.Hash_set.t }
+          (** Tracks the number of blocks that have purchased a proof for each
+              work statement.
+              Work is included iff it is was purchased in some block.
+          *)
+    ; best_tip_table: Work.Hash_set.t
+          (** The set of all snark work statements present in the scan state
+              for the last 10 blocks in the best chain.
+          *)
+    }
   [@@deriving sexp]
 
   type t =
     { refcount_table: int Work.Table.t
+          (** Tracks the number of blocks that have each work statement in
+              their scan state.
+              Work is included iff it is a member of some block scan state.
+          *)
     ; inclusion_table: int Work.Table.t
-    ; best_tip_table: Work.Hash_set.t }
+          (** Tracks the number of blocks that have purchased a proof for each
+              work statement.
+              Work is included iff it is was purchased in some block.
+          *)
+    ; best_tip_table: Work.Hash_set.t
+          (** The set of all snark work statements present in the scan state
+              for the last 10 blocks in the best chain.
+          *)
+    }
 
   let get_work = Staged_ledger.Scan_state.all_work_statements_exn
 
