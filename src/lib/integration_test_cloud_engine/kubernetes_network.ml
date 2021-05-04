@@ -75,9 +75,10 @@ module Node = struct
     let%bind _ = run_in_container node "ps aux" in
     let%bind _ = run_in_container node "./stop.sh" in
     let%bind _ = run_in_container node "ps aux" in
-    Malleable_error.return ()
+    return ()
 
   let get_pod_name t : string Malleable_error.t =
+    let open Malleable_error.Let_syntax in
     let args =
       List.append (base_kube_args t)
         [ "get"
@@ -88,23 +89,16 @@ module Node = struct
         ; "--no-headers" ]
     in
     let%bind run_result =
-      Deferred.bind ~f:Malleable_error.of_or_error_hard
+      Deferred.bind ~f:Malleable_error.or_hard_error
         (Process.run_lines ~prog:"kubectl" ~args ())
     in
     match run_result with
-    | Ok
-        { Malleable_error.Accumulator.computation_result= [pod_name]
-        ; soft_errors= _ } ->
-        Malleable_error.return pod_name
-    | Ok {Malleable_error.Accumulator.computation_result= []; soft_errors= _}
-      ->
-        Malleable_error.of_string_hard_error "get_pod_name: no result"
-    | Ok _ ->
-        Malleable_error.of_string_hard_error "get_pod_name: too many results"
-    | Error
-        { Malleable_error.Hard_fail.hard_error= e
-        ; Malleable_error.Hard_fail.soft_errors= _ } ->
-        Malleable_error.of_error_hard e.error
+    | [] ->
+        Malleable_error.hard_error_string "get_pod_name: no result"
+    | [pod_name] ->
+        return pod_name
+    | _ ->
+        Malleable_error.hard_error_string "get_pod_name: too many results"
 
   module Decoders = Graphql_lib.Decoders
 
@@ -194,9 +188,9 @@ module Node = struct
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
       ?(initial_delay_sec = 30.0) ~logger ~node
       ?(retry_on_graphql_error = false) ~query_name query_obj =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Let_syntax in
     if not node.graphql_enabled then
-      Malleable_error.of_string_hard_error
+      Deferred.Or_error.error_string
         "graphql is not enabled (hint: set `requires_graphql= true` in the \
          test config)"
     else
@@ -211,18 +205,15 @@ module Node = struct
           [%log error]
             "GraphQL request \"$query\" to \"$uri\" failed too many times"
             ~metadata ;
-          Malleable_error.of_string_hard_error_format
+          Deferred.Or_error.errorf
             "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
             (Uri.to_string uri) )
         else
-          match%bind
-            Deferred.bind ~f:Malleable_error.return
-              ((Graphql.Client.query query_obj) uri)
-          with
+          match%bind Graphql.Client.query query_obj uri with
           | Ok result ->
               [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
                 ~metadata ;
-              return result
+              Deferred.Or_error.return result
           | Error (`Failed_request err_string) ->
               [%log warn]
                 "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
@@ -231,10 +222,7 @@ module Node = struct
                   ( metadata
                   @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
                   ) ;
-              let%bind () =
-                Deferred.bind ~f:Malleable_error.return
-                  (after (Time.Span.of_sec retry_delay_sec))
-              in
+              let%bind () = after (Time.Span.of_sec retry_delay_sec) in
               retry (n - 1)
           | Error (`Graphql_error err_string) ->
               [%log error]
@@ -245,21 +233,15 @@ module Node = struct
                   @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
                   ) ;
               if retry_on_graphql_error then
-                let%bind () =
-                  Deferred.bind ~f:Malleable_error.return
-                    (after (Time.Span.of_sec retry_delay_sec))
-                in
+                let%bind () = after (Time.Span.of_sec retry_delay_sec) in
                 retry (n - 1)
-              else Malleable_error.of_string_hard_error err_string
+              else Deferred.Or_error.error_string err_string
       in
-      let%bind () =
-        Deferred.bind ~f:Malleable_error.return
-          (after (Time.Span.of_sec initial_delay_sec))
-      in
+      let%bind () = after (Time.Span.of_sec initial_delay_sec) in
       retry num_tries
 
   let get_peer_id ~logger t =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
@@ -273,19 +255,22 @@ module Node = struct
     let%bind self_id =
       match self_id_obj with
       | None ->
-          Malleable_error.of_string_hard_error "Peer not found"
+          Deferred.Or_error.error_string "Peer not found"
       | Some peer ->
-          Malleable_error.return peer#peerId
+          return peer#peerId
     in
     let peers = (query_result_obj#daemonStatus)#peers |> Array.to_list in
     let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
     [%log info]
-      "get_peer_id, result of graphql querry (self_id,[peers]) (%s,%s)" self_id
+      "get_peer_id, result of graphql query (self_id,[peers]) (%s,%s)" self_id
       (String.concat ~sep:" " peer_ids) ;
     return (self_id, peer_ids)
 
+  let must_get_peer_id ~logger t =
+    get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let get_best_chain ~logger t =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     let query = Graphql.Best_chain.make () in
     let%bind result =
       exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
@@ -293,13 +278,16 @@ module Node = struct
     in
     match result#bestChain with
     | None | Some [||] ->
-        Malleable_error.of_string_hard_error "failed to get best chains"
+        Deferred.Or_error.error_string "failed to get best chains"
     | Some chain ->
-        Malleable_error.return
+        return
         @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
 
+  let must_get_best_chain ~logger t =
+    get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
   let get_balance ~logger t ~account_id =
-    let open Malleable_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     [%log info] "Getting account balance"
       ~metadata:
         [ ("namespace", `String t.namespace)
@@ -307,42 +295,44 @@ module Node = struct
         ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
-    let get_balance () =
-      let get_balance_obj =
-        Graphql.Get_balance.make
-          ~public_key:(Graphql_lib.Encoders.public_key pk)
-          ~token:(Graphql_lib.Encoders.token token)
-          ()
-      in
-      let%bind balance_obj =
-        exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
-          ~query_name:"get_balance_graphql" get_balance_obj
-      in
-      match balance_obj#account with
-      | None ->
-          Malleable_error.of_string_hard_error
-            (sprintf
-               !"Account with %{sexp:Mina_base.Account_id.t} not found"
-               account_id)
-      | Some acc ->
-          Malleable_error.return (acc#balance)#total
+    let get_balance_obj =
+      Graphql.Get_balance.make
+        ~public_key:(Graphql_lib.Encoders.public_key pk)
+        ~token:(Graphql_lib.Encoders.token token)
+        ()
     in
-    get_balance ()
+    let%bind balance_obj =
+      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
+        ~query_name:"get_balance_graphql" get_balance_obj
+    in
+    match balance_obj#account with
+    | None ->
+        Deferred.Or_error.errorf
+          !"Account with %{sexp:Mina_base.Account_id.t} not found"
+          account_id
+    | Some acc ->
+        return (acc#balance)#total
+
+  let must_get_balance ~logger t ~account_id =
+    get_balance ~logger t ~account_id
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender ~receiver
-      ~amount ~fee =
+  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
-    let open Malleable_error.Let_syntax in
-    let sender_pk_str = Signature_lib.Public_key.Compressed.to_string sender in
+    let open Deferred.Or_error.Let_syntax in
+    let sender_pk_str =
+      Signature_lib.Public_key.Compressed.to_string sender_pub_key
+    in
     [%log info] "send_payment: unlocking account"
       ~metadata:[("sender_pk", `String sender_pk_str)] ;
     let unlock_sender_account_graphql () =
       let unlock_account_obj =
         Graphql.Unlock_account.make ~password:"naughty blue worm"
-          ~public_key:(Graphql_lib.Encoders.public_key sender)
+          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
           ()
       in
       exec_graphql_request ~logger ~node:t
@@ -352,8 +342,8 @@ module Node = struct
     let send_payment_graphql () =
       let send_payment_obj =
         Graphql.Send_payment.make
-          ~sender:(Graphql_lib.Encoders.public_key sender)
-          ~receiver:(Graphql_lib.Encoders.public_key receiver)
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
           ~amount:(Graphql_lib.Encoders.amount amount)
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
@@ -368,6 +358,12 @@ module Node = struct
     [%log info] "Sent payment"
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
+
+  let must_send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee =
+    send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
+      ~receiver_pub_key ~amount ~fee
+    |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =
     let open Malleable_error.Let_syntax in
@@ -559,7 +555,7 @@ let initialize ~logger network =
         "Not all pods were assigned to nodes and ready in time: \
          $bad_pod_statuses"
         ~metadata:[("bad_pod_statuses", bad_pod_statuses_json)] ;
-      Malleable_error.of_string_hard_error_format
+      Malleable_error.hard_error_format
         "Some pods either were not assigned to nodes or did deploy properly \
          (errors: %s)"
         (Yojson.Safe.to_string bad_pod_statuses_json)

@@ -22,8 +22,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ; {balance= "1000"; timing= Untimed} ]
     ; num_snark_workers= 0 }
 
-  let expected_error_event_reprs = []
-
   let check_common_prefixes ?number_of_blocks:(n = 3) ~logger chains =
     let recent_chains =
       List.map chains ~f:(fun chain ->
@@ -37,28 +35,28 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let length = Hash_set.length common_prefixes in
     if length = 0 then (
       let result =
-        Malleable_error.soft_error ()
+        Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
                 "Chains don't have any common prefixes among their most \
                  recent %d blocks"
                 n))
       in
-      [%log info]
+      [%log error]
         "common_prefix test: TEST FAILURE, Chains don't have any common \
          prefixes among their most recent %d blocks"
         n ;
       result )
     else if length < n then (
       let result =
-        Malleable_error.soft_error ()
+        Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
                 !"Chains only have %d common prefixes, expected %d common \
                   prefixes"
                 length n))
       in
-      [%log info]
+      [%log error]
         "common_prefix test: TEST FAILURE, Chains only have %d common \
          prefixes, expected %d common prefixes"
         length n ;
@@ -82,7 +80,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     [%log info] "common_prefix test: collecting best chains from nodes" ;
     let%bind chains =
       Malleable_error.List.map block_producers ~f:(fun bp ->
-          Network.Node.get_best_chain ~logger bp )
+          Network.Node.must_get_best_chain ~logger bp )
     in
     [%log info]
       ~metadata:

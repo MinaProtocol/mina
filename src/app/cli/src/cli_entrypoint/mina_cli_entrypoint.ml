@@ -792,8 +792,14 @@ let setup_daemon logger =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
-               | Ok key ->
-                   Some key
+               | Ok key -> (
+                 match Public_key.decompress key with
+                 | None ->
+                     Mina_user_error.raisef ~where:"decompressing a public key"
+                       "The %s public key %s could not be decompressed." which
+                       pk_str
+                 | Some _ ->
+                     Some key )
                | Error _e ->
                    Mina_user_error.raisef ~where:"decoding a public key"
                      "The %s public key %s could not be decoded." which pk_str

@@ -482,6 +482,9 @@ let batch_send_payments =
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
           let signer_pk = Public_key.compress keypair.public_key in
+          let receiver_pk =
+            Public_key.of_base58_check_decompress_exn receiver
+          in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
@@ -489,8 +492,7 @@ let batch_send_payments =
             ~body:
               (Payment
                  { source_pk= signer_pk
-                 ; receiver_pk=
-                     Public_key.Compressed.of_base58_check_exn receiver
+                 ; receiver_pk
                  ; token_id= Token_id.default
                  ; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
@@ -890,9 +892,11 @@ let dump_keypair =
 
 let handle_export_ledger_response ~json = function
   | Error e ->
-      Daemon_rpcs.Client.print_rpc_error e
+      Daemon_rpcs.Client.print_rpc_error e ;
+      exit 1
   | Ok (Error e) ->
-      printf !"Ledger not found: %s\n" (Error.to_string_hum e)
+      printf !"Ledger not found: %s\n" (Error.to_string_hum e) ;
+      exit 1
   | Ok (Ok accounts) ->
       if json then (
         Yojson.Safe.pretty_print Format.std_formatter
@@ -900,7 +904,8 @@ let handle_export_ledger_response ~json = function
              (List.map accounts ~f:(fun a ->
                   Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
         printf "\n" )
-      else printf !"%{sexp:Account.t list}\n" accounts
+      else printf !"%{sexp:Account.t list}\n" accounts ;
+      return ()
 
 let export_ledger =
   let state_hash_flag =
@@ -954,7 +959,7 @@ let export_ledger =
                (* unreachable *)
                failwithf "Unknown ledger kind: %s" ledger_kind ()
          in
-         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+         response >>= handle_export_ledger_response ~json:(not plaintext) ))
 
 let hash_ledger =
   let open Command.Let_syntax in

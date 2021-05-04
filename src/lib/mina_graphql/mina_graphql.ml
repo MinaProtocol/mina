@@ -1840,8 +1840,9 @@ module Types = struct
         ~coerce:(fun key ->
           match key with
           | `String s ->
-              Public_key.Compressed.of_base58_check s
-              |> Result.map_error ~f:(fun _ -> "Could not decode public key.")
+              Result.try_with (fun () ->
+                  Public_key.of_base58_check_decompress_exn s )
+              |> Result.map_error ~f:(fun e -> Exn.to_string e)
           | _ ->
               Error "Invalid format for public key." )
 
