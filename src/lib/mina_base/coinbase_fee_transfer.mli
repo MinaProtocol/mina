@@ -26,10 +26,15 @@ val fee : t -> Currency.Fee.t
 val to_fee_transfer : t -> Fee_transfer.Single.t
 
 module Gen : sig
-  val gen : max_fee:Currency.Fee.t -> t Quickcheck.Generator.t
+  val gen :
+       ?min_fee:Currency.Fee.t
+    -> max_fee:Currency.Fee.t
+    -> t Quickcheck.Generator.t
 
   val with_random_receivers :
-       keys:Signature_keypair.t array
-    -> max_fee:Currency.Fee.t
+       constraint_constants:Genesis_constants.Constraint_constants.t
+    -> keys:Signature_keypair.t array
+    -> ?min_fee:Currency.Fee.t
+    -> coinbase_amount:Currency.Amount.t
     -> t Quickcheck.Generator.t
 end

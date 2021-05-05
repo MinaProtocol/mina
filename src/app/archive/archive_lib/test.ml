@@ -51,14 +51,15 @@ let%test_module "Archive node unit tests" =
         ~fee_range:10 ()
 
     let fee_transfer_gen =
-      Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
+      Fee_transfer.Single.Gen.with_random_receivers ~keys ~min_fee:0
+        ~max_fee:10
         ~token:(Quickcheck.Generator.return Token_id.default)
 
     let coinbase_gen =
       Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
         ~fee_transfer:
-          (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
-             ~max_fee:(Currency.Fee.of_int 10))
+          (Coinbase.Fee_transfer.Gen.with_random_receivers
+             ~constraint_constants ~keys ~min_fee:Currency.Fee.zero)
 
     let%test_unit "User_command: read and write" =
       let conn = Lazy.force conn_lazy in

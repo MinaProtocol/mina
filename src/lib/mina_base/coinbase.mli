@@ -54,6 +54,7 @@ module Gen : sig
        keys:Signature_keypair.t array
     -> min_amount:int
     -> max_amount:int
-    -> fee_transfer:Fee_transfer.t Quickcheck.Generator.t
+    -> fee_transfer:(   coinbase_amount:Currency.Amount.t
+                     -> Fee_transfer.t Quickcheck.Generator.t)
     -> t Quickcheck.Generator.t
 end

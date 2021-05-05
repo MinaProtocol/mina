@@ -38,18 +38,27 @@ let to_fee_transfer {receiver_pk; fee} =
   Fee_transfer.Single.create ~receiver_pk ~fee ~fee_token:Token_id.default
 
 module Gen = struct
-  let gen ~max_fee : t Quickcheck.Generator.t =
+  let gen ?(min_fee = Currency.Fee.zero) ~max_fee : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
     let%bind receiver_pk = Public_key.Compressed.gen in
-    let%map fee = Currency.Fee.gen_incl Currency.Fee.zero max_fee in
+    let%map fee = Currency.Fee.gen_incl min_fee max_fee in
     {receiver_pk; fee}
 
-  let with_random_receivers ~keys ~max_fee : t Quickcheck.Generator.t =
+  let with_random_receivers
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~keys
+      ?(min_fee = Currency.Fee.zero) ~coinbase_amount :
+      t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
+    let max_fee =
+      Option.value_exn
+        (Currency.Fee.sub
+           (Currency.Amount.to_fee coinbase_amount)
+           constraint_constants.account_creation_fee)
+    in
     let%map receiver_pk =
       let open Signature_lib in
       Quickcheck_lib.of_array keys
       >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
-    and fee = Currency.Fee.gen_incl Currency.Fee.zero max_fee in
+    and fee = Currency.Fee.gen_incl min_fee max_fee in
     {receiver_pk; fee}
 end
