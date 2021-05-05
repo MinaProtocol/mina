@@ -200,7 +200,8 @@ module Snark_worker = struct
       snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
     don't_wait_for
       ( match%bind
-          Monitor.try_with (fun () -> Process.wait snark_worker_process)
+          Monitor.try_with ~here:[%here] (fun () ->
+              Process.wait snark_worker_process )
         with
       | Ok signal_or_error -> (
         match signal_or_error with
@@ -1004,7 +1005,7 @@ let create ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
           let%bind prover =
-            Monitor.try_with
+            Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
                   (fun exn ->
@@ -1021,7 +1022,7 @@ let create ?wallets (config : Config.t) =
             >>| Result.ok_exn
           in
           let%bind verifier =
-            Monitor.try_with
+            Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
                   (fun exn ->

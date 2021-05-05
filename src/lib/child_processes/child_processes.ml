@@ -320,7 +320,7 @@ let start_custom :
   don't_wait_for
     (let open Deferred.Let_syntax in
     let%bind termination_status =
-      Deferred.Or_error.try_with (fun () -> Process.wait process)
+      Deferred.Or_error.try_with ~here:[%here] (fun () -> Process.wait process)
     in
     [%log trace] "child process %s died" name ;
     don't_wait_for
