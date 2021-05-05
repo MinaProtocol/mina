@@ -533,68 +533,6 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
       let ledger = Staged_ledger.ledger staged_ledger in
       let mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
       let new_ledger = Ledger.register_mask ledger mask in
-      (*
-      let root_snarked_ledger =
-        Transition_frontier.root_snarked_ledger frontier
-      in
-      let ledger = Ledger.of_database root_snarked_ledger in
-      let path = Transition_frontier.path_map frontier b ~f:Fn.id in
-      let%bind _ =
-        List.fold_until ~init:(Ok ()) path
-          ~f:(fun _acc b ->
-            if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
-              match
-                Staged_ledger.proof_txns_with_state_hashes
-                  (Transition_frontier.Breadcrumb.staged_ledger b)
-              with
-              | None ->
-                  Stop
-                    (Or_error.error_string
-                       (sprintf
-                          "No transactions corresponding to the emitted proof \
-                           for state_hash:%s"
-                          (State_hash.to_string
-                             (Transition_frontier.Breadcrumb.state_hash b))))
-              | Some txns -> (
-                match
-                  List.fold_until ~init:(Ok ())
-                    (Non_empty_list.to_list txns)
-                    ~f:(fun _acc (txn, state_hash) ->
-                      (*Validate transactions against the protocol state associated with the transaction*)
-                      match
-                        Transition_frontier.find_protocol_state frontier
-                          state_hash
-                      with
-                      | Some state -> (
-                          let txn_state_view =
-                            Mina_state.Protocol_state.body state
-                            |> Mina_state.Protocol_state.Body.view
-                          in
-                          match
-                            Ledger.apply_transaction
-                              ~constraint_constants:
-                                t.config.precomputed_values
-                                  .constraint_constants ~txn_state_view ledger
-                              txn.data
-                          with
-                          | Ok _ ->
-                              Continue (Ok ())
-                          | e ->
-                              Stop (Or_error.map e ~f:ignore) )
-                      | None ->
-                          Stop
-                            (Or_error.errorf
-                               !"Coudln't find protocol state with hash %s"
-                               (State_hash.to_string state_hash)) )
-                    ~finish:Fn.id
-                with
-                | Ok _ ->
-                    Continue (Ok ())
-                | e ->
-                    Stop e )
-            else Continue (Ok ()) )
-          ~finish:Fn.id
-      in*)
       let staged_undos =
         Staged_ledger.Scan_state.staged_undos
           (Staged_ledger.scan_state staged_ledger)
@@ -615,7 +553,30 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
         Core.printf "Ledger_hash %s%!"
           (Yojson.Safe.to_string
              (Ledger_hash.to_yojson (Ledger.merkle_root new_ledger))) ;
-        (*let process_accounts accounts =
+        let compare_accounts ledger =
+          List.iter res ~f:(fun acc ->
+              let account_id = Account.identifier acc in
+              match Ledger.location_of_account ledger account_id with
+              | Some loc -> (
+                match Ledger.get ledger loc with
+                | None ->
+                    Core.printf
+                      !"could not find account %{sexp:Account.t}\n%!"
+                      acc
+                | Some acc' ->
+                    if not (Account.equal acc acc') then
+                      Core.printf
+                        !"account expected %{sexp:Account.t} got \
+                          %{sexp:Account.t}\n\
+                          %!"
+                        acc acc' )
+              | None ->
+                  Core.printf
+                    !"could not find account %{sexp:Account.t}\n%!"
+                    acc )
+        in
+        compare_accounts new_ledger ;
+        let check accounts =
           let constraint_constants =
             Genesis_constants.Constraint_constants.compiled
           in
@@ -628,10 +589,15 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
               ~depth:constraint_constants.ledger_depth accounts
           in
           let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
+          Core.printf !"total accounts: %d\n%!" (List.length res) ;
+          compare_accounts ledger ;
+          Core.printf "New Ledger_hash %s%!"
+            (Yojson.Safe.to_string
+               (Ledger_hash.to_yojson (Ledger.merkle_root ledger))) ;
           Format.printf "%s@."
             (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
         in
-        process_accounts (Lazy.return (List.map ~f:(fun a -> (None, a)) res)) ;*)
+        check (Lazy.return (List.map ~f:(fun a -> (None, a)) res)) ;
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger ;
         Ok res )
       else (
