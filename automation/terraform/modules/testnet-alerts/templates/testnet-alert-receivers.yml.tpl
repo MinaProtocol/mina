@@ -8,8 +8,20 @@ receivers:
     pagerduty_configs:
       - service_key: ${pagerduty_service_key}
   - name: slack-alert-default
-    webhook_configs:
-      - url: ${slack_alert_webhook}
+    slack_configs:
+      - api_url: ${slack_alert_webhook}
+        channel: '#testnet-warnings'
+        send_resolved: true
+        text: >-
+          {{ if eq .Status "firing" }}All active alerts:{{ end }}
+
+          {{ range .Alerts -}}
+            *Alert:* {{ .Labels.alertname }}{{ if .Labels.severity }} - `{{ .Labels.severity }}`{{ end }}
+            *Description:* {{ .Annotations.description }}
+            *Runbook:* {{ if .Annotations.runbook }} `{{ .Annotations.runbook }}` {{ end }}
+
+          {{ end }}
+
 route:
   receiver: slack-alert-default
   group_by:

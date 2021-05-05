@@ -22,7 +22,7 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "At least 3 nodes on {{ $lables.testnet }} restarted"
+      summary: "At least 3 nodes on {{ $labels.testnet }} restarted"
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: HighDisconnectedBlocksPerHour
@@ -62,8 +62,9 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} has pods which have not logged in 10 minutes"
-      description: "There are no new logs in the last 10 minutes for {{ $value }} pods on network {{ $labels.testnet }}."
+      summary: "{{ $labels.testnet }} has pods which have not logged in an hour"
+      description: "There are no new logs in the last hour for {{ $value }} pods on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/WatchdogNoNewLogs-7ffb7a74bad542c78961abddd9004489"
 
   - alert: SeedListDown
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alert_timeframe}])) == 0
@@ -359,7 +360,7 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: warning
     annotations:
-      summary: "At least one of the nodes on {{ $lables.testnet }} restarted"
+      summary: "At least one of the nodes on {{ $labels.testnet }} restarted"
       description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
 
   - alert: UnparentedBlocksObserved

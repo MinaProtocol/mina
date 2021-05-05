@@ -62,14 +62,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let amount = Currency.Amount.of_int 300_000_000_000 in
     let%bind () =
       Node.must_send_payment ~retry_on_graphql_error:false ~logger sender_bp
-        ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount ~fee
+        ~sender_pub_key ~receiver_pub_key ~amount ~fee
     in
     [%log info] "Payment succeeded, as expected" ;
     [%log info] "Waiting for payment to appear in breadcrumb" ;
     let%bind () =
       wait_for t
-        (Wait_condition.payment_to_be_included_in_frontier
-           ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount)
+        (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
+           ~receiver_pub_key ~amount)
     in
     [%log info] "Got breadcrumb with desired payment" ;
     [%log info]
@@ -81,12 +81,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       let open Deferred.Let_syntax in
       match%bind
         Node.send_payment ~retry_on_graphql_error:false ~logger sender_bp
-          ~sender:sender_pub_key ~receiver:receiver_pub_key ~amount:amount'
-          ~fee
+          ~sender_pub_key ~receiver_pub_key ~amount:amount' ~fee
       with
       (* TODO: this currently relies on the returned error being a soft error and not a hard error *)
       | Ok () ->
-          Malleable_error.soft_error_string ()
+          Malleable_error.soft_error_string ~value:()
             "Payment succeeded, but expected it to fail because of a minimum \
              balance violation"
       | Error error ->
@@ -103,7 +102,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             [%log error]
               "Payment failed in GraphQL, but for unexpected reason: %s"
               err_str ;
-            Malleable_error.soft_error_format ()
+            Malleable_error.soft_error_format ~value:()
               "Payment failed for unexpected reason: %s" err_str )
     in
     [%log info] "Payment test with timed accounts completed"
