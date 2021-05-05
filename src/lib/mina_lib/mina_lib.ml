@@ -576,6 +576,31 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
                     !"could not find account %{sexp:Account.t}\n%!"
                     acc )
         in
+        let compare_locations ledger1 ledger2 =
+          List.iter acc_list_to_be_exported ~f:(fun acc ->
+              let account_id = Account.identifier acc in
+              match
+                ( Ledger.location_of_account ledger1 account_id
+                , Ledger.location_of_account ledger2 account_id )
+              with
+              | Some loc1, Some loc2 ->
+                  if not (Ledger.Location.equal loc1 loc2) then
+                    Core.printf
+                      !"location mismatch for key %{sexp:Account_id.t}: loc1 \
+                        %{sexp:Ledger.Location.t} loc2: %{sexp: \
+                        Ledger.Location.t}\n\
+                        %!"
+                      account_id loc1 loc2
+                  else
+                    Core.printf
+                      !"location matched key %{sexp:Account_id.t} loc1 \
+                        %{sexp:Ledger.Location.t} loc2: %{sexp: \
+                        Ledger.Location.t}\n\
+                        %!"
+                      account_id loc1 loc2
+              | _ ->
+                  Core.printf "something went wrong%!" )
+        in
         (*compare the accounts from acc_list_to_be_exported against the ledger on which transactions were undone *)
         compare_accounts new_ledger ;
         let check accounts =
@@ -597,6 +622,8 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
             (List.length acc_list_to_be_exported) ;
           (*compare the accounts from acc_list_to_be_exported against the ledger that was created from the list*)
           compare_accounts ledger_from_accounts ;
+          (*Check if account location are equal*)
+          compare_locations new_ledger ledger_from_accounts ;
           let merkle_root_from_accounts =
             Ledger.merkle_root ledger_from_accounts
           in
