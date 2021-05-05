@@ -313,65 +313,21 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         ~transition_writer_ref ~frontier_w ~persistent_root
         ~persistent_frontier ~initial_root_transition ~catchup_mode
         ~best_seen_transition:best_tip ~precomputed_values
-  | None, Some frontier ->
-      [%log info]
-        "Successfully loaded frontier, but failed to download best tip from \
-         network; starting participation" ;
-      let curr_best_tip = Transition_frontier.best_tip frontier in
-      let%map () =
-        match
-          Consensus.Hooks.required_local_state_sync
-            ~constants:precomputed_values.consensus_constants
-            ~consensus_state:
-              (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
-            ~local_state:consensus_local_state
-        with
-        | None ->
-            [%log info] "Local state already in sync" ;
-            Deferred.unit
-        | Some sync_jobs -> (
-            [%log info] "Local state is out of sync; " ;
-            match%map
-              Consensus.Hooks.sync_local_state
-                ~local_state:consensus_local_state ~logger ~trust_system
-                ~random_peers:(Mina_networking.random_peers network)
-                ~query_peer:
-                  { Consensus.Hooks.Rpcs.query=
-                      (fun peer rpc query ->
-                        Mina_networking.(
-                          query_peer network peer.peer_id
-                            (Rpcs.Consensus_rpc rpc) query) ) }
-                ~ledger_depth:
-                  precomputed_values.constraint_constants.ledger_depth
-                sync_jobs
-            with
-            | Error e ->
-                Error.tag e ~tag:"Local state sync failed" |> Error.raise
-            | Ok () ->
-                () )
-      in
-      start_transition_frontier_controller ~logger ~trust_system ~verifier
-        ~network ~time_controller ~producer_transition_reader_ref
-        ~producer_transition_writer_ref ~verified_transition_writer
-        ~clear_reader ~collected_transitions:[] ~transition_reader_ref
-        ~transition_writer_ref ~frontier_w ~precomputed_values frontier
-  | Some best_tip, Some frontier ->
-      [%log info]
-        ~metadata:
-          [ ( "length"
-            , `Int
-                (Unsigned.UInt32.to_int
-                   (External_transition.Initial_validated.blockchain_length
-                      best_tip.data)) ) ]
-        "Successfully loaded frontier and downloaded best tip with $length \
-         from network" ;
-      if
-        is_transition_for_bootstrap ~logger frontier
-          (best_tip |> Envelope.Incoming.data)
-          ~precomputed_values
-      then (
+  | best_tip, Some frontier -> (
+    match best_tip with
+    | Some best_tip
+      when is_transition_for_bootstrap ~logger frontier
+             (best_tip |> Envelope.Incoming.data)
+             ~precomputed_values ->
         [%log info]
-          "Network best tip is too new to catchup to; starting bootstrap" ;
+          ~metadata:
+            [ ( "length"
+              , `Int
+                  (Unsigned.UInt32.to_int
+                     (External_transition.Initial_validated.blockchain_length
+                        best_tip.data)) ) ]
+          "Network best tip is too new to catchup to (best_tip with $length); \
+           starting bootstrap" ;
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
         in
@@ -382,11 +338,22 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
           ~clear_reader ~transition_reader_ref ~consensus_local_state
           ~transition_writer_ref ~frontier_w ~persistent_root
           ~persistent_frontier ~initial_root_transition ~catchup_mode
-          ~best_seen_transition:(Some best_tip) ~precomputed_values )
-      else (
-        [%log info]
-          "Network best tip is recent enough to catchup to; syncing local \
-           state and starting participation" ;
+          ~best_seen_transition:(Some best_tip) ~precomputed_values
+    | _ ->
+        if Option.is_some best_tip then
+          [%log info]
+            ~metadata:
+              [ ( "length"
+                , `Int
+                    (Unsigned.UInt32.to_int
+                       (External_transition.Initial_validated.blockchain_length
+                          (Option.value_exn best_tip).data)) ) ]
+            "Network best tip is recent enough to catchup to (best_tip with \
+             $length); syncing local state and starting participation"
+        else
+          [%log info]
+            "Successfully loaded frontier, but failed downloaded best tip \
+             from network" ;
         let curr_best_tip = Transition_frontier.best_tip frontier in
         let%map () =
           match
@@ -423,9 +390,8 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~network ~time_controller ~producer_transition_reader_ref
           ~producer_transition_writer_ref ~verified_transition_writer
-          ~clear_reader ~collected_transitions:[best_tip]
-          ~transition_reader_ref ~transition_writer_ref ~frontier_w
-          ~precomputed_values frontier )
+          ~clear_reader ~collected_transitions:[] ~transition_reader_ref
+          ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
