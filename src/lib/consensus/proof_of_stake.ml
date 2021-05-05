@@ -13,8 +13,6 @@ module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
 module Length = Mina_numbers.Length
 
-let m = Snark_params.Tick.m
-
 let make_checked t =
   let open Snark_params.Tick in
   with_state (As_prover.return ()) (Run.make_checked t)
@@ -588,88 +586,6 @@ module Data = struct
 
   module Vrf = struct
     include Consensus_vrf
-
-    module Threshold = struct
-      open Bignum_bigint
-
-      (* c is a constant factor on vrf-win likelihood *)
-      (* c = 2^0 is production behavior *)
-      (* c > 2^0 is a temporary hack for testnets *)
-      let c = `Two_to_the 0
-
-      (* f determines the fraction of slots that will have blocks if c = 2^0 *)
-      let f = Bignum.(of_int 3 / of_int 4)
-
-      let base = Bignum.(of_int 1 - f)
-
-      let c_bias =
-        let (`Two_to_the i) = c in
-        fun xs -> List.drop xs i
-
-      let params =
-        Snarky_taylor.Exp.params ~base
-          ~field_size_in_bits:Snark_params.Tick.Field.size_in_bits
-
-      let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
-
-      (*  Check if
-          vrf_output / 2^256 <= c * (1 - (1 - f)^(amount / total_stake))
-      *)
-      let is_satisfied ~my_stake ~total_stake vrf_output =
-        let input =
-          (* get first params.per_term_precision bits of top / bottom.
-
-             This is equal to
-
-             floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
-          *)
-          let k = params.per_term_precision in
-          let top = bigint_of_uint64 (Balance.to_uint64 my_stake) in
-          let bottom = bigint_of_uint64 (Amount.to_uint64 total_stake) in
-          Bignum.(
-            of_bigint Bignum_bigint.(shift_left top k / bottom)
-            / of_bigint Bignum_bigint.(shift_left one k))
-        in
-        let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
-        let lhs =
-          let n =
-            of_bits_lsb
-              (c_bias (Array.to_list (Blake2.string_to_bits vrf_output)))
-          in
-          Bignum.(
-            of_bigint n
-            / of_bigint
-                Bignum_bigint.(shift_left one Output.Truncated.length_in_bits))
-        in
-        Bignum.(lhs <= rhs)
-
-      module Checked = struct
-        let is_satisfied ~my_stake ~total_stake
-            (vrf_output : Output.Truncated.var) =
-          let open Snarky_integer in
-          let open Snarky_taylor in
-          make_checked (fun () ->
-              let open Run in
-              let rhs =
-                Exp.one_minus_exp ~m params
-                  (Floating_point.of_quotient ~m
-                     ~precision:params.per_term_precision
-                     ~top:(Integer.of_bits ~m (Balance.var_to_bits my_stake))
-                     ~bottom:
-                       (Integer.of_bits ~m (Amount.var_to_bits total_stake))
-                     ~top_is_less_than_bottom:())
-              in
-              let vrf_output =
-                Array.to_list (vrf_output :> Boolean.var array)
-              in
-              let lhs = c_bias vrf_output in
-              Floating_point.(
-                le ~m
-                  (of_bits ~m lhs ~precision:Output.Truncated.length_in_bits)
-                  rhs) )
-      end
-    end
-
     module T = Integrated
 
     type _ Snarky_backendless.Request.t +=
