@@ -913,9 +913,9 @@ let setup_daemon logger =
             client_trustlist
       in
       Stream.iter
-        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context (t ()))
+        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context @@ t ())
            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
-        ~f:(fun (span, ctx) ->
+        ~f:(fun (span, context) ->
           let secs = Time_ns.Span.to_sec span in
           let rec get_monitors accum monitor =
             match Async_kernel.Monitor.parent monitor with
@@ -924,11 +924,11 @@ let setup_daemon logger =
             | Some parent ->
                 get_monitors (parent :: accum) parent
           in
-          let monitors = get_monitors [ctx.monitor] ctx.monitor in
+          let monitors = get_monitors [context.monitor] context.monitor in
           let monitor_infos =
             List.map monitors ~f:(fun monitor ->
-                `String
-                  (Async_kernel.Monitor.sexp_of_t monitor |> Sexp.to_string) )
+                Async_kernel.Monitor.sexp_of_t monitor
+                |> Error_json.sexp_to_yojson )
           in
           [%log debug]
             ~metadata:
