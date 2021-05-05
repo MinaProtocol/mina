@@ -86,19 +86,20 @@ module Gen = struct
     let%bind supercharged_coinbase = Quickcheck.Generator.bool in
     let%bind amount =
       let max_amount = constraint_constants.coinbase_amount in
-      let min_fee =
+      (* amount should be at least the account creation fee to pay for the creation of coinbase receiver and the fee transfer receiver below *)
+      let min_amount =
         Option.value_exn
           (Currency.Fee.scale constraint_constants.account_creation_fee 2)
+        |> Currency.Amount.of_fee
       in
-      let%map amount =
-        Currency.Amount.(gen_incl (of_fee min_fee) max_amount)
-      in
+      let%map amount = Currency.Amount.(gen_incl min_amount max_amount) in
       if supercharged_coinbase then
         Option.value_exn
           (Currency.Amount.scale amount
              constraint_constants.supercharged_coinbase_factor)
       else amount
     in
+    (* keep account-creation fee for the coinbase-receiver *)
     let max_fee =
       Option.value_exn
         (Currency.Fee.sub

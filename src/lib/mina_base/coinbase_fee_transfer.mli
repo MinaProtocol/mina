@@ -31,9 +31,9 @@ module Gen : sig
     -> max_fee:Currency.Fee.t
     -> t Quickcheck.Generator.t
 
+  (** Creates coinbase fee transfers with fees between [min_fee] and [coinbase_amount]*)
   val with_random_receivers :
-       constraint_constants:Genesis_constants.Constraint_constants.t
-    -> keys:Signature_keypair.t array
+       keys:Signature_keypair.t array
     -> ?min_fee:Currency.Fee.t
     -> coinbase_amount:Currency.Amount.t
     -> t Quickcheck.Generator.t

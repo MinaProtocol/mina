@@ -6243,8 +6243,7 @@ let%test_module "transaction_undos" =
         Quickcheck.Generator.list_with_length remaining
           (Coinbase.Gen.with_random_receivers ~keys ~min_amount ~max_amount
              ~fee_transfer:
-               (Coinbase.Fee_transfer.Gen.with_random_receivers
-                  ~constraint_constants ~keys
+               (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
                   ~min_fee:constraint_constants.account_creation_fee))
       in
       List.map
@@ -6301,7 +6300,7 @@ let%test_module "transaction_undos" =
         let%map fts = gen_fee_transfers ~length:5 ledger_init_state in
         (ledger_init_state, fts)
       in
-      Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
+      Async.Quickcheck.test ~seed:(`Deterministic "fee-transfer undos")
         ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
         gen ~f:(fun (ledger_init_state, ft_list) ->
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
@@ -6316,7 +6315,7 @@ let%test_module "transaction_undos" =
         let%map cmds = gen_user_commands ~length:10 ledger_init_state in
         (ledger_init_state, cmds)
       in
-      Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
+      Async.Quickcheck.test ~seed:(`Deterministic "user-command undo")
         ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
         gen ~f:(fun (ledger_init_state, cmd_list) ->
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
@@ -6340,7 +6339,7 @@ let%test_module "transaction_undos" =
         in
         (ledger_init_state, txns)
       in
-      Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
+      Async.Quickcheck.test ~seed:(`Deterministic "all-transaction undos")
         ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
         gen ~f:(fun (ledger_init_state, txn_list) ->
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth

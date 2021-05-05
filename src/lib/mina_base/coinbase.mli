@@ -50,6 +50,7 @@ module Gen : sig
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> (t * [`Supercharged_coinbase of bool]) Quickcheck.Generator.t
 
+  (** Creates coinbase with reward between [min_amount] and [max_amount]. The generated amount[coinbase_amount] is then used as the upper bound for the fee transfer. *)
   val with_random_receivers :
        keys:Signature_keypair.t array
     -> min_amount:int
