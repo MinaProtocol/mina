@@ -149,6 +149,15 @@ module Message = struct
     {global_slot; seed; delegator}
 end
 
+(* c is a constant factor on vrf-win likelihood *)
+(* c = 2^0 is production behavior *)
+(* c > 2^0 is a temporary hack for testnets *)
+let c = `Two_to_the 0
+
+let c_bias =
+  let (`Two_to_the i) = c in
+  fun xs -> List.drop xs i
+
 module Output = struct
   module Truncated = struct
     [%%versioned
@@ -204,6 +213,15 @@ module Output = struct
 
     let to_bits t =
       Fold.(to_list (string_bits t)) |> Fn.flip List.take length_in_bits
+
+    (* vrf_output / 2^256 *)
+    let to_fraction vrf_output =
+      let open Bignum_bigint in
+      let n =
+        of_bits_lsb (c_bias (Array.to_list (Blake2.string_to_bits vrf_output)))
+      in
+      Bignum.(
+        of_bigint n / of_bigint Bignum_bigint.(shift_left one length_in_bits))
   end
 
   open Tick
@@ -270,21 +288,11 @@ end
 
 module Threshold = struct
   open Unsigned
-  open Bignum_bigint
-
-  (* c is a constant factor on vrf-win likelihood *)
-  (* c = 2^0 is production behavior *)
-  (* c > 2^0 is a temporary hack for testnets *)
-  let c = `Two_to_the 0
 
   (* f determines the fraction of slots that will have blocks if c = 2^0 *)
   let f = Bignum.(of_int 3 / of_int 4)
 
   let base = Bignum.(of_int 1 - f)
-
-  let c_bias =
-    let (`Two_to_the i) = c in
-    fun xs -> List.drop xs i
 
   let params =
     Snarky_taylor.Exp.params ~base
@@ -312,15 +320,7 @@ module Threshold = struct
         / of_bigint Bignum_bigint.(shift_left one k))
     in
     let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
-    let lhs =
-      let n =
-        of_bits_lsb (c_bias (Array.to_list (Blake2.string_to_bits vrf_output)))
-      in
-      Bignum.(
-        of_bigint n
-        / of_bigint
-            Bignum_bigint.(shift_left one Output.Truncated.length_in_bits))
-    in
+    let lhs = Output.Truncated.to_fraction vrf_output in
     Bignum.(lhs <= rhs)
 
   module Checked = struct
@@ -450,6 +450,11 @@ type context =
   Vrf_lib.Standalone.Context.t
 
 module Layout = struct
+  (* NB: These types are carefully structured to match the GraphQL
+         representation. By keeping these in sync, we are able to pass the
+         output of GraphQL commands to the input of command line tools and vice
+         versa.
+  *)
   module Message = struct
     type t =
       { global_slot: Mina_numbers.Global_slot.t [@key "globalSlot"]
@@ -468,13 +473,30 @@ module Layout = struct
       ; delegator_index= t.delegator }
   end
 
+  module Threshold = struct
+    type t =
+      { delegated_stake: Currency.Balance.t [@key "delegatedStake"]
+      ; total_stake: Currency.Amount.t [@key "totalStake"] }
+    [@@deriving yojson]
+
+    let is_satisfied vrf_output t =
+      Threshold.is_satisfied ~my_stake:t.delegated_stake
+        ~total_stake:t.total_stake vrf_output
+  end
+
   module Evaluation = struct
     type t =
       { message: Message.t
       ; public_key: Signature_lib.Public_key.t [@key "publicKey"]
       ; c: Scalar.t
       ; s: Scalar.t
-      ; scaled_message_hash: Group.t [@key "ScaledMessageHash"] }
+      ; scaled_message_hash: Group.t [@key "ScaledMessageHash"]
+      ; vrf_threshold: Threshold.t option [@default None] [@key "vrfThreshold"]
+      ; vrf_output: Output.Truncated.t option
+            [@default None] [@key "vrfOutput"]
+      ; vrf_output_fractional: float option
+            [@default None] [@key "vrfOutputFractional"]
+      ; threshold_met: bool option [@default None] [@key "thresholdMet"] }
     [@@deriving yojson]
 
     let to_evaluation_and_context (t : t) : evaluation * context =
@@ -489,7 +511,11 @@ module Layout = struct
       ; public_key= Group.to_affine_exn context.public_key
       ; c= evaluation.discrete_log_equality.c
       ; s= evaluation.discrete_log_equality.s
-      ; scaled_message_hash= evaluation.scaled_message_hash }
+      ; scaled_message_hash= evaluation.scaled_message_hash
+      ; vrf_threshold= None
+      ; vrf_output= None
+      ; vrf_output_fractional= None
+      ; threshold_met= None }
 
     let of_message_and_sk ~constraint_constants (message : Message.t)
         (private_key : Signature_lib.Private_key.t) =
@@ -512,6 +538,35 @@ module Layout = struct
       end) in
       let standalone_eval, context = to_evaluation_and_context t in
       Standalone.Evaluation.verified_output standalone_eval context
+
+    let compute_vrf ~constraint_constants ?delegated_stake ?total_stake (t : t)
+        =
+      match to_vrf ~constraint_constants t with
+      | None ->
+          { t with
+            vrf_output= None
+          ; vrf_output_fractional= None
+          ; threshold_met= None }
+      | Some vrf ->
+          let vrf_output = Output.truncate vrf in
+          let vrf_output_fractional =
+            Output.Truncated.to_fraction vrf_output |> Bignum.to_float
+          in
+          let vrf_threshold =
+            match (delegated_stake, total_stake) with
+            | Some delegated_stake, Some total_stake ->
+                Some {Threshold.delegated_stake; total_stake}
+            | _ ->
+                t.vrf_threshold
+          in
+          let threshold_met =
+            Option.map ~f:(Threshold.is_satisfied vrf_output) vrf_threshold
+          in
+          { t with
+            vrf_threshold
+          ; vrf_output= Some vrf_output
+          ; vrf_output_fractional= Some vrf_output_fractional
+          ; threshold_met }
   end
 end
 

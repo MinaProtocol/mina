@@ -157,59 +157,6 @@ module Types = struct
 
   let epoch_seed = epoch_seed ()
 
-  let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
-    let open Consensus_vrf.Layout.Message in
-    obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
-        [ field "globalSlot" ~typ:(non_null uint32)
-            ~args:Arg.[]
-            ~resolve:(fun _ {global_slot; _} -> global_slot)
-        ; field "epochSeed" ~typ:(non_null epoch_seed)
-            ~args:Arg.[]
-            ~resolve:(fun _ {epoch_seed; _} -> epoch_seed)
-        ; field "delegatorIndex"
-            ~doc:"Position in the ledger of the delegator's account"
-            ~typ:(non_null int)
-            ~args:Arg.[]
-            ~resolve:(fun _ {delegator_index; _} -> delegator_index) ] )
-
-  let vrf_evaluation : ('context, Consensus_vrf.Layout.Evaluation.t option) typ
-      =
-    let open Consensus_vrf.Layout.Evaluation in
-    obj "VrfEvaluation"
-      ~doc:"A witness to a vrf evaluation, which may be externally verified"
-      ~fields:(fun _ ->
-        [ field "message" ~typ:(non_null vrf_message)
-            ~args:Arg.[]
-            ~resolve:(fun _ {message; _} -> message)
-        ; field "publicKey" ~typ:(non_null public_key)
-            ~args:Arg.[]
-            ~resolve:(fun _ {public_key; _} -> Public_key.compress public_key)
-        ; field "c" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ {c; _} -> Consensus_vrf.Scalar.to_string c)
-        ; field "s" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ {s; _} -> Consensus_vrf.Scalar.to_string s)
-        ; field "scaledMessageHash"
-            ~typ:(non_null (list (non_null string)))
-            ~doc:"A group element represented as 2 field elements"
-            ~args:Arg.[]
-            ~resolve:(fun _ {scaled_message_hash; _} ->
-              Consensus_vrf.Group.to_string_list_exn scaled_message_hash )
-        ; field "vrfOutput" ~typ:string
-            ~doc:
-              "The vrf output derived from the evaluation witness. If null, \
-               the vrf witness was invalid."
-            ~args:Arg.[]
-            ~resolve:(fun {ctx= mina; _} t ->
-              let constraint_constants =
-                (Mina_lib.config mina).precomputed_values.constraint_constants
-              in
-              to_vrf ~constraint_constants t
-              |> Option.map ~f:(fun vrf ->
-                     Consensus_vrf.Output.(
-                       Truncated.to_base58_check (truncate vrf)) ) ) ] )
-
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
@@ -2029,21 +1976,50 @@ module Types = struct
               ~doc:"Position in the ledger of the delegator's account"
               ~typ:(non_null int) ]
 
+    let vrf_threshold =
+      obj "VrfThresholdInput"
+        ~doc:
+          "The amount of stake delegated, used to determine the threshold for \
+           a vrf evaluation producing a block"
+        ~coerce:(fun delegated_stake total_stake ->
+          { Consensus_vrf.Layout.Threshold.delegated_stake=
+              Currency.Balance.of_uint64 delegated_stake
+          ; total_stake= Currency.Amount.of_uint64 total_stake } )
+        ~fields:
+          [ arg "delegatedStake"
+              ~doc:
+                "The amount of stake delegated to the vrf evaluator by the \
+                 delegating account. This should match the amount in the \
+                 epoch's staking ledger, which may be different to the amount \
+                 in the current ledger."
+              ~typ:(non_null uint64_arg)
+          ; arg "totalStake"
+              ~doc:
+                "The total amount of stake across all accounts in the epoch's \
+                 staking ledger."
+              ~typ:(non_null uint64_arg) ]
+
     let vrf_evaluation =
       obj "VrfEvaluationInput" ~doc:"The witness to a vrf evaluation"
-        ~coerce:(fun message public_key c s scaled_message_hash ->
+        ~coerce:
+          (fun message public_key c s scaled_message_hash vrf_threshold ->
           { Consensus_vrf.Layout.Evaluation.message
           ; public_key= Public_key.decompress_exn public_key
           ; c= Snark_params.Tick.Inner_curve.Scalar.of_string c
           ; s= Snark_params.Tick.Inner_curve.Scalar.of_string s
           ; scaled_message_hash=
-              Consensus_vrf.Group.of_string_list_exn scaled_message_hash } )
+              Consensus_vrf.Group.of_string_list_exn scaled_message_hash
+          ; vrf_threshold
+          ; vrf_output= None
+          ; vrf_output_fractional= None
+          ; threshold_met= None } )
         ~fields:
           [ arg "message" ~typ:(non_null vrf_message)
           ; arg "publicKey" ~typ:(non_null public_key_arg)
           ; arg "c" ~typ:(non_null string)
           ; arg "s" ~typ:(non_null string)
-          ; arg "scaledMessageHash" ~typ:(non_null (list (non_null string))) ]
+          ; arg "scaledMessageHash" ~typ:(non_null (list (non_null string)))
+          ; arg "vrfThreshold" ~typ:vrf_threshold ]
 
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
@@ -2316,6 +2292,140 @@ module Types = struct
                   "If true, no connections will be allowed unless they are \
                    from a trusted peer" ]
   end
+
+  let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
+    let open Consensus_vrf.Layout.Message in
+    obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
+        [ field "globalSlot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ {global_slot; _} -> global_slot)
+        ; field "epochSeed" ~typ:(non_null epoch_seed)
+            ~args:Arg.[]
+            ~resolve:(fun _ {epoch_seed; _} -> epoch_seed)
+        ; field "delegatorIndex"
+            ~doc:"Position in the ledger of the delegator's account"
+            ~typ:(non_null int)
+            ~args:Arg.[]
+            ~resolve:(fun _ {delegator_index; _} -> delegator_index) ] )
+
+  let vrf_threshold =
+    obj "VrfThreshold"
+      ~doc:
+        "The amount of stake delegated, used to determine the threshold for a \
+         vrf evaluation winning a slot" ~fields:(fun _ ->
+        [ field "delegatedStake"
+            ~doc:
+              "The amount of stake delegated to the vrf evaluator by the \
+               delegating account. This should match the amount in the \
+               epoch's staking ledger, which may be different to the amount \
+               in the current ledger."
+            ~args:[] ~typ:(non_null uint64)
+            ~resolve:(fun _
+                     {Consensus_vrf.Layout.Threshold.delegated_stake; _}
+                     -> Currency.Balance.to_uint64 delegated_stake )
+        ; field "totalStake"
+            ~doc:
+              "The total amount of stake across all accounts in the epoch's \
+               staking ledger."
+            ~args:[] ~typ:(non_null uint64)
+            ~resolve:(fun _ {Consensus_vrf.Layout.Threshold.total_stake; _} ->
+              Currency.Amount.to_uint64 total_stake ) ] )
+
+  let vrf_evaluation : ('context, Consensus_vrf.Layout.Evaluation.t option) typ
+      =
+    let open Consensus_vrf.Layout.Evaluation in
+    obj "VrfEvaluation"
+      ~doc:"A witness to a vrf evaluation, which may be externally verified"
+      ~fields:(fun _ ->
+        [ field "message" ~typ:(non_null vrf_message)
+            ~args:Arg.[]
+            ~resolve:(fun _ {message; _} -> message)
+        ; field "publicKey" ~typ:(non_null public_key)
+            ~args:Arg.[]
+            ~resolve:(fun _ {public_key; _} -> Public_key.compress public_key)
+        ; field "c" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ {c; _} -> Consensus_vrf.Scalar.to_string c)
+        ; field "s" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ {s; _} -> Consensus_vrf.Scalar.to_string s)
+        ; field "scaledMessageHash"
+            ~typ:(non_null (list (non_null string)))
+            ~doc:"A group element represented as 2 field elements"
+            ~args:Arg.[]
+            ~resolve:(fun _ {scaled_message_hash; _} ->
+              Consensus_vrf.Group.to_string_list_exn scaled_message_hash )
+        ; field "vrfThreshold" ~typ:vrf_threshold
+            ~args:Arg.[]
+            ~resolve:(fun _ {vrf_threshold; _} -> vrf_threshold)
+        ; field "vrfOutput" ~typ:string
+            ~doc:
+              "The vrf output derived from the evaluation witness. If null, \
+               the vrf witness was invalid."
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= mina; _} t ->
+              let vrf_opt =
+                match t.vrf_output with
+                | Some vrf ->
+                    Some (Consensus_vrf.Output.Truncated.to_base58_check vrf)
+                | None ->
+                    let constraint_constants =
+                      (Mina_lib.config mina).precomputed_values
+                        .constraint_constants
+                    in
+                    to_vrf ~constraint_constants t
+                    |> Option.map ~f:Consensus_vrf.Output.truncate
+              in
+              Option.map ~f:Consensus_vrf.Output.Truncated.to_base58_check
+                vrf_opt )
+        ; field "vrfOutputFractional" ~typ:float
+            ~doc:
+              "The vrf output derived from the evaluation witness, as a \
+               fraction. This represents a won slot if vrfOutputFractional <= \
+               (1 - (1 / 4)^(delegated_balance / total_stake)). If null, the \
+               vrf witness was invalid."
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= mina; _} t ->
+              match t.vrf_output_fractional with
+              | Some f ->
+                  Some f
+              | None ->
+                  let vrf_opt =
+                    match t.vrf_output with
+                    | Some vrf ->
+                        Some vrf
+                    | None ->
+                        let constraint_constants =
+                          (Mina_lib.config mina).precomputed_values
+                            .constraint_constants
+                        in
+                        to_vrf ~constraint_constants t
+                        |> Option.map ~f:Consensus_vrf.Output.truncate
+                  in
+                  Option.map
+                    ~f:(fun vrf ->
+                      Consensus_vrf.Output.Truncated.to_fraction vrf
+                      |> Bignum.to_float )
+                    vrf_opt )
+        ; field "thresholdMet" ~typ:bool
+            ~doc:
+              "Whether the threshold to produce a block was met, if specified"
+            ~args:
+              Arg.
+                [ arg "input" ~doc:"Override for delegation threshold"
+                    ~typ:Input.vrf_threshold ]
+            ~resolve:(fun {ctx= mina; _} t input ->
+              match input with
+              | Some {delegated_stake; total_stake} ->
+                  let constraint_constants =
+                    (Mina_lib.config mina).precomputed_values
+                      .constraint_constants
+                  in
+                  (Consensus_vrf.Layout.Evaluation.compute_vrf
+                     ~constraint_constants t ~delegated_stake ~total_stake)
+                    .threshold_met
+              | None ->
+                  t.threshold_met ) ] )
 end
 
 module Subscriptions = struct
@@ -3627,8 +3737,9 @@ module Queries = struct
       ~args:
         Arg.
           [ arg "message" ~typ:(non_null Types.Input.vrf_message)
-          ; arg "publicKey" ~typ:(non_null Types.Input.public_key_arg) ]
-      ~resolve:(fun {ctx= mina; _} () message public_key ->
+          ; arg "publicKey" ~typ:(non_null Types.Input.public_key_arg)
+          ; arg "vrfThreshold" ~typ:Types.Input.vrf_threshold ]
+      ~resolve:(fun {ctx= mina; _} () message public_key vrf_threshold ->
         Deferred.return
         @@
         let open Result.Let_syntax in
@@ -3644,14 +3755,28 @@ module Queries = struct
         let constraint_constants =
           (Mina_lib.config mina).precomputed_values.constraint_constants
         in
-        Consensus_vrf.Layout.Evaluation.of_message_and_sk ~constraint_constants
-          message sk )
+        let t =
+          { (Consensus_vrf.Layout.Evaluation.of_message_and_sk
+               ~constraint_constants message sk)
+            with
+            vrf_threshold }
+        in
+        match vrf_threshold with
+        | Some _ ->
+            Consensus_vrf.Layout.Evaluation.compute_vrf ~constraint_constants t
+        | None ->
+            t )
 
   let check_vrf =
     field "checkVrf" ~doc:"Check a vrf evaluation commitment"
       ~typ:(non_null Types.vrf_evaluation)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.vrf_evaluation)]
-      ~resolve:(fun _ () evaluation -> evaluation)
+      ~resolve:(fun {ctx= mina; _} () evaluation ->
+        let constraint_constants =
+          (Mina_lib.config mina).precomputed_values.constraint_constants
+        in
+        Consensus_vrf.Layout.Evaluation.compute_vrf ~constraint_constants
+          evaluation )
 
   let commands =
     [ sync_status
