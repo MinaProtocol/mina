@@ -878,11 +878,13 @@ module Types = struct
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool
-      ; path: string }
+      ; path: string
+      ; index: Account.Index.t option }
 
     let lift coda pk account =
       let block_production_pubkeys = Mina_lib.block_production_pubkeys coda in
       let accounts = Mina_lib.wallets coda in
+      let best_tip_ledger = Mina_lib.best_ledger coda in
       { account
       ; locked= Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking=
@@ -890,7 +892,15 @@ module Types = struct
             Public_key.Compressed.Set.mem block_production_pubkeys pk
           else (* Non-default token accounts cannot stake. *)
             false )
-      ; path= Secrets.Wallets.get_path accounts pk }
+      ; path= Secrets.Wallets.get_path accounts pk
+      ; index=
+          ( match best_tip_ledger with
+          | `Active ledger ->
+              Option.try_with (fun () ->
+                  Ledger.index_of_account_exn ledger
+                    (Account_id.create account.public_key account.token_id) )
+          | _ ->
+              None ) }
 
     let get_best_ledger_account coda aid =
       lift coda
@@ -1029,12 +1039,21 @@ module Types = struct
                    let%map delegators =
                      Mina_lib.current_epoch_delegators coda ~pk
                    in
+                   let best_tip_ledger = Mina_lib.best_ledger coda in
                    List.map
                      ~f:(fun a ->
                        { account= Partial_account.of_full_account a
                        ; locked= None
                        ; is_actively_staking= true
-                       ; path= "" } )
+                       ; path= ""
+                       ; index=
+                           ( match best_tip_ledger with
+                           | `Active ledger ->
+                               Option.try_with (fun () ->
+                                   Ledger.index_of_account_exn ledger
+                                     (Account.identifier a) )
+                           | _ ->
+                               None ) } )
                      delegators )
              ; field "lastEpochDelegators"
                  ~typ:(list @@ non_null @@ Lazy.force account)
@@ -1050,12 +1069,21 @@ module Types = struct
                    let%map delegators =
                      Mina_lib.last_epoch_delegators coda ~pk
                    in
+                   let best_tip_ledger = Mina_lib.best_ledger coda in
                    List.map
                      ~f:(fun a ->
                        { account= Partial_account.of_full_account a
                        ; locked= None
                        ; is_actively_staking= true
-                       ; path= "" } )
+                       ; path= ""
+                       ; index=
+                           ( match best_tip_ledger with
+                           | `Active ledger ->
+                               Option.try_with (fun () ->
+                                   Ledger.index_of_account_exn ledger
+                                     (Account.identifier a) )
+                           | _ ->
+                               None ) } )
                      delegators )
              ; field "votingFor" ~typ:string
                  ~doc:
@@ -1102,7 +1130,11 @@ module Types = struct
                    | Token_owned _ ->
                        false
                    | Not_owned {account_disabled} ->
-                       account_disabled ) ] ))
+                       account_disabled )
+             ; field "index" ~typ:int
+                 ~doc:"The index of this account in the ledger"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ {index; _} -> index) ] ))
 
     let account = Lazy.force account
   end
@@ -3306,6 +3338,7 @@ module Queries = struct
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Mina_lib.wallets coda in
     let block_production_pubkeys = Mina_lib.block_production_pubkeys coda in
+    let best_tip_ledger = Mina_lib.best_ledger coda in
     wallets |> Secrets.Wallets.pks
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account=
@@ -3313,7 +3346,15 @@ module Queries = struct
            ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
            ; is_actively_staking=
                Public_key.Compressed.Set.mem block_production_pubkeys pk
-           ; path= Secrets.Wallets.get_path wallets pk } )
+           ; path= Secrets.Wallets.get_path wallets pk
+           ; index=
+               ( match best_tip_ledger with
+               | `Active ledger ->
+                   Option.try_with (fun () ->
+                       Ledger.index_of_account_exn ledger
+                         (Account_id.create pk Token_id.default) )
+               | _ ->
+                   None ) } )
 
   let owned_wallets =
     field "ownedWallets"
