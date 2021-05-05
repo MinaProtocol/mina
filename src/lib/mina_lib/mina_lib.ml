@@ -548,13 +548,14 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
         |> Mina_state.Blockchain_state.snarked_ledger_hash
       in
       let merkle_root = Ledger.merkle_root new_ledger in
+      (*if the ledger hash is as expected, then return the account list*)
       if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
-        let res = Ledger.to_list new_ledger in
+        let acc_list_to_be_exported = Ledger.to_list new_ledger in
         Core.printf "Ledger_hash %s%!"
           (Yojson.Safe.to_string
              (Ledger_hash.to_yojson (Ledger.merkle_root new_ledger))) ;
         let compare_accounts ledger =
-          List.iter res ~f:(fun acc ->
+          List.iter acc_list_to_be_exported ~f:(fun acc ->
               let account_id = Account.identifier acc in
               match Ledger.location_of_account ledger account_id with
               | Some loc -> (
@@ -575,6 +576,7 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
                     !"could not find account %{sexp:Account.t}\n%!"
                     acc )
         in
+        (*compare the accounts from acc_list_to_be_exported against the ledger on which transactions were undone *)
         compare_accounts new_ledger ;
         let check accounts =
           let constraint_constants =
@@ -588,18 +590,28 @@ let get_snarked_ledger t state_hash_opt : Mina_base.Account.t list Or_error.t =
             Genesis_ledger_helper.Ledger.packed_genesis_ledger_of_accounts
               ~depth:constraint_constants.ledger_depth accounts
           in
-          let ledger = Lazy.force @@ Genesis_ledger.Packed.t packed_ledger in
-          Core.printf !"total accounts: %d\n%!" (List.length res) ;
-          compare_accounts ledger ;
+          let ledger_from_accounts =
+            Lazy.force @@ Genesis_ledger.Packed.t packed_ledger
+          in
+          Core.printf !"total accounts: %d\n%!"
+            (List.length acc_list_to_be_exported) ;
+          (*compare the accounts from acc_list_to_be_exported against the ledger that was created from the list*)
+          compare_accounts ledger_from_accounts ;
+          let merkle_root_from_accounts =
+            Ledger.merkle_root ledger_from_accounts
+          in
+          Core.printf "Frozen Ledger_hash %s%!"
+            (Yojson.Safe.to_string
+               (Frozen_ledger_hash.to_yojson merkle_root_from_accounts)) ;
           Core.printf "New Ledger_hash %s%!"
             (Yojson.Safe.to_string
-               (Ledger_hash.to_yojson (Ledger.merkle_root ledger))) ;
-          Format.printf "%s@."
-            (Ledger.merkle_root ledger |> Ledger_hash.to_base58_check)
+               (Ledger_hash.to_yojson merkle_root_from_accounts))
         in
-        check (Lazy.return (List.map ~f:(fun a -> (None, a)) res)) ;
+        check
+          (Lazy.return
+             (List.map ~f:(fun a -> (None, a)) acc_list_to_be_exported)) ;
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger ;
-        Ok res )
+        Ok acc_list_to_be_exported )
       else (
         ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ new_ledger ;
         Or_error.errorf
