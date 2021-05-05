@@ -2409,7 +2409,8 @@ let advanced =
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
-    ; ("chain-id-inputs", chain_id_inputs) ]
+    ; ("chain-id-inputs", chain_id_inputs)
+    ; ("vrf", Cli_lib.Commands.Vrf.command_group) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"
