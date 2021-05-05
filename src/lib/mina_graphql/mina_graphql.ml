@@ -155,6 +155,61 @@ module Types = struct
 
   let token_id = token_id ()
 
+  let epoch_seed = epoch_seed ()
+
+  let vrf_message : ('context, Consensus_vrf.Layout.Message.t option) typ =
+    let open Consensus_vrf.Layout.Message in
+    obj "VrfMessage" ~doc:"The inputs to a vrf evaluation" ~fields:(fun _ ->
+        [ field "globalSlot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ {global_slot; _} -> global_slot)
+        ; field "epochSeed" ~typ:(non_null epoch_seed)
+            ~args:Arg.[]
+            ~resolve:(fun _ {epoch_seed; _} -> epoch_seed)
+        ; field "delegatorIndex"
+            ~doc:"Position in the ledger of the delegator's account"
+            ~typ:(non_null int)
+            ~args:Arg.[]
+            ~resolve:(fun _ {delegator_index; _} -> delegator_index) ] )
+
+  let vrf_evaluation : ('context, Consensus_vrf.Layout.Evaluation.t option) typ
+      =
+    let open Consensus_vrf.Layout.Evaluation in
+    obj "VrfEvaluation"
+      ~doc:"A witness to a vrf evaluation, which may be externally verified"
+      ~fields:(fun _ ->
+        [ field "message" ~typ:(non_null vrf_message)
+            ~args:Arg.[]
+            ~resolve:(fun _ {message; _} -> message)
+        ; field "publicKey" ~typ:(non_null public_key)
+            ~args:Arg.[]
+            ~resolve:(fun _ {public_key; _} -> Public_key.compress public_key)
+        ; field "c" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ {c; _} -> Consensus_vrf.Scalar.to_string c)
+        ; field "s" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ {s; _} -> Consensus_vrf.Scalar.to_string s)
+        ; field "scaledMessageHash"
+            ~typ:(non_null (list (non_null string)))
+            ~doc:"A group element represented as 2 field elements"
+            ~args:Arg.[]
+            ~resolve:(fun _ {scaled_message_hash; _} ->
+              Consensus_vrf.Group.to_string_list_exn scaled_message_hash )
+        ; field "vrfOutput" ~typ:string
+            ~doc:
+              "The vrf output derived from the evaluation witness. If null, \
+               the vrf witness was invalid."
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= mina; _} t ->
+              let constraint_constants =
+                (Mina_lib.config mina).precomputed_values.constraint_constants
+              in
+              to_vrf ~constraint_constants t
+              |> Option.map ~f:(fun vrf ->
+                     Consensus_vrf.Output.(
+                       Truncated.to_base58_check (truncate vrf)) ) ) ] )
+
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
@@ -1961,6 +2016,35 @@ module Types = struct
           ; arg "scalar" ~typ:string ~doc:"Scalar component of signature"
           ; arg "rawSignature" ~typ:string ~doc:"Raw encoded signature" ]
 
+    let vrf_message =
+      obj "VrfMessageInput" ~doc:"The inputs to a vrf evaluation"
+        ~coerce:(fun global_slot epoch_seed delegator_index ->
+          { Consensus_vrf.Layout.Message.global_slot
+          ; epoch_seed= Mina_base.Epoch_seed.of_base58_check_exn epoch_seed
+          ; delegator_index } )
+        ~fields:
+          [ arg "globalSlot" ~typ:(non_null uint32_arg)
+          ; arg "epochSeed" ~typ:(non_null string)
+          ; arg "delegatorIndex"
+              ~doc:"Position in the ledger of the delegator's account"
+              ~typ:(non_null int) ]
+
+    let vrf_evaluation =
+      obj "VrfEvaluationInput" ~doc:"The witness to a vrf evaluation"
+        ~coerce:(fun message public_key c s scaled_message_hash ->
+          { Consensus_vrf.Layout.Evaluation.message
+          ; public_key= Public_key.decompress_exn public_key
+          ; c= Snark_params.Tick.Inner_curve.Scalar.of_string c
+          ; s= Snark_params.Tick.Inner_curve.Scalar.of_string s
+          ; scaled_message_hash=
+              Consensus_vrf.Group.of_string_list_exn scaled_message_hash } )
+        ~fields:
+          [ arg "message" ~typ:(non_null vrf_message)
+          ; arg "publicKey" ~typ:(non_null public_key_arg)
+          ; arg "c" ~typ:(non_null string)
+          ; arg "s" ~typ:(non_null string)
+          ; arg "scaledMessageHash" ~typ:(non_null (list (non_null string))) ]
+
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
 
@@ -3537,6 +3621,38 @@ module Queries = struct
         in
         Signed_command.check_signature user_command )
 
+  let evaluate_vrf =
+    io_field "evaluateVrf" ~doc:"Evaluate a vrf for the given public key"
+      ~typ:(non_null Types.vrf_evaluation)
+      ~args:
+        Arg.
+          [ arg "message" ~typ:(non_null Types.Input.vrf_message)
+          ; arg "publicKey" ~typ:(non_null Types.Input.public_key_arg) ]
+      ~resolve:(fun {ctx= mina; _} () message public_key ->
+        Deferred.return
+        @@
+        let open Result.Let_syntax in
+        let%map sk =
+          match%bind Mutations.find_identity ~public_key mina with
+          | `Keypair {private_key; _} ->
+              Ok private_key
+          | `Hd_index _ ->
+              Error
+                "Computing a vrf evaluation from a hardware wallet is not \
+                 supported"
+        in
+        let constraint_constants =
+          (Mina_lib.config mina).precomputed_values.constraint_constants
+        in
+        Consensus_vrf.Layout.Evaluation.of_message_and_sk ~constraint_constants
+          message sk )
+
+  let check_vrf =
+    field "checkVrf" ~doc:"Check a vrf evaluation commitment"
+      ~typ:(non_null Types.vrf_evaluation)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.vrf_evaluation)]
+      ~resolve:(fun _ () evaluation -> evaluation)
+
   let commands =
     [ sync_status
     ; daemon_status
@@ -3563,7 +3679,9 @@ module Queries = struct
     ; genesis_constants
     ; time_offset
     ; next_available_token
-    ; validate_payment ]
+    ; validate_payment
+    ; evaluate_vrf
+    ; check_vrf ]
 end
 
 let schema =

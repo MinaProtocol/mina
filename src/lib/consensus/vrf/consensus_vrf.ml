@@ -3,9 +3,25 @@ open Fold_lib
 open Snark_params
 
 module Scalar = struct
-  type value = Tick.Inner_curve.Scalar.t
+  type t = Tick.Inner_curve.Scalar.t
+
+  type value = t
 
   type var = Tick.Inner_curve.Scalar.var
+
+  let to_string = Tick.Inner_curve.Scalar.to_string
+
+  let of_string = Tick.Inner_curve.Scalar.of_string
+
+  let to_yojson t = `String (to_string t)
+
+  let of_yojson yojson =
+    match yojson with
+    | `String x ->
+        Or_error.try_with (fun () -> of_string x)
+        |> Result.map_error ~f:Error.to_string_hum
+    | _ ->
+        Error "Consensus_vrf.of_yojson: Expected a string"
 
   let typ : (var, value) Tick.Typ.t = Tick.Inner_curve.Scalar.typ
 end
@@ -14,6 +30,23 @@ module Group = struct
   open Tick
 
   type t = Inner_curve.t [@@deriving sexp]
+
+  let to_yojson (t : t) = Inner_curve.(Affine.to_yojson (to_affine_exn t))
+
+  let of_yojson json =
+    Result.map ~f:Inner_curve.of_affine (Inner_curve.Affine.of_yojson json)
+
+  let to_string_list_exn (t : t) =
+    let x, y = Inner_curve.to_affine_exn t in
+    [Field.to_string x; Field.to_string y]
+
+  let of_string_list_exn = function
+    | [x; y] ->
+        Inner_curve.of_affine (Field.of_string x, Field.of_string y)
+    | _ ->
+        invalid_arg
+          "Consensus_vrf.Group.of_string_list_exn: wrong number of field \
+           elements given, expected 2"
 
   type value = Inner_curve.t
 
@@ -322,6 +355,83 @@ struct
 
               let hash_for_proof = hash_for_proof ~constraint_constants
             end)
+end
+
+type evaluation =
+  ( Marlin_plonk_bindings_pasta_pallas.t
+  , Marlin_plonk_bindings_pasta_fq.t
+    Vrf_lib.Standalone.Evaluation.Discrete_log_equality.Poly.t )
+  Vrf_lib.Standalone.Evaluation.Poly.t
+
+type context =
+  ( (Unsigned.uint32, Marlin_plonk_bindings_pasta_fp.t, int) Message.t
+  , Marlin_plonk_bindings_pasta_pallas.t )
+  Vrf_lib.Standalone.Context.t
+
+module Layout = struct
+  module Message = struct
+    type t =
+      { global_slot: Mina_numbers.Global_slot.t [@key "globalSlot"]
+      ; epoch_seed: Mina_base.Epoch_seed.t [@key "epochSeed"]
+      ; delegator_index: int [@key "delegatorIndex"] }
+    [@@deriving yojson]
+
+    let to_message (t : t) : Message.value =
+      { global_slot= t.global_slot
+      ; seed= t.epoch_seed
+      ; delegator= t.delegator_index }
+
+    let of_message (t : Message.value) : t =
+      { global_slot= t.global_slot
+      ; epoch_seed= t.seed
+      ; delegator_index= t.delegator }
+  end
+
+  module Evaluation = struct
+    type t =
+      { message: Message.t
+      ; public_key: Signature_lib.Public_key.t [@key "publicKey"]
+      ; c: Scalar.t
+      ; s: Scalar.t
+      ; scaled_message_hash: Group.t [@key "ScaledMessageHash"] }
+    [@@deriving yojson]
+
+    let to_evaluation_and_context (t : t) : evaluation * context =
+      ( { discrete_log_equality= {c= t.c; s= t.s}
+        ; scaled_message_hash= t.scaled_message_hash }
+      , { message= Message.to_message t.message
+        ; public_key= Group.of_affine t.public_key } )
+
+    let of_evaluation_and_context
+        ((evaluation, context) : evaluation * context) : t =
+      { message= Message.of_message context.message
+      ; public_key= Group.to_affine_exn context.public_key
+      ; c= evaluation.discrete_log_equality.c
+      ; s= evaluation.discrete_log_equality.s
+      ; scaled_message_hash= evaluation.scaled_message_hash }
+
+    let of_message_and_sk ~constraint_constants (message : Message.t)
+        (private_key : Signature_lib.Private_key.t) =
+      let module Standalone = Standalone (struct
+        let constraint_constants = constraint_constants
+      end) in
+      let message = Message.to_message message in
+      let standalone_eval = Standalone.Evaluation.create private_key message in
+      let context : Standalone.Context.t =
+        { message
+        ; public_key=
+            Signature_lib.Public_key.of_private_key_exn private_key
+            |> Group.of_affine }
+      in
+      of_evaluation_and_context (standalone_eval, context)
+
+    let to_vrf ~constraint_constants (t : t) =
+      let module Standalone = Standalone (struct
+        let constraint_constants = constraint_constants
+      end) in
+      let standalone_eval, context = to_evaluation_and_context t in
+      Standalone.Evaluation.verified_output standalone_eval context
+  end
 end
 
 let%test_unit "Standalone and integrates vrfs are consistent" =
