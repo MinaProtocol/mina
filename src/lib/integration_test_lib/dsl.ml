@@ -45,6 +45,8 @@ module Make (Engine : Intf.Engine.S) () :
     ; event_router: Event_router.t
     ; network_state_reader: Network_state.t Broadcast_pipe.Reader.t }
 
+  let network_state t = Broadcast_pipe.Reader.peek t.network_state_reader
+
   let create ~logger ~network ~event_router ~network_state_reader =
     let t = {logger; network; event_router; network_state_reader} in
     `Don't_call_in_tests t
@@ -153,7 +155,7 @@ module Make (Engine : Intf.Engine.S) () :
             "wait_for hit a soft timeout waiting for %s (condition succeeded, \
              but beyond expectation)"
             condition.description
-          |> Malleable_error.soft_error ()
+          |> Malleable_error.soft_error ~value:()
 
   (**************************************************************************************************)
   (* TODO: move into executive module *)

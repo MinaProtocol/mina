@@ -1,5 +1,5 @@
 {
-    "genesis_ledger": {
+    "staking_ledger": {
         "accounts": [
             {
                 "timing": {
@@ -17649,5 +17649,5 @@
         ],
         "add_genesis_winner": true
     },
-    "target_state_hash": "3NKqgreLuicXH1GunkqAR6yvi7E4ApxVQ2yZDrwJUPtQtybyWZy9"
+    "epoch": 0
 }
