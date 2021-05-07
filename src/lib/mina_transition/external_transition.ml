@@ -20,7 +20,7 @@ module Validate_content = struct
 
   let sexp_of_t _ = sexp_of_unit ()
 
-  let layout_t =
+  let bin_layout_t =
     { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
     ; version_opt= None
     ; type_decl= "Mina_net2.Validation_callback.t"

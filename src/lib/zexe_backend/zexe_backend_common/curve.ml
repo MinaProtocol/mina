@@ -41,7 +41,7 @@ module type Field_intf = sig
     module Latest : sig
       type t [@@deriving bin_io, eq, sexp, compare, yojson, hash]
 
-      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+      val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
   end
 
@@ -107,7 +107,7 @@ struct
         exception Invalid_curve_point of t
 
         (* TODO : what's the actual rule? *)
-        let layout_t =
+        let bin_layout_t =
           { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
           ; version_opt= None
           ; type_decl=

@@ -157,7 +157,7 @@ module type S = sig
         type nonrec t = private t
         [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
 
-        val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+        val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
 
         include Gen_intf with type t := t
       end

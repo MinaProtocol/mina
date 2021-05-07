@@ -13,7 +13,7 @@ module Width : sig
       type t [@@deriving sexp, equal, compare, hash, yojson]
 
       (* TODO: generate these *)
-      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+      val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
   end]
 

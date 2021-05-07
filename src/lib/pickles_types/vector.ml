@@ -441,7 +441,7 @@ module Vector_2 = struct
       type 'a t = ('a, Nat.N2.n) vec
 
       (* TODO: what's the actual rule? *)
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N2.n) vec"
@@ -480,7 +480,7 @@ module Vector_4 = struct
       type 'a t = ('a, Nat.N4.n) vec
 
       (* TODO : what's the actual rule? *)
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N4.n) vec"
@@ -519,7 +519,7 @@ module Vector_8 = struct
       type 'a t = ('a, Nat.N8.n) vec
 
       (* TODO : what's the actual rule? *)
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N17.n) vec"
@@ -558,7 +558,7 @@ module Vector_17 = struct
       type 'a t = ('a, Nat.N17.n) vec
 
       (* TODO : what's the actual rule? *)
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N17.n) vec"
@@ -597,7 +597,7 @@ module Vector_18 = struct
       type 'a t = ('a, Nat.N18.n) vec
 
       (* TODO : what's the actual rule? *)
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N17.n) vec"

@@ -116,7 +116,7 @@ module Stable :
     module V1 : sig
       type t = {diff: Diff.t} [@@deriving sexp, yojson, bin_io, version]
 
-      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+      val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1

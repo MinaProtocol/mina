@@ -125,7 +125,7 @@ module type S_with_version = sig
     module V1 : sig
       type t [@@deriving version, sexp, bin_io, compare, yojson, hash, eq]
 
-      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+      val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1
@@ -166,7 +166,7 @@ module Make (F : Input_intf) :
          serialization of keys
       *)
 
-      let layout_t =
+      let bin_layout_t =
         (* TODO : what's the actual rule? *)
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None

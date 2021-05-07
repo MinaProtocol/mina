@@ -27,7 +27,7 @@ module Stable : sig
     type nonrec t = t
     [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
 
-    val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+    val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
   end
 
   module Latest : module type of V1

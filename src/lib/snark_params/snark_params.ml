@@ -80,7 +80,7 @@ struct
   module T = Other_impl.Field
 
   (* TODO : what's the real layout? *)
-  let layout_t = Bin_prot_layouts.inet_addr_v1_layout
+  let bin_layout_t = Bin_prot_layouts.inet_addr_v1_layout
 
   include (
     T :
@@ -188,7 +188,7 @@ module Tick = struct
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     (* TODO : what's the actual rule? *)
-    let layout_t =
+    let bin_layout_t =
       { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
       ; version_opt= None
       ; type_decl= "Tick.Field.t"

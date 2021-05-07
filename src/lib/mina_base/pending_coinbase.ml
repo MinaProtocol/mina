@@ -81,7 +81,7 @@ module Stack_id : sig
     module V1 : sig
       type t [@@deriving bin_io, sexp, to_yojson, compare, version]
 
-      val layout_t : Ppx_version_runtime.Bin_prot_layout.t
+      val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
     end
 
     module Latest = V1

@@ -103,7 +103,7 @@ module UInt64 = struct
         , to_yojson
         , of_yojson )]
 
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= Some 1
         ; type_decl= "Unsigned.UInt64.t"
@@ -160,7 +160,7 @@ module UInt32 = struct
         , to_yojson
         , of_yojson )]
 
-      let layout_t =
+      let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= Some 1
         ; type_decl= "Unsigned.UInt32.t"

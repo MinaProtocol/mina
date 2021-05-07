@@ -2696,8 +2696,9 @@ module Hooks = struct
             ; bin_io_derived= true
             ; bin_prot_rule=
                 Bin_prot_layouts.make_result_v1_rule
-                  ~ok:Mina_base.Sparse_ledger.Stable.V1.layout_t.bin_prot_rule
-                  ~error:String }
+                  ~ok:
+                    Mina_base.Sparse_ledger.Stable.V1.bin_layout_t
+                      .bin_prot_rule ~error:String }
 
           type response =
             (( Mina_base.Sparse_ledger.Stable.V1.t

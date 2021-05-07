@@ -210,7 +210,7 @@ module Rpcs = struct
           ; bin_io_derived= true
           ; bin_prot_rule=
               Bin_prot_layouts.make_or_error_v1_rule
-                ~ok:Sync_ledger.Answer.Stable.V1.layout_t.bin_prot_rule }
+                ~ok:Sync_ledger.Answer.Stable.V1.bin_layout_t.bin_prot_rule }
 
         type response =
           (Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t[@layout
@@ -701,7 +701,7 @@ module Rpcs = struct
           ; bin_io_derived= true
           ; bin_prot_rule=
               Bin_prot_layouts.make_or_error_v1_rule
-                ~ok:Node_status.Stable.V2.layout_t.bin_prot_rule }
+                ~ok:Node_status.Stable.V2.bin_layout_t.bin_prot_rule }
 
         type response =
           (Node_status.Stable.V2.t Core_kernel.Or_error.Stable.V1.t[@layout
@@ -739,7 +739,7 @@ module Rpcs = struct
           ; bin_io_derived= true
           ; bin_prot_rule=
               Bin_prot_layouts.make_or_error_v1_rule
-                ~ok:Node_status.Stable.V1.layout_t.bin_prot_rule }
+                ~ok:Node_status.Stable.V1.bin_layout_t.bin_prot_rule }
 
         type response =
           (Node_status.Stable.V1.t Core_kernel.Or_error.Stable.V1.t[@layout
