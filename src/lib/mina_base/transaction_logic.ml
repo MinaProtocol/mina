@@ -85,6 +85,9 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let previous_empty_accounts t =
+      match t.body with Payment acc -> acc.previous_empty_accounts | _ -> []
   end
 
   module Snapp_command_applied = struct
@@ -113,6 +116,12 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let previous_empty_accounts = function
+      | Snapp_command _ ->
+          []
+      | Signed_command c ->
+          Signed_command_applied.previous_empty_accounts c
   end
 
   module Fee_transfer_applied = struct
@@ -130,6 +139,8 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let previous_empty_accounts t = t.previous_empty_accounts
   end
 
   module Coinbase_applied = struct
@@ -146,6 +157,8 @@ module Transaction_applied = struct
         let to_latest = Fn.id
       end
     end]
+
+    let previous_empty_accounts t = t.previous_empty_accounts
   end
 
   module Varying = struct
@@ -173,6 +186,15 @@ module Transaction_applied = struct
       let to_latest = Fn.id
     end
   end]
+
+  let previous_empty_accounts t =
+    match t.varying with
+    | Command c ->
+        Command_applied.previous_empty_accounts c
+    | Fee_transfer f ->
+        Fee_transfer_applied.previous_empty_accounts f
+    | Coinbase c ->
+        Coinbase_applied.previous_empty_accounts c
 end
 
 module type S = sig
@@ -253,6 +275,8 @@ module type S = sig
     val transaction : t -> Transaction.t With_status.t
 
     val user_command_status : t -> Transaction_status.t
+
+    val previous_empty_accounts : t -> Account_id.t list
   end
 
   val apply_user_command :
@@ -1532,7 +1556,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let apply_fee_transfer ~constraint_constants ~txn_global_slot t transfer =
     let open Or_error.Let_syntax in
-    let%map previous_empty_accounts, receiver_timing =
+    let%map empty_accounts, receiver_timing =
       process_fee_transfer t transfer
         ~modify_balance:(fun action _ b f ->
           let%bind amount =
@@ -1566,7 +1590,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     Transaction_applied.Fee_transfer_applied.
       { fee_transfer= transfer
-      ; previous_empty_accounts
+      ; previous_empty_accounts= empty_accounts
       ; receiver_timing
       ; balances }
 

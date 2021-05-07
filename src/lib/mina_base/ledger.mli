@@ -177,6 +177,8 @@ module Transaction_applied : sig
   val transaction : t -> Transaction.t With_status.t
 
   val user_command_status : t -> Transaction_status.t
+
+  val previous_empty_accounts : t -> Account_id.t list
 end
 
 (** Raises if the ledger is full, or if an account already exists for the given

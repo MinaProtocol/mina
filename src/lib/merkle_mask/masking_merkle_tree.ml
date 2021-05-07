@@ -275,6 +275,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       assert_is_attached t ;
       (* remove account and key from tables *)
       let account = Option.value_exn (self_find_account t location) in
+      Core.printf
+        !"Removing account %{sexp: Account_id.t} uuid: %{sexp: Uuid.t}\n%!"
+        (Account.identifier account)
+        t.uuid ;
       Location_binable.Table.remove t.account_tbl location ;
       (* Update token info. *)
       let account_token = Account.token account in
@@ -558,6 +562,8 @@ module Make (Inputs : Inputs_intf.S) = struct
       get_hash t address |> Option.value_exn
 
     let remove_accounts_exn t keys =
+      if not (List.is_empty keys) then
+        Core.printf !"Removing keys %{sexp: Account_id.t list}\n%!" keys ;
       assert_is_attached t ;
       let rec loop keys parent_keys mask_locations =
         match keys with
@@ -576,6 +582,10 @@ module Make (Inputs : Inputs_intf.S) = struct
       (* allow call to parent to raise an exception if raised, the parent
          hasn't removed any accounts, and we don't try to remove any accounts
          from mask *)
+      if not (List.is_empty keys) then
+        Core.printf
+          !"Removing Parent keys %{sexp: Account_id.t list}\n%!"
+          parent_keys ;
       Base.remove_accounts_exn (get_parent t) parent_keys ;
       (* removing accounts in parent succeeded, so proceed with removing
          accounts from mask we sort mask locations in reverse order,

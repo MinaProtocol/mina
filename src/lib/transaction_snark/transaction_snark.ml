@@ -3514,7 +3514,7 @@ struct
     lazy (constraint_system_digests ~constraint_constants ())
 end
 
-let%test_module "transaction_snark" =
+(*let%test_module "transaction_snark" =
   ( module struct
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
@@ -6094,7 +6094,7 @@ let%test_module "account timing check" =
             unchecked_timing unchecked_min_balance
       | _ ->
           false
-  end )
+  end )*)
 
 let%test_module "transaction_undos" =
   ( module struct
@@ -6118,7 +6118,7 @@ let%test_module "transaction_undos" =
 
     let txn_state_view = Mina_state.Protocol_state.Body.view state_body
 
-    let gen_user_commands ~length ledger_init_state =
+    let _gen_user_commands ~length ledger_init_state =
       let open Quickcheck.Generator.Let_syntax in
       let%map cmds =
         User_command.Valid.Gen.sequence ~length:(length / 2) ~sign_type:`Real
@@ -6173,7 +6173,7 @@ let%test_module "transaction_undos" =
       in
       List.map ~f:(fun c -> Transaction.Command c) (cmds @ new_cmds)
 
-    let gen_fee_transfers ~length ledger_init_state =
+    let _gen_fee_transfers ~length ledger_init_state =
       let open Quickcheck.Generator.Let_syntax in
       let count = 3 in
       let new_keys =
@@ -6217,7 +6217,7 @@ let%test_module "transaction_undos" =
 
     let gen_coinbases ~length ledger_init_state =
       let open Quickcheck.Generator.Let_syntax in
-      let count = 3 in
+      let count = 1 in
       let%bind coinbase_new_accounts =
         Quickcheck.Generator.list_with_length count
           (Quickcheck.Generator.map ~f:fst
@@ -6252,48 +6252,104 @@ let%test_module "transaction_undos" =
 
     let test_undo ledger transaction =
       let merkle_root_before = Ledger.merkle_root ledger in
+      let num_account = Ledger.to_list ledger |> List.length in
       let applied_txn =
         Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
           transaction
         |> Or_error.ok_exn
       in
+      let new_accounts =
+        Ledger.Transaction_applied.previous_empty_accounts applied_txn
+      in
+      let num_account_after_apply = Ledger.to_list ledger |> List.length in
+      (*Accounts get added*)
+      let added = num_account + List.length new_accounts in
+      assert (added = num_account_after_apply) ;
       let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
       let new_ledger = Ledger.register_mask ledger new_mask in
       let _ =
         Ledger.undo ~constraint_constants new_ledger applied_txn
         |> Or_error.ok_exn
       in
+      let num_account_after_undo = Ledger.to_list new_ledger |> List.length in
+      (*Accounts should get deleted*)
+      (*if num_account <> num_account_after_undo then
+        Core.printf !"%{sexp:Ledger.Transaction_applied.t}\n%!" applied_txn ;
+      if List.length new_accounts > 0 && added = num_account_after_undo then (
+        Core.printf "Did not delete\n%!" ;
+        Core.printf
+          !"Account that was supposed to be deleted: %{sexp: Account.t option \
+            list}\n\
+            %!"
+          (List.map new_accounts ~f:(fun acc ->
+               let loc =
+                 Ledger.location_of_account new_ledger acc |> Option.value_exn
+               in
+               Ledger.get new_ledger loc )) ) ;*)
+      assert (num_account = num_account_after_undo) ;
       assert (
         Ledger_hash.equal merkle_root_before (Ledger.merkle_root new_ledger) ) ;
       (merkle_root_before, applied_txn)
 
     let test_undos ledger transactions =
+      let num_account = List.length (Ledger.to_list ledger) in
       let res =
+        (*Apply transaction to [ledger], create a child mask and apply undo to it *)
         List.fold ~init:[] transactions ~f:(fun acc t ->
             test_undo ledger t :: acc )
       in
+      let _txns_with_new_accounts, _new_accounts =
+        List.fold ~init:([], 0) res ~f:(fun (ls, count) (root_before, t) ->
+            match Ledger.Transaction_applied.previous_empty_accounts t with
+            | [] ->
+                (ls, count)
+            | s ->
+                ((t, s, root_before) :: ls, count + List.length s) )
+      in
+      Core.printf !"Remove from the parent mask\n%!" ;
       List.iter res ~f:(fun (root_before, u) ->
+          let _new_accounts =
+            Ledger.Transaction_applied.previous_empty_accounts u
+          in
           let _ =
             Ledger.undo ~constraint_constants ledger u |> Or_error.ok_exn
           in
-          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) )
+          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) ) ;
+      let num_account_after_undos = Ledger.to_list ledger |> List.length in
+      (*Accounts should get deleted*)
+      (*Core.printf
+        !"num account %d, new accounts %d new num account %d\n%!"
+        num_account (List.length new_accounts) num_account_after_undos ;
+      if num_account - List.length new_accounts <> num_account_after_applies then
+        Core.printf !"%{sexp:Ledger.Transaction_applied.t}\n%!" u ;
+      if List.length new_accounts > 0 then
+        Core.printf
+          !"Accounts that were supposed to be deleted: %{sexp: \
+            Account_id.t list} %{sexp: Account.t option list}\n\
+            %!"
+          new_accounts
+          (List.map new_accounts ~f:(fun acc ->
+                let open Option.Let_syntax in
+                let%bind loc = Ledger.location_of_account ledger acc in
+                Ledger.get ledger loc ))*)
+      assert (num_account = num_account_after_undos)
 
     let%test_unit "undo_coinbase" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
-        let%map coinbases = gen_coinbases ~length:5 ledger_init_state in
+        let%map coinbases = gen_coinbases ~length:2 ledger_init_state in
         (ledger_init_state, coinbases)
       in
       Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
-        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:1
         gen ~f:(fun (ledger_init_state, coinbase_list) ->
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
               test_undos ledger coinbase_list ) )
 
-    let%test_unit "undo_fee_transfers" =
+    (*let%test_unit "undo_fee_transfers" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
         let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
@@ -6345,5 +6401,44 @@ let%test_module "transaction_undos" =
           Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
             ~f:(fun ledger ->
               Ledger.apply_initial_ledger_state ledger ledger_init_state ;
-              test_undos ledger txn_list ) )
+              test_undos ledger txn_list ) )*)
+
+    (*let%test_unit "undo_all_txns_multiple_masks" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%bind coinbase = gen_coinbases ~length:4 ledger_init_state in
+        let%bind fee_transfers =
+          gen_fee_transfers ~length:6 ledger_init_state
+        in
+        let%bind cmds = gen_user_commands ~length:6 ledger_init_state in
+        let%map txns =
+          let%map txns = Quickcheck_lib.shuffle (fee_transfers @ coinbase) in
+          List.take cmds 3 @ List.take txns 5 @ List.drop cmds 3
+          @ List.drop txns 5
+        in
+        (ledger_init_state, txns)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "all-transaction-masks undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, txn_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              let mask1 = Ledger.Mask.create ~depth:constraint_constants.ledger_depth () in
+              let m1 = Ledger.register_mask ledger mask1 in
+              let length = List.length txn_list in
+              let txns = List.take txn_list (length/2) in
+              let applied_commands =
+                List.map txns ~f:(fun t -> Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger t |> Or_error.ok_exn )
+              in
+              let txns_with_new_accounts = 
+                List.fold ~init:[] applied_commands ~f:(fun acc t -> 
+                  match Ledger.Transaction_applied.previous_empty_accounts t with
+                  | [] -> acc
+                  | s -> (t,s)::acc)
+              in
+              let mask2 = Ledger.Mask.create ~depth:constraint_constants.ledger_depth () in
+              let m2 = Ledger.register_mask m1 mask2 in
+              let   ))*)
   end )
