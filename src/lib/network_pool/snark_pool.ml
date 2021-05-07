@@ -618,7 +618,7 @@ module Diff_versioned = struct
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson]
+      [@@deriving compare, sexp, to_yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -629,7 +629,7 @@ module Diff_versioned = struct
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson]
+  [@@deriving compare, sexp, to_yojson, hash]
 end
 
 let%test_module "random set test" =
