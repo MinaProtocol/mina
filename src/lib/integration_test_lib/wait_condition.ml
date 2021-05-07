@@ -104,7 +104,8 @@ struct
     ; soft_timeout= Slots soft_timeout_in_slots
     ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
 
-  let payment_to_be_included_in_frontier ~sender ~receiver ~amount =
+  let payment_to_be_included_in_frontier ~sender_pub_key ~receiver_pub_key
+      ~amount =
     let command_matches_payment cmd =
       let open User_command in
       match cmd with
@@ -115,8 +116,8 @@ struct
           in
           match body with
           | Payment {source_pk; receiver_pk; amount= paid_amt; token_id= _}
-            when Public_key.Compressed.equal source_pk sender
-                 && Public_key.Compressed.equal receiver_pk receiver
+            when Public_key.Compressed.equal source_pk sender_pub_key
+                 && Public_key.Compressed.equal receiver_pk receiver_pub_key
                  && Currency.Amount.equal paid_amt amount ->
               true
           | _ ->
@@ -152,8 +153,8 @@ struct
     let soft_timeout_in_slots = 8 in
     { description=
         Printf.sprintf "payment from %s to %s of amount %s"
-          (Public_key.Compressed.to_string sender)
-          (Public_key.Compressed.to_string receiver)
+          (Public_key.Compressed.to_string sender_pub_key)
+          (Public_key.Compressed.to_string receiver_pub_key)
           (Amount.to_string amount)
     ; predicate= Event_predicate (Event_type.Breadcrumb_added, (), check)
     ; soft_timeout= Slots soft_timeout_in_slots
