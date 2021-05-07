@@ -29,6 +29,8 @@ end
 module type Intf = sig
   type t [@@deriving bin_io, sexp, compare]
 
+  val bin_layout_t : Ppx_version_runtime.Bin_prot_layout.t
+
   include Bindings with type t := t
 
   val num_limbs : int
@@ -108,6 +110,14 @@ module Make
       pos_ref := len + !pos_ref ;
       of_bytes bytes
   end)
+
+  (* TODO : real layout *)
+  let bin_layout_t =
+    { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
+    ; type_decl= "type t = type for bigint"
+    ; version_opt= None
+    ; bin_io_derived= false
+    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
 
   let of_numeral s ~base = of_numeral s (String.length s) base
 end
