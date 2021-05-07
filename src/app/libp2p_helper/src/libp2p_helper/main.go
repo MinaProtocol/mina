@@ -36,6 +36,40 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+func min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
+const MESSAGE_BUFFER_SIZE uint64 = 2 << 20 // 2mb
+
+type messageBuffer [MESSAGE_BUFFER_SIZE]byte
+
+type messageBufferPool struct {
+	pool sync.Pool
+}
+
+func newMessageBufferPool() messageBufferPool {
+	return messageBufferPool{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return new(messageBuffer)
+			},
+		},
+	}
+}
+
+func (p *messageBufferPool) Get() *messageBuffer {
+	return p.pool.Get().(*messageBuffer)
+}
+
+func (p *messageBufferPool) Put(buffer *messageBuffer) {
+	p.pool.Put(buffer)
+}
+
 type subscription struct {
 	Sub    *pubsub.Subscription
 	Idx    int
@@ -64,6 +98,8 @@ type app struct {
 	UnsafeNoTrustIP          bool
 	MetricsRefreshTime       time.Duration
 	metricsCollectionStarted bool
+
+	messageBufferPool messageBufferPool
 
 	// development configuration options
 	NoMDNS    bool
@@ -688,8 +724,8 @@ type incomingMsgUpcall struct {
 func handleStreamReads(app *app, stream net.Stream, idx int) {
 	// create buffer stream for non-blocking read
 	r := bufio.NewReader(stream)
+	buffer := app.messageBufferPool.Get()
 
-	var msgBytes []byte
 	go func() {
 		defer func() {
 			_ = stream.Close()
@@ -712,27 +748,37 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			}
 
 			if length == 0 {
-				// should this be an error? we could be skipping null bytes like this?
-				continue
-			}
-
-			msgBytes = make([]byte, length)
-			n, err := io.ReadFull(r, msgBytes)
-			if err != nil {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
-					Reason:    fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n),
+					Reason:    fmt.Sprintf("invalid length prefix byte (cannot be 0)"),
 				})
 				return
 			}
 
 			app.P2p.MsgStats.UpdateMetrics(length)
-			app.writeMsg(incomingMsgUpcall{
-				Upcall:    "incomingStreamMsg",
-				Data:      codaEncode(msgBytes),
-				StreamIdx: idx,
-			})
+
+			bytesToRead := length
+			for bytesToRead > 0 {
+				bufferReadSize := min(MESSAGE_BUFFER_SIZE, bytesToRead)
+				n, err := io.ReadFull(r, buffer[:bufferReadSize])
+				if err != nil {
+					app.writeMsg(streamLostUpcall{
+						Upcall:    "streamLost",
+						StreamIdx: idx,
+						Reason:    fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n),
+					})
+					return
+				}
+
+				// shouldn't need to worry about underflow here
+				bytesToRead -= uint64(n)
+				app.writeMsg(incomingMsgUpcall{
+					Upcall:    "incomingStreamMsg",
+					Data:      codaEncode(buffer[:bufferReadSize]),
+					StreamIdx: idx,
+				})
+			}
 		}
 	}()
 }
@@ -1588,6 +1634,7 @@ func newApp() *app {
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
+		messageBufferPool:        newMessageBufferPool(),
 		metricsCollectionStarted: false,
 	}
 }
