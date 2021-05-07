@@ -387,10 +387,11 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
               | Ok () ->
                   () )
         in
+        let collected_transitions = Option.to_list best_tip in
         start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~network ~time_controller ~producer_transition_reader_ref
           ~producer_transition_writer_ref ~verified_transition_writer
-          ~clear_reader ~collected_transitions:[] ~transition_reader_ref
+          ~clear_reader ~collected_transitions ~transition_reader_ref
           ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
 
 let wait_till_genesis ~logger ~time_controller
