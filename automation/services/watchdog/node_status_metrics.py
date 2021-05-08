@@ -21,7 +21,7 @@ def peer_to_multiaddr(peer):
     peer['libp2p_port'],
     peer['peer_id'] )
 
-def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, nodes_responded, nodes_errored, context_deadline_exceeded, failed_security_protocol_negotiation, connection_refused_errors, size_limit_exceeded_errors, timed_out_errors, stream_reset_errors, other_connection_errors, prover_errors):
+def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes_synced, nodes_queried, nodes_responded, seed_nodes_queried, seed_nodes_responded, nodes_errored, context_deadline_exceeded, failed_security_protocol_negotiation, connection_refused_errors, size_limit_exceeded_errors, timed_out_errors, stream_reset_errors, other_connection_errors, prover_errors):
   print('collecting node status metrics')
 
   pods = v1.list_namespaced_pod(namespace, watch=False)
@@ -30,7 +30,7 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
   seeds = [ p for p in pod_names if 'seed' in p ]
 
-  resp_count, valid_resps, error_resps = collect_node_status(v1, namespace, seeds, pods)
+  resp_count, valid_resps, error_resps = collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_nodes_queried)
 
   err_context_deadline = 0
   err_negotiate_security_protocol = 0
@@ -149,10 +149,11 @@ def collect_node_status_metrics(v1, namespace, nodes_synced_near_best_tip, nodes
 
 # ========================================================================
 
-def collect_node_status(v1, namespace, seeds, pods):
+def collect_node_status(v1, namespace, seeds, pods, seed_nodes_responded, seed_nodes_queried):
   peer_table = {}
   error_resps = []
   all_resps = []
+  peer_set = set()
 
   def contains_error(resp):
     try:
@@ -164,12 +165,16 @@ def collect_node_status(v1, namespace, seeds, pods):
   def no_error(resp):
     return (not (contains_error(resp)))
 
-  def add_resp(raw):
+  def add_resp(raw, peers, seed, seed_node_responded, seed_node_queried):
     resps = [ ast.literal_eval(s) for s in raw.split('\n') if s != '' ]
     
     valid_resps = list(filter(no_error, resps))
     error_resps.extend(list(filter(contains_error, resps)))
     all_resps.extend(resps)
+    peer_set.update(set(peers))
+
+    seed_node_responded.labels(seed= seed).set(len(valid_resps))
+    seed_node_queried.labels(seed= seed).set(len(peers))
 
     peer_resp_map = [ ((r['node_ip_addr'], r['node_peer_id']), r) for r in valid_resps ]
 
@@ -183,14 +188,22 @@ def collect_node_status(v1, namespace, seeds, pods):
     seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
     seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
 
-    cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -daemon-peers" + " -show-errors"
-    resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
+    try:
+      cmd = "mina advanced get-peers"
+      peers = util.exec_on_pod(v1, namespace, seed, 'coda', cmd).rstrip().split('\n')
 
-    if not 'Error: Unable to connect to Mina Daemon.' in resp:
-      add_resp(resp)
+      cmd = "mina advanced node-status -daemon-port " + seed_daemon_port + " -peers " + ",".join(peers) + " -show-errors"
+      resp = util.exec_on_pod(v1, namespace, seed, 'coda', cmd)
+
+      if not 'Error: Unable to connect to Mina Daemon.' in resp:
+        add_resp(resp, peers, seed, seed_nodes_responded, seed_nodes_queried)
+    except Exception as e:
+      print("failed to exec command on pod: {}".format(e))
+      continue
+      
 
   valid_resps = peer_table.values()
 
-  return (len(all_resps), valid_resps, error_resps)
+  return (len(peer_set), valid_resps, error_resps)
 
 # ========================================================================

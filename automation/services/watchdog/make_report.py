@@ -222,8 +222,8 @@ def main():
           else:
             print("Errored response: {}".format(error_str))
             err_others += 1
-        except _:
-          print("Errored response: {}".format(error_str))
+        except:
+          print("Errored response: {}".format(p))
           err_others += 1
 
       print('\t%s valid responses from peers'%(str(len(list(peers)))))
