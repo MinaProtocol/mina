@@ -186,8 +186,7 @@ module Node = struct
 
   (* this function will repeatedly attempt to connect to graphql port <num_tries> times before giving up *)
   let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
-      ?(initial_delay_sec = 30.0) ~logger ~node
-      ?(retry_on_graphql_error = false) ~query_name query_obj =
+      ?(initial_delay_sec = 30.0) ~logger ~node ~query_name query_obj =
     let open Deferred.Let_syntax in
     if not node.graphql_enabled then
       Deferred.Or_error.error_string
@@ -227,15 +226,9 @@ module Node = struct
           | Error (`Graphql_error err_string) ->
               [%log error]
                 "GraphQL request \"$query\" to \"$uri\" returned an error: \
-                 \"$error\" ($num_tries attempts left)"
-                ~metadata:
-                  ( metadata
-                  @ [("error", `String err_string); ("num_tries", `Int (n - 1))]
-                  ) ;
-              if retry_on_graphql_error then
-                let%bind () = after (Time.Span.of_sec retry_delay_sec) in
-                retry (n - 1)
-              else Deferred.Or_error.error_string err_string
+                 \"$error\" (this is a graphql error so not retrying)"
+                ~metadata:(metadata @ [("error", `String err_string)]) ;
+              Deferred.Or_error.error_string err_string
       in
       let%bind () = after (Time.Span.of_sec initial_delay_sec) in
       retry num_tries
@@ -247,8 +240,8 @@ module Node = struct
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
     let query_obj = Graphql.Query_peer_id.make () in
     let%bind query_result_obj =
-      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
-        ~query_name:"query_peer_id" query_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"query_peer_id"
+        query_obj
     in
     [%log info] "get_peer_id, finished exec_graphql_request" ;
     let self_id_obj = ((query_result_obj#daemonStatus)#addrsAndPorts)#peer in
@@ -273,8 +266,7 @@ module Node = struct
     let open Deferred.Or_error.Let_syntax in
     let query = Graphql.Best_chain.make () in
     let%bind result =
-      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
-        ~query_name:"best_chain" query
+      exec_graphql_request ~logger ~node:t ~query_name:"best_chain" query
     in
     match result#bestChain with
     | None | Some [||] ->
@@ -302,8 +294,8 @@ module Node = struct
         ()
     in
     let%bind balance_obj =
-      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error:true
-        ~query_name:"get_balance_graphql" get_balance_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"get_balance_graphql"
+        get_balance_obj
     in
     match balance_obj#account with
     | None ->
@@ -318,8 +310,7 @@ module Node = struct
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ?(retry_on_graphql_error = true) ~logger t ~sender_pub_key
-      ~receiver_pub_key ~amount ~fee =
+  let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
     [%log info] "Sending a payment"
       ~metadata:
         [("namespace", `String t.namespace); ("pod_id", `String t.pod_id)] ;
@@ -349,8 +340,8 @@ module Node = struct
           ()
       in
       (* retry_on_graphql_error=true because the node might be bootstrapping *)
-      exec_graphql_request ~logger ~node:t ~retry_on_graphql_error
-        ~query_name:"send_payment_graphql" send_payment_obj
+      exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
+        send_payment_obj
     in
     let%map sent_payment_obj = send_payment_graphql () in
     let (`UserCommand id_obj) = (sent_payment_obj#sendPayment)#payment in
@@ -359,10 +350,9 @@ module Node = struct
       ~metadata:[("user_command_id", `String user_cmd_id)] ;
     ()
 
-  let must_send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
-      ~receiver_pub_key ~amount ~fee =
-    send_payment ?retry_on_graphql_error ~logger t ~sender_pub_key
-      ~receiver_pub_key ~amount ~fee
+  let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount
+      ~fee =
+    send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   let dump_archive_data ~logger (t : t) ~data_file =

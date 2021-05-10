@@ -51,8 +51,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       else
         let%bind () =
           let%map () =
-            Network.Node.must_send_payment ~retry_on_graphql_error:false
-              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee node
+            Network.Node.must_send_payment ~logger ~sender_pub_key
+              ~receiver_pub_key ~amount ~fee node
           in
           [%log info] "gossip_consistency test: payment #%d sent." n ;
           ()
