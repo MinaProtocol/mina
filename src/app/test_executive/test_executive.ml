@@ -40,9 +40,7 @@ let engines : engine list =
 
 let tests : test list =
   [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
-  ; ("send-payment", (module Send_payment_test.Make : Intf.Test.Functor_intf))
-  ; ( "pmt-timed-accts"
-    , (module Payments_timed_accounts_test.Make : Intf.Test.Functor_intf) )
+  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
     (*
   ; ( "bp-timed-accts"
     , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
