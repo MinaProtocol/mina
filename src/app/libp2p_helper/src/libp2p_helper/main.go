@@ -44,6 +44,7 @@ func min(a, b uint64) uint64 {
 	}
 }
 
+const MAX_MESSAGE_LENGTH uint64 = 2 << 30  // 2gb
 const MESSAGE_BUFFER_SIZE uint64 = 2 << 20 // 2mb
 
 type messageBuffer [MESSAGE_BUFFER_SIZE]byte
@@ -745,6 +746,13 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
 				})
 				return
+			} else if length > MAX_MESSAGE_LENGTH {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    fmt.Sprintf("message length too long: %d", length),
+				})
+				return
 			}
 
 			if length == 0 {
@@ -772,7 +780,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				}
 
 				// shouldn't need to worry about underflow here
-				bytesToRead -= uint64(n)
+				bytesToRead -= bufferReadSize
 				app.writeMsg(incomingMsgUpcall{
 					Upcall:    "incomingStreamMsg",
 					Data:      codaEncode(buffer[:bufferReadSize]),
