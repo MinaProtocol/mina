@@ -104,7 +104,7 @@ func newTestAppWithMaxConns(t *testing.T, seeds []peer.AddrInfo, noUpcalls bool,
 		ValidatorMutex:     &sync.Mutex{},
 		Validators:         make(map[int]*validationStatus),
 		Streams:            make(map[int]net.Stream),
-		AddedPeers:         make([]peer.AddrInfo, 0, 512),
+		StreamStates:       make(map[int]streamState),
 		OutChan:            make(chan interface{}),
 		MetricsRefreshTime: time.Second * 2,
 		NoUpcalls:          noUpcalls,
@@ -999,6 +999,7 @@ func TestMplex_SendLargeMessage(t *testing.T) {
 	msg := createMessage(msgSize)
 
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
 	})
@@ -1023,11 +1024,14 @@ func TestMplex_SendMultipleMessage(t *testing.T) {
 	msg := createMessage(msgSize)
 
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
-		sendStreamMessage(t, stream, msg)
-		sendStreamMessage(t, stream, msg)
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
+		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
+		sendStreamMessage(t, stream, msg)
 		require.Equal(t, msg, waitForMessage(t, appB, msgSize))
 	})
 }
@@ -1057,9 +1061,11 @@ func TestLibp2pMetrics(t *testing.T) {
 
 	// Send multiple messages from A to B
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
 		sendStreamMessage(t, stream, createMessage(maxStatsMsg))
-		sendStreamMessage(t, stream, createMessage(minStatsMsg))
 		waitForMessage(t, appB, maxStatsMsg)
+		appB.StreamStates[0] = STREAM_QUERY_HANDLED
+		sendStreamMessage(t, stream, createMessage(minStatsMsg))
 		waitForMessage(t, appB, minStatsMsg)
 	})
 

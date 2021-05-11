@@ -47,6 +47,13 @@ func min(a, b uint64) uint64 {
 const MAX_MESSAGE_LENGTH uint64 = 2 << 30  // 2gb
 const MESSAGE_BUFFER_SIZE uint64 = 2 << 20 // 2mb
 
+type streamState int
+
+const (
+	STREAM_QUERY_UNHANDLED streamState = iota
+	STREAM_QUERY_HANDLED
+)
+
 type messageBuffer [MESSAGE_BUFFER_SIZE]byte
 
 type messageBufferPool struct {
@@ -91,6 +98,7 @@ type app struct {
 	Validators               map[int]*validationStatus
 	ValidatorMutex           *sync.Mutex
 	Streams                  map[int]net.Stream
+	StreamStates             map[int]streamState
 	StreamsMutex             sync.Mutex
 	Out                      *bufio.Writer
 	OutChan                  chan interface{}
@@ -731,6 +739,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 		defer func() {
 			_ = stream.Close()
 		}()
+
 		for {
 			length, err := readLEB128ToUint64(r)
 			if err == io.EOF {
@@ -759,10 +768,25 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
-					Reason:    fmt.Sprintf("invalid length prefix byte (cannot be 0)"),
+					Reason:    "invalid length prefix byte (cannot be 0)",
 				})
 				return
 			}
+
+			app.StreamsMutex.Lock()
+			streamState := app.StreamStates[idx]
+			if streamState == STREAM_QUERY_HANDLED {
+				app.StreamStates[idx] = STREAM_QUERY_UNHANDLED
+			} else {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    "received new message before we responded to previous message",
+				})
+				app.StreamsMutex.Unlock()
+				return
+			}
+			app.StreamsMutex.Unlock()
 
 			app.P2p.MsgStats.UpdateMetrics(length)
 
@@ -832,6 +856,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
+	app.StreamStates[streamIdx] = STREAM_QUERY_HANDLED
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
@@ -908,6 +933,8 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 		if err != nil {
 			return nil, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
 		}
+
+		app.StreamStates[cs.StreamIdx] = STREAM_QUERY_HANDLED
 		return "sendStreamMsg success", nil
 	}
 	return nil, badRPC(errors.New("unknown stream_idx"))
