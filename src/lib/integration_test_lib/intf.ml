@@ -40,8 +40,7 @@ module Engine = struct
       val stop : t -> unit Malleable_error.t
 
       val send_payment :
-           ?retry_on_graphql_error:bool
-        -> logger:Logger.t
+           logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
@@ -50,8 +49,7 @@ module Engine = struct
         -> unit Deferred.Or_error.t
 
       val must_send_payment :
-           ?retry_on_graphql_error:bool
-        -> logger:Logger.t
+           logger:Logger.t
         -> t
         -> sender_pub_key:Signature_lib.Public_key.Compressed.t
         -> receiver_pub_key:Signature_lib.Public_key.Compressed.t
