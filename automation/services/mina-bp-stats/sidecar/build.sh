@@ -2,6 +2,8 @@
 
 BUILDDIR="${BUILDDIR:-deb_build}"
 
+VERSION=1.1.6-${GITHASH}
+
 # Get CWD if run locally or run through "source"
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 

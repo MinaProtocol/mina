@@ -336,6 +336,9 @@ ls -lh mina*.deb
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
 
+echo "removing all extra packages to avoid pushing new versions on this branch"
+rm -rf *.deb
+
 # Build mina block producer sidecar 
 source ../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb

@@ -34,7 +34,11 @@ case $BUILDKITE_BRANCH in
         CODENAME=unstable ;;
 esac
 
-echo "Publishing debs: ${DEBS}"
+CODENAME=pre-release
+
+echo "WARNING: publishing to release repo!"
+
+echo "Publishing debs to repo [${CODENAME}]: ${DEBS}"
 set -x
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
