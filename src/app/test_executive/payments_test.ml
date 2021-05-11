@@ -96,13 +96,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        let sender = timed_node_a in
        let%bind sender_pub_key = Util.pub_key_of_node sender in
        (* TODO: refactor this using new [expect] dsl when it's available *)
-       (* TODO: consider making [send_payment'] for a non-malleable version that we can assert on *)
        let open Deferred.Let_syntax in
        match%bind
          Node.send_payment ~retry_on_graphql_error:false ~logger sender
            ~sender_pub_key ~receiver_pub_key ~amount ~fee
        with
-       (* TODO: this currently relies on the returned error being a soft error and not a hard error *)
        | Ok () ->
            Malleable_error.soft_error_string ~value:()
              "Payment succeeded, but expected it to fail because of a minimum \
