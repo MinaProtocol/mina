@@ -50,8 +50,8 @@ const MESSAGE_BUFFER_SIZE uint64 = 2 << 20 // 2mb
 type streamState int
 
 const (
-	STREAM_QUERY_UNHANDLED streamState = iota
-	STREAM_QUERY_HANDLED
+	STREAM_DATA_UNEXPECTED streamState = iota
+	STREAM_DATA_EXPECTED
 )
 
 type messageBuffer [MESSAGE_BUFFER_SIZE]byte
@@ -775,8 +775,8 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 
 			app.StreamsMutex.Lock()
 			streamState := app.StreamStates[idx]
-			if streamState == STREAM_QUERY_HANDLED {
-				app.StreamStates[idx] = STREAM_QUERY_UNHANDLED
+			if streamState == STREAM_DATA_EXPECTED {
+				app.StreamStates[idx] = STREAM_DATA_UNEXPECTED
 			} else {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
@@ -856,7 +856,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
-	app.StreamStates[streamIdx] = STREAM_QUERY_HANDLED
+	app.StreamStates[streamIdx] = STREAM_DATA_EXPECTED
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
@@ -934,7 +934,7 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 			return nil, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
 		}
 
-		app.StreamStates[cs.StreamIdx] = STREAM_QUERY_HANDLED
+		app.StreamStates[cs.StreamIdx] = STREAM_DATA_EXPECTED
 		return "sendStreamMsg success", nil
 	}
 	return nil, badRPC(errors.New("unknown stream_idx"))
