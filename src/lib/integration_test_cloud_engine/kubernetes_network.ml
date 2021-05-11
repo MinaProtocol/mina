@@ -339,7 +339,6 @@ module Node = struct
           ~fee:(Graphql_lib.Encoders.fee fee)
           ()
       in
-      (* retry_on_graphql_error=true because the node might be bootstrapping *)
       exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
         send_payment_obj
     in
