@@ -1,0 +1,15 @@
+(executable
+ (name poseidon_hash)
+ (modes js)
+ (js_of_ocaml
+  (flags +toplevel.js +dynlink.js))
+ (libraries
+  random_oracle_nonconsensus
+  js_of_ocaml
+  zarith_stubs_js
+  integers_stubs_js)
+ (preprocessor_deps ../../../config.mlh)
+ (instrumentation
+  (backend bisect_ppx))
+ (preprocess
+  (pps ppx_version ppx_custom_printf ppx_optcomp js_of_ocaml-ppx)))

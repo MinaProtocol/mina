@@ -106,6 +106,12 @@ client_sdk_test_sigs_nonconsensus :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
+javascript_exports :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/javascript_exports/poseidon_hash/poseidon_hash.bc.js --profile=nonconsensus_mainnet
+	node _build/default/src/app/javascript_exports/poseidon_hash/poseidon_hash.bc.js
+	$(info Build complete)
+
 rosetta_lib_encodings :
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=mainnet
