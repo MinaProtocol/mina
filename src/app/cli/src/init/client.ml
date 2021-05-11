@@ -1932,7 +1932,7 @@ let compile_time_constants =
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+                 ~logger:(Logger.null ()) ~proof_level:None
            >>| Or_error.ok_exn
          in
          let all_constants =
