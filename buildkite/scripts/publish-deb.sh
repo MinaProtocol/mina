@@ -34,7 +34,7 @@ case $BUILDKITE_BRANCH in
         CODENAME=unstable ;;
 esac
 
-CODENAME=pre-release
+CODENAME=release
 
 echo "WARNING: publishing to release repo!"
 
