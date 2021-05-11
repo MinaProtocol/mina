@@ -49,20 +49,21 @@ type validationStatus struct {
 }
 
 type app struct {
-	P2p                *codanet.Helper
-	Ctx                context.Context
-	Subs               map[int]subscription
-	Topics             map[string]*pubsub.Topic
-	Validators         map[int]*validationStatus
-	ValidatorMutex     *sync.Mutex
-	Streams            map[int]net.Stream
-	StreamsMutex       sync.Mutex
-	Out                *bufio.Writer
-	OutChan            chan interface{}
-	Bootstrapper       io.Closer
-	AddedPeers         []peer.AddrInfo
-	UnsafeNoTrustIP    bool
-	MetricsRefreshTime time.Duration
+	P2p                      *codanet.Helper
+	Ctx                      context.Context
+	Subs                     map[int]subscription
+	Topics                   map[string]*pubsub.Topic
+	Validators               map[int]*validationStatus
+	ValidatorMutex           *sync.Mutex
+	Streams                  map[int]net.Stream
+	StreamsMutex             sync.Mutex
+	Out                      *bufio.Writer
+	OutChan                  chan interface{}
+	Bootstrapper             io.Closer
+	AddedPeers               []peer.AddrInfo
+	UnsafeNoTrustIP          bool
+	MetricsRefreshTime       time.Duration
+	metricsCollectionStarted bool
 
 	// development configuration options
 	NoMDNS    bool
@@ -360,6 +361,13 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	}
 	if len(m.MetricsPort) > 0 {
 		metricsServer = startMetricsServer(m.MetricsPort)
+		if !app.metricsCollectionStarted {
+			go app.checkBandwidth()
+			go app.checkPeerCount()
+			go app.checkMessageStats()
+			go app.checkLatency()
+			app.metricsCollectionStarted = true
+		}
 	}
 
 	return "configure success", nil
@@ -1555,17 +1563,18 @@ func init() {
 
 func newApp() *app {
 	return &app{
-		P2p:                nil,
-		Ctx:                context.Background(),
-		Subs:               make(map[int]subscription),
-		Topics:             make(map[string]*pubsub.Topic),
-		ValidatorMutex:     &sync.Mutex{},
-		Validators:         make(map[int]*validationStatus),
-		Streams:            make(map[int]net.Stream),
-		OutChan:            make(chan interface{}, 4096),
-		Out:                bufio.NewWriter(os.Stdout),
-		AddedPeers:         []peer.AddrInfo{},
-		MetricsRefreshTime: time.Minute,
+		P2p:                      nil,
+		Ctx:                      context.Background(),
+		Subs:                     make(map[int]subscription),
+		Topics:                   make(map[string]*pubsub.Topic),
+		ValidatorMutex:           &sync.Mutex{},
+		Validators:               make(map[int]*validationStatus),
+		Streams:                  make(map[int]net.Stream),
+		OutChan:                  make(chan interface{}, 4096),
+		Out:                      bufio.NewWriter(os.Stdout),
+		AddedPeers:               []peer.AddrInfo{},
+		MetricsRefreshTime:       time.Minute,
+		metricsCollectionStarted: false,
 	}
 }
 
@@ -1639,11 +1648,6 @@ func main() {
 	lines.Buffer(make([]byte, bufsize), bufsize)
 
 	app := newApp()
-
-	go app.checkBandwidth()
-	go app.checkPeerCount()
-	go app.checkMessageStats()
-	go app.checkLatency()
 
 	go func() {
 		for {
