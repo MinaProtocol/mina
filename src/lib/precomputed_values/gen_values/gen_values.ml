@@ -105,8 +105,7 @@ module Dummy = struct
            ; consensus_constants
            ; protocol_state_with_hash
            ; constraint_system_digests= hashes
-           ; blockchain_proof_system_id= Pickles.Verification_key.Id.dummy ()
-           ; genesis_proof= Mina_base.Proof.blockchain_dummy })
+           ; proof_data= None })
     else None
 end
 
@@ -186,8 +185,7 @@ let main () =
            ; protocol_state_with_hash
            ; constraint_system_digests=
                lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
-           ; blockchain_proof_system_id= Pickles.Verification_key.Id.dummy ()
-           ; genesis_proof= Mina_base.Proof.blockchain_dummy })
+           ; proof_data= None })
 
       let compiled_inputs =
         lazy
@@ -223,9 +221,11 @@ let main () =
            ; blockchain_proof_system_id=
                [%e
                  match compiled_values with
-                 | Some {blockchain_proof_system_id= id; _} ->
+                 | Some
+                     {proof_data= Some {blockchain_proof_system_id= id; _}; _}
+                   ->
                      [%expr Some [%e vk_id_to_expr ~loc id]]
-                 | None ->
+                 | _ ->
                      [%expr None]] })
 
       let compiled =
@@ -247,18 +247,28 @@ let main () =
                          inputs.protocol_state_with_hash
                      ; constraint_system_digests=
                          lazy [%e hashes_to_expr ~loc (Lazy.force hashes)]
-                     ; blockchain_proof_system_id=
-                         [%expr
-                           vk_id_to_expr ~loc
-                             compiled_values.blockchain_proof_system_id]
-                     ; genesis_proof=
-                         Core.Binable.of_string
-                           (module Mina_base.Proof.Stable.Latest)
-                           [%e
-                             estring ~loc
-                               (Binable.to_string
-                                  (module Mina_base.Proof.Stable.Latest)
-                                  compiled_values.genesis_proof)] }) )]
+                     ; proof_data=
+                         [%e
+                           match compiled_values.proof_data with
+                           | Some proof_data ->
+                               [%expr
+                                 Some
+                                   { blockchain_proof_system_id=
+                                       [%expr
+                                         vk_id_to_expr ~loc
+                                           proof_data
+                                             .blockchain_proof_system_id]
+                                   ; genesis_proof=
+                                       Core.Binable.of_string
+                                         (module Mina_base.Proof.Stable.Latest)
+                                         [%e
+                                           estring ~loc
+                                             (Binable.to_string
+                                                ( module Mina_base.Proof.Stable
+                                                         .Latest )
+                                                proof_data.genesis_proof)] }]
+                           | None ->
+                               [%expr None]] }) )]
           | None ->
               [%expr None]]]
   in
