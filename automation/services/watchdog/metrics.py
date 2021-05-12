@@ -102,15 +102,16 @@ def daemon_containers(v1, namespace):
   pods = v1.list_namespaced_pod(namespace, watch=False)
 
   for pod in pods.items:
-    containers = pod.status.container_statuses
-    for c in containers:
-      if c.name in [ 'coda', 'mina', 'seed']:
-        yield (pod.metadata.name, c.name)
+    if pod.status.phase == 'Running':
+      containers = pod.status.container_statuses
+      for c in containers:
+        if c.name in [ 'coda', 'mina', 'seed']:
+          yield (pod.metadata.name, c.name)
 
 def get_chain_id(v1, namespace):
   for (pod_name, container_name) in daemon_containers(v1, namespace):
-    resp = util.exec_on_pod(v1, namespace, pod_name, container_name, 'mina client status --json')
     try:
+      resp = util.exec_on_pod(v1, namespace, pod_name, container_name, 'mina client status --json')      
       resp = resp.strip()
       if resp[0] != '{':
         #first line could be 'Using password from environment variable CODA_PRIVKEY_PASS'
