@@ -53,6 +53,8 @@ module Make (Engine : Intf.Engine.S) () :
 
   let section = Malleable_error.contextualize
 
+  let section_soft = Malleable_error.contextualize_soft
+
   let hard_wait_for_network_state_predicate ~logger ~hard_timeout
       ~network_state_reader ~init ~check =
     let open Wait_condition in

@@ -108,6 +108,17 @@ let contextualize context m =
   | Error hard_fail ->
       Error (Hard_fail.contextualize context hard_fail)
 
+let contextualize_soft (context : string) m =
+  let open Deferred.Let_syntax in
+  match%map m with
+  | Ok acc ->
+      Ok (Result_accumulator.contextualize context acc)
+  | Error {Hard_fail.soft_errors; hard_errors} ->
+      Ok
+        (Result_accumulator.contextualize context
+           (Result_accumulator.create ()
+              (Error_accumulator.merge soft_errors hard_errors)))
+
 let is_ok = function Ok acc -> Result_accumulator.is_ok acc | _ -> false
 
 let ok_unit = return ()

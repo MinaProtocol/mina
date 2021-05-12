@@ -116,7 +116,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     let%bind () =
-      section "network is fully connected upon initialization"
+      section_soft "network is fully connected upon initialization"
         (check_peers ~logger all_nodes)
     in
     let%bind _ =
