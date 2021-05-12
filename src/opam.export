@@ -176,7 +176,7 @@ installed: [
   "ppx_sexp_message.v0.12.0"
   "ppx_sexp_value.v0.12.0"
   "ppx_stable.v0.12.0"
-  "ppx_tools.5.2+4.08.0"
+  "ppx_tools.6.0+4.08.0"
   "ppx_tools_versioned.5.2.3"
   "ppx_typerep_conv.v0.12.0"
   "ppx_variants_conv.v0.12.0"

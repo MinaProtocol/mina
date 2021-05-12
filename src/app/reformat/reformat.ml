@@ -64,7 +64,9 @@ let main dry_run check path =
           in
           if dry_run then dump prog args
           else
-            let%map _stdout = Process.run_exn ~prog ~args () in
+            let%map stdout = Process.run_exn ~prog ~args () in
+            if not (String.is_empty stdout) then
+              Format.printf "%s@." stdout ;
             () )
   in
   exit 0

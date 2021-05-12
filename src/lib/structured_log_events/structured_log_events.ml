@@ -49,8 +49,11 @@ let log t =
   | Some data ->
       data
   | None ->
+      (* NOTE: We suppress these warnings here, because the deprecation began
+         in 4.08.0 but we still want to support 4.07.1.
+      *)
       failwithf "log: did not find matching logger for %s"
-        (Obj.extension_name (Obj.extension_constructor t))
+        ((Obj.extension_name [@ocaml.warning "-3"]) ((Obj.extension_constructor [@ocaml.warning "-3"]) t))
         ()
 
 let register_constructor = Registry.register_constructor
