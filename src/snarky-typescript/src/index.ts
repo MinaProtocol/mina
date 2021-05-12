@@ -302,26 +302,26 @@ abstract class CircuitData<
   abstract read(this: this): Type;
 }
 
-abstract class Circuit<F extends FieldElement<F>, ConstraintKind, Gadget, Result> {
-  abstract Field: Field<F>;
-  abstract Var: CircuitVarCtor<F, this, CircuitVar<F, this>>;
-  abstract Bool: BoolVarCtor<
+interface Circuit<F extends FieldElement<F>, ConstraintKind, Gadget, Result> {
+  Field: Field<F>;
+  Var: CircuitVarCtor<F, this, CircuitVar<F, this>>;
+  Bool: BoolVarCtor<
     F,
     this,
     CircuitVar<F, this>,
     BoolVar<F, this, CircuitVar<F, this>>
   >;
 
-  abstract finish(this: this): Result;
+  finish(this: this): Result;
 
   /* Run some code while proving; skipped during constraint generation. */
-  abstract run(this: this, f: () => void): void;
+  run(this: this, f: () => void): void;
 
-  abstract addConstraint(kind: ConstraintKind, ...data: any): void;
+  addConstraint(kind: ConstraintKind, ...data: any): void;
 
-  abstract runGadget(gadget: Gadget): void;
+  runGadget(gadget: Gadget): void;
 
-  abstract constant<Type extends AsFieldElements<F, Type>>(
+  constant<Type extends AsFieldElements<F, Type>>(
     this: this,
     x: Type
   ): CircuitData<
@@ -332,7 +332,7 @@ abstract class Circuit<F extends FieldElement<F>, ConstraintKind, Gadget, Result
     Type
   >;
 
-  abstract compute<Type extends AsFieldElements<F, Type>>(
+  compute<Type extends AsFieldElements<F, Type>>(
     this: this,
     x: Type
   ): CircuitData<
@@ -342,7 +342,7 @@ abstract class Circuit<F extends FieldElement<F>, ConstraintKind, Gadget, Result
     BoolVar<F, this, CircuitVar<F, this>>,
     Type
   >;
-  abstract compute<Type extends AsFieldElements<F, Type>>(
+  compute<Type extends AsFieldElements<F, Type>>(
     this: this,
     f: () => Type
   ): CircuitData<
@@ -353,13 +353,13 @@ abstract class Circuit<F extends FieldElement<F>, ConstraintKind, Gadget, Result
     Type
   >;
 
-  abstract if_<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
+  if_<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
     this: this,
     cond: BoolVar<F, this, CircuitVar<F, this>> | boolean,
     then_: Var,
     else_: Var
   ): Var;
-  abstract if_<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
+  if_<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
     this: this,
     cond: BoolVar<F, this, CircuitVar<F, this>> | boolean,
     args: {
@@ -368,13 +368,13 @@ abstract class Circuit<F extends FieldElement<F>, ConstraintKind, Gadget, Result
     }
   ): Var;
 
-  abstract equals<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
+  equals<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
     this: this,
     x: Var,
     y: Var
   ): BoolVar<F, this, CircuitVar<F, this>>;
 
-  abstract assertEqual<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
+  assertEqual<Var extends AsFieldElements<CircuitVar<F, this>, Var>>(
     this: this,
     x: Var,
     y: Var
