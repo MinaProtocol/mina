@@ -280,7 +280,7 @@ let get_public_keys =
 
 let read_json filepath ~flag =
   let%map res =
-    Deferred.Or_error.try_with (fun () ->
+    Deferred.Or_error.try_with ~here:[%here] (fun () ->
         let%map json_contents = Reader.file_contents filepath in
         Ok (Yojson.Safe.from_string json_contents) )
   in
@@ -774,7 +774,7 @@ let send_rosetta_transactions_graphql =
          let lexbuf = Lexing.from_channel In_channel.stdin in
          let lexer = Yojson.init_lexer () in
          match%bind
-           Deferred.Or_error.try_with (fun () ->
+           Deferred.Or_error.try_with ~here:[%here] (fun () ->
                Deferred.repeat_until_finished () (fun () ->
                    try
                      let transaction_json =
@@ -1944,7 +1944,7 @@ let compile_time_constants =
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+                 ~logger:(Logger.null ()) ~proof_level:None
            >>| Or_error.ok_exn
          in
          let all_constants =

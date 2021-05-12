@@ -77,12 +77,18 @@ def main():
 
     pods = v1.list_namespaced_pod(args.namespace, watch=False)
 
-    seeds = [ p for p in pods.items if 'seed' in p.metadata.name ]
+    pod_names = [ p['metadata']['name'] for p in pods.to_dict()['items'] if p['status']['phase'] == 'Running' ]
+
+    seeds = [ p for p in pod_names if 'seed' in p ]
+
     seed = seeds[-1]
-    seed_daemon_container = [ c for c in seed.spec.containers if c.args[0] == 'daemon' ][0]
-    seed_vars_dict = [ v.to_dict() for v in seed_daemon_container.env ]
+
+    seed_pod = [ p for p in pods.to_dict()['items'] if p['metadata']['name'] == seed ][0]
+    seed_daemon_container = [ c for c in seed_pod['spec']['containers'] if c['args'][0] == 'daemon' ][0]
+    seed_vars_dict = [ v for v in seed_daemon_container['env'] ]
     seed_daemon_port = [ v['value'] for v in seed_vars_dict if v['name'] == 'DAEMON_CLIENT_PORT'][0]
-    print('seed', seed.metadata.name)
+
+    print('seed', seed)
 
     request_timeout_seconds = 600
 
@@ -110,7 +116,7 @@ def main():
           '-c',
           command,
         ]
-        result = stream.stream(v1.connect_get_namespaced_pod_exec, seed.metadata.name, args.namespace, command=exec_command, container='coda', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
+        result = stream.stream(v1.connect_get_namespaced_pod_exec, seed, args.namespace, command=exec_command, container='coda', stderr=True, stdout=True, stdin=False, tty=False, _request_timeout=timeout)
         return result
 
       print('running command:', command)
@@ -216,8 +222,8 @@ def main():
           else:
             print("Errored response: {}".format(error_str))
             err_others += 1
-        except _:
-          print("Errored response: {}".format(error_str))
+        except:
+          print("Errored response: {}".format(p))
           err_others += 1
 
       print('\t%s valid responses from peers'%(str(len(list(peers)))))
