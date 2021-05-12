@@ -957,6 +957,8 @@ let export_ledger =
                let state_hash =
                  Option.map ~f:State_hash.of_base58_check_exn state_hash
                in
+               printf
+                 "Generating snarked ledger(this may take a few seconds)...\n" ;
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
                  state_hash port
            | "staking-epoch-ledger" ->
