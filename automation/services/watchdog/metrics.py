@@ -120,7 +120,7 @@ def get_chain_id(v1, namespace):
       print("Chain ID: {}".format(resp_dict['chain_id']))
       return resp_dict['chain_id']
     except Exception as e:
-      print("Exception when extracting chain id: {}\n mina client status response: {}".format(e, resp))
+      print("Exception when extracting chain id on pod {}: {}\n mina client status response: {}".format(pod_name, e, resp))
       continue
 
 def check_seed_list_up(v1, namespace, seeds_reachable):
