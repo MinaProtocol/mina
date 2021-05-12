@@ -80,7 +80,8 @@ let process_line ~timezone ~interpolation_config ~filter line =
 (* TODO: check for common filter errors (e.g. invalid level provided) *)
 let main timezone_str interpolation_config filter_str =
   let filter =
-    if filter_str = "" then Result.ok_or_failwith (Filter.Parser.parse "true")
+    if String.equal filter_str "" then
+      Result.ok_or_failwith (Filter.Parser.parse "true")
     else
       let error s =
         eprintf !"ERROR PARSING FILTER: %s\n%!" s ;
@@ -98,7 +99,7 @@ let main timezone_str interpolation_config filter_str =
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse "true") in *)
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse ".level === \"Info\"") in *)
   let timezone =
-    if timezone_str = "" then find_timezone ()
+    if String.equal timezone_str "" then find_timezone ()
     else Time.Zone.of_string timezone_str
   in
   In_channel.(

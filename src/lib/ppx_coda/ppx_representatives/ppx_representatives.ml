@@ -128,21 +128,21 @@ let rec core_type ~loc (typ : core_type) : expression =
              [%e
                elist ~loc
                  (List.rev_map rows ~f:(function
-                   | Rtag (name, _, _, []) ->
+                   | {prf_desc= Rtag (name, _, []); _} ->
                        [%expr [[%e pexp_variant ~loc name.txt None]]]
-                   | Rtag (name, _, _, [typ]) ->
+                   | {prf_desc= Rtag (name, _, [typ]); _} ->
                        [%expr
                          Stdlib.List.rev_map
                            (fun e ->
                              [%e pexp_variant ~loc name.txt (Some [%expr e])]
                              )
                            (Stdlib.Lazy.force [%e core_type ~loc typ])]
-                   | Rtag _ ->
+                   | {prf_desc= Rtag _; _} ->
                        Location.raise_errorf ~loc:typ.ptyp_loc
                          "Cannot derive %s for variant constructors with \
                           different type arguments for the same constructor"
                          deriver_name
-                   | Rinherit typ' ->
+                   | {prf_desc= Rinherit typ'; _} ->
                        [%expr
                          Stdlib.List.rev
                            (Stdlib.Lazy.force

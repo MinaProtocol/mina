@@ -134,7 +134,7 @@ module Processor = struct
     let create ~log_level = log_level
 
     let process log_level (msg : Message.t) =
-      if msg.level < log_level then None
+      if Level.compare msg.level log_level < 0 then None
       else
         let msg_json_fields =
           Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
@@ -142,7 +142,8 @@ module Processor = struct
         let json =
           if Level.compare msg.level Level.Spam = 0 then
             `Assoc
-              (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+              (List.filter msg_json_fields ~f:(fun (k, _) ->
+                   not (String.equal k "source") ))
           else `Assoc msg_json_fields
         in
         Some (Yojson.Safe.to_string json)
@@ -155,7 +156,7 @@ module Processor = struct
 
     let process {log_level; config} (msg : Message.t) =
       let open Message in
-      if msg.level < log_level then None
+      if Level.compare msg.level log_level < 0 then None
       else
         match
           Logproc_lib.Interpolator.interpolate config msg.message msg.metadata

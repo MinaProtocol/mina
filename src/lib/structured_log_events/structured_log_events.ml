@@ -52,7 +52,7 @@ let log t =
       data
   | None ->
       failwithf "log: did not find matching logger for %s"
-        (Obj.extension_name (Obj.extension_constructor t))
+        (Obj.Extension_constructor.name (Obj.Extension_constructor.of_val t))
         ()
 
 let register_constructor = Registry.register_constructor

@@ -19,7 +19,7 @@ let name = "define_locally"
 
 let raise_errorf = Location.raise_errorf
 
-let expand ~loc ~path:_ override (module_name : longident) defs =
+let expand ~loc ~path:_ override defs =
   match defs.pexp_desc with
   | Pexp_tuple exps ->
       let names =
@@ -35,19 +35,18 @@ let expand ~loc ~path:_ override (module_name : longident) defs =
         List.map names ~f:(fun name -> Pat.var ~loc {txt= name; loc})
       in
       Str.value ~loc Nonrecursive
-        [ Vb.mk ~loc (Pat.tuple ~loc vars)
-            (Exp.open_ ~loc override {txt= module_name; loc} defs) ]
+        [Vb.mk ~loc (Pat.tuple ~loc vars) (Exp.open_ ~loc override defs)]
   | Pexp_ident {txt= Lident id; _} ->
       Str.value ~loc Nonrecursive
         [ Vb.mk ~loc
             (Pat.var ~loc {txt= id; loc})
-            (Exp.open_ ~loc override {txt= module_name; loc} defs) ]
+            (Exp.open_ ~loc override defs) ]
   | _ ->
       raise_errorf ~loc "Must provide an identifier or tuple of identifiers"
 
 let ext =
   Extension.declare name Extension.Context.structure_item
-    Ast_pattern.(single_expr_payload (pexp_open __ __ __))
+    Ast_pattern.(single_expr_payload (pexp_open __ __))
     expand
 
 let () =

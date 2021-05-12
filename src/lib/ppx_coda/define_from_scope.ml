@@ -24,13 +24,10 @@ open Asttypes
 
 let name = "define_from_scope"
 
-let pat_of_id loc id =
-  {ppat_desc= Ppat_var {txt= id; loc}; ppat_loc= loc; ppat_attributes= []}
+let pat_of_id loc id = Ast_builder.Default.pvar ~loc id
 
 let ident_of_id loc id =
-  { pexp_desc= Pexp_ident {txt= Lident id; loc}
-  ; pexp_loc= loc
-  ; pexp_attributes= [] }
+  Ast_builder.Default.pexp_ident ~loc {txt= Lident id; loc}
 
 let expr_to_id loc expr =
   match expr.pexp_desc with
@@ -43,18 +40,10 @@ let expand ~loc ~path:_ (items : expression list) =
   let ids = List.map items ~f:(expr_to_id loc) in
   let pats = List.map ids ~f:(pat_of_id loc) in
   let idents = List.map ids ~f:(ident_of_id loc) in
-  { pstr_desc=
-      Pstr_value
-        ( Nonrecursive
-        , [ { pvb_pat=
-                {ppat_desc= Ppat_tuple pats; ppat_loc= loc; ppat_attributes= []}
-            ; pvb_expr=
-                { pexp_desc= Pexp_tuple idents
-                ; pexp_loc= loc
-                ; pexp_attributes= [] }
-            ; pvb_attributes= []
-            ; pvb_loc= loc } ] )
-  ; pstr_loc= loc }
+  let open Ast_builder.Default in
+  pstr_value ~loc Nonrecursive
+    [ value_binding ~loc ~pat:(ppat_tuple ~loc pats)
+        ~expr:(pexp_tuple ~loc idents) ]
 
 let ext =
   Extension.declare name Extension.Context.structure_item

@@ -6,8 +6,8 @@ let deriver = "register_event"
 let digest s = Md5.digest_string s |> Md5.to_hex
 
 let check_interpolations ~loc msg label_names =
-  match Ast_convenience.get_str msg with
-  | Some s -> (
+  match msg with
+  | {pexp_desc= Pexp_constant (Pconst_string (s, _)); _} -> (
     (* check that every interpolation point $foo in msg has a matching label;
        OK to have extra labels not mentioned in message
     *)
@@ -66,9 +66,10 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
           failwith
             (sprintf "Expected structure item in payload for %s" deriver)
     in
-    List.find_map_exn ty_ext.ptyext_attributes ~f:(fun ({txt; _}, payload) ->
+    List.find_map_exn ty_ext.ptyext_attributes
+      ~f:(fun {attr_name= {txt; _}; attr_payload; _} ->
         if String.equal txt "deriving" then
-          match payload with
+          match attr_payload with
           | PStr stris ->
               Some (List.find_map_exn stris ~f:find_deriver)
           | _ ->
