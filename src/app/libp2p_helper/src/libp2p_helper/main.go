@@ -1130,19 +1130,19 @@ func (app *app) updateConnectionMetrics() {
 // TODO: {peer,protocol}-{min,max,avg}
 func (app *app) checkBandwidth() {
 	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "total_bandwidth_in",
+		Name: "Mina_libp2p_total_bandwidth_in",
 		Help: "The total incoming bandwidth used",
 	})
 	totalOut := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "total_bandwidth_out",
+		Name: "Mina_libp2p_total_bandwidth_out",
 		Help: "The total outgoing bandwidth used",
 	})
 	rateIn := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "bandwidth_rate_in",
+		Name: "Mina_libp2p_bandwidth_rate_in",
 		Help: "The incoming bandwidth rate",
 	})
 	rateOut := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "bandwidth_rate_out",
+		Name: "Mina_libp2p_bandwidth_rate_out",
 		Help: "The outging bandwidth rate",
 	})
 
@@ -1185,11 +1185,11 @@ func (app *app) checkBandwidth() {
 
 func (app *app) checkPeerCount() {
 	peerCount := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "peer_count",
+		Name: "Mina_libp2p_peer_count",
 		Help: "The total number of peers in our network",
 	})
 	connectedPeerCount := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "connected_peer_count",
+		Name: "Mina_libp2p_connected_peer_count",
 		Help: "The total number of peers we are actively connected to",
 	})
 
@@ -1217,15 +1217,15 @@ func (app *app) checkPeerCount() {
 
 func (app *app) checkMessageStats() {
 	msgMax := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_max_stats"),
+		Name: "Mina_libp2p_message_max_stats",
 		Help: "The max size of network message received",
 	})
 	msgAvg := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_avg_stats"),
+		Name: "Mina_libp2p_message_avg_stats",
 		Help: "The average size of network message received",
 	})
 	msgMin := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_min_stats"),
+		Name: "Mina_libp2p_message_min_stats",
 		Help: "The min size of network message received",
 	})
 
@@ -1259,15 +1259,15 @@ func (app *app) checkMessageStats() {
 
 func (app *app) checkLatency() {
 	latencyMin := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("latency_min"),
+		Name: "Mina_libp2p_latency_min",
 		Help: fmt.Sprintf("The minimum latency (recorded over %s)", latencyMeasurementTime),
 	})
 	latencyMax := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("latency_max"),
+		Name: "Mina_libp2p_latency_max",
 		Help: fmt.Sprintf("The maximum latency (recorded over %s)", latencyMeasurementTime),
 	})
 	latencyAvg := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("latency_avg"),
+		Name: "Mina_libp2p_latency_avg",
 		Help: fmt.Sprintf("The average latency (recorded over %s)", latencyMeasurementTime),
 	})
 
@@ -1551,7 +1551,7 @@ type successResult struct {
 }
 
 var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "Coda_active_connections_total",
+	Name: "Mina_libp2p_connections_total",
 	Help: "Number of active connections, according to the CodaConnectionManager.",
 })
 
