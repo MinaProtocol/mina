@@ -6,9 +6,9 @@ set -euo pipefail
 shopt -s nullglob
 
 # Print all commands executed if DEBUG mode enabled
-[ -n "${DEBUG:-""}" ] && set -x
+[ -n "${DEBUG}" ] && set -x
 
-INPUT_ARGS = ( "$@" )
+INPUT_ARGS="$@"
 
 # Attempt to execute or source custom entrypoint scripts accordingly
 for script in /entrypoint.d/*; do
