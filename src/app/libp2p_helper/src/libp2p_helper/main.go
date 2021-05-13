@@ -17,6 +17,9 @@ import (
 	"sync"
 	"time"
 
+	// importing this automatically registers the pprof api to our metrics server
+	_ "net/http/pprof"
+
 	"codanet"
 
 	"github.com/go-errors/errors"
