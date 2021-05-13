@@ -167,9 +167,13 @@ let stop_snark_worker (conn, _, _) =
     ~f:Coda_worker.functions.stop_snark_worker ~arg:()
 
 let disconnect ((conn, proc, _) as t) ~logger =
+  Child_processes.Termination.wait_for_process_log_errors ~logger proc
+    ~module_:__MODULE__ ~location:__LOC__ ;
   (* This kills any straggling snark worker process *)
   let%bind () =
-    match%map Monitor.try_with (fun () -> stop_snark_worker t) with
+    match%map
+      Monitor.try_with ~here:[%here] (fun () -> stop_snark_worker t)
+    with
     | Ok () ->
         ()
     | Error exn ->
@@ -177,7 +181,7 @@ let disconnect ((conn, proc, _) as t) ~logger =
           ~metadata:[("exn", `String (Exn.to_string exn))]
   in
   let%bind () = Coda_worker.Connection.close conn in
-  match%map Monitor.try_with (fun () -> Process.wait proc) with
+  match%map Monitor.try_with ~here:[%here] (fun () -> Process.wait proc) with
   | Ok _ ->
       ()
   | Error e ->

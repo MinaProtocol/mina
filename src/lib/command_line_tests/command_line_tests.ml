@@ -2,7 +2,7 @@ open Core
 open Async
 
 (**
- * Test the basic functionality of the coda daemon and client through the CLI
+ * Test the basic functionality of the mina daemon and client through the CLI
  *)
 
 let%test_module "Command line tests" =
@@ -16,11 +16,11 @@ let%test_module "Command line tests" =
        dune won't allow running it via "dune exec", because it's outside its
        workspace, so we invoke the executable directly
 
-       the coda.exe executable must have been built before running the test
+       the mina.exe executable must have been built before running the test
        here, else it will fail
 
      *)
-    let coda_exe = "../../app/cli/src/coda.exe"
+    let coda_exe = "../../app/cli/src/mina.exe"
 
     let start_daemon config_dir genesis_ledger_dir port =
       let%bind working_dir = Sys.getcwd () in
@@ -75,13 +75,15 @@ let%test_module "Command line tests" =
       let test_failed = ref false in
       let port = 1337 in
       let client_delay = 40. in
+      let retry_delay = 15. in
+      let retry_attempts = 15 in
       let config_dir, genesis_ledger_dir = create_config_directories () in
       Monitor.protect
         ~finally:(fun () ->
           ( if !test_failed then
             let contents =
               Core.In_channel.(
-                with_file (config_dir ^/ "coda.log") ~f:input_all)
+                with_file (config_dir ^/ "mina.log") ~f:input_all)
             in
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
@@ -91,13 +93,28 @@ let%test_module "Command line tests" =
           match%map
             let open Deferred.Or_error.Let_syntax in
             let%bind _ = start_daemon config_dir genesis_ledger_dir port in
-            (* it takes awhile for the daemon to become available *)
+            (* It takes a while for the daemon to become available. *)
             let%bind () =
               Deferred.map
                 (after @@ Time.Span.of_sec client_delay)
                 ~f:Or_error.return
             in
-            let%bind _ = start_client port in
+            let%bind _ =
+              let rec go retries_remaining =
+                let open Deferred.Let_syntax in
+                match%bind start_client port with
+                | Error _ when retries_remaining > 0 ->
+                    Core.Printf.printf
+                      "Daemon not responding.. retrying (%i/%i)\n"
+                      (retry_attempts - retries_remaining)
+                      retry_attempts ;
+                    let%bind () = after @@ Time.Span.of_sec retry_delay in
+                    go (retries_remaining - 1)
+                | ret ->
+                    return ret
+              in
+              go retry_attempts
+            in
             let%map _ = stop_daemon port in
             ()
           with
@@ -107,11 +124,11 @@ let%test_module "Command line tests" =
               test_failed := true ;
               Error.raise err )
 
-    let%test "The coda daemon works in background mode" =
+    let%test "The mina daemon works in background mode" =
       match Core.Sys.is_file coda_exe with
       | `Yes ->
           Async.Thread_safe.block_on_async_exn test_background_daemon
       | _ ->
-          printf !"Please build coda.exe in order to run this test\n%!" ;
+          printf !"Please build mina.exe in order to run this test\n%!" ;
           false
   end )

@@ -376,6 +376,8 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
+      val genesis_data : genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> t
+
       val precomputed_handler :
            constraint_constants:Genesis_constants.Constraint_constants.t
         -> genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t
@@ -433,6 +435,9 @@ module type S = sig
       val end_time : constants:Constants.t -> t -> Block_time.t
 
       val to_global_slot : t -> Mina_numbers.Global_slot.t
+
+      val of_global_slot :
+        constants:Constants.t -> Mina_numbers.Global_slot.t -> t
 
       val zero : constants:Constants.t -> t
     end
@@ -496,6 +501,8 @@ module type S = sig
       val consensus_time : Value.t -> Consensus_time.t
 
       val blockchain_length : Value.t -> Length.t
+
+      val min_window_density : Value.t -> Length.t
 
       val block_stake_winner : Value.t -> Public_key.Compressed.t
 
@@ -565,6 +572,7 @@ module type S = sig
     *)
 
     type t = [`Producer | `Other of Public_key.Compressed.t]
+    [@@deriving yojson]
   end
 
   module Hooks : sig
@@ -670,7 +678,7 @@ module type S = sig
          constants:Constants.t
       -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> local_state_sync Non_empty_list.t option
+      -> local_state_sync option
 
     (**
      * Synchronize local state over the network.
@@ -682,7 +690,7 @@ module type S = sig
       -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
       -> ledger_depth:int
-      -> local_state_sync Non_empty_list.t
+      -> local_state_sync
       -> unit Deferred.Or_error.t
 
     module Make_state_hooks

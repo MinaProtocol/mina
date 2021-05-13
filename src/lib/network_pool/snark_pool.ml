@@ -353,9 +353,12 @@ struct
             Hashtbl.remove t.snark_tables.rebroadcastable work ;
           (*when snark work is added to the pool*)
           Mina_metrics.(
+            Gauge.set Snark_work.useful_snark_work_received_time_sec
+              Time.(
+                let x = now () |> to_span_since_epoch |> Span.to_sec in
+                x -. Mina_metrics.time_offset_sec) ;
             Gauge.set Snark_work.snark_pool_size
-              (Float.of_int @@ Hashtbl.length t.snark_tables.all)) ;
-          Mina_metrics.(
+              (Float.of_int @@ Hashtbl.length t.snark_tables.all) ;
             Snark_work.Snark_fee_histogram.observe Snark_work.snark_fee
               ( fee.Mina_base.Fee_with_prover.fee |> Currency.Fee.to_int
               |> Float.of_int )) ;
@@ -379,13 +382,16 @@ struct
             sender
         in
         let is_local = Envelope.Sender.(equal Local sender) in
+        let metadata =
+          [ ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
+          ; ("fee", Currency.Fee.to_yojson fee)
+          ; ("sender", Envelope.Sender.to_yojson sender) ]
+        in
         let log_and_punish ?(punish = true) statement e =
           let metadata =
-            [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
-            ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
-            ; ("fee", Currency.Fee.to_yojson fee)
-            ; ("error", Error_json.error_to_yojson e)
-            ; ("sender", Envelope.Sender.to_yojson sender) ]
+            [ ("error", Error_json.error_to_yojson e)
+            ; ("work_id", `Int (Transaction_snark.Statement.hash statement)) ]
+            @ metadata
           in
           [%log' error t.logger] ~metadata
             "Error verifying transaction snark from $sender: $error" ;
@@ -409,7 +415,7 @@ struct
                 else
                   let e = Error.of_string "Statement and proof do not match" in
                   if is_local then
-                    [%log' debug t.logger]
+                    [%log' debug t.logger] ~metadata
                       !"Statement and proof mismatch. Proof statement: \
                         %{sexp:Transaction_snark.Statement.t} Statement \
                         %{sexp: Transaction_snark.Statement.t}"
@@ -419,15 +425,16 @@ struct
           in
           let work = One_or_two.map proofs ~f:snd in
           if not prover_account_ok then (
-            [%log' debug t.logger] "Prover did not have sufficient balance"
-              ~metadata:[] ;
+            [%log' debug t.logger]
+              "Prover $prover did not have sufficient balance" ~metadata ;
             return false )
           else if not (work_is_referenced t work) then (
             [%log' debug t.logger] "Work $stmt not referenced"
               ~metadata:
-                [ ( "stmt"
+                ( ( "stmt"
                   , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
-                      work ) ] ;
+                      work )
+                :: metadata ) ;
             return false )
           else
             match statement_check with
@@ -476,7 +483,12 @@ struct
             verify pairs
         | Error e ->
             [%log' error t.logger]
-              ~metadata:[("error", Error_json.error_to_yojson e)]
+              ~metadata:
+                ( [ ("error", Error_json.error_to_yojson e)
+                  ; ( "work_ids"
+                    , Transaction_snark_work.Statement.compact_json statements
+                    ) ]
+                @ metadata )
               "One_or_two length mismatch: $error" ;
             Deferred.return false
     end
@@ -606,7 +618,7 @@ module Diff_versioned = struct
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson]
+      [@@deriving compare, sexp, to_yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -617,7 +629,7 @@ module Diff_versioned = struct
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson]
+  [@@deriving compare, sexp, to_yojson, hash]
 end
 
 let%test_module "random set test" =
@@ -643,6 +655,12 @@ let%test_module "random set test" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
+
     module Mock_snark_pool =
       Make (Mocks.Base_ledger) (Mocks.Staged_ledger)
         (Mocks.Transition_frontier)
@@ -665,7 +683,7 @@ let%test_module "random set test" =
       | Error _ ->
           Deferred.return (Error (`Other (Error.of_string "Invalid diff")))
 
-    let config verifier =
+    let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
         ~disk_location:"/tmp/snark-pool"
 
@@ -692,12 +710,6 @@ let%test_module "random set test" =
       in
       let res =
         let open Deferred.Let_syntax in
-        let%bind verifier =
-          Verifier.create ~logger ~proof_level
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~conf_dir:None
-        in
-        let config = config verifier in
         let resource_pool =
           Mock_snark_pool.create ~config ~logger ~constraint_constants
             ~consensus_constants ~time_controller
@@ -883,12 +895,6 @@ let%test_module "random set test" =
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create []))
           in
-          let%bind verifier =
-            Verifier.create ~logger ~proof_level
-              ~pids:(Child_processes.Termination.create_pid_table ())
-              ~conf_dir:None
-          in
-          let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~constraint_constants
               ~consensus_constants ~time_controller ~incoming_diffs:pool_reader
@@ -975,12 +981,6 @@ let%test_module "random set test" =
               Broadcast_pipe.create
                 (Some (Mocks.Transition_frontier.create []))
             in
-            let%bind verifier =
-              Verifier.create ~logger ~proof_level
-                ~pids:(Child_processes.Termination.create_pid_table ())
-                ~conf_dir:None
-            in
-            let config = config verifier in
             let network_pool =
               Mock_snark_pool.create ~logger ~config ~constraint_constants
                 ~consensus_constants ~time_controller
@@ -1036,12 +1036,6 @@ let%test_module "random set test" =
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
-          let%bind verifier =
-            Verifier.create ~logger ~proof_level
-              ~pids:(Child_processes.Termination.create_pid_table ())
-              ~conf_dir:None
-          in
-          let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
               ~constraint_constants ~consensus_constants ~time_controller

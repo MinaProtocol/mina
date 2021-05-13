@@ -132,7 +132,7 @@ module Wrap = struct
       [@@deriving sexp]
 
       let equal ((_, x1, y1) : t) ((_, x2, y2) : t) =
-        [%eq: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
+        [%equal: unit * Md5.t] ((* TODO: *) ignore x1, y1) (ignore x2, y2)
 
       let to_string : t -> _ = function
         | _id, header, h ->

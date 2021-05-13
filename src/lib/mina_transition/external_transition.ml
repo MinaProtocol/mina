@@ -1081,22 +1081,19 @@ let genesis ~precomputed_values =
   let genesis_protocol_state =
     Precomputed_values.genesis_state_with_hash precomputed_values
   in
-  let protocol_state_proof =
-    Precomputed_values.genesis_proof precomputed_values
-  in
-  let empty_diff =
-    { Staged_ledger_diff.diff=
-        ( { completed_works= []
-          ; commands= []
-          ; coinbase= Staged_ledger_diff.At_most_two.Zero
-          ; internal_command_balances= [] }
-        , None ) }
-  in
+  let empty_diff = Staged_ledger_diff.empty_diff in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
-           create ~protocol_state ~protocol_state_proof
+           create
+             ~protocol_state
+               (* We pass a dummy proof here, with the understanding that it will
+                never be validated except as part of the snark for the first
+                block produced (where we will explicitly generate the genesis
+                proof).
+             *)
+             ~protocol_state_proof:Proof.blockchain_dummy
              ~staged_ledger_diff:empty_diff
              ~validation_callback:
                (Mina_net2.Validation_callback.create_without_expiration ())

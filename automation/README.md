@@ -166,6 +166,14 @@ There is a testnet module variable which determines the *Kubernetes* context to 
   default     = "gke_o1labs-192920_us-east1_coda-infra-east"
 }```
 
+#### Set Terraform Kubernetes provider configuration path
+
+In order for Terraform to locate and identify the configured Kubernetes contexts, it is expected that the `KUBE_CONFIG_PATH` environment variable is set to the operator's Kubernetes configuration file (generally found at *~/.kube/config*). Be sure to run this step prior to attempting to execute any `terraform` commands on a testnet. See [here](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs#config_paths) for more details.
+
+```
+export KUBE_CONFIG_PATH=~/.kube/config
+}```
+
 ### Generate Keys and Genesis Ledger
 
 The script `scripts/generate-keys-and-ledger.sh` handles key and genesis ledger generation. This script will build keysets and public/private key files to the output path in `./keys/keysets` and `keys/testnet-keys`.
@@ -363,7 +371,7 @@ There's several gotchas here that the script will check for:
 Next, you must create a new testnet in `terraform/testnets/`. For ease of use, you can copy-paste an existing one, however it's important to go through the terraform and change the following things:
 
 - location of Terraform state file
-- Name of testnet
+- Name of testnet (Note: Prefix it with `test-` for testnets that don't require alerting. For example, private testnets for testing specific features)
 - number of nodes to deploy
 - Location of the Genesis Ledger
 

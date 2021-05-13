@@ -42,6 +42,18 @@ module Get_ledger = struct
     Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
 end
 
+module Get_snarked_ledger = struct
+  type query = State_hash.Stable.Latest.t option
+  [@@deriving bin_io_unversioned]
+
+  type response = Account.Stable.Latest.t list Or_error.t
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_snarked_ledger" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Get_staking_ledger = struct
   type query = Current | Next [@@deriving bin_io_unversioned]
 
@@ -102,6 +114,17 @@ module Reset_trust_status = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
       ~bin_response
+end
+
+module Chain_id_inputs = struct
+  type query = unit [@@deriving bin_io_unversioned]
+
+  type response =
+    State_hash.Stable.Latest.t * Genesis_constants.t * string list
+  [@@deriving bin_io_unversioned]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Chain_id_inputs" ~version:0 ~bin_query ~bin_response
 end
 
 module Verify_proof = struct
@@ -281,22 +304,17 @@ module Get_trustlist = struct
     Rpc.Rpc.create ~name:"Get_trustlist" ~version:0 ~bin_query ~bin_response
 end
 
-(** daemon-level Get_telemetry_data; implementation invokes
-    Mina_networking's Get_telemetry_data for each provided peer
-*)
-module Get_telemetry_data = struct
-  type query = Network_peer.Peer.Id.Stable.Latest.t list option
+module Get_node_status = struct
+  type query = Mina_net2.Multiaddr.t list option
   [@@deriving bin_io_unversioned]
 
   type response =
-    Mina_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
-    Or_error.t
+    Mina_networking.Rpcs.Get_node_status.Node_status.Stable.Latest.t Or_error.t
     list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_telemetry_data" ~version:0 ~bin_query
-      ~bin_response
+    Rpc.Rpc.create ~name:"Get_node_status" ~version:0 ~bin_query ~bin_response
 end
 
 module Get_object_lifetime_statistics = struct

@@ -512,6 +512,22 @@ module Helper = struct
       let name = "listPeers"
     end
 
+    module Set_node_status = struct
+      type input = {data: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "setNodeStatus"
+    end
+
+    module Get_peer_node_status = struct
+      type input = {peer_multiaddr: string} [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "getPeerNodeStatus"
+    end
+
     module Find_peer = struct
       type input = {peer_id: string} [@@deriving yojson]
 
@@ -1023,7 +1039,8 @@ module Helper = struct
                   [Tcp.Server.create]. See [handle_protocol] doc comment.
                *)
                 match%map
-                  Monitor.try_with ~extract_exn:true (fun () -> ph.f stream)
+                  Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+                      ph.f stream )
                 with
                 | Ok () ->
                     ()
@@ -1140,7 +1157,7 @@ module Keypair = struct
 end
 
 module Multiaddr = struct
-  type t = string [@@deriving compare]
+  type t = string [@@deriving compare, bin_io_unversioned]
 
   let to_string t = t
 
@@ -1165,6 +1182,17 @@ module Multiaddr = struct
         true
     | _ ->
         false
+
+  let of_file_contents ~(contents : string) : t list =
+    String.split ~on:'\n' contents
+    |> List.filter ~f:(fun s ->
+           if valid_as_peer s then true
+           else if String.is_empty s then false
+           else (
+             [%log' error (Logger.create ())]
+               "Invalid peer $peer found in peers list"
+               ~metadata:[("peer", `String s)] ;
+             false ) )
 end
 
 type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
@@ -1304,6 +1332,20 @@ module Pubsub = struct
 end
 
 let me (net : Helper.t) = Ivar.read net.me_keypair
+
+let set_node_status net data =
+  match%map Helper.do_rpc net (module Helper.Rpcs.Set_node_status) {data} with
+  | Ok "setNodeStatus success" ->
+      Ok ()
+  | Ok v ->
+      failwithf "helper broke RPC protocol: setNodeStatus got %s" v ()
+  | Error e ->
+      Error e
+
+let get_peer_node_status net peer =
+  Helper.do_rpc net
+    (module Helper.Rpcs.Get_peer_node_status)
+    {peer_multiaddr= Peer.to_multiaddr_string peer}
 
 let list_peers net =
   match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
@@ -1522,7 +1564,7 @@ let set_connection_gating_config net (config : connection_gating) =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~on_unexpected_termination ~logger ~conf_dir =
+let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1597,6 +1639,8 @@ let create ~on_unexpected_termination ~logger ~conf_dir =
               to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
               CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
+      Child_processes.register_process ~termination_expected:true pids
+        subprocess Libp2p_helper ;
       let t : Helper.t =
         { subprocess
         ; conf_dir
@@ -1677,6 +1721,8 @@ let%test_module "coda network tests" =
       "This is a test. This is a test of the Outdoor Warning System. This is \
        only a test."
 
+    let pids = Child_processes.Termination.create_pid_table ()
+
     let setup_two_nodes network_id =
       let%bind a_tmp = Unix.mkdtemp "p2p_helper_test_a" in
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
@@ -1684,7 +1730,7 @@ let%test_module "coda network tests" =
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
-          ~conf_dir:a_tmp
+          ~conf_dir:a_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1692,7 +1738,7 @@ let%test_module "coda network tests" =
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
-          ~conf_dir:b_tmp
+          ~conf_dir:b_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn
@@ -1700,7 +1746,7 @@ let%test_module "coda network tests" =
       let%bind c =
         create
           ~logger:(Logger.extend logger [("name", `String "c")])
-          ~conf_dir:c_tmp
+          ~conf_dir:c_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
         >>| Or_error.ok_exn

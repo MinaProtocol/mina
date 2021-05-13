@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	"io"
+	"math"
 	"math/rand"
 	gonet "net"
 	"path"
+	"sync"
 	"time"
 
 	dsb "github.com/ipfs/go-ds-badger"
@@ -23,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/metrics"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	peerstore "github.com/libp2p/go-libp2p-core/peerstore"
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -41,6 +43,8 @@ import (
 	mplex "github.com/libp2p/go-mplex"
 )
 
+const NodeStatusTimeout = 10 * time.Second
+
 func parseCIDR(cidr string) gonet.IPNet {
 	_, ipnet, err := gonet.ParseCIDR(cidr)
 	if err != nil {
@@ -51,9 +55,10 @@ func parseCIDR(cidr string) gonet.IPNet {
 
 type getRandomPeersFunc func(num int, from peer.ID) []peer.AddrInfo
 
+const numPxConnectionWorkers int = 8
+
 var (
 	logger      = logging.Logger("codanet.Helper")
-	gsLogger    = logging.Logger("codanet.CodaGatingState")
 	NoDHT       bool // option for testing to completely disable the DHT
 	WithPrivate bool // option for testing to allow private IPs
 
@@ -66,7 +71,8 @@ var (
 		"169.254.0.0/16",
 	}
 
-	pxProtocolID = protocol.ID("/mina/peer-exchange")
+	pxProtocolID         = protocol.ID("/mina/peer-exchange")
+	NodeStatusProtocolID = protocol.ID("/mina/node-status")
 
 	privateIpFilter *ma.Filters = nil
 )
@@ -157,10 +163,6 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 	cm.OnConnect(net, c)
 	cm.p2pManager.Notifee().Connected(net, c)
 
-	if !cm.minaPeerExchange {
-		return
-	}
-
 	info := cm.GetInfo()
 	if len(net.Peers()) <= info.HighWater {
 		return
@@ -170,8 +172,16 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	logger.Debugf("node=%s disconnecting from peer=%s; max peers=%d peercount=%d", c.LocalPeer(), c.RemotePeer(), info.HighWater, len(net.Peers()))
 
+	if !cm.minaPeerExchange {
+		return
+	}
+
 	defer func() {
-		_ = c.Close()
+		go func() {
+			// small delay to allow for remote peer to read from stream
+			time.Sleep(time.Millisecond * 400)
+			_ = c.Close()
+		}()
 	}()
 
 	// select random subset of our peers to send over, then disconnect
@@ -189,23 +199,20 @@ func (cm *CodaConnectionManager) Connected(net network.Network, c network.Conn) 
 
 	stream, err := cm.host.NewStream(cm.ctx, c.RemotePeer(), pxProtocolID)
 	if err != nil {
-		logger.Error("failed to open stream", err)
+		logger.Debug("failed to open stream", err)
 		return
 	}
 
 	n, err := stream.Write(bz)
 	if err != nil {
-		logger.Error("failed to write to stream", err)
+		logger.Debug("failed to write to stream", err)
 		return
 	} else if n != len(bz) {
-		logger.Error("failed to write all data to stream")
+		logger.Debug("failed to write all data to stream")
 		return
 	}
 
 	logger.Debugf("wrote peers to stream %s", stream.Protocol())
-
-	// small delay to allow for remote peer to read from stream
-	time.Sleep(time.Millisecond * 400)
 }
 
 func (cm *CodaConnectionManager) Disconnected(net network.Network, c network.Conn) {
@@ -232,7 +239,54 @@ type Helper struct {
 	GatingState       *CodaGatingState
 	ConnectionManager *CodaConnectionManager
 	BandwidthCounter  *metrics.BandwidthCounter
+	MsgStats          *MessageStats
 	Seeds             []peer.AddrInfo
+	NodeStatus        string
+	pxDiscoveries     chan peer.AddrInfo
+}
+
+type MessageStats struct {
+	min   uint64
+	avg   uint64
+	max   uint64
+	total uint64
+	sync.RWMutex
+}
+
+func (ms *MessageStats) UpdateMetrics(val uint64) {
+	ms.Lock()
+	defer ms.Unlock()
+	if ms.max < val {
+		ms.max = val
+	}
+
+	if ms.min > val {
+		ms.min = val
+	}
+
+	ms.total++
+	if ms.avg == 0 {
+		ms.avg = val
+	} else {
+		ms.avg = (ms.avg*(ms.total-1) + val) / ms.total
+	}
+}
+
+type safeStats struct {
+	Min float64
+	Max float64
+	Avg float64
+}
+
+func (ms *MessageStats) GetStats() *safeStats {
+	ms.RLock()
+	defer ms.RUnlock()
+
+	return &safeStats{
+		Min: float64(ms.min),
+		Max: float64(ms.max),
+		Avg: float64(ms.avg),
+	}
 }
 
 // this type implements the ConnectionGating interface
@@ -435,7 +489,7 @@ func (h *Helper) getRandomPeers(num int, from peer.ID) []peer.AddrInfo {
 		for {
 			if idx >= len(peers) {
 				return ret
-			} else if peers[idx] != h.Host.ID() && peers[idx] != from {
+			} else if peers[idx] != h.Host.ID() && peers[idx] != from && len(h.Host.Peerstore().PeerInfo(peers[idx]).Addrs) != 0 {
 				break
 			} else {
 				idx += 1
@@ -465,52 +519,87 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 }
 
 func (h *Helper) handlePxStreams(s network.Stream) {
-	fromSeed := false
-
-	for _, seed := range h.Seeds {
-		if s.Conn().RemotePeer() == seed.ID {
-			fromSeed = true
-			break
-		}
-	}
-
-	if !fromSeed {
-		logger.Debugf("ignoring peer-exchange stream from non-seed peer=%s", s.Conn().RemotePeer())
+	defer func() {
 		_ = s.Close()
+	}()
+
+	stat := s.Conn().Stat()
+	if stat.Direction != network.DirOutbound {
 		return
 	}
 
-	for {
-		dec := json.NewDecoder(s)
-		peers := []peer.AddrInfo{}
-		err := dec.Decode(&peers)
-		if err != nil && err == io.EOF {
-			continue
-		} else if err != nil && err.Error() == "stream reset" {
-			_ = s.Close()
+	connInfo := h.ConnectionManager.GetInfo()
+	if connInfo.ConnCount >= connInfo.LowWater {
+		return
+	}
+
+	buf := make([]byte, 8192)
+	_, err := s.Read(buf)
+	if err != nil && err != io.EOF {
+		logger.Debugf("failed to decode list of peers err=%s", err)
+		return
+	}
+
+	r := bytes.NewReader(buf)
+	peers := []peer.AddrInfo{}
+	dec := json.NewDecoder(r)
+	err = dec.Decode(&peers)
+	if err != nil {
+		logger.Debugf("failed to decode list of peers err=%s", err)
+		return
+	}
+
+	for _, p := range peers {
+		select {
+		case h.pxDiscoveries <- p:
+		default:
+			logger.Debugf("peer discoveries channel full; dropping peer %v", p)
+		}
+	}
+}
+
+func (h *Helper) handleNodeStatusStreams(s network.Stream) {
+	defer func() {
+		err := s.Close()
+		if err != nil {
+			logger.Error("failed to close write side of stream", err)
 			return
-		} else if err != nil {
-			logger.Errorf("failed to decode list of peers err=%s", err)
-			continue
 		}
 
-		for _, peer := range peers {
-			go func() {
-				connInfo := h.ConnectionManager.GetInfo()
-				if connInfo.ConnCount < connInfo.LowWater {
-					err = h.Host.Connect(h.Ctx, peer)
-					if err != nil {
-						logger.Errorf("failed to connect to peer err=%s", err)
-					} else {
-						logger.Debugf("connected to peer! %s", peer)
-					}
-				} else {
-					h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
-				}
-			}()
-		}
+		<-time.After(NodeStatusTimeout)
 
-		_ = s.Close()
+		err = s.Reset()
+		if err != nil {
+			logger.Error("failed to reset stream", err)
+		}
+	}()
+
+	n, err := s.Write([]byte(h.NodeStatus))
+	if err != nil {
+		logger.Error("failed to write to stream", err)
+		return
+	} else if n != len(h.NodeStatus) {
+		logger.Error("failed to write all data to stream")
+		return
+	}
+
+	logger.Debugf("wrote node status to stream %s", s.Protocol())
+}
+
+func (h Helper) pxConnectionWorker() {
+	for peer := range h.pxDiscoveries {
+		connInfo := h.ConnectionManager.GetInfo()
+		if connInfo.ConnCount < connInfo.LowWater {
+			err := h.Host.Connect(h.Ctx, peer)
+			if err != nil {
+				logger.Debugf("failed to connect to peer %v err=%s", peer, err)
+			} else {
+				logger.Debugf("connected to peer! %v", peer)
+			}
+		} else {
+			logger.Debugf("discovered peer (%v) via peer exchange, but already have too many connections; adding to peerstore, but refusing to connect", peer)
+			h.Host.Peerstore().AddAddrs(peer.ID, peer.Addrs, peerstore.ConnectedAddrTTL)
+		}
 	}
 }
 
@@ -608,16 +697,24 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		GatingState:       gatingState,
 		ConnectionManager: connManager,
 		BandwidthCounter:  bandwidthCounter,
+		MsgStats:          &MessageStats{min: math.MaxUint64},
 		Seeds:             seeds,
+		pxDiscoveries:     nil,
 	}
 
 	if !minaPeerExchange {
 		return h, nil
 	}
 
+	h.pxDiscoveries = make(chan peer.AddrInfo, maxConnections*3)
+	for w := 0; w < numPxConnectionWorkers; w++ {
+		go h.pxConnectionWorker()
+	}
+
 	connManager.getRandomPeers = h.getRandomPeers
 	connManager.ctx = ctx
 	connManager.host = host
 	h.Host.SetStreamHandler(pxProtocolID, h.handlePxStreams)
+	h.Host.SetStreamHandler(NodeStatusProtocolID, h.handleNodeStatusStreams)
 	return h, nil
 }

@@ -16,7 +16,7 @@ module Get_coinbase_and_genesis =
       }
       protocolState {
         blockchainState {
-          utcDate
+          date
         }
       }
       stateHash
@@ -627,7 +627,7 @@ module Specific = struct
             ; winner= `Pk (genesisBlock#winnerAccount)#publicKey
             ; timestamp=
                 Int64.of_string
-                  ((genesisBlock#protocolState)#blockchainState)#utcDate
+                  ((genesisBlock#protocolState)#blockchainState)#date
             ; internal_info= []
             ; user_commands= [] }
         else env.db_block query
@@ -694,24 +694,25 @@ module Specific = struct
     end )
 end
 
-let router ~graphql_uri ~logger ~db (route : string list) body =
-  let (module Db : Caqti_async.CONNECTION) = db in
+let router ~graphql_uri ~logger ~with_db (route : string list) body =
   let open Async.Deferred.Result.Let_syntax in
   [%log debug] "Handling /block/ $route"
     ~metadata:[("route", `List (List.map route ~f:(fun s -> `String s)))] ;
   match route with
   | [] | [""] ->
-      let%bind req =
-        Errors.Lift.parse ~context:"Request" @@ Block_request.of_yojson body
-        |> Errors.Lift.wrap
-      in
-      let%map res =
-        Specific.Real.handle
-          ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
-          req
-        |> Errors.Lift.wrap
-      in
-      Block_response.to_yojson res
+      with_db (fun ~db ->
+          let%bind req =
+            Errors.Lift.parse ~context:"Request"
+            @@ Block_request.of_yojson body
+            |> Errors.Lift.wrap
+          in
+          let%map res =
+            Specific.Real.handle
+              ~env:(Specific.Env.real ~logger ~db ~graphql_uri)
+              req
+            |> Errors.Lift.wrap
+          in
+          Block_response.to_yojson res )
   (* Note: We do not need to implement /block/transaction endpoint because we
    * don't return any "other_transactions" *)
   | _ ->

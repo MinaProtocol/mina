@@ -33,6 +33,7 @@ val create :
   -> max_length:int
   -> precomputed_values:Precomputed_values.t
   -> persistent_root_instance:Persistent_root.Instance.t
+  -> time_controller:Block_time.Controller.t
   -> t
 
 val persistent_root_instance : t -> Persistent_root.Instance.t

@@ -31,7 +31,7 @@ Download and build the app:
 
 Run locally with hot reloading:
 1. `yarn dev` to start dev server with fake data
-1. `yarn dev-real` to start dev server with real coda daemon
+1. `yarn dev-real` to start dev server with real mina daemon
 
 ### Common Issues
 
@@ -44,7 +44,7 @@ Run locally with hot reloading:
    up before you pulled the code. Make sure you ran `git lfs install` and then
    run `git lfs pull` to download files.
 
-### Repackaging coda.exe [Needs work]
+### Repackaging mina.exe [Needs work]
 
 1. cd to root of repo
 2. `make build`

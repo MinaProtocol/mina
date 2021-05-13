@@ -178,36 +178,6 @@ let reduce_exn (type n) (t : (_, n) t) ~f =
   | init :: xs ->
       fold xs ~f ~init
 
-module Cata (F : sig
-  type _ t
-
-  val pair : 'a t -> 'b t -> ('a * 'b) t
-
-  val cnv : ('a -> 'b) -> ('b -> 'a) -> 'b t -> 'a t
-
-  val unit : unit t
-end) =
-struct
-  let rec f : type n a. n nat -> a F.t -> (a, n) t F.t =
-   fun n tc ->
-    match n with
-    | Z ->
-        F.cnv (function [] -> ()) (fun () -> []) F.unit
-    | S n ->
-        let tl = f n tc in
-        F.cnv
-          (function x :: xs -> (x, xs))
-          (fun (x, xs) -> x :: xs)
-          (F.pair tc tl)
-end
-
-module Sexpable (N : Nat_intf) : Sexpable.S1 with type 'a t := ('a, N.n) t =
-struct
-  let sexp_of_t f t = List.sexp_of_t f (to_list t)
-
-  let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
-end
-
 module L = struct
   type 'a t = 'a list [@@deriving yojson]
 end
@@ -223,129 +193,152 @@ module type Yojson_intf1 = sig
     -> 'a t Ppx_deriving_yojson_runtime.error_or
 end
 
-module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
-struct
-  let to_yojson f t = L.to_yojson f (to_list t)
+module Make = struct
+  module Cata (F : sig
+    type _ t
 
-  let of_yojson f s =
-    Result.map (L.of_yojson f s) ~f:(Fn.flip of_list_and_length_exn N.n)
-end
+    val pair : 'a t -> 'b t -> ('a * 'b) t
 
-module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =
-struct
-  open Bin_prot
+    val cnv : ('a -> 'b) -> ('b -> 'a) -> 'b t -> 'a t
 
-  module Tc = Cata (struct
-    type 'a t = 'a Type_class.t
+    val unit : unit t
+  end) =
+  struct
+    let rec f : type n a. n nat -> a F.t -> (a, n) t F.t =
+     fun n tc ->
+      match n with
+      | Z ->
+          F.cnv (function [] -> ()) (fun () -> []) F.unit
+      | S n ->
+          let tl = f n tc in
+          F.cnv
+            (function x :: xs -> (x, xs))
+            (fun (x, xs) -> x :: xs)
+            (F.pair tc tl)
+  end
 
-    let pair = Type_class.bin_pair
+  module Sexpable (N : Nat_intf) : Sexpable.S1 with type 'a t := ('a, N.n) t =
+  struct
+    let sexp_of_t f t = List.sexp_of_t f (to_list t)
 
-    let cnv t = Type_class.cnv Fn.id t
+    let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
+  end
 
-    let unit = Type_class.bin_unit
-  end)
+  module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
+  struct
+    let to_yojson f t = L.to_yojson f (to_list t)
 
-  module Shape = Cata (struct
-    type _ t = Shape.t
+    let of_yojson f s =
+      Result.map (L.of_yojson f s) ~f:(Fn.flip of_list_and_length_exn N.n)
+  end
 
-    let pair = Shape.bin_shape_pair
+  module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =
+  struct
+    open Bin_prot
 
-    let cnv _ _ = Fn.id
+    module Tc = Cata (struct
+      type 'a t = 'a Type_class.t
 
-    let unit = Shape.bin_shape_unit
-  end)
+      let pair = Type_class.bin_pair
 
-  module Size = Cata (struct
-    type 'a t = 'a Size.sizer
+      let cnv t = Type_class.cnv Fn.id t
 
-    let pair = Size.bin_size_pair
+      let unit = Type_class.bin_unit
+    end)
 
-    let cnv a_to_b _b_to_a b_sizer a = b_sizer (a_to_b a)
+    module Shape = Cata (struct
+      type _ t = Shape.t
 
-    let unit = Size.bin_size_unit
-  end)
+      let pair = Shape.bin_shape_pair
 
-  module Write = Cata (struct
-    type 'a t = 'a Write.writer
+      let cnv _ _ = Fn.id
 
-    let pair = Write.bin_write_pair
+      let unit = Shape.bin_shape_unit
+    end)
 
-    let cnv a_to_b _b_to_a b_writer buf ~pos a = b_writer buf ~pos (a_to_b a)
+    module Size = Cata (struct
+      type 'a t = 'a Size.sizer
 
-    let unit = Write.bin_write_unit
-  end)
+      let pair = Size.bin_size_pair
 
-  module Writer = Cata (struct
-    type 'a t = 'a Type_class.writer
+      let cnv a_to_b _b_to_a b_sizer a = b_sizer (a_to_b a)
 
-    let pair = Type_class.bin_writer_pair
+      let unit = Size.bin_size_unit
+    end)
 
-    let cnv a_to_b _b_to_a b_writer = Type_class.cnv_writer a_to_b b_writer
+    module Write = Cata (struct
+      type 'a t = 'a Write.writer
 
-    let unit = Type_class.bin_writer_unit
-  end)
+      let pair = Write.bin_write_pair
 
-  module Reader = Cata (struct
-    type 'a t = 'a Type_class.reader
+      let cnv a_to_b _b_to_a b_writer buf ~pos a = b_writer buf ~pos (a_to_b a)
 
-    let pair = Type_class.bin_reader_pair
+      let unit = Write.bin_write_unit
+    end)
 
-    let cnv _a_to_b b_to_a b_reader = Type_class.cnv_reader b_to_a b_reader
+    module Writer = Cata (struct
+      type 'a t = 'a Type_class.writer
 
-    let unit = Type_class.bin_reader_unit
-  end)
+      let pair = Type_class.bin_writer_pair
 
-  module Read = Cata (struct
-    type 'a t = 'a Read.reader
+      let cnv a_to_b _b_to_a b_writer = Type_class.cnv_writer a_to_b b_writer
 
-    let pair = Read.bin_read_pair
+      let unit = Type_class.bin_writer_unit
+    end)
 
-    let cnv _a_to_b b_to_a b_reader buf ~pos_ref =
-      b_to_a (b_reader buf ~pos_ref)
+    module Reader = Cata (struct
+      type 'a t = 'a Type_class.reader
 
-    let unit = Read.bin_read_unit
-  end)
+      let pair = Type_class.bin_reader_pair
 
-  let bin_shape_t sh = Shape.f N.n sh
+      let cnv _a_to_b b_to_a b_reader = Type_class.cnv_reader b_to_a b_reader
 
-  let bin_size_t sz = Size.f N.n sz
+      let unit = Type_class.bin_reader_unit
+    end)
 
-  let bin_write_t wr = Write.f N.n wr
+    module Read = Cata (struct
+      type 'a t = 'a Read.reader
 
-  let bin_writer_t wr = Writer.f N.n wr
+      let pair = Read.bin_read_pair
 
-  let bin_t tc = Tc.f N.n tc
+      let cnv _a_to_b b_to_a b_reader buf ~pos_ref =
+        b_to_a (b_reader buf ~pos_ref)
 
-  let bin_reader_t re = Reader.f N.n re
+      let unit = Read.bin_read_unit
+    end)
 
-  let bin_read_t re = Read.f N.n re
+    let bin_shape_t sh = Shape.f N.n sh
 
-  let __bin_read_t__ _f _buf ~pos_ref _vint =
-    Common.raise_variant_wrong_type "vector" !pos_ref
+    let bin_size_t sz = Size.f N.n sz
+
+    let bin_write_t wr = Write.f N.n wr
+
+    let bin_writer_t wr = Writer.f N.n wr
+
+    let bin_t tc = Tc.f N.n tc
+
+    let bin_reader_t re = Reader.f N.n re
+
+    let bin_read_t re = Read.f N.n re
+
+    let __bin_read_t__ _f _buf ~pos_ref _vint =
+      Common.raise_variant_wrong_type "vector" !pos_ref
+  end
 end
 
 type ('a, 'n) vec = ('a, 'n) t
 
 module With_length (N : Nat.Intf) = struct
-  module Stable = struct
-    module V1 = struct
-      type 'a t = ('a, N.n) vec [@@deriving version {asserted}]
+  type 'a t = ('a, N.n) vec
 
-      let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
+  let compare c t1 t2 = Base.List.compare c (to_list t1) (to_list t2)
 
-      let hash_fold_t f s v = List.hash_fold_t f s (to_list v)
+  let hash_fold_t f s v = List.hash_fold_t f s (to_list v)
 
-      let equal f t1 t2 = List.equal f (to_list t1) (to_list t2)
+  let equal f t1 t2 = List.equal f (to_list t1) (to_list t2)
 
-      include Yojson (N)
-      include Binable (N)
-      include Sexpable (N)
-    end
-
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  include Make.Yojson (N)
+  include Make.Sexpable (N)
 
   let map (t : 'a t) = map t
 
@@ -418,3 +411,166 @@ let rec extend : type a n m.
       default :: extend [] Z m default
   | x :: xs, S p, S m ->
       x :: extend xs p m default
+
+module With_version (N : Nat.Intf) = struct
+  module type S = sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type 'a t = ('a, N.n) vec
+        [@@deriving compare, yojson, sexp, hash, equal]
+      end
+    end]
+
+    val map : 'a t -> f:('a -> 'b) -> 'b t
+
+    val of_list_exn : 'a list -> 'a t
+
+    val to_list : 'a t -> 'a list
+  end
+end
+
+module Vector_2 = struct
+  module T = With_length (Nat.N2)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N2.n) vec
+
+      include Make.Binable (Nat.N2)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let _ =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_4 = struct
+  module T = With_length (Nat.N4)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N4.n) vec
+
+      include Make.Binable (Nat.N4)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let _ =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_8 = struct
+  module T = With_length (Nat.N8)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N8.n) vec
+
+      include Make.Binable (Nat.N8)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let _ =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_17 = struct
+  module T = With_length (Nat.N17)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N17.n) vec
+
+      include Make.Binable (Nat.N17)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let _ =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end
+
+module Vector_18 = struct
+  module T = With_length (Nat.N18)
+
+  [%%versioned_binable
+  module Stable = struct
+    [@@@no_toplevel_latest_type]
+
+    module V1 = struct
+      type 'a t = ('a, Nat.N18.n) vec
+
+      include Make.Binable (Nat.N18)
+
+      include (T : module type of T with type 'a t := 'a t)
+
+      module Tests = struct
+        (* TODO *)
+      end
+    end
+  end]
+
+  include T
+
+  let _ =
+    let _f : type a. unit -> (a t, a Stable.Latest.t) Type_equal.t =
+     fun () -> Type_equal.T
+    in
+    ()
+end

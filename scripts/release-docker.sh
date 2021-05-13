@@ -27,12 +27,12 @@ function usage() {
 }
 
 while [[ "$#" -gt 0 ]]; do case $1 in
+  --no-upload) NOUPLOAD=1;;
   --build-rosetta) BUILD_ROSETTA=true;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
-  --no-upload) NOUPLOAD=1;shift;;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
 
@@ -49,7 +49,8 @@ if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then u
 
 case $SERVICE in
 coda-archive)
-  DOCKERFILE_PATH="scripts/archive/Dockerfile"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+  DOCKER_CONTEXT="dockerfiles/"
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
@@ -62,9 +63,6 @@ coda-daemon)
 coda-daemon-puppeteered)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
   DOCKER_CONTEXT="dockerfiles/"
-  ;;
-coda-demo)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
   ;;
 coda-rosetta)
   if [[ "$BUILD_ROSETTA" != "true" ]]; then

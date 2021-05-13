@@ -74,3 +74,41 @@ spec:
           - key: keyfile
             path: keyfile.json
       {{- end }}
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: watchdog-make-reports
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: watchdog
+            image: {{ .Values.image }}
+            imagePullPolicy: IfNotPresent
+            command: ["python3"]
+            args: ["/code/make_report.py", 
+                   "--incluster", "true", 
+                   "--namespace", "", 
+                   {{- if .Values.makeReportDiscordWebhookUrl }}
+                   "--discord_webhook_url", "$(MAKE_REPORT_DISCORD_WEBHOOK_URL)",
+                   {{- end }}
+                   {{- if $.Values.makeReportAccounts }}
+                   "--accounts", "$(MAKE_REPORT_ACCOUNTS)" 
+                   {{- end }}
+                  ]
+            env:
+            {{- if .Values.makeReportDiscordWebhookUrl }}
+            - name: "MAKE_REPORT_DISCORD_WEBHOOK_URL"
+              value: {{ .Values.makeReportDiscordWebhookUrl | quote }}
+            {{- if .Values.makeReportAccount }}
+            {{- end }}
+            - name: "MAKE_REPORT_ACCOUNTS"
+              value: {{ .Values.makeReportAccounts | quote }}
+            {{- end }}
+          restartPolicy: OnFailure
+

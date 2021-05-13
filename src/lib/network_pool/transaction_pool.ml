@@ -39,7 +39,7 @@ module Diff_versioned = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
+      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson, hash]
 
       let to_latest = Fn.id
     end
@@ -96,6 +96,37 @@ module Diff_versioned = struct
       | Expired
       | Overloaded
     [@@deriving sexp, yojson]
+
+    let to_string_hum = function
+      | Insufficient_replace_fee ->
+          "This transaction would have replaced an existing transaction in \
+           the pool, but the fee was too low"
+      | Invalid_signature ->
+          "This transaction had an invalid signature"
+      | Duplicate ->
+          "This transaction is a duplicate of one already in the pool"
+      | Sender_account_does_not_exist ->
+          "The fee-payer's account for this transaction could not be found in \
+           the ledger"
+      | Invalid_nonce ->
+          "This transaction had an invalid nonce"
+      | Insufficient_funds ->
+          "There are not enough funds in the fee-payer's account to execute \
+           this transaction"
+      | Insufficient_fee ->
+          "The fee for this transaction is too low"
+      | Overflow ->
+          "Executing this transaction would result in an integer overflow"
+      | Bad_token ->
+          "This transaction uses non-default tokens where they are not \
+           permitted"
+      | Unwanted_fee_token ->
+          "This transaction pays fees in a non-default token that this pool \
+           does not accept"
+      | Expired ->
+          "This transaction has expired"
+      | Overloaded ->
+          "The diff containing this transaction was too large"
   end
 
   module Rejected = struct
@@ -249,6 +280,10 @@ struct
                    in the pool are always valid against the best tip, so
                    no need to check balances here *)
                 ~fee_payer_balance:Currency.Amount.max_int
+                ~fee_payer_nonce:
+                  ( Transaction_hash.User_command_with_valid_signature.command
+                      cmd
+                  |> User_command.nonce_exn )
             with
             | Ok (t, _) ->
                 Some (cmd, t)
@@ -466,19 +501,19 @@ struct
                 Base_ledger.location_of_account best_tip_ledger account_id
               with
               | None ->
-                  Currency.Balance.zero
+                  (Currency.Amount.zero, Mina_base.Account.Nonce.zero)
               | Some loc ->
                   let acc =
                     Option.value_exn
                       ~message:"public key has location but no account"
                       (Base_ledger.get best_tip_ledger loc)
                   in
-                  balance_of_account ~global_slot acc
+                  ( Currency.Balance.to_amount
+                      (balance_of_account ~global_slot acc)
+                  , acc.nonce )
             in
             let fee_payer = User_command.(fee_payer (forget_check cmd.data)) in
-            let fee_payer_balance =
-              Currency.Balance.to_amount (balance fee_payer)
-            in
+            let fee_payer_balance, fee_payer_nonce = balance fee_payer in
             let cmd' =
               Transaction_hash.User_command_with_valid_signature.create
                 cmd.data
@@ -500,6 +535,7 @@ struct
             let p', dropped =
               match
                 Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
+                  ~fee_payer_nonce
               with
               | Ok res ->
                   res
@@ -771,6 +807,8 @@ struct
           | Expired
           | Overloaded
         [@@deriving sexp, yojson]
+
+        let to_string_hum = Diff_versioned.Diff_error.to_string_hum
       end
 
       module Rejected = struct
@@ -1200,7 +1238,15 @@ struct
 
       let unsafe_apply t diff =
         match%map apply t diff with
-        | Ok e ->
+        | Ok ((accepted, _) as e) ->
+            ( if not (List.is_empty accepted) then
+              Mina_metrics.(
+                Gauge.set
+                  Transaction_pool.useful_transactions_received_time_sec
+                  (let x =
+                     Time.(now () |> to_span_since_epoch |> Span.to_sec)
+                   in
+                   x -. Mina_metrics.time_offset_sec)) ) ;
             Ok e
         | Error e ->
             Error (`Other e)
@@ -1293,9 +1339,17 @@ let%test_module _ =
 
     let consensus_constants = precomputed_values.consensus_constants
 
+    let proof_level = precomputed_values.proof_level
+
     let logger = Logger.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
@@ -1369,8 +1423,6 @@ let%test_module _ =
       in
       ()
 
-    let proof_level = Genesis_constants.Proof_level.for_unit_tests
-
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
@@ -1381,12 +1433,7 @@ let%test_module _ =
         Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
       in
       let trust_system = Trust_system.null () in
-      let%bind config =
-        let%map verifier =
-          Verifier.create ~logger ~proof_level
-            ~pids:(Child_processes.Termination.create_pid_table ())
-            ~conf_dir:None
-        in
+      let config =
         Test.Resource_pool.make_config ~trust_system ~pool_max_size ~verifier
       in
       let pool =
@@ -1651,6 +1698,7 @@ let%test_module _ =
                   List.map ~f:mk_with_status @@ List.take independent_cmds 2
               ; reorg_best_tip= true }
           in
+          (*first cmd from removed_commands gets replaced by cmd2 (same sender), cmd1 is invalid because of insufficient balance, and so only the second cmd from removed_commands is expected to be in the pool*)
           assert_pool_txs [List.nth_exn independent_cmds' 1] ;
           Deferred.unit )
 
@@ -1821,12 +1869,7 @@ let%test_module _ =
             Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
           in
           let trust_system = Trust_system.null () in
-          let%bind config =
-            let%map verifier =
-              Verifier.create ~logger ~proof_level
-                ~pids:(Child_processes.Termination.create_pid_table ())
-                ~conf_dir:None
-            in
+          let config =
             Test.Resource_pool.make_config ~trust_system ~pool_max_size
               ~verifier
           in
