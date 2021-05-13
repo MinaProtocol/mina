@@ -5,8 +5,8 @@ set -euo pipefail
 # If glob doesn't match anything, return empty string rather than literal pattern
 shopt -s nullglob
 
-# Print all commands executed if DEBUG mode enabled
-[ -n "${DEBUG}" ] && set -x
+
+set -x
 
 INPUT_ARGS="$@"
 
