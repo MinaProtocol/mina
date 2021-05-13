@@ -205,23 +205,12 @@ let rec load_with_max_length :
       Persistent_frontier.create_instance_exn persistent_frontier
     in
     Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
-    let persistent_root_instance =
-      Persistent_root.create_instance_exn persistent_root
+    let genesis_ledger_hash =
+      Precomputed_values.genesis_ledger precomputed_values
+      |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
     in
-    match%bind
-      load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
-        ~max_length ~persistent_root ~persistent_root_instance
-        ~persistent_frontier ~persistent_frontier_instance ~precomputed_values
-        ~catchup_mode false
-    with
-    | Ok _ as result ->
-        return result
-    | Error _ as err ->
-        let%map () =
-          Persistent_frontier.Instance.destroy persistent_frontier_instance
-        in
-        Persistent_root.Instance.destroy persistent_root_instance ;
-        err
+    continue persistent_frontier_instance ~ignore_consensus_local_state:false
+      ~snarked_ledger_hash:genesis_ledger_hash
   in
   match
     Persistent_frontier.Instance.check_database
