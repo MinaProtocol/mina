@@ -411,10 +411,7 @@ let parse_event (message : Logger.Message.t) =
   | Some event_id ->
       let (Event_type event_type) =
         of_structured_event_id event_id
-        |> Option.value_exn
-             ~message:
-               "could not convert incoming event log into event type; no \
-                matching structured event id"
+        |> Option.value ~default:(Event_type Log_error)
       in
       let (module Type) = event_type_module event_type in
       let%map data = Type.parse message in

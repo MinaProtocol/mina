@@ -325,14 +325,9 @@ let setup_daemon logger =
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
-  and may_generate =
+  and _may_generate =
     flag "--generate-genesis-proof" ~aliases:["generate-genesis-proof"]
-      ~doc:
-        (sprintf
-           "true|false Generate a new genesis proof for the current \
-            configuration if none is found (default: %s)"
-           ( if Mina_compile_config.generate_genesis_proof then "false"
-           else "true" ))
+      ~doc:"true|false Deprecated. Passing this flag has no effect"
       (optional bool)
   and disable_node_status =
     flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
@@ -515,13 +510,6 @@ let setup_daemon logger =
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
-    let may_generate =
-      (* Default is [true] if there is no compile-time genesis proof to fall
-         back on, or [false] otherwise.
-      *)
-      Option.value may_generate
-        ~default:(not Mina_compile_config.generate_genesis_proof)
-    in
     (* FIXME adapt to new system, move into child_processes lib *)
     let pids = Child_processes.Termination.create_pid_table () in
     let rec terminated_child_loop () =
@@ -676,7 +664,7 @@ let setup_daemon logger =
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-            ~may_generate ~proof_level config
+            ~proof_level config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values

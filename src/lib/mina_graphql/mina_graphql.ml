@@ -3251,8 +3251,8 @@ module Queries = struct
         let { Precomputed_values.genesis_ledger
             ; constraint_constants
             ; consensus_constants
-            ; genesis_proof
             ; genesis_epoch_data
+            ; proof_data
             ; _ } =
           (Mina_lib.config coda).precomputed_values
         in
@@ -3279,7 +3279,18 @@ module Queries = struct
                 ; coinbase_receiver=
                     Some (fst Consensus_state_hooks.genesis_winner) }
             ; snark_jobs= []
-            ; proof= genesis_proof }
+            ; proof=
+                ( match proof_data with
+                | Some {genesis_proof; _} ->
+                    genesis_proof
+                | None ->
+                    (* It's nearly never useful to have a specific genesis
+                       proof to pass here -- anyone can create one as needed --
+                       and we don't want this GraphQL query to trigger an
+                       expensive proof generation step if we don't have one
+                       available.
+                    *)
+                    Proof.blockchain_dummy ) }
         ; hash } )
 
   (* used by best_chain, block below *)
