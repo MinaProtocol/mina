@@ -1,6 +1,5 @@
 open Core
 open Integration_test_lib
-open Signature_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -25,11 +24,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         List.init n ~f:(fun _ ->
             {Block_producer.balance= block_producer_balance; timing= Untimed}
         ) }
-
-  let expected_error_event_reprs = []
-
-  let pk_of_keypair keypairs n =
-    Public_key.compress (List.nth_exn keypairs n).Keypair.public_key
 
   let wait_for_all_to_initialize ~logger network t =
     let open Malleable_error.Let_syntax in
