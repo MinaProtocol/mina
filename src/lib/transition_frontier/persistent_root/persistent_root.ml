@@ -105,6 +105,10 @@ module Instance = struct
     Ledger.Db.close t.snarked_ledger ;
     t.factory.instance <- None
 
+  let close t =
+    Ledger.Db.close t.snarked_ledger ;
+    t.factory.instance <- None
+
   let create factory =
     let snarked_ledger =
       Ledger.Db.create ~depth:factory.ledger_depth
@@ -252,6 +256,13 @@ let create ~logger ~directory ~ledger_depth =
 let create_instance_exn t =
   assert (t.instance = None) ;
   let instance = Instance.create t in
+  t.instance <- Some instance ;
+  instance
+
+let load_from_disk_exn t ~snarked_ledger_hash =
+  let open Result.Let_syntax in
+  assert (t.instance = None) ;
+  let%map instance = Instance.load_from_disk t ~snarked_ledger_hash in
   t.instance <- Some instance ;
   instance
 
