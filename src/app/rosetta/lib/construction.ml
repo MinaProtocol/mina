@@ -141,7 +141,7 @@ module Options = struct
     Raw.of_yojson r
     |> Result.map_error ~f:(fun e ->
            Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
-    |> Result.bind ~f:(fun r ->
+    |> Result.bind ~f:(fun (r : Raw.t) ->
            let open Result.Let_syntax in
            let%map sender =
              Public_key.Compressed.of_base58_check r.sender
