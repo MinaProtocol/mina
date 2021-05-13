@@ -98,8 +98,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
        (* TODO: refactor this using new [expect] dsl when it's available *)
        let open Deferred.Let_syntax in
        match%bind
-         Node.send_payment ~retry_on_graphql_error:false ~logger sender
-           ~sender_pub_key ~receiver_pub_key ~amount ~fee
+         Node.send_payment ~logger sender ~sender_pub_key ~receiver_pub_key
+           ~amount ~fee
        with
        | Ok () ->
            Malleable_error.soft_error_string ~value:()
