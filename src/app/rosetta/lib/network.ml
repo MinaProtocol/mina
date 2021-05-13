@@ -1,3 +1,6 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
 open Async
 open Rosetta_lib
@@ -74,16 +77,28 @@ let oldest_block_query =
     (Caqti_type.tup2 Caqti_type.int64 Caqti_type.string)
     "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC LIMIT 1"
 
+[%%if
+mainnet = true]
+
+let default_network = "mainnet"
+
+[%%else]
+
+let default_network = "testnet"
+
+[%%endif]
+
 let network_tag_of_graphql res =
   match res#initialPeers with
   | [||] ->
-      if Array.is_empty (res#daemonStatus)#peers then "debug" else "testnet"
+      if Array.is_empty (res#daemonStatus)#peers then "debug"
+      else default_network
   | peers ->
       if
         Array.filter peers ~f:(fun p ->
             String.is_substring ~substring:"dev.o1test.net" p )
         |> Array.is_empty
-      then "testnet"
+      then default_network
       else "dev"
 
 module Validate_choice = struct

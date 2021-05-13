@@ -24,6 +24,7 @@
    secrets
    unsigned_extended
  )
+ (preprocessor_deps ../../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps
                graphql_ppx
