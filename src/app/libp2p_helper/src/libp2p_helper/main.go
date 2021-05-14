@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	gonet "net"
 	"net/http"
 	"os"
@@ -48,20 +49,21 @@ type validationStatus struct {
 }
 
 type app struct {
-	P2p                *codanet.Helper
-	Ctx                context.Context
-	Subs               map[int]subscription
-	Topics             map[string]*pubsub.Topic
-	Validators         map[int]*validationStatus
-	ValidatorMutex     *sync.Mutex
-	Streams            map[int]net.Stream
-	StreamsMutex       sync.Mutex
-	Out                *bufio.Writer
-	OutChan            chan interface{}
-	Bootstrapper       io.Closer
-	AddedPeers         []peer.AddrInfo
-	UnsafeNoTrustIP    bool
-	MetricsRefreshTime time.Duration
+	P2p                      *codanet.Helper
+	Ctx                      context.Context
+	Subs                     map[int]subscription
+	Topics                   map[string]*pubsub.Topic
+	Validators               map[int]*validationStatus
+	ValidatorMutex           *sync.Mutex
+	Streams                  map[int]net.Stream
+	StreamsMutex             sync.Mutex
+	Out                      *bufio.Writer
+	OutChan                  chan interface{}
+	Bootstrapper             io.Closer
+	AddedPeers               []peer.AddrInfo
+	UnsafeNoTrustIP          bool
+	MetricsRefreshTime       time.Duration
+	metricsCollectionStarted bool
 
 	// development configuration options
 	NoMDNS    bool
@@ -359,6 +361,13 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	}
 	if len(m.MetricsPort) > 0 {
 		metricsServer = startMetricsServer(m.MetricsPort)
+		if !app.metricsCollectionStarted {
+			go app.checkBandwidth()
+			go app.checkPeerCount()
+			go app.checkMessageStats()
+			go app.checkLatency()
+			app.metricsCollectionStarted = true
+		}
 	}
 
 	return "configure success", nil
@@ -1093,14 +1102,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			ID:     peer.Encode(id),
 			Upcall: "peerConnected",
 		})
-
-		// Note: These are disabled because we see weirdness on our networks
-		//       caused by this prometheus issues.
-		// go app.checkBandwidth(id)
-		// go app.checkLatency(id)
-		// go app.checkPeerCount(id)
-		// go app.checkMessageExchanged(id)
-		// go app.checkMessageStats(id)
 	}
 
 	app.P2p.ConnectionManager.OnDisconnect = func(net net.Network, c net.Conn) {
@@ -1126,50 +1127,53 @@ func (app *app) updateConnectionMetrics() {
 	connectionCountMetric.Set(float64(info.ConnCount))
 }
 
-func (app *app) checkBandwidth(id peer.ID) {
+// TODO: {peer,protocol}-{min,max,avg}
+func (app *app) checkBandwidth() {
 	totalIn := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("total_bandwidth_in_%s", id),
-		Help: "The bandwidth used by the given peer.",
+		Name: "Mina_libp2p_total_bandwidth_in",
+		Help: "The total incoming bandwidth used",
 	})
 	totalOut := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("total_bandwidth_out_%s", id),
-		Help: "The bandwidth used by the given peer.",
+		Name: "Mina_libp2p_total_bandwidth_out",
+		Help: "The total outgoing bandwidth used",
 	})
 	rateIn := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("bandwidth_rate_in_%s", id),
-		Help: "The bandwidth used by the given peer.",
+		Name: "Mina_libp2p_bandwidth_rate_in",
+		Help: "The incoming bandwidth rate",
 	})
 	rateOut := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("bandwidth_rate_out_%s", id),
-		Help: "The bandwidth used by the given peer.",
+		Name: "Mina_libp2p_bandwidth_rate_out",
+		Help: "The outging bandwidth rate",
 	})
 
-	err := prometheus.Register(totalIn)
+	var err error
+
+	err = prometheus.Register(totalIn)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register total-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register total_bandwidth_in; perhaps we've already done so", err.Error())
 		return
 	}
 
 	err = prometheus.Register(totalOut)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register total-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register total_bandwidth_out; perhaps we've already done so", err.Error())
 		return
 	}
 
 	err = prometheus.Register(rateIn)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register rate-in bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register bandwidth_rate_in; perhaps we've already done so", err.Error())
 		return
 	}
 
 	err = prometheus.Register(rateOut)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register rate-out bandwidth gauge for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register bandwidth_rate_out; perhaps we've already done so", err.Error())
 		return
 	}
 
 	for {
-		stats := app.P2p.BandwidthCounter.GetBandwidthForPeer(id)
+		stats := app.P2p.BandwidthCounter.GetBandwidthTotals()
 		totalIn.Set(float64(stats.TotalIn))
 		totalOut.Set(float64(stats.TotalOut))
 		rateIn.Set(stats.RateIn)
@@ -1179,104 +1183,138 @@ func (app *app) checkBandwidth(id peer.ID) {
 	}
 }
 
-func (app *app) checkPeerCount(id peer.ID) {
-	peerCountGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("peer_count_%s", id),
-		Help: "The total number of peers connected by the peer",
+func (app *app) checkPeerCount() {
+	peerCount := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_peer_count",
+		Help: "The total number of peers in our network",
+	})
+	connectedPeerCount := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_connected_peer_count",
+		Help: "The total number of peers we are actively connected to",
 	})
 
-	err := prometheus.Register(peerCountGauge)
+	var err error
+
+	err = prometheus.Register(peerCount)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register peer count for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register peer_count; perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(connectedPeerCount)
+	if err != nil {
+		app.P2p.Logger.Debugf("couldn't register connected_peer_count; perhaps we've already done so", err.Error())
 		return
 	}
 
 	for {
-		peerIDs := app.P2p.Host.Network().Peers()
-		peerCountGauge.Set(float64(len(peerIDs)))
+		peerCount.Set(float64(len(app.P2p.Host.Network().Peers())))
+		connectedPeerCount.Set(float64(app.P2p.ConnectionManager.GetInfo().ConnCount))
+
 		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
-func (app *app) checkMessageExchanged(id peer.ID) {
-	msgGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_exchanged_%s", id),
-		Help: "The number of different peers that the peer connects with",
+func (app *app) checkMessageStats() {
+	msgMax := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_message_max_stats",
+		Help: "The max size of network message received",
+	})
+	msgAvg := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_message_avg_stats",
+		Help: "The average size of network message received",
+	})
+	msgMin := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_message_min_stats",
+		Help: "The min size of network message received",
 	})
 
-	err := prometheus.Register(msgGauge)
+	err := prometheus.Register(msgMax)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message exchanged of peers for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register message_max_stats; perhaps we've already done so", err.Error())
 		return
 	}
 
-	for {
-		currentCount := app.P2p.ConnectionManager.GetInfo().ConnCount
-		msgGauge.Set(float64(currentCount))
-		time.Sleep(app.MetricsRefreshTime)
-	}
-}
-
-func (app *app) checkMessageStats(id peer.ID) {
-	msgMaxGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_max_stats_%s", id),
-		Help: "The max size of network message received by the peer",
-	})
-
-	msgAvgGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_avg_stats_%s", id),
-		Help: "The average size of network message received by the peer",
-	})
-
-	msgMinGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("message_min_stats_%s", id),
-		Help: "The min size of network message received by the peer",
-	})
-
-	err := prometheus.Register(msgMaxGauge)
+	err = prometheus.Register(msgAvg)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message max stats for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register message_avg_stats; perhaps we've already done so", err.Error())
 		return
 	}
 
-	err = prometheus.Register(msgAvgGauge)
+	err = prometheus.Register(msgMin)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message average stats for id", id, "perhaps we've already done so", err.Error())
-		return
-	}
-
-	err = prometheus.Register(msgMinGauge)
-	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register message min stats for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register message_min_stats; perhaps we've already done so", err.Error())
 		return
 	}
 
 	for {
 		msgStats := app.P2p.MsgStats.GetStats()
-		msgMinGauge.Set(msgStats.Min)
-		msgAvgGauge.Set(msgStats.Avg)
-		msgMaxGauge.Set(msgStats.Max)
+		msgMin.Set(msgStats.Min)
+		msgAvg.Set(msgStats.Avg)
+		msgMax.Set(msgStats.Max)
 
 		time.Sleep(app.MetricsRefreshTime)
 	}
 }
 
-func (app *app) checkLatency(id peer.ID) {
-	latencyGauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: fmt.Sprintf("latency_%s", id),
-		Help: "The latency for the given peer.",
+func (app *app) checkLatency() {
+	latencyMin := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_latency_min",
+		Help: fmt.Sprintf("The minimum latency (recorded over %s)", latencyMeasurementTime),
+	})
+	latencyMax := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_latency_max",
+		Help: fmt.Sprintf("The maximum latency (recorded over %s)", latencyMeasurementTime),
+	})
+	latencyAvg := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "Mina_libp2p_latency_avg",
+		Help: fmt.Sprintf("The average latency (recorded over %s)", latencyMeasurementTime),
 	})
 
-	err := prometheus.Register(latencyGauge)
+	var err error
+
+	err = prometheus.Register(latencyMin)
 	if err != nil {
-		app.P2p.Logger.Debugf("couldn't register latency gauge for id", id, "perhaps we've already done so", err.Error())
+		app.P2p.Logger.Debugf("couldn't register latency_min; perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(latencyMax)
+	if err != nil {
+		app.P2p.Logger.Debugf("couldn't register latency_max; perhaps we've already done so", err.Error())
+		return
+	}
+
+	err = prometheus.Register(latencyAvg)
+	if err != nil {
+		app.P2p.Logger.Debugf("couldn't register latency_avg; perhaps we've already done so", err.Error())
 		return
 	}
 
 	for {
-		app.P2p.Host.Peerstore().RecordLatency(id, latencyMeasurementTime)
-		latency := app.P2p.Host.Peerstore().LatencyEWMA(id)
-		latencyGauge.Set(float64(latency))
+		peers := app.P2p.Host.Peerstore().Peers()
+		if len(peers) > 0 {
+			sum := 0.0
+			minimum := math.MaxFloat64
+			maximum := 0.0
+
+			for _, peer := range peers {
+				app.P2p.Host.Peerstore().RecordLatency(peer, latencyMeasurementTime)
+				latency := float64(app.P2p.Host.Peerstore().LatencyEWMA(peer))
+
+				sum += latency
+				minimum = math.Min(minimum, latency)
+				maximum = math.Max(maximum, latency)
+			}
+
+			latencyMin.Set(minimum)
+			latencyMax.Set(maximum)
+			latencyAvg.Set(sum / float64(len(peers)))
+		} else {
+			latencyMin.Set(0.0)
+			latencyMax.Set(0.0)
+			latencyAvg.Set(0.0)
+		}
 
 		time.Sleep(app.MetricsRefreshTime)
 	}
@@ -1513,7 +1551,7 @@ type successResult struct {
 }
 
 var connectionCountMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "Coda_active_connections_total",
+	Name: "Mina_libp2p_connections_total",
 	Help: "Number of active connections, according to the CodaConnectionManager.",
 })
 
@@ -1525,17 +1563,18 @@ func init() {
 
 func newApp() *app {
 	return &app{
-		P2p:                nil,
-		Ctx:                context.Background(),
-		Subs:               make(map[int]subscription),
-		Topics:             make(map[string]*pubsub.Topic),
-		ValidatorMutex:     &sync.Mutex{},
-		Validators:         make(map[int]*validationStatus),
-		Streams:            make(map[int]net.Stream),
-		OutChan:            make(chan interface{}, 4096),
-		Out:                bufio.NewWriter(os.Stdout),
-		AddedPeers:         []peer.AddrInfo{},
-		MetricsRefreshTime: time.Minute,
+		P2p:                      nil,
+		Ctx:                      context.Background(),
+		Subs:                     make(map[int]subscription),
+		Topics:                   make(map[string]*pubsub.Topic),
+		ValidatorMutex:           &sync.Mutex{},
+		Validators:               make(map[int]*validationStatus),
+		Streams:                  make(map[int]net.Stream),
+		OutChan:                  make(chan interface{}, 4096),
+		Out:                      bufio.NewWriter(os.Stdout),
+		AddedPeers:               []peer.AddrInfo{},
+		MetricsRefreshTime:       time.Minute,
+		metricsCollectionStarted: false,
 	}
 }
 
