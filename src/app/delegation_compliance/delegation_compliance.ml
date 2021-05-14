@@ -115,6 +115,18 @@ let compute_delegated_stake staking_ledger delegatee =
       | None ->
           accum )
 
+let account_balance ledger pk =
+  let account_id = Account_id.create pk Token_id.default in
+  match Ledger.location_of_account ledger account_id with
+  | Some location -> (
+    match Ledger.get ledger location with
+    | Some account ->
+        account.balance
+    | None ->
+        failwith "account_balance: Could not find account for public key" )
+  | None ->
+      failwith "account_balance: Could not find location for account"
+
 let get_account_balance_as_amount ledger pk =
   let account_id = Account_id.create pk Token_id.default in
   match Ledger.location_of_account ledger account_id with
@@ -144,13 +156,47 @@ let block_ids_in_epoch pool delegatee_id epoch =
         ~creator:delegatee_id ~low_slot ~high_slot )
     ~item:"block ids for delegatee in epoch"
 
-let main ~input_file ~archive_uri ~payout_addresses () =
+let write_csv_header ~csv_out_channel =
+  let line =
+    String.concat ~sep:","
+      [ "Payout address"
+      ; "Balance"
+      ; "Delegatee"
+      ; "Total delegation"
+      ; "Blocks won"
+      ; "Payout obligation"
+      ; "Payout received"
+      ; "Check" ]
+  in
+  Out_channel.output_string csv_out_channel line ;
+  Out_channel.newline csv_out_channel
+
+let write_csv_line ~csv_out_channel ~payout_addr ~balance ~delegatee
+    ~delegation ~blocks_won ~payout_obligation ~payout_received =
+  let check = Currency.Amount.( >= ) payout_received payout_obligation in
+  let line =
+    String.concat ~sep:","
+      [ Public_key.Compressed.to_base58_check payout_addr
+      ; Currency.Balance.to_formatted_string balance
+      ; Public_key.Compressed.to_base58_check delegatee
+      ; Currency.Amount.to_formatted_string delegation
+      ; Int.to_string blocks_won
+      ; Currency.Amount.to_formatted_string payout_obligation
+      ; Currency.Amount.to_formatted_string payout_received
+      ; Bool.to_string check ]
+  in
+  Out_channel.output_string csv_out_channel line ;
+  Out_channel.newline csv_out_channel
+
+let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
   let logger = Logger.create () in
   if List.is_empty payout_addresses then (
     [%log error]
       "Please provide at least one payout address on the command line" ;
     Core.exit 1 ) ;
   let json = Yojson.Safe.from_file input_file in
+  let csv_out_channel = Out_channel.create csv_file in
+  write_csv_header ~csv_out_channel ;
   let input =
     match input_of_yojson json with
     | Ok inp ->
@@ -246,8 +292,8 @@ let main ~input_file ~archive_uri ~payout_addresses () =
         try_slot max_slot num_tries
       in
       let block_ids =
-        (* only examine blocks in current epoch up through slot 3500 in next epoch *)
-        let min_slot = input.epoch * slots_per_epoch in
+        (* only examine blocks from slot 3501 of current epoch up through slot 3500 in next epoch *)
+        let min_slot = (input.epoch * slots_per_epoch) + 3501 in
         let max_slot_int64 =
           min_slot + slots_per_epoch + 3500 |> Int64.of_int
         in
@@ -580,8 +626,15 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                 (Currency.Amount.to_formatted_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
                 (Currency.Amount.to_formatted_string total_payout_obligation) ;
+            write_csv_line ~csv_out_channel ~payout_addr:payout_info.payout_pk
+              ~balance:(account_balance ledger payout_info.payout_pk)
+              ~delegatee:payout_info.delegatee ~delegation:delegated_stake
+              ~blocks_won:num_blocks_produced
+              ~payout_obligation:total_payout_obligation
+              ~payout_received:payment_total_as_amount ;
             return () )
       in
+      Out_channel.close csv_out_channel ;
       Deferred.unit
 
 let () =
@@ -597,6 +650,10 @@ let () =
                "file File containing the starting staking ledger and epoch \
                 number"
              Param.(required string)
+         and csv_file =
+           Param.flag "--csv-file"
+             ~doc:"file CSV file to write containing payment statuses"
+             Param.(required string)
          and archive_uri =
            Param.flag "--archive-uri"
              ~doc:
@@ -606,4 +663,4 @@ let () =
          and payout_addresses =
            Param.anon Anons.(sequence ("PAYOUT ADDRESSES" %: Param.string))
          in
-         main ~input_file ~archive_uri ~payout_addresses)))
+         main ~input_file ~csv_file ~archive_uri ~payout_addresses)))

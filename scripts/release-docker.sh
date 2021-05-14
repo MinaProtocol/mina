@@ -62,7 +62,7 @@ coda-daemon)
   ;;
 coda-daemon-puppeteered)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
-  DOCKER_CONTEXT="dockerfiles/"
+  DOCKER_CONTEXT="dockerfiles/puppeteer-context"
   ;;
 coda-rosetta)
   if [[ "$BUILD_ROSETTA" != "true" ]]; then
