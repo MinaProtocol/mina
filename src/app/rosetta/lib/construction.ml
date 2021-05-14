@@ -25,7 +25,7 @@ module Get_nonce =
         nonce
       }
       daemonStatus {
-        peers { peerId }
+        chainId
       }
       initialPeers
      }

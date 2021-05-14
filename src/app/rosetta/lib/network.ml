@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Async
 open Rosetta_lib
@@ -28,6 +25,7 @@ module Get_status =
       }
     }
     daemonStatus {
+      chainId
       peers { peerId }
     }
     syncStatus
@@ -55,9 +53,8 @@ module Get_version =
   query {
     version
     daemonStatus {
-      peers { peerId }
+      chainId
     }
-    initialPeers
   }
 |}]
 
@@ -66,9 +63,8 @@ module Get_network =
 {|
   query {
     daemonStatus {
-      peers { peerId }
+      chainId
     }
-    initialPeers
   }
 |}]
 
@@ -77,43 +73,26 @@ let oldest_block_query =
     (Caqti_type.tup2 Caqti_type.int64 Caqti_type.string)
     "SELECT height, state_hash FROM blocks ORDER BY timestamp ASC LIMIT 1"
 
-[%%if
-mainnet = true]
+(* TODO: Update this when we have a new chainId *)
+let mainnet_chain_id =
+  "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1"
 
-let default_network = "mainnet"
-
-[%%else]
-
-let default_network = "testnet"
-
-[%%endif]
+(* TODO: Update this when we have a new chainId *)
+let devnet_chain_id =
+  "8af43cf261ea10c761ec540f92aafb76aec56d8d74f77c836f3ab1de5ce4eac5"
 
 let network_tag_of_graphql res =
-  match res#initialPeers with
-  | [||] ->
-      if Array.is_empty (res#daemonStatus)#peers then "debug"
-      else default_network
-  | peers ->
-      if
-        Array.filter peers ~f:(fun p ->
-            String.is_substring ~substring:"dev.o1test.net" p )
-        |> Array.is_empty
-      then default_network
-      else "dev"
+  if String.equal (res#daemonStatus)#chainId mainnet_chain_id then "mainnet"
+  else if String.equal (res#daemonStatus)#chainId devnet_chain_id then "dev"
+  else "debug"
 
 module Validate_choice = struct
-  let build ~peers ~initialPeers =
+  let build ~chainId =
     object
       method daemonStatus =
         object
-          method peers =
-            Array.map peers ~f:(fun peer ->
-                object
-                  method peerId = peer
-                end )
+          method chainId = chainId
         end
-
-      method initialPeers = initialPeers
     end
 
   module Impl (M : Monad_fail.S) = struct
@@ -148,10 +127,9 @@ module Validate_choice = struct
             (Mock.validate
                ~network_identifier:
                  { Network_identifier.blockchain= "coda"
-                 ; network= "dev"
+                 ; network= "debug"
                  ; sub_network_identifier= None }
-               ~gql_response:
-                 (build ~peers:[||] ~initialPeers:[|"dev.o1test.net"|]))
+               ~gql_response:(build ~chainId:"0"))
           ~expected:(Result.return ())
 
       let%test_unit "failure" =
@@ -163,11 +141,10 @@ module Validate_choice = struct
                  { Network_identifier.blockchain= "coda"
                  ; network= "testnet"
                  ; sub_network_identifier= None }
-               ~gql_response:
-                 (build ~peers:[||] ~initialPeers:[|"dev.o1test.net"|]))
+               ~gql_response:(build ~chainId:"0"))
           ~expected:
             (Result.fail
-               (Errors.create (`Network_doesn't_exist ("testnet", "dev"))))
+               (Errors.create (`Network_doesn't_exist ("testnet", "debug"))))
     end )
 end
 
@@ -203,8 +180,7 @@ module List_ = struct
       module Mock = Impl (Result)
 
       let debug_env : 'gql Env.Mock.t =
-       fun () ->
-        Result.return @@ Validate_choice.build ~peers:[||] ~initialPeers:[||]
+       fun () -> Result.return @@ Validate_choice.build ~chainId:"0"
 
       let%test_unit "debug net" =
         Test.assert_ ~f:Network_list_response.to_yojson
@@ -216,29 +192,11 @@ module List_ = struct
                      ; network= "debug"
                      ; sub_network_identifier= None } ] })
 
-      let testnet_env : 'gql Env.Mock.t =
-       fun () ->
-        Result.return
-        @@ Validate_choice.build ~peers:[||]
-             ~initialPeers:[|"/dns/joyous-occasion.o1test.net/long/multiaddr"|]
-
-      let%test_unit "testnet net" =
-        Test.assert_ ~f:Network_list_response.to_yojson
-          ~actual:(Mock.handle ~env:testnet_env)
-          ~expected:
-            (Result.return
-               { Network_list_response.network_identifiers=
-                   [ { Network_identifier.blockchain= "coda"
-                     ; network= "testnet"
-                     ; sub_network_identifier= None } ] })
-
       let devnet_env : 'gql Env.Mock.t =
        fun () ->
-        Result.return
-        @@ Validate_choice.build ~peers:[||]
-             ~initialPeers:[|"/dns/dev.o1test.net/long/multiaddr"|]
+        Result.return @@ Validate_choice.build ~chainId:devnet_chain_id
 
-      let%test_unit "dev net" =
+      let%test_unit "devnet net" =
         Test.assert_ ~f:Network_list_response.to_yojson
           ~actual:(Mock.handle ~env:devnet_env)
           ~expected:
@@ -246,6 +204,20 @@ module List_ = struct
                { Network_list_response.network_identifiers=
                    [ { Network_identifier.blockchain= "coda"
                      ; network= "dev"
+                     ; sub_network_identifier= None } ] })
+
+      let mainnet_env : 'gql Env.Mock.t =
+       fun () ->
+        Result.return @@ Validate_choice.build ~chainId:mainnet_chain_id
+
+      let%test_unit "mainnet net" =
+        Test.assert_ ~f:Network_list_response.to_yojson
+          ~actual:(Mock.handle ~env:mainnet_env)
+          ~expected:
+            (Result.return
+               { Network_list_response.network_identifiers=
+                   [ { Network_identifier.blockchain= "coda"
+                     ; network= "mainnet"
                      ; sub_network_identifier= None } ] })
     end )
 end
@@ -357,6 +329,8 @@ module Status = struct
 
           method daemonStatus =
             object
+              method chainId = devnet_chain_id
+
               method peers =
                 [| object
                      method peerId = "dev.o1test.net"
