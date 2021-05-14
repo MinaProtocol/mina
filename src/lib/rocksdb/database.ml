@@ -5,7 +5,7 @@ open Core
 (* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
 
 module T = struct
-  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+  type t = {uuid: Uuid.Stable.V1.t; db: (Rocks.t [@sexp.opaque])} [@@deriving sexp]
 end
 
 include T

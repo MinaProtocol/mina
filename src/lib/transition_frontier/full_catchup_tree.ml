@@ -227,16 +227,25 @@ let remove_node' t (node : Node.t) =
   | Root _ | Failed | Finished _ ->
       ()
   | Wait_for_parent c ->
-      Cached.invalidate_with_failure c |> ignore
+    let _ : nativeint =
+      Cached.invalidate_with_failure c
+    in
+    ()
   | To_download _job ->
       (* TODO: Cancel job somehow *)
       ()
   | To_initial_validate _ ->
       ()
   | To_verify c ->
-      Cached.invalidate_with_failure c |> ignore
+    let _ : nativeint =
+      Cached.invalidate_with_failure c
+    in
+    ()
   | To_build_breadcrumb (_parent, c) ->
-      Cached.invalidate_with_failure c |> ignore
+    let _ : nativeint =
+      Cached.invalidate_with_failure c
+    in
+    ()
 
 let remove_node t h =
   match Hashtbl.find t.nodes h with

@@ -58,7 +58,7 @@ let trace_event (name : string) =
 let trace (name : string) (f : unit -> 'a) =
   let new_ctx =
     Execution_context.with_tid
-      Scheduler.(t () |> current_execution_context)
+      Scheduler.(current_execution_context ())
       !next_tid
   in
   next_tid := !next_tid + 1 ;
@@ -94,7 +94,7 @@ let measure (name : string) (f : unit -> 'a) : 'a =
 
 let forget_tid (f : unit -> 'a) =
   let new_ctx =
-    Execution_context.with_tid Scheduler.(t () |> current_execution_context) 0
+    Execution_context.with_tid Scheduler.(current_execution_context ()) 0
   in
   let res = Scheduler.within_context new_ctx f |> Result.ok in
   Option.value_exn res

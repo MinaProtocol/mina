@@ -829,11 +829,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    | `Produce_now (data, winner_pk) ->
                        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                        let%map () = generate_genesis_proof_if_needed () in
-                       Interruptible.finally
+                       ignore (Interruptible.finally
                          (Singleton_supervisor.dispatch production_supervisor
                             (now, data, winner_pk))
-                         ~f:check_next_block_timing
-                       |> ignore
+                         ~f:check_next_block_timing : int)
                    | `Produce (time, data, winner_pk) ->
                        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                        let scheduled_time = time_of_ms time in
@@ -868,7 +867,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 (Singleton_supervisor.dispatch
                                    production_supervisor
                                    (scheduled_time, data, winner_pk))
-                                ~f:check_next_block_timing) ) ;
+                                ~f:check_next_block_timing : int)) ;
                        Deferred.return ()) )
       in
       let start () =
@@ -902,7 +901,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
            milliseconds before starting block producer" ;
         ignore
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
-               start () )) )
+               start () ) : int) )
 
 let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     ~frontier_reader ~transition_writer ~precomputed_blocks

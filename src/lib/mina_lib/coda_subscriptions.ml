@@ -28,13 +28,14 @@ type t =
 (* idempotent *)
 let add_new_subscription (t : t) ~pk =
   (* add a new subscribed block user for this pk if we're not already tracking it *)
-  Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
-    ~default:(fun () -> [Pipe.create ()])
-  |> ignore ;
+  let _ : char = Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
+      ~default:(fun () -> [Pipe.create ()])
+  in
   (* add a new payment user if we're not already tracking it *)
-  Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
-    ~default:Pipe.create
-  |> ignore
+  let _ : char = Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
+      ~default:Pipe.create
+  in
+  ()
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
     ~transition_frontier ~is_storing_all ~time_controller
@@ -108,7 +109,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   Option.iter gcloud_keyfile ~f:(fun path ->
       ignore
         (Core.Sys.command
-           (sprintf "gcloud auth activate-service-account --key-file=%s" path))
+           (sprintf "gcloud auth activate-service-account --key-file=%s" path) : int)
   ) ;
   trace_task "subscriptions new block loop" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->

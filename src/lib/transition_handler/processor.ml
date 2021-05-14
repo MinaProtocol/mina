@@ -342,7 +342,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                    Gauge.dec_one
                      Transition_frontier_controller.transitions_being_processed)
              | `Partially_valid_transition transition ->
-                 process_transition ~transition ) ))
+                 process_transition ~transition ) ) : nativeint)
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct

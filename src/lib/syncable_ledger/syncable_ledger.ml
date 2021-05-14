@@ -706,7 +706,7 @@ end = struct
             `Ok t.tree )
 
   let fetch t rh ~data ~equal =
-    new_goal t rh ~data ~equal |> ignore ;
+    let _ : int32 = new_goal t rh ~data ~equal in
     wait_until_valid t rh
 
   let create mt ~logger ~trust_system =

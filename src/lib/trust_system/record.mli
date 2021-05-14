@@ -22,6 +22,6 @@ end
 
 val decay_rate : float
 
-module Make (Now : sig
+module Make (_ : sig
   val now : unit -> Time.t
 end) : S

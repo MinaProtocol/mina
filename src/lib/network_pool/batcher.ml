@@ -54,7 +54,7 @@ let call_verifier t (ps : 'proof list) = t.verifier ps
 
 (*Worst case (if all the proofs are invalid): log n * (2^(log n) + 1)
   In the average case this should show better performance.
-  We could implement the trusted/untrusted batches from the snark pool batching RFC #4882 
+  We could implement the trusted/untrusted batches from the snark pool batching RFC #4882
   to further mitigate possible DoS/DDoS here*)
 let rec determine_outcome : type p r partial.
        (p, r) elt list
@@ -142,7 +142,8 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
                   acc
               | Some ({weight; _} as proof) ->
                   if weight <= capacity then (
-                    Q.remove_first t.queue |> ignore ;
+                    let _ : nativeint = Q.remove_first t.queue
+                    in ();
                     take (capacity - weight) (proof :: acc) )
                   else acc
             in
@@ -183,6 +184,7 @@ let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
   let elt =
     {id= Id.create (); data= proof; weight= t.weight proof; res= Ivar.create ()}
   in
+  let _ : nativeint =
   ( match (t.how_to_add, t.compare_init) with
   | `Enqueue_back, _ | `Insert, None ->
       Q.insert_last t.queue elt
@@ -195,7 +197,7 @@ let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
           Q.insert_last t.queue elt
       | Some succ ->
           Q.insert_before t.queue succ elt ) )
-  |> ignore ;
+  in
   (match t.state with Verifying _ -> () | Waiting -> start_verifier t) ;
   Ivar.read elt.res
 
@@ -214,7 +216,7 @@ module Transaction_pool = struct
   (* A partially verified transaction is either valid, or valid assuming that some list of
      (verification key, statement, proof) triples will verify. That is, the transaction has
      already been validated in all ways, except the proofs were in a batch that failed to
-     verify. 
+     verify.
   *)
   type partial_item =
     [ `Valid of User_command.Valid.t

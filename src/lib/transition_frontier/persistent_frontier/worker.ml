@@ -44,7 +44,7 @@ module Worker = struct
           let garbage = match garbage with Lite garbage -> garbage in
           match Database.move_root t.db ~new_root ~garbage with
           | Ok _old_root ->
-              ignore (Queue.dequeue_exn t.root_transitions) ;
+            let _ : nativeint = Queue.dequeue_exn t.root_transitions in
               go (count + 1)
           | Error _ ->
               count )

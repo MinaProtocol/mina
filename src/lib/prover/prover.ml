@@ -104,7 +104,7 @@ module Worker_state = struct
                  let proof_level = proof_level
                end)
 
-               let _ = Pickles.Cache_handle.generate_or_load B.cache_handle
+               let _ : int32 = Pickles.Cache_handle.generate_or_load B.cache_handle
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)

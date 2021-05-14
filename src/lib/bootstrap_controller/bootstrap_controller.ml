@@ -348,7 +348,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~pending_coinbases ~get_state
                 in
                 ignore
-                  (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask) ;
+                  (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask : int) ;
                 Result.map result
                   ~f:
                     (const
@@ -745,8 +745,8 @@ let%test_module "Bootstrap_controller tests" =
         Fn.compose Consensus.Data.Consensus_state.blockchain_length
           External_transition.consensus_state
       in
-      List.fold_result ~init:root incoming_transitions
-        ~f:(fun max_acc incoming_transition ->
+      ignore (List.fold_result ~init:root incoming_transitions
+                ~f:(fun max_acc incoming_transition ->
           let With_hash.{data= transition; _}, _ =
             Envelope.Incoming.data incoming_transition
           in
@@ -760,7 +760,7 @@ let%test_module "Bootstrap_controller tests" =
                    "The blocks are not sorted in increasing order")
           in
           transition )
-      |> Or_error.ok_exn |> ignore
+            |> Or_error.ok_exn : int64)
 
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1

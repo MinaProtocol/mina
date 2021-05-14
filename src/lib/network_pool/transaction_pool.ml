@@ -48,7 +48,7 @@ module Diff_versioned = struct
   (* We defer do any checking on signed-commands until the call to
    [add_from_gossip_gossip_exn].
 
-   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor 
+   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor
    [add_from_gossip_gossip_exn] into [check_from_gossip_exn] (which just does
    the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
    and do the same for snapp commands as well.
@@ -240,9 +240,11 @@ struct
 
       let add t h =
         if not (Q.mem t h) then (
-          if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
-          Q.enqueue_back_exn t h () )
-        else Q.lookup_and_move_to_back t h |> ignore
+          let _ : nativeint = if Q.length t >= max_size then Q.dequeue_front t
+          in Q.enqueue_back_exn t h () )
+        else
+          let _ : nativeint = Q.lookup_and_move_to_back t h
+          in ()
     end
 
     type t =
@@ -655,7 +657,8 @@ struct
               [ ( "cmd"
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd ) ] ;
-          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
+          let _ : nativeint = Hashtbl.find_and_remove t.locally_generated_uncommitted cmd in
+          ()
       ) ;
       t.pool <- pool ;
       Deferred.unit
@@ -1392,14 +1395,14 @@ let%test_module _ =
 
     let pool_max_size = 25
 
-    let _ =
+    let () =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
     (** Assert the invariants of the locally generated command tracking system.
     *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
-      let _ =
+      let _ :nativeint =
         Hashtbl.merge pool.locally_generated_committed
           pool.locally_generated_uncommitted ~f:(fun ~key -> function
           | `Both (committed, uncommitted) ->
@@ -2210,7 +2213,7 @@ let%test_module _ =
           (* When transactions expire from rebroadcast pool they are gone. This
              doesn't affect the main pool.
           *)
-          let _ =
+          let _ : nativeint =
             Test.Resource_pool.get_rebroadcastable pool
               ~has_timed_out:(Fn.const `Timed_out)
           in

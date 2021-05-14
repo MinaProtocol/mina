@@ -2,7 +2,7 @@
  (name transaction_snark_scan_state)
  (public_name transaction_snark_scan_state)
  (library_flags -linkall)
- (libraries pipe_lib core async async_extra.async_bus sgn parallel_scan
+ (libraries pipe_lib core async sgn parallel_scan
             transaction_snark mina_base ledger_proof transaction_snark_work transaction_witness snark_work_lib snark_params logger mina_state ppx_deriving_yojson.runtime
             yojson)
  (preprocessor_deps ../../config.mlh)

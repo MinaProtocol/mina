@@ -108,8 +108,10 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                   ~metadata:[("error", Error_json.error_to_yojson err)] ;
                 List.iter transition_branches ~f:(fun subtree ->
                     Rose_tree.iter subtree ~f:(fun cached_transition ->
-                        Cached.invalidate_with_failure cached_transition
-                        |> ignore ) ) ) )
+                        let _ : nativeint =
+                          Cached.invalidate_with_failure cached_transition
+                        in
+                        ()))))
   in
   { logger
   ; collected_transitions
@@ -221,8 +223,7 @@ let watch t ~timeout_duration ~cached_transition =
           (make_timeout
              (Option.fold remaining_time ~init:timeout_duration
                 ~f:(fun _ remaining_time ->
-                  Block_time.Span.min remaining_time timeout_duration )))
-      |> ignore ;
+                  Block_time.Span.min remaining_time timeout_duration )));
       Mina_metrics.(
         Gauge.inc_one
           Transition_frontier_controller.transitions_in_catchup_scheduler)
@@ -437,8 +438,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                        (Cached.peek breadcrumb_2))
               | `Ok (`Ok _) ->
                   failwith "invalid breadcrumb builder response" ) ;
-          ignore (Cached.invalidate_with_success breadcrumb_1) ;
-          ignore (Cached.invalidate_with_success breadcrumb_2) ;
+          let _ : nativeint = Cached.invalidate_with_success breadcrumb_1 in
+          let _ : nativeint = Cached.invalidate_with_success breadcrumb_2 in
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
@@ -470,8 +471,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           assert (
             has_timeout_parent_hash scheduler
               (Transition_frontier.Breadcrumb.parent_hash oldest_breadcrumb) ) ;
-          ignore
-          @@ List.fold dependent_breadcrumbs ~init:oldest_breadcrumb
+          let _ : nativeint =
+            (List.fold dependent_breadcrumbs ~init:oldest_breadcrumb
                ~f:(fun prev_breadcrumb curr_breadcrumb ->
                  watch scheduler ~timeout_duration
                    ~cached_transition:
@@ -485,14 +486,13 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    has_timeout_parent_hash scheduler
                      (Transition_frontier.Breadcrumb.parent_hash
                         curr_breadcrumb) ) ;
-                 curr_breadcrumb ) ;
-          ignore
-          @@ Async.Thread_safe.block_on_async_exn (fun () ->
+                 curr_breadcrumb )) in
+            Async.Thread_safe.block_on_async_exn (fun () ->
                  match%map Strict_pipe.Reader.read catchup_job_reader with
                  | `Eof ->
                      failwith "pipe closed unexpectedly"
                  | `Ok (job_hash, _) ->
                      [%test_eq: State_hash.t] job_hash
                        ( Transition_frontier.Breadcrumb.parent_hash
-                       @@ List.hd_exn branch ) ) )
+                         @@ List.hd_exn branch ) ))
   end )

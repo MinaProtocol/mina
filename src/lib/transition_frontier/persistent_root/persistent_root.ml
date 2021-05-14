@@ -83,7 +83,7 @@ module Instance = struct
       ~f:(fun buf ->
         ignore
           (Root_identifier.Stable.Latest.bin_write_t buf ~pos:0
-             new_root_identifier) )
+             new_root_identifier : int) )
 
   (* defaults to genesis *)
   let load_root_identifier t =
@@ -126,11 +126,12 @@ let reset_to_genesis_exn t ~precomputed_values =
   assert (t.instance = None) ;
   let%map () = File_system.remove_dir t.directory in
   with_instance_exn t ~f:(fun instance ->
-      ignore
+      let _ : nativeint =
         (Ledger_transfer.transfer_accounts
            ~src:
              (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
-           ~dest:(Instance.snarked_ledger instance)) ;
+           ~dest:(Instance.snarked_ledger instance))
+      in
       Instance.set_root_identifier instance
         (genesis_root_identifier
            ~genesis_state_hash:

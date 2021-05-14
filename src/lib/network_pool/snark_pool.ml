@@ -1057,7 +1057,7 @@ let%test_module "random set test" =
             | Error (`Locally_generated _) ->
                 failwith "rejected because locally generated"
           in
-          ok_exn res1 |> ignore ;
+          let _ : nativeint = ok_exn res1 in
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
@@ -1066,7 +1066,7 @@ let%test_module "random set test" =
             rebroadcastable1 [] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
-          ok_exn res2 |> ignore ;
+          let _ : nativeint = ok_exn res2 in
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)

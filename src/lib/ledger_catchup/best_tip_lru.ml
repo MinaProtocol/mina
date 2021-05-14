@@ -19,8 +19,9 @@ let add (x : elt) =
     |> External_transition.Initial_validated.state_hash
   in
   if not (Q.mem t h) then (
-    if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
+    if Q.length t >= max_size then
+      ignore (Q.dequeue_front t : State_hash.t);
     Q.enqueue_back_exn t h x )
-  else Q.lookup_and_move_to_back t h |> ignore
+  else ignore (Q.lookup_and_move_to_back t h : int)
 
 let get h = Q.lookup t h

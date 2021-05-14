@@ -40,7 +40,6 @@ installed: [
   "asetmap.0.8.1"
   "astring.0.8.5"
   "async.v0.13.0"
-  "async_extra.v0.13.0"
   "async_kernel.v0.13.0"
   "async_rpc_kernel.v0.13.0"
   "async_ssl.v0.13.0"

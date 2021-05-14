@@ -43,9 +43,13 @@ end = struct
         Or_error.try_with (fun () ->
             Sparse_ledger.iteri src ~f:(fun _idx account ->
                 let id = Account.identifier account in
-                ignore
+                let _ : nativeint =
                   ( Dest.get_or_create_account dest id account
-                  |> Or_error.ok_exn ) ) )
+                    |> Or_error.ok_exn )
+                in
+                ()
+
+              ) )
       in
       let src_hash = Sparse_ledger.merkle_root src in
       let dest_hash = Dest.merkle_root dest in

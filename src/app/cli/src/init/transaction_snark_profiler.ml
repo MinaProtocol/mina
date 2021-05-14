@@ -209,7 +209,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
 let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
     preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let _ =
+  let _ : string =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
         ~prover:
@@ -253,7 +253,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
 let generate_base_snarks_witness sparse_ledger0
     (transitions : Transaction.Valid.t list) preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let _ =
+  let _ : int * int =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
         ~prover:

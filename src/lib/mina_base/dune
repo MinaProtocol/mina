@@ -6,7 +6,6 @@
  (libraries
    allocation_functor
    async
-   async_extra.async_bus
    base58_check
    bignum_bigint
    block_time

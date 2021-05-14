@@ -236,8 +236,8 @@ module Make (Inputs : Inputs_intf) = struct
           unregister_mask_exn ~loc:__LOC__
             ~grandchildren:`I_promise_I_am_reparenting_this_mask c )
     in
-    ignore (unregister_mask_exn ~loc:__LOC__ t_as_mask) ;
-    List.iter dangling_masks ~f:(fun m -> ignore (register_mask parent m))
+    let _ : char = unregister_mask_exn ~loc:__LOC__ t_as_mask in
+    List.iter dangling_masks ~f:(fun m -> let _ : char = register_mask parent m in ())
 
   let batch_notify_mask_children t accounts =
     match Uuid.Table.find registered_masks (get_uuid t) with

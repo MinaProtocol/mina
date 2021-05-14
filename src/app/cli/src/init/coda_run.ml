@@ -199,7 +199,7 @@ let coda_status coda_ref =
 let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: enter" ;
-  let _ = remove_prev_crash_reports ~conf_dir in
+  ignore (remove_prev_crash_reports ~conf_dir : int) ;
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
   let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
   let () = Core.Unix.mkdir temp_config in
@@ -236,12 +236,9 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   Yojson.Safe.to_file (temp_config ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
-  let _ =
-    if Core.Sys.file_exists daemon_config = `Yes then
-      Core.Sys.command
-        (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
-      |> ignore
-  in
+  if Core.Sys.file_exists daemon_config = `Yes then
+    ignore (Core.Sys.command
+              (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json")) : int);
   (*Zip them all up*)
   let tmp_files =
     [ "coda_short.log"
@@ -608,7 +605,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
   (* attempt to free up some memory before handling crash *)
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
-  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid))) ;
+  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid): int)) ;
   let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
@@ -627,7 +624,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
           with exn -> return (Error (Error.of_exn exn)) )
     with
     | `Ok (Ok (Some (report_file, temp_config))) ->
-        ( try Core.Sys.command (sprintf "rm -rf %s" temp_config) |> ignore
+        ( try ignore (Core.Sys.command (sprintf "rm -rf %s" temp_config) : int)
           with _ -> () ) ;
         sprintf "attach the crash report %s" report_file
     | `Ok (Ok None) ->

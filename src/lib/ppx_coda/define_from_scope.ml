@@ -37,7 +37,7 @@ let expand ~loc ~path:_ (items : expression list) =
   let ids = List.map items ~f:(expr_to_id loc) in
   let vars = List.map ids ~f:evar in
   let pats = List.map ids ~f:pvar in
-  [%stri let [%p plist pats] = [%e pexp_tuple vars]]
+  [%stri let [%p ppat_tuple pats] = [%e pexp_tuple vars]]
 
 let ext =
   Extension.declare name Extension.Context.structure_item
