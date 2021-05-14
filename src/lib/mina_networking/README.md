@@ -87,6 +87,7 @@ Returns a bulk bulk set of blocks associated with a provided set of state hashes
 ### get\_transition\_chain\_proof
 
 **Query**: `state_hash`
+
 **Response**: `optional (state_hash, [state_body_hash])` (a merkle proof of block hashes)
 
 Returns a transition chain proof for a specified block on the blockchain. A transition chain proof proves that, given some block `b1`, there exists a block `b0` which is `k` blocks preceeding `b1`. To prove this, a node receives `H(b1)`, and returns `H(b0)` along with a merkle proof of all the intermediate "state body hashes" along the path `b0 -> b1`. The requester checks this proof by re-computing `H(b1)` from the provided merkle proof.
