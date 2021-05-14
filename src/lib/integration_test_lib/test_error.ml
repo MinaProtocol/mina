@@ -4,7 +4,7 @@ type remote_error = {node_id: string; error_message: Logger.Message.t}
 
 (* NB: equality on internal errors ignores timestamp *)
 type internal_error =
-  { occurrence_time: Time.t sexp_opaque
+  { occurrence_time: Time.t [@sexp.opaque]
         [@equal fun _ _ -> true] [@compare fun _ _ -> 0]
   ; error: Error.t
         [@equal

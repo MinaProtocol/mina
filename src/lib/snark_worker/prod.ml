@@ -73,7 +73,7 @@ module Inputs = struct
                   ~metadata:
                     [ ("error", Error_json.error_to_yojson e)
                     ; ( "spec"
-                        (* the sexp_opaque in Work.Single.Spec.t means we can't derive yojson,
+                        (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
 		       so we use the less-desirable sexp here
                     *)
                       , `String (Sexp.to_string (sexp_of_single_spec single))

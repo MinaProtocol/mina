@@ -18,10 +18,10 @@ type 'a pred = 'a -> bool
 
 let pred_to_yojson _f _x = `String "<opaque>"
 
-let sexp_opaque_to_yojson _f _x = `String "<opaque>"
+let [@sexp.opaque]_to_yojson _f _x = `String "<opaque>"
 
 module Claimed_knowledge = struct
-  type 'key t = [`All | `Some of 'key list | `Call of 'key pred sexp_opaque]
+  type 'key t = [`All | `Some of 'key list | `Call of 'key pred [@sexp.opaque]]
   [@@deriving sexp, to_yojson]
 
   let to_yojson f t =
@@ -254,17 +254,17 @@ end = struct
     type t =
       { downloading_peers: Peer.Hash_set.t
       ; knowledge_requesting_peers: Peer.Hash_set.t
-      ; temporary_ignores: (unit, unit) Clock.Event.t sexp_opaque Peer.Table.t
+      ; temporary_ignores: ((unit, unit) Clock.Event.t [@sexp.opaque]) Peer.Table.t
       ; mutable all_preferred: Preferred_heap.t
       ; knowledge: Knowledge.t Peer.Table.t
             (* Written to when something changes. *)
-      ; r: unit Strict_pipe.Reader.t sexp_opaque
+      ; r: unit Strict_pipe.Reader.t [@sexp.opaque]
       ; w:
           ( unit
           , Strict_pipe.drop_head Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
-          sexp_opaque }
+          [@sexp.opaque] }
     [@@deriving sexp]
 
     let reset_knowledge t ~all_peers =
@@ -379,7 +379,7 @@ end = struct
               if not (Preferred_heap.mem t.all_preferred p) then (p, k) :: acc
               else acc )
       in
-      (* 
+      (*
          Algorithm:
          - Look at the pending jobs
          - Find all peers who have the best claim to knowing the first job in the queue.
@@ -1029,7 +1029,7 @@ end = struct
     refresh_peers t peers ;
     t
 
-  (* After calling download, if no one else has called within time [max_wait], 
+  (* After calling download, if no one else has called within time [max_wait],
        we flush our queue. *)
   let download t ~key ~attempts : Job.t =
     match (Q.lookup t.pending key, Hashtbl.find t.downloading key) with

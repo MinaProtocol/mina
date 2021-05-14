@@ -55,7 +55,7 @@ module Make (Inputs : Inputs_intf) :
 
   type t =
     { uuid: Uuid.Stable.V1.t
-    ; kvdb: Kvdb.t sexp_opaque
+    ; kvdb: Kvdb.t [@sexp.opaque]
     ; depth: int
     ; directory: string
     ; detached_parent_signal: Detached_parent_signal.t }
@@ -517,7 +517,7 @@ module Make (Inputs : Inputs_intf) :
                 (Token_id.next (Account_id.token_id aid)) ) )
       in
       let next_available_token_change =
-        if new_next_available_token > next_available_token then
+        if Token_id.(>) new_next_available_token next_available_token then
           [ Tokens.next_available_kv ~ledger_depth:mdb.depth
               new_next_available_token ]
         else []

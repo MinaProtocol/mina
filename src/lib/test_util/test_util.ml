@@ -35,7 +35,7 @@ module Make (Impl : Snarky_backendless.Snark_intf.S) = struct
       |> Or_error.ok_exn
     in
     let unchecked = Fold.to_list (fold input) in
-    if not (checked = unchecked) then
+    if not ([%equal: (bool * bool * bool) list] checked unchecked) then
       failwithf
         !"Got %s (%d)\nexpected %s (%d)"
         (triple_string checked) (List.length checked) (triple_string unchecked)

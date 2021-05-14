@@ -46,7 +46,7 @@ module Transaction_with_witness = struct
         ; init_stack:
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness: Mina_base.Sparse_ledger.Stable.V1.t sexp_opaque }
+        ; ledger_witness: Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque] }
       [@@deriving sexp]
 
       let to_latest = Fn.id

@@ -30,7 +30,7 @@ module Raw_versioned__ = struct
     module V1 = struct
       type t =
         { protocol_state: Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+        ; protocol_state_proof: Proof.Stable.V1.t [@sexp.opaque]
         ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
         ; delta_transition_chain_proof:
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
@@ -105,7 +105,7 @@ type external_transition = t
 (*
 type t_ = Raw_versioned__.t =
   { protocol_state: Protocol_state.Value.t
-  ; protocol_state_proof: Proof.t sexp_opaque
+  ; protocol_state_proof: Proof.t [@sexp.opaque]
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_protocol_version: Protocol_version.t

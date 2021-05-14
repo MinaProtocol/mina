@@ -204,7 +204,7 @@ module T = struct
     ; ledger:
         (* Invariant: this is the ledger after having applied all the
            transactions in the above state. *)
-        Ledger.attached_mask sexp_opaque
+        Ledger.attached_mask [@sexp.opaque]
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
@@ -1132,7 +1132,7 @@ module T = struct
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
       ; is_coinbase_receiver_new: bool
-      ; logger: Logger.t sexp_opaque }
+      ; logger: Logger.t [@sexp.opaque] }
     [@@deriving sexp_of]
 
     let coinbase_ft (cw : Transaction_snark_work.t) =

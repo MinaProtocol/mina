@@ -292,7 +292,7 @@ end = struct
                   List.fold rest_address
                     ~init:(Addr.next first_address, true)
                     ~f:(fun (expected_address, is_compact) actual_address ->
-                      if is_compact && expected_address = Some actual_address
+                      if is_compact && [%eq: Addr.t option] expected_address (Some actual_address)
                       then (Addr.next actual_address, true)
                       else (expected_address, false) )
                 in
@@ -706,7 +706,7 @@ end = struct
             `Ok t.tree )
 
   let fetch t rh ~data ~equal =
-    let _ : int32 = new_goal t rh ~data ~equal in
+    ignore (new_goal t rh ~data ~equal : [`New | `Repeat | `Update_data]);
     wait_until_valid t rh
 
   let create mt ~logger ~trust_system =

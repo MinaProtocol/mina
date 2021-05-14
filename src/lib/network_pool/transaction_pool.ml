@@ -210,14 +210,14 @@ struct
 
     module Config = struct
       type t =
-        { trust_system: Trust_system.t sexp_opaque
+        { trust_system: Trust_system.t [@sexp.opaque]
         ; pool_max_size: int
               (* note this value needs to be mostly the same across gossipping nodes, so
       nodes with larger pools don't send nodes with smaller pools lots of
       low fee transactions the smaller-pooled nodes consider useless and get
       themselves banned.
    *)
-        ; verifier: Verifier.t sexp_opaque }
+        ; verifier: Verifier.t [@sexp.opaque] }
       [@@deriving sexp_of, make]
     end
 
@@ -249,7 +249,7 @@ struct
 
     type t =
       { mutable pool: Indexed_pool.t
-      ; recently_seen: Lru_cache.t sexp_opaque
+      ; recently_seen: Lru_cache.t [@sexp.opaque]
       ; locally_generated_uncommitted:
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t )
@@ -262,10 +262,10 @@ struct
           Hashtbl.t
             (** Ones that are included in the current best tip. *)
       ; config: Config.t
-      ; logger: Logger.t sexp_opaque
+      ; logger: Logger.t [@sexp.opaque]
       ; batcher: Batcher.t
-      ; mutable best_tip_diff_relay: unit Deferred.t sexp_opaque Option.t
-      ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
+      ; mutable best_tip_diff_relay: (unit Deferred.t [@sexp.opaque]) Option.t
+      ; mutable best_tip_ledger: (Base_ledger.t [@sexp.opaque]) Option.t }
     [@@deriving sexp_of]
 
     let member t x =

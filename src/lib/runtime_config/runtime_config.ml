@@ -112,13 +112,13 @@ module Json_layout = struct
         end
 
         type t =
-          { stake: bool [@default false]
-          ; edit_state: Auth_required.t [@default None]
-          ; send: Auth_required.t [@default None]
-          ; receive: Auth_required.t [@default None]
-          ; set_delegate: Auth_required.t [@default None]
-          ; set_permissions: Auth_required.t [@default None]
-          ; set_verification_key: Auth_required.t [@default None] }
+          { stake: bool
+          ; edit_state: Auth_required.t
+          ; send: Auth_required.t
+          ; receive: Auth_required.t
+          ; set_delegate: Auth_required.t
+          ; set_permissions: Auth_required.t
+          ; set_verification_key: Auth_required.t }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =
@@ -135,9 +135,9 @@ module Json_layout = struct
 
       module Token_permissions = struct
         type t =
-          { token_owned: bool [@default false]
-          ; account_disabled: bool [@default false]
-          ; disable_new_accounts: bool [@default false] }
+          { token_owned: bool
+          ; account_disabled: bool
+          ; disable_new_accounts: bool }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
         let fields =

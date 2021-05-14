@@ -55,12 +55,16 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving eq, compare, hash]
+      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, hash]
 
       (* dummy type for inserting constraint
          adding constraint to t produces "unused rec" error
       *)
       type unused = unit constraint t = Arg.Stable.V1.t
+
+      (* don't derive because of Comparable.Make_binable below *)
+      let equal (t1:t) (t2:t) =
+        Field.equal t1.x t2.x && Bool.equal t1.is_odd t2.is_odd
 
       let to_latest = Fn.id
 
@@ -193,9 +197,14 @@ module Uncompressed = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Field.t * Field.t [@@deriving eq, compare, hash]
+      type t = Field.t * Field.t [@@deriving compare, hash]
 
       let to_latest = Fn.id
+
+      (* not in deriving list, which would generate unused definition *)
+      let equal (t1_f1,t1_f2) (t2_f1,t2_f2) =
+        Field.equal t1_f1 t2_f1 &&
+        Field.equal t1_f2 t2_f2
 
       include Binable.Of_binable
                 (Compressed.Stable.V1)
