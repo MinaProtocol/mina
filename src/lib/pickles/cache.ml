@@ -197,7 +197,7 @@ module Wrap = struct
                Common.time "wrapkeygen" (fun () ->
                    generate_keypair ~exposing:[typ] main )
              in
-             let _ : nativeint = Key_cache.Sync.write cache s_p k (Keypair.pk r) in
+             ignore (Key_cache.Sync.write cache s_p k (Keypair.pk r) : unit Or_error.t);
              (r, `Generated_something))
     in
     let vk =
@@ -259,7 +259,7 @@ module Wrap = struct
                    (let open Marlin_plonk_bindings.Pasta_fq_index in
                    {constraints= domain_d1_size pk.index}) }
              in
-             let _ : nativeint = Key_cache.Sync.write cache s_v k_v vk in
+             ignore (Key_cache.Sync.write cache s_v k_v vk : unit Or_error.t);
              let _vk = Key_cache.Sync.read cache s_v k_v in
              (vk, `Generated_something))
     in
