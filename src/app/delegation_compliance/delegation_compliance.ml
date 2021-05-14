@@ -292,8 +292,8 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
         try_slot max_slot num_tries
       in
       let block_ids =
-        (* only examine blocks from slot 3501 of current epoch up through slot 3500 in next epoch *)
-        let min_slot = (input.epoch * slots_per_epoch) + 3501 in
+        (* only examine blocks from start of current epoch up through slot 3500 in next epoch *)
+        let min_slot = input.epoch * slots_per_epoch in
         let max_slot_int64 =
           min_slot + slots_per_epoch + 3500 |> Int64.of_int
         in
@@ -383,10 +383,14 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               let open Sql.User_command in
               Int64.compare p1.global_slot p2.global_slot
             in
-            (* only payments in canonical chain *)
+            (* only payments in canonical chain, starting at slot 3501 of this epoch *)
+            let min_payment_slot =
+              (input.epoch * slots_per_epoch) + 3501 |> Int64.of_int
+            in
             let payments_from_delegatee =
               List.filter payments_from_delegatee_raw ~f:(fun payment ->
-                  Int.Set.mem block_ids payment.block_id )
+                  Int.Set.mem block_ids payment.block_id
+                  && payment.global_slot >= min_payment_slot )
               |> List.sort ~compare:compare_by_global_slot
             in
             let payment_amount_and_slot (user_cmd : Sql.User_command.t) =
@@ -442,14 +446,15 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                             ~receiver_id:payout_id )
                         ~item:
                           (sprintf
-                             "payments from coinbase receiver with id %d to \
+                             "Payments from coinbase receiver with id %d to \
                               payment address"
                              coinbase_receiver_id)
                     in
                     let payments =
-                      (* only payments in canonical chain *)
+                      (* only payments in canonical chain, starting at slot 3501 of this epoch *)
                       List.filter payments_raw ~f:(fun payment ->
-                          Int.Set.mem block_ids payment.block_id )
+                          Int.Set.mem block_ids payment.block_id
+                          && payment.global_slot >= min_payment_slot )
                       |> List.sort ~compare:compare_by_global_slot
                     in
                     Ok ((cb_receiver_pk, payments) :: accum) )
