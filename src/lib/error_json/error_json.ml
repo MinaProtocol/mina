@@ -1,13 +1,13 @@
 open Base
 
-let rec sexp_to_yojson (sexp : Sexp.t) : Yojson.Safe.t =
+let rec sexp_yojson_of (sexp : Sexp.t) : Yojson.Safe.t =
   match sexp with
   | Atom str ->
       `String str
   | List sexps ->
-      `List (List.map ~f:sexp_to_yojson sexps)
+      `List (List.map ~f:sexp_yojson_of sexps)
 
-let rec sexp_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
+let rec sexp_t_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
   match json with
   | `String str ->
       Ok (Sexp.Atom str)
@@ -15,7 +15,7 @@ let rec sexp_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
       let rev_sexps =
         List.fold_until ~init:[] jsons ~finish:Result.return
           ~f:(fun sexps json ->
-            match sexp_of_yojson json with
+            match sexp_t_of_yojson json with
             | Ok sexp ->
                 Continue (sexp :: sexps)
             | Error str ->
@@ -23,7 +23,7 @@ let rec sexp_of_yojson (json : Yojson.Safe.t) : (Sexp.t, string) Result.t =
       in
       Result.map ~f:(fun l -> Sexp.List (List.rev l)) rev_sexps
   | _ ->
-      Error "Error_json.sexp_of_yojson: Expected a string or a list"
+      Error "Error_json.sexp_t_of_yojson: Expected a string or a list"
 
 type info_data =
   | Sexp of Sexp.t
@@ -39,17 +39,17 @@ type info_tag =
 type 'a info_repr =
   {base: 'a; rev_tags: info_tag list; backtrace: string option}
 
-let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
+let info_repr_yojson_of (info : info_data info_repr) : Yojson.Safe.t =
   let base_pairs =
     match info.base with
     | Sexp sexp ->
-        [("sexp", sexp_to_yojson sexp)]
+        [("sexp", sexp_yojson_of sexp)]
     | String str ->
         [("string", `String str)]
     | Exn exn ->
         [ ( "exn_name"
           , `String Stdlib.Obj.Extension_constructor.(name @@ of_val exn))
-        ; ("exn", sexp_to_yojson (Sexplib.Conv.sexp_of_exn exn)) ]
+        ; ("exn", sexp_yojson_of (Sexplib.Conv.sexp_of_exn exn)) ]
     | Of_list (Some trunc_after, length, json) ->
         [ ("multiple", json)
         ; ("length", `Int length)
@@ -71,7 +71,7 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
         | None ->
             jsons
         | Some data ->
-            ("sexp", sexp_to_yojson data) :: jsons
+            ("sexp", sexp_yojson_of data) :: jsons
       in
       `Assoc (("tag", `String tag) :: jsons)
     in
@@ -94,12 +94,12 @@ let info_repr_to_yojson (info : info_data info_repr) : Yojson.Safe.t =
   in
   `Assoc (base_pairs @ tags @ backtrace)
 
-(* NOTE: Could also add a [of_yojson] version for everything except [Exn]
+(* NOTE: Could also add a [t_of_yojson] version for everything except [Exn]
    (which could be converted to [String]), but it's not clear that it would
    ever be useful.
 *)
 
-let rec info_internal_repr_to_yojson_aux (info : Info.Internal_repr.t)
+let rec info_internal_repr_yojson_of_aux (info : Info.Internal_repr.t)
     (acc : unit info_repr) : info_data info_repr =
   match info with
   | Could_not_construct sexp ->
@@ -115,10 +115,10 @@ let rec info_internal_repr_to_yojson_aux (info : Info.Internal_repr.t)
         base= Sexp sexp
       ; rev_tags= {tag; data= None; loc} :: acc.rev_tags }
   | Tag_t (tag, info) ->
-      info_internal_repr_to_yojson_aux info
+      info_internal_repr_yojson_of_aux info
         {acc with rev_tags= {tag; data= None; loc= None} :: acc.rev_tags}
   | Tag_arg (tag, data, info) ->
-      info_internal_repr_to_yojson_aux info
+      info_internal_repr_yojson_of_aux info
         {acc with rev_tags= {tag; data= Some data; loc= None} :: acc.rev_tags}
   | Of_list (trunc_after, infos) ->
       let rec rev_take i acc_len infos acc_infos =
@@ -126,11 +126,11 @@ let rec info_internal_repr_to_yojson_aux (info : Info.Internal_repr.t)
         | _, [] ->
             (None, acc_len, acc_infos)
         | None, info :: infos ->
-            let json_info = info_internal_repr_to_yojson info in
+            let json_info = info_internal_repr_yojson_of info in
             rev_take i (acc_len + 1) infos (json_info :: acc_infos)
         | Some i, info :: infos ->
             if i > 0 then
-              let json_info = info_internal_repr_to_yojson info in
+              let json_info = info_internal_repr_yojson_of info in
               rev_take
                 (Some (i - 1))
                 (acc_len + 1) infos (json_info :: acc_infos)
@@ -142,19 +142,19 @@ let rec info_internal_repr_to_yojson_aux (info : Info.Internal_repr.t)
       let json_infos = `List (List.rev rev_json_infos) in
       {acc with base= Of_list (trunc_after, length, json_infos)}
   | With_backtrace (info, backtrace) ->
-      info_internal_repr_to_yojson_aux info {acc with backtrace= Some backtrace}
+      info_internal_repr_yojson_of_aux info {acc with backtrace= Some backtrace}
 
-and info_internal_repr_to_yojson (info : Info.Internal_repr.t) : Yojson.Safe.t
+and info_internal_repr_yojson_of (info : Info.Internal_repr.t) : Yojson.Safe.t
     =
-  info_internal_repr_to_yojson_aux info
+  info_internal_repr_yojson_of_aux info
     {base= (); rev_tags= []; backtrace= None}
-  |> info_repr_to_yojson
+  |> info_repr_yojson_of
 
-let info_to_yojson (info : Info.t) : Yojson.Safe.t =
-  info_internal_repr_to_yojson (Info.Internal_repr.of_info info)
+let info_yojson_of (info : Info.t) : Yojson.Safe.t =
+  info_internal_repr_yojson_of (Info.Internal_repr.of_info info)
 
-let error_to_yojson (err : Error.t) : Yojson.Safe.t =
-  match info_to_yojson (err :> Info.t) with
+let error_yojson_of (err : Error.t) : Yojson.Safe.t =
+  match info_yojson_of (err :> Info.t) with
   | `Assoc assocs ->
       `Assoc (("commit_id", `String Mina_version.commit_id) :: assocs)
   | json ->

@@ -12,7 +12,7 @@ type t =
     signers: string list
   ; account_identifier_signers: Account_identifier.t list
   ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** ConstructionParseResponse contains an array of operations that occur in a transaction blob. This should match the array of operations provided to `/construction/preprocess` and `/construction/payloads`. *)
 let create (operations : Operation.t list) : t =

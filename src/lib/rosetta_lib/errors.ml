@@ -266,15 +266,15 @@ end = struct
     ; details=
         ( match (context t.kind, t.extra_context) with
         | None, None ->
-            Some (`Assoc [("body", Variant.to_yojson t.kind)])
+            Some (`Assoc [("body", Variant.yojson_of t.kind)])
         | None, Some context | Some context, None ->
             Some
               (`Assoc
-                [("body", Variant.to_yojson t.kind); ("error", `String context)])
+                [("body", Variant.yojson_of t.kind); ("error", `String context)])
         | Some context1, Some context2 ->
             Some
               (`Assoc
-                [ ("body", Variant.to_yojson t.kind)
+                [ ("body", Variant.yojson_of t.kind)
                 ; ("error", `String context1)
                 ; ("extra", `String context2) ]) )
     ; description= Some (description t.kind) }

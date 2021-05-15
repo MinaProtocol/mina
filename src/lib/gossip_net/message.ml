@@ -9,7 +9,7 @@ module Master = struct
       | New_state of External_transition.t
       | Snark_pool_diff of Snark_pool.Resource_pool.Diff.t
       | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
   end
 
   let name = "message"

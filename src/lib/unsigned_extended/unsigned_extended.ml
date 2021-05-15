@@ -55,9 +55,9 @@ module Extend
   include (Unsigned : Unsigned_intf with type t := t)
 
   (* serializes to and from json as strings since bit lengths > 32 cannot be represented in json *)
-  let to_yojson n = `String (to_string n)
+  let yojson_of_t n = `String (to_string n)
 
-  let of_yojson = function
+  let t_t_of_yojson = function
     | `String s ->
         Ok (of_string s)
     | _ ->
@@ -100,8 +100,8 @@ module UInt64 = struct
         , hash_fold_t
         , sexp_of_t
         , t_of_sexp
-        , to_yojson
-        , of_yojson )]
+        , yojson_of
+        , t_of_yojson )]
 
       include Bin_prot.Utils.Make_binable (struct
         module Binable = Int64
@@ -150,8 +150,8 @@ module UInt32 = struct
         , hash_fold_t
         , sexp_of_t
         , t_of_sexp
-        , to_yojson
-        , of_yojson )]
+        , yojson_of
+        , t_of_yojson )]
 
       include Bin_prot.Utils.Make_binable (struct
         module Binable = Int32

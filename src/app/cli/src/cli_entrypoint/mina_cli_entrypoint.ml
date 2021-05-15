@@ -523,7 +523,7 @@ let setup_daemon logger =
             [%log fatal] "Saw an unexpected error $exn from wait_nohang."
               ~metadata:
                 [ ( "exn"
-                  , Error_json.error_to_yojson
+                  , Error_json.error_yojson_of
                       (Error.of_exn ~backtrace:`Get exn) ) ] ;
             (* This will now appear in the backtrace for this exception when it
                reaches the top level, making this very easy to identify.
@@ -541,7 +541,7 @@ let setup_daemon logger =
           let child_pid_metadata =
             [ ("child_pid", `Int (Pid.to_int child_pid))
             ; ( "child_data"
-              , [%to_yojson: Child_processes.Termination.data option]
+              , [%yojson_of: Child_processes.Termination.data option]
                   child_data ) ]
           in
           ( match exit_or_signal with
@@ -640,13 +640,13 @@ let setup_daemon logger =
                   [%log warn] "Could not read configuration from $config_file"
                     ~metadata:
                       [ ("config_file", `String config_file)
-                      ; ("error", Error_json.error_to_yojson err) ] ;
+                      ; ("error", Error_json.error_yojson_of err) ] ;
                   return None ) )
       in
       let config =
         List.fold ~init:Runtime_config.default config_jsons
           ~f:(fun config (config_file, config_json) ->
-            match Runtime_config.of_yojson config_json with
+            match Runtime_config.t_of_yojson config_json with
             | Ok loaded_config ->
                 Runtime_config.combine config loaded_config
             | Error err ->
@@ -672,8 +672,8 @@ let setup_daemon logger =
             [%log fatal]
               "Failed initializing with configuration $config: $error"
               ~metadata:
-                [ ("config", Runtime_config.to_yojson config)
-                ; ("error", Error_json.error_to_yojson err) ] ;
+                [ ("config", Runtime_config.yojson_of config)
+                ; ("error", Error_json.error_yojson_of err) ] ;
             Error.raise err
       in
       let rev_daemon_configs =
@@ -916,7 +916,7 @@ let setup_daemon logger =
           let monitor_infos =
             List.map monitors ~f:(fun monitor ->
                 Async_kernel.Monitor.sexp_of_t monitor
-                |> Error_json.sexp_to_yojson )
+                |> Error_json.sexp_yojson_of )
           in
           [%log debug]
             ~metadata:
@@ -1197,7 +1197,7 @@ let replay_blocks logger =
                  match
                    Yojson.Safe.from_string line
                    |> Mina_transition.External_transition.Precomputed_block
-                      .of_yojson
+                      .t_of_yojson
                  with
                  | Ok block ->
                      block
@@ -1249,7 +1249,7 @@ let rec ensure_testnet_id_still_good logger =
         "Exception while trying to fetch testnet_id: $error. Trying again in \
          $retry_minutes minutes"
         ~metadata:
-          [ ("error", Error_json.error_to_yojson e)
+          [ ("error", Error_json.error_yojson_of e)
           ; ("retry_minutes", `Int soon_minutes) ] ;
       try_later recheck_soon ;
       Deferred.unit
@@ -1302,7 +1302,7 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 let snark_hashes =
   let module Hashes = struct
-    type t = string list [@@deriving to_yojson]
+    type t = string list [@@deriving yojson_of]
   end in
   let open Command.Let_syntax in
   Command.basic ~summary:"List hashes of proving and verification keys"
@@ -1322,7 +1322,7 @@ let snark_hashes =
           | None ->
               []
         in
-        if json then print (Yojson.Safe.to_string (Hashes.to_yojson hashes))
+        if json then print (Yojson.Safe.to_string (Hashes.yojson_of hashes))
         else List.iter hashes ~f:print]
 
 let internal_commands logger =
@@ -1419,7 +1419,7 @@ let internal_commands logger =
                 match mode with
                 | `Transaction -> (
                   match
-                    [%derive.of_yojson: (Ledger_proof.t * Sok_message.t) list]
+                    [%derive.t_of_yojson: (Ledger_proof.t * Sok_message.t) list]
                       (Yojson.Safe.from_string input_line)
                   with
                   | Ok input ->
@@ -1428,7 +1428,7 @@ let internal_commands logger =
                       failwithf "Could not parse JSON: %s" err () )
                 | `Blockchain -> (
                   match
-                    [%derive.of_yojson: Blockchain_snark.Blockchain.t list]
+                    [%derive.t_of_yojson: Blockchain_snark.Blockchain.t list]
                       (Yojson.Safe.from_string input_line)
                   with
                   | Ok input ->
@@ -1483,7 +1483,7 @@ let internal_commands logger =
           in
           let json =
             Structured_log_events.dump_registered_events ()
-            |> [%derive.to_yojson:
+            |> [%derive.yojson_of:
                  (string * Structured_log_events.id * string list) list]
           in
           if pretty then Yojson.Safe.pretty_to_channel out_channel json

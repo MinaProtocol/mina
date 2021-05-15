@@ -35,7 +35,7 @@ module Space_partition : sig
 end
 
 module Job_view : sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson_of]
 end
 
 module type Monad_with_Or_error_intf = sig

@@ -4,4 +4,4 @@
  (inline_tests)
  (libraries core_kernel mina_base signature_lib genesis_constants runtime_config cache_dir genesis_ledger genesis_proof precomputed_values mina_user_error genesis_ledger_helper_lib)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_coda ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_deriving_yojson ppx_custom_printf)))
+ (preprocess (pps ppx_coda ppx_jane ppx_version ppx_inline_test ppx_let ppx_deriving.std ppx_yojson_conv ppx_custom_printf)))

@@ -290,7 +290,7 @@ let initialize t ~root_data =
     External_transition.Validated.erase (transition root_data)
   in
   [%log' trace t.logger]
-    ~metadata:[("root_data", Root_data.Limited.to_yojson root_data)]
+    ~metadata:[("root_data", Root_data.Limited.yojson_of root_data)]
     "Initializing persistent frontier database with $root_data" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;

@@ -12,7 +12,7 @@ type t =
     _method: string
   ; (* Parameters is some network-specific argument for a method. It is up to the caller to determine which parameters to provide when invoking `/call`. *)
     parameters: Yojson.Safe.t }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** CallRequest is the input to the `/call` endpoint. *)
 let create (network_identifier : Network_identifier.t) (_method : string)

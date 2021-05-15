@@ -29,7 +29,7 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
             sprintf ", %s" txt )
     in
     let metadata =
-      ("state_hash", State_hash.to_yojson state_hash)
+      ("state_hash", State_hash.yojson_of state_hash)
       :: Option.value_map message ~default:[] ~f:Tuple2.get2
     in
     Trust_system.record_envelope_sender trust_system logger sender
@@ -50,22 +50,22 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
         [ ("reason", `String "invalid proof")
         ; ( "protocol_state"
           , External_transition.protocol_state transition
-            |> Protocol_state.value_to_yojson )
+            |> Protocol_state.value_yojson_of )
         ; ( "proof"
           , External_transition.protocol_state_proof transition
-            |> Proof.to_yojson ) ]
+            |> Proof.yojson_of ) ]
     | `Invalid_delta_transition_chain_proof ->
         [("reason", `String "invalid delta transition chain proof")]
     | `Verifier_error err ->
         [ ("reason", `String "verifier error")
-        ; ("error", Error_json.error_to_yojson err) ]
+        ; ("error", Error_json.error_yojson_of err) ]
     | `Mismatched_protocol_version ->
         [("reason", `String "protocol version mismatch")]
     | `Invalid_protocol_version ->
         [("reason", `String "invalid protocol version")]
   in
   let metadata =
-    [ ("state_hash", State_hash.to_yojson state_hash)
+    [ ("state_hash", State_hash.yojson_of state_hash)
     ; ( "time_received"
       , `String
           (Time.to_string_abs
@@ -79,17 +79,17 @@ let handle_validation_error ~logger ~rejected_blocks_logger ~time_received
   [%log' debug rejected_blocks_logger]
     ~metadata:
       ( ( "protocol_state"
-        , Protocol_state.Value.to_yojson
+        , Protocol_state.Value.yojson_of
             (External_transition.protocol_state transition) )
       :: metadata )
     "Validation error: external transition with state hash $state_hash was \
      rejected for reason $reason" ;
   match error with
   | `Verifier_error err ->
-      let error_metadata = [("error", Error_json.error_to_yojson err)] in
+      let error_metadata = [("error", Error_json.error_yojson_of err)] in
       [%log error]
         ~metadata:
-          (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
+          (error_metadata @ [("state_hash", State_hash.yojson_of state_hash)])
         "Error in verifier verifying blockchain proof for $state_hash: $error" ;
       Deferred.unit
   | `Invalid_proof ->
@@ -182,12 +182,12 @@ module Duplicate_block_detector = struct
     | Some hash ->
         if not (State_hash.equal hash protocol_state_hash) then (
           let metadata =
-            [ ("block_producer", Public_key.Compressed.to_yojson block_producer)
+            [ ("block_producer", Public_key.Compressed.yojson_of block_producer)
             ; ( "consensus_time"
-              , Consensus.Data.Consensus_time.to_yojson consensus_time )
-            ; ("hash", State_hash.to_yojson hash)
+              , Consensus.Data.Consensus_time.yojson_of consensus_time )
+            ; ("hash", State_hash.yojson_of hash)
             ; ( "current_protocol_state_hash"
-              , State_hash.to_yojson protocol_state_hash )
+              , State_hash.yojson_of protocol_state_hash )
             ; ( "time_received"
               , `String
                   (Time.to_string_abs
@@ -299,7 +299,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                  |> External_transition.state_hash
                in
                let metadata =
-                 [ ("state_hash", State_hash.to_yojson state_hash)
+                 [ ("state_hash", State_hash.yojson_of state_hash)
                  ; ( "time_received"
                    , `String
                        (Time.to_string_abs

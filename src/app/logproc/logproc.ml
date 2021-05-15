@@ -70,7 +70,7 @@ let process_line ~timezone ~interpolation_config ~filter line =
   let open Result.Let_syntax in
   match
     let%bind json = yojson_from_string_result line in
-    let%map msg = Logger.Message.of_yojson json in
+    let%map msg = Logger.Message.t_of_yojson json in
     (json, msg)
   with
   | Error _ ->

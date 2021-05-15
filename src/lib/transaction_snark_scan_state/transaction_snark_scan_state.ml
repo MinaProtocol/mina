@@ -80,9 +80,9 @@ module Job_view = struct
   type t = Transaction_snark.Statement.t Parallel_scan.Job_view.t
   [@@deriving sexp]
 
-  let to_yojson ({value; position} : t) : Yojson.Safe.t =
-    let hash_yojson h = Frozen_ledger_hash.to_yojson h in
-    let statement_to_yojson (s : Transaction_snark.Statement.t) =
+  let yojson_of_t ({value; position} : t) : Yojson.Safe.t =
+    let hash_yojson h = Frozen_ledger_hash.yojson_of h in
+    let statement_yojson_of (s : Transaction_snark.Statement.t) =
       `Assoc
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", hash_yojson s.source)
@@ -90,32 +90,32 @@ module Job_view = struct
         ; ( "Fee Excess"
           , `List
               [ `Assoc
-                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_l)
-                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_l)
+                  [ ("token", Token_id.yojson_of s.fee_excess.fee_token_l)
+                  ; ("amount", Fee.Signed.yojson_of s.fee_excess.fee_excess_l)
                   ]
               ; `Assoc
-                  [ ("token", Token_id.to_yojson s.fee_excess.fee_token_r)
-                  ; ("amount", Fee.Signed.to_yojson s.fee_excess.fee_excess_r)
+                  [ ("token", Token_id.yojson_of s.fee_excess.fee_token_r)
+                  ; ("amount", Fee.Signed.yojson_of s.fee_excess.fee_excess_r)
                   ] ] )
-        ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase)
+        ; ("Supply Increase", Currency.Amount.yojson_of s.supply_increase)
         ; ( "Pending coinbase stack"
-          , Transaction_snark.Pending_coinbase_stack_state.to_yojson
+          , Transaction_snark.Pending_coinbase_stack_state.yojson_of
               s.pending_coinbase_stack_state ) ]
     in
-    let job_to_yojson =
+    let job_yojson_of =
       match value with
       | BEmpty ->
           `Assoc [("B", `List [])]
       | MEmpty ->
           `Assoc [("M", `List [])]
       | MPart x ->
-          `Assoc [("M", `List [statement_to_yojson x])]
+          `Assoc [("M", `List [statement_yojson_of x])]
       | MFull (x, y, {seq_no; status}) ->
           `Assoc
             [ ( "M"
               , `List
-                  [ statement_to_yojson x
-                  ; statement_to_yojson y
+                  [ statement_yojson_of x
+                  ; statement_yojson_of y
                   ; `Int seq_no
                   ; `Assoc
                       [ ( "Status"
@@ -125,14 +125,14 @@ module Job_view = struct
           `Assoc
             [ ( "B"
               , `List
-                  [ statement_to_yojson x
+                  [ statement_yojson_of x
                   ; `Int seq_no
                   ; `Assoc
                       [ ( "Status"
                         , `String (Parallel_scan.Job_status.to_string status)
                         ) ] ] ) ]
     in
-    `List [`Int position; job_to_yojson]
+    `List [`Int position; job_yojson_of]
 end
 
 type job = Available_job.t [@@deriving sexp]
@@ -309,12 +309,12 @@ struct
       module Time_span = struct
         type t = Time.Span.t
 
-        let to_yojson t = `Float (Time.Span.to_ms t)
+        let yojson_of_t t = `Float (Time.Span.to_ms t)
       end
 
       type t =
         {total: Time_span.t; count: int; min: Time_span.t; max: Time_span.t}
-      [@@deriving to_yojson]
+      [@@deriving yojson_of]
 
       let singleton time = {total= time; count= 1; max= time; min= time}
 
@@ -345,7 +345,7 @@ struct
       [%log debug]
         ~metadata:
           (List.map (Hashtbl.to_alist t) ~f:(fun (k, info) ->
-               (k, Info.to_yojson info) ))
+               (k, Info.yojson_of info) ))
         "%s timing" label
   end
 
@@ -676,7 +676,7 @@ let snark_job_list_json t =
   Yojson.Safe.to_string
     (`List
       (List.map all_jobs ~f:(fun tree ->
-           `List (List.map tree ~f:Job_view.to_yojson) )))
+           `List (List.map tree ~f:Job_view.yojson_of) )))
 
 (*Always the same pairing of jobs*)
 let all_work_statements_exn t : Transaction_snark_work.Statement.t list =

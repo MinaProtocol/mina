@@ -7,13 +7,13 @@ module Git_sha = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = string [@@deriving sexp, to_yojson, eq]
+      type t = string [@@deriving sexp, yojson_of, eq]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson, eq]
+  type t = Stable.Latest.t [@@deriving sexp, yojson_of, eq]
 
   let of_string s = s
 end
@@ -59,7 +59,7 @@ module Status = struct
   module Rpc_timings = struct
     module Rpc_pair = struct
       type 'a t = {dispatch: 'a; impl: 'a}
-      [@@deriving to_yojson, bin_io_unversioned, fields]
+      [@@deriving yojson_of, bin_io_unversioned, fields]
     end
 
     type t =
@@ -68,7 +68,7 @@ module Status = struct
       ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
       ; get_transition_chain_proof: Perf_histograms.Report.t option Rpc_pair.t
       ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
-    [@@deriving to_yojson, bin_io_unversioned, fields]
+    [@@deriving yojson_of, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
@@ -111,7 +111,7 @@ module Status = struct
       ; accepted_transition_remote_latency: Perf_histograms.Report.t option
       ; snark_worker_transition_time: Perf_histograms.Report.t option
       ; snark_worker_merge_time: Perf_histograms.Report.t option }
-    [@@deriving to_yojson, bin_io_unversioned, fields]
+    [@@deriving yojson_of, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
@@ -163,20 +163,20 @@ module Status = struct
     type slot =
       { slot: Mina_numbers.Global_slot.Stable.Latest.t
       ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.Latest.t }
-    [@@deriving to_yojson, fields, bin_io_unversioned]
+    [@@deriving yojson_of, fields, bin_io_unversioned]
 
     (* time is the start-time of for_slot.slot*)
     type producing_time = {time: Block_time.Stable.Latest.t; for_slot: slot}
-    [@@deriving to_yojson, bin_io_unversioned, fields]
+    [@@deriving yojson_of, bin_io_unversioned, fields]
 
     type timing =
       | Check_again of Block_time.Stable.Latest.t
       | Produce of producing_time
       | Produce_now of producing_time
-    [@@deriving to_yojson, bin_io_unversioned]
+    [@@deriving yojson_of, bin_io_unversioned]
 
     type t = {generated_from_consensus_at: slot; timing: timing}
-    [@@deriving to_yojson, bin_io_unversioned]
+    [@@deriving yojson_of, bin_io_unversioned]
   end
 
   module Make_entries (FieldT : sig
@@ -412,7 +412,7 @@ module Status = struct
     ; consensus_mechanism: string
     ; consensus_configuration: Consensus.Configuration.Stable.Latest.t
     ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t }
-  [@@deriving to_yojson, bin_io_unversioned, fields]
+  [@@deriving yojson_of, bin_io_unversioned, fields]
 
   let entries (s : t) =
     let module M = Make_entries (struct

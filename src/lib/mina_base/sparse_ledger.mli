@@ -10,7 +10,7 @@ module Stable : sig
       , Account.Stable.V1.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
   end
 end]
 

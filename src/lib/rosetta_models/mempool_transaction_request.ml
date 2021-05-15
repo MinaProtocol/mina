@@ -9,7 +9,7 @@
 type t =
   { network_identifier: Network_identifier.t
   ; transaction_identifier: Transaction_identifier.t }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** A MempoolTransactionRequest is utilized to retrieve a transaction from the mempool. *)
 let create (network_identifier : Network_identifier.t)

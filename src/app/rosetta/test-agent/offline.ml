@@ -20,10 +20,10 @@ module Derive = struct
                 { Public_key.hex_bytes= public_key_hex_bytes
                 ; curve_type= "pallas" }
             ; metadata= Some Amount_of.Token_id.(encode default) }
-            |> to_yojson)
+            |> yojson_of)
         ~path:"construction/derive"
     in
-    Lift.res r ~logger ~of_yojson:Construction_derive_response.of_yojson
+    Lift.res r ~logger ~t_of_yojson:Construction_derive_response.t_of_yojson
     |> Lift.successfully
 end
 
@@ -38,10 +38,10 @@ module Preprocess = struct
             ; operations
             ; suggested_fee_multiplier= None
             ; metadata= None }
-            |> to_yojson)
+            |> yojson_of)
         ~path:"construction/preprocess"
     in
-    Lift.res r ~logger ~of_yojson:Construction_preprocess_response.of_yojson
+    Lift.res r ~logger ~t_of_yojson:Construction_preprocess_response.t_of_yojson
     |> Lift.successfully
 end
 
@@ -55,10 +55,10 @@ module Payloads = struct
             ; operations
             ; metadata= Some metadata
             ; public_keys= [] }
-            |> to_yojson)
+            |> yojson_of)
         ~path:"construction/payloads"
     in
-    Lift.res r ~logger ~of_yojson:Construction_payloads_response.of_yojson
+    Lift.res r ~logger ~t_of_yojson:Construction_payloads_response.t_of_yojson
     |> Lift.successfully
 end
 
@@ -76,10 +76,10 @@ module Parse = struct
         ~body:
           Construction_parse_request.(
             {network_identifier= net_id network_response; transaction; signed}
-            |> to_yojson)
+            |> yojson_of)
         ~path:"construction/parse"
     in
-    Lift.res r ~logger ~of_yojson:Construction_parse_response.of_yojson
+    Lift.res r ~logger ~t_of_yojson:Construction_parse_response.t_of_yojson
     |> Lift.successfully
 end
 
@@ -104,10 +104,10 @@ module Combine = struct
                       ; curve_type= "pallas" }
                   ; signature_type= "schnorr_poseidon"
                   ; hex_bytes= signature } ] }
-            |> to_yojson)
+            |> yojson_of)
         ~path:"construction/combine"
     in
-    Lift.res r ~logger ~of_yojson:Construction_combine_response.of_yojson
+    Lift.res r ~logger ~t_of_yojson:Construction_combine_response.t_of_yojson
     |> Lift.successfully
 end
 
@@ -118,9 +118,9 @@ module Hash = struct
         ~body:
           Construction_hash_request.(
             {network_identifier= net_id network_response; signed_transaction}
-            |> to_yojson)
+            |> yojson_of)
         ~path:"construction/hash"
     in
-    Lift.res r ~logger ~of_yojson:Construction_hash_response.of_yojson
+    Lift.res r ~logger ~t_of_yojson:Construction_hash_response.t_of_yojson
     |> Lift.successfully
 end

@@ -8,7 +8,7 @@ module Poly : sig
     module V1 : sig
       type ('state_hash, 'body) t =
         {previous_state_hash: 'state_hash; body: 'body}
-      [@@deriving eq, ord, hash, sexp, to_yojson]
+      [@@deriving eq, ord, hash, sexp, yojson_of]
     end
   end]
 end
@@ -38,7 +38,7 @@ module Body : sig
           , Consensus.Data.Consensus_state.Value.Stable.V1.t
           , Protocol_constants_checked.Value.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving eq, ord, hash, sexp, to_yojson]
+        [@@deriving eq, ord, hash, sexp, yojson_of]
       end
     end]
   end

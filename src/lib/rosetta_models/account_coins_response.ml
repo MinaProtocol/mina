@@ -12,7 +12,7 @@ type t =
     coins: Coin.t list
   ; (* Account-based blockchains that utilize a nonce or sequence number should include that number in the metadata. This number could be unique to the identifier or global across the account address. *)
     metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** AccountCoinsResponse is returned on the /account/coins endpoint and includes all unspent Coins owned by an AccountIdentifier. *)
 let create (block_identifier : Block_identifier.t) (coins : Coin.t list) : t =

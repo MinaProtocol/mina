@@ -57,10 +57,10 @@ open Core_kernel
 module Make = struct
   module Yojson (N : Nat.Intf) :
     Vector.Yojson_intf1 with type 'a t := ('a, N.n) t = struct
-    let to_yojson f t = Vector.L.to_yojson f (to_list t)
+    let yojson_of_t f t = Vector.L.yojson_of f (to_list t)
 
-    let of_yojson f s =
-      Result.map (Vector.L.of_yojson f s)
+    let t_t_of_yojson f s =
+      Result.map (Vector.L.t_of_yojson f s)
         ~f:(Fn.flip of_list_and_length_exn N.n)
   end
 

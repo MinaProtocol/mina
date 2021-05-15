@@ -13,7 +13,7 @@ type t =
     include_mempool: bool
   ; (* In some cases, the caller may not want to retrieve coins for all currencies for an AccountIdentifier. If the currencies field is populated, only coins for the specified currencies will be returned. If not populated, all unspent coins will be returned. *)
     currencies: Currency.t list }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** AccountCoinsRequest is utilized to make a request on the /account/coins endpoint. *)
 let create (network_identifier : Network_identifier.t)

@@ -18,7 +18,7 @@ type t =
   ; amount: Amount.t option [@default None]
   ; coin_change: Coin_change.t option [@default None]
   ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show, eq]
+[@@deriving yojson, show, eq][@@yojson.allow_extra_fields]
 
 (** Operations contain all balance-changing information within a transaction. They are always one-sided (only affect 1 AccountIdentifier) and can succeed or fail independently from a Transaction. Operations are used both to represent on-chain data (Data API) and to construct new transactions (Construction API), creating a standard interface for reading and writing to blockchains. *)
 let create (operation_identifier : Operation_identifier.t) (_type : string) : t

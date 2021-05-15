@@ -9,7 +9,7 @@
 type t =
   { network_identifier: Network_identifier.t
   ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** A NetworkRequest is utilized to retrieve some data specific exclusively to a NetworkIdentifier. *)
 let create (network_identifier : Network_identifier.t) : t =

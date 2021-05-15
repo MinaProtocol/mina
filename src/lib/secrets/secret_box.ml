@@ -10,19 +10,19 @@ module BytesWr = struct
     let version_byte = Base58_check.Version_bytes.secret_box_byteswr
   end)
 
-  let to_yojson t = `String (Bytes.to_string t |> Base58_check.encode)
+  let yojson_of_t t = `String (Bytes.to_string t |> Base58_check.encode)
 
-  let of_yojson = function
+  let t_t_of_yojson = function
     | `String s -> (
       match Base58_check.decode s with
       | Error e ->
           Error
-            (sprintf "Bytes.of_yojson, bad Base58Check: %s"
+            (sprintf "Bytes.t_of_yojson, bad Base58Check: %s"
                (Error.to_string_hum e))
       | Ok x ->
           Ok (Bytes.of_string x) )
     | _ ->
-        Error "Bytes.of_yojson needs a string"
+        Error "Bytes.t_of_yojson needs a string"
 end
 
 module T = struct
@@ -70,10 +70,10 @@ type t = T.t =
   ; ciphertext: Bytes.t }
 [@@deriving sexp]
 
-let to_yojson t : Yojson.Safe.t = Json.to_yojson (Json.of_stable t)
+let yojson_of_t t : Yojson.Safe.t = Json.yojson_of (Json.of_stable t)
 
-let of_yojson (t : Yojson.Safe.t) =
-  Result.map ~f:Json.to_stable (Json.of_yojson t)
+let t_t_of_yojson (t : Yojson.Safe.t) =
+  Result.map ~f:Json.to_stable (Json.t_of_yojson t)
 
 (** warning: this will zero [password] *)
 let encrypt ~(password : Bytes.t) ~(plaintext : Bytes.t) =

@@ -6,4 +6,4 @@
   yojson
   mina_version)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_deriving_yojson ppx_version)))
+ (preprocess (pps ppx_yojson_conv ppx_version)))

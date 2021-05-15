@@ -1,11 +1,11 @@
 (** Encrypted secrets.
 
-[of_yojson] is the only constructor that takes in raw data.
+[t_of_yojson] is the only constructor that takes in raw data.
 General usage pattern:
 
 {[
-  let protected = Secret_box.encrypt ~password ~plaintext |> Secret_box.to_yojson |> Yojson.to_string in
-  let maybe_unprotected = Secret_box.of_yojson protected |> Or_error.map ~f:(Secret_box.decrypt ~password) in
+  let protected = Secret_box.encrypt ~password ~plaintext |> Secret_box.yojson_of |> Yojson.to_string in
+  let maybe_unprotected = Secret_box.t_of_yojson protected |> Or_error.map ~f:(Secret_box.decrypt ~password) in
   assert maybe_unprotected = Ok plaintext
 ]}
 

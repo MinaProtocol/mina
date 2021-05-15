@@ -192,7 +192,7 @@ module List_ = struct
         Result.return @@ Validate_choice.build ~peers:[||] ~initialPeers:[||]
 
       let%test_unit "debug net" =
-        Test.assert_ ~f:Network_list_response.to_yojson
+        Test.assert_ ~f:Network_list_response.yojson_of
           ~actual:(Mock.handle ~env:debug_env)
           ~expected:
             (Result.return
@@ -208,7 +208,7 @@ module List_ = struct
              ~initialPeers:[|"/dns/joyous-occasion.o1test.net/long/multiaddr"|]
 
       let%test_unit "testnet net" =
-        Test.assert_ ~f:Network_list_response.to_yojson
+        Test.assert_ ~f:Network_list_response.yojson_of
           ~actual:(Mock.handle ~env:testnet_env)
           ~expected:
             (Result.return
@@ -224,7 +224,7 @@ module List_ = struct
              ~initialPeers:[|"/dns/dev.o1test.net/long/multiaddr"|]
 
       let%test_unit "dev net" =
-        Test.assert_ ~f:Network_list_response.to_yojson
+        Test.assert_ ~f:Network_list_response.yojson_of
           ~actual:(Mock.handle ~env:devnet_env)
           ~expected:
             (Result.return
@@ -358,7 +358,7 @@ module Status = struct
             (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH")) }
 
       let%test_unit "chain info missing" =
-        Test.assert_ ~f:Network_status_response.to_yojson
+        Test.assert_ ~f:Network_status_response.yojson_of
           ~actual:(Mock.handle ~env:no_chain_info_env dummy_network_request)
           ~expected:(Result.fail (Errors.create `Chain_info_missing))
 
@@ -369,7 +369,7 @@ module Status = struct
             (fun () -> Result.return (Int64.of_int_exn 1, "GENESIS_HASH")) }
 
       let%test_unit "oldest block is genesis" =
-        Test.assert_ ~f:Network_status_response.to_yojson
+        Test.assert_ ~f:Network_status_response.yojson_of
           ~actual:
             (Mock.handle ~env:oldest_block_is_genesis_env dummy_network_request)
           ~expected:
@@ -396,7 +396,7 @@ module Status = struct
             (fun () -> Result.return (Int64.of_int_exn 3, "SOME_HASH")) }
 
       let%test_unit "oldest block is different" =
-        Test.assert_ ~f:Network_status_response.to_yojson
+        Test.assert_ ~f:Network_status_response.yojson_of
           ~actual:
             (Mock.handle ~env:oldest_block_is_different_env
                dummy_network_request)
@@ -480,7 +480,7 @@ module Options = struct
         ; validate_network_choice= Validate_choice.Mock.succeed }
 
       let%test_unit "options succeeds" =
-        Test.assert_ ~f:Network_options_response.to_yojson
+        Test.assert_ ~f:Network_options_response.yojson_of
           ~actual:(Mock.handle ~env dummy_network_request)
           ~expected:
             ( Result.return
@@ -504,35 +504,35 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
   match route with
   | ["list"] ->
       let%bind _meta =
-        Errors.Lift.parse ~context:"Request" @@ Metadata_request.of_yojson body
+        Errors.Lift.parse ~context:"Request" @@ Metadata_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         List_.Real.handle ~env:(List_.Env.real ~graphql_uri)
         |> Errors.Lift.wrap
       in
-      Network_list_response.to_yojson res
+      Network_list_response.yojson_of res
   | ["status"] ->
       with_db (fun ~db ->
           let%bind network =
             Errors.Lift.parse ~context:"Request"
-            @@ Network_request.of_yojson body
+            @@ Network_request.t_of_yojson body
             |> Errors.Lift.wrap
           in
           let%map res =
             Status.Real.handle ~env:(Status.Env.real ~graphql_uri ~db) network
             |> Errors.Lift.wrap
           in
-          Network_status_response.to_yojson res )
+          Network_status_response.yojson_of res )
   | ["options"] ->
       let%bind network =
-        Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
+        Errors.Lift.parse ~context:"Request" @@ Network_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Options.Real.handle ~env:(Options.Env.real ~graphql_uri) network
         |> Errors.Lift.wrap
       in
-      Network_options_response.to_yojson res
+      Network_options_response.yojson_of res
   | _ ->
       Deferred.Result.fail `Page_not_found

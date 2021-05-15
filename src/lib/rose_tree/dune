@@ -3,4 +3,4 @@
  (public_name rose_tree)
  (libraries core_kernel async_kernel non_empty_list)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson)))
+ (preprocess (pps ppx_version ppx_jane ppx_yojson_conv)))

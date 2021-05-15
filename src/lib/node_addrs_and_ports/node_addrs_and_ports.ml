@@ -59,7 +59,7 @@ let to_multiaddr_exn t =
     ~message:"cannot format peer as multiaddr before libp2p key generated"
     (to_multiaddr t)
 
-let to_yojson = Fn.compose Display.Stable.V1.to_yojson to_display
+let yojson_of_t = Fn.compose Display.Stable.V1.yojson_of to_display
 
 let to_peer_exn : t -> Peer.t = function
   | {peer= Some peer; _} ->

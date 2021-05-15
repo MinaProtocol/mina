@@ -293,7 +293,7 @@ let check_state_hash ~logger state_hash_opt =
         [%log error] "Error decoding state hash"
           ~metadata:
             [ ("state_hash", `String state_hash)
-            ; ("error", Error_json.error_to_yojson err) ] ;
+            ; ("error", Error_json.error_yojson_of err) ] ;
         Core.exit 1 )
 
 let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
@@ -417,14 +417,14 @@ let main ~archive_uri ~start_state_hash_opt ~end_state_hash_opt ~all_blocks ()
       let%map () =
         Deferred.List.iter blocks_with_all_cmds ~f:(fun block ->
             [%log info] "Writing block with $state_hash"
-              ~metadata:[("state_hash", State_hash.to_yojson block.state_hash)] ;
+              ~metadata:[("state_hash", State_hash.yojson_of block.state_hash)] ;
             let output_file =
               State_hash.to_string block.state_hash ^ ".json"
             in
             Async_unix.Writer.with_file output_file ~f:(fun writer ->
                 return
                   (Async.fprintf writer "%s\n%!"
-                     ( Extensional.Block.to_yojson block
+                     ( Extensional.Block.yojson_of block
                      |> Yojson.Safe.pretty_to_string )) ) )
       in
       ()

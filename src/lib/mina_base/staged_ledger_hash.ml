@@ -24,24 +24,24 @@ module Aux_hash = struct
           Base58_check.Version_bytes.staged_ledger_hash_aux_hash
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let yojson_of_t s = `String (Base58_check.encode s)
 
-      let of_yojson = function
+      let t_t_of_yojson = function
         | `String s -> (
           match Base58_check.decode s with
           | Error e ->
               Error
-                (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
+                (sprintf "Aux_hash.t_of_yojson, bad Base58Check:%s"
                    (Error.to_string_hum e))
           | Ok x ->
               Ok x )
         | _ ->
-            Error "Aux_hash.of_yojson expected `String"
+            Error "Aux_hash.t_of_yojson expected `String"
     end
   end]
 
   [%%define_locally
-  Stable.Latest.(to_yojson, of_yojson)]
+  Stable.Latest.(yojson_of, t_of_yojson)]
 
   let of_bytes = Fn.id
 
@@ -69,24 +69,24 @@ module Pending_coinbase_aux = struct
           Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
       end)
 
-      let to_yojson s = `String (Base58_check.encode s)
+      let yojson_of_t s = `String (Base58_check.encode s)
 
-      let of_yojson = function
+      let t_t_of_yojson = function
         | `String s -> (
           match Base58_check.decode s with
           | Ok x ->
               Ok x
           | Error e ->
               Error
-                (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
+                (sprintf "Pending_coinbase_aux.t_of_yojson, bad Base58Check:%s"
                    (Error.to_string_hum e)) )
         | _ ->
-            Error "Pending_coinbase_aux.of_yojson expected `String"
+            Error "Pending_coinbase_aux.t_of_yojson expected `String"
     end
   end]
 
   [%%define_locally
-  Stable.Latest.(to_yojson, of_yojson)]
+  Stable.Latest.(yojson_of, t_of_yojson)]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end

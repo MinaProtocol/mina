@@ -12,7 +12,7 @@ type t =
     offset: int64 option [@default None]
   ; (* limit is the maximum number of events to fetch in one call. The implementation may return <= limit events. *)
     limit: int64 option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** EventsBlocksRequest is utilized to fetch a sequence of BlockEvents indicating which blocks were added and removed from storage to reach the current state. *)
 let create (network_identifier : Network_identifier.t) : t =

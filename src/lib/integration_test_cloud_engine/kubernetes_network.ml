@@ -284,7 +284,7 @@ module Node = struct
       ~metadata:
         [ ("namespace", `String t.namespace)
         ; ("pod_id", `String t.pod_id)
-        ; ("account_id", Mina_base.Account_id.to_yojson account_id) ] ;
+        ; ("account_id", Mina_base.Account_id.yojson_of account_id) ] ;
     let pk = Mina_base.Account_id.public_key account_id in
     let token = Mina_base.Account_id.token_id account_id in
     let get_balance_obj =

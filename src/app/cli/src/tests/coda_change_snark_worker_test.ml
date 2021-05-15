@@ -49,12 +49,12 @@ let main () =
           List.exists completed_works
             ~f:(fun {Transaction_snark_work.prover; _} ->
               [%log trace] "Prover of completed work"
-                ~metadata:[("Prover", Public_key.Compressed.to_yojson prover)] ;
+                ~metadata:[("Prover", Public_key.Compressed.yojson_of prover)] ;
               Public_key.Compressed.equal prover public_key )
         then (
           [%log trace] "Found snark prover ivar filled"
             ~metadata:
-              [("public key", Public_key.Compressed.to_yojson public_key)] ;
+              [("public key", Public_key.Compressed.yojson_of public_key)] ;
           Ivar.fill_if_empty found_snark_prover_ivar () )
         else () ;
         Deferred.unit )
@@ -64,7 +64,7 @@ let main () =
   [%log trace] "Waiting to get snark work from largest public key"
     ~metadata:
       [ ( "largest public key"
-        , Public_key.Compressed.to_yojson largest_public_key ) ] ;
+        , Public_key.Compressed.yojson_of largest_public_key ) ] ;
   let%bind () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
@@ -75,7 +75,7 @@ let main () =
   in
   [%log trace] "Setting new snark worker key"
     ~metadata:
-      [("new snark worker", Public_key.Compressed.to_yojson new_snark_worker)] ;
+      [("new snark worker", Public_key.Compressed.yojson_of new_snark_worker)] ;
   let%bind () =
     let%map opt =
       Coda_worker_testnet.Api.replace_snark_worker_key testnet

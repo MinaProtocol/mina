@@ -78,7 +78,7 @@ module Make (Inputs : Inputs_intf) :
     [%log debug]
       ~metadata:
         [ ( "merkle_list"
-          , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
+          , `List (List.map ~f:State_body_hash.yojson_of merkle_list) ) ]
       "Best tip prover produced a merkle list of $merkle_list" ;
     Proof_carrying_data.
       { data= best_tip

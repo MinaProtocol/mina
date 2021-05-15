@@ -319,7 +319,7 @@ let main ~tsv_file ~output_file () =
   let accounts = provided_accounts @ generated_accounts in
   Out_channel.with_file output_file ~f:(fun out_channel ->
       let jsons =
-        List.map accounts ~f:Runtime_config.Accounts.Single.to_yojson
+        List.map accounts ~f:Runtime_config.Accounts.Single.yojson_of
       in
       List.iter jsons ~f:(fun json ->
           Out_channel.output_string out_channel

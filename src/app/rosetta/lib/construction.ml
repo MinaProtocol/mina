@@ -135,10 +135,10 @@ module Options = struct
   let to_json t =
     { Raw.sender= Public_key.Compressed.to_base58_check t.sender
     ; token_id= Unsigned.UInt64.to_string t.token_id }
-    |> Raw.to_yojson
+    |> Raw.yojson_of
 
   let of_json r =
-    Raw.of_yojson r
+    Raw.t_of_yojson r
     |> Result.map_error ~f:(fun e ->
            Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
     |> Result.bind ~f:(fun r ->
@@ -165,7 +165,7 @@ module Metadata_data = struct
     {sender= Public_key.Compressed.to_base58_check sender; nonce; token_id}
 
   let of_json r =
-    of_yojson r
+    t_of_yojson r
     |> Result.map_error ~f:(fun e ->
            Errors.create ~context:"Options of_json" (`Json_parse (Some e)) )
 end
@@ -297,7 +297,7 @@ module Metadata = struct
       let amount_metadata =
         `Assoc
           [ ( "minimum_fee"
-            , Amount.to_yojson
+            , Amount.yojson_of
                 (Amount_of.coda
                    (MinaCurrency.Fee.to_uint64
                       Mina_compile_config.minimum_user_command_fee)) ) ]
@@ -305,7 +305,7 @@ module Metadata = struct
       { Construction_metadata_response.metadata=
           Metadata_data.create ~sender:options.Options.sender
             ~token_id:options.Options.token_id ~nonce
-          |> Metadata_data.to_yojson
+          |> Metadata_data.yojson_of
       ; suggested_fee= [{suggested_fee with metadata= Some amount_metadata}] }
   end
 
@@ -420,7 +420,7 @@ module Payloads = struct
         ; command= partial_user_command
         ; nonce= metadata.nonce }
         |> Transaction.Unsigned.render
-        |> Result.map ~f:Transaction.Unsigned.Rendered.to_yojson
+        |> Result.map ~f:Transaction.Unsigned.Rendered.yojson_of
         |> Result.map ~f:Yojson.Safe.to_string
         |> env.lift
       in
@@ -463,7 +463,7 @@ module Combine = struct
         with _ -> M.fail (Errors.create (`Json_parse None))
       in
       let%bind unsigned_transaction =
-        Transaction.Unsigned.Rendered.of_yojson json
+        Transaction.Unsigned.Rendered.t_of_yojson json
         |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
         |> Result.bind ~f:Transaction.Unsigned.of_rendered
         |> env.lift
@@ -485,7 +485,7 @@ module Combine = struct
         Transaction.Signed.render signed_transaction_full |> env.lift
       in
       let signed_transaction =
-        Transaction.Signed.Rendered.to_yojson rendered |> Yojson.Safe.to_string
+        Transaction.Signed.Rendered.yojson_of rendered |> Yojson.Safe.to_string
       in
       {Construction_combine_response.signed_transaction}
   end
@@ -538,7 +538,7 @@ module Parse = struct
         match req.signed with
         | true ->
             let%bind signed_rendered_transaction =
-              Transaction.Signed.Rendered.of_yojson json
+              Transaction.Signed.Rendered.t_of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)) )
               |> env.lift
@@ -566,7 +566,7 @@ module Parse = struct
                   signed_transaction.command.token ] )
         | false ->
             let%map unsigned_transaction =
-              Transaction.Unsigned.Rendered.of_yojson json
+              Transaction.Unsigned.Rendered.t_of_yojson json
               |> Result.map_error ~f:(fun e ->
                      Errors.create (`Json_parse (Some e)) )
               |> Result.bind ~f:Transaction.Unsigned.of_rendered
@@ -608,7 +608,7 @@ module Hash = struct
         with _ -> M.fail (Errors.create (`Json_parse None))
       in
       let%bind signed_transaction =
-        Transaction.Signed.Rendered.of_yojson json
+        Transaction.Signed.Rendered.t_of_yojson json
         |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
         |> Result.bind ~f:Transaction.Signed.of_rendered
         |> env.lift
@@ -777,7 +777,7 @@ module Submit = struct
         with _ -> M.fail (Errors.create (`Json_parse None))
       in
       let%bind signed_transaction =
-        Transaction.Signed.Rendered.of_yojson json
+        Transaction.Signed.Rendered.t_of_yojson json
         |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
         |> env.lift
       in
@@ -847,27 +847,27 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
   | ["derive"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_derive_request.of_yojson body
+        @@ Construction_derive_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Derive.Real.handle ~env:Derive.Env.real req |> Errors.Lift.wrap
       in
-      Construction_derive_response.to_yojson res
+      Construction_derive_response.yojson_of res
   | ["preprocess"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_preprocess_request.of_yojson body
+        @@ Construction_preprocess_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Preprocess.Real.handle ~env:Preprocess.Env.real req |> Errors.Lift.wrap
       in
-      Construction_preprocess_response.to_yojson res
+      Construction_preprocess_response.yojson_of res
   | ["metadata"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_metadata_request.of_yojson body
+        @@ Construction_metadata_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%bind graphql_uri = get_graphql_uri_or_error () in
@@ -875,31 +875,31 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Metadata.Real.handle ~env:(Metadata.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Construction_metadata_response.to_yojson res
+      Construction_metadata_response.yojson_of res
   | ["payloads"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_payloads_request.of_yojson body
+        @@ Construction_payloads_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Payloads.Real.handle ~env:Payloads.Env.real req |> Errors.Lift.wrap
       in
-      Construction_payloads_response.to_yojson res
+      Construction_payloads_response.yojson_of res
   | ["combine"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_combine_request.of_yojson body
+        @@ Construction_combine_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Combine.Real.handle ~env:Combine.Env.real req |> Errors.Lift.wrap
       in
-      Construction_combine_response.to_yojson res
+      Construction_combine_response.yojson_of res
   | ["parse"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_parse_request.of_yojson body
+        @@ Construction_parse_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%bind graphql_uri = get_graphql_uri_or_error () in
@@ -907,21 +907,21 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Parse.Real.handle ~env:(Parse.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Construction_parse_response.to_yojson res
+      Construction_parse_response.yojson_of res
   | ["hash"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_hash_request.of_yojson body
+        @@ Construction_hash_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Hash.Real.handle ~env:Hash.Env.real req |> Errors.Lift.wrap
       in
-      Construction_hash_response.to_yojson res
+      Construction_hash_response.yojson_of res
   | ["submit"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Construction_submit_request.of_yojson body
+        @@ Construction_submit_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%bind graphql_uri = get_graphql_uri_or_error () in
@@ -929,6 +929,6 @@ let router ~get_graphql_uri_or_error ~logger (route : string list) body =
         Submit.Real.handle ~env:(Submit.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Construction_submit_response.to_yojson res
+      Construction_submit_response.yojson_of res
   | _ ->
       Deferred.Result.fail `Page_not_found

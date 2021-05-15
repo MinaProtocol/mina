@@ -1,11 +1,11 @@
 open Core_kernel
 
 module By_direction = struct
-  type 'a t = {sent: 'a; received: 'a} [@@deriving to_yojson, fields]
+  type 'a t = {sent: 'a; received: 'a} [@@deriving yojson_of, fields]
 end
 
 module type Set = sig
-  type 'a t [@@deriving to_yojson]
+  type 'a t [@@deriving yojson_of]
 
   val add :
     'a t -> 'a Event_type.Gossip.With_direction.t Event_type.t -> 'a -> unit
@@ -31,7 +31,7 @@ module Set : Set = struct
     List.iter xs ~f:(fun s -> Hash_set.iter s ~f:(Hash_set.add res)) ;
     res
 
-  let to_yojson _f t = `Int (Hash_set.length t)
+  let yojson_of_t _f t = `Int (Hash_set.length t)
 
   let create () = Int.Hash_set.create ()
 
@@ -57,7 +57,7 @@ type t =
   ; blocks: Block.r Set.t By_direction.t
   ; transactions: Transactions.r Set.t By_direction.t
   ; snark_work: Snark_work.r Set.t By_direction.t }
-[@@deriving to_yojson, fields]
+[@@deriving yojson_of, fields]
 
 let create node_id : t =
   let f create =

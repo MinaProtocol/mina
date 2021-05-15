@@ -234,11 +234,11 @@ module Accumulator = struct
           type 'a t = 'a Shift.Map.t
           [@@deriving sexp, version {asserted}, compare]
 
-          let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
+          let yojson_of_t f t = Alist.yojson_of f (Map.to_alist t)
 
-          let of_yojson f t =
+          let t_t_of_yojson f t =
             let open Result.Let_syntax in
-            let%bind t = Alist.of_yojson f t in
+            let%bind t = Alist.t_of_yojson f t in
             match Shift.Map.of_alist t with
             | `Ok t ->
                 return t
@@ -248,7 +248,7 @@ module Accumulator = struct
       end]
 
       [%%define_locally
-      Stable.Latest.(to_yojson, of_yojson)]
+      Stable.Latest.(yojson_of, t_of_yojson)]
     end
 
     [%%versioned

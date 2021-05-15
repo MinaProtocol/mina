@@ -107,12 +107,12 @@ module Account_creation_fees_paid = struct
     | By_no_one
     | By_fee_payer of Unsigned_extended.UInt64.t
     | By_receiver of Unsigned_extended.UInt64.t
-  [@@deriving eq, to_yojson, sexp, compare]
+  [@@deriving eq, yojson_of, sexp, compare]
 end
 
 module Failure_status = struct
   type t = [`Applied of Account_creation_fees_paid.t | `Failed of string]
-  [@@deriving eq, to_yojson, sexp, compare]
+  [@@deriving eq, yojson_of, sexp, compare]
 end
 
 type t =
@@ -127,7 +127,7 @@ type t =
   ; amount: Unsigned_extended.UInt64.t option
   ; hash: string
   ; failure_status: Failure_status.t option }
-[@@deriving to_yojson, eq, sexp, compare]
+[@@deriving yojson_of, eq, sexp, compare]
 
 module Partial = struct
   type t =
@@ -139,7 +139,7 @@ module Partial = struct
     ; token: Unsigned_extended.UInt64.t
     ; fee: Unsigned_extended.UInt64.t
     ; amount: Unsigned_extended.UInt64.t option }
-  [@@deriving to_yojson, sexp, compare]
+  [@@deriving yojson_of, sexp, compare]
 
   module Reason = Errors.Partial_reason
 

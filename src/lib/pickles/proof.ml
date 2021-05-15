@@ -247,9 +247,9 @@ module Make (W : Nat.Intf) (MLMB : Nat.Intf) = struct
               let of_sexpable = of_repr
             end)
 
-  let to_yojson x = Repr.to_yojson (to_repr x)
+  let yojson_of_t x = Repr.yojson_of (to_repr x)
 
-  let of_yojson x = Result.map ~f:of_repr (Repr.of_yojson x)
+  let t_t_of_yojson x = Result.map ~f:of_repr (Repr.t_of_yojson x)
 end
 
 module Branching_2 = struct

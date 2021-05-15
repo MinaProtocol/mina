@@ -295,14 +295,14 @@ struct
                   ~metadata:
                     [ ( "cmd"
                       , Transaction_hash.User_command_with_valid_signature
-                        .to_yojson cmd )
+                        .yojson_of cmd )
                     ; ("error", `String error_str)
                     ; ( "queue"
                       , `List
                           (List.map (Sequence.to_list queued_cmds) ~f:(fun c ->
                                Transaction_hash
                                .User_command_with_valid_signature
-                               .to_yojson c )) ) ] ;
+                               .yojson_of c )) ) ] ;
                 failwith error_str )
           | None ->
               None )
@@ -346,22 +346,22 @@ struct
 
     let of_indexed_pool_error = function
       | Indexed_pool.Command_error.Invalid_nonce (`Between (low, hi), nonce) ->
-          let nonce_json = Account.Nonce.to_yojson in
+          let nonce_json = Account.Nonce.yojson_of in
           ( "invalid_nonce"
           , [ ( "between"
               , `Assoc [("low", nonce_json low); ("hi", nonce_json hi)] )
             ; ("nonce", nonce_json nonce) ] )
       | Invalid_nonce (`Expected enonce, nonce) ->
-          let nonce_json = Account.Nonce.to_yojson in
+          let nonce_json = Account.Nonce.yojson_of in
           ( "invalid_nonce"
           , [("expected_nonce", nonce_json enonce); ("nonce", nonce_json nonce)]
           )
       | Insufficient_funds (`Balance bal, amt) ->
-          let amt_json = Currency.Amount.to_yojson in
+          let amt_json = Currency.Amount.yojson_of in
           ( "insufficient_funds"
           , [("balance", amt_json bal); ("amount", amt_json amt)] )
       | Insufficient_replace_fee (`Replace_fee rfee, fee) ->
-          let fee_json = Currency.Fee.to_yojson in
+          let fee_json = Currency.Fee.yojson_of in
           ( "insufficient_replace_fee"
           , [("replace_fee", fee_json rfee); ("fee", fee_json fee)] )
       | Overflow ->
@@ -371,14 +371,14 @@ struct
       | Invalid_transaction ->
           ("invalid_transaction", [])
       | Unwanted_fee_token fee_token ->
-          ("unwanted_fee_token", [("fee_token", Token_id.to_yojson fee_token)])
+          ("unwanted_fee_token", [("fee_token", Token_id.yojson_of fee_token)])
       | Expired
           (`Valid_until valid_until, `Current_global_slot current_global_slot)
         ->
           ( "expired"
-          , [ ("valid_until", Mina_numbers.Global_slot.to_yojson valid_until)
+          , [ ("valid_until", Mina_numbers.Global_slot.yojson_of valid_until)
             ; ( "current_global_slot"
-              , Mina_numbers.Global_slot.to_yojson current_global_slot ) ] )
+              , Mina_numbers.Global_slot.yojson_of current_global_slot ) ] )
 
     let balance_of_account ~global_slot (account : Account.t) =
       match account.timing with
@@ -432,7 +432,7 @@ struct
            new ledger. Error: $error"
           ~metadata:
             ( [ ( "cmd"
-                , Transaction_hash.User_command_with_valid_signature.to_yojson
+                , Transaction_hash.User_command_with_valid_signature.yojson_of
                     cmd )
               ; ("error", `String error_str) ]
             @ metadata )
@@ -442,11 +442,11 @@ struct
           [ ( "removed"
             , `List
                 (List.map removed_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson)) )
+                   ~f:(With_status.yojson_of User_command.Valid.yojson_of)) )
           ; ( "added"
             , `List
                 (List.map new_commands
-                   ~f:(With_status.to_yojson User_command.Valid.to_yojson)) )
+                   ~f:(With_status.yojson_of User_command.Valid.yojson_of)) )
           ]
         "Diff: removed: $removed added: $added from best tip" ;
       let pool', dropped_backtrack =
@@ -494,7 +494,7 @@ struct
                   (List.map
                      ~f:
                        Transaction_hash.User_command_with_valid_signature
-                       .to_yojson locally_generated_dropped) ) ] ;
+                       .yojson_of locally_generated_dropped) ) ] ;
       let pool'', dropped_commit_conflicts =
         List.fold new_commands ~init:(pool', Sequence.empty)
           ~f:(fun (p, dropped_so_far) cmd ->
@@ -530,7 +530,7 @@ struct
                   "Locally generated command $cmd committed in a block!"
                   ~metadata:
                     [ ( "cmd"
-                      , With_status.to_yojson User_command.Valid.to_yojson cmd
+                      , With_status.yojson_of User_command.Valid.yojson_of cmd
                       ) ] ;
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
@@ -546,7 +546,7 @@ struct
                     "Error handling committed transaction $cmd: $error "
                     ~metadata:
                       [ ( "cmd"
-                        , With_status.to_yojson User_command.Valid.to_yojson
+                        , With_status.yojson_of User_command.Valid.yojson_of
                             cmd )
                       ; ("error", `String error_str)
                       ; ( "queue"
@@ -555,7 +555,7 @@ struct
                                ~f:(fun c ->
                                  Transaction_hash
                                  .User_command_with_valid_signature
-                                 .to_yojson c )) ) ] ;
+                                 .yojson_of c )) ) ] ;
                   failwith error_str
             in
             (p', Sequence.append dropped_so_far dropped) )
@@ -576,7 +576,7 @@ struct
                      (Sequence.map commit_conflicts_locally_generated
                         ~f:
                           Transaction_hash.User_command_with_valid_signature
-                          .to_yojson)) ) ] ;
+                          .yojson_of)) ) ] ;
       [%log' debug t.logger]
         !"Finished handling diff. Old pool size %i, new pool size %i. Dropped \
           %i commands during backtracking to maintain max size."
@@ -610,7 +610,7 @@ struct
                 ~metadata:
                   [ ( "cmd"
                     , Transaction_hash.User_command_with_valid_signature
-                      .to_yojson cmd ) ] ;
+                      .yojson_of cmd ) ] ;
               remove_cmd () )
             else
               let unchecked =
@@ -633,7 +633,7 @@ struct
                     let error_str, metadata = of_indexed_pool_error e in
                     log_and_remove error_str
                       ~metadata:
-                        ( ("user_command", User_command.to_yojson unchecked)
+                        ( ("user_command", User_command.yojson_of unchecked)
                         :: metadata )
                 | Ok (_, pool''', _) ->
                     [%log' debug t.logger]
@@ -642,12 +642,12 @@ struct
                       ~metadata:
                         [ ( "cmd"
                           , Transaction_hash.User_command_with_valid_signature
-                            .to_yojson cmd ) ] ;
+                            .yojson_of cmd ) ] ;
                     t.pool <- pool''' )
               | None ->
                   log_and_remove "Fee_payer_account not found"
                     ~metadata:
-                      [("user_command", User_command.to_yojson unchecked)] ) ;
+                      [("user_command", User_command.yojson_of unchecked)] ) ;
       (*Remove any expired user commands*)
       let expired_commands, pool = Indexed_pool.remove_expired t.pool in
       Sequence.iter expired_commands ~f:(fun cmd ->
@@ -655,7 +655,7 @@ struct
             "Dropping expired user command from the pool $cmd"
             ~metadata:
               [ ( "cmd"
-                , Transaction_hash.User_command_with_valid_signature.to_yojson
+                , Transaction_hash.User_command_with_valid_signature.yojson_of
                     cmd ) ] ;
           let _ : nativeint = Hashtbl.find_and_remove t.locally_generated_uncommitted cmd in
           ()
@@ -768,7 +768,7 @@ struct
                                 ~f:
                                   Transaction_hash
                                   .User_command_with_valid_signature
-                                  .to_yojson) ) ] ;
+                                  .yojson_of) ) ] ;
                  [%log debug]
                    !"Re-validated transaction pool after restart: dropped %i \
                      of %i previously in pool"
@@ -849,8 +849,8 @@ struct
         in
         let is_local = Envelope.Sender.(equal Local sender) in
         let metadata =
-          [ ("error", Error_json.error_to_yojson e)
-          ; ("sender", Envelope.Sender.to_yojson sender) ]
+          [ ("error", Error_json.error_yojson_of e)
+          ; ("sender", Envelope.Sender.yojson_of sender) ]
         in
         [%log' error t.logger] ~metadata
           "Error verifying transaction pool diff from $sender: $error" ;
@@ -881,9 +881,9 @@ struct
                   "Filtering user command with insufficient fee from \
                    transaction-pool diff $cmd from $sender"
                   ~metadata:
-                    [ ("cmd", User_command.to_yojson cmd)
+                    [ ("cmd", User_command.yojson_of cmd)
                     ; ( "sender"
-                      , Envelope.(Sender.to_yojson (Incoming.sender diffs)) )
+                      , Envelope.(Sender.yojson_of (Incoming.sender diffs)) )
                     ] ;
               is_valid )
         in
@@ -973,7 +973,7 @@ struct
                             ( Trust_system.Actions.Sent_useless_gossip
                             , Some
                                 ( "account does not exist for command: $cmd"
-                                , [("cmd", User_command.to_yojson tx)] ) )
+                                , [("cmd", User_command.yojson_of tx)] ) )
                         in
                         go txs''
                           ( accepted
@@ -994,7 +994,7 @@ struct
                           let of_indexed_pool_error = function
                             | Indexed_pool.Command_error.Invalid_nonce
                                 (`Between (low, hi), nonce) ->
-                                let nonce_json = Account.Nonce.to_yojson in
+                                let nonce_json = Account.Nonce.yojson_of in
                                 ( Diff_versioned.Diff_error.Invalid_nonce
                                 , [ ( "between"
                                     , `Assoc
@@ -1002,18 +1002,18 @@ struct
                                         ; ("hi", nonce_json hi) ] )
                                   ; ("nonce", nonce_json nonce) ] )
                             | Invalid_nonce (`Expected enonce, nonce) ->
-                                let nonce_json = Account.Nonce.to_yojson in
+                                let nonce_json = Account.Nonce.yojson_of in
                                 ( Diff_versioned.Diff_error.Invalid_nonce
                                 , [ ("expected_nonce", nonce_json enonce)
                                   ; ("nonce", nonce_json nonce) ] )
                             | Insufficient_funds (`Balance bal, amt) ->
-                                let amt_json = Currency.Amount.to_yojson in
+                                let amt_json = Currency.Amount.yojson_of in
                                 ( Insufficient_funds
                                 , [ ("balance", amt_json bal)
                                   ; ("amount", amt_json amt) ] )
                             | Insufficient_replace_fee (`Replace_fee rfee, fee)
                               ->
-                                let fee_json = Currency.Fee.to_yojson in
+                                let fee_json = Currency.Fee.yojson_of in
                                 ( Insufficient_replace_fee
                                 , [ ("replace_fee", fee_json rfee)
                                   ; ("fee", fee_json fee) ] )
@@ -1025,17 +1025,17 @@ struct
                                 (Diff_error.Invalid_signature, [])
                             | Unwanted_fee_token fee_token ->
                                 ( Unwanted_fee_token
-                                , [("fee_token", Token_id.to_yojson fee_token)]
+                                , [("fee_token", Token_id.yojson_of fee_token)]
                                 )
                             | Expired
                                 ( `Valid_until valid_until
                                 , `Current_global_slot current_global_slot ) ->
                                 ( Expired
                                 , [ ( "valid_until"
-                                    , Mina_numbers.Global_slot.to_yojson
+                                    , Mina_numbers.Global_slot.yojson_of
                                         valid_until )
                                   ; ( "current_global_slot"
-                                    , Mina_numbers.Global_slot.to_yojson
+                                    , Mina_numbers.Global_slot.yojson_of
                                         current_global_slot ) ] )
                           in
                           let yojson_fail_reason =
@@ -1074,10 +1074,10 @@ struct
                                   ( Trust_system.Actions.Sent_useful_gossip
                                   , Some
                                       ( "$cmd"
-                                      , [("cmd", User_command.to_yojson tx)] )
+                                      , [("cmd", User_command.yojson_of tx)] )
                                   )
                               in
-                              let seq_cmd_to_yojson seq =
+                              let seq_cmd_yojson_of seq =
                                 `List
                                   Sequence.(
                                     to_list
@@ -1085,20 +1085,20 @@ struct
                                          ~f:
                                            Transaction_hash
                                            .User_command_with_valid_signature
-                                           .to_yojson seq)
+                                           .yojson_of seq)
                               in
                               if not (Sequence.is_empty dropped) then
                                 [%log' debug t.logger]
                                   "dropped commands due to transaction \
                                    replacement: $dropped"
                                   ~metadata:
-                                    [("dropped", seq_cmd_to_yojson dropped)] ;
+                                    [("dropped", seq_cmd_yojson_of dropped)] ;
                               if not (Sequence.is_empty dropped_for_size) then
                                 [%log' debug t.logger]
                                   "dropped commands to maintain max size: $cmds"
                                   ~metadata:
                                     [ ( "cmds"
-                                      , seq_cmd_to_yojson dropped_for_size ) ] ;
+                                      , seq_cmd_yojson_of dropped_for_size ) ] ;
                               let locally_generated_dropped =
                                 Sequence.filter
                                   (Sequence.append dropped dropped_for_size)
@@ -1122,7 +1122,7 @@ struct
                                              ~f:
                                                Transaction_hash
                                                .User_command_with_valid_signature
-                                               .to_yojson
+                                               .yojson_of
                                              locally_generated_dropped) ) ] ;
                               go txs'' (tx :: accepted, rejected)
                           | Error
@@ -1141,9 +1141,9 @@ struct
                                 "rejecting $cmd because of insufficient \
                                  replace fee ($rfee > $fee)"
                                 ~metadata:
-                                  [ ("cmd", User_command.to_yojson tx)
-                                  ; ("rfee", Currency.Fee.to_yojson rfee)
-                                  ; ("fee", Currency.Fee.to_yojson fee) ] ;
+                                  [ ("cmd", User_command.yojson_of tx)
+                                  ; ("rfee", Currency.Fee.yojson_of rfee)
+                                  ; ("fee", Currency.Fee.yojson_of fee) ] ;
                               go txs''
                                 ( accepted
                                 , ( tx
@@ -1162,8 +1162,8 @@ struct
                                 "rejecting $cmd because we don't accept fees \
                                  in $token"
                                 ~metadata:
-                                  [ ("cmd", User_command.to_yojson tx)
-                                  ; ("token", Token_id.to_yojson fee_token) ] ;
+                                  [ ("cmd", User_command.yojson_of tx)
+                                  ; ("token", Token_id.yojson_of fee_token) ] ;
                               go txs''
                                 ( accepted
                                 , ( tx
@@ -1201,7 +1201,7 @@ struct
                                   , Some
                                       ( "rejecting $cmd because of $reason. \
                                          ($error_extra)"
-                                      , [ ("cmd", User_command.to_yojson tx)
+                                      , [ ("cmd", User_command.yojson_of tx)
                                         ; ("reason", yojson_fail_reason err)
                                         ; ("error_extra", `Assoc error_extra)
                                         ] ) )
@@ -1215,7 +1215,7 @@ struct
                                   ( sprintf
                                       "rejecting command $cmd due to \
                                        insufficient fee."
-                                  , [("cmd", User_command.to_yojson tx)] ) )
+                                  , [("cmd", User_command.yojson_of tx)] ) )
                           in
                           go txs''
                             ( accepted
@@ -1258,7 +1258,7 @@ struct
     let get_rebroadcastable (t : t) ~has_timed_out =
       let metadata ~key ~data =
         [ ( "cmd"
-          , Transaction_hash.User_command_with_valid_signature.to_yojson key )
+          , Transaction_hash.User_command_with_valid_signature.yojson_of key )
         ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc data)) ]
       in
       let added_str =

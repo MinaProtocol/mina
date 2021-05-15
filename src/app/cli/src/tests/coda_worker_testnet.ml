@@ -235,7 +235,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
       `List
         ( Array.to_list online_chains
         |> List.map ~f:(fun chain ->
-               `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain) )
+               `List (List.map ~f:State_hash.Stable.Latest.yojson_of chain) )
         )
     in
     match
@@ -267,7 +267,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               [ ( "hashes"
                 , `List
                     ( Hash_set.to_list hashes_in_common
-                    |> List.map ~f:State_hash.Stable.Latest.to_yojson ) )
+                    |> List.map ~f:State_hash.Stable.Latest.yojson_of ) )
               ; ("chains", chains_json ())
               ; ( "root_lengths"
                 , `List
@@ -368,7 +368,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    [%log fatal]
                      ~metadata:
                        [ ("worker_id", `Int worker_id)
-                       ; ("user_cmd", User_command.to_yojson user_cmd) ]
+                       ; ("user_cmd", User_command.yojson_of user_cmd) ]
                      "Transaction $user_cmd took too long to get into the \
                       root of node $worker_id. Length expected: %d got: %d"
                      expected_deadline root_length ;
@@ -380,7 +380,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                        Ivar.fill passed_root () ;
                        [%log info]
                          ~metadata:
-                           [ ("user_cmd", User_command.to_yojson user_cmd.data)
+                           [ ("user_cmd", User_command.yojson_of user_cmd.data)
                            ; ("worker_id", `Int worker_id)
                            ; ("length", `Int root_length) ]
                          "Transaction $user_cmd finally gets into the root of \

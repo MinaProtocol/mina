@@ -71,7 +71,7 @@ module Make_ocamlgraph (Node : Node_intf) = struct
     let vertex_name = Node.name
 
     let vertex_attributes node =
-      let dot_format = to_dot @@ Node.display_to_yojson (Node.display node) in
+      let dot_format = to_dot @@ Node.display_yojson_of (Node.display node) in
       [`Label dot_format]
 
     let default_edge_attributes _ = []

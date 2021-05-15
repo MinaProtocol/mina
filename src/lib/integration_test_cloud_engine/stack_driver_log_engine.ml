@@ -260,7 +260,7 @@ let parse_event_from_log_entry ~network log_entry =
   in
   let%bind log =
     find
-      (parser_from_of_yojson Logger.Message.of_yojson)
+      (parser_from_t_of_yojson Logger.Message.t_of_yojson)
       log_entry ["jsonPayload"]
   in
   let%map event = Event_type.parse_event log in

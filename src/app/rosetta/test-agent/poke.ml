@@ -102,7 +102,7 @@ module SendTransaction = struct
         from amount_str to_ amount_str
     in
     let json = Yojson.Safe.from_string operations in
-    [%of_yojson: Rosetta_models.Operation.t list] json
+    [%t_of_yojson: Rosetta_models.Operation.t list] json
     |> Result.ok |> Option.value_exn
 
   module Delegation =
@@ -138,7 +138,7 @@ module SendTransaction = struct
         from to_
     in
     let json = Yojson.Safe.from_string operations in
-    [%of_yojson: Rosetta_models.Operation.t list] json
+    [%t_of_yojson: Rosetta_models.Operation.t list] json
     |> Result.ok |> Option.value_exn
 
   module Create_token =
@@ -174,7 +174,7 @@ module SendTransaction = struct
         (Unsigned.UInt64.to_string fee)
     in
     let json = Yojson.Safe.from_string operations in
-    [%of_yojson: Rosetta_models.Operation.t list] json
+    [%t_of_yojson: Rosetta_models.Operation.t list] json
     |> Result.ok |> Option.value_exn
 
   module Create_token_account =
@@ -214,6 +214,6 @@ module SendTransaction = struct
         (Unsigned.UInt64.to_string fee)
     in
     let json = Yojson.Safe.from_string operations in
-    [%of_yojson: Rosetta_models.Operation.t list] json
+    [%t_of_yojson: Rosetta_models.Operation.t list] json
     |> Result.ok |> Option.value_exn
 end

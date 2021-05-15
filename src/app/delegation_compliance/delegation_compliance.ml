@@ -198,7 +198,7 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
   let csv_out_channel = Out_channel.create csv_file in
   write_csv_header ~csv_out_channel ;
   let input =
-    match input_of_yojson json with
+    match input_t_of_yojson json with
     | Ok inp ->
         inp
     | Error msg ->
@@ -404,8 +404,8 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               "Direct payments from delegatee $delegatee to payout address \
                $payout_addr"
               ~metadata:
-                [ ("delegatee", Public_key.Compressed.to_yojson delegatee)
-                ; ("payout_addr", Public_key.Compressed.to_yojson payout_pk)
+                [ ("delegatee", Public_key.Compressed.yojson_of delegatee)
+                ; ("payout_addr", Public_key.Compressed.yojson_of payout_pk)
                 ; ( "payments"
                   , `List
                       (List.map payments_from_delegatee
@@ -466,15 +466,15 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                 "Payments from delegatee $delegatee to payout address \
                  $payout_addr via a coinbase receiver"
                 ~metadata:
-                  [ ("delegatee", Public_key.Compressed.to_yojson delegatee)
-                  ; ("payout_addr", Public_key.Compressed.to_yojson payout_pk)
+                  [ ("delegatee", Public_key.Compressed.yojson_of delegatee)
+                  ; ("payout_addr", Public_key.Compressed.yojson_of payout_pk)
                   ; ( "payments_via_coinbase_receivers"
                     , `List
                         (List.map payments_by_coinbase_receivers
                            ~f:(fun (cb_receiver, payments) ->
                              `Assoc
                                [ ( "coinbase_receiver"
-                                 , Public_key.Compressed.to_yojson cb_receiver
+                                 , Public_key.Compressed.yojson_of cb_receiver
                                  )
                                ; ( "payments"
                                  , `List

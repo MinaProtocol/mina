@@ -105,14 +105,14 @@ let sexp_of_t t = to_base58_check t |> Sexp.of_string
 
 let t_of_sexp sexp = Sexp.to_string sexp |> of_base58_check_exn
 
-let to_yojson t = `String (to_base58_check t)
+let yojson_of_t t = `String (to_base58_check t)
 
-let of_yojson = function
+let t_t_of_yojson = function
   | `String x -> (
     try Ok (of_base58_check_exn x) with
     | Failure str ->
         Error str
     | exn ->
-        Error ("Signature_lib.Private_key.of_yojson: " ^ Exn.to_string exn) )
+        Error ("Signature_lib.Private_key.t_of_yojson: " ^ Exn.to_string exn) )
   | _ ->
-      Error "Signature_lib.Private_key.of_yojson: Expected a string"
+      Error "Signature_lib.Private_key.t_of_yojson: Expected a string"

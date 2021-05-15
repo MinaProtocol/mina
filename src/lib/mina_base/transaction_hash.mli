@@ -36,11 +36,11 @@ module User_command_with_valid_signature : sig
       type t =
         private
         (User_command.Valid.Stable.V1.t, hash) With_hash.Stable.V1.t
-      [@@deriving sexp, compare, hash, to_yojson]
+      [@@deriving sexp, compare, hash, yojson_of]
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson_of]
 
   val create : User_command.Valid.t -> t
 
@@ -66,11 +66,11 @@ module User_command : sig
 
     module V1 : sig
       type t = private (User_command.Stable.V1.t, hash) With_hash.Stable.V1.t
-      [@@deriving sexp, compare, hash, to_yojson]
+      [@@deriving sexp, compare, hash, yojson_of]
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson_of]
 
   val create : User_command.t -> t
 

@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base
 
 module type Printable_intf = sig
-  type t [@@deriving to_yojson]
+  type t [@@deriving yojson_of]
 
   val to_text : t -> string
 end
@@ -11,7 +11,7 @@ let print (type t) (module Print : Printable_intf with type t = t) ~error_ctx
     is_json = function
   | Ok t ->
       if is_json then
-        printf "%s\n" (Print.to_yojson t |> Yojson.Safe.pretty_to_string)
+        printf "%s\n" (Print.yojson_of t |> Yojson.Safe.pretty_to_string)
       else printf "%s\n" (Print.to_text t)
   | Error e ->
       eprintf "%s\n%s\n" error_ctx (Error.to_string_hum e)
@@ -36,24 +36,24 @@ module Prove_receipt = struct
   let to_text proof =
     sprintf
       !"Merkle List of transactions:\n%s"
-      (to_yojson proof |> Yojson.Safe.pretty_to_string)
+      (yojson_of proof |> Yojson.Safe.pretty_to_string)
 end
 
 module Public_key_with_details = struct
   module Pretty_account = struct
     type t = string * int * int
 
-    let to_yojson (public_key, balance, nonce) =
+    let yojson_of_t (public_key, balance, nonce) =
       `Assoc
         [ ( public_key
           , `Assoc [("balance", `Int balance); ("nonce", `Int nonce)] ) ]
   end
 
-  type t = Pretty_account.t list [@@deriving to_yojson]
+  type t = Pretty_account.t list [@@deriving yojson_of]
 
-  type format = {accounts: t} [@@deriving to_yojson, fields]
+  type format = {accounts: t} [@@deriving yojson_of, fields]
 
-  let to_yojson t = format_to_yojson {accounts= t}
+  let yojson_of_t t = format_yojson_of {accounts= t}
 
   let to_text account =
     List.map account ~f:(fun (public_key, balance, nonce) ->

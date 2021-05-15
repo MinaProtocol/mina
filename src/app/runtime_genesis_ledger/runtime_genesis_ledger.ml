@@ -12,7 +12,7 @@ let main ~config_file ~genesis_dir ~proof_level () =
           Deferred.Or_error.ok_exn
           @@ Genesis_ledger_helper.load_config_json config_file
         in
-        match Runtime_config.of_yojson config_json with
+        match Runtime_config.t_of_yojson config_json with
         | Ok config ->
             config
         | Error err ->

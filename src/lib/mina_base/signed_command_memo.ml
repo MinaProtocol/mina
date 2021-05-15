@@ -42,7 +42,7 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
+Stable.Latest.(yojson_of, t_of_yojson, to_string, of_string)]
 
 exception Too_long_user_memo_input
 

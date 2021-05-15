@@ -10,10 +10,10 @@ let rec to_display (T (value, children)) =
 let rec of_display {value; children} =
   T (value, List.map ~f:of_display children)
 
-let to_yojson conv t = display_to_yojson conv (to_display t)
+let yojson_of_t conv t = display_yojson_of conv (to_display t)
 
-let of_yojson conv json =
-  Result.map ~f:of_display (display_of_yojson conv json)
+let t_t_of_yojson conv json =
+  Result.map ~f:of_display (display_t_of_yojson conv json)
 
 let root (T (value, _)) = value
 

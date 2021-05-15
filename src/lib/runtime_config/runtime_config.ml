@@ -44,8 +44,8 @@ let dump_on_error yojson x =
       str ^ "\n\nCould not parse JSON:\n" ^ Yojson.Safe.pretty_to_string yojson
   )
 
-let of_yojson_generic ~fields of_yojson json =
-  dump_on_error json @@ of_yojson
+let t_t_of_yojson_generic ~fields t_of_yojson json =
+  dump_on_error json @@ t_of_yojson
   @@ yojson_strip_fields ~keep_fields:fields json
 
 module Json_layout = struct
@@ -67,7 +67,7 @@ module Json_layout = struct
            ; "vesting_period"
            ; "vesting_increment" |]
 
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
       end
 
       module Permissions = struct
@@ -75,7 +75,7 @@ module Json_layout = struct
           type t = None | Either | Proof | Signature | Both | Impossible
           [@@deriving dhall_type, sexp, bin_io_unversioned]
 
-          let to_yojson = function
+          let yojson_of_t = function
             | None ->
                 `String "none"
             | Either ->
@@ -89,7 +89,7 @@ module Json_layout = struct
             | Impossible ->
                 `String "impossible"
 
-          let of_yojson = function
+          let t_t_of_yojson = function
             | `String s -> (
               match String.lowercase s with
               | "none" ->
@@ -130,7 +130,7 @@ module Json_layout = struct
            ; "set_permissions"
            ; "set_verification_key" |]
 
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
       end
 
       module Token_permissions = struct
@@ -143,7 +143,7 @@ module Json_layout = struct
         let fields =
           [|"token_owned"; "account_disabled"; "disable_new_accounts"|]
 
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
       end
 
       module Snapp_account = struct
@@ -154,9 +154,9 @@ module Json_layout = struct
           (* can't be automatically derived *)
           let dhall_type = Ppx_dhall_type.Dhall_type.Text
 
-          let to_yojson t = `String (Snark_params.Tick.Field.to_string t)
+          let yojson_of_t t = `String (Snark_params.Tick.Field.to_string t)
 
-          let of_yojson = function
+          let t_t_of_yojson = function
             | `String s ->
                 Ok (Snark_params.Tick.Field.of_string s)
             | _ ->
@@ -168,7 +168,7 @@ module Json_layout = struct
 
         let fields = [|"state"; "verification_key"|]
 
-        let of_yojson json = of_yojson_generic ~fields of_yojson json
+        let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
       end
 
       type t =
@@ -202,7 +202,7 @@ module Json_layout = struct
          ; "snapp"
          ; "permissions" |]
 
-      let of_yojson json = of_yojson_generic ~fields of_yojson json
+      let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
 
       let default : t =
         { pk= None
@@ -245,7 +245,7 @@ module Json_layout = struct
        ; "name"
        ; "add_genesis_winner" |]
 
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
   end
 
   module Proof_keys = struct
@@ -260,11 +260,11 @@ module Json_layout = struct
 
       let alternates = [|("two_to_the", "2_to_the"); ("log_2", "2_to_the")|]
 
-      let of_yojson json =
+      let t_t_of_yojson json =
         json
         |> yojson_rename_fields ~alternates
         |> yojson_strip_fields ~keep_fields:fields
-        |> of_yojson |> dump_on_error json
+        |> t_of_yojson |> dump_on_error json
     end
 
     type t =
@@ -291,7 +291,7 @@ module Json_layout = struct
        ; "supercharged_coinbase_factor"
        ; "account_creation_fee" |]
 
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
   end
 
   module Genesis = struct
@@ -312,7 +312,7 @@ module Json_layout = struct
        ; "sub_window_per_window"
        ; "genesis_state_timestamp" |]
 
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
   end
 
   module Daemon = struct
@@ -323,7 +323,7 @@ module Json_layout = struct
 
     let fields = [|"txpool_max_size"; "peer_list_url"|]
 
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
   end
 
   module Epoch_data = struct
@@ -333,7 +333,7 @@ module Json_layout = struct
 
       let fields = [|"accounts"; "seed"|]
 
-      let of_yojson json = of_yojson_generic ~fields of_yojson json
+      let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
     end
 
     type t =
@@ -343,7 +343,7 @@ module Json_layout = struct
 
     let fields = [|"staking"; "next"|]
 
-    let of_yojson json = of_yojson_generic ~fields of_yojson json
+    let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
   end
 
   type t =
@@ -356,7 +356,7 @@ module Json_layout = struct
 
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"; "epoch_data"|]
 
-  let of_yojson json = of_yojson_generic ~fields of_yojson json
+  let t_t_of_yojson json = t_of_yojson_generic ~fields t_of_yojson json
 end
 
 (** JSON representation:
@@ -433,11 +433,11 @@ module Accounts = struct
         =
       Result.return
 
-    let to_yojson x = Json_layout.Accounts.Single.to_yojson (to_json_layout x)
+    let yojson_of_t x = Json_layout.Accounts.Single.yojson_of (to_json_layout x)
 
-    let of_yojson json =
+    let t_t_of_yojson json =
       Result.bind ~f:of_json_layout
-        (Json_layout.Accounts.Single.of_yojson json)
+        (Json_layout.Accounts.Single.t_of_yojson json)
 
     let default = Json_layout.Accounts.Single.default
   end
@@ -473,10 +473,10 @@ module Accounts = struct
                  raise (Stop err) )
     with Stop err -> Error err
 
-  let to_yojson x = Json_layout.Accounts.to_yojson (to_json_layout x)
+  let yojson_of_t x = Json_layout.Accounts.yojson_of (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Accounts.of_yojson json)
+  let t_t_of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Accounts.t_of_yojson json)
 end
 
 module Ledger = struct
@@ -542,10 +542,10 @@ module Ledger = struct
     in
     {base; num_accounts; balances; hash; name; add_genesis_winner}
 
-  let to_yojson x = Json_layout.Ledger.to_yojson (to_json_layout x)
+  let yojson_of_t x = Json_layout.Ledger.yojson_of (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Ledger.of_yojson json)
+  let t_t_of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Ledger.t_of_yojson json)
 end
 
 module Proof_keys = struct
@@ -578,9 +578,9 @@ module Proof_keys = struct
           "Runtime_config.Proof_keys.Level.of_json_layout: Could not decode \
            field 'level'. " ^ err )
 
-    let to_yojson x = `String (to_json_layout x)
+    let yojson_of_t x = `String (to_json_layout x)
 
-    let of_yojson = function
+    let t_t_of_yojson = function
       | `String str ->
           of_json_layout str
       | _ ->
@@ -613,12 +613,12 @@ module Proof_keys = struct
              Expected exactly one of the fields '2_to_the' or \
              'txns_per_second_x10'"
 
-    let to_yojson x =
-      Json_layout.Proof_keys.Transaction_capacity.to_yojson (to_json_layout x)
+    let yojson_of_t x =
+      Json_layout.Proof_keys.Transaction_capacity.yojson_of (to_json_layout x)
 
-    let of_yojson json =
+    let t_t_of_yojson json =
       Result.bind ~f:of_json_layout
-        (Json_layout.Proof_keys.Transaction_capacity.of_yojson json)
+        (Json_layout.Proof_keys.Transaction_capacity.t_of_yojson json)
   end
 
   type t =
@@ -684,10 +684,10 @@ module Proof_keys = struct
     ; account_creation_fee
     ; fork }
 
-  let to_yojson x = Json_layout.Proof_keys.to_yojson (to_json_layout x)
+  let yojson_of_t x = Json_layout.Proof_keys.yojson_of (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Proof_keys.of_yojson json)
+  let t_t_of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Proof_keys.t_of_yojson json)
 
   let combine t1 t2 =
     { level= opt_fallthrough ~default:t1.level t2.level
@@ -728,10 +728,10 @@ module Genesis = struct
   let of_json_layout : Json_layout.Genesis.t -> (t, string) Result.t =
     Result.return
 
-  let to_yojson x = Json_layout.Genesis.to_yojson (to_json_layout x)
+  let yojson_of_t x = Json_layout.Genesis.yojson_of (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Genesis.of_yojson json)
+  let t_t_of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Genesis.t_of_yojson json)
 
   let combine t1 t2 =
     { k= opt_fallthrough ~default:t1.k t2.k
@@ -759,10 +759,10 @@ module Daemon = struct
   let of_json_layout : Json_layout.Daemon.t -> (t, string) Result.t =
     Result.return
 
-  let to_yojson x = Json_layout.Daemon.to_yojson (to_json_layout x)
+  let yojson_of_t x = Json_layout.Daemon.yojson_of (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Daemon.of_yojson json)
+  let t_t_of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Daemon.t_of_yojson json)
 
   let combine t1 t2 =
     { txpool_max_size=
@@ -814,10 +814,10 @@ module Epoch_data = struct
     let next = Option.map next ~f:(fun n -> data n.accounts n.seed) in
     Ok {staking; next}
 
-  let to_yojson x = Json_layout.Epoch_data.to_yojson (to_json_layout x)
+  let yojson_of_t x = Json_layout.Epoch_data.yojson_of (to_json_layout x)
 
-  let of_yojson json =
-    Result.bind ~f:of_json_layout (Json_layout.Epoch_data.of_yojson json)
+  let t_t_of_yojson json =
+    Result.bind ~f:of_json_layout (Json_layout.Epoch_data.t_of_yojson json)
 end
 
 type t =
@@ -844,9 +844,9 @@ let of_json_layout {Json_layout.daemon; genesis; proof; ledger; epoch_data} =
   and epoch_data = result_opt ~f:Epoch_data.of_json_layout epoch_data in
   {daemon; genesis; proof; ledger; epoch_data}
 
-let to_yojson x = Json_layout.to_yojson (to_json_layout x)
+let yojson_of_t x = Json_layout.yojson_of (to_json_layout x)
 
-let of_yojson json = Result.bind ~f:of_json_layout (Json_layout.of_yojson json)
+let t_t_of_yojson json = Result.bind ~f:of_json_layout (Json_layout.t_of_yojson json)
 
 let default =
   {daemon= None; genesis= None; proof= None; ledger= None; epoch_data= None}
@@ -890,7 +890,7 @@ module Test_configs = struct
       , "account_creation_fee": "1" }
   , "ledger": { "name": "test", "add_genesis_winner": false } }
       |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+      |> Yojson.Safe.from_string |> t_of_yojson |> Result.ok_or_failwith )
 
   let transactions =
     lazy
@@ -916,7 +916,7 @@ module Test_configs = struct
       { "name": "test_split_two_stakers"
       , "add_genesis_winner": false } }
       |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+      |> Yojson.Safe.from_string |> t_of_yojson |> Result.ok_or_failwith )
 
   let split_snarkless =
     lazy
@@ -942,7 +942,7 @@ module Test_configs = struct
       { "name": "test_split_two_stakers"
       , "add_genesis_winner": false } }
       |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+      |> Yojson.Safe.from_string |> t_of_yojson |> Result.ok_or_failwith )
 
   let delegation =
     lazy
@@ -969,5 +969,5 @@ module Test_configs = struct
       { "name": "test_delegation"
       , "add_genesis_winner": false } }
       |json}
-      |> Yojson.Safe.from_string |> of_yojson |> Result.ok_or_failwith )
+      |> Yojson.Safe.from_string |> t_of_yojson |> Result.ok_or_failwith )
 end

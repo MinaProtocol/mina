@@ -1,7 +1,7 @@
 open Core_kernel
 open Mina_base
 
-type count_and_fee = int * Currency.Fee.t [@@deriving sexp, to_yojson]
+type count_and_fee = int * Currency.Fee.t [@@deriving sexp, yojson_of]
 
 module Fee_Summable = struct
   open Currency
@@ -18,13 +18,13 @@ module Summary = struct
     { completed_work: count_and_fee
     ; commands: count_and_fee
     ; coinbase_work_fees: Currency.Fee.t Staged_ledger_diff.At_most_two.t }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving sexp, yojson_of, lens]
 
   type command_constraints = {insufficient_work: int; insufficient_space: int}
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving sexp, yojson_of, lens]
 
   type completed_work_constraints = {insufficient_fees: int; extra_work: int}
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving sexp, yojson_of, lens]
 
   type t =
     { partition: [`First | `Second]
@@ -34,7 +34,7 @@ module Summary = struct
     ; discarded_commands: command_constraints
     ; discarded_completed_work: completed_work_constraints
     ; end_resources: resources }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving sexp, yojson_of, lens]
 
   let coinbase_fees
       (coinbase : Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t) =
@@ -128,9 +128,9 @@ module Detail = struct
     ; commands: count_and_fee
     ; completed_work: count_and_fee
     ; coinbase: Currency.Fee.t Staged_ledger_diff.At_most_two.t }
-  [@@deriving sexp, to_yojson, lens]
+  [@@deriving sexp, yojson_of, lens]
 
-  type t = line list [@@deriving sexp, to_yojson]
+  type t = line list [@@deriving sexp, yojson_of]
 
   let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
       ~(commands : User_command.Valid.t With_status.t Sequence.t)
@@ -181,13 +181,13 @@ module Detail = struct
         :: x :: xs
 end
 
-type t = Summary.t * Detail.t [@@deriving sexp, to_yojson]
+type t = Summary.t * Detail.t [@@deriving sexp, yojson_of]
 
-type log_list = t list [@@deriving sexp, to_yojson]
+type log_list = t list [@@deriving sexp, yojson_of]
 
-type summary_list = Summary.t list [@@deriving sexp, to_yojson]
+type summary_list = Summary.t list [@@deriving sexp, yojson_of]
 
-type detail_list = Detail.t list [@@deriving sexp, to_yojson]
+type detail_list = Detail.t list [@@deriving sexp, yojson_of]
 
 let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(commands : User_command.Valid.t With_status.t Sequence.t)

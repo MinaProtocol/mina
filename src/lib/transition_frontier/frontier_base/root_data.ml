@@ -12,11 +12,11 @@ module Common = struct
 
       let to_latest = Fn.id
 
-      let to_yojson {scan_state= _; pending_coinbase} =
+      let yojson_of_t {scan_state= _; pending_coinbase} =
         `Assoc
           [ ("scan_state", `String "<opaque>")
           ; ( "pending_coinbase"
-            , Pending_coinbase.Stable.V1.to_yojson pending_coinbase ) ]
+            , Pending_coinbase.Stable.V1.yojson_of pending_coinbase ) ]
     end
   end]
 
@@ -74,18 +74,18 @@ module Limited = struct
             list
         ; common: Common.Stable.V1.t }
 
-      let to_yojson {transition; protocol_states= _; common} =
+      let yojson_of_t {transition; protocol_states= _; common} =
         `Assoc
-          [ ("transition", External_transition.Validated.to_yojson transition)
+          [ ("transition", External_transition.Validated.yojson_of transition)
           ; ("protocol_states", `String "<opaque>")
-          ; ("common", Common.Stable.V1.to_yojson common) ]
+          ; ("common", Common.Stable.V1.yojson_of common) ]
 
       let to_latest = Fn.id
     end
   end]
 
   [%%define_locally
-  Stable.Latest.(to_yojson)]
+  Stable.Latest.(yojson_of)]
 
   let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
     let common = {Common.scan_state; pending_coinbase} in
@@ -109,14 +109,14 @@ module Minimal = struct
 
     module V1 = struct
       type t = {hash: State_hash.Stable.V1.t; common: Common.Stable.V1.t}
-      [@@driving to_yojson]
+      [@@driving yojson_of]
 
       let to_latest = Fn.id
     end
   end]
 
   type t = Stable.Latest.t = {hash: State_hash.t; common: Common.t}
-  [@@driving to_yojson]
+  [@@driving yojson_of]
 
   let hash t = t.hash
 

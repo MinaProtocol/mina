@@ -16,7 +16,7 @@ module Scan_state : sig
   end]
 
   module Job_view : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp, yojson_of]
   end
 
   module Space_partition : sig

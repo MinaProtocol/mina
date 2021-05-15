@@ -452,7 +452,7 @@ let to_mina_signed transaction_json =
   Or_error.try_with_join (fun () ->
       let open Or_error.Let_syntax in
       let%bind rosetta_transaction_rendered =
-        Signed.Rendered.of_yojson transaction_json
+        Signed.Rendered.t_of_yojson transaction_json
         |> Result.map_error ~f:Error.of_string
       in
       let%bind rosetta_transaction =

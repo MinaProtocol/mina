@@ -18,7 +18,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module Seen_key = struct
       module T = struct
         type t = Transaction_snark.Statement.t One_or_two.t
-        [@@deriving compare, sexp, to_yojson, hash]
+        [@@deriving compare, sexp, yojson_of, hash]
       end
 
       include T
@@ -72,7 +72,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
                   | Error e ->
                       [%log fatal]
                         "Error occured when updating available work: $error"
-                        ~metadata:[("error", Error_json.error_to_yojson e)]
+                        ~metadata:[("error", Error_json.error_yojson_of e)]
                   | Ok new_available_jobs ->
                       let end_time = Time.now () in
                       [%log info] "Updating new available work took $time ms"
@@ -102,7 +102,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
               ~reassignment_wait:t.reassignment_wait
           then (
             [%log info]
-              ~metadata:[("work", Seen_key.to_yojson work)]
+              ~metadata:[("work", Seen_key.yojson_of work)]
               "Waited too long to get work for $work. Ready to be reassigned" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_timed_out_rpc) ;
             false )

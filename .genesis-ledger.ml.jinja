@@ -18,7 +18,7 @@ let accounts = [
 
 module Accounts = struct
   let accounts = List.map accounts ~f:(fun s ->
-    let account = Yojson.Safe.from_string s |> Account.Stable.Latest.of_yojson |> Result.ok_or_failwith in
+    let account = Yojson.Safe.from_string s |> Account.Stable.Latest.t_of_yojson |> Result.ok_or_failwith in
     (None,account))
 end
 

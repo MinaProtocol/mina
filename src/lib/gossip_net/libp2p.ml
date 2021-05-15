@@ -311,7 +311,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                           [%log' warn config.logger]
                             "failed to reset stream (this means it was \
                              probably closed successfully): $error"
-                            ~metadata:[("error", Error_json.error_to_yojson e)]
+                            ~metadata:[("error", Error_json.error_yojson_of e)]
                       | Ok () ->
                           () ) )
             in
@@ -353,7 +353,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                       in
                       let metadata =
                         [ ("sender_peer_id", `String peer.peer_id)
-                        ; ("error", Error_json.error_to_yojson err) ]
+                        ; ("error", Error_json.error_yojson_of err) ]
                       in
                       Trust_system.(
                         record config.trust_system config.logger peer
@@ -407,7 +407,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    | Error e ->
                        [%log' warn config.logger]
                          "starting libp2p up failed: $error"
-                         ~metadata:[("error", Error_json.error_to_yojson e)] )) ;
+                         ~metadata:[("error", Error_json.error_yojson_of e)] )) ;
             (subscription, message_reader)
           in
           match%map initializing_libp2p_result with
@@ -641,7 +641,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
             [%log' warn t.config.logger] "RPC call error for $rpc"
               ~metadata:
                 [ ("rpc", `String rpc_name)
-                ; ("error", Error_json.error_to_yojson err) ] ;
+                ; ("error", Error_json.error_yojson_of err) ] ;
             match (Error.to_exn err, Error.sexp_of_t err) with
             | ( _
               , Sexp.List
@@ -667,7 +667,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                         ( Outgoing_connection_error
                         , Some
                             ( "RPC call failed, reason: $exn"
-                            , [("exn", Error_json.error_to_yojson err)] ) ))
+                            , [("exn", Error_json.error_yojson_of err)] ) ))
                 in
                 Error err )
         | Error monitor_exn ->

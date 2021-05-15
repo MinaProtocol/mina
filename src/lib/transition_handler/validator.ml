@@ -74,9 +74,9 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                  ( Trust_system.Actions.Sent_useful_gossip
                  , Some
                      ( "external transition $state_hash"
-                     , [ ("state_hash", State_hash.to_yojson transition_hash)
+                     , [ ("state_hash", State_hash.yojson_of transition_hash)
                        ; ( "transition"
-                         , External_transition.to_yojson transition ) ] ) )
+                         , External_transition.yojson_of transition ) ] ) )
              in
              let transition_time =
                External_transition.protocol_state transition
@@ -94,18 +94,18 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                ( Trust_system.Actions.Sent_old_gossip
                , Some
                    ( "external transition with state hash $state_hash"
-                   , [ ("state_hash", State_hash.to_yojson transition_hash)
-                     ; ("transition", External_transition.to_yojson transition)
+                   , [ ("state_hash", State_hash.yojson_of transition_hash)
+                     ; ("transition", External_transition.yojson_of transition)
                      ] ) )
          | Error `Disconnected ->
              Mina_metrics.(Counter.inc_one Rejected_blocks.worse_than_root) ;
              [%log error]
                ~metadata:
-                 [ ("state_hash", State_hash.to_yojson transition_hash)
+                 [ ("state_hash", State_hash.yojson_of transition_hash)
                  ; ("reason", `String "not selected over current root")
                  ; ( "protocol_state"
                    , External_transition.protocol_state transition
-                     |> Protocol_state.value_to_yojson ) ]
+                     |> Protocol_state.value_yojson_of ) ]
                "Validation error: external transition with state hash \
                 $state_hash was rejected for reason $reason" ;
              Trust_system.record_envelope_sender trust_system logger sender
@@ -114,7 +114,7 @@ let run ~logger ~consensus_constants ~trust_system ~time_controller ~frontier
                    ( "received transition that was not connected to our chain \
                       from $sender"
                    , [ ( "sender"
-                       , Envelope.Sender.to_yojson
+                       , Envelope.Sender.yojson_of
                            (Envelope.Incoming.sender transition_env) )
-                     ; ("transition", External_transition.to_yojson transition)
+                     ; ("transition", External_transition.yojson_of transition)
                      ] ) ) ))

@@ -52,7 +52,7 @@ let compare_blocks ~logger ~original_blocks_dir ~copy_blocks_dir =
   let get_block fn =
     In_channel.with_file fn ~f:(fun in_channel ->
         let json = Yojson.Safe.from_channel in_channel in
-        match Archive_lib.Extensional.Block.of_yojson json with
+        match Archive_lib.Extensional.Block.t_of_yojson json with
         | Ok block ->
             block
         | Error err ->

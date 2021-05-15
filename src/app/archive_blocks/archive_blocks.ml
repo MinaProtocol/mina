@@ -28,8 +28,8 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
       exit 1
   | Ok pool ->
       [%log info] "Successfully created Caqti connection to Postgresql" ;
-      let make_add_block of_yojson add_block_aux ~json ~file =
-        match of_yojson json with
+      let make_add_block t_of_yojson add_block_aux ~json ~file =
+        match t_of_yojson json with
         | Ok block -> (
             match%map add_block_aux block with
             | Ok () ->
@@ -49,14 +49,14 @@ let main ~archive_uri ~precomputed ~extensional ~success_file ~failure_file
       in
       let add_precomputed_block =
         make_add_block
-          Mina_transition.External_transition.Precomputed_block.of_yojson
+          Mina_transition.External_transition.Precomputed_block.t_of_yojson
           (Processor.add_block_aux_precomputed
              ~constraint_constants:
                Genesis_constants.Constraint_constants.compiled pool
              ~delete_older_than:None ~logger)
       in
       let add_extensional_block =
-        make_add_block Archive_lib.Extensional.Block.of_yojson
+        make_add_block Archive_lib.Extensional.Block.t_of_yojson
           (Processor.add_block_aux_extensional ~logger pool
              ~delete_older_than:None)
       in

@@ -117,7 +117,7 @@ type ('repr, 'mutant) t =
 
 type ('repr, 'mutant) diff = ('repr, 'mutant) t
 
-val to_yojson : ('repr, 'mutant) t -> Yojson.Safe.t
+val yojson_of_t : ('repr, 'mutant) t -> Yojson.Safe.t
 
 val to_lite : (full, 'mutant) t -> (lite, 'mutant) t
 
@@ -138,7 +138,7 @@ module Full : sig
   type 'mutant t = (full, 'mutant) diff
 
   module E : sig
-    type t = E : (full, 'mutant) diff -> t [@@deriving to_yojson]
+    type t = E : (full, 'mutant) diff -> t [@@deriving yojson_of]
 
     val to_lite : t -> Lite.E.t
   end

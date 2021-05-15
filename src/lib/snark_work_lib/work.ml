@@ -16,7 +16,7 @@ module Single = struct
               Transaction_snark.Statement.Stable.V1.t
               * 'ledger_proof
               * 'ledger_proof
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson_of]
 
         let to_latest transition_latest witness_latest ledger_proof_latest =
           function
@@ -46,7 +46,7 @@ module Single = struct
           ('transition, 'witness, 'ledger_proof) Stable.Latest.t =
       | Transition of Transaction_snark.Statement.t * 'transition * 'witness
       | Merge of Transaction_snark.Statement.t * 'ledger_proof * 'ledger_proof
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
 
     let statement = function Transition (s, _, _) -> s | Merge (s, _, _) -> s
 
@@ -82,7 +82,7 @@ module Spec = struct
       type 'single t =
         { instances: 'single One_or_two.Stable.V1.t
         ; fee: Currency.Fee.Stable.V1.t }
-      [@@deriving fields, sexp, to_yojson]
+      [@@deriving fields, sexp, yojson_of]
 
       let to_latest single_latest {instances; fee} =
         {instances= One_or_two.Stable.V1.to_latest single_latest instances; fee}
@@ -98,7 +98,7 @@ module Spec = struct
 
   type 'single t = 'single Stable.Latest.t =
     {instances: 'single One_or_two.t; fee: Currency.Fee.t}
-  [@@deriving fields, sexp, to_yojson]
+  [@@deriving fields, sexp, yojson_of]
 end
 
 module Result = struct

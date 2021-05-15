@@ -188,10 +188,10 @@ module Make (F : Input_intf) :
 
       let equal = equal
 
-      let to_yojson t : Yojson.Safe.t =
+      let yojson_of_t t : Yojson.Safe.t =
         `String (Bigint.to_hex_string (to_bigint t))
 
-      let of_yojson j =
+      let t_t_of_yojson j =
         match j with
         | `String h ->
             Ok (of_bigint (Bigint.of_hex_string h))

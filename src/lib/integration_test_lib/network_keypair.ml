@@ -6,7 +6,7 @@ type t =
   ; secret_name: string
   ; public_key_file: string
   ; private_key_file: string }
-[@@deriving to_yojson]
+[@@deriving yojson_of]
 
 let create_network_keypair ~keypair ~secret_name =
   let open Keypair in
@@ -21,6 +21,6 @@ let create_network_keypair ~keypair ~secret_name =
     in
     let password = Bytes.of_string "naughty blue worm" in
     Secrets.Secret_box.encrypt ~plaintext ~password
-    |> Secrets.Secret_box.to_yojson |> Yojson.Safe.to_string
+    |> Secrets.Secret_box.yojson_of |> Yojson.Safe.to_string
   in
   {keypair; secret_name; public_key_file; private_key_file}

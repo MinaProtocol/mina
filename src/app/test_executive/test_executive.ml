@@ -112,7 +112,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
               (color_of_severity severity)
               "        [%s] %s\n"
               (Time.to_string error_message.timestamp)
-              (Yojson.Safe.to_string (Logger.Message.to_yojson error_message))
+              (Yojson.Safe.to_string (Logger.Message.yojson_of error_message))
         ) ;
         Print.eprintf "\n" )
   in
@@ -292,7 +292,7 @@ let main inputs =
            ~exit_reason:
              (sprintf
                 !"log engine fatal error: %s"
-                (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
+                (Yojson.Safe.to_string (Logger.Message.yojson_of message)))
            ~test_result:(Malleable_error.return ()))
     in
     Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->

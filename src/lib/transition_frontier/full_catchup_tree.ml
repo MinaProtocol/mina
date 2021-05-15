@@ -16,10 +16,10 @@ module Attempt_history = struct
 
   type t = Attempt.t Peer.Map.t
 
-  let to_yojson (t : t) =
+  let yojson_of_t (t : t) =
     `Assoc
       (List.map (Map.to_alist t) ~f:(fun (peer, a) ->
-           (Peer.to_multiaddr_string peer, Attempt.to_yojson a) ))
+           (Peer.to_multiaddr_string peer, Attempt.yojson_of a) ))
 
   let empty : t = Peer.Map.empty
 end
@@ -33,12 +33,12 @@ module Downloader_job = struct
     , External_transition.t )
     Downloader.Job.t
 
-  let to_yojson (t : t) : Yojson.Safe.t =
+  let yojson_of_t (t : t) : Yojson.Safe.t =
     let h, l = t.key in
     `Assoc
-      [ ("hash", State_hash.to_yojson h)
-      ; ("length", Length.to_yojson l)
-      ; ("attempts", Attempt_history.to_yojson t.attempts) ]
+      [ ("hash", State_hash.yojson_of h)
+      ; ("length", Length.yojson_of l)
+      ; ("attempts", Attempt_history.yojson_of t.attempts) ]
 
   let result (t : t) = Ivar.read t.res
 end
@@ -152,11 +152,11 @@ let finish t (node : Node.t) b =
   set_state t node s ;
   Ivar.fill_if_empty node.result r
 
-let to_yojson =
+let yojson_of_t =
   let module T = struct
-    type t = (Node.State.Enum.t * int) list [@@deriving to_yojson]
+    type t = (Node.State.Enum.t * int) list [@@deriving yojson_of]
   end in
-  fun (t : t) -> T.to_yojson (Hashtbl.to_alist t.states)
+  fun (t : t) -> T.yojson_of (Hashtbl.to_alist t.states)
 
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
@@ -282,7 +282,7 @@ let apply_diffs (t : t) (ds : Diff.Full.E.t list) =
         if Hashtbl.mem t.nodes h then prune t ~root_hash:h
         else (
           [%log' debug t.logger]
-            ~metadata:[("hash", State_hash.to_yojson h); ("tree", to_yojson t)]
+            ~metadata:[("hash", State_hash.yojson_of h); ("tree", yojson_of t)]
             "catchup $tree invariant broken: new root $hash not present. \
              Diffs may have been applied out of order. This may lead to a \
              memory leak" ;

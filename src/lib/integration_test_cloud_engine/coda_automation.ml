@@ -30,7 +30,7 @@ module Network_config = struct
     ; private_key: string
     ; keypair_secret: string
     ; libp2p_secret: string }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   type terraform_config =
     { k8s_context: string
@@ -46,7 +46,7 @@ module Network_config = struct
     ; coda_archive_image: string
           (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
     ; runtime_config: Yojson.Safe.t
-          [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
+          [@yojson_of fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs: block_producer_config list
     ; log_precomputed_blocks: bool
     ; archive_node_count: int
@@ -54,7 +54,7 @@ module Network_config = struct
     ; snark_worker_replicas: int
     ; snark_worker_fee: string
     ; snark_worker_public_key: string }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   type t =
     { coda_automation_location: string
@@ -62,11 +62,11 @@ module Network_config = struct
     ; keypairs: Network_keypair.t list
     ; constants: Test_config.constants
     ; terraform: terraform_config }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   let terraform_config_to_assoc t =
     let[@warning "-8"] (`Assoc assoc : Yojson.Safe.t) =
-      terraform_config_to_yojson t
+      terraform_config_yojson_of t
     in
     assoc
 
@@ -225,7 +225,7 @@ module Network_config = struct
         ; coda_bots_image= images.bots
         ; coda_points_image= images.points
         ; coda_archive_image= images.archive_node
-        ; runtime_config= Runtime_config.to_yojson runtime_config
+        ; runtime_config= Runtime_config.yojson_of runtime_config
         ; block_producer_configs=
             List.mapi block_producer_keypairs ~f:block_producer_config
         ; log_precomputed_blocks

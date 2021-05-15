@@ -23,14 +23,14 @@ type t =
 
 type time = Time.Span.t
 
-let time_to_yojson span =
+let time_yojson_of span =
   `String (Printf.sprintf "%f seconds" (Time.Span.to_sec span))
 
 type opt_time = time option
 
-let opt_time_to_yojson = function
+let opt_time_yojson_of = function
   | Some time ->
-      time_to_yojson time
+      time_yojson_of time
   | None ->
       `Null
 
@@ -41,7 +41,7 @@ type bootstrap_cycle_stats =
   ; staged_ledger_construction_time: opt_time
   ; local_state_sync_required: bool
   ; local_state_sync_time: opt_time }
-[@@deriving to_yojson]
+[@@deriving yojson_of]
 
 let time_deferred deferred =
   let start_time = Time.now () in
@@ -69,7 +69,7 @@ let received_bad_proof t host e =
         ( Violated_protocol
         , Some
             ( "Bad ancestor proof: $error"
-            , [("error", Error_json.error_to_yojson e)] ) ))
+            , [("error", Error_json.error_yojson_of e)] ) ))
 
 let done_syncing_root root_sync_ledger =
   Option.is_some (Sync_ledger.Db.peek_valid_tree root_sync_ledger)
@@ -130,7 +130,7 @@ let on_transition t ~sender ~root_sync_ledger ~genesis_constants
     with
     | Error e ->
         [%log' error t.logger]
-          ~metadata:[("error", Error_json.error_to_yojson e)]
+          ~metadata:[("error", Error_json.error_yojson_of e)]
           !"Could not get the proof of the root transition from the network: \
             $error" ;
         Deferred.return `Ignored
@@ -173,9 +173,9 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
         [%log' trace t.logger]
           "Added the transition from sync_ledger_reader into cache"
           ~metadata:
-            [ ("state_hash", State_hash.to_yojson (With_hash.hash transition))
+            [ ("state_hash", State_hash.yojson_of (With_hash.hash transition))
             ; ( "external_transition"
-              , External_transition.to_yojson (With_hash.data transition) ) ] ;
+              , External_transition.yojson_of (With_hash.data transition) ) ] ;
         Deferred.ignore
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
              transition )
@@ -288,9 +288,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             [%log debug]
               ~metadata:
                 [ ( "expected_staged_ledger_hash"
-                  , Staged_ledger_hash.to_yojson expected_staged_ledger_hash )
+                  , Staged_ledger_hash.yojson_of expected_staged_ledger_hash )
                 ; ( "received_staged_ledger_hash"
-                  , Staged_ledger_hash.to_yojson received_staged_ledger_hash )
+                  , Staged_ledger_hash.yojson_of received_staged_ledger_hash )
                 ]
               "Comparing $expected_staged_ledger_hash to \
                $received_staged_ledger_hash" ;
@@ -319,8 +319,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                   let new_state_hash = (fst new_root).hash in
                   [%log error]
                     ~metadata:
-                      [ ("new_root", State_hash.to_yojson new_state_hash)
-                      ; ("state_hash", State_hash.to_yojson hash) ]
+                      [ ("new_root", State_hash.yojson_of new_state_hash)
+                      ; ("state_hash", State_hash.yojson_of hash) ]
                     "Protocol state (for scan state transactions) for \
                      $state_hash not found when bootstrapping to the new root \
                      $new_root" ;
@@ -383,10 +383,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         in
         [%log error]
           ~metadata:
-            [ ("error", Error_json.error_to_yojson e)
-            ; ("state_hash", State_hash.to_yojson hash)
+            [ ("error", Error_json.error_yojson_of e)
+            ; ("state_hash", State_hash.yojson_of hash)
             ; ( "expected_staged_ledger_hash"
-              , Staged_ledger_hash.to_yojson expected_staged_ledger_hash ) ]
+              , Staged_ledger_hash.yojson_of expected_staged_ledger_hash ) ]
           "Failed to find scan state for the transition with hash $state_hash \
            from the peer or received faulty scan state: $error. Retry \
            bootstrap" ;
@@ -425,10 +425,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 [%log debug]
                   ~metadata:
                     [ ( "local_state"
-                      , Consensus.Data.Local_state.to_yojson
+                      , Consensus.Data.Local_state.yojson_of
                           consensus_local_state )
                     ; ( "consensus_state"
-                      , Consensus.Data.Consensus_state.Value.to_yojson
+                      , Consensus.Data.Consensus_state.Value.yojson_of
                           consensus_state ) ]
                   "Not synchronizing consensus local state" ;
                 Deferred.return (false, Or_error.return ())
@@ -458,7 +458,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         match local_state_sync_result with
         | Error e ->
             [%log error]
-              ~metadata:[("error", Error_json.error_to_yojson e)]
+              ~metadata:[("error", Error_json.error_yojson_of e)]
               "Local state sync failed: $error. Retry bootstrap" ;
             Writer.close sync_ledger_writer ;
             let this_cycle =
@@ -561,9 +561,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
   let%map time_elapsed, (cycles, result) = time_deferred (loop []) in
   [%log info] "Bootstrap completed in $time_elapsed: $bootstrap_stats"
     ~metadata:
-      [ ("time_elapsed", time_to_yojson time_elapsed)
+      [ ("time_elapsed", time_yojson_of time_elapsed)
       ; ( "bootstrap_stats"
-        , `List (List.map ~f:bootstrap_cycle_stats_to_yojson cycles) ) ] ;
+        , `List (List.map ~f:bootstrap_cycle_stats_yojson_of cycles) ) ] ;
   Mina_metrics.(
     Gauge.set Bootstrap.bootstrap_time_ms
       Core.Time.(Span.to_ms @@ time_elapsed)) ;

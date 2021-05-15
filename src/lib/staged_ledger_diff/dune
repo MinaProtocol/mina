@@ -3,4 +3,4 @@
  (public_name staged_ledger_diff)
  (libraries core_kernel mina_base transaction_snark_work)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_jane ppx_version ppx_deriving_yojson)))
+ (preprocess (pps ppx_jane ppx_version ppx_yojson_conv)))

@@ -139,16 +139,16 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
         | Error e ->
             [%log debug]
               ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", Error_json.error_to_yojson e) ]
+                [ ("peer", Network_peer.Peer.yojson_of peer)
+                ; ("error", Error_json.error_yojson_of e) ]
               "Couldn't get best tip from peer: $error" ;
             return None
         | Ok peer_best_tip -> (
             [%log debug]
               ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson peer)
+                [ ("peer", Network_peer.Peer.yojson_of peer)
                 ; ( "length"
-                  , Length.to_yojson
+                  , Length.yojson_of
                       (External_transition.blockchain_length peer_best_tip.data)
                   ) ]
               "Successfully downloaded best tip with $length from $peer" ;
@@ -160,8 +160,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             | Error e ->
                 [%log warn]
                   ~metadata:
-                    [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ("error", Error_json.error_to_yojson e) ]
+                    [ ("peer", Network_peer.Peer.yojson_of peer)
+                    ; ("error", Error_json.error_yojson_of e) ]
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =
                   Trust_system.(
@@ -174,7 +174,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 None
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 [%log debug]
-                  ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
+                  ~metadata:[("peer", Network_peer.Peer.yojson_of peer)]
                   "Successfully verified best tip from $peer" ;
                 return
                   (Some

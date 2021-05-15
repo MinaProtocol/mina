@@ -78,7 +78,7 @@ let write ~path ~mkdir ~(password : Bytes.t Deferred.t Lazy.t) ~plaintext =
   let%bind password = lift @@ Lazy.force password in
   let sb = Secret_box.encrypt ~plaintext ~password in
   let sb =
-    Secret_box.to_yojson sb |> Yojson.Safe.to_string |> Bytes.of_string
+    Secret_box.yojson_of sb |> Yojson.Safe.to_string |> Bytes.of_string
   in
   Writer.write_bytes privkey_f sb ;
   let%bind () = lift (Unix.chmod path ~perm:0o600) in
@@ -127,7 +127,7 @@ let read ~path ~(password : Bytes.t Deferred.t Lazy.t) =
   in
   let%bind file_contents = read_all privkey_file |> to_corrupt_privkey in
   let%bind sb =
-    match Secret_box.of_yojson (Yojson.Safe.from_string file_contents) with
+    match Secret_box.t_of_yojson (Yojson.Safe.from_string file_contents) with
     | Ok sb ->
         return sb
     | Error e ->

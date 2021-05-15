@@ -88,18 +88,18 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
         (Error.of_string
            (sprintf !"%s"
               ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
-                .to_yojson (snd failed_txn)
+                .yojson_of (snd failed_txn)
               |> Yojson.Safe.to_string )))
   | Ok ([Signed_command txn], []) ->
       [%log' info (Mina_lib.top_level_logger t)]
-        ~metadata:[("command", User_command.to_yojson (Signed_command txn))]
+        ~metadata:[("command", User_command.yojson_of (Signed_command txn))]
         "Scheduled payment $command" ;
       Ok txn
   | Ok (valid_commands, invalid_commands) ->
       [%log' info (Mina_lib.top_level_logger t)]
         ~metadata:
           [ ( "valid_commands"
-            , `List (List.map ~f:User_command.to_yojson valid_commands) )
+            , `List (List.map ~f:User_command.yojson_of valid_commands) )
           ; ( "invalid_commands"
             , `List
                 (List.map
@@ -107,7 +107,7 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                      (Fn.compose
                         Network_pool.Transaction_pool.Resource_pool.Diff
                         .Diff_error
-                        .to_yojson snd)
+                        .yojson_of snd)
                    invalid_commands) ) ]
         "Invalid result from scheduling a payment" ;
       Error (Error.of_string "Internal error while scheduling a payment")

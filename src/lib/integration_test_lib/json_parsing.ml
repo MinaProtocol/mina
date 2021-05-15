@@ -19,22 +19,22 @@ let float : float parser =
 let list : 'a parser -> 'a list parser = fun f x -> List.map ~f (to_list x)
 
 let state_hash : State_hash.t parser =
-  Fn.compose Result.ok_or_failwith State_hash.of_yojson
+  Fn.compose Result.ok_or_failwith State_hash.t_of_yojson
 
 let parse (parser : 'a parser) (json : Yojson.Safe.t) : 'a Or_error.t =
   try Ok (parser json)
   with exn ->
     Or_error.errorf "failed to parse json value: %s" (Exn.to_string exn)
 
-let parser_from_of_yojson of_yojson js =
-  match of_yojson js with
+let parser_from_t_of_yojson t_of_yojson js =
+  match t_of_yojson js with
   | Ok cmd ->
       cmd
   | Error modl ->
       let logger = Logger.create () in
-      [%log error] "Could not parse JSON using of_yojson"
+      [%log error] "Could not parse JSON using t_of_yojson"
         ~metadata:[("module", `String modl); ("json", js)] ;
-      failwithf "Could not parse JSON using %s.of_yojson" modl ()
+      failwithf "Could not parse JSON using %s.t_of_yojson" modl ()
 
 let valid_commands_with_statuses :
     Mina_base.User_command.Valid.t Mina_base.With_status.t list parser =
@@ -43,8 +43,8 @@ let valid_commands_with_statuses :
       let cmd_or_errors =
         List.map cmds
           ~f:
-            (Mina_base.With_status.of_yojson
-               Mina_base.User_command.Valid.of_yojson)
+            (Mina_base.With_status.t_of_yojson
+               Mina_base.User_command.Valid.t_of_yojson)
       in
       List.fold cmd_or_errors ~init:[] ~f:(fun accum cmd_or_err ->
           match (accum, cmd_or_err) with

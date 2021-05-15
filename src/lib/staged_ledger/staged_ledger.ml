@@ -59,7 +59,7 @@ module T = struct
                  ( s
                  , Transaction_snark.Statement.hash s
                  , Yojson.Safe.to_string
-                   @@ Public_key.Compressed.to_yojson m.prover ) ))
+                   @@ Public_key.Compressed.yojson_of m.prover ) ))
       | Insufficient_work str ->
           str
       | Mismatched_statuses (transaction, status) ->
@@ -90,7 +90,7 @@ module T = struct
     let statements () =
       `List
         (List.map proofs ~f:(fun (_, s, _) ->
-             Transaction_snark.Statement.to_yojson s ))
+             Transaction_snark.Statement.yojson_of s ))
     in
     let log_error err_str ~metadata =
       [%log warn]
@@ -99,7 +99,7 @@ module T = struct
             ; ("error", `String err_str)
             ; ( "sok_messages"
               , `List
-                  (List.map proofs ~f:(fun (_, _, m) -> Sok_message.to_yojson m))
+                  (List.map proofs ~f:(fun (_, _, m) -> Sok_message.yojson_of m))
               ) ]
           @ metadata )
         "Invalid transaction snark for statement $statement: $error" ;
@@ -117,7 +117,7 @@ module T = struct
           [ ( "statements_from_proof"
             , `List
                 (List.map proofs ~f:(fun (p, _, _) ->
-                     Transaction_snark.Statement.to_yojson
+                     Transaction_snark.Statement.yojson_of
                        (Ledger_proof.statement p) )) ) ]
     else
       let start = Time.now () in
@@ -142,8 +142,8 @@ module T = struct
               [ ( "statement"
                 , `List
                     (List.map proofs ~f:(fun (_, s, _) ->
-                         Transaction_snark.Statement.to_yojson s )) )
-              ; ("error", Error_json.error_to_yojson e) ]
+                         Transaction_snark.Statement.yojson_of s )) )
+              ; ("error", Error_json.error_yojson_of e) ]
             "Verifier error when checking transaction snark for statement \
              $statement: $error" ;
           Error e
@@ -886,14 +886,14 @@ module T = struct
                 `List
                   (List.map data
                      ~f:(fun {Scan_state.Transaction_with_witness.statement; _}
-                        -> Transaction_snark.Statement.to_yojson statement ))
+                        -> Transaction_snark.Statement.yojson_of statement ))
               in
               [%log error]
                 ~metadata:
                   [ ( "scan_state"
                     , `String (Scan_state.snark_job_list_json t.scan_state) )
                   ; ("data", data_json)
-                  ; ("error", Error_json.error_to_yojson e)
+                  ; ("error", Error_json.error_yojson_of e)
                   ; ("prefix", `String log_prefix) ]
                 !"$prefix: Unexpected error when applying diff data $data to \
                   the scan_state $scan_state: $error" ) ;
@@ -1078,7 +1078,7 @@ module T = struct
       Or_error.iter_error (update_metrics new_staged_ledger witness)
         ~f:(fun e ->
           [%log error]
-            ~metadata:[("error", Error_json.error_to_yojson e)]
+            ~metadata:[("error", Error_json.error_yojson_of e)]
             !"Error updating metrics after applying staged_ledger diff: $error"
       )
     in
@@ -1554,7 +1554,7 @@ module T = struct
             res''
         | Error e ->
             [%log' error t.logger] "Error when increasing coinbase: $error"
-              ~metadata:[("error", Error_json.error_to_yojson e)] ;
+              ~metadata:[("error", Error_json.error_yojson_of e)] ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1819,12 +1819,12 @@ module T = struct
                 [%log debug]
                   ~metadata:
                     [ ( "work"
-                      , Transaction_snark_work.Checked.to_yojson cw_checked )
+                      , Transaction_snark_work.Checked.yojson_of cw_checked )
                     ; ( "work_ids"
                       , Transaction_snark_work.Statement.compact_json w )
-                    ; ("snark_fee", Currency.Fee.to_yojson cw_checked.fee)
+                    ; ("snark_fee", Currency.Fee.yojson_of cw_checked.fee)
                     ; ( "account_creation_fee"
-                      , Currency.Fee.to_yojson
+                      , Currency.Fee.yojson_of
                           constraint_constants.account_creation_fee ) ]
                   !"Staged_ledger_diff creation: Snark fee $snark_fee \
                     insufficient to create the snark worker account" ;
@@ -1832,7 +1832,7 @@ module T = struct
           | None ->
               [%log debug]
                 ~metadata:
-                  [ ("statement", Transaction_snark_work.Statement.to_yojson w)
+                  [ ("statement", Transaction_snark_work.Statement.yojson_of w)
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json w ) ]
                 !"Staged_ledger_diff creation: No snark work found for \
@@ -1854,8 +1854,8 @@ module T = struct
           | Error e ->
               [%log error]
                 ~metadata:
-                  [ ("user_command", User_command.Valid.to_yojson txn)
-                  ; ("error", Error_json.error_to_yojson e) ]
+                  [ ("user_command", User_command.Valid.yojson_of txn)
+                  ; ("error", Error_json.error_yojson_of e) ]
                 "Staged_ledger_diff creation: Skipping user command: \
                  $user_command due to error: $error" ;
               Continue (seq, count)
@@ -1897,12 +1897,12 @@ module T = struct
       ~metadata:
         [ ("proof_count", `Int proof_count)
         ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
-        ; ("diff_log", Diff_creation_log.summary_list_to_yojson summaries) ] ;
+        ; ("diff_log", Diff_creation_log.summary_list_yojson_of summaries) ] ;
     if log_block_creation then
       [%log debug] "Detailed diff creation log: $diff_log"
         ~metadata:
           [ ( "diff_log"
-            , Diff_creation_log.detail_list_to_yojson
+            , Diff_creation_log.detail_list_yojson_of
                 (List.map ~f:List.rev detailed) ) ] ;
     trace_event "prediffs done" ;
     {Staged_ledger_diff.With_valid_signatures_and_proofs.diff}

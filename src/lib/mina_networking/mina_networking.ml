@@ -233,7 +233,7 @@ module Rpcs = struct
       let name = "get_transition_chain"
 
       module T = struct
-        type query = State_hash.t list [@@deriving sexp, to_yojson]
+        type query = State_hash.t list [@@deriving sexp, yojson_of]
 
         type response = External_transition.t list option
       end
@@ -285,7 +285,7 @@ module Rpcs = struct
       let name = "get_transition_chain_proof"
 
       module T = struct
-        type query = State_hash.t [@@deriving sexp, to_yojson]
+        type query = State_hash.t [@@deriving sexp, yojson_of]
 
         type response = (State_hash.t * State_body_hash.t list) option
       end
@@ -338,7 +338,7 @@ module Rpcs = struct
       let name = "Get_transition_knowledge"
 
       module T = struct
-        type query = unit [@@deriving sexp, to_yojson]
+        type query = unit [@@deriving sexp, yojson_of]
 
         type response = State_hash.t list
       end
@@ -392,7 +392,7 @@ module Rpcs = struct
         (** NB: The state hash sent in this query should not be trusted, as it can be forged. This is ok for how this RPC is implented, as we only use the state hash for tie breaking when checking whether or not the proof is worth serving. *)
         type query =
           (Consensus.Data.Consensus_state.Value.t, State_hash.t) With_hash.t
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson_of]
 
         type response =
           ( External_transition.t
@@ -508,7 +508,7 @@ module Rpcs = struct
       let name = "get_best_tip"
 
       module T = struct
-        type query = unit [@@deriving sexp, to_yojson]
+        type query = unit [@@deriving sexp, yojson_of]
 
         type response =
           ( External_transition.t
@@ -570,17 +570,17 @@ module Rpcs = struct
         module V2 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
-                  [@to_yojson
+                  [@yojson_of
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-                  [@of_yojson
+                  [@t_of_yojson
                     function
                     | `String s ->
                         Ok (Unix.Inet_addr.of_string s)
                     | _ ->
                         Error "expected string"]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
-                  [@to_yojson fun peer_id -> `String peer_id]
-                  [@of_yojson
+                  [@yojson_of fun peer_id -> `String peer_id]
+                  [@t_of_yojson
                     function `String s -> Ok s | _ -> Error "expected string"]
             ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
@@ -596,7 +596,7 @@ module Rpcs = struct
             ; git_commit: string
             ; uptime_minutes: int
             ; block_height_opt: int option [@default None] }
-          [@@deriving to_yojson, of_yojson]
+          [@@deriving yojson_of, t_of_yojson]
 
           let to_latest = Fn.id
         end
@@ -604,17 +604,17 @@ module Rpcs = struct
         module V1 = struct
           type t =
             { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
-                  [@to_yojson
+                  [@yojson_of
                     fun ip_addr -> `String (Unix.Inet_addr.to_string ip_addr)]
-                  [@of_yojson
+                  [@t_of_yojson
                     function
                     | `String s ->
                         Ok (Unix.Inet_addr.of_string s)
                     | _ ->
                         Error "expected string"]
             ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
-                  [@to_yojson fun peer_id -> `String peer_id]
-                  [@of_yojson
+                  [@yojson_of fun peer_id -> `String peer_id]
+                  [@t_of_yojson
                     function `String s -> Ok s | _ -> Error "expected string"]
             ; sync_status: Sync_status.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
@@ -629,7 +629,7 @@ module Rpcs = struct
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int }
-          [@@deriving to_yojson, of_yojson]
+          [@@deriving yojson_of, t_of_yojson]
 
           let to_latest status : Latest.t =
             { node_ip_addr= status.node_ip_addr
@@ -652,7 +652,7 @@ module Rpcs = struct
       let name = "get_node_status"
 
       module T = struct
-        type query = unit [@@deriving sexp, to_yojson]
+        type query = unit [@@deriving sexp, yojson_of]
 
         type response = Node_status.t Or_error.t
       end
@@ -665,12 +665,12 @@ module Rpcs = struct
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
-    let response_to_yojson response =
+    let response_yojson_of response =
       match response with
       | Ok status ->
-          Node_status.Stable.Latest.to_yojson status
+          Node_status.Stable.Latest.yojson_of status
       | Error err ->
-          `Assoc [("error", Error_json.error_to_yojson err)]
+          `Assoc [("error", Error_json.error_yojson_of err)]
 
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
@@ -1036,7 +1036,7 @@ let create (config : Config.t)
   let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc conn ~version:_
       hash =
     let action_msg = "Staged ledger and pending coinbases at hash: $hash" in
-    let msg_args = [("hash", State_hash.to_yojson hash)] in
+    let msg_args = [("hash", State_hash.yojson_of hash)] in
     let%bind result, sender =
       run_for_rpc_result conn hash
         ~f:get_staged_ledger_aux_and_pending_coinbases_at_hash action_msg
@@ -1049,7 +1049,7 @@ let create (config : Config.t)
     let%bind result, sender =
       run_for_rpc_result conn sync_query ~f:answer_sync_ledger_query
         "Answer_sync_ledger_query: $query"
-        [("query", Sync_ledger.Query.to_yojson query)]
+        [("query", Sync_ledger.Query.yojson_of query)]
     in
     let%bind () =
       match result with
@@ -1066,20 +1066,20 @@ let create (config : Config.t)
                   , Some
                       ( "Sync ledger query with hash: $hash, query: $query, \
                          with error: $error"
-                      , [ ("hash", Ledger_hash.to_yojson hash)
+                      , [ ("hash", Ledger_hash.yojson_of hash)
                         ; ( "query"
-                          , Syncable_ledger.Query.to_yojson
-                              Ledger.Addr.to_yojson query )
-                        ; ("error", Error_json.error_to_yojson err) ] ) ))
+                          , Syncable_ledger.Query.yojson_of
+                              Ledger.Addr.yojson_of query )
+                        ; ("error", Error_json.error_yojson_of err) ] ) ))
           else return ()
     in
     return result
   in
-  let md p = [("peer", Peer.to_yojson p)] in
+  let md p = [("peer", Peer.yojson_of p)] in
   let get_ancestry_rpc conn ~version:_ query =
     [%log debug] "Sending root proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_ancestry query: $query" in
-    let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
+    let msg_args = [("query", Rpcs.Get_ancestry.query_yojson_of query)] in
     let%bind result, sender =
       run_for_rpc_result conn query ~f:get_ancestry action_msg msg_args
     in
@@ -1104,7 +1104,7 @@ let create (config : Config.t)
   let get_best_tip_rpc conn ~version:_ (() : unit) =
     [%log debug] "Sending best_tip to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_best_tip. query: $query" in
-    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson ())] in
+    let msg_args = [("query", Rpcs.Get_best_tip.query_yojson_of ())] in
     let%bind result, sender =
       run_for_rpc_result conn () ~f:get_best_tip action_msg msg_args
     in
@@ -1128,7 +1128,7 @@ let create (config : Config.t)
     [%log info] "Sending transition_chain_proof to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
     let msg_args =
-      [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
+      [("query", Rpcs.Get_transition_chain_proof.query_yojson_of query)]
     in
     let%bind result, sender =
       run_for_rpc_result conn query ~f:get_transition_chain_proof action_msg
@@ -1140,7 +1140,7 @@ let create (config : Config.t)
     [%log info] "Sending transition_knowledge to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_knowledge query: $query" in
     let msg_args =
-      [("query", Rpcs.Get_transition_knowledge.query_to_yojson query)]
+      [("query", Rpcs.Get_transition_knowledge.query_yojson_of query)]
     in
     run_for_rpc_result conn query ~f:get_transition_knowledge action_msg
       msg_args
@@ -1150,7 +1150,7 @@ let create (config : Config.t)
     [%log info] "Sending transition_chain to $peer" ~metadata:(md conn) ;
     let action_msg = "Get_transition_chain query: $query" in
     let msg_args =
-      [("query", Rpcs.Get_transition_chain.query_to_yojson query)]
+      [("query", Rpcs.Get_transition_chain.query_yojson_of query)]
     in
     let%bind result, sender =
       run_for_rpc_result conn query ~f:get_transition_chain action_msg msg_args
@@ -1173,7 +1173,7 @@ let create (config : Config.t)
     (* the port in `conn' is an ephemeral port, not of interest *)
     [%log warn] "Node banned by peer $peer until $ban_until"
       ~metadata:
-        [ ("peer", Peer.to_yojson conn)
+        [ ("peer", Peer.yojson_of conn)
         ; ( "ban_until"
           , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) ) ] ;
     (* no computation to do; we're just getting notification *)
@@ -1254,7 +1254,7 @@ let create (config : Config.t)
           Deferred.unit
       | Ok data ->
           Gossip_net.Any.set_node_status gossip_net
-            ( Rpcs.Get_node_status.Node_status.to_yojson data
+            ( Rpcs.Get_node_status.Node_status.yojson_of data
             |> Yojson.Safe.to_string )
           >>| ignore ) ;
   don't_wait_for
@@ -1295,7 +1295,7 @@ let create (config : Config.t)
             if config.log_gossip_heard.new_state then
               [%str_log info]
                 ~metadata:
-                  [("external_transition", External_transition.to_yojson state)]
+                  [("external_transition", External_transition.yojson_of state)]
                 (Block_received
                    { state_hash= External_transition.state_hash state
                    ; sender= Envelope.Incoming.sender envelope }) ;
@@ -1343,7 +1343,7 @@ include struct
     let%bind s = get_peer_node_status t.gossip_net peer in
     Or_error.try_with (fun () ->
         match
-          Rpcs.Get_node_status.Node_status.of_yojson
+          Rpcs.Get_node_status.Node_status.t_of_yojson
             (Yojson.Safe.from_string s)
         with
         | Ok x ->
@@ -1391,14 +1391,14 @@ let fill_first_received_message_signal {first_received_message_signal; _} =
 (* TODO: Have better pushback behavior *)
 let broadcast t ~log_msg msg =
   [%str_log' trace t.logger]
-    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    ~metadata:[("message", Gossip_net.Message.msg_yojson_of msg)]
     log_msg ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
 let broadcast_state t state =
   let msg = Gossip_net.Message.New_state (With_hash.data state) in
   [%str_log' info t.logger]
-    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    ~metadata:[("message", Gossip_net.Message.msg_yojson_of msg)]
     (Gossip_new_state {state_hash= With_hash.hash state}) ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
@@ -1541,7 +1541,7 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
                   ( Outgoing_connection_error
                   , Some
                       ( "Error while doing RPC"
-                      , [("error", Error_json.error_to_yojson e)] ) ))
+                      , [("error", Error_json.error_yojson_of e)] ) ))
         | Local ->
             return ()
       in
@@ -1562,7 +1562,7 @@ module Sl_downloader = struct
   module Key = struct
     module T = struct
       type t = Ledger_hash.t * Sync_ledger.Query.t
-      [@@deriving hash, compare, sexp, to_yojson]
+      [@@deriving hash, compare, sexp, yojson_of]
     end
 
     include T
@@ -1573,7 +1573,7 @@ module Sl_downloader = struct
   include Downloader.Make
             (Key)
             (struct
-              type t = unit [@@deriving to_yojson]
+              type t = unit [@@deriving yojson_of]
 
               let download : t = ()
 
@@ -1583,7 +1583,7 @@ module Sl_downloader = struct
               type t =
                 (Mina_base.Ledger_hash.t * Mina_base.Sync_ledger.Query.t)
                 * Mina_base.Sync_ledger.Answer.t
-              [@@deriving to_yojson]
+              [@@deriving yojson_of]
 
               let key = fst
             end)

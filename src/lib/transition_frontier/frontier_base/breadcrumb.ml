@@ -35,14 +35,14 @@ module T = struct
     ; just_emitted_a_proof
     ; transition_receipt_time }
 
-  let to_yojson
+  let yojson_of_t
       { validated_transition
       ; staged_ledger= _
       ; just_emitted_a_proof
       ; transition_receipt_time } =
     `Assoc
       [ ( "validated_transition"
-        , External_transition.Validated.to_yojson validated_transition )
+        , External_transition.Validated.yojson_of validated_transition )
       ; ("staged_ledger", `String "<opaque>")
       ; ("just_emitted_a_proof", `Bool just_emitted_a_proof)
       ; ( "transition_receipt_time"
@@ -58,7 +58,7 @@ T.
   , staged_ledger
   , just_emitted_a_proof
   , transition_receipt_time
-  , to_yojson )]
+  , yojson_of )]
 
 include Allocation_functor.Make.Sexp (T)
 
@@ -439,7 +439,7 @@ module For_tests = struct
           [%log info]
             ~metadata:
               [ ( "state_hash"
-                , state_hash new_breadcrumb |> State_hash.to_yojson ) ]
+                , state_hash new_breadcrumb |> State_hash.yojson_of ) ]
             "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
       | Error (`Fatal_error exn) ->

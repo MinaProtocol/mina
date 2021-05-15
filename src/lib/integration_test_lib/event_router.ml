@@ -76,7 +76,7 @@ module Make (Engine : Intf.Engine.S) () :
       (Pipe.iter event_reader ~f:(fun (node, event) ->
            [%log debug] "Dispatching event $event for $node"
              ~metadata:
-               [ ("event", Event_type.event_to_yojson event)
+               [ ("event", Event_type.event_yojson_of event)
                ; ("node", `String (Node.id node)) ] ;
            dispatch_event handlers node event )) ;
     {logger; handlers}

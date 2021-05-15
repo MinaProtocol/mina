@@ -92,7 +92,7 @@ module type Protocol_state = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('state_hash, 'body) t [@@deriving eq, hash, sexp, to_yojson]
+        type ('state_hash, 'body) t [@@deriving eq, hash, sexp, yojson_of]
       end
     end]
   end
@@ -118,7 +118,7 @@ module type Protocol_state = sig
             , consensus_state
             , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
-          [@@deriving sexp, to_yojson]
+          [@@deriving sexp, yojson_of]
         end
       end]
     end
@@ -325,7 +325,7 @@ module type S = sig
         end
       end
 
-      type t [@@deriving to_yojson]
+      type t [@@deriving yojson_of]
 
       val create :
            Signature_lib.Public_key.Compressed.Set.t
@@ -374,7 +374,7 @@ module type S = sig
         end
       end]
 
-      type t = Stable.Latest.t [@@deriving to_yojson, sexp]
+      type t = Stable.Latest.t [@@deriving yojson_of, sexp]
 
       val genesis_data : genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> t
 
@@ -397,7 +397,7 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving sexp, to_yojson]
+            type t [@@deriving sexp, yojson_of]
           end
         end]
       end
@@ -669,7 +669,7 @@ module type S = sig
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
     (** Data needed to synchronize the local state. *)
-    type local_state_sync [@@deriving to_yojson]
+    type local_state_sync [@@deriving yojson_of]
 
     (**
      * Predicate indicating whether or not the local state requires synchronization.

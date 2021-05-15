@@ -124,14 +124,14 @@ let validate_transaction =
                        error:%s@."
                       (Yojson.Safe.pretty_to_string transaction_json)
                       (Yojson.Safe.pretty_to_string
-                         (Error_json.error_to_yojson err)) )
+                         (Error_json.error_yojson_of err)) )
               jsons )
       with
     | Ok () ->
         ()
     | Error err ->
         Format.eprintf "Error:@.%s@.@."
-          (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+          (Yojson.Safe.pretty_to_string (Error_json.error_yojson_of err)) ;
         Format.printf "Invalid transaction.@." ;
         Core_kernel.exit 1 ) ;
     if !num_fails > 0 then (

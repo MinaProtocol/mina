@@ -9,18 +9,18 @@ module Level = struct
     try Ok (t_of_sexp (Sexp.Atom str))
     with Sexp.Of_sexp_error (err, _) -> Error (Exn.to_string err)
 
-  let to_yojson t = `String (show t)
+  let yojson_of_t t = `String (show t)
 
-  let of_yojson json = of_string @@ Yojson.Safe.Util.to_string json
+  let t_t_of_yojson json = of_string @@ Yojson.Safe.Util.to_string json
 end
 
 (* Core modules extended with Yojson converters *)
 module Time = struct
   include Time
 
-  let to_yojson t = `String (Time.to_string_abs t ~zone:Zone.utc)
+  let yojson_of_t t = `String (Time.to_string_abs t ~zone:Zone.utc)
 
-  let of_yojson json =
+  let t_t_of_yojson json =
     json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
 end
 
@@ -39,9 +39,9 @@ module Metadata = struct
 
       let to_latest = Fn.id
 
-      let to_yojson t = `Assoc (String.Map.to_alist t)
+      let yojson_of_t t = `Assoc (String.Map.to_alist t)
 
-      let of_yojson = function
+      let t_t_of_yojson = function
         | `Assoc alist ->
             Ok (String.Map.of_alist_exn alist)
         | _ ->
@@ -52,10 +52,10 @@ module Metadata = struct
                 (struct
                   type nonrec t = t
 
-                  let to_binable t = to_yojson t |> Yojson.Safe.to_string
+                  let to_binable t = yojson_of t |> Yojson.Safe.to_string
 
                   let of_binable (t : string) : t =
-                    Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                    Yojson.Safe.from_string t |> t_of_yojson |> Result.ok
                     |> Option.value_exn
                 end)
     end
@@ -63,9 +63,9 @@ module Metadata = struct
 
   let empty = String.Map.empty
 
-  let to_yojson = Stable.Latest.to_yojson
+  let yojson_of_t = Stable.Latest.yojson_of
 
-  let of_yojson = Stable.Latest.of_yojson
+  let t_t_of_yojson = Stable.Latest.t_of_yojson
 
   let of_alist_exn = String.Map.of_alist_exn
 
@@ -124,7 +124,7 @@ module Processor = struct
       if Level.compare msg.level log_level < 0 then None
       else
         let msg_json_fields =
-          Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
+          Message.yojson_of msg |> Yojson.Safe.Util.to_assoc
         in
         let json =
           if Level.compare msg.level Level.Spam = 0 then
@@ -354,7 +354,7 @@ let raw ({id; _} as t) msg =
 
 let add_tags_to_metadata metadata tags =
   Option.value_map tags ~default:metadata ~f:(fun tags ->
-      let tags_item = ("tags", `List (List.map tags ~f:Tags.to_yojson)) in
+      let tags_item = ("tags", `List (List.map tags ~f:Tags.yojson_of)) in
       tags_item :: metadata )
 
 let log t ~level ~module_ ~location ?tags ?(metadata = []) ?event_id fmt =

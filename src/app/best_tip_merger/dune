@@ -7,7 +7,7 @@
     async
     core_kernel
     logger
-    ppx_deriving_yojson.runtime
+    ppx_yojson_conv_lib
     lib
     cli_lib
     yojson
@@ -16,7 +16,7 @@
  (preprocess (pps
     ppx_coda
     ppx_deriving.show
-    ppx_deriving_yojson
+    ppx_yojson_conv
     ppx_jane
     ppx_version
     ppx_deriving.eq))

@@ -78,7 +78,7 @@ module Rpcs : sig
   end
 
   module Get_best_tip : sig
-    type query = unit [@@deriving sexp, to_yojson]
+    type query = unit [@@deriving sexp, yojson_of]
 
     type response =
       ( External_transition.t
@@ -113,15 +113,15 @@ module Rpcs : sig
       end]
     end
 
-    type query = unit [@@deriving sexp, to_yojson]
+    type query = unit [@@deriving sexp, yojson_of]
 
-    type response = Node_status.t Or_error.t [@@deriving to_yojson]
+    type response = Node_status.t Or_error.t [@@deriving yojson_of]
   end
 
   module Get_some_initial_peers : sig
-    type query = unit [@@deriving sexp, to_yojson]
+    type query = unit [@@deriving sexp, yojson_of]
 
-    type response = Network_peer.Peer.t list [@@deriving to_yojson]
+    type response = Network_peer.Peer.t list [@@deriving yojson_of]
   end
 
   type ('query, 'response) rpc =

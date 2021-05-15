@@ -196,7 +196,7 @@ module Make (Engine : Intf.Engine.S) () :
            DynArray.add acc (node, message) ;
            if message.level = Fatal then (
              [%log fatal] "Error occured $error"
-               ~metadata:[("error", Logger.Message.to_yojson message)] ;
+               ~metadata:[("error", Logger.Message.yojson_of message)] ;
              on_fatal_error message ) ;
            Deferred.return `Continue )) ;
     log_error_accumulator

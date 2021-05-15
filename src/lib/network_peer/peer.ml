@@ -41,13 +41,13 @@ module Stable = struct
 
     let hash : t -> int = Ppx_hash_lib.Std.Hash.of_fold hash_fold_t
 
-    let to_yojson {host; peer_id; libp2p_port} =
+    let yojson_of_t {host; peer_id; libp2p_port} =
       `Assoc
         [ ("host", `String (Unix.Inet_addr.to_string host))
         ; ("peer_id", `String peer_id)
         ; ("libp2p_port", `Int libp2p_port) ]
 
-    let of_yojson =
+    let t_t_of_yojson =
       let lift_string = function `String s -> Some s | _ -> None in
       let lift_int = function `Int n -> Some n | _ -> None in
       function
@@ -76,7 +76,7 @@ type t = Stable.Latest.t =
 [@@deriving compare, sexp]
 
 [%%define_locally
-Stable.Latest.(of_yojson, to_yojson)]
+Stable.Latest.(t_of_yojson, yojson_of)]
 
 include Hashable.Make (Stable.Latest)
 include Comparable.Make_binable (Stable.Latest)

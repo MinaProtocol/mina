@@ -21,17 +21,17 @@ let build_subtrees_of_breadcrumbs ~logger ~precomputed_values ~verifier
     | None ->
         [%log error]
           ~metadata:
-            [ ("state_hash", Mina_base.State_hash.to_yojson initial_hash)
+            [ ("state_hash", Mina_base.State_hash.yojson_of initial_hash)
             ; ( "transition_hashes"
               , `List
                   (List.map subtrees_of_enveloped_transitions
                      ~f:(fun subtree ->
-                       Rose_tree.to_yojson
+                       Rose_tree.yojson_of
                          (fun enveloped_transitions ->
                            Cached.peek enveloped_transitions
                            |> Envelope.Incoming.data
                            |> External_transition.Initial_validated.state_hash
-                           |> Mina_base.State_hash.to_yojson )
+                           |> Mina_base.State_hash.yojson_of )
                          subtree )) ) ]
           "Transition frontier already garbage-collected the parent of \
            $state_hash" ;

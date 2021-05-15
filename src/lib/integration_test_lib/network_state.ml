@@ -11,7 +11,7 @@ module Make
    and module Event_router := Event_router = struct
   module Node = Engine.Network.Node
 
-  let map_to_yojson m ~f = `Assoc String.Map.(m |> map ~f |> to_alist)
+  let map_yojson_of m ~f = `Assoc String.Map.(m |> map ~f |> to_alist)
 
   (* TODO: Just replace the first 3 fields here with Protocol_state *)
   type t =
@@ -21,12 +21,12 @@ module Make
     ; snarked_ledgers_generated: int
     ; blocks_generated: int
     ; node_initialization: bool String.Map.t
-          [@to_yojson map_to_yojson ~f:(fun b -> `Bool b)]
+          [@yojson_of map_yojson_of ~f:(fun b -> `Bool b)]
     ; gossip_received: Gossip_state.t String.Map.t
-          [@to_yojson map_to_yojson ~f:Gossip_state.to_yojson]
+          [@yojson_of map_yojson_of ~f:Gossip_state.yojson_of]
     ; best_tips_by_node: State_hash.t String.Map.t
-          [@to_yojson map_to_yojson ~f:State_hash.to_yojson] }
-  [@@deriving to_yojson]
+          [@yojson_of map_yojson_of ~f:State_hash.yojson_of] }
+  [@@deriving yojson_of]
 
   let empty =
     { block_height= 0
@@ -44,7 +44,7 @@ module Make
       (* should be safe to ignore the write here, so long as `f` is synchronous *)
       let state = f (Broadcast_pipe.Reader.peek r) in
       [%log debug] "updated network state to: $state"
-        ~metadata:[("state", to_yojson state)] ;
+        ~metadata:[("state", yojson_of state)] ;
       ignore (Broadcast_pipe.Writer.write w state) ;
       Deferred.return `Continue
     in
@@ -106,7 +106,7 @@ module Make
                          [%log debug] "GOSSIP RECEIVED recevied event: $event"
                            ~metadata:
                              [ ( "event"
-                               , Event_type.event_to_yojson
+                               , Event_type.event_yojson_of
                                    (Event_type.Event
                                       (event_type, gossip_with_direction)) ) ] ;
                          Gossip_state.add gossip_state event_type

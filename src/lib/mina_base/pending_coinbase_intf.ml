@@ -18,11 +18,11 @@ open Signature_lib
 open Currency
 
 module type S = sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson_of]
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, to_yojson, version]
+      type nonrec t = t [@@deriving bin_io, sexp, yojson_of, version]
     end
 
     module Latest = V1
@@ -32,13 +32,13 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-        [@@deriving sexp, bin_io, to_yojson]
+        [@@deriving sexp, bin_io, yojson_of]
       end
 
       module Latest = V1
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+    type t = Stable.Latest.t [@@deriving sexp, yojson_of]
 
     type var = Public_key.Compressed.var * Amount.var
 
@@ -171,7 +171,7 @@ module type S = sig
             | Update_one
             | Update_two_coinbase_in_first
             | Update_two_coinbase_in_second
-          [@@deriving sexp, to_yojson]
+          [@@deriving sexp, yojson_of]
         end
       end]
 
@@ -197,7 +197,7 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson_of]
       end
     end]
 

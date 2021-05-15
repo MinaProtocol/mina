@@ -10,7 +10,7 @@ type t =
   { network_identifier: Network_identifier.t
   ; unsigned_transaction: string
   ; signatures: Signature.t list }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** ConstructionCombineRequest is the input to the `/construction/combine` endpoint. It contains the unsigned transaction blob returned by `/construction/payloads` and all required signatures to create a network transaction. *)
 let create (network_identifier : Network_identifier.t)

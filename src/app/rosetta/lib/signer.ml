@@ -22,7 +22,7 @@ module Keys = struct
   let of_private_key_box secret_box_string =
     let json = Yojson.Safe.from_string secret_box_string in
     let sb : Secrets.Secret_box.t =
-      Secrets.Secret_box.of_yojson json |> Result.ok |> Option.value_exn
+      Secrets.Secret_box.t_of_yojson json |> Result.ok |> Option.value_exn
     in
     let output : Bytes.t =
       Secrets.Secret_box.decrypt ~password:(Bytes.of_string "") sb
@@ -41,7 +41,7 @@ let sign ~(keys : Keys.t) ~unsigned_transaction_string =
     with _ -> Result.fail (Errors.create (`Json_parse None))
   in
   let%map unsigned_transaction =
-    Transaction.Unsigned.Rendered.of_yojson json
+    Transaction.Unsigned.Rendered.t_of_yojson json
     |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
     |> Result.bind ~f:Transaction.Unsigned.of_rendered
   in
@@ -68,7 +68,7 @@ let verify ~public_key_hex_bytes ~signed_transaction_string =
     with _ -> Result.fail (Errors.create (`Json_parse None))
   in
   let%bind signed_transaction =
-    Transaction.Signed.Rendered.of_yojson json
+    Transaction.Signed.Rendered.t_of_yojson json
     |> Result.map_error ~f:(fun e -> Errors.create (`Json_parse (Some e)))
     |> Result.bind ~f:Transaction.Signed.of_rendered
   in

@@ -47,7 +47,7 @@ module Chain_hash = struct
       let to_latest = Fn.id
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      yojson_of, t_of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)

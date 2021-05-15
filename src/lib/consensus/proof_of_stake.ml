@@ -229,11 +229,11 @@ module Data = struct
       let delegators t key =
         Public_key.Compressed.Table.find t.delegatee_table key
 
-      let to_yojson {ledger; delegatee_table} =
+      let yojson_of_t {ledger; delegatee_table} =
         `Assoc
           [ ( "ledger_hash"
             , Ledger_snapshot.merkle_root ledger
-              |> Mina_base.Ledger_hash.to_yojson )
+              |> Mina_base.Ledger_hash.yojson_of )
           ; ( "delegators"
             , `Assoc
                 ( Hashtbl.to_alist delegatee_table
@@ -243,7 +243,7 @@ module Data = struct
                            ( Hashtbl.to_alist delegators
                            |> List.map ~f:(fun (addr, account) ->
                                   ( Int.to_string addr
-                                  , Mina_base.Account.to_yojson account ) ) )
+                                  , Mina_base.Account.yojson_of account ) ) )
                        ) ) ) ) ]
 
       let ledger t = t.ledger
@@ -268,24 +268,24 @@ module Data = struct
         ; mutable epoch_ledger_uuids: epoch_ledger_uuids
         ; epoch_ledger_location: string }
 
-      let to_yojson t =
+      let yojson_of_t t =
         `Assoc
           [ ( "staking_epoch_snapshot"
-            , [%to_yojson: Snapshot.t] t.staking_epoch_snapshot )
+            , [%yojson_of: Snapshot.t] t.staking_epoch_snapshot )
           ; ( "next_epoch_snapshot"
-            , [%to_yojson: Snapshot.t] t.next_epoch_snapshot )
+            , [%yojson_of: Snapshot.t] t.next_epoch_snapshot )
           ; ( "last_checked_slot_and_epoch"
             , `Assoc
                 ( Public_key.Compressed.Table.to_alist
                     t.last_checked_slot_and_epoch
                 |> List.map ~f:(fun (key, epoch_and_slot) ->
                        ( Public_key.Compressed.to_string key
-                       , [%to_yojson: Epoch.t * Slot.t] epoch_and_slot ) ) ) )
+                       , [%yojson_of: Epoch.t * Slot.t] epoch_and_slot ) ) ) )
           ]
     end
 
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
-    type t = Data.t ref [@@deriving to_yojson]
+    type t = Data.t ref [@@deriving yojson_of]
 
     let staking_epoch_ledger_location (t : t) =
       !t.epoch_ledger_location ^ Uuid.to_string !t.epoch_ledger_uuids.staking
@@ -312,12 +312,12 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
-    let epoch_ledger_uuids_to_yojson Data.{staking; next; genesis_state_hash} =
+    let epoch_ledger_uuids_yojson_of Data.{staking; next; genesis_state_hash} =
       `Assoc
         [ ("staking", `String (Uuid.to_string staking))
         ; ("next", `String (Uuid.to_string next))
         ; ( "genesis_state_hash"
-          , Mina_base.State_hash.to_yojson genesis_state_hash ) ]
+          , Mina_base.State_hash.yojson_of genesis_state_hash ) ]
 
     let epoch_ledger_uuids_from_file location =
       let open Yojson.Safe.Util in
@@ -332,7 +332,7 @@ module Data = struct
       let%bind staking = json |> member "staking" |> to_string |> uuid in
       let%bind next = json |> member "next" |> to_string |> uuid in
       let%map genesis_state_hash =
-        json |> member "genesis_state_hash" |> Mina_base.State_hash.of_yojson
+        json |> member "genesis_state_hash" |> Mina_base.State_hash.t_of_yojson
       in
       Data.{staking; next; genesis_state_hash}
 
@@ -368,7 +368,7 @@ module Data = struct
             ; genesis_state_hash }
         in
         Yojson.Safe.to_file epoch_ledger_uuids_location
-          (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
+          (epoch_ledger_uuids_yojson_of epoch_ledger_uuids) ;
         epoch_ledger_uuids
       in
       let ledger_location uuid = epoch_ledger_location ^ Uuid.to_string uuid in
@@ -405,7 +405,7 @@ module Data = struct
                at locations $staking and $next"
               ~metadata:
                 [ ( "state_hash"
-                  , Mina_base.State_hash.to_yojson
+                  , Mina_base.State_hash.yojson_of
                       epoch_ledger_uuids.genesis_state_hash )
                 ; ("staking", `String staking_ledger_location)
                 ; ("next", `String next_ledger_location) ] ;
@@ -474,7 +474,7 @@ module Data = struct
         ; epoch_ledger_location= old.epoch_ledger_location }
 
     type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
-    [@@deriving to_yojson]
+    [@@deriving yojson_of]
 
     let get_snapshot (t : t) id =
       match id with
@@ -691,21 +691,21 @@ module Data = struct
           module V1 = struct
             type t = string [@@deriving sexp, eq, compare, hash]
 
-            let to_yojson t =
+            let yojson_of_t t =
               `String (Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet t)
 
-            let of_yojson = function
+            let t_t_of_yojson = function
               | `String s ->
                   Result.map_error
                       (Base64.decode ~alphabet:Base64.uri_safe_alphabet s)
                       ~f:(function `Msg err ->
                       sprintf
                         "Error decoding vrf output in \
-                         Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
+                         Vrf.Output.Truncated.Stable.V1.t_of_yojson: %s"
                         err )
               | _ ->
                   Error
-                    "Vrf.Output.Truncated.Stable.V1.of_yojson: Expected a \
+                    "Vrf.Output.Truncated.Stable.V1.t_of_yojson: Expected a \
                      string"
 
             let to_latest = Fn.id
@@ -1072,7 +1072,7 @@ module Data = struct
                   [ ( "delegator"
                     , `Int (Mina_base.Account.Index.to_int delegator) )
                   ; ( "delegator_pk"
-                    , Public_key.Compressed.to_yojson account.public_key )
+                    , Public_key.Compressed.yojson_of account.public_key )
                   ; ("balance", `Int (Balance.to_int account.balance))
                   ; ("amount", `Int (Amount.to_int total_stake))
                   ; ( "result"
@@ -1118,7 +1118,7 @@ module Data = struct
     module Stable = struct
       module V1 = struct
         type t = Mina_base.State_hash.Stable.V1.t option
-        [@@deriving sexp, compare, hash, to_yojson]
+        [@@deriving sexp, compare, hash, yojson_of]
 
         let to_latest = Fn.id
       end
@@ -1129,7 +1129,7 @@ module Data = struct
     include Mina_base.Epoch_data
 
     module Make (Lock_checkpoint : sig
-      type t [@@deriving sexp, compare, hash, to_yojson]
+      type t [@@deriving sexp, compare, hash, yojson_of]
 
       val typ : (Mina_base.State_hash.var, t) Typ.t
 
@@ -1155,7 +1155,7 @@ module Data = struct
           , Lock_checkpoint.t
           , Length.t )
           Poly.t
-        [@@deriving sexp, compare, hash, to_yojson]
+        [@@deriving sexp, compare, hash, yojson_of]
       end
 
       let data_spec =
@@ -2736,8 +2736,8 @@ module Hooks = struct
         Deferred.create (fun ivar ->
             [%log info]
               ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson conn)
-                ; ("ledger_hash", Mina_base.Ledger_hash.to_yojson ledger_hash)
+                [ ("peer", Network_peer.Peer.yojson_of conn)
+                ; ("ledger_hash", Mina_base.Ledger_hash.yojson_of ledger_hash)
                 ]
               "Serving epoch ledger query with hash $ledger_hash from $peer" ;
             let response =
@@ -2781,10 +2781,10 @@ module Hooks = struct
             Result.iter_error response ~f:(fun err ->
                 [%log info]
                   ~metadata:
-                    [ ("peer", Network_peer.Peer.to_yojson conn)
+                    [ ("peer", Network_peer.Peer.yojson_of conn)
                     ; ("error", `String err)
                     ; ( "ledger_hash"
-                      , Mina_base.Ledger_hash.to_yojson ledger_hash ) ]
+                      , Mina_base.Ledger_hash.yojson_of ledger_hash ) ]
                   "Failed to serve epoch ledger query with hash $ledger_hash \
                    from $peer: $error" ) ;
             if Ivar.is_full ivar then [%log error] "Ivar.fill bug is here!" ;
@@ -2911,14 +2911,14 @@ module Hooks = struct
   type required_snapshot =
     { snapshot_id: Local_state.snapshot_identifier
     ; expected_root: Mina_base.Frozen_ledger_hash.t }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   type local_state_sync =
     | One of required_snapshot
     | Both of
         { next: Mina_base.Frozen_ledger_hash.t
         ; staking: Mina_base.Frozen_ledger_hash.t }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   let local_state_sync_count (s : local_state_sync) =
     match s with One _ -> 1 | Both _ -> 2
@@ -2968,8 +2968,8 @@ module Hooks = struct
       "Syncing local state; requesting $num_requested snapshots from peers"
       ~metadata:
         [ ("num_requested", `Int (local_state_sync_count requested_syncs))
-        ; ("requested_syncs", local_state_sync_to_yojson requested_syncs)
-        ; ("local_state", Local_state.to_yojson local_state) ] ;
+        ; ("requested_syncs", local_state_sync_yojson_of requested_syncs)
+        ; ("local_state", Local_state.yojson_of local_state) ] ;
     let sync {snapshot_id; expected_root= target_ledger_hash} =
       (* if requested last epoch ledger is equal to the current epoch ledger
          then we don't need make a rpc call to the peers. *)
@@ -3029,8 +3029,8 @@ module Hooks = struct
                   | Error e ->
                       [%log faulty_peer_without_punishment]
                         ~metadata:
-                          [ ("peer", Network_peer.Peer.to_yojson peer)
-                          ; ("error", Error_json.error_to_yojson e) ]
+                          [ ("peer", Network_peer.Peer.yojson_of peer)
+                          ; ("error", Error_json.error_yojson_of e) ]
                         "Peer $peer failed to serve requested epoch ledger: \
                          $error" ;
                       return (Error e) )
@@ -3038,7 +3038,7 @@ module Hooks = struct
                     (* TODO figure out punishments here. *)
                     [%log faulty_peer_without_punishment]
                       ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
+                        [ ("peer", Network_peer.Peer.yojson_of peer)
                         ; ("error", `String err) ]
                       "Peer $peer failed to serve requested epoch ledger: \
                        $error" ;
@@ -3046,7 +3046,7 @@ module Hooks = struct
                 | Connected {data= Error err; _} ->
                     [%log faulty_peer_without_punishment]
                       ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
+                        [ ("peer", Network_peer.Peer.yojson_of peer)
                         ; ("error", `String (Error.to_string_mach err)) ]
                       "Peer $peer failed to serve requested epoch ledger: \
                        $error" ;
@@ -3054,8 +3054,8 @@ module Hooks = struct
                 | Failed_to_connect err ->
                     [%log faulty_peer_without_punishment]
                       ~metadata:
-                        [ ("peer", Network_peer.Peer.to_yojson peer)
-                        ; ("error", Error_json.error_to_yojson err) ]
+                        [ ("peer", Network_peer.Peer.yojson_of peer)
+                        ; ("error", Error_json.error_yojson_of err) ]
                       "Failed to connect to $peer to retrieve epoch ledger: \
                        $error" ;
                     return (Error err) ) )
@@ -3139,8 +3139,8 @@ module Hooks = struct
     in
     [%log debug] "Selecting best consensus state"
       ~metadata:
-        [ ("existing", Consensus_state.Value.to_yojson existing)
-        ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
+        [ ("existing", Consensus_state.Value.yojson_of existing)
+        ; ("candidate", Consensus_state.Value.yojson_of candidate) ] ;
     (* TODO: add fork_before_checkpoint check *)
     (* Each branch contains a precondition predicate and a choice predicate,
      * which takes the new state when true. Each predicate is also decorated
@@ -3270,7 +3270,7 @@ module Hooks = struct
           [%log debug]
             ~metadata:
               [ ( "ledger_hash"
-                , Mina_base.Frozen_ledger_hash.to_yojson snapshot_ledger_hash
+                , Mina_base.Frozen_ledger_hash.yojson_of snapshot_ledger_hash
                 ) ]
             !"Using %s_epoch_snapshot root hash $ledger_hash"
             (epoch_snapshot_name source) ;
@@ -3311,8 +3311,8 @@ module Hooks = struct
                           "Checking slot-winner for slot $slot which is older \
                            than the slot in the latest consensus state $state"
                           ~metadata:
-                            [ ("slot", Global_slot.to_yojson global_slot)
-                            ; ("state", Consensus_state.Value.to_yojson state)
+                            [ ("slot", Global_slot.yojson_of global_slot)
+                            ; ("state", Consensus_state.Value.yojson_of state)
                             ] ;
                         failwith
                           "Checking slot-winner for a slot which is older \
@@ -3415,7 +3415,7 @@ module Hooks = struct
         !local_state.epoch_ledger_uuids <- epoch_ledger_uuids ;
         Yojson.Safe.to_file
           (!local_state.epoch_ledger_location ^ ".json")
-          (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
+          (Local_state.epoch_ledger_uuids_yojson_of epoch_ledger_uuids) ;
         !local_state.next_epoch_snapshot
         <- { ledger=
                Local_state.Snapshot.Ledger_snapshot.Ledger_db
@@ -3932,7 +3932,7 @@ let%test_module "Proof of stake tests" =
           Some
             { Genesis_constants.Fork_constants.previous_state_hash=
                 Result.ok_or_failwith
-                  (State_hash.of_yojson
+                  (State_hash.t_of_yojson
                      (`String
                        "3NL3bc213VQEFx6XTLbc3HxHqHH9ANbhHxRxSnBcRzXcKgeFA6TY"))
             ; previous_length= Mina_numbers.Length.of_int 100
@@ -4508,7 +4508,7 @@ let%test_module "Proof of stake tests" =
         let indent_size = 2 in
         let indent = String.init indent_size ~f:(Fn.const ' ') in
         let indented_json state =
-          state |> Consensus_state.Value.to_yojson
+          state |> Consensus_state.Value.yojson_of
           |> Yojson.Safe.pretty_to_string |> String.split ~on:'\n'
           |> String.concat ~sep:(indent ^ "\n")
         in

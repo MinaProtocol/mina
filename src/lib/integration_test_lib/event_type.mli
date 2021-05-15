@@ -2,7 +2,7 @@ open Core_kernel
 open Mina_base
 
 module type Event_type_intf = sig
-  type t [@@deriving to_yojson]
+  type t [@@deriving yojson_of]
 
   val name : string
 
@@ -46,7 +46,7 @@ module Block_produced : sig
   (*
   type aggregated =
     {last_seen_result: t; blocks_generated: int; snarked_ledgers_generated: int}
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   val empty_aggregated : aggregated
 
@@ -112,7 +112,7 @@ type 'a t =
 val to_string : 'a t -> string
 
 type existential = Event_type : 'a t -> existential
-[@@deriving sexp, to_yojson]
+[@@deriving sexp, yojson_of]
 
 val all_event_types : existential list
 
@@ -128,7 +128,7 @@ val of_structured_event_id : Structured_log_events.id -> existential option
 
 module Map : Map.S with type Key.t = existential
 
-type event = Event : 'a t * 'a -> event [@@deriving to_yojson]
+type event = Event : 'a t * 'a -> event [@@deriving yojson_of]
 
 val type_of_event : event -> existential
 

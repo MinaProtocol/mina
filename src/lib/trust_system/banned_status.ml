@@ -8,7 +8,7 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    let to_yojson = function
+    let yojson_of_t = function
       | Unbanned ->
           `String "Unbanned"
       | Banned_until tm ->
@@ -16,13 +16,13 @@ module Stable = struct
             [ ( "Banned_until"
               , `String (Time.to_string_abs tm ~zone:Time.Zone.utc) ) ]
 
-    let of_yojson = function
+    let t_t_of_yojson = function
       | `String "Unbanned" ->
           Ok Unbanned
       | `Assoc [("Banned_until", `String s)] ->
           Ok (Banned_until (Time.of_string s))
       | _ ->
-          Error "Banned_status.of_yojson: unexpected JSON"
+          Error "Banned_status.t_of_yojson: unexpected JSON"
   end
 
   module Tests = struct
@@ -37,4 +37,4 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
+Stable.Latest.(yojson_of, t_of_yojson)]

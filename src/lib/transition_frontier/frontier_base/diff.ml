@@ -134,13 +134,13 @@ let name : type repr mutant. (repr, mutant) t -> string = function
   | Best_tip_changed _ ->
       "Best_tip_changed"
 
-let to_yojson (type repr mutant) (key : (repr, mutant) t) =
+let yojson_of_t (type repr mutant) (key : (repr, mutant) t) =
   let json_key =
     match key with
     | New_node (Full breadcrumb) ->
-        State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
+        State_hash.yojson_of (Breadcrumb.state_hash breadcrumb)
     | New_node (Lite transition) ->
-        State_hash.to_yojson
+        State_hash.yojson_of
           (External_transition.Validated.state_hash transition)
     | Root_transitioned {new_root; garbage} ->
         let garbage_hashes =
@@ -151,11 +151,11 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
               hashes
         in
         `Assoc
-          [ ("new_root", State_hash.to_yojson (Root_data.Limited.hash new_root))
-          ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
+          [ ("new_root", State_hash.yojson_of (Root_data.Limited.hash new_root))
+          ; ("garbage", `List (List.map ~f:State_hash.yojson_of garbage_hashes))
           ]
     | Best_tip_changed breadcrumb ->
-        State_hash.to_yojson breadcrumb
+        State_hash.yojson_of breadcrumb
   in
   `Assoc [(name key, json_key)]
 
@@ -241,7 +241,7 @@ module Full = struct
 
     let to_lite (E diff) = Lite.E.E (to_lite diff)
 
-    let to_yojson (E diff) = to_yojson diff
+    let yojson_of_t (E diff) = yojson_of diff
   end
 
   module With_mutant = struct

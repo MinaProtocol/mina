@@ -224,7 +224,7 @@ let _ =
                in
                match Transaction.Signed.render signed_txn with
                | Ok signed ->
-                   let json = Transaction.Signed.Rendered.to_yojson signed in
+                   let json = Transaction.Signed.Rendered.yojson_of signed in
                    let json' = `Assoc [("data", json)] in
                    Js.string (Yojson.Safe.to_string json')
                | Error errs ->
@@ -232,7 +232,7 @@ let _ =
            | Error errs ->
                make_error (Rosetta_lib_nonconsensus.Errors.show errs)
          in
-         match Transaction.Unsigned.Rendered.of_yojson unsigned_txn_json with
+         match Transaction.Unsigned.Rendered.t_of_yojson unsigned_txn_json with
          | Ok
              { random_oracle_input= _
              ; payment= Some payment
@@ -268,7 +268,7 @@ let _ =
          let result_json =
            match Transaction.to_mina_signed signed_txn_json with
            | Ok signed_cmd ->
-               let cmd_json = Signed_command.to_yojson signed_cmd in
+               let cmd_json = Signed_command.yojson_of signed_cmd in
                `Assoc [("data", cmd_json)]
            | Error err ->
                let open Core_kernel in

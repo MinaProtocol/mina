@@ -65,7 +65,7 @@ module Op = User_command_info.Op
 module Internal_command_info = struct
   module Kind = struct
     type t = [`Coinbase | `Fee_transfer | `Fee_transfer_via_coinbase]
-    [@@deriving eq, to_yojson]
+    [@@deriving eq, yojson_of]
   end
 
   type t =
@@ -74,7 +74,7 @@ module Internal_command_info = struct
     ; fee: Unsigned_extended.UInt64.t
     ; token: Unsigned_extended.UInt64.t
     ; hash: string }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   module T (M : Monad_fail.S) = struct
     module Op_build = Op.T (M)
@@ -645,7 +645,7 @@ module Specific = struct
               Internal_command_info_ops.to_operations ~coinbase_receiver info
             in
             [%log debug]
-              ~metadata:[("info", Internal_command_info.to_yojson info)]
+              ~metadata:[("info", Internal_command_info.yojson_of info)]
               "Block internal received $info" ;
             { Transaction.transaction_identifier=
                 {Transaction_identifier.hash= info.hash}
@@ -663,7 +663,7 @@ module Specific = struct
                 internal_transactions
                 @ List.map block_info.user_commands ~f:(fun info ->
                       [%log debug]
-                        ~metadata:[("info", User_command_info.to_yojson info)]
+                        ~metadata:[("info", User_command_info.yojson_of info)]
                         "Block user received $info" ;
                       { Transaction.transaction_identifier=
                           {Transaction_identifier.hash= info.hash}
@@ -683,7 +683,7 @@ module Specific = struct
        * it properly yet *)
       (*
       let%test_unit "all dummies" =
-        Test.assert_ ~f:Block_response.to_yojson
+        Test.assert_ ~f:Block_response.yojson_of
           ~expected:
             (Mock.handle ~env:Env.mock
                (Block_request.create
@@ -703,7 +703,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
       with_db (fun ~db ->
           let%bind req =
             Errors.Lift.parse ~context:"Request"
-            @@ Block_request.of_yojson body
+            @@ Block_request.t_of_yojson body
             |> Errors.Lift.wrap
           in
           let%map res =
@@ -712,7 +712,7 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
               req
             |> Errors.Lift.wrap
           in
-          Block_response.to_yojson res )
+          Block_response.yojson_of res )
   (* Note: We do not need to implement /block/transaction endpoint because we
    * don't return any "other_transactions" *)
   | _ ->

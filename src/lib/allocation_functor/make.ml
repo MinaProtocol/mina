@@ -33,10 +33,10 @@ module Partial = struct
 
   module Yojson (M : Intf.Input.Yojson_intf) :
     Intf.Partial.Yojson_intf with type t := M.t = struct
-    let to_yojson = M.to_yojson
+    let yojson_of_t = M.yojson_of
 
-    let of_yojson json =
-      M.of_yojson json |> Result.map ~f:(Table.attach_finalizer M.id)
+    let t_t_of_yojson json =
+      M.t_of_yojson json |> Result.map ~f:(Table.attach_finalizer M.id)
   end
 end
 

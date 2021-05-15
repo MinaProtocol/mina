@@ -135,8 +135,8 @@ let print_trust_statuses statuses json =
            (List.map
               ~f:(fun (peer, status) ->
                 `List
-                  [ Network_peer.Peer.to_yojson peer
-                  ; Trust_system.Peer_status.to_yojson status ] )
+                  [ Network_peer.Peer.yojson_of peer
+                  ; Trust_system.Peer_status.yojson_of status ] )
               statuses)))
   else
     let ban_status status =
@@ -187,12 +187,12 @@ let get_trust_status =
              printf "Failed to get trust status %s\n" (Error.to_string_hum e)
      ))
 
-let ip_trust_statuses_to_yojson ip_trust_statuses =
+let ip_trust_statuses_yojson_of ip_trust_statuses =
   let items =
     List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
         `Assoc
           [ ("ip", `String (Unix.Inet_addr.to_string ip_addr))
-          ; ("status", Trust_system.Peer_status.to_yojson status) ] )
+          ; ("status", Trust_system.Peer_status.yojson_of status) ] )
   in
   `List items
 
@@ -333,13 +333,13 @@ let verify_receipt =
              |> Deferred.return
            in
            let%bind payment =
-             User_command.of_yojson payment_json
+             User_command.t_of_yojson payment_json
              |> to_deferred_or_error
                   ~error:
                     (sprintf "Payment file %s has invalid json format"
                        payment_path)
            and proof =
-             [%of_yojson: Receipt.Chain_hash.t * User_command.t list]
+             [%t_of_yojson: Receipt.Chain_hash.t * User_command.t list]
                proof_json
              |> to_deferred_or_error
                   ~error:
@@ -798,7 +798,7 @@ let send_rosetta_transactions_graphql =
              Deferred.return ()
          | Error err ->
              Format.eprintf "Error:@.%s@.@."
-               (Yojson.Safe.pretty_to_string (Error_json.error_to_yojson err)) ;
+               (Yojson.Safe.pretty_to_string (Error_json.error_yojson_of err)) ;
              Core_kernel.exit 1 ))
 
 module Export_logs = struct
@@ -831,7 +831,7 @@ module Export_logs = struct
             pp_export_result result
         | Error err ->
             failwithf "Error when exporting logs: %s"
-              (Error_json.error_to_yojson err |> Yojson.Safe.to_string)
+              (Error_json.error_yojson_of err |> Yojson.Safe.to_string)
               ()
     in
     let open Command.Let_syntax in
@@ -900,7 +900,7 @@ let handle_export_ledger_response ~json = function
   | Ok (Ok accounts) ->
       if json then (
         Yojson.Safe.pretty_print Format.std_formatter
-          (Runtime_config.Accounts.to_yojson
+          (Runtime_config.Accounts.yojson_of
              (List.map accounts ~f:(fun a ->
                   Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
         printf "\n" )
@@ -1013,7 +1013,7 @@ let hash_ledger =
              process_accounts accounts )
        else
          let json = Yojson.Safe.from_file ledger_file in
-         match Runtime_config.Accounts.of_yojson json with
+         match Runtime_config.Accounts.t_of_yojson json with
          | Ok runtime_accounts ->
              let accounts =
                lazy (Genesis_ledger_helper.Accounts.to_full runtime_accounts)
@@ -1080,7 +1080,7 @@ let currency_in_ledger =
              process_accounts accounts )
        else
          let json = Yojson.Safe.from_file ledger_file in
-         match Runtime_config.Accounts.of_yojson json with
+         match Runtime_config.Accounts.t_of_yojson json with
          | Ok runtime_accounts ->
              let accounts =
                Genesis_ledger_helper.Accounts.to_full runtime_accounts
@@ -1139,7 +1139,7 @@ let snark_pool_list =
               graphql_endpoint)
            ~f:(fun response ->
              let lst =
-               [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
+               [%yojson_of: Cli_lib.Graphql_types.Completed_works.t]
                  (Array.to_list
                     (Array.map
                        ~f:(fun w ->
@@ -1162,7 +1162,7 @@ let pooled_user_commands =
        ~f:(fun graphql_endpoint maybe_public_key ->
          let public_key =
            Yojson.Safe.to_basic
-           @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
+           @@ [%yojson_of: Public_key.Compressed.t option] maybe_public_key
          in
          let graphql =
            Graphql_queries.Pooled_user_commands.make ~public_key ()
@@ -1174,7 +1174,7 @@ let pooled_user_commands =
            `List
              ( List.map
                  ~f:
-                   (Fn.compose Graphql_client.Signed_command.to_yojson
+                   (Fn.compose Graphql_client.Signed_command.yojson_of
                       (Fn.compose Graphql_client.Signed_command.of_obj
                          unwrap_user_command))
              @@ Array.to_list response#pooledUserCommands )
@@ -1200,7 +1200,7 @@ let pending_snark_work =
               graphql_endpoint)
            ~f:(fun response ->
              let lst =
-               [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
+               [%yojson_of: Cli_lib.Graphql_types.Pending_snark_work.t]
                  (Array.map
                     ~f:(fun bundle ->
                       Array.map bundle#workBundle ~f:(fun w ->
@@ -1789,7 +1789,7 @@ let generate_libp2p_keypair =
               printf "libp2p keypair:\n%s\n" (Mina_net2.Keypair.to_string me)
           | Error e ->
               [%log fatal] "failed to generate libp2p keypair: $error"
-                ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                ~metadata:[("error", Error_json.error_yojson_of e)] ;
               exit 20 )))
 
 let trustlist_ip_flag =
@@ -1943,7 +1943,7 @@ let compile_time_constants =
            config_file |> Genesis_ledger_helper.load_config_json
            >>| Or_error.ok
            >>| Option.value ~default:(`Assoc [])
-           >>| Runtime_config.of_yojson >>| Result.ok
+           >>| Runtime_config.t_of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
                  ~logger:(Logger.null ()) ~proof_level:None
@@ -2033,7 +2033,7 @@ let node_status =
              List.iter all_status_data ~f:(fun peer_status_data ->
                  printf "%s\n%!"
                    ( Yojson.Safe.to_string
-                   @@ Mina_networking.Rpcs.Get_node_status.response_to_yojson
+                   @@ Mina_networking.Rpcs.Get_node_status.response_yojson_of
                         peer_status_data ) )
          | Error err ->
              printf "Failed to get node status: %s\n%!"
@@ -2123,7 +2123,7 @@ let archive_blocks =
          if Bool.equal precomputed_flag extensional_flag then
            failwith
              "Must provide exactly one of -precomputed and -extensional flags" ;
-         let make_send_block ~graphql_make ~archive_dispatch ~block_to_yojson
+         let make_send_block ~graphql_make ~archive_dispatch ~block_yojson_of
              block =
            match archive_process_location with
            | Some archive_process_location ->
@@ -2131,7 +2131,7 @@ let archive_blocks =
                archive_dispatch archive_process_location block
            | None ->
                (* Send the requests over GraphQL. *)
-               let block = block_to_yojson block |> Yojson.Safe.to_basic in
+               let block = block_yojson_of block |> Yojson.Safe.to_basic in
                let%map.Deferred.Or_error.Let_syntax _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
@@ -2171,15 +2171,15 @@ let archive_blocks =
              ~graphql_make:Graphql_queries.Archive_precomputed_block.make
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_precomputed_block
-             ~block_to_yojson:
-               Mina_transition.External_transition.Precomputed_block.to_yojson
+             ~block_yojson_of:
+               Mina_transition.External_transition.Precomputed_block.yojson_of
          in
          let send_extensional_block =
            make_send_block
              ~graphql_make:Graphql_queries.Archive_extensional_block.make
              ~archive_dispatch:
                Mina_lib.Archive_client.dispatch_extensional_block
-             ~block_to_yojson:Archive_lib.Extensional.Block.to_yojson
+             ~block_yojson_of:Archive_lib.Extensional.Block.yojson_of
          in
          Deferred.List.iter files ~f:(fun path ->
              match%map
@@ -2196,7 +2196,7 @@ let archive_blocks =
                if precomputed_flag then
                  let%bind precomputed_block =
                    Mina_transition.External_transition.Precomputed_block
-                   .of_yojson block_json
+                   .t_of_yojson block_json
                    |> Result.map_error ~f:(fun err ->
                           Error.tag_arg (Error.of_string err)
                             "Could not parse JSON as a precomputed block from \
@@ -2207,7 +2207,7 @@ let archive_blocks =
                  send_precomputed_block precomputed_block
                else if extensional_flag then
                  let%bind extensional_block =
-                   Archive_lib.Extensional.Block.of_yojson block_json
+                   Archive_lib.Extensional.Block.t_of_yojson block_json
                    |> Result.map_error ~f:(fun err ->
                           Error.tag_arg (Error.of_string err)
                             "Could not parse JSON as an extensional block \
@@ -2273,7 +2273,7 @@ let chain_id_inputs =
                (State_hash.to_base58_check genesis_state_hash) ;
              printf "Genesis_constants:@." ;
              printf "  Protocol:          %s@."
-               ( Genesis_constants.Protocol.to_yojson genesis_constants.protocol
+               ( Genesis_constants.Protocol.yojson_of genesis_constants.protocol
                |> Yojson.Safe.to_string ) ;
              printf "  Txn pool max size: %d@."
                genesis_constants.txpool_max_size ;

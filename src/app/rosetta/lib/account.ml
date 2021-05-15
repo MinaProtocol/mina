@@ -442,7 +442,7 @@ module Balance = struct
       module Mock = Impl (Result)
 
       let%test_unit "account exists lookup" =
-        Test.assert_ ~f:Account_balance_response.to_yojson
+        Test.assert_ ~f:Account_balance_response.yojson_of
           ~expected:
             (Mock.handle ~env:Env.mock
                (Account_balance_request.create
@@ -471,13 +471,13 @@ let router ~graphql_uri ~logger ~with_db (route : string list) body =
       with_db (fun ~db ->
           let%bind req =
             Errors.Lift.parse ~context:"Request"
-            @@ Account_balance_request.of_yojson body
+            @@ Account_balance_request.t_of_yojson body
             |> Errors.Lift.wrap
           in
           let%map res =
             Balance.Real.handle ~env:(Balance.Env.real ~db ~graphql_uri) req
             |> Errors.Lift.wrap
           in
-          Account_balance_response.to_yojson res )
+          Account_balance_response.yojson_of res )
   | _ ->
       Deferred.Result.fail `Page_not_found

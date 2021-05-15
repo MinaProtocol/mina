@@ -71,12 +71,12 @@ module type Work_S = sig
     module Spec : sig
       type t =
         (Transaction.t, Transaction_witness.t, ledger_proof) Work.Single.Spec.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
     end
   end
 
   module Spec : sig
-    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+    type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson_of]
   end
 
   module Result : sig

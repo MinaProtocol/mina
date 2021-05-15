@@ -609,7 +609,7 @@ module Amount = struct
       [@@deriving sexp, compare, hash, eq, yojson]
 
       [%%define_from_scope
-      to_yojson, of_yojson, dhall_type]
+      yojson_of, t_of_yojson, dhall_type]
 
       let to_latest = Fn.id
     end

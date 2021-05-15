@@ -31,12 +31,12 @@ module Info : sig
     ; work_ids: int One_or_two.Stable.V1.t
     ; fee: Fee.Stable.V1.t
     ; prover: Public_key.Compressed.Stable.V1.t }
-  [@@deriving to_yojson, sexp, compare]
+  [@@deriving yojson_of, sexp, compare]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving to_yojson, version, sexp, bin_io]
+        type t [@@deriving yojson_of, version, sexp, bin_io]
       end
     end
     with type V1.t = t
@@ -75,7 +75,7 @@ module Checked : sig
     { fee: Fee.t
     ; proofs: Ledger_proof.t One_or_two.t
     ; prover: Public_key.Compressed.t }
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
   module Stable : module type of Stable
 

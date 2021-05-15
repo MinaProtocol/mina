@@ -77,9 +77,9 @@ let transfer ~logger ~archive_location
           | Error e ->
               [%log warn]
                 ~metadata:
-                  [ ("error", Error_json.error_to_yojson e)
+                  [ ("error", Error_json.error_yojson_of e)
                   ; ( "breadcrumb"
-                    , Transition_frontier.Breadcrumb.to_yojson breadcrumb ) ]
+                    , Transition_frontier.Breadcrumb.yojson_of breadcrumb ) ]
                 "Could not send breadcrumb to archive: $error" ) )
 
 let run ~logger

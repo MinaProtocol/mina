@@ -132,7 +132,7 @@ module Worker_state = struct
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
-                       ~metadata:[("error", Error_json.error_to_yojson e)]
+                       ~metadata:[("error", Error_json.error_yojson_of e)]
                        "Prover threw an error while extending block: $error" ) ;
                  res
 
@@ -164,7 +164,7 @@ module Worker_state = struct
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      [%log error]
-                       ~metadata:[("error", Error_json.error_to_yojson e)]
+                       ~metadata:[("error", Error_json.error_yojson_of e)]
                        "Prover threw an error while extending block: $error" ) ;
                  Async.Deferred.return res
 
@@ -286,7 +286,7 @@ type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
   let on_failure err =
     [%log error] "Prover process failed with error $err"
-      ~metadata:[("err", Error_json.error_to_yojson err)] ;
+      ~metadata:[("err", Error_json.error_yojson_of err)] ;
     Error.raise err
   in
   let%map connection, process =
@@ -334,7 +334,7 @@ let prove_from_input_sexp {connection; logger; _} sexp =
       true
   | Error e ->
       [%log error] "prover errored :("
-        ~metadata:[("error", Error_json.error_to_yojson e)] ;
+        ~metadata:[("error", Error_json.error_yojson_of e)] ;
       false
 
 let extend_blockchain {connection; logger; _} chain next_state block
@@ -366,7 +366,7 @@ let extend_blockchain {connection; logger; _} chain next_state block
                    (Binable.to_string
                       (module Extend_blockchain_input.Stable.Latest)
                       input)) )
-          ; ("error", Error_json.error_to_yojson e) ]
+          ; ("error", Error_json.error_yojson_of e) ]
         "Prover failed: $error" ;
       Error e
 

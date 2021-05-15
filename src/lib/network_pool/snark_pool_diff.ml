@@ -28,9 +28,9 @@ module Make
   type t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, sexp, yojson_of, hash]
 
-  type verified = t [@@deriving compare, sexp, to_yojson]
+  type verified = t [@@deriving compare, sexp, yojson_of]
 
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
@@ -48,7 +48,7 @@ module Make
     | Empty ->
         None
 
-  let compact_json t = to_compact t |> Option.map ~f:compact_to_yojson
+  let compact_json t = to_compact t |> Option.map ~f:compact_yojson_of
 
   let empty = Empty
 
@@ -70,7 +70,7 @@ module Make
         Printf.sprintf
           !"Snark_pool_diff for work %s added with fee-prover %s"
           (Yojson.Safe.to_string @@ Work.compact_json work)
-          (Yojson.Safe.to_string @@ Mina_base.Fee_with_prover.to_yojson fee)
+          (Yojson.Safe.to_string @@ Mina_base.Fee_with_prover.yojson_of fee)
     | Empty ->
         "empty Snark_pool_diff"
 
@@ -93,7 +93,7 @@ module Make
         "Rejecting snark work $work from $sender: $reason"
         ~metadata:
           [ ("work", Work.compact_json work)
-          ; ("sender", Envelope.Sender.to_yojson sender)
+          ; ("sender", Envelope.Sender.yojson_of sender)
           ; ("reason", `String reason) ] ;
       Or_error.error_string reason
     in

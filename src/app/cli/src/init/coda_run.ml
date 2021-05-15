@@ -194,7 +194,7 @@ let coda_status coda_ref =
       (Deferred.return (`String "Shutdown before Coda instance was created"))
     ~f:(fun t ->
       Mina_commands.get_status ~flag:`Performance t
-      >>| Daemon_rpcs.Types.Status.to_yojson )
+      >>| Daemon_rpcs.Types.Status.yojson_of )
 
 let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
@@ -416,7 +416,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             in
             let%map r = Mina_lib.request_work coda in
             [%log trace]
-              ~metadata:[("work_spec", Snark_worker.Work.Spec.to_yojson r)]
+              ~metadata:[("work_spec", Snark_worker.Work.Spec.yojson_of r)]
               "responding to a Get_work request with some new work" ;
             Mina_metrics.(Counter.inc_one Snark_work.snark_work_assigned_rpc) ;
             (r, key)) )
@@ -426,7 +426,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             Counter.inc_one Snark_work.completed_snark_work_received_rpc) ;
           [%log trace] "received completed work from a snark worker"
             ~metadata:
-              [("work_spec", Snark_worker.Work.Spec.to_yojson work.spec)] ;
+              [("work_spec", Snark_worker.Work.Spec.yojson_of work.spec)] ;
           One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
@@ -457,7 +457,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           let status flag =
             let%bind status = Mina_commands.get_status ~flag coda in
             Server.respond_string
-              ( status |> Daemon_rpcs.Types.Status.to_yojson
+              ( status |> Daemon_rpcs.Types.Status.yojson_of
               |> Yojson.Safe.pretty_to_string )
           in
           let lift x = `Response x in
@@ -606,7 +606,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
   |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid): int)) ;
-  let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
+  let exn_json = Error_json.error_yojson_of (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", exn_json)] ;
@@ -632,7 +632,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
         no_report exn_json status
     | `Ok (Error e) ->
         [%log' fatal top_logger] "Exception when generating crash report: $exn"
-          ~metadata:[("exn", Error_json.error_to_yojson e)] ;
+          ~metadata:[("exn", Error_json.error_yojson_of e)] ;
         no_report exn_json status
     | `Timeout ->
         [%log' fatal top_logger] "Timed out while generated crash report" ;

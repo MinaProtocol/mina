@@ -37,7 +37,7 @@ module Input = struct
     let log_lines = In_channel.read_lines log_file in
     let res =
       List.fold ~init:t log_lines ~f:(fun acc line ->
-          match Logger.Message.of_yojson (Yojson.Safe.from_string line) with
+          match Logger.Message.t_of_yojson (Yojson.Safe.from_string line) with
           | Ok msg -> (
               let tf_event_id =
                 Option.map msg.event_id ~f:(fun e ->
@@ -58,7 +58,7 @@ module Input = struct
                   let peers = Set.add acc.peers peer_id in
                   let added_transitions =
                     Map.find_exn msg.metadata "added_transitions"
-                    |> added_transitions_of_yojson |> Result.ok_or_failwith
+                    |> added_transitions_t_of_yojson |> Result.ok_or_failwith
                   in
                   let acc' =
                     List.fold ~init:acc added_transitions ~f:(fun acc'' tr ->
@@ -349,9 +349,9 @@ let main ~input_dir ~output_dir ~output_format ~min_peers () =
   let output_json, fmt_str =
     match output_format with
     | `Full ->
-        (Display.(to_yojson @@ of_output output), "Full")
+        (Display.(yojson_of @@ of_output output), "Full")
     | `Compact ->
-        (Compact_display.(to_yojson @@ of_output output), "Compact")
+        (Compact_display.(yojson_of @@ of_output output), "Compact")
   in
   let result_file = output_dir ^/ "Result.txt" in
   [%log info] "Writing the result (format: %s) to %s" fmt_str result_file ;

@@ -79,11 +79,11 @@ let wait_for_process_log_errors ~logger process ~module_ ~location =
           | Error err ->
               Logger.error logger ~module_ ~location
                 "Saw a deferred exception $exn while waiting for process"
-                ~metadata:[("exn", Error_json.error_to_yojson err)] ) )
+                ~metadata:[("exn", Error_json.error_yojson_of err)] ) )
   with
   | Ok _ ->
       ()
   | Error err ->
       Logger.error logger ~module_ ~location
         "Saw an immediate exception $exn while waiting for process"
-        ~metadata:[("exn", Error_json.error_to_yojson err)]
+        ~metadata:[("exn", Error_json.error_yojson_of err)]

@@ -7,7 +7,7 @@
  *)
 
 type t = {metadata: Yojson.Safe.t option [@default None]}
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** A MetadataRequest is utilized in any request where the only argument is optional metadata. *)
 let create () : t = {metadata= None}

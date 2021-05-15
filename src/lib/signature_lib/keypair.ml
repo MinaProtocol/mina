@@ -12,7 +12,7 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    let to_yojson t = Public_key.Stable.V1.to_yojson t.public_key
+    let yojson_of_t t = Public_key.Stable.V1.yojson_of t.public_key
   end
 end]
 
@@ -25,7 +25,7 @@ module T = struct
       {public_key= pk2; private_key= _} =
     Public_key.compare pk1 pk2
 
-  let to_yojson = Stable.Latest.to_yojson
+  let yojson_of_t = Stable.Latest.yojson_of
 end
 
 include T

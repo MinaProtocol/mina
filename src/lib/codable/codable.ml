@@ -11,22 +11,18 @@ module type Iso_intf = sig
 end
 
 module type S = sig
-  type t
-
-  val to_yojson : t -> Yojson.Safe.t
-
-  val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+  type t [@@deriving yojson]
 end
 
 module Make (Iso : Iso_intf) = struct
-  let to_yojson t = Iso.encode t |> Iso.standardized_to_yojson
+  let yojson_of_t t = Iso.encode t |> Iso.standardized_yojson_of
 
-  let of_yojson json =
-    Result.map ~f:Iso.decode (Iso.standardized_of_yojson json)
+  let t_t_of_yojson json =
+    Result.map ~f:Iso.decode (Iso.standardized_t_of_yojson json)
 
   module For_tests = struct
     let check_encoding t ~equal =
-      match of_yojson (to_yojson t) with
+      match t_of_yojson (yojson_of t) with
       | Ok result ->
           equal t result
       | Error e ->
@@ -36,7 +32,7 @@ end
 
 module For_tests = struct
   let check_encoding (type t) (module M : S with type t = t) t ~equal =
-    match M.of_yojson (M.to_yojson t) with
+    match M.t_of_yojson (M.yojson_of t) with
     | Ok result ->
         equal t result
     | Error e ->

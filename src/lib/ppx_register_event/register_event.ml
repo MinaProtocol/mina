@@ -103,16 +103,15 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
   in
   let event_name = String.lowercase ctor in
   let event_path = path ^ "." ^ ctor in
-  let split_path = String.split path ~on:'.' in
-  let to_yojson x =
-    Conv_from_ppx_deriving.copy_expression
-    @@ Ppx_deriving_yojson.ser_expr_of_typ
-    @@ Conv_to_ppx_deriving.copy_core_type x
+  let yojson_of_t core_type =
+    Conv_from_ppx_deriving.copy_expression @@
+    Ppx_yojson_conv_expander.Yojson_of.core_type
+      @@ Conv_to_ppx_deriving.copy_core_type core_type
   in
-  let of_yojson ~path x =
-    Conv_from_ppx_deriving.copy_expression
-    @@ Ppx_deriving_yojson.desu_expr_of_typ ~path
-    @@ Conv_to_ppx_deriving.copy_core_type x
+  let t_of_yojson ~path core_type =
+    (*    Conv_from_ppx_deriving.copy_expression @@ *)
+    Ppx_yojson_conv_expander.Of_yojson.core_type ~path
+      (*    @@ Conv_to_ppx_deriving.copy_core_type *) core_type
   in
   let elist ~f l = elist (List.map ~f l) in
   let record_pattern =
@@ -161,12 +160,9 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                     , [%e
                         elist label_decls
                           ~f:(fun {pld_name= {txt= name; _}; pld_type; _} ->
-                            Conv_from_ppx_deriving.copy_expression
-                            @@ Ppx_deriving_yojson.wrap_runtime
-                            @@ Conv_to_ppx_deriving.copy_expression
-                            @@ [%expr
+                              [%expr
                                  [%e estring name]
-                                 , [%e to_yojson pld_type] [%e evar name]] )]
+                                 , [%e yojson_of_t pld_type] [%e evar name]] )]
                     )
               | _ ->
                   None )
@@ -179,18 +175,15 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
                   [%e
                     List.fold_right label_decls
                       ~f:(fun {pld_name= {txt= name; _}; pld_type; _} acc ->
-                        Conv_from_ppx_deriving.copy_expression
-                        @@ Ppx_deriving_yojson.wrap_runtime
-                        @@ Conv_to_ppx_deriving.copy_expression
-                        @@ [%expr
+                          [%expr
                              match
                                Core_kernel.Map.find args_list [%e estring name]
                              with
                              | Some [%p pvar name] ->
                                  Core_kernel.Result.bind
                                    ([%e
-                                      of_yojson
-                                        ~path:(split_path @ [ctor; name])
+                                      t_of_yojson
+                                        ~path:(sprintf "%s.%s.%s" path ctor name)
                                         pld_type]
                                       [%e evar name])
                                    ~f:(fun [%p pvar name] -> [%e acc])

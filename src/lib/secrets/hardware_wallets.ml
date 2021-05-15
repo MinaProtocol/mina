@@ -61,7 +61,7 @@ let report_process_error e =
 let decode_public_key : string -> (Public_key.t, string) Result.t =
  fun public_key ->
   Yojson.Safe.from_string public_key
-  |> public_key_of_yojson
+  |> public_key_t_of_yojson
   |> Result.map_error ~f:report_json_error
   |> Result.bind ~f:(fun {status; x; y} ->
          decode_status_code status ~f:(fun () ->
@@ -74,7 +74,7 @@ type signature = {status: string; field: string; scalar: string}
 let decode_signature : string -> (Signature.t, string) Result.t =
  fun signature ->
   Yojson.Safe.from_string signature
-  |> signature_of_yojson
+  |> signature_t_of_yojson
   |> Result.map_error ~f:report_json_error
   |> Result.bind ~f:(fun {status; field; scalar} ->
          decode_status_code status ~f:(fun () ->

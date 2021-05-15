@@ -279,7 +279,7 @@ module Protocol = struct
 
       let to_latest = Fn.id
 
-      let to_yojson (t : t) =
+      let yojson_of_t (t : t) =
         `Assoc
           [ ("k", `Int t.k)
           ; ("slots_per_epoch", `Int t.slots_per_epoch)
@@ -293,7 +293,7 @@ module Protocol = struct
                          (Int64.to_float t.genesis_state_timestamp)))
                    ~zone:Time.Zone.utc) ) ]
 
-      let of_yojson = function
+      let t_t_of_yojson = function
         | `Assoc
             [ ("k", `Int k)
             ; ("slots_per_epoch", `Int slots_per_epoch)
@@ -309,9 +309,9 @@ module Protocol = struct
                 ; delta
                 ; genesis_state_timestamp }
           | Error e ->
-              Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
+              Error (sprintf !"Genesis_constants.Protocol.t_of_yojson: %s" e) )
         | _ ->
-            Error "Genesis_constants.Protocol.of_yojson: unexpected JSON"
+            Error "Genesis_constants.Protocol.t_of_yojson: unexpected JSON"
 
       let t_of_sexp _ = failwith "t_of_sexp: not implemented"
 
@@ -352,7 +352,7 @@ module Protocol = struct
   end]
 
   [%%define_locally
-  Stable.Latest.(to_yojson)]
+  Stable.Latest.(yojson_of)]
 end
 
 module T = struct
@@ -361,7 +361,7 @@ module T = struct
     { protocol: Protocol.Stable.Latest.t
     ; txpool_max_size: int
     ; num_accounts: int option }
-  [@@deriving to_yojson, bin_io_unversioned]
+  [@@deriving yojson_of, bin_io_unversioned]
 
   let hash (t : t) =
     let str =

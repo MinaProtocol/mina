@@ -39,7 +39,7 @@ let command_run =
      in
      let runtime_config_opt =
        Option.map runtime_config_file ~f:(fun file ->
-           Yojson.Safe.from_file file |> Runtime_config.of_yojson
+           Yojson.Safe.from_file file |> Runtime_config.t_of_yojson
            |> Result.ok_or_failwith )
      in
      fun () ->

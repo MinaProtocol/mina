@@ -24,7 +24,7 @@ module Poly = struct
         ; epoch_duration: 'timespan
         ; delta_duration: 'timespan
         ; genesis_state_timestamp: 'time }
-      [@@deriving eq, ord, hash, sexp, to_yojson, hlist]
+      [@@deriving eq, ord, hash, sexp, yojson_of, hlist]
     end
   end]
 end
@@ -37,7 +37,7 @@ module Stable = struct
       , Block_time.Stable.V1.t
       , Block_time.Span.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving eq, ord, hash, sexp, to_yojson]
+    [@@deriving eq, ord, hash, sexp, yojson_of]
 
     let to_latest = Fn.id
   end

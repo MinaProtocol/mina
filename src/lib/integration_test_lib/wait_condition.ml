@@ -145,7 +145,7 @@ struct
           else
             Predicate_failure
               (Error.createf "Unexpected status in matching payment: %s"
-                 ( Transaction_status.to_yojson actual_status
+                 ( Transaction_status.yojson_of actual_status
                  |> Yojson.Safe.to_string ))
       | None ->
           Predicate_continuation ()

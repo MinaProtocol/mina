@@ -5,9 +5,9 @@ open Mina_base
 type Structured_log_events.t +=
   | Merge_snark_generated of
       { time:
-          (Time.Span.t[@to_yojson
+          (Time.Span.t[@yojson_of
                         fun total -> `String (Time.Span.to_string_hum total)]
-                      [@of_yojson
+                      [@t_of_yojson
                         function
                         | `String time ->
                             Ok (Time.Span.of_string time)
@@ -20,9 +20,9 @@ type Structured_log_events.t +=
 type Structured_log_events.t +=
   | Base_snark_generated of
       { time:
-          (Time.Span.t[@to_yojson
+          (Time.Span.t[@yojson_of
                         fun total -> `String (Time.Span.to_string_hum total)]
-                      [@of_yojson
+                      [@t_of_yojson
                         function
                         | `String time ->
                             Ok (Time.Span.of_string time)
@@ -47,14 +47,14 @@ module Make (Inputs : Intf.Inputs_intf) :
           , Transaction_witness.t
           , Ledger_proof.t )
           Work.Single.Spec.t
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson_of]
 
         let statement = Work.Single.Spec.statement
       end
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, to_yojson]
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp, yojson_of]
 
       let instances = Work.Spec.instances
     end

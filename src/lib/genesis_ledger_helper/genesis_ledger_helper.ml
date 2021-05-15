@@ -96,7 +96,7 @@ module Ledger = struct
     ^ ".tar.gz"
 
   let accounts_hash accounts =
-    Runtime_config.Accounts.to_yojson accounts
+    Runtime_config.Accounts.yojson_of accounts
     |> Yojson.Safe.to_string |> Blake2.digest_string |> Blake2.to_hex
 
   let find_tar ~logger ~genesis_dir ~constraint_constants ~ledger_name_prefix
@@ -328,7 +328,7 @@ module Ledger = struct
                 [%log error] "Could not load ledger from $path: $error"
                   ~metadata:
                     [ ("path", `String tar_path)
-                    ; ("error", Error_json.error_to_yojson err) ] ;
+                    ; ("error", Error_json.error_yojson_of err) ] ;
                 Error err )
         | None -> (
           match padded_accounts_opt with
@@ -355,7 +355,7 @@ module Ledger = struct
                    built in, and no ledger file was found at $ledger_filename"
                   ~metadata:
                     [ ("ledger", `String ledger_name_prefix)
-                    ; ("config", Runtime_config.Ledger.to_yojson config)
+                    ; ("config", Runtime_config.Ledger.yojson_of config)
                     ; ("ledger_name", `String ledger_name)
                     ; ("ledger_filename", `String ledger_filename) ] ;
                 Deferred.Or_error.errorf "ledger '%s' not found" ledger_name )
@@ -421,7 +421,7 @@ module Ledger = struct
                     ~metadata:
                       [ ("ledger", `String ledger_name_prefix)
                       ; ("path", `String tar_path)
-                      ; ("error", Error_json.error_to_yojson err) ] ;
+                      ; ("error", Error_json.error_yojson_of err) ] ;
                   return (Error err) ) ) )
 end
 
@@ -529,7 +529,7 @@ module Genesis_proof = struct
               "Could not download genesis proof file from $uri: $error"
               ~metadata:
                 [ ("uri", `String s3_path)
-                ; ("error", Error_json.error_to_yojson e) ] ;
+                ; ("error", Error_json.error_yojson_of e) ] ;
             return None )
 
   let generate_inputs ~runtime_config ~proof_level ~ledger ~genesis_epoch_data
@@ -673,7 +673,7 @@ module Genesis_proof = struct
               [%log error] "Could not load genesis proof from $path: $error"
                 ~metadata:
                   [ ("path", `String file)
-                  ; ("error", Error_json.error_to_yojson err) ] ;
+                  ; ("error", Error_json.error_yojson_of err) ] ;
               None )
       | None ->
           return None
@@ -694,8 +694,8 @@ module Genesis_proof = struct
           "Base hash $computed_hash matches compile-time $compiled_hash, \
            using precomputed genesis proof"
           ~metadata:
-            [ ("computed_hash", Base_hash.to_yojson base_hash)
-            ; ("compiled_hash", Base_hash.to_yojson compiled_base_hash) ] ;
+            [ ("computed_hash", Base_hash.yojson_of base_hash)
+            ; ("compiled_hash", Base_hash.yojson_of compiled_base_hash) ] ;
         let filename = genesis_dir ^/ filename ~base_hash in
         let values =
           { Genesis_proof.runtime_config= inputs.runtime_config
@@ -720,14 +720,14 @@ module Genesis_proof = struct
                  $error"
                 ~metadata:
                   [ ("path", `String filename)
-                  ; ("error", Error_json.error_to_yojson err) ]
+                  ; ("error", Error_json.error_yojson_of err) ]
         in
         Ok (values, filename)
     | None ->
         [%log info]
           "No genesis proof file was found for $base_hash, generating a new \
            genesis proof"
-          ~metadata:[("base_hash", Base_hash.to_yojson base_hash)] ;
+          ~metadata:[("base_hash", Base_hash.yojson_of base_hash)] ;
         let%bind values = generate inputs in
         let filename = genesis_dir ^/ filename ~base_hash in
         let%map () =
@@ -744,7 +744,7 @@ module Genesis_proof = struct
                     "Genesis proof could not be written to $path: $error"
                     ~metadata:
                       [ ("path", `String filename)
-                      ; ("error", Error_json.error_to_yojson err) ] )
+                      ; ("error", Error_json.error_yojson_of err) ] )
         in
         Ok (values, filename)
 end
@@ -758,7 +758,7 @@ let load_config_file filename =
   let open Deferred.Or_error.Let_syntax in
   Monitor.try_with_join_or_error ~here:[%here] (fun () ->
       let%map json = load_config_json filename in
-      match Runtime_config.of_yojson json with
+      match Runtime_config.t_of_yojson json with
       | Ok config ->
           Ok config
       | Error err ->
@@ -779,7 +779,7 @@ let inputs_from_config_file ?(genesis_dir = Cache_dir.autogen_path) ~logger
   in
   [%log info] "Initializing with runtime configuration. Ledger name: $name"
     ~metadata:
-      [("name", ledger_name_json); ("config", Runtime_config.to_yojson config)] ;
+      [("name", ledger_name_json); ("config", Runtime_config.yojson_of config)] ;
   let open Deferred.Or_error.Let_syntax in
   let genesis_constants = Genesis_constants.compiled in
   let proof_level =

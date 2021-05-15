@@ -101,7 +101,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
   let {With_hash.hash= transition_hash; data= transition}, _ =
     initially_validated_transition
   in
-  let metadata = [("state_hash", State_hash.to_yojson transition_hash)] in
+  let metadata = [("state_hash", State_hash.yojson_of transition_hash)] in
   Deferred.map ~f:(Fn.const ())
     (let open Deferred.Result.Let_syntax in
     let%bind mostly_validated_transition =
@@ -189,7 +189,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           | Error (`Invalid_staged_ledger_diff error) ->
               [%log error]
                 ~metadata:
-                  (metadata @ [("error", Error_json.error_to_yojson error)])
+                  (metadata @ [("error", Error_json.error_yojson_of error)])
                 "Error while building breadcrumb in the transition handler \
                  processor: $error" ;
               Deferred.return (Error ())
@@ -299,7 +299,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                      [%log error]
                        "Error, failed to attach all catchup breadcrumbs to \
                         transition frontier: $error"
-                       ~metadata:[("error", Error_json.error_to_yojson err)] )
+                       ~metadata:[("error", Error_json.error_yojson_of err)] )
                  >>| fun () ->
                  match subsequent_callback_action with
                  | `Ledger_catchup decrement_signal ->
@@ -330,7 +330,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                        ()
                    | Error err ->
                        [%log error]
-                         ~metadata:[("error", Error_json.error_to_yojson err)]
+                         ~metadata:[("error", Error_json.error_yojson_of err)]
                          "Error, failed to attach produced breadcrumb to \
                           transition frontier: $error" ;
                        let (_ : Transition_frontier.Breadcrumb.t) =

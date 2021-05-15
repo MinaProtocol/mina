@@ -50,7 +50,7 @@ let main () =
            [%log debug]
              ~metadata:
                [ ( "peers"
-                 , `List (List.map ~f:Network_peer.Peer.to_yojson peers) )
+                 , `List (List.map ~f:Network_peer.Peer.yojson_of peers) )
                ; ( "expected_ports"
                  , `List (List.map ~f:(fun n -> `Int n) expected_peer_ports) )
                ]

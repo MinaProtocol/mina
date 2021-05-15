@@ -7,20 +7,20 @@ module Sender = struct
 
   let equal sender1 sender2 = Int.equal (compare sender1 sender2) 0
 
-  let to_yojson t : Yojson.Safe.t =
+  let yojson_of_t t : Yojson.Safe.t =
     match t with
     | Local ->
         `String "Local"
     | Remote p ->
-        `Assoc [("Remote", Peer.to_yojson p)]
+        `Assoc [("Remote", Peer.yojson_of p)]
 
-  let of_yojson (json : Yojson.Safe.t) : (t, string) Result.t =
+  let t_t_of_yojson (json : Yojson.Safe.t) : (t, string) Result.t =
     match json with
     | `String "Local" ->
         Ok Local
     | `Assoc [("Remote", peer_json)] ->
         let open Result.Let_syntax in
-        let%map peer = Peer.of_yojson peer_json in
+        let%map peer = Peer.t_of_yojson peer_json in
         Remote peer
     | _ ->
         Error "Expected JSON representing envelope sender"
@@ -59,19 +59,19 @@ module Sender = struct
 end
 
 module Incoming = struct
-  let time_to_yojson tm = `String (Time.to_string tm)
+  let time_yojson_of tm = `String (Time.to_string tm)
 
-  let time_of_yojson = function
+  let time_t_of_yojson = function
     | `String s ->
         Ok (Time.of_string s)
     | _ ->
-        Error "time_of_yojson: Expected string"
+        Error "time_t_of_yojson: Expected string"
 
   type 'a t =
     { data: 'a
     ; sender: Sender.t
     ; received_at: Time.t
-          [@to_yojson time_to_yojson] [@of_yojson time_of_yojson] }
+          [@yojson_of time_yojson_of] [@t_of_yojson time_t_of_yojson] }
   [@@deriving eq, sexp, yojson, compare]
 
   let sender t = t.sender

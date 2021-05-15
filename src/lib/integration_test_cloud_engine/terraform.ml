@@ -1,25 +1,25 @@
 open Core
 
 (* this is only a partial (minimum required) implementation of the terraform json spec *)
-let cons (type a) (key : string) (body : a) (to_yojson : a -> Yojson.Safe.t) =
-  `Assoc [(key, to_yojson body)]
+let cons (type a) (key : string) (body : a) (yojson_of : a -> Yojson.Safe.t) =
+  `Assoc [(key, yojson_of body)]
 
 module Backend = struct
   module S3 = struct
     type t =
       {key: string; encrypt: bool; region: string; bucket: string; acl: string}
-    [@@deriving to_yojson]
+    [@@deriving yojson_of]
   end
 
   type t = S3 of S3.t
 
-  let to_yojson = function S3 x -> cons "s3" x S3.to_yojson
+  let yojson_of_t = function S3 x -> cons "s3" x S3.yojson_of
 end
 
 module Block = struct
   module Terraform = struct
     type t = {required_version: string; backend: Backend.t}
-    [@@deriving to_yojson]
+    [@@deriving yojson_of]
   end
 
   (* should probably leave these untyped, but this covers basic keys for both google and aws *)
@@ -30,9 +30,9 @@ module Block = struct
       ; alias: string option
       ; project: string option
       ; zone: string option }
-    [@@deriving to_yojson]
+    [@@deriving yojson_of]
 
-    let to_yojson {provider; region; alias; project; zone} =
+    let yojson_of_t {provider; region; alias; project; zone} =
       cons provider () (fun () ->
           let open Option.Let_syntax in
           let field k v = (k, `String v) in
@@ -52,7 +52,7 @@ module Block = struct
       ; source: string
       ; args: (string * Yojson.Safe.t) list }
 
-    let to_yojson {local_name; providers; source; args} =
+    let yojson_of_t {local_name; providers; source; args} =
       cons local_name () (fun () ->
           let const_fields =
             [ ( "providers"
@@ -69,7 +69,7 @@ module Block = struct
       ; local_name: string
       ; args: (string * Yojson.Safe.t) list }
 
-    let to_yojson {data_source; local_name; args} =
+    let yojson_of_t {data_source; local_name; args} =
       cons data_source () (fun () -> cons local_name () (fun () -> `Assoc args))
   end
 
@@ -77,7 +77,7 @@ module Block = struct
     type t =
       {type_: string; local_name: string; args: (string * Yojson.Safe.t) list}
 
-    let to_yojson {type_; local_name; args} =
+    let yojson_of_t {type_; local_name; args} =
       cons type_ () (fun () -> cons local_name () (fun () -> `Assoc args))
   end
 
@@ -88,19 +88,19 @@ module Block = struct
     | Data of Data.t
     | Resource of Resource.t
 
-  let to_yojson = function
+  let yojson_of_t = function
     | Terraform x ->
-        cons "terraform" x Terraform.to_yojson
+        cons "terraform" x Terraform.yojson_of
     | Provider x ->
-        cons "provider" x Provider.to_yojson
+        cons "provider" x Provider.yojson_of
     | Module x ->
-        cons "module" x Module.to_yojson
+        cons "module" x Module.yojson_of
     | Data x ->
-        cons "data" x Data.to_yojson
+        cons "data" x Data.yojson_of
     | Resource x ->
-        cons "resource" x Resource.to_yojson
+        cons "resource" x Resource.yojson_of
 end
 
-type t = Block.t list [@@deriving to_yojson]
+type t = Block.t list [@@deriving yojson_of]
 
-let to_string = Fn.compose Yojson.Safe.pretty_to_string to_yojson
+let to_string = Fn.compose Yojson.Safe.pretty_to_string yojson_of

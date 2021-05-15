@@ -71,7 +71,7 @@ module Inputs = struct
                 let logger = Logger.create () in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
-                    [ ("error", Error_json.error_to_yojson e)
+                    [ ("error", Error_json.error_yojson_of e)
                     ; ( "spec"
                         (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
 		       so we use the less-desirable sexp here

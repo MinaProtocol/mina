@@ -70,9 +70,9 @@ module Exp_time_spans = Make (struct
   (** Note: All time spans are represented in JSON as floating point millis *)
   type t = Time.Span.t [@@deriving bin_io_unversioned]
 
-  let to_yojson t = `Float (Time.Span.to_ms t)
+  let yojson_of_t t = `Float (Time.Span.to_ms t)
 
-  let of_yojson t =
+  let t_t_of_yojson t =
     let open Ppx_deriving_yojson_runtime in
     match t with
     | `Float ms ->

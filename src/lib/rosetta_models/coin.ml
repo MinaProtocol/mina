@@ -7,7 +7,7 @@
  *)
 
 type t = {coin_identifier: Coin_identifier.t; amount: Amount.t}
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** Coin contains its unique identifier and the amount it represents. *)
 let create (coin_identifier : Coin_identifier.t) (amount : Amount.t) : t =

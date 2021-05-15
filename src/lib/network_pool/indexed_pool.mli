@@ -26,7 +26,7 @@ module Command_error : sig
         * [`Current_global_slot of Mina_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
-  [@@deriving sexp_of, to_yojson]
+  [@@deriving sexp_of, yojson_of]
 end
 
 val replace_fee : Currency.Fee.t

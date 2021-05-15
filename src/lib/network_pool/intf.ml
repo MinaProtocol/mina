@@ -47,12 +47,12 @@ end
 module type Resource_pool_diff_intf = sig
   type pool
 
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson_of]
 
-  type verified [@@deriving sexp, to_yojson]
+  type verified [@@deriving sexp, yojson_of]
 
   (** Part of the diff that was not added to the resource pool*)
-  type rejected [@@deriving sexp, to_yojson]
+  type rejected [@@deriving sexp, yojson_of]
 
   val empty : t
 
@@ -264,7 +264,7 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  type t = User_command.t list [@@deriving sexp, of_yojson]
+  type t = User_command.t list [@@deriving sexp, t_of_yojson]
 
   module Diff_error : sig
     type t =

@@ -429,7 +429,7 @@ let statement t = {t.statement with sok_digest= ()}
 
 let sok_digest t = t.statement.sok_digest
 
-let to_yojson = Stable.Latest.to_yojson
+let yojson_of_t = Stable.Latest.yojson_of
 
 let create ~source ~target ~supply_increase ~pending_coinbase_stack_state
     ~fee_excess ~next_available_token_before ~next_available_token_after

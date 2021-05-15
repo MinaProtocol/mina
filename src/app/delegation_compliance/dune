@@ -18,4 +18,4 @@
  (preprocessor_deps ../../config.mlh)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_let ppx_sexp_conv ppx_deriving.show
-                  ppx_hash ppx_compare ppx_deriving_yojson h_list.ppx)))
+                  ppx_hash ppx_compare ppx_yojson_conv h_list.ppx)))

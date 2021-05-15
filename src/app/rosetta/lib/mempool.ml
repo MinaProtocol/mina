@@ -110,7 +110,7 @@ module All = struct
       module Mock = Impl (Result)
 
       let%test_unit "succeeds" =
-        Test.assert_ ~f:Mempool_response.to_yojson
+        Test.assert_ ~f:Mempool_response.yojson_of
           ~expected:(Mock.handle ~env:Env.mock Network.dummy_network_request)
           ~actual:
             (Result.return
@@ -297,7 +297,7 @@ module Transaction = struct
      * it properly yet *)
       (*
       let%test_unit "all dummies" =
-        Test.assert_ ~f:Mempool_transaction_response.to_yojson
+        Test.assert_ ~f:Mempool_transaction_response.yojson_of
           ~expected:
             (Mock.handle ~env:Env.mock
                (Mempool_transaction_request.create
@@ -315,24 +315,24 @@ let router ~graphql_uri ~logger (route : string list) body =
   match route with
   | [] | [""] ->
       let%bind req =
-        Errors.Lift.parse ~context:"Request" @@ Network_request.of_yojson body
+        Errors.Lift.parse ~context:"Request" @@ Network_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         All.Real.handle ~env:(All.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Mempool_response.to_yojson res
+      Mempool_response.yojson_of res
   | ["transaction"] ->
       let%bind req =
         Errors.Lift.parse ~context:"Request"
-        @@ Mempool_transaction_request.of_yojson body
+        @@ Mempool_transaction_request.t_of_yojson body
         |> Errors.Lift.wrap
       in
       let%map res =
         Transaction.Real.handle ~env:(Transaction.Env.real ~graphql_uri) req
         |> Errors.Lift.wrap
       in
-      Mempool_transaction_response.to_yojson res
+      Mempool_transaction_response.yojson_of res
   | _ ->
       Deferred.Result.fail `Page_not_found

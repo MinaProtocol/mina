@@ -27,7 +27,7 @@ type t =
     address: string option [@default None]
   ; (* success is a synthetic condition populated by parsing network-specific operation statuses (using the mapping provided in `/network/options`). *)
     success: bool option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** SearchTransactionsRequest is used to search for transactions matching a set of provided conditions in canonical blocks. *)
 let create (network_identifier : Network_identifier.t) : t =

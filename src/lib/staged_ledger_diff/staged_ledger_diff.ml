@@ -198,20 +198,20 @@ module With_valid_signatures_and_proofs = struct
     ( Transaction_snark_work.Checked.t
     , User_command.Valid.t With_status.t )
     Pre_diff_two.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.Checked.t
     , User_command.Valid.t With_status.t )
     Pre_diff_one.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
   type diff =
     pre_diff_with_at_most_two_coinbase
     * pre_diff_with_at_most_one_coinbase option
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
-  type t = {diff: diff} [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, yojson_of]
 
   let empty_diff : t =
     { diff=
@@ -257,20 +257,20 @@ module With_valid_signatures = struct
     ( Transaction_snark_work.t
     , User_command.Valid.t With_status.t )
     Pre_diff_two.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
   type pre_diff_with_at_most_one_coinbase =
     ( Transaction_snark_work.t
     , User_command.Valid.t With_status.t )
     Pre_diff_one.t
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
   type diff =
     pre_diff_with_at_most_two_coinbase
     * pre_diff_with_at_most_one_coinbase option
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
-  type t = {diff: diff} [@@deriving sexp, to_yojson]
+  type t = {diff: diff} [@@deriving sexp, yojson_of]
 
   let coinbase
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)

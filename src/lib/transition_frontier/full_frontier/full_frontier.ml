@@ -257,7 +257,7 @@ module Visualizor = struct
             | None ->
                 [%log' debug t.logger]
                   ~metadata:
-                    [ ("state_hash", State_hash.to_yojson successor_state_hash)
+                    [ ("state_hash", State_hash.yojson_of successor_state_hash)
                     ; ("error", `String "missing from frontier") ]
                   "Could not visualize state $state_hash: $error" ;
                 acc_graph ) )
@@ -761,9 +761,9 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
                  required_local_state_sync or frontier_root_transition."
                 ~metadata:
                   [ ( "sync_jobs"
-                    , Consensus.Hooks.local_state_sync_to_yojson jobs )
+                    , Consensus.Hooks.local_state_sync_yojson_of jobs )
                   ; ( "local_state"
-                    , Consensus.Data.Local_state.to_yojson
+                    , Consensus.Data.Local_state.yojson_of
                         t.consensus_local_state )
                   ; ("tf_viz", `String (visualize_to_string t)) ] ;
               failwith
@@ -781,7 +781,7 @@ module For_tests = struct
         failwith
           (sprintf
              !"Protocol state with hash %s not found"
-             (State_body_hash.to_yojson hash |> Yojson.Safe.to_string))
+             (State_body_hash.yojson_of hash |> Yojson.Safe.to_string))
 
   let equal t1 t2 =
     let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in

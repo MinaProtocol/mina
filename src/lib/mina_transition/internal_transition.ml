@@ -2,12 +2,12 @@ open Core_kernel
 open Mina_state
 
 module type S = sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson_of]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, to_yojson, bin_io]
+        type t [@@deriving sexp, yojson_of, bin_io]
       end
 
       module Latest = V1
@@ -51,7 +51,7 @@ type t = Stable.Latest.t =
   ; ledger_proof: Ledger_proof.t option
   ; prover_state: Consensus.Data.Prover_state.t
   ; staged_ledger_diff: Staged_ledger_diff.t }
-[@@deriving sexp, fields, to_yojson]
+[@@deriving sexp, fields, yojson_of]
 
 let create ~snark_transition ~ledger_proof ~prover_state ~staged_ledger_diff =
   { Stable.Latest.snark_transition

@@ -92,7 +92,7 @@ module Worker_state = struct
                    result
                | Error e ->
                    [%log error]
-                     ~metadata:[("error", Error_json.error_to_yojson e)]
+                     ~metadata:[("error", Error_json.error_yojson_of e)]
                      "Verifier threw an exception while verifying transaction \
                       snark" ;
                    failwith "Verifier crashed"
@@ -274,7 +274,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
-      ~metadata:[("err", Error_json.error_to_yojson err)] ;
+      ~metadata:[("err", Error_json.error_yojson_of err)] ;
     Error.raise err
   in
   let create_worker () =
@@ -297,7 +297,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
             (fun exn ->
               let err = Error.of_exn ~backtrace:`Get exn in
               [%log error] "Error from verifier worker $err"
-                ~metadata:[("err", Error_json.error_to_yojson err)] ))
+                ~metadata:[("err", Error_json.error_yojson_of err)] ))
         (fun () ->
           Worker.spawn_in_foreground_exn
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
@@ -373,7 +373,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
                   [%log info]
                     "Saw an exception while trying to wait for the verifier \
                      process: $exn"
-                    ~metadata:[("exn", Error_json.error_to_yojson err)]
+                    ~metadata:[("exn", Error_json.error_yojson_of err)]
               | _ ->
                   () ) ;
               match Signal.send Signal.kill (`Pid pid) with
@@ -396,7 +396,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
                    , `String (Unix.Exit_or_signal.to_string_hum res) ) ]
              | Error err ->
                  [ ("exit_status", `String "Unknown: wait threw an error")
-                 ; ("exn", Error_json.error_to_yojson err) ]
+                 ; ("exn", Error_json.error_yojson_of err) ]
            in
            [%log info] "verifier successfully stopped"
              ~metadata:

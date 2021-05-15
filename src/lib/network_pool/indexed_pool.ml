@@ -74,7 +74,7 @@ module Command_error = struct
         * [`Current_global_slot of Mina_numbers.Global_slot.t]
     | Unwanted_fee_token of Token_id.t
     | Invalid_transaction
-  [@@deriving sexp_of, to_yojson]
+  [@@deriving sexp_of, yojson_of]
 end
 
 (* Compute the total currency required from the sender to execute a command.

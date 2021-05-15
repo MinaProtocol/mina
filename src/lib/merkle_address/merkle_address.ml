@@ -30,7 +30,7 @@ let of_directions dirs =
   in
   loop 0 dirs ; path
 
-let to_yojson t = `String (to_string t)
+let yojson_of_t t = `String (to_string t)
 
 let to_tuple path =
   let length = depth path in
@@ -84,7 +84,7 @@ module Stable = struct
       [%hash_fold: int * string] hash_state (to_tuple t)
 
     [%%define_from_scope
-    compare, to_yojson]
+    compare, yojson_of]
 
     let equal = equals
   end
@@ -97,7 +97,7 @@ let height ~ledger_depth path = ledger_depth - depth path
 let get = get
 
 [%%define_locally
-Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
+Stable.Latest.(t_of_sexp, sexp_of_t, yojson_of, compare, equal)]
 
 include Hashable.Make_binable (Stable.Latest)
 

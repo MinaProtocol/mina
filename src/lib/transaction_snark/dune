@@ -5,6 +5,6 @@
  (inline_tests)
  (libraries core cache_dir snarky.backendless mina_base sgn bignum ppx_version.runtime transaction_protocol_state mina_state)
  (preprocess
-  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_deriving_yojson h_list.ppx))
+  (pps ppx_snarky ppx_version ppx_jane ppx_deriving.std ppx_yojson_conv h_list.ppx))
  (instrumentation (backend bisect_ppx))
  (synopsis "Transaction state transition snarking library"))

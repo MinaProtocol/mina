@@ -253,21 +253,21 @@ end = struct
           | Error e ->
               let logger = Logger.create () in
               [%log error]
-                ~metadata:[("error", Error_json.error_to_yojson e)]
+                ~metadata:[("error", Error_json.error_yojson_of e)]
                 "When handling What_child_hashes request, the following error \
                  happended: $error" ;
               Either.Second
                 ( Actions.Violated_protocol
                 , Some
                     ( "invalid address $addr in What_child_hashes request"
-                    , [("addr", Addr.to_yojson a)] ) ) )
+                    , [("addr", Addr.yojson_of a)] ) ) )
         | What_contents a ->
             if Addr.height ~ledger_depth a > account_subtree_height then
               Either.Second
                 ( Actions.Violated_protocol
                 , Some
                     ( "requested too big of a subtree at once: $addr"
-                    , [("addr", Addr.to_yojson a)] ) )
+                    , [("addr", Addr.yojson_of a)] ) )
             else
               let addresses_and_accounts =
                 List.sort ~compare:(fun (addr1, _) (addr2, _) ->
@@ -283,7 +283,7 @@ end = struct
                   ( Actions.Violated_protocol
                   , Some
                       ( "Requested empty subtree: $addr"
-                      , [("addr", Addr.to_yojson a)] ) )
+                      , [("addr", Addr.yojson_of a)] ) )
               else
                 let first_address, rest_address =
                   (List.hd_exn addresses, List.tl_exn addresses)
@@ -301,14 +301,14 @@ end = struct
                   [%log fatal]
                     ~metadata:
                       [ ( "missing_address"
-                        , Addr.to_yojson (Option.value_exn missing_address) )
+                        , Addr.yojson_of (Option.value_exn missing_address) )
                       ; ( "addresses_and_accounts"
                         , `List
                             (List.map addresses_and_accounts
                                ~f:(fun (addr, account) ->
                                  `Tuple
-                                   [ Addr.to_yojson addr
-                                   ; Account.to_yojson account ] )) ) ]
+                                   [ Addr.yojson_of addr
+                                   ; Account.yojson_of account ] )) ) ]
                     "Missing an account at address: $missing_address inside \
                      the list: $addresses_and_accounts" ;
                   assert false )
@@ -374,8 +374,8 @@ end = struct
    fun t parent_addr expected ->
     [%log' trace t.logger]
       ~metadata:
-        [ ("parent_address", Addr.to_yojson parent_addr)
-        ; ("hash", Hash.to_yojson expected) ]
+        [ ("parent_address", Addr.yojson_of parent_addr)
+        ; ("hash", Hash.yojson_of expected) ]
       "Expecting children parent $parent_address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
 
@@ -383,7 +383,7 @@ end = struct
    fun t addr expected ->
     [%log' trace t.logger]
       ~metadata:
-        [("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected)]
+        [("address", Addr.yojson_of addr); ("hash", Hash.yojson_of expected)]
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
@@ -533,14 +533,14 @@ end = struct
       let answer = Envelope.Incoming.data env in
       [%log' trace t.logger]
         ~metadata:
-          [ ("root_hash", Root_hash.to_yojson root_hash)
-          ; ("query", Query.to_yojson Addr.to_yojson query) ]
+          [ ("root_hash", Root_hash.yojson_of root_hash)
+          ; ("query", Query.yojson_of Addr.yojson_of query) ]
         "Handle answer for $root_hash" ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
         [%log' trace t.logger]
           ~metadata:
-            [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
-            ; ("ignored_hash", Root_hash.to_yojson root_hash) ]
+            [ ("desired_hash", Root_hash.yojson_of (desired_root_exn t))
+            ; ("ignored_hash", Root_hash.yojson_of root_hash) ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
         Deferred.unit )
       else if already_done then (
@@ -562,7 +562,7 @@ end = struct
             ( Actions.Fulfilled_request
             , Some
                 ( "sync ledger query $query"
-                , [("query", Query.to_yojson Addr.to_yojson query)] ) )
+                , [("query", Query.yojson_of Addr.yojson_of query)] ) )
         in
         let%bind _ =
           match (query, answer) with
@@ -576,10 +576,10 @@ end = struct
                         ( "sent child hashes $lhash and $rhash for address \
                            $addr, they merge hash to $actualmerge but we \
                            expected $expectedmerge"
-                        , [ ("lhash", Hash.to_yojson lh)
-                          ; ("rhash", Hash.to_yojson rh)
-                          ; ("actualmerge", Hash.to_yojson actual)
-                          ; ("expectedmerge", Hash.to_yojson expected) ] ) )
+                        , [ ("lhash", Hash.yojson_of lh)
+                          ; ("rhash", Hash.yojson_of rh)
+                          ; ("actualmerge", Hash.yojson_of actual)
+                          ; ("expectedmerge", Hash.yojson_of expected) ] ) )
                 in
                 requeue_query ()
             | `Good children_to_verify ->
@@ -599,10 +599,10 @@ end = struct
                         ( "sent accounts $accounts for address $addr, they \
                            hash to $actual but we expected $expected"
                         , [ ( "accounts"
-                            , `List (List.map ~f:Account.to_yojson leaves) )
-                          ; ("addr", Addr.to_yojson addr)
-                          ; ("actual", Hash.to_yojson actual)
-                          ; ("expected", Hash.to_yojson expected) ] ) )
+                            , `List (List.map ~f:Account.yojson_of leaves) )
+                          ; ("addr", Addr.yojson_of addr)
+                          ; ("actual", Hash.yojson_of actual)
+                          ; ("expected", Hash.yojson_of expected) ] ) )
                 in
                 requeue_query () )
           | Query.Num_accounts, Answer.Num_accounts (count, content_root) -> (
@@ -618,9 +618,9 @@ end = struct
                            $content_root_hash, that implies a root hash of \
                            $actual, we expected $expected"
                         , [ ("count", `Int count)
-                          ; ("content_root_hash", Hash.to_yojson content_root)
-                          ; ("actual", Hash.to_yojson actual)
-                          ; ("expected", Hash.to_yojson expected) ] ) )
+                          ; ("content_root_hash", Hash.yojson_of content_root)
+                          ; ("actual", Hash.yojson_of actual)
+                          ; ("expected", Hash.yojson_of expected) ] ) )
                 in
                 requeue_query () )
           | query, answer ->
@@ -630,9 +630,9 @@ end = struct
                   , Some
                       ( "Answered question we didn't ask! Query was $query \
                          answer was $answer"
-                      , [ ("query", Query.to_yojson Addr.to_yojson query)
+                      , [ ("query", Query.yojson_of Addr.yojson_of query)
                         ; ( "answer"
-                          , Answer.to_yojson Hash.to_yojson Account.to_yojson
+                          , Answer.yojson_of Hash.yojson_of Account.yojson_of
                               answer ) ] ) )
               in
               requeue_query ()
@@ -660,8 +660,8 @@ end = struct
       Option.iter t.desired_root ~f:(fun root_hash ->
           [%log' debug t.logger]
             ~metadata:
-              [ ("old_root_hash", Root_hash.to_yojson root_hash)
-              ; ("new_root_hash", Root_hash.to_yojson h) ]
+              [ ("old_root_hash", Root_hash.yojson_of root_hash)
+              ; ("new_root_hash", Root_hash.yojson_of h) ]
             "New_goal: changing target from $old_root_hash to $new_root_hash"
       ) ;
       Ivar.fill_if_empty t.validity_listener

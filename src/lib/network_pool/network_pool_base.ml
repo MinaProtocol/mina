@@ -82,7 +82,7 @@ end)
           "Refusing to rebroadcast $diff. Pool diff apply feedback: empty diff"
           ~metadata:
             [ ( "diff"
-              , Resource_pool.Diff.verified_to_yojson
+              , Resource_pool.Diff.verified_yojson_of
                 @@ Envelope.Incoming.data diff ) ] ;
         drop diff' rejected cb )
       else (
@@ -98,7 +98,7 @@ end)
     | Error (`Other e) ->
         [%log' debug t.logger]
           "Refusing to rebroadcast. Pool diff apply feedback: $error"
-          ~metadata:[("error", Error_json.error_to_yojson e)] ;
+          ~metadata:[("error", Error_json.error_yojson_of e)] ;
         Broadcast_callback.error e cb
 
   let log_rate_limiter_occasionally t rl =
@@ -126,7 +126,7 @@ end)
                     [%log' warn t.logger]
                       "Dropping verified diff $diff due to pipe overflow"
                       ~metadata:
-                        [("diff", Resource_pool.Diff.verified_to_yojson diff)] ;
+                        [("diff", Resource_pool.Diff.verified_yojson_of diff)] ;
                     Broadcast_callback.drop Resource_pool.Diff.empty
                       (Resource_pool.Diff.reject_overloaded_diff diff)
                       cb )) ))
@@ -152,7 +152,7 @@ end)
               with
             | `Capacity_exceeded ->
                 [%log' debug t.logger]
-                  ~metadata:[("sender", Envelope.Sender.to_yojson diff.sender)]
+                  ~metadata:[("sender", Envelope.Sender.yojson_of diff.sender)]
                   "exceeded capacity from $sender" ;
                 Broadcast_callback.error
                   (Error.of_string "exceeded capacity")
@@ -165,17 +165,17 @@ end)
                        $error"
                       ~metadata:
                         [ ("diff", summary)
-                        ; ("error", Error_json.error_to_yojson err) ] ;
+                        ; ("error", Error_json.error_yojson_of err) ] ;
                     (*reject incoming messages*)
                     Broadcast_callback.error err cb
                 | Ok verified_diff -> (
                     [%log' debug t.logger] "Verified diff: $verified_diff"
                       ~metadata:
                         [ ( "verified_diff"
-                          , Resource_pool.Diff.verified_to_yojson
+                          , Resource_pool.Diff.verified_yojson_of
                             @@ Envelope.Incoming.data verified_diff )
                         ; ( "sender"
-                          , Envelope.Sender.to_yojson
+                          , Envelope.Sender.yojson_of
                             @@ Envelope.Incoming.sender verified_diff ) ] ;
                     match Strict_pipe.Writer.write w (verified_diff, cb) with
                     | Some r ->
@@ -251,7 +251,7 @@ end)
           ~metadata:
             [ ( "diffs"
               , `List
-                  (List.map ~f:Resource_pool.Diff.to_yojson rebroadcastable) )
+                  (List.map ~f:Resource_pool.Diff.yojson_of rebroadcastable) )
             ] ;
       let%bind () =
         Deferred.List.iter rebroadcastable

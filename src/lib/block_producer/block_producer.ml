@@ -164,8 +164,8 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                 "Block reward $reward is less than the min-block-reward \
                  $threshold, creating empty block"
                 ~metadata:
-                  [ ("threshold", Currency.Amount.to_yojson threshold)
-                  ; ("reward", Currency.Amount.to_yojson net_return) ] ;
+                  [ ("threshold", Currency.Amount.yojson_of threshold)
+                  ; ("reward", Currency.Amount.yojson_of net_return) ] ;
               Ok Staged_ledger_diff.With_valid_signatures_and_proofs.empty_diff )
         | _ ->
             diff
@@ -196,7 +196,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             , pending_coinbase_update )
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           [%log error] "Failed to apply the diff: $error"
-            ~metadata:[("error", Error_json.error_to_yojson e)] ;
+            ~metadata:[("error", Error_json.error_yojson_of e)] ;
           None
       | Error e ->
           ( match diff with
@@ -208,7 +208,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
                     )
                   ; ( "diff"
                     , Staged_ledger_diff.With_valid_signatures_and_proofs
-                      .to_yojson diff ) ]
+                      .yojson_of diff ) ]
                 "Error applying the diff $diff: $error"
           | Error e ->
               [%log error] "Error building the diff: $error"
@@ -337,7 +337,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
     ("time", `Int (Time.Span.to_ms span |> Int64.to_int_exn))
   in
   let state_metadata =
-    ("protocol_state", Protocol_state.Value.to_yojson protocol_state)
+    ("protocol_state", Protocol_state.Value.yojson_of protocol_state)
   in
   match x with
   | Ok x ->
@@ -352,14 +352,14 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
         "Prover failed to prove freshly generated transition: $error"
       in
       let metadata =
-        [ ("error", Error_json.error_to_yojson err)
-        ; ("prev_state", Protocol_state.value_to_yojson previous_protocol_state)
-        ; ("prev_state_proof", Proof.to_yojson previous_protocol_state_proof)
-        ; ("next_state", Protocol_state.value_to_yojson protocol_state)
+        [ ("error", Error_json.error_yojson_of err)
+        ; ("prev_state", Protocol_state.value_yojson_of previous_protocol_state)
+        ; ("prev_state_proof", Proof.yojson_of previous_protocol_state_proof)
+        ; ("next_state", Protocol_state.value_yojson_of protocol_state)
         ; ( "internal_transition"
-          , Internal_transition.to_yojson internal_transition )
+          , Internal_transition.yojson_of internal_transition )
         ; ( "pending_coinbase_witness"
-          , Pending_coinbase_witness.to_yojson pending_coinbase_witness )
+          , Pending_coinbase_witness.yojson_of pending_coinbase_witness )
         ; time_metadata ]
       in
       [%log error] ~metadata msg ;
@@ -367,7 +367,7 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
       return ()
   | Error `Invalid_genesis_protocol_state ->
       let state_yojson =
-        Fn.compose State_hash.to_yojson Protocol_state.genesis_state_hash
+        Fn.compose State_hash.yojson_of Protocol_state.genesis_state_hash
       in
       let msg : (_, unit, string, unit) format4 =
         "Produced transition has invalid genesis state hash"
@@ -424,8 +424,8 @@ let handle_block_production_errors ~logger ~rejected_blocks_logger
          staged ledger diff: $error"
       in
       let metadata =
-        [ ("error", Error_json.error_to_yojson e)
-        ; ("diff", Staged_ledger_diff.to_yojson staged_ledger_diff) ]
+        [ ("error", Error_json.error_yojson_of e)
+        ; ("diff", Staged_ledger_diff.yojson_of staged_ledger_diff) ]
       in
       [%log error] ~metadata msg ;
       [%log' debug rejected_blocks_logger]
@@ -474,7 +474,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   return (Ok res)
               | Error err ->
                   [%log error] "Failed to generate genesis breadcrumb: $error"
-                    ~metadata:[("error", Error_json.error_to_yojson err)] ;
+                    ~metadata:[("error", Error_json.error_yojson_of err)] ;
                   if retries > 0 then go (retries - 1)
                   else (
                     Ivar.fill genesis_breadcrumb_ivar (Error err) ;
@@ -504,7 +504,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             let start = Time.now time_controller in
             [%log info]
-              ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
+              ~metadata:[("breadcrumb", Breadcrumb.yojson_of crumb)]
               "Producing new block with parent $breadcrumb%!" ;
             let previous_transition =
               Breadcrumb.validated_transition crumb
@@ -681,10 +681,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     [%str_log info]
                       ~metadata:
-                        [("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
+                        [("breadcrumb", Breadcrumb.yojson_of breadcrumb)]
                       Block_produced ;
                     let metadata =
-                      [("state_hash", State_hash.to_yojson protocol_state_hash)]
+                      [("state_hash", State_hash.yojson_of protocol_state_hash)]
                     in
                     Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
@@ -739,7 +739,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
                             )
                           ; ( "protocol_state"
-                            , Protocol_state.Value.to_yojson protocol_state )
+                            , Protocol_state.Value.yojson_of protocol_state )
                           ]
                           @ metadata
                         in
@@ -938,7 +938,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
         in
         let crumb = Transition_frontier.best_tip frontier in
         [%log trace]
-          ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
+          ~metadata:[("breadcrumb", Breadcrumb.yojson_of crumb)]
           "Emitting precomputed block with parent $breadcrumb%!" ;
         let previous_transition =
           Breadcrumb.validated_transition crumb
@@ -1023,10 +1023,10 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
                          err ) )
           in
           [%str_log trace]
-            ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
+            ~metadata:[("breadcrumb", Breadcrumb.yojson_of breadcrumb)]
             Block_produced ;
           let metadata =
-            [("state_hash", State_hash.to_yojson protocol_state_hash)]
+            [("state_hash", State_hash.yojson_of protocol_state_hash)]
           in
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
           let%bind.Async () =

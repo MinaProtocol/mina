@@ -65,7 +65,7 @@ would translate to
 Logger.error logger
   ~module:__MODULE__
   ~location:__LOC__
-  ~metadata:[("breadcrumb", Breadcrumb.to_yojson breadcrumb)]
+  ~metadata:[("breadcrumb", Breadcrumb.yojson_of breadcrumb)]
   "Error adding breadcrumb $breadcrumb to transition frontier: %s"
   (Error.to_string err)
 ```

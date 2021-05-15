@@ -185,9 +185,9 @@ end
 module type Yojson_intf1 = sig
   type 'a t
 
-  val to_yojson : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
+  val yojson_of_t : ('a -> Yojson.Safe.t) -> 'a t -> Yojson.Safe.t
 
-  val of_yojson :
+  val t_t_of_yojson :
        (Yojson.Safe.t -> 'a Ppx_deriving_yojson_runtime.error_or)
     -> Yojson.Safe.t
     -> 'a t Ppx_deriving_yojson_runtime.error_or
@@ -226,10 +226,10 @@ module Make = struct
 
   module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
   struct
-    let to_yojson f t = L.to_yojson f (to_list t)
+    let yojson_of_t f t = L.yojson_of f (to_list t)
 
-    let of_yojson f s =
-      Result.map (L.of_yojson f s) ~f:(Fn.flip of_list_and_length_exn N.n)
+    let t_t_of_yojson f s =
+      Result.map (L.t_of_yojson f s) ~f:(Fn.flip of_list_and_length_exn N.n)
   end
 
   module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =

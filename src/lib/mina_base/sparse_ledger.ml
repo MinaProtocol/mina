@@ -11,7 +11,7 @@ module Stable = struct
       , Account.Stable.V1.t
       , Token_id.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving to_yojson, sexp]
+    [@@deriving yojson_of, sexp]
 
     let to_latest = Fn.id
   end
@@ -99,7 +99,7 @@ module T = Transaction_logic.Make (L)
 [%%define_locally
 M.
   ( of_hash
-  , to_yojson
+  , yojson_of
   , get_exn
   , path_exn
   , set_exn

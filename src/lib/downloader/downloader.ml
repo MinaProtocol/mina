@@ -16,22 +16,22 @@ end
 
 type 'a pred = 'a -> bool
 
-let pred_to_yojson _f _x = `String "<opaque>"
+let pred_yojson_of _f _x = `String "<opaque>"
 
-let [@sexp.opaque]_to_yojson _f _x = `String "<opaque>"
+let [@sexp.opaque]_yojson_of _f _x = `String "<opaque>"
 
 module Claimed_knowledge = struct
   type 'key t = [`All | `Some of 'key list | `Call of 'key pred [@sexp.opaque]]
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, yojson_of]
 
-  let to_yojson f t =
+  let yojson_of_t f t =
     match t with
     | `Some ks ->
         let n = List.length ks in
-        if n > 5 then to_yojson (fun x -> `Int x) (`Some [n])
-        else to_yojson f t
+        if n > 5 then yojson_of (fun x -> `Int x) (`Some [n])
+        else yojson_of f t
     | _ ->
-        to_yojson f t
+        yojson_of f t
 
   let check ~equal t k =
     match t with
@@ -44,13 +44,13 @@ module Claimed_knowledge = struct
 end
 
 module Make (Key : sig
-  type t [@@deriving to_yojson, hash, sexp, compare]
+  type t [@@deriving yojson_of, hash, sexp, compare]
 
   include Hashable.S with type t := t
 
   include Comparable.S with type t := t
 end) (Attempt : sig
-  type t [@@deriving to_yojson]
+  type t [@@deriving yojson_of]
 
   val download : t
 
@@ -62,7 +62,7 @@ end) (Result : sig
 end) (Knowledge_context : sig
   type t
 end) : sig
-  type t [@@deriving to_yojson]
+  type t [@@deriving yojson_of]
 
   module Job : sig
     type t = (Key.t, Attempt.t, Result.t) Job.t
@@ -111,13 +111,13 @@ end = struct
   module Job = struct
     type t = (Key.t, Attempt.t, Result.t) Job.t
 
-    let to_yojson ({key; attempts; _} : t) : Yojson.Safe.t =
+    let yojson_of_t ({key; attempts; _} : t) : Yojson.Safe.t =
       `Assoc
-        [ ("key", Key.to_yojson key)
+        [ ("key", Key.yojson_of key)
         ; ( "attempts"
           , `Assoc
               (List.map (Map.to_alist attempts) ~f:(fun (p, a) ->
-                   (Peer.to_multiaddr_string p, Attempt.to_yojson a) )) ) ]
+                   (Peer.to_multiaddr_string p, Attempt.yojson_of a) )) ) ]
 
     let result = Job.result
   end
@@ -179,12 +179,12 @@ end = struct
     module Key_set = struct
       type t = Key.Hash_set.t [@@deriving sexp]
 
-      let to_yojson t = `List (List.map (Hash_set.to_list t) ~f:Key.to_yojson)
+      let yojson_of_t t = `List (List.map (Hash_set.to_list t) ~f:Key.yojson_of)
     end
 
     type t =
       {claimed: Key.t Claimed_knowledge.t option; tried_and_failed: Key_set.t}
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
 
     let clear t = Hash_set.clear t.tried_and_failed
 
@@ -278,7 +278,7 @@ end = struct
             Hashtbl.add_exn t.knowledge ~key:p ~data:(Knowledge.create ()) ) ;
       Strict_pipe.Writer.write t.w ()
 
-    let to_yojson
+    let yojson_of_t
         { knowledge
         ; all_preferred
         ; knowledge_requesting_peers
@@ -289,7 +289,7 @@ end = struct
       let list xs =
         `Assoc [("length", `Int (List.length xs)); ("elts", `List xs)]
       in
-      let f q = Knowledge.to_yojson q in
+      let f q = Knowledge.yojson_of q in
       `Assoc
         [ ( "all"
           , `Assoc
@@ -300,15 +300,15 @@ end = struct
               (List.map (Preferred_heap.to_list all_preferred) ~f:(fun p ->
                    `String (Peer.to_multiaddr_string p) )) )
         ; ( "temporary_ignores"
-          , list (List.map ~f:Peer.to_yojson (Hashtbl.keys temporary_ignores))
+          , list (List.map ~f:Peer.yojson_of (Hashtbl.keys temporary_ignores))
           )
         ; ( "downloading_peers"
           , list
-              (List.map ~f:Peer.to_yojson (Hash_set.to_list downloading_peers))
+              (List.map ~f:Peer.yojson_of (Hash_set.to_list downloading_peers))
           )
         ; ( "knowledge_requesting_peers"
           , list
-              (List.map ~f:Peer.to_yojson
+              (List.map ~f:Peer.yojson_of
                  (Hash_set.to_list knowledge_requesting_peers)) ) ]
 
     let create ~preferred ~all_peers =
@@ -710,7 +710,7 @@ end = struct
         ( ("length", `Int n)
         ::
         ( if n > 8 then []
-        else [("elts", `List (List.map xs ~f:(fun j -> Key.to_yojson j.J.key)))]
+        else [("elts", `List (List.map xs ~f:(fun j -> Key.yojson_of j.J.key)))]
         ) )
     in
     let keys = List.map xs ~f:(fun x -> x.J.key) in
@@ -718,7 +718,7 @@ end = struct
       let e = Error.to_string_hum e in
       [%log' debug t.logger] "Downloading from $peer failed ($error) on $keys"
         ~metadata:
-          [("peer", Peer.to_yojson peer); ("error", `String e); ("keys", f xs)] ;
+          [("peer", Peer.yojson_of peer); ("error", `String e); ("keys", f xs)] ;
       if Option.is_some punish then
         (* TODO: Make this an insta ban *)
         Trust_system.(
@@ -805,23 +805,23 @@ end = struct
                 } ) ;
           flush_soon t )
 
-  let to_yojson t : Yojson.Safe.t =
+  let yojson_of_t t : Yojson.Safe.t =
     check_invariant t ;
     let list xs =
       `Assoc [("length", `Int (List.length xs)); ("elts", `List xs)]
     in
     let now = Time.now () in
-    let f q = list (List.map ~f:Job.to_yojson (Q.to_list q)) in
+    let f q = list (List.map ~f:Job.yojson_of (Q.to_list q)) in
     `Assoc
       [ ("total_jobs", `Int (total_jobs t))
-      ; ("useful_peers", Useful_peers.to_yojson t.useful_peers)
+      ; ("useful_peers", Useful_peers.yojson_of t.useful_peers)
       ; ("pending", f t.pending)
       ; ( "downloading"
         , list
             (List.map (Hashtbl.to_alist t.downloading)
                ~f:(fun (h, (p, _, start)) ->
                  `Assoc
-                   [ ("hash", Key.to_yojson h)
+                   [ ("hash", Key.yojson_of h)
                    ; ("start", `String (Time.to_string start))
                    ; ( "time_since_start"
                      , `String (Time.Span.to_string_hum (Time.diff now start))
@@ -880,7 +880,7 @@ end = struct
           [%log' debug t.logger] "Downloader: downloading $n from $peer"
             ~metadata:
               [ ("n", `Int (List.length to_download))
-              ; ("peer", Peer.to_yojson peer) ] ;
+              ; ("peer", Peer.yojson_of peer) ] ;
           List.iter to_download ~f:(fun j -> Q.remove t.pending j.key) ;
           match to_download with
           | [] ->
@@ -1024,7 +1024,7 @@ end = struct
     upon stop (fun () -> tear_down t) ;
     every ~stop (Time.Span.of_sec 30.) (fun () ->
         [%log' debug t.logger]
-          ~metadata:[("jobs", to_yojson t)]
+          ~metadata:[("jobs", yojson_of t)]
           "Downloader jobs" ) ;
     refresh_peers t peers ;
     t

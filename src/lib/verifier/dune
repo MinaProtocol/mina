@@ -5,4 +5,4 @@
             blockchain_snark memory_stats snark_params ledger_proof logger child_processes)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_compare ppx_hash ppx_coda ppx_version ppx_here ppx_bin_prot ppx_let
-                  ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv)))
+                  ppx_deriving.std ppx_yojson_conv ppx_sexp_conv)))

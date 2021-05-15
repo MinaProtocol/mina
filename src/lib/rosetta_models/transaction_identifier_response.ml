@@ -9,7 +9,7 @@
 type t =
   { transaction_identifier: Transaction_identifier.t
   ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** TransactionIdentifierResponse contains the transaction_identifier of a transaction that was submitted to either `/construction/hash` or `/construction/submit`. *)
 let create (transaction_identifier : Transaction_identifier.t) : t =

@@ -12,7 +12,7 @@ module Poly = struct
         { blockchain_state: 'blockchain_state
         ; consensus_transition: 'consensus_transition
         ; pending_coinbase_update: 'pending_coinbase_update }
-      [@@deriving to_yojson, sexp, fields, hlist]
+      [@@deriving yojson_of, sexp, fields, hlist]
     end
   end]
 end
@@ -26,7 +26,7 @@ module Value = struct
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
 
       let to_latest = Fn.id
     end

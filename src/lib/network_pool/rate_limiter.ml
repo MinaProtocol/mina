@@ -14,7 +14,7 @@ let interval = Time.Span.of_min 5.
    values.
 *)
 module type Coned_abelian_group = sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving sexp, yojson_of]
 
   val ( + ) : t -> t -> t
 
@@ -28,7 +28,7 @@ module type Score_intf = Coned_abelian_group
 module Score : Score_intf with type t = int = struct
   open Int
 
-  type t = int [@@deriving to_yojson, sexp]
+  type t = int [@@deriving yojson_of, sexp]
 
   let ( + ) = ( + )
 
@@ -137,15 +137,15 @@ let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
       else `Capacity_exceeded
 
 module Summary = struct
-  type r = {capacity_used: Score.t} [@@deriving to_yojson]
+  type r = {capacity_used: Score.t} [@@deriving yojson_of]
 
   type t = {by_ip: (string * r) list; by_peer_id: (string * r) list}
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 end
 
 let summary ({by_ip; by_peer_id} : t) =
   let open Summary in
-  to_yojson
+  yojson_of
     { by_ip=
         Ip.Hash_queue.foldi by_ip.table ~init:[] ~f:(fun acc ~key ~data ->
             ( Unix.Inet_addr.to_string key

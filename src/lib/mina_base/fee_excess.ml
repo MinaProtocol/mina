@@ -61,25 +61,25 @@ module Poly = struct
         ; fee_excess_r: 'fee }
       [@@deriving compare, equal, hash, sexp, hlist]
 
-      let to_yojson token_to_yojson fee_to_yojson
+      let yojson_of_t token_yojson_of fee_yojson_of
           {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r} =
         `List
           [ `Assoc
-              [ ("token", token_to_yojson fee_token_l)
-              ; ("amount", fee_to_yojson fee_excess_l) ]
+              [ ("token", token_yojson_of fee_token_l)
+              ; ("amount", fee_yojson_of fee_excess_l) ]
           ; `Assoc
-              [ ("token", token_to_yojson fee_token_r)
-              ; ("amount", fee_to_yojson fee_excess_r) ] ]
+              [ ("token", token_yojson_of fee_token_r)
+              ; ("amount", fee_yojson_of fee_excess_r) ] ]
 
-      let of_yojson token_of_yojson fee_of_yojson = function
+      let t_t_of_yojson token_t_of_yojson fee_t_of_yojson = function
         | `List
             [ `Assoc [("token", fee_token_l); ("amount", fee_excess_l)]
             ; `Assoc [("token", fee_token_r); ("amount", fee_excess_r)] ] ->
             let open Result.Let_syntax in
-            let%map fee_token_l = token_of_yojson fee_token_l
-            and fee_excess_l = fee_of_yojson fee_excess_l
-            and fee_token_r = token_of_yojson fee_token_r
-            and fee_excess_r = fee_of_yojson fee_excess_r in
+            let%map fee_token_l = token_t_of_yojson fee_token_l
+            and fee_excess_l = fee_t_of_yojson fee_excess_l
+            and fee_token_r = token_t_of_yojson fee_token_r
+            and fee_excess_r = fee_t_of_yojson fee_excess_r in
             {fee_token_l; fee_excess_l; fee_token_r; fee_excess_r}
         | _ ->
             Error "Fee_excess.Poly.Stable.V1.t"
@@ -87,7 +87,7 @@ module Poly = struct
   end]
 
   [%%define_locally
-  Stable.Latest.(to_yojson, of_yojson)]
+  Stable.Latest.(yojson_of, t_of_yojson)]
 
   [%%ifdef
   consensus_mechanism]
@@ -123,9 +123,9 @@ type ('token, 'fee) poly = ('token, 'fee) Poly.t =
   ; fee_excess_r: 'fee }
 [@@deriving compare, equal, hash, sexp]
 
-let poly_to_yojson = Poly.to_yojson
+let poly_yojson_of = Poly.yojson_of
 
-let poly_of_yojson = Poly.of_yojson
+let poly_t_of_yojson = Poly.t_of_yojson
 
 [%%ifdef
 consensus_mechanism]

@@ -67,7 +67,7 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
   let respond_500 error =
     Cohttp_async.Server.respond_string
       ~status:(Cohttp.Code.status_of_code 500)
-      (Yojson.Safe.to_string (Rosetta_models.Error.to_yojson error))
+      (Yojson.Safe.to_string (Rosetta_models.Error.yojson_of error))
       ~headers:(Cohttp.Header.of_list [("Content-Type", "application/json")])
     >>| lift
   in
@@ -88,7 +88,7 @@ let server_handler ~pool ~graphql_uri ~logger ~body _sock req =
       respond_500 error
   | Error (`App app_error) ->
       let error = Errors.erase app_error in
-      let metadata = [("error", Rosetta_models.Error.to_yojson error)] in
+      let metadata = [("error", Rosetta_models.Error.yojson_of error)] in
       [%log warn] ~metadata "Error response: $error" ;
       respond_500 error
 

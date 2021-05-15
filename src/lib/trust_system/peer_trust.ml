@@ -24,7 +24,7 @@ let max_rate secs =
 
 module type Input_intf = sig
   module Peer_id : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp, yojson_of]
 
     val ip : t -> Unix.Inet_addr.Blocking_sexp.t
   end
@@ -53,10 +53,10 @@ end
 module Time_with_json = struct
   include Time
 
-  let to_yojson expiration =
+  let yojson_of_t expiration =
     `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
 
-  let of_yojson = function
+  let t_t_of_yojson = function
     | `String time ->
         Ok
           (Time.of_string_gen ~if_no_timezone:(`Use_this_one Time.Zone.utc)
@@ -175,7 +175,7 @@ module Make0 (Inputs : Input_intf) = struct
         else "Decreasing"
       in
       [%log debug]
-        ~metadata:([("sender_id", Peer_id.to_yojson peer)] @ action_metadata)
+        ~metadata:([("sender_id", Peer_id.yojson_of peer)] @ action_metadata)
         "%s trust for peer $sender_id due to %s. New trust is %f." verb
         action_fmt simple_new.trust
     in

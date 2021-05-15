@@ -201,6 +201,6 @@ let dump () =
   let entries =
     String.Table.to_alist table
     |> List.Assoc.map ~f:(fun {statistics; _} ->
-           Allocation_statistics.to_yojson statistics )
+           Allocation_statistics.yojson_of statistics )
   in
   `Assoc entries

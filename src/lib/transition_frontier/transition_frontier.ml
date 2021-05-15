@@ -40,7 +40,7 @@ let catchup_tree t = t.catchup_tree
 type Structured_log_events.t += Added_breadcrumb_user_commands
   [@@deriving register_event]
 
-(* There is no Diff.Full.E.of_yojson, so we store raw Yojson.Safe.t here so that
+(* There is no Diff.Full.E.t_of_yojson, so we store raw Yojson.Safe.t here so that
  * we can still deserialize something to inspect *)
 type Structured_log_events.t += Applying_diffs of {diffs: Yojson.Safe.t list}
   [@@deriving register_event {msg= "Applying diffs: $diffs"}]
@@ -91,7 +91,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       | Error (`Failure msg) ->
           [%log fatal]
             ~metadata:
-              [("target_root", Root_identifier.to_yojson root_identifier)]
+              [("target_root", Root_identifier.yojson_of root_identifier)]
             "Unable to fast forward persistent frontier: %s" msg ;
           Error (`Failure msg) )
   in
@@ -220,9 +220,9 @@ let rec load_with_max_length :
          from the current genesis state $precomputed_state_hash"
         ~metadata:
           [ ( "persisted_state_hash"
-            , State_hash.to_yojson persisted_genesis_state_hash )
+            , State_hash.yojson_of persisted_genesis_state_hash )
           ; ( "precomputed_state_hash"
-            , State_hash.to_yojson
+            , State_hash.yojson_of
                 precomputed_values.protocol_state_with_hash.hash ) ] ;
       reset_and_continue ()
   | Error (`Corrupt err) ->
@@ -318,14 +318,14 @@ let add_breadcrumb_exn t breadcrumb =
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
-        , State_hash.to_yojson
+        , State_hash.yojson_of
             (Breadcrumb.state_hash (Full_frontier.best_tip t.full_frontier)) )
       ; ( "n"
         , `Int (List.length @@ Full_frontier.all_breadcrumbs t.full_frontier)
         ) ]
     "PRE: ($state_hash, $n)" ;
   [%str_log' trace t.logger]
-    (Applying_diffs {diffs= List.map ~f:Diff.Full.E.to_yojson diffs}) ;
+    (Applying_diffs {diffs= List.map ~f:Diff.Full.E.yojson_of diffs}) ;
   Catchup_tree.apply_diffs t.catchup_tree diffs ;
   let (`New_root_and_diffs_with_mutants
         (new_root_identifier, diffs_with_mutants)) =
@@ -341,7 +341,7 @@ let add_breadcrumb_exn t breadcrumb =
   [%log' trace t.logger]
     ~metadata:
       [ ( "state_hash"
-        , State_hash.to_yojson
+        , State_hash.yojson_of
             (Breadcrumb.state_hash @@ Full_frontier.best_tip t.full_frontier)
         )
       ; ( "n"
@@ -358,7 +358,7 @@ let add_breadcrumb_exn t breadcrumb =
         [ ( "user_commands"
           , `List
               (List.map user_cmds
-                 ~f:(With_status.to_yojson User_command.Valid.to_yojson)) ) ] ;
+                 ~f:(With_status.yojson_of User_command.Valid.yojson_of)) ) ] ;
   let lite_diffs =
     List.map diffs ~f:Diff.(fun (Full.E.E diff) -> Lite.E.E (to_lite diff))
   in

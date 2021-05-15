@@ -154,7 +154,7 @@ module type F = functor
       and module Timer := Timer
 
 module Make (State : sig
-  type t [@@deriving eq, sexp, to_yojson]
+  type t [@@deriving eq, sexp, yojson_of]
 end) (Message : sig
   type t
 end)
@@ -168,7 +168,7 @@ end) (Timer_label : sig
 
   include Hashable.S with type t = label
 end) (Condition_label : sig
-  type label [@@deriving sexp, to_yojson]
+  type label [@@deriving sexp, yojson_of]
 
   include Hashable.S with type t = label
 end)
@@ -271,7 +271,7 @@ struct
 
   let make_node ~transport ~logger ~me ~messages ?parent:_ ~initial_state
       ~timer message_conditions handle_conditions =
-    let logger = Logger.extend logger [("dsl_node", Peer.to_yojson me)] in
+    let logger = Logger.extend logger [("dsl_node", Peer.yojson_of me)] in
     let conditions = Condition_label.Table.create () in
     List.iter handle_conditions ~f:(fun (l, c, h) ->
         match Condition_label.Table.add conditions ~key:l ~data:(c, h) with
@@ -328,10 +328,10 @@ struct
             let%map t' = transition t t.state >>| with_new_state t in
             [%log' debug t.logger]
               ~metadata:
-                [ ("source", State.to_yojson t.state)
-                ; ("destination", State.to_yojson t'.state)
-                ; ("peer", Peer.to_yojson t.ident)
-                ; ("label", Condition_label.label_to_yojson label) ]
+                [ ("source", State.yojson_of t.state)
+                ; ("destination", State.yojson_of t'.state)
+                ; ("peer", Peer.yojson_of t.ident)
+                ; ("label", Condition_label.label_yojson_of label) ]
               "Making transition from $source to $destination at $peer label: \
                $label" ;
             t'
@@ -346,9 +346,9 @@ struct
         let%map t' = transition t t.state >>| with_new_state t in
         [%log' debug t.logger]
           ~metadata:
-            [ ("source", State.to_yojson t.state)
-            ; ("destination", State.to_yojson t'.state)
-            ; ("peer", Peer.to_yojson t.ident) ]
+            [ ("source", State.yojson_of t.state)
+            ; ("destination", State.yojson_of t'.state)
+            ; ("peer", Peer.yojson_of t.ident) ]
           "Making transition from $source to $destination at $peer via timer" ;
         t'
     | false, None, Some msg -> (

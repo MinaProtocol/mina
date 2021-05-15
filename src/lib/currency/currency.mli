@@ -20,8 +20,8 @@ module Fee : sig
       type t [@@deriving sexp, compare, hash]
 
       (* TODO : use Yojsonable.S *)
-      val to_yojson : t -> Yojson.Safe.t
-      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+      val yojson_of_t : t -> Yojson.Safe.t
+      val t_t_of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
 
       val equal : t -> t -> bool
 
@@ -70,8 +70,8 @@ module Amount : sig
       type t [@@deriving sexp, compare, hash]
 
       (* TODO : use Yojsonable.S *)
-      val to_yojson : t -> Yojson.Safe.t
-      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+      val yojson_of_t : t -> Yojson.Safe.t
+      val t_t_of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
 
       val equal : t -> t -> bool
 
@@ -133,8 +133,8 @@ module Balance : sig
       type t [@@deriving sexp, compare, hash]
 
       (* TODO : use Yojsonable.S *)
-      val to_yojson : t -> Yojson.Safe.t
-      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
+      val yojson_of_t : t -> Yojson.Safe.t
+      val t_t_of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
 
       val equal : t -> t -> bool
 

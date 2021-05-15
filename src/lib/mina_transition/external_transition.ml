@@ -142,19 +142,19 @@ module Precomputed_block = struct
       | sexp ->
           Proof.t_of_sexp sexp
 
-    let to_yojson proof = `String (to_bin_string proof)
+    let yojson_of_t proof = `String (to_bin_string proof)
 
-    let _to_yojson_structured = Proof.to_yojson
+    let _yojson_of_structured = Proof.yojson_of
 
-    let of_yojson = function
+    let t_t_of_yojson = function
       | `String str ->
           Or_error.try_with (fun () -> of_bin_string str)
           |> Result.map_error ~f:(fun err ->
                  sprintf
-                   "External_transition.Precomputed_block.Proof.of_yojson: %s"
+                   "External_transition.Precomputed_block.Proof.t_of_yojson: %s"
                    (Error.to_string_hum err) )
       | json ->
-          Proof.of_yojson json
+          Proof.t_of_yojson json
   end
 
   module T = struct
@@ -221,7 +221,7 @@ module Precomputed_block = struct
     let serialized_block =
       External_transition_sample_precomputed_block.sample_block_json
     in
-    match of_yojson @@ Yojson.Safe.from_string serialized_block with
+    match t_of_yojson @@ Yojson.Safe.from_string serialized_block with
     | Ok _ ->
         ()
     | Error err ->
@@ -233,7 +233,7 @@ module Precomputed_block = struct
     in
     let json = Yojson.Safe.from_string serialized_block in
     let json_roundtrip =
-      match Result.map ~f:to_yojson @@ of_yojson json with
+      match Result.map ~f:yojson_of @@ t_of_yojson json with
       | Ok json ->
           json
       | Error err ->
@@ -275,9 +275,9 @@ let block_winner =
 
 let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
 
-let to_yojson t =
+let yojson_of_t t =
   `Assoc
-    [ ("protocol_state", Protocol_state.value_to_yojson (protocol_state t))
+    [ ("protocol_state", Protocol_state.value_yojson_of (protocol_state t))
     ; ("protocol_state_proof", `String "<opaque>")
     ; ("staged_ledger_diff", `String "<opaque>")
     ; ("delta_transition_chain_proof", `String "<opaque>")
@@ -998,8 +998,8 @@ module Validated = struct
                   let to_binable = erase
                 end)
 
-      let to_yojson (transition_with_hash, _) =
-        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
+      let yojson_of_t (transition_with_hash, _) =
+        With_hash.yojson_of yojson_of State_hash.yojson_of transition_with_hash
 
       let create_unsafe_pre_hashed t =
         `I_swear_this_is_safe_see_my_comment
@@ -1059,7 +1059,7 @@ module Validated = struct
     , payments
     , global_slot
     , erase
-    , to_yojson )]
+    , yojson_of )]
 
   include Comparable.Make (Stable.Latest)
 

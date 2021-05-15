@@ -24,7 +24,7 @@ module Coinbase_data = struct
   module Stable = struct
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
 
       let to_latest = Fn.id
     end
@@ -79,13 +79,13 @@ module Stack_id : sig
   *)
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, to_yojson, compare, version]
+      type t [@@deriving bin_io, sexp, yojson_of, compare, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson_of]
 
   val of_int : int -> t
 
@@ -102,7 +102,7 @@ end = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = int [@@deriving sexp, to_yojson, compare]
+      type t = int [@@deriving sexp, yojson_of, compare]
 
       let to_latest = Fn.id
     end
@@ -161,7 +161,7 @@ module Coinbase_stack = struct
       let to_latest = Core.Fn.id
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      yojson_of, t_of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -221,7 +221,7 @@ module Stack_hash = struct
       let to_latest = Core.Fn.id
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      yojson_of, t_of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -365,7 +365,7 @@ module Hash_builder = struct
       let to_latest = Fn.id
 
       [%%define_from_scope
-      to_yojson, of_yojson]
+      yojson_of, t_of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -396,7 +396,7 @@ module Update = struct
           | Update_one
           | Update_two_coinbase_in_first
           | Update_two_coinbase_in_second
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson_of]
 
         let to_latest = Fn.id
       end
@@ -449,7 +449,7 @@ module Update = struct
       module V1 = struct
         type ('action, 'coinbase_amount) t =
           {action: 'action; coinbase_amount: 'coinbase_amount}
-        [@@deriving sexp, to_yojson, hlist]
+        [@@deriving sexp, yojson_of, hlist]
       end
     end]
   end
@@ -458,7 +458,7 @@ module Update = struct
   module Stable = struct
     module V1 = struct
       type t = (Action.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
 
       let to_latest = Fn.id
     end
@@ -535,7 +535,7 @@ module Merkle_tree_versioned = struct
         , Stack_versioned.Stable.V1.t
         , unit )
         Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
 
       let to_latest = Fn.id
     end
@@ -719,7 +719,7 @@ module T = struct
   end
 
   module Merkle_tree = struct
-    type t = Merkle_tree_versioned.t [@@deriving sexp, to_yojson]
+    type t = Merkle_tree_versioned.t [@@deriving sexp, yojson_of]
 
     type _unused = unit
       constraint
@@ -727,7 +727,7 @@ module T = struct
         (Hash.t, Stack_id.t, Stack.t, unit) Sparse_ledger_lib.Sparse_ledger.T.t
 
     module Dummy_token = struct
-      type t = unit [@@deriving sexp, to_yojson]
+      type t = unit [@@deriving sexp, yojson_of]
 
       let max () () = ()
 
@@ -977,10 +977,10 @@ module T = struct
   module Poly = struct
     type ('tree, 'stack_id) t =
       {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
   end
 
-  type t = (Merkle_tree.t, Stack_id.t) Poly.t [@@deriving sexp, to_yojson]
+  type t = (Merkle_tree.t, Stack_id.t) Poly.t [@@deriving sexp, yojson_of]
 
   let init_hash = Stack.data_hash Stack.empty
 
@@ -1227,7 +1227,7 @@ module Poly_versioned = struct
     module V1 = struct
       type ('tree, 'stack_id) t = ('tree, 'stack_id) T.Poly.t =
         {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
     end
   end]
 end
@@ -1241,7 +1241,7 @@ module Stable = struct
       ( Merkle_tree_versioned.Stable.V1.t
       , Stack_id.Stable.V1.t )
       Poly_versioned.Stable.V1.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
 
     let to_latest = Fn.id
 

@@ -213,7 +213,7 @@ let reader_to_strict_pipe_with_logging :
                Option.try_with (fun () -> Yojson.Safe.from_string line)
              with
              | Some json -> (
-               match Logger.Message.of_yojson json with
+               match Logger.Message.t_of_yojson json with
                | Ok msg ->
                    Logger.raw logger msg
                | Error _err ->
@@ -338,7 +338,7 @@ let start_custom :
         | Ok termination_status ->
             `String (Unix.Exit_or_signal.to_string_hum termination_status)
         | Error err ->
-            Error_json.error_to_yojson err
+            Error_json.error_yojson_of err
       in
       [%log fatal] "Process died unexpectedly: $exit_or_signal"
         ~metadata:[("exit_or_signal", exit_or_signal)] ;

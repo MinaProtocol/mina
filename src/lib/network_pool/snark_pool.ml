@@ -210,9 +210,9 @@ struct
                in
                `Assoc
                  [ ("work_ids", work_ids)
-                 ; ("fee", Currency.Fee.Stable.V1.to_yojson fee)
+                 ; ("fee", Currency.Fee.Stable.V1.yojson_of fee)
                  ; ( "prover"
-                   , Signature_lib.Public_key.Compressed.Stable.V1.to_yojson
+                   , Signature_lib.Public_key.Compressed.Stable.V1.yojson_of
                        prover ) ]
                :: acc ))
 
@@ -369,7 +369,7 @@ struct
             "Rejecting %s snark work $stmt, statement not referenced" origin
             ~metadata:
               [ ( "stmt"
-                , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                , One_or_two.yojson_of Transaction_snark.Statement.yojson_of
                     work ) ] ;
           `Statement_not_referenced
 
@@ -383,13 +383,13 @@ struct
         in
         let is_local = Envelope.Sender.(equal Local sender) in
         let metadata =
-          [ ("prover", Signature_lib.Public_key.Compressed.to_yojson prover)
-          ; ("fee", Currency.Fee.to_yojson fee)
-          ; ("sender", Envelope.Sender.to_yojson sender) ]
+          [ ("prover", Signature_lib.Public_key.Compressed.yojson_of prover)
+          ; ("fee", Currency.Fee.yojson_of fee)
+          ; ("sender", Envelope.Sender.yojson_of sender) ]
         in
         let log_and_punish ?(punish = true) statement e =
           let metadata =
-            [ ("error", Error_json.error_to_yojson e)
+            [ ("error", Error_json.error_yojson_of e)
             ; ("work_id", `Int (Transaction_snark.Statement.hash statement)) ]
             @ metadata
           in
@@ -432,7 +432,7 @@ struct
             [%log' debug t.logger] "Work $stmt not referenced"
               ~metadata:
                 ( ( "stmt"
-                  , One_or_two.to_yojson Transaction_snark.Statement.to_yojson
+                  , One_or_two.yojson_of Transaction_snark.Statement.yojson_of
                       work )
                 :: metadata ) ;
             return false )
@@ -459,7 +459,7 @@ struct
                       "Proof had an invalid key: $public_key"
                       ~metadata:
                         [ ( "public_key"
-                          , Signature_lib.Public_key.Compressed.to_yojson
+                          , Signature_lib.Public_key.Compressed.yojson_of
                               prover ) ] ;
                     Deferred.return false
                 | Some _ -> (
@@ -484,7 +484,7 @@ struct
         | Error e ->
             [%log' error t.logger]
               ~metadata:
-                ( [ ("error", Error_json.error_to_yojson e)
+                ( [ ("error", Error_json.error_yojson_of e)
                   ; ( "work_ids"
                     , Transaction_snark_work.Statement.compact_json statements
                     ) ]
@@ -506,8 +506,8 @@ struct
                  added at $time its rebroadcast period is now expired"
                 ~metadata:
                   [ ( "stmt"
-                    , One_or_two.to_yojson
-                        Transaction_snark.Statement.to_yojson stmt )
+                    , One_or_two.yojson_of
+                        Transaction_snark.Statement.yojson_of stmt )
                   ; ( "time"
                     , `String (Time.to_string_abs ~zone:Time.Zone.utc time) )
                   ] ;
@@ -618,7 +618,7 @@ module Diff_versioned = struct
             * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
               Priced_proof.Stable.V1.t
         | Empty
-      [@@deriving compare, sexp, to_yojson, hash]
+      [@@deriving compare, sexp, yojson_of, hash]
 
       let to_latest = Fn.id
     end
@@ -629,7 +629,7 @@ module Diff_versioned = struct
         Transaction_snark_work.Statement.t
         * Ledger_proof.t One_or_two.t Priced_proof.t
     | Empty
-  [@@deriving compare, sexp, to_yojson, hash]
+  [@@deriving compare, sexp, yojson_of, hash]
 end
 
 let%test_module "random set test" =

@@ -13,18 +13,18 @@ module UInt64 = struct
   *)
   type t = Unsigned.UInt64.t [@@deriving ord, eq]
 
-  let to_yojson x = `String (Unsigned.UInt64.to_string x)
+  let yojson_of_t x = `String (Unsigned.UInt64.to_string x)
 
-  let of_yojson = function
+  let t_t_of_yojson = function
     | `String x ->
         Or_error.try_with (fun () -> Unsigned.UInt64.of_string x)
         |> Result.map_error ~f:(fun err ->
                sprintf
-                 "Snark_keys_header.UInt64.of_yojson: Could not parse string \
+                 "Snark_keys_header.UInt64.t_of_yojson: Could not parse string \
                   as UInt64: %s"
                  (Error.to_string_hum err) )
     | _ ->
-        Error "Snark_keys_header.UInt64.of_yojson: Expected a string"
+        Error "Snark_keys_header.UInt64.t_of_yojson: Expected a string"
 
   let sexp_of_t x = Sexp.Atom (Unsigned.UInt64.to_string x)
 
@@ -60,14 +60,14 @@ module Constraint_constants = struct
     type t = Log_2 of int | Txns_per_second_x10 of int
     [@@deriving sexp, ord, eq]
 
-    let to_yojson t : Yojson.Safe.t =
+    let yojson_of_t t : Yojson.Safe.t =
       match t with
       | Log_2 i ->
           `Assoc [("two_to_the", `Int i)]
       | Txns_per_second_x10 i ->
           `Assoc [("txns_per_second_x10", `Int i)]
 
-    let of_yojson (json : Yojson.Safe.t) =
+    let t_t_of_yojson (json : Yojson.Safe.t) =
       match json with
       | `Assoc [("two_to_the", `Int i)] ->
           Ok (Log_2 i)
@@ -75,12 +75,12 @@ module Constraint_constants = struct
           Ok (Txns_per_second_x10 i)
       | `Assoc _ ->
           Error
-            "Snark_keys_header.Constraint_constants.Transaction_capacity.of_yojson: \
+            "Snark_keys_header.Constraint_constants.Transaction_capacity.t_of_yojson: \
              Expected a JSON object containing the field 'two_to_the' or \
              'txns_per_second_x10'"
       | _ ->
           Error
-            "Snark_keys_header.Constraint_constants.Transaction_capacity.of_yojson: \
+            "Snark_keys_header.Constraint_constants.Transaction_capacity.t_of_yojson: \
              Expected a JSON object"
   end
 
@@ -92,15 +92,15 @@ module Constraint_constants = struct
       ; previous_global_slot: int }
     [@@deriving yojson, sexp, ord, eq]
 
-    let opt_to_yojson t : Yojson.Safe.t =
-      match t with Some t -> to_yojson t | None -> `Assoc []
+    let opt_yojson_of t : Yojson.Safe.t =
+      match t with Some t -> yojson_of t | None -> `Assoc []
 
-    let opt_of_yojson (json : Yojson.Safe.t) =
+    let opt_t_of_yojson (json : Yojson.Safe.t) =
       match json with
       | `Assoc [] ->
           Ok None
       | _ ->
-          Result.map (of_yojson json) ~f:(fun t -> Some t)
+          Result.map (t_of_yojson json) ~f:(fun t -> Some t)
   end
 
   (** The constants used in the constraint system.  *)
@@ -115,8 +115,8 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor: int
     ; account_creation_fee: UInt64.t
     ; fork:
-        (Fork_config.t option[@to_yojson Fork_config.opt_to_yojson]
-                             [@of_yojson Fork_config.opt_of_yojson]) }
+        (Fork_config.t option[@yojson_of Fork_config.opt_yojson_of]
+                             [@t_of_yojson Fork_config.opt_t_of_yojson]) }
   [@@deriving yojson, sexp, ord, eq]
 end
 
@@ -234,7 +234,7 @@ let%test_module "Check parsing of header" =
       ; constraint_system_hash= "ABCDEF1234567890"
       ; identifying_hash= "ABCDEF1234567890" }
 
-    let valid_header_string = Yojson.Safe.to_string (to_yojson valid_header)
+    let valid_header_string = Yojson.Safe.to_string (yojson_of valid_header)
 
     let valid_header_with_prefix = prefix ^ valid_header_string
 
@@ -357,7 +357,7 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
     failwith
       "Snark_keys_header.write_header: expected_max_size_log2 is too large, \
        the resulting length underflows" ;
-  let header_string = Yojson.Safe.to_string (to_yojson {header with length}) in
+  let header_string = Yojson.Safe.to_string (yojson_of {header with length}) in
   (* We look for the "length" field first, to ensure that we find our length
      and not some other data that happens to match it. Due to the
      JSON-encoding, we will only find the first field named "length", which is
@@ -417,7 +417,7 @@ let read_with_header ~read_data filename =
       let lexbuf = Lexing.from_channel in_channel in
       let%bind header_json = parse_lexbuf lexbuf in
       let%bind header =
-        of_yojson header_json |> Result.map_error ~f:Error.of_string
+        t_of_yojson header_json |> Result.map_error ~f:Error.of_string
       in
       let offset = lexbuf.lex_curr_pos in
       let%bind () =

@@ -13,7 +13,7 @@ type t =
     target_index: int64 option [@default None]
   ; (* Stage is the phase of the sync process. *)
     stage: string option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** SyncStatus is used to provide additional context about an implementation's sync status. It is often used to indicate that an implementation is healthy when it cannot be queried  until some sync phase occurs. If an implementation is immediately queryable, this model is often not populated. *)
 let create (current_index : int64) : t =

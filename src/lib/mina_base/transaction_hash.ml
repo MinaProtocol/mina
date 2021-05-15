@@ -17,15 +17,15 @@ end)
 [%%define_locally
 Base58_check.(of_base58_check, of_base58_check_exn, to_base58_check)]
 
-let to_yojson t = `String (to_base58_check t)
+let yojson_of_t t = `String (to_base58_check t)
 
-let of_yojson = function
+let t_t_of_yojson = function
   | `String str ->
       Result.map_error (of_base58_check str) ~f:(fun _ ->
-          "Transaction_hash.of_yojson: Error decoding string from \
+          "Transaction_hash.t_of_yojson: Error decoding string from \
            base58_check format" )
   | _ ->
-      Error "Transaction_hash.of_yojson: Expected a string"
+      Error "Transaction_hash.t_of_yojson: Expected a string"
 
 let hash_command = Fn.compose digest_string User_command.to_base58_check
 
@@ -37,18 +37,18 @@ let hash_coinbase = Fn.compose digest_string Coinbase.to_base58_check
 module User_command_with_valid_signature = struct
   type hash = T.t [@@deriving sexp, compare, hash]
 
-  let hash_to_yojson = to_yojson
+  let hash_yojson_of = yojson_of
 
-  let hash_of_yojson = of_yojson
+  let hash_t_of_yojson = t_of_yojson
 
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         ( (User_command.Valid.Stable.V1.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
+        , (T.Stable.V1.t[@yojson_of hash_yojson_of]) )
         With_hash.Stable.V1.t
-      [@@deriving sexp, hash, to_yojson]
+      [@@deriving sexp, hash, yojson_of]
 
       let to_latest = Fn.id
 
@@ -79,18 +79,18 @@ end
 module User_command = struct
   type hash = T.t [@@deriving sexp, compare, hash]
 
-  let hash_to_yojson = to_yojson
+  let hash_yojson_of = yojson_of
 
-  let hash_of_yojson = of_yojson
+  let hash_t_of_yojson = t_of_yojson
 
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         ( (User_command.Stable.V1.t[@hash.ignore])
-        , (T.Stable.V1.t[@to_yojson hash_to_yojson]) )
+        , (T.Stable.V1.t[@yojson_of hash_yojson_of]) )
         With_hash.Stable.V1.t
-      [@@deriving sexp, hash, to_yojson]
+      [@@deriving sexp, hash, yojson_of]
 
       let to_latest = Fn.id
 

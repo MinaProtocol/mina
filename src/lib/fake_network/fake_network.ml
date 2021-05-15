@@ -99,7 +99,7 @@ let setup (type n) ?(logger = Logger.null ())
                     [%log debug]
                       ~metadata:
                         [ ( "staged_ledger_hash"
-                          , Staged_ledger_hash.to_yojson staged_ledger_hash )
+                          , Staged_ledger_hash.yojson_of staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
                     ( scan_state

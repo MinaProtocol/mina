@@ -90,7 +90,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
       [%log warn]
-        ~metadata:[("error", Error_json.error_to_yojson error)]
+        ~metadata:[("error", Error_json.error_yojson_of error)]
         "verifier threw an error while verifying transiton queried during \
          ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
@@ -224,7 +224,7 @@ let to_error = function
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
     ~target_hash ~job ~hash_tree ~blockchain_length_of_target_hash =
   [%log debug]
-    ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+    ~metadata:[("target_hash", State_hash.yojson_of target_hash)]
     "Doing a catchup job with target $target_hash" ;
   let blockchain_length_of_root =
     Transition_frontier.root frontier
@@ -278,7 +278,7 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                    (Unsigned.UInt32.pred blockchain_length, hash :: acc) )
            ~finish:(fun (blockchain_length, acc) ->
              let module T = struct
-               type t = State_hash.t list [@@deriving to_yojson]
+               type t = State_hash.t list [@@deriving yojson_of]
              end in
              let all_hashes =
                List.map (Transition_frontier.all_breadcrumbs frontier)
@@ -287,8 +287,8 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
              [%log debug]
                ~metadata:
                  [ ("n", `Int (List.length acc))
-                 ; ("hashes", T.to_yojson acc)
-                 ; ("all_hashes", T.to_yojson all_hashes) ]
+                 ; ("hashes", T.yojson_of acc)
+                 ; ("all_hashes", T.yojson_of all_hashes) ]
                "Finishing download_state_hashes with $n $hashes. with \
                 $all_hashes" ;
              if
@@ -394,8 +394,8 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                   [%log debug]
                     ~metadata:
                       [ ("n", `Int (List.length hashes))
-                      ; ("peer", Peer.to_yojson peer)
-                      ; ("target_hash", State_hash.to_yojson target_hash) ]
+                      ; ("peer", Peer.yojson_of peer)
+                      ; ("target_hash", State_hash.yojson_of target_hash) ]
                     "requesting $n blocks from $peer for catchup to \
                      $target_hash" ;
                   let%bind transitions =
@@ -409,7 +409,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                           ~metadata:
                             [ ("error", `String (Error.to_string_hum e))
                             ; ("n", `Int (List.length hashes))
-                            ; ("peer", Peer.to_yojson peer) ]
+                            ; ("peer", Peer.yojson_of peer) ]
                           "$error from downloading $n blocks from $peer" ;
                         Error e
                   in
@@ -421,7 +421,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                   [%log debug]
                     ~metadata:
                       [ ("n", `Int (List.length transitions))
-                      ; ("peer", Peer.to_yojson peer) ]
+                      ; ("peer", Peer.yojson_of peer) ]
                     "downloaded $n blocks from $peer" ;
                   if not @@ verify_against_hashes transitions hashes then (
                     let error_msg =
@@ -478,7 +478,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
                     {e with data} )))
       | Error (`Verifier_error error) ->
           [%log warn]
-            ~metadata:[("error", Error_json.error_to_yojson error)]
+            ~metadata:[("error", Error_json.error_yojson_of error)]
             "verifier threw an error while verifying transition queried \
              during ledger catchup: $error" ;
           Deferred.Or_error.fail
@@ -493,7 +493,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
     let verification_end_time = Core.Time.now () in
     [%log debug]
       ~metadata:
-        [ ("target_hash", State_hash.to_yojson target_hash)
+        [ ("target_hash", State_hash.yojson_of target_hash)
         ; ( "time_elapsed"
           , `Float
               Core.Time.(
@@ -522,7 +522,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
         let validation_end_time = Core.Time.now () in
         [%log debug]
           ~metadata:
-            [ ("target_hash", State_hash.to_yojson target_hash)
+            [ ("target_hash", State_hash.yojson_of target_hash)
             ; ( "time_elapsed"
               , `Float
                   Core.Time.(
@@ -556,7 +556,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
   | Ok result ->
       [%log debug]
         ~metadata:
-          [ ("target_hash", State_hash.to_yojson target_hash)
+          [ ("target_hash", State_hash.yojson_of target_hash)
           ; ( "time_elapsed"
             , `Float Core.Time.(Span.to_sec @@ diff (now ()) build_start_time)
             ) ]
@@ -565,7 +565,7 @@ let verify_transitions_and_build_breadcrumbs ~logger
   | Error e ->
       [%log debug]
         ~metadata:
-          [ ("target_hash", State_hash.to_yojson target_hash)
+          [ ("target_hash", State_hash.yojson_of target_hash)
           ; ( "time_elapsed"
             , `Float Core.Time.(Span.to_sec @@ diff (now ()) build_start_time)
             )
@@ -618,7 +618,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
          don't_wait_for
            (let start_time = Core.Time.now () in
             [%log info] "Catch up to $target_hash"
-              ~metadata:[("target_hash", State_hash.to_yojson target_hash)] ;
+              ~metadata:[("target_hash", State_hash.yojson_of target_hash)] ;
             let%bind () = Catchup_jobs.incr () in
             let blockchain_length_of_target_hash =
               let blockchain_length_of_dangling_block =
@@ -706,9 +706,9 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                   [ ( "state_hashes_of_children"
                                     , `List
                                         (List.map children_state_hashes
-                                           ~f:State_hash.to_yojson) )
+                                           ~f:State_hash.yojson_of) )
                                   ; ( "state_hash"
-                                    , State_hash.to_yojson
+                                    , State_hash.yojson_of
                                       @@ External_transition.Initial_validated
                                          .state_hash transition )
                                   ; ( "reason"
@@ -719,7 +719,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                                     , External_transition.Initial_validated
                                       .protocol_state transition
                                       |> Mina_state.Protocol_state
-                                         .value_to_yojson ) ]
+                                         .value_yojson_of ) ]
                                 "Validation error: external transition with \
                                  state hash $state_hash and its children were \
                                  rejected for reason $reason" ;
@@ -740,7 +740,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   [ ( "hashes_of_missing_transitions"
                     , `List
                         (List.map hashes_of_missing_transitions
-                           ~f:State_hash.to_yojson) ) ]
+                           ~f:State_hash.yojson_of) ) ]
                 !"Number of missing transitions is %d"
                 num_of_missing_transitions ;
               let%bind transitions =
@@ -751,7 +751,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     ~preferred_peer ~hashes_of_missing_transitions ~target_hash
               in
               [%log debug]
-                ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+                ~metadata:[("target_hash", State_hash.yojson_of target_hash)]
                 "Download transitions complete" ;
               verify_transitions_and_build_breadcrumbs ~logger
                 ~precomputed_values ~trust_system ~verifier ~frontier
@@ -764,11 +764,11 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                     [ ( "hashes of transitions"
                       , `List
                           (List.map trees_of_breadcrumbs ~f:(fun tree ->
-                               Rose_tree.to_yojson
+                               Rose_tree.yojson_of
                                  (fun breadcrumb ->
                                    Cached.peek breadcrumb
                                    |> Transition_frontier.Breadcrumb.state_hash
-                                   |> State_hash.to_yojson )
+                                   |> State_hash.yojson_of )
                                  tree )) ) ]
                   "about to write to the catchup breadcrumbs pipe" ;
                 if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
@@ -793,7 +793,7 @@ let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
                   Catchup_jobs.decr ()
             | Error e ->
                 [%log warn]
-                  ~metadata:[("error", Error_json.error_to_yojson e)]
+                  ~metadata:[("error", Error_json.error_yojson_of e)]
                   "Catchup process failed -- unable to receive valid data \
                    from peers or transition frontier progressed faster than \
                    catchup data received. See error for details: $error" ;

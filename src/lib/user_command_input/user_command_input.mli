@@ -10,7 +10,7 @@ module Payload : sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t [@@deriving sexp, to_yojson]
+        type t [@@deriving sexp, yojson_of]
       end
     end]
 
@@ -20,7 +20,7 @@ module Payload : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, to_yojson]
+      type t [@@deriving sexp, yojson_of]
     end
   end]
 
@@ -35,7 +35,7 @@ module Sign_choice : sig
         | Signature of Signature.Stable.V1.t
         | Hd_index of Unsigned_extended.UInt32.Stable.V1.t
         | Keypair of Keypair.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
     end
   end]
 end
@@ -48,7 +48,7 @@ module Stable : sig
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
       Signed_command.Poly.Stable.V1.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
   end
 end]
 

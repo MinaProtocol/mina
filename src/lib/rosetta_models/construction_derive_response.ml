@@ -11,7 +11,7 @@ type t =
     address: string option [@default None]
   ; account_identifier: Account_identifier.t option [@default None]
   ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** ConstructionDeriveResponse is returned by the `/construction/derive` endpoint. *)
 let create () : t = {address= None; account_identifier= None; metadata= None}

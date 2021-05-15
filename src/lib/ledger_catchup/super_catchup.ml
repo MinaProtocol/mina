@@ -161,7 +161,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
       [%log warn]
-        ~metadata:[("error", Error_json.error_to_yojson error)]
+        ~metadata:[("error", Error_json.error_yojson_of error)]
         "verifier threw an error while verifying transiton queried during \
          ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
@@ -292,7 +292,7 @@ let try_to_connect_hash_chain t hashes ~frontier
           Continue (Unsigned.UInt32.pred blockchain_length, hash :: acc) )
     ~finish:(fun (blockchain_length, acc) ->
       let module T = struct
-        type t = State_hash.t list [@@deriving to_yojson]
+        type t = State_hash.t list [@@deriving yojson_of]
       end in
       let all_hashes =
         List.map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
@@ -301,8 +301,8 @@ let try_to_connect_hash_chain t hashes ~frontier
       [%log debug]
         ~metadata:
           [ ("n", `Int (List.length acc))
-          ; ("hashes", T.to_yojson acc)
-          ; ("all_hashes", T.to_yojson all_hashes) ]
+          ; ("hashes", T.yojson_of acc)
+          ; ("all_hashes", T.yojson_of all_hashes) ]
         "Finishing download_state_hashes with $n $hashes. with $all_hashes" ;
       if
         Unsigned.UInt32.compare blockchain_length blockchain_length_of_root
@@ -313,7 +313,7 @@ let try_to_connect_hash_chain t hashes ~frontier
 module Downloader = struct
   module Key = struct
     module T = struct
-      type t = State_hash.t * Length.t [@@deriving to_yojson, hash, sexp]
+      type t = State_hash.t * Length.t [@@deriving yojson_of, hash, sexp]
 
       let compare (h1, n1) (h2, n2) =
         match Length.compare n1 n2 with
@@ -359,7 +359,7 @@ let with_lengths hs ~target_length =
 let download_state_hashes t ~logger ~trust_system ~network ~frontier
     ~target_hash ~target_length ~downloader ~blockchain_length_of_target_hash =
   [%log debug]
-    ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
+    ~metadata:[("target_hash", State_hash.yojson_of target_hash)]
     "Doing a catchup job with target $target_hash" ;
   let%bind peers =
     (* TODO: Find some preferred peers, e.g., whoever told us about this target_hash *)
@@ -536,7 +536,7 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
         Error (`Error (Error.of_string s))
     | Error e ->
         [%log warn]
-          ~metadata:[("error", Error_json.error_to_yojson e)]
+          ~metadata:[("error", Error_json.error_yojson_of e)]
           "verification of blockchain snark failed but it was our fault" ;
         return (Error `Couldn't_reach_verifier)
   in
@@ -566,7 +566,7 @@ let check_invariant ~downloader t =
 let download s d ~key ~attempts =
   let logger = Logger.create () in
   [%log debug]
-    ~metadata:[("key", Downloader.Key.to_yojson key); ("caller", `String s)]
+    ~metadata:[("key", Downloader.Key.yojson_of key); ("caller", `String s)]
     "Download download $key" ;
   Downloader.download d ~key ~attempts
 
@@ -741,7 +741,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         check_invariant ~downloader t )
   in
   every ~stop (Time.Span.of_sec 10.) (fun () ->
-      [%log debug] ~metadata:[("states", to_yojson t)] "Catchup states" ) ;
+      [%log debug] ~metadata:[("states", yojson_of t)] "Catchup states" ) ;
   let initial_validation_batcher = Initial_validate_batcher.create ~verifier in
   let verify_work_batcher = Verify_work_batcher.create ~verifier in
   let set_state t node s =
@@ -760,7 +760,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
           [ ( "error"
             , Option.value_map ~default:`Null error ~f:(fun e ->
                   `String (Error.to_string_hum e) ) )
-          ; ("reason", Attempt_history.Attempt.reason_to_yojson failure_reason)
+          ; ("reason", Attempt_history.Attempt.reason_yojson_of failure_reason)
           ] ;
       node.attempts
       <- ( match sender with
@@ -793,7 +793,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         let%bind b, attempts = step (Downloader.Job.result download_job) in
         [%log' debug t.logger]
           ~metadata:
-            [ ("state_hash", State_hash.to_yojson state_hash)
+            [ ("state_hash", State_hash.yojson_of state_hash)
             ; ( "donwload_number"
               , `Int
                   (Hashtbl.count t.nodes ~f:(fun node ->
@@ -805,9 +805,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                     Hashtbl.incr s (Node.State.enum node.state) ) ;
                 `List
                   (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                       `List [Node.State.Enum.to_yojson k; `Int v] )) )
+                       `List [Node.State.Enum.yojson_of k; `Int v] )) )
             ; ("total_jobs", `Int (Downloader.total_jobs downloader))
-            ; ("downloader", Downloader.to_yojson downloader) ]
+            ; ("downloader", Downloader.yojson_of downloader) ]
           "download finished $state_hash" ;
         node.attempts <- attempts ;
         set_state t node (To_initial_validate b) ;
@@ -845,12 +845,12 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         with
         | Error _e ->
             [%log' debug t.logger] "Couldn't reach verifier. Retrying"
-              ~metadata:[("state_hash", State_hash.to_yojson node.state_hash)] ;
+              ~metadata:[("state_hash", State_hash.yojson_of node.state_hash)] ;
             (* No need to redownload in this case. We just wait a little and try again. *)
             retry ()
         | Ok (Error ()) ->
             [%log' warn t.logger] "verification failed! redownloading"
-              ~metadata:[("state_hash", State_hash.to_yojson node.state_hash)] ;
+              ~metadata:[("state_hash", State_hash.yojson_of node.state_hash)] ;
             ( match iv.sender with
             | Local ->
                 ()
@@ -996,7 +996,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
          | Error errors ->
              [%log debug]
                ~metadata:
-                 [("target_hash", State_hash.to_yojson target_parent_hash)]
+                 [("target_hash", State_hash.yojson_of target_parent_hash)]
                "Failed to download state hashes for $target_hash" ;
              if contains_no_common_ancestor errors then
                List.iter forest ~f:(fun subtree ->
@@ -1020,9 +1020,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                        [ ( "state_hashes_of_children"
                          , `List
                              (List.map children_state_hashes
-                                ~f:State_hash.to_yojson) )
+                                ~f:State_hash.yojson_of) )
                        ; ( "state_hash"
-                         , State_hash.to_yojson
+                         , State_hash.yojson_of
                            @@ External_transition.Initial_validated.state_hash
                                 transition )
                        ; ( "reason"
@@ -1032,7 +1032,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                        ; ( "protocol_state"
                          , External_transition.Initial_validated.protocol_state
                              transition
-                           |> Mina_state.Protocol_state.value_to_yojson ) ]
+                           |> Mina_state.Protocol_state.value_yojson_of ) ]
                      "Validation error: external transition with state hash \
                       $state_hash and its children were rejected for reason \
                       $reason" ;
@@ -1043,14 +1043,14 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
-                 [ ("downloader", Downloader.to_yojson downloader)
+                 [ ("downloader", Downloader.yojson_of downloader)
                  ; ( "node_states"
                    , let s = Node.State.Enum.Table.create () in
                      Hashtbl.iter t.nodes ~f:(fun node ->
                          Hashtbl.incr s (Node.State.enum node.state) ) ;
                      `List
                        (List.map (Hashtbl.to_alist s) ~f:(fun (k, v) ->
-                            `List [Node.State.Enum.to_yojson k; `Int v] )) ) ]
+                            `List [Node.State.Enum.yojson_of k; `Int v] )) ) ]
                "before everything" ;
              let root =
                match root with

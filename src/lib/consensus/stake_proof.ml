@@ -31,4 +31,4 @@ type t = Stable.Latest.t =
   ; ledger: Sparse_ledger.t
   ; producer_private_key: Private_key.t
   ; producer_public_key: Public_key.t }
-[@@deriving to_yojson, sexp]
+[@@deriving yojson_of, sexp]

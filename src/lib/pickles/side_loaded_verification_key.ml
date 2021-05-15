@@ -136,9 +136,9 @@ let max_domains_with_x =
 module Vk = struct
   type t = Impls.Wrap.Verification_key.t [@sexp.opaque] [@@deriving sexp]
 
-  let to_yojson _ = `String "opaque"
+  let yojson_of_t _ = `String "opaque"
 
-  let of_yojson _ = Error "Vk: yojson not supported"
+  let t_t_of_yojson _ = Error "Vk: yojson not supported"
 
   let hash _ = Unit.hash ()
 

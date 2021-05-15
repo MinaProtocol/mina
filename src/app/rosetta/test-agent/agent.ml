@@ -12,7 +12,7 @@ open Rosetta_models
 module Error = struct
   include Error
 
-  let equal e1 e2 = Yojson.Safe.equal (Error.to_yojson e1) (Error.to_yojson e2)
+  let equal e1 e2 = Yojson.Safe.equal (Error.yojson_of e1) (Error.yojson_of e2)
 end
 
 let other_pk = "B62qoDWfBZUxKpaoQCoFqr12wkaY84FrhxXNXzgBkMUi2Tz4K8kBDiv"
@@ -98,7 +98,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
   [%log debug]
     ~metadata:
       [ ( "operations"
-        , mempool_res.transaction.operations |> [%to_yojson: Operation.t list]
+        , mempool_res.transaction.operations |> [%yojson_of: Operation.t list]
         ) ]
     "Mempool operations: $operations" ;
   let%bind () =
@@ -169,7 +169,7 @@ let verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
   [%log debug]
     ~metadata:
       [ ( "transactions"
-        , [%to_yojson: Rosetta_models.Transaction.t list]
+        , [%yojson_of: Rosetta_models.Transaction.t list]
             (Option.value_exn block.block).transactions ) ]
     "Asserting that operations are similar in block. Transactions $transactions" ;
   Operation_expectation.assert_similar_operations ~logger
@@ -347,7 +347,7 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       ~options:preprocess_res.options
   in
   [%log debug]
-    ~metadata:[("res", Construction_metadata_response.to_yojson metadata_res)]
+    ~metadata:[("res", Construction_metadata_response.yojson_of metadata_res)]
     "Construction_metadata result $res" ;
   let%bind payloads_res =
     Offline.Payloads.req ~logger ~rosetta_uri ~network_response ~operations
@@ -363,9 +363,9 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
   then (
     [%log debug]
       ~metadata:
-        [ ("expected", [%to_yojson: Operation.t list] operations)
+        [ ("expected", [%yojson_of: Operation.t list] operations)
         ; ( "actual"
-          , [%to_yojson: Operation.t list] payloads_parse_res.operations ) ]
+          , [%yojson_of: Operation.t list] payloads_parse_res.operations ) ]
       "Construction_parse : Expected $expected, after payloads+parse $actual" ;
     failwith "Operations are not equal before and after payloads+parse" ) ;
   let%bind signature =
@@ -388,9 +388,9 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
   then (
     [%log debug]
       ~metadata:
-        [ ("expected", [%to_yojson: Operation.t list] operations)
+        [ ("expected", [%yojson_of: Operation.t list] operations)
         ; ( "actual"
-          , [%to_yojson: Operation.t list] combine_parse_res.operations ) ]
+          , [%yojson_of: Operation.t list] combine_parse_res.operations ) ]
       "Construction_combine : Expected $expected, after combine+parse $actual" ;
     failwith "Operations are not equal before and after combine+parse" ) ;
   let%bind hash_res =
@@ -520,7 +520,7 @@ let get_consensus_constants ~logger :
   in
   let%bind config =
     let%map config_json = Genesis_ledger_helper.load_config_json config_file in
-    match Runtime_config.of_yojson config_json with
+    match Runtime_config.t_of_yojson config_json with
     | Ok config ->
         config
     | Error err ->

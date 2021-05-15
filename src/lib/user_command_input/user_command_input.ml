@@ -17,7 +17,7 @@ module Payload = struct
           , Global_slot.Stable.V1.t
           , Signed_command_memo.Stable.V1.t )
           Signed_command_payload.Common.Poly.Stable.V1.t
-        [@@deriving sexp, to_yojson]
+        [@@deriving sexp, yojson_of]
 
         let to_latest = Fn.id
       end
@@ -68,7 +68,7 @@ module Payload = struct
         ( Common.Stable.V1.t
         , Signed_command_payload.Body.Stable.V1.t )
         Signed_command_payload.Poly.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
 
       let to_latest = Fn.id
     end
@@ -99,7 +99,7 @@ module Sign_choice = struct
         | Signature of Signature.Stable.V1.t
         | Hd_index of Unsigned_extended.UInt32.Stable.V1.t
         | Keypair of Keypair.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
 
       let to_latest = Fn.id
     end
@@ -114,14 +114,14 @@ module Stable = struct
       , Public_key.Compressed.Stable.V1.t
       , Sign_choice.Stable.V1.t )
       Signed_command.Poly.Stable.V1.t
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
 
     let to_latest = Fn.id
   end
 end]
 
 [%%define_locally
-Stable.Latest.(to_yojson)]
+Stable.Latest.(yojson_of)]
 
 let fee_payer ({payload; _} : t) = Payload.fee_payer payload
 
@@ -202,7 +202,7 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     ~f:
       (Result.map_error ~f:(fun str ->
            Error.createf "Error creating user command: %s Error: %s"
-             (Yojson.Safe.to_string (to_yojson client_input))
+             (Yojson.Safe.to_string (yojson_of client_input))
              str ))
   @@
   let open Deferred.Result.Let_syntax in

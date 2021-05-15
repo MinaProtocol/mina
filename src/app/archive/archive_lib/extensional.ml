@@ -32,8 +32,8 @@ module User_command = struct
     ; valid_until: Mina_numbers.Global_slot.Stable.Latest.t option
     ; memo: Signed_command_memo.Stable.Latest.t
     ; hash: Transaction_hash.Stable.Latest.t
-          [@to_yojson Transaction_hash.to_yojson]
-          [@of_yojson Transaction_hash.of_yojson]
+          [@yojson_of Transaction_hash.yojson_of]
+          [@t_of_yojson Transaction_hash.t_of_yojson]
     ; status: string
     ; failure_reason: Transaction_status.Failure.Stable.Latest.t option
     ; source_balance: Currency.Balance.Stable.Latest.t option
@@ -60,8 +60,8 @@ module Internal_command = struct
     ; fee: Currency.Fee.Stable.Latest.t
     ; token: Token_id.Stable.Latest.t
     ; hash: Transaction_hash.Stable.Latest.t
-          [@to_yojson Transaction_hash.to_yojson]
-          [@of_yojson Transaction_hash.of_yojson] }
+          [@yojson_of Transaction_hash.yojson_of]
+          [@t_of_yojson Transaction_hash.t_of_yojson] }
   [@@deriving yojson, equal, bin_io_unversioned]
 end
 

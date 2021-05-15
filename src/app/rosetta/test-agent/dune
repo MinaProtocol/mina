@@ -16,7 +16,7 @@
    logger
    rosetta_models
    lib
-   ppx_deriving_yojson.runtime
+   ppx_yojson_conv_lib
    yojson
  )
  (instrumentation (backend bisect_ppx))
@@ -24,7 +24,7 @@
                graphql_ppx
                ppx_coda
                ppx_deriving.show
-               ppx_deriving_yojson
+               ppx_yojson_conv
                ppx_jane
                ppx_version
                ppx_deriving.eq

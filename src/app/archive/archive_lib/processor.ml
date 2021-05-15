@@ -1626,7 +1626,7 @@ let add_block_aux ?(retries = 3) ~logger ~add_block ~hash ~delete_older_than
         | Ok _ ->
             [%log info] "Committing block data for $state_hash"
               ~metadata:
-                [("state_hash", Mina_base.State_hash.to_yojson (hash block))] ;
+                [("state_hash", Mina_base.State_hash.yojson_of (hash block))] ;
             Conn.commit () )
       pool
   in
@@ -1653,7 +1653,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
         | Error e ->
             [%log warn]
               ~metadata:
-                [ ("block", With_hash.hash block |> State_hash.to_yojson)
+                [ ("block", With_hash.hash block |> State_hash.yojson_of)
                 ; ("error", `String (Caqti_error.show e)) ]
               "Failed to archive block: $block, see $error"
         | Ok () ->
@@ -1676,7 +1676,7 @@ let run pool reader ~constraint_constants ~logger ~delete_older_than =
                           ~metadata:
                             [ ("error", `String (Caqti_error.show e))
                             ; ( "command"
-                              , Mina_base.User_command.to_yojson command ) ]
+                              , Mina_base.User_command.yojson_of command ) ]
                           "Failed to archive user command $command from \
                            transaction pool: $block, see $error" )
               in
@@ -1727,7 +1727,7 @@ let add_genesis_accounts ~logger
                   | Error e as err ->
                       [%log error]
                         ~metadata:
-                          [ ("account", Account.to_yojson account)
+                          [ ("account", Account.yojson_of account)
                           ; ("error", `String (Caqti_error.show e)) ]
                         "Failed to add genesis account: $account, see $error" ;
                       let%map _ = Conn.rollback () in
@@ -1821,7 +1821,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                 ~metadata:
                   [ ( "block"
                     , Protocol_state.hash precomputed_block.protocol_state
-                      |> State_hash.to_yojson )
+                      |> State_hash.yojson_of )
                   ; ("error", `String (Caqti_error.show e)) ]
           | Ok () ->
               () )
@@ -1837,7 +1837,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
                 "Extensional block $block could not be archived: $error"
                 ~metadata:
                   [ ( "block"
-                    , extensional_block.state_hash |> State_hash.to_yojson )
+                    , extensional_block.state_hash |> State_hash.yojson_of )
                   ; ("error", `String (Caqti_error.show e)) ]
           | Ok () ->
               () )

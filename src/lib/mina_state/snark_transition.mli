@@ -39,7 +39,7 @@ module Value : sig
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Pending_coinbase.Update.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, to_yojson]
+      [@@deriving sexp, yojson_of]
     end
   end]
 end

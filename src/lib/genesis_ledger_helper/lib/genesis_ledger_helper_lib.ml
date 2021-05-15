@@ -255,7 +255,7 @@ module Accounts = struct
         let sk =
           match sk with
           | Some sk -> (
-            match Private_key.of_yojson (`String sk) with
+            match Private_key.t_of_yojson (`String sk) with
             | Ok sk ->
                 Some sk
             | Error err ->

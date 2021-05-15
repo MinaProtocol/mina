@@ -10,10 +10,10 @@ open Currency
     constructor, so we have to recurse over the structure replacing all of the
     [`Enum]s with [`String]s.
 *)
-let rec to_yojson (json : Graphql_parser.const_value) : Yojson.Safe.t =
+let rec yojson_of (json : Graphql_parser.const_value) : Yojson.Safe.t =
   match json with
   | `Assoc fields ->
-      `Assoc (List.map fields ~f:(fun (name, json) -> (name, to_yojson json)))
+      `Assoc (List.map fields ~f:(fun (name, json) -> (name, yojson_of json)))
   | `Bool b ->
       `Bool b
   | `Enum s ->
@@ -23,7 +23,7 @@ let rec to_yojson (json : Graphql_parser.const_value) : Yojson.Safe.t =
   | `Int i ->
       `Int i
   | `List l ->
-      `List (List.map ~f:to_yojson l)
+      `List (List.map ~f:yojson_of l)
   | `Null ->
       `Null
   | `String s ->
@@ -1861,15 +1861,15 @@ module Types = struct
     let precomputed_block =
       scalar "PrecomputedBlock"
         ~doc:"Block encoded in precomputed block format" ~coerce:(fun json ->
-          let json = to_yojson json in
-          Mina_transition.External_transition.Precomputed_block.of_yojson json
+          let json = yojson_of json in
+          Mina_transition.External_transition.Precomputed_block.t_of_yojson json
       )
 
     let extensional_block =
       scalar "ExtensionalBlock"
         ~doc:"Block encoded in extensional block format" ~coerce:(fun json ->
-          let json = to_yojson json in
-          Archive_lib.Extensional.Block.of_yojson json )
+          let json = yojson_of json in
+          Archive_lib.Extensional.Block.t_of_yojson json )
 
     module type Numeric_type = sig
       type t
@@ -2101,7 +2101,7 @@ module Types = struct
       Schema.Arg.scalar "RosettaTransaction"
         ~doc:"A transaction encoded in the rosetta format"
         ~coerce:(fun graphql_json ->
-          Rosetta_lib.Transaction.to_mina_signed (to_yojson graphql_json)
+          Rosetta_lib.Transaction.to_mina_signed (yojson_of graphql_json)
           |> Result.map_error ~f:Error.to_string_hum )
 
     let create_account =
@@ -2751,7 +2751,7 @@ module Mutations = struct
       ~resolve:(fun {ctx= coda; _} () basename_opt ->
         let%map result = export_logs ~coda basename_opt in
         Result.map_error result
-          ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_to_yojson) )
+          ~f:(Fn.compose Yojson.Safe.to_string Error_json.error_yojson_of) )
 
   let set_staking =
     field "setStaking" ~doc:"Set keys you wish to stake with"
@@ -2773,10 +2773,10 @@ module Mutations = struct
         [%log' info (Mina_lib.top_level_logger coda)]
           ~metadata:
             [ ( "old"
-              , [%to_yojson: Public_key.Compressed.t list]
+              , [%yojson_of: Public_key.Compressed.t list]
                   (Public_key.Compressed.Set.to_list old_block_production_keys)
               )
-            ; ("new", [%to_yojson: Public_key.Compressed.t list] pks) ]
+            ; ("new", [%yojson_of: Public_key.Compressed.t list] pks) ]
           !"Block production key replacement; old: $old, new: $new" ;
         ignore
         @@ Mina_lib.replace_block_production_keypairs coda

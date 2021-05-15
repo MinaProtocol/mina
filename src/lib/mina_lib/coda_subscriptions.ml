@@ -128,7 +128,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                   |> External_transition.Precomputed_block
                      .of_external_transition ~scheduled_time
                 in
-                External_transition.Precomputed_block.to_yojson
+                External_transition.Precomputed_block.yojson_of
                   precomputed_block)
            in
            if upload_blocks_to_gcloud then (
@@ -204,7 +204,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                      | Error e ->
                          [%log warn]
                            ~metadata:
-                             [ ("error", Error_json.error_to_yojson e)
+                             [ ("error", Error_json.error_yojson_of e)
                              ; ("command", `String command) ]
                            "Uploading block to gcloud with command $command \
                             failed: $error" ) ;
@@ -266,7 +266,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                   [ ( "error"
                     , `String (Staged_ledger.Pre_diff_info.Error.to_string e)
                     )
-                  ; ("state_hash", State_hash.to_yojson hash) ]
+                  ; ("state_hash", State_hash.yojson_of hash) ]
                 "Staged ledger had error with transactions in block for state \
                  $state_hash: $error" ;
               Deferred.unit ) ) ;

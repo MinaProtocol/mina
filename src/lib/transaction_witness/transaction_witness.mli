@@ -8,6 +8,6 @@ module Stable : sig
       ; protocol_state_body: Mina_state.Protocol_state.Body.Value.Stable.V1.t
       ; init_stack: Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
       ; status: Mina_base.Transaction_status.Stable.V1.t }
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp, yojson_of]
   end
 end]

@@ -30,7 +30,7 @@ module Limited : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving to_yojson]
+      type t [@@deriving yojson_of]
     end
   end]
 

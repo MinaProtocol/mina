@@ -7,7 +7,7 @@
  *)
 
 type t = {network_identifiers: Network_identifier.t list}
-[@@deriving yojson {strict= false}, show]
+[@@deriving yojson, show][@@yojson.allow_extra_fields]
 
 (** A NetworkListResponse contains all NetworkIdentifiers that the node can serve information for. *)
 let create (network_identifiers : Network_identifier.t list) : t =

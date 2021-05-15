@@ -105,7 +105,7 @@ let create ~logger ~precomputed_values ~verifier ~trust_system ~frontier
                 [%log debug]
                   !"Error during buildup breadcrumbs inside \
                     catchup_scheduler: $error"
-                  ~metadata:[("error", Error_json.error_to_yojson err)] ;
+                  ~metadata:[("error", Error_json.error_yojson_of err)] ;
                 List.iter transition_branches ~f:(fun subtree ->
                     Rose_tree.iter subtree ~f:(fun cached_transition ->
                         let _ : nativeint =
@@ -198,12 +198,12 @@ let watch t ~timeout_duration ~cached_transition =
         remove_tree t parent_hash ;
         [%log' info t.logger]
           ~metadata:
-            [ ("parent_hash", Mina_base.State_hash.to_yojson parent_hash)
+            [ ("parent_hash", Mina_base.State_hash.yojson_of parent_hash)
             ; ( "duration"
               , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc) )
             ; ( "cached_transition"
               , With_hash.data transition_with_hash
-                |> External_transition.to_yojson ) ]
+                |> External_transition.yojson_of ) ]
           "Timed out waiting for the parent of $cached_transition after \
            $duration ms, signalling a catchup job" ;
         (* it's ok to create a new thread here because the thread essentially does no work *)
@@ -237,7 +237,7 @@ let watch t ~timeout_duration ~cached_transition =
             State_hash.equal hash sibling_hash )
       then
         [%log' debug t.logger]
-          ~metadata:[("state_hash", State_hash.to_yojson hash)]
+          ~metadata:[("state_hash", State_hash.yojson_of hash)]
           "Received request to watch transition for catchup that already is \
            being watched: $state_hash"
       else

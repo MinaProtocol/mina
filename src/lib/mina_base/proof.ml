@@ -18,7 +18,7 @@ module Stable = struct
 end]
 
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
+Stable.Latest.(yojson_of, t_of_yojson)]
 
 let%test_module "proof-tests" =
   ( module struct

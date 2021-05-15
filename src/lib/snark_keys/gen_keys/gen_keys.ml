@@ -55,7 +55,7 @@ let str ~loc ~constraint_constants ~blockchain_verification_key_id
 
     let blockchain_verification () = [%e blockchain_snark]
 
-    type key_hashes = string list [@@deriving to_yojson]
+    type key_hashes = string list [@@deriving yojson_of]
 
     let key_hashes : key_hashes = [%e hashes]]
 
@@ -191,7 +191,7 @@ let main () =
               failwith "Expected an argument FILENAME for --config-file"
         in
         let json = Yojson.Safe.from_file ~fname:filename filename in
-        Runtime_config.Json_layout.of_yojson json
+        Runtime_config.Json_layout.t_of_yojson json
         |> Result.ok_or_failwith |> Runtime_config.of_json_layout
         |> Result.ok_or_failwith
     | None ->

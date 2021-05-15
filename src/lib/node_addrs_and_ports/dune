@@ -4,4 +4,4 @@
  (libraries core async network_peer yojson)
  (inline_tests)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_version ppx_jane ppx_let ppx_deriving_yojson)))
+ (preprocess (pps ppx_version ppx_jane ppx_let ppx_yojson_conv)))

@@ -185,7 +185,7 @@ module Uncompressed = struct
     | None ->
         failwith
           (sprintf "Compressed public key %s could not be decompressed"
-             (Yojson.Safe.to_string @@ Compressed.to_yojson t))
+             (Yojson.Safe.to_string @@ Compressed.yojson_of t))
 
   let of_base58_check_decompress_exn pk_str =
     let pk = Compressed.of_base58_check_exn pk_str in
@@ -233,14 +233,14 @@ module Uncompressed = struct
       (* We reuse the Base58check-based yojson (de)serialization from the
          compressed representation. *)
 
-      let of_yojson json =
+      let t_t_of_yojson json =
         let open Result in
-        Compressed.of_yojson json
+        Compressed.t_of_yojson json
         >>= fun compressed ->
         Result.of_option ~error:"couldn't decompress, curve point invalid"
           (decompress compressed)
 
-      let to_yojson t = Compressed.to_yojson @@ compress t
+      let yojson_of_t t = Compressed.yojson_of @@ compress t
 
       (* as for yojson, use the Base58check-based sexps from the compressed representation *)
       let sexp_of_t t = Compressed.sexp_of_t @@ compress t
@@ -255,7 +255,7 @@ module Uncompressed = struct
 
   [%%define_locally
   Stable.Latest.
-    (of_bigstring, to_bigstring, sexp_of_t, t_of_sexp, to_yojson, of_yojson)]
+    (of_bigstring, to_bigstring, sexp_of_t, t_of_sexp, yojson_of, t_of_yojson)]
 
   let gen : t Quickcheck.Generator.t = gen_uncompressed
 

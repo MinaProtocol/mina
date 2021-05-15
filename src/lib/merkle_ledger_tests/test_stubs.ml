@@ -44,9 +44,9 @@ module Hash = struct
 
     let to_string = Md5.to_hex
 
-    let to_yojson t = `String (Md5.to_hex t)
+    let yojson_of_t t = `String (Md5.to_hex t)
 
-    let of_yojson = function
+    let t_t_of_yojson = function
       | `String s ->
           Ok (Md5.of_hex_exn s)
       | _ ->

@@ -155,9 +155,9 @@ let replace_coinbase_receiver t coinbase_receiver =
      $new_receiver"
     ~metadata:
       [ ( "old_receiver"
-        , Consensus.Coinbase_receiver.to_yojson !(t.coinbase_receiver) )
+        , Consensus.Coinbase_receiver.yojson_of !(t.coinbase_receiver) )
       ; ( "new_receiver"
-        , Consensus.Coinbase_receiver.to_yojson coinbase_receiver ) ] ;
+        , Consensus.Coinbase_receiver.yojson_of coinbase_receiver ) ] ;
   t.coinbase_receiver := coinbase_receiver
 
 let replace_block_production_keypairs t kps =
@@ -306,8 +306,8 @@ module Snark_worker = struct
         [%log debug]
           !"Changing snark worker key from $old to $new"
           ~metadata:
-            [ ("old", Public_key.Compressed.to_yojson old)
-            ; ("new", Public_key.Compressed.to_yojson new_key) ] ;
+            [ ("old", Public_key.Compressed.yojson_of old)
+            ; ("new", Public_key.Compressed.yojson_of new_key) ] ;
         t.processes.snark_worker
         <- `On ({public_key= new_key; process; kill_ivar}, fee) ;
         Deferred.unit
@@ -1098,7 +1098,7 @@ let create ?wallets (config : Config.t) =
                     let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
+                      ~metadata:[("exn", Error_json.error_yojson_of err)] ))
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
@@ -1116,7 +1116,7 @@ let create ?wallets (config : Config.t) =
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
+                      ~metadata:[("exn", Error_json.error_yojson_of err)] ))
               (fun () ->
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
@@ -1169,7 +1169,7 @@ let create ?wallets (config : Config.t) =
                   | `Capacity_exceeded ->
                       [%log' warn config.logger]
                         "$sender has sent many blocks. This is very unusual."
-                        ~metadata:[("sender", Envelope.Sender.to_yojson sender)] ;
+                        ~metadata:[("sender", Envelope.Sender.yojson_of sender)] ;
                       Mina_net2.Validation_callback.fire_if_not_already_fired
                         cb `Reject ;
                       None
@@ -1382,7 +1382,7 @@ let create ?wallets (config : Config.t) =
                     [%log' debug config.logger]
                       ~metadata:
                         [ ( "staged_ledger_hash"
-                          , Staged_ledger_hash.to_yojson staged_ledger_hash )
+                          , Staged_ledger_hash.yojson_of staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
                     ( scan_state
@@ -1488,7 +1488,7 @@ let create ?wallets (config : Config.t) =
               | Error e ->
                   [%log' error config.logger]
                     "Failed to submit user commands: $error"
-                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                    ~metadata:[("error", Error_json.error_yojson_of e)] ;
                   result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
@@ -1613,7 +1613,7 @@ let create ?wallets (config : Config.t) =
                         [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"
-                              , External_transition.Validated.to_yojson
+                              , External_transition.Validated.yojson_of
                                   transition ) ]
                           (Rebroadcast_transition {state_hash= hash}) ;
                       External_transition.Validated.broadcast transition
@@ -1626,9 +1626,9 @@ let create ?wallets (config : Config.t) =
                             `String (sprintf "%Lu slots too late" slots)
                       in
                       let metadata =
-                        [ ("state_hash", State_hash.to_yojson hash)
+                        [ ("state_hash", State_hash.yojson_of hash)
                         ; ( "external_transition"
-                          , External_transition.Validated.to_yojson transition
+                          , External_transition.Validated.yojson_of transition
                           )
                         ; ("timing", timing_error_json) ]
                       in

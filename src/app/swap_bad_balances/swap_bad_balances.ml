@@ -51,17 +51,17 @@ let main ~archive_uri ~state_hash ~sequence_no () =
           ~f:(fun db -> Sql.Receiver_balances.load db balance_2_id)
           ~item:"receiver balance 2"
       in
-      let balance_to_yojson (pk_id, bal_int64) =
+      let balance_yojson_of (pk_id, bal_int64) =
         let bal_json =
           Unsigned.UInt64.of_int64 bal_int64
-          |> Currency.Balance.of_uint64 |> Currency.Balance.to_yojson
+          |> Currency.Balance.of_uint64 |> Currency.Balance.yojson_of
         in
         `Assoc [("public_key_id", `Int pk_id); ("balance", bal_json)]
       in
       [%log info] "Found balances to be swapped"
         ~metadata:
-          [ ("balance_1", balance_to_yojson balance_1)
-          ; ("balance_2", balance_to_yojson balance_2) ] ;
+          [ ("balance_1", balance_yojson_of balance_1)
+          ; ("balance_2", balance_yojson_of balance_2) ] ;
       let balance_1_swapped, balance_2_swapped =
         match (balance_1, balance_2) with
         | (pk1, bal1), (pk2, bal2) ->

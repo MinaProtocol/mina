@@ -24,7 +24,7 @@ let parse id (m : Logger.Message.t) =
 let bad_parse = Or_error.error_string "bad parse"
 
 module type Event_type_intf = sig
-  type t [@@deriving to_yojson]
+  type t [@@deriving yojson_of]
 
   val name : string
 
@@ -38,7 +38,7 @@ module Log_error = struct
 
   let structured_event_id = None
 
-  type t = Logger.Message.t [@@deriving to_yojson]
+  type t = Logger.Message.t [@@deriving yojson_of]
 
   let parse = Or_error.return
 end
@@ -51,7 +51,7 @@ module Node_initialization = struct
       Transition_router
       .starting_transition_frontier_controller_structured_events_id
 
-  type t = unit [@@deriving to_yojson]
+  type t = unit [@@deriving yojson_of]
 
   let parse = Fn.const (Or_error.return ())
 end
@@ -63,13 +63,13 @@ module Transition_frontier_diff_application = struct
     Some Transition_frontier.applying_diffs_structured_events_id
 
   type root_transitioned = {new_root: State_hash.t; garbage: State_hash.t list}
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   type t =
     { new_node: State_hash.t option
     ; best_tip_changed: State_hash.t option
     ; root_transitioned: root_transitioned option }
-  [@@deriving lens, to_yojson]
+  [@@deriving lens, yojson_of]
 
   let empty = {new_node= None; best_tip_changed= None; root_transitioned= None}
 
@@ -122,7 +122,7 @@ module Block_produced = struct
     ; epoch: int
     ; global_slot: int
     ; snarked_ledger_generated: bool }
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   (*
   let empty =
@@ -131,7 +131,7 @@ module Block_produced = struct
   (* Aggregated values for determining timeout conditions. Note: Slots passed and epochs passed are only determined if we produce a block. Add a log for these events to calculate these independently? *)
   type aggregated =
     {last_seen_result: t; blocks_generated: int; snarked_ledgers_generated: int}
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   let empty_aggregated =
     {last_seen_result= empty; blocks_generated= 0; snarked_ledgers_generated= 0}
@@ -188,7 +188,7 @@ module Breadcrumb_added = struct
       Transition_frontier.added_breadcrumb_user_commands_structured_events_id
 
   type t = {user_commands: User_command.Valid.t With_status.t list}
-  [@@deriving to_yojson]
+  [@@deriving yojson_of]
 
   let parse message =
     let open Json_parsing in
@@ -331,7 +331,7 @@ let existential_of_string_exn = function
   | _ ->
       failwith "invalid event type string"
 
-let existential_to_yojson t = `String (existential_to_string t)
+let existential_yojson_of t = `String (existential_to_string t)
 
 let existential_of_sexp = function
   | Sexp.Atom string ->
@@ -384,10 +384,10 @@ let event_type_module : type a. a t -> (module Event_type_intf with type t = a)
   | Transactions_gossip ->
       (module Gossip.Transactions)
 
-let event_to_yojson event =
+let event_yojson_of event =
   let (Event (t, d)) = event in
   let (module Type) = event_type_module t in
-  `Assoc [(to_string t, Type.to_yojson d)]
+  `Assoc [(to_string t, Type.yojson_of d)]
 
 let to_structured_event_id event_type =
   let (Event_type t) = event_type in

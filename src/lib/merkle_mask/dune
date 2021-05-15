@@ -8,7 +8,7 @@
   (pps
     ppx_deriving.eq
     ppx_deriving.show
-    ppx_deriving_yojson
+    ppx_yojson_conv
     ppx_jane
     ppx_version
  ))

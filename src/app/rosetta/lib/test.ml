@@ -11,7 +11,7 @@ let assert_ ~f ~expected ~actual =
     | _ ->
         false
   in
-  let to_yojson = function Ok x -> x | Error y -> Errors.to_yojson y in
+  let yojson_of_t = function Ok x -> x | Error y -> Errors.yojson_of y in
   let expected = Result.map ~f expected in
   let actual = Result.map ~f actual in
   if eq expected actual then ()
@@ -19,6 +19,6 @@ let assert_ ~f ~expected ~actual =
     let output =
       Yojson.Safe.pretty_to_string
         (`Assoc
-          [("expected", to_yojson expected); ("actual", to_yojson actual)])
+          [("expected", yojson_of expected); ("actual", yojson_of actual)])
     in
     eprintf "%s" output ; failwith output

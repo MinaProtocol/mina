@@ -63,7 +63,7 @@ module type External_transition_common_intf = sig
 end
 
 module type External_transition_base_intf = sig
-  type t [@@deriving sexp, to_yojson, eq]
+  type t [@@deriving sexp, yojson_of, eq]
 
   [%%versioned:
   module Stable : sig

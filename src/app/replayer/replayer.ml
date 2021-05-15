@@ -42,7 +42,7 @@ let constraint_constants = Genesis_constants.Constraint_constants.compiled
 let proof_level = Genesis_constants.Proof_level.Full
 
 let json_ledger_hash_of_ledger ledger =
-  Ledger_hash.to_yojson @@ Ledger.merkle_root ledger
+  Ledger_hash.yojson_of @@ Ledger.merkle_root ledger
 
 let create_output ~target_fork_state_hash ~target_epoch_ledgers_state_hash
     ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger ~next_seed
@@ -334,8 +334,8 @@ let verify_balance ~logger ~pool ~ledger ~who ~balance_id ~pk_id ~token_int64
     [%log error] "Claimed balance does not match actual balance in ledger"
       ~metadata:
         [ ("who", `String who)
-        ; ("claimed_balance", Currency.Balance.to_yojson claimed_balance)
-        ; ("actual_balance", Currency.Balance.to_yojson actual_balance) ] ;
+        ; ("claimed_balance", Currency.Balance.yojson_of claimed_balance)
+        ; ("actual_balance", Currency.Balance.yojson_of actual_balance) ] ;
     if continue_on_error then incr error_count else Core_kernel.exit 1 )
 
 let run_internal_command ~logger ~pool ~ledger (cmd : Sql.Internal_command.t)
@@ -580,7 +580,7 @@ let run_user_command ~logger ~pool ~ledger (cmd : Sql.User_command.t)
         [%sexp_of: (string * int64) * (string * int)]
       |> Error.raise
 
-let unquoted_string_of_yojson json =
+let unquoted_string_t_of_yojson json =
   (* Yojson.Safe.to_string produces double-quoted strings
      remove those quotes for SQL queries
   *)
@@ -591,7 +591,7 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
   let logger = Logger.create () in
   let json = Yojson.Safe.from_file input_file in
   let input =
-    match input_of_yojson json with
+    match input_t_of_yojson json with
     | Ok inp ->
         inp
     | Error msg ->
@@ -798,7 +798,7 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
               ~metadata:
                 [ ("ledger_hash", json_ledger_hash_of_ledger ledger)
                 ; ( "expected_ledger_hash"
-                  , Ledger_hash.to_yojson expected_ledger_hash ) ]
+                  , Ledger_hash.yojson_of expected_ledger_hash ) ]
               last_global_slot ;
             if continue_on_error then incr error_count else Core_kernel.exit 1 )
         in
@@ -914,7 +914,7 @@ let main ~input_file ~output_file ~archive_uri ~continue_on_error () =
             ~target_fork_state_hash:(State_hash.of_string fork_state_hash)
             ~ledger ~staking_epoch_ledger ~staking_seed ~next_epoch_ledger
             ~next_seed input.genesis_ledger
-          |> output_to_yojson |> Yojson.Safe.to_string
+          |> output_yojson_of |> Yojson.Safe.to_string
         in
         let%map writer = Async_unix.Writer.open_file output_file in
         Async.fprintf writer "%s\n" output ;

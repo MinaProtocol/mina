@@ -34,7 +34,7 @@ let construct_staged_ledger_at_root
     match Map.find protocol_states_map hash with
     | None ->
         [%log error]
-          ~metadata:[("state_hash", State_hash.to_yojson hash)]
+          ~metadata:[("state_hash", State_hash.yojson_of hash)]
           "Protocol state (for scan state transactions) for $state_hash not \
            found when loading persisted transition frontier" ;
         Or_error.errorf
@@ -175,8 +175,8 @@ module Instance = struct
     else (
       [%log' warn t.factory.logger]
         ~metadata:
-          [ ("current_root", State_hash.to_yojson root_hash)
-          ; ("target_root", State_hash.to_yojson target_root.state_hash) ]
+          [ ("current_root", State_hash.yojson_of root_hash)
+          ; ("target_root", State_hash.yojson_of target_root.state_hash) ]
         "Cannot fast forward persistent frontier's root: bootstrap is \
          required ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
@@ -346,7 +346,7 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
   [%log' info t.logger]
     ~metadata:
       [ ( "state_hash"
-        , State_hash.to_yojson
+        , State_hash.yojson_of
             (External_transition.Validated.state_hash (transition root_data))
         ) ]
     "Resetting transition frontier database to new root" ;
