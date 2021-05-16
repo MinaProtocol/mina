@@ -93,7 +93,8 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libssl1.1, libgmp10, libgomp1, postgresql
+Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libssl1.1, libgmp10, libgomp1, libpq-dev
+Suggests: postgresql
 Conflicts: mina-devnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
@@ -179,7 +180,8 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libssl1.1, libgmp10, libgomp1, postgresql
+Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libssl1.1, libgmp10, libgomp1, libpq-dev
+Suggests: postgresql
 Conflicts: mina-mainnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
