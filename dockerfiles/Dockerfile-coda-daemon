@@ -35,6 +35,7 @@ RUN apt-get -y update && \
     libgomp1 \
     libjemalloc-dev \
     libssl1.1 \
+    postgresql \
     strace \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
