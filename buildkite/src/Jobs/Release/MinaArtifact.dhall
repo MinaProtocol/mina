@@ -47,7 +47,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker [
-            "DUNE_PROFILE=testnet_postake_medium_curves",
+            "DUNE_PROFILE=devnet",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
             "CODA_BRANCH=$BUILDKITE_BRANCH",

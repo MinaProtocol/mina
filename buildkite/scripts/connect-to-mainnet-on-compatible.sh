@@ -7,29 +7,28 @@ if [ ! "$BUILDKITE_PULL_REQUEST_BASE_BRANCH" = "compatible" ]; then
   exit 0
 fi
 
-apt-get update
-apt-get install -y git
-
-export DUNE_PROFILE=testnet_postake_medium_curves
-
-source buildkite/scripts/export-git-env-vars.sh
-
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get install -y apt-transport-https ca-certificates
+apt-get update
+apt-get install -y git apt-transport-https ca-certificates
+
+export DUNE_PROFILE=mainnet
+
+source buildkite/scripts/export-git-env-vars.sh
+
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
-apt-get install --allow-downgrades -y curl ${PROJECT}-mainnet-noprovingkeys=${VERSION}
+apt-get install --allow-downgrades -y curl mina-mainnet=${VERSION}
 
 TESTNET_NAME="mainnet"
 
-
+# Disabled as genesis proofs are no longer needed to connect
 # Generate genesis proof and then crash due to no peers
-mina daemon \
-  -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
-  -generate-genesis-proof true \
-|| true
+# mina daemon \
+#   -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
+#   -generate-genesis-proof true \
+# || true
 
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
@@ -37,8 +36,7 @@ rm ~/.mina-config/.mina-lock ||:
 # Restart in the background
 mina daemon \
   --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt \
-  --config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
-  --generate-genesis-proof true \
+  --config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json
   & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes

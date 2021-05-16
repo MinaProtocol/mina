@@ -2,7 +2,7 @@
 
 set -eo pipefail
 
-export DUNE_PROFILE=mainnet
+export DUNE_PROFILE=devnet
 
 source buildkite/scripts/export-git-env-vars.sh
 
