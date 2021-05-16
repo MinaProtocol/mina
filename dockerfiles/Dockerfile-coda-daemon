@@ -2,6 +2,7 @@ FROM debian:buster-slim
 # Run with `docker build --build-arg coda_deb_version=<version>`
 ARG coda_deb_version
 ARG deb_repo=stable
+ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
@@ -48,7 +49,7 @@ RUN apt-get update && apt-get install -y google-cloud-sdk kubectl
 # coda package
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
   && apt-get update \
-  && apt-get install -y --allow-downgrades "mina-dev-mainnet-noprovingkeys=$coda_deb_version" "mina-dev=$coda_deb_version"
+  && apt-get install -y --allow-downgrades "mina-$network=$coda_deb_version" "mina-dev=$coda_deb_version"
 
 WORKDIR /root
 
