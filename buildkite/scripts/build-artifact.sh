@@ -27,8 +27,9 @@ dune build --profile=${DUNE_PROFILE} src/app/generate_keypair/generate_keypair.e
 echo "--- Build runtime_genesis_ledger binary"
 dune build --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
-echo "--- Generate runtime_genesis_ledger for mainnet"
-dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/mainnet.json
+# Disabling to save ~1 minute, should not be necessary anymore
+# echo "--- Generate runtime_genesis_ledger for mainnet"
+# dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/mainnet.json
 
 # echo "--- Upload genesis data"
 # ./scripts/upload-genesis.sh
