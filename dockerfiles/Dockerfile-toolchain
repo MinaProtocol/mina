@@ -115,9 +115,10 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
 # RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.15.8.linux-amd64.tar.gz && sudo tar -xvf go1.15.8.linux-amd64.tar.gz && sudo rm go1.15.8.linux-amd64.tar.gz
 # RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
+# -- Change timezone to UTC (mina-rosetta:build-deps never changed this in the first place)
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
-RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+# RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 
 # Unlimit stack for future shells that might use spacetime
 RUN echo ulimit -s unlimited >> ~/.bashrc
