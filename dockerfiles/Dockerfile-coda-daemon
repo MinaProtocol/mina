@@ -34,7 +34,6 @@ RUN apt-get -y update && \
     libgmp10 \
     libgomp1 \
     libjemalloc-dev \
-    libprocps6 \
     libssl1.1 \
     strace \
     tzdata && \

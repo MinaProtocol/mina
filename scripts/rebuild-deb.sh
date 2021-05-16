@@ -51,7 +51,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: libffi6 | libffi-dev | libffi7, libprocps6 | libprocps-dev | libprocps8, libssl1.1, libgmp10, libgomp1
+Depends: libffi6 | libffi-dev | libffi7, libssl1.1, libgmp10, libgomp1
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -93,7 +93,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libprocps6 | libprocps-dev | libprocps8, libssl1.1, libgmp10, libgomp1
+Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libssl1.1, libgmp10, libgomp1
 Conflicts: mina-devnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
@@ -179,7 +179,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libprocps6 | libprocps-dev | libprocps8, libssl1.1, libgmp10, libgomp1
+Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libssl1.1, libgmp10, libgomp1
 Conflicts: mina-mainnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
