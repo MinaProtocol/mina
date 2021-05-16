@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM debian:buster-slim
 # Run with `docker build --build-arg coda_deb_version=<version>`
 ARG coda_deb_version
 ARG deb_repo=stable
@@ -21,19 +21,21 @@ COPY ./auxiliary_entrypoints /entrypoint.d
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
   DEBIAN_FRONTEND=noninteractive apt-get -y install \
-    curl \
-    jq \
-    strace \
-    dumb-init \
-    libssl1.1 \
-    libprocps6 \
-    libgmp10 \
-    libgomp1 \
-    libffi6 \
     apt-transport-https \
     ca-certificates \
+    curl \
     dnsutils \
+    dumb-init \
+    gettext \
     gnupg2 \
+    jq \
+    libffi6 \
+    libgmp10 \
+    libgomp1 \
+    libjemalloc-dev \
+    libprocps6 \
+    libssl1.1 \
+    strace \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 
