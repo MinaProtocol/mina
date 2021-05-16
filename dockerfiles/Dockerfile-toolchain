@@ -28,7 +28,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
-    lsb-base \
+    lsb-release \
     m4 \
     nodejs \
     pandoc \
