@@ -11,11 +11,11 @@ export GO=/usr/lib/go/bin/go
 
 CODA_COMMIT_SHA1=$(git rev-parse HEAD)
 
-echo "--- Explicitly generate PV-keys and upload before building"
-make build_or_download_pv_keys 2>&1 | tee /tmp/buildocaml.log
+# echo "--- Explicitly generate PV-keys and upload before building"
+# make build_or_download_pv_keys 2>&1 | tee /tmp/buildocaml.log
 
-echo "--- Publish pvkeys"
-./scripts/publish-pvkeys.sh
+# echo "--- Publish pvkeys"
+# ./scripts/publish-pvkeys.sh
 
 # TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
 echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
