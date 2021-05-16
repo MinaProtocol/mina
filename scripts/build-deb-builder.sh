@@ -10,9 +10,9 @@ echo "--- Building and pushing gcr.io/o1labs-192920/mina-deb-builder:${TAG}"
 
 time cat dockerfiles/Dockerfile-deb-builder | docker build \
   --target builder \
-  --build-args CODENAME=${CODENAME} \
-  --build-args OPAM_BRANCH=${BRANCH} \
-  --build-args MINA_BRANCH=${BRANCH} \
+  --build-arg CODENAME=${CODENAME} \
+  --build-arg OPAM_BRANCH=${BRANCH} \
+  --build-arg MINA_BRANCH=${BRANCH} \
   -t gcr.io/o1labs-192920/mina-deb-builder:${TAG} -
 
 docker push gcr.io/o1labs-192920/mina-deb-builder:${TAG}

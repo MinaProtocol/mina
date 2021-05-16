@@ -260,7 +260,8 @@ RUN ./scripts/zexe-standardize.sh
 
 # --- Build all major tagets required for packaging
 RUN echo "--- Build all major tagets required for packaging" \
-   && echo "Building from Commit SHA: $CODA_COMMIT_SHA1" \
+   && export CODA_COMMIT_SHA1="$(git rev-parse HEAD)" \
+   && echo "Building from Commit SHA: ${CODA_COMMIT_SHA1}" \
    && eval $(opam config env) \
    && dune build --profile=${DUNE_PROFILE} \
     src/app/logproc/logproc.exe \
@@ -280,7 +281,10 @@ RUN echo "--- Build all major tagets required for packaging" \
     src/app/rosetta/ocaml-signer/signer.exe
 
 # --- MAKE DEB
-RUN eval $(opam config env) && make deb
+RUN eval $(opam config env) \
+   && export CODA_COMMIT_SHA1="$(git rev-parse HEAD)" \
+   && echo "Building from Commit SHA: ${CODA_COMMIT_SHA1}" \
+   && ./scripts/rebuild-deb.sh
 
 # Rosetta-demo artifacts / build dir removal:
 # Make rosetta-crucial components and the generate_keypair tool
