@@ -23,7 +23,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
+Depends: libjemalloc1 | libjemalloc-dev | libjemalloc2, libgomp1, libssl1.1, libpq-dev
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -69,7 +69,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
+Depends: libjemalloc1 | libjemalloc-dev | libjemalloc2, libgomp1, libssl1.1, libpq-dev
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -115,7 +115,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libgomp1, libjemalloc1, libssl1.1, libpq-dev
+Depends: libjemalloc1 | libjemalloc-dev | libjemalloc2, libgomp1, libssl1.1, libpq-dev
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
