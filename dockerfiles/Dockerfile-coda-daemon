@@ -1,9 +1,9 @@
-ARG deb_release=buster
-FROM debian:${deb_release}-slim
+ARG deb_codename=buster
+FROM debian:${deb_codename}-slim
 # Run with `docker build --build-arg deb_version=<version>`
 ARG deb_version
 ARG deb_repo=alpha
-ARG deb_release=buster
+ARG deb_codename=buster
 ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -35,7 +35,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
   && apt-get install -y google-cloud-sdk
 
 # Mina daemon package
-# jemalloc is also installed automatically here to match the package dependencies for this $deb_release
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_codename
 RUN echo "Building image with version $deb_version from repo $deb_codename $deb_repo for network $network" \
   && echo "deb [trusted=yes] http://packages.o1test.net $deb_repo $deb_codename" > /etc/apt/sources.list.d/o1.list \
   && apt-get update \

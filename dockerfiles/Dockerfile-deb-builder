@@ -2,6 +2,7 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on debian buster-slim
 #################################################################################################
+ARG debian_codename
 FROM debian:buster-slim AS build-deps
 
 # Ocaml Version
