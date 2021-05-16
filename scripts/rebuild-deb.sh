@@ -18,7 +18,7 @@ set +u
 
 # TODO: be smarter about this when we introduce a devnet package
 #if [[ "$GITBRANCH" == "master" ]] ; then
-DUNE_PROFILE="testnet_postake_medium_curves"
+DUNE_PROFILE="mainnet"
 #fi
 
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
@@ -51,7 +51,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
+Depends: libffi6 | libffi-dev | libffi7, libprocps6 | libprocps-dev | libprocps8, libssl1.1, libgmp10, libgomp1
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -83,18 +83,18 @@ ls -lh mina*.deb
 
 ###### deb without the proving keys
 echo "------------------------------------------------------------"
-echo "Building deb without keys:"
+echo "Building mainnet deb without keys:"
 
 rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}-noprovingkeys
+Package: mina-mainnet
 Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery, ${PROJECT}-testnet-noprovingkeys, ${PROJECT}-mainnet-noprovingkeys
+Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libprocps6 | libprocps-dev | libprocps8, libssl1.1, libgmp10, libgomp1
+Conflicts: mina-devnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -110,8 +110,8 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
-cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+sudo cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
@@ -119,8 +119,8 @@ chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 chmod -w $p2p_path
-cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
-cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/mina-logproc"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/mina-create-genesis"
 
 mkdir -p "${BUILDDIR}/usr/lib/systemd/user"
 cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
@@ -145,13 +145,6 @@ cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/devnet.json"
 # The default configuration:
 cp ../genesis_ledgers/mainnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
-# Copy genesis Ledger/proof/epoch ledger if they were downloaded from s3
-for f in /tmp/s3_cache_dir/genesis*; do
-    if [ -e "$f" ]; then
-        mv /tmp/s3_cache_dir/genesis* "${BUILDDIR}/var/lib/coda/."
-    fi
-done
-
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
 #       but it needs to be present for this to be effective
@@ -167,22 +160,27 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${VERSION}.deb
 ls -lh mina*.deb
 
 ###### deb with testnet signatures
 echo "------------------------------------------------------------"
 echo "Building testnet signatures deb without keys:"
 
-# Overwrite control file
+#300     curl \
+#301     ca-certificates \
+#302     dnsutils \
+#304     gettext \
+#312     tzdata
+
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}-testnet-noprovingkeys
+Package: mina-devnet
 Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery, ${PROJECT}-noprovingkeys, ${PROJECT}-mainnet-noprovingkeys
+Depends: libffi6 | libffi-dev | libffi7, libjemalloc1 | libjemalloc-dev | libjemalloc2, libprocps6 | libprocps-dev | libprocps8, libssl1.1, libgmp10, libgomp1
+Conflicts: mina-mainnet
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -194,6 +192,7 @@ EOF
 echo "------------------------------------------------------------"
 echo "Control File:"
 cat "${BUILDDIR}/DEBIAN/control"
+
 
 echo "------------------------------------------------------------"
 # Overwrite binaries (sudo to fix permissions error)
@@ -201,46 +200,8 @@ sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/l
 sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 ls -l ../src/app/libp2p_helper/result/bin
 
-# echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
-
-# Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-testnet-noprovingkeys_${VERSION}.deb
-ls -lh mina*.deb
-
-###### deb with mainnet signatures
-echo "------------------------------------------------------------"
-echo "Building mainnet signatures deb without keys:"
-
-# Overwrite control file
-mkdir -p "${BUILDDIR}/DEBIAN"
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}-mainnet-noprovingkeys
-Version: ${VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, postgresql
-Conflicts: mina-discovery, ${PROJECT}-noprovingkeys, ${PROJECT}-testnet-noprovingkeys
-License: Apache-2.0
-Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
-Description: Mina Client and Daemon
- Mina Protocol Client and Daemon
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
-
-echo "------------------------------------------------------------"
-# Overwrite binaries (sudo to fix permissions error)
-sudo cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-sudo cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+# Switch the default configuration to devnet.json:
+sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
 
 # echo contents of deb
 echo "------------------------------------------------------------"
@@ -249,36 +210,8 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-mainnet-noprovingkeys_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${VERSION}.deb
 ls -lh mina*.deb
-
-###### deb with the proving keys
-echo "------------------------------------------------------------"
-echo "Building deb with keys:"
-
-rm -rf "${BUILDDIR}"
-mkdir -p "${BUILDDIR}/DEBIAN"
-
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}
-Version: ${VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, ${PROJECT}-noprovingkeys (= ${VERSION})
-License: Apache-2.0
-Homepage: https://minaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
-Description: Mina Client and Daemon
- Mina Protocol Client and Daemon
- Built from ${GITHASH} by ${BUILD_URL}
-EOF
-
-echo "------------------------------------------------------------"
-echo "Control File:"
-cat "${BUILDDIR}/DEBIAN/control"
-
-echo "------------------------------------------------------------"
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
 # TODO: Keys should be their own package, which this 'non-noprovingkeys' deb depends on
@@ -324,14 +257,14 @@ do
 done
 
 # echo contents of deb
-echo "------------------------------------------------------------"
-echo "Deb Contents:"
-find "${BUILDDIR}"
+# echo "------------------------------------------------------------"
+# echo "Deb Contents:"
+# find "${BUILDDIR}"
 
 # Build the package
-echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
-ls -lh mina*.deb
+# echo "------------------------------------------------------------"
+# fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+# ls -lh mina*.deb
 
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
