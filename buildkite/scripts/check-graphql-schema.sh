@@ -2,20 +2,17 @@
 
 set -eo pipefail
 
-apt-get update
-apt-get install -y git python3
-
 export DUNE_PROFILE=mainnet
 
 source buildkite/scripts/export-git-env-vars.sh
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
-
-apt-get install -y apt-transport-https ca-certificates make
+apt-get update
+apt-get install -y git python3 apt-transport-https ca-certificates make curl
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
-apt-get install --allow-downgrades -y curl ${PROJECT}-noprovingkeys=${VERSION}
+apt-get install --allow-downgrades -y curl mina-devnet=${VERSION}
 
 mina daemon --seed --proof-level none --rest-port 8080 &
 
