@@ -14,11 +14,11 @@ set +u
 
 
 
-# Everything that uses this is doing a testnet_postake_medium_curves build, and
+# Everything that uses this is doing a devnet build, and
 # we generate packages with different signatures there. Instead of trying to
 # infer a name and ending up with a silly mina-mainnet-testnet package, lets
-# just call them mina-dev.
-export PROJECT="mina-dev"
+# just call them mina.
+export PROJECT="mina"
 # export PROJECT="mina-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 export BUILD_NUM=${BUILDKITE_BUILD_NUM}

@@ -4,12 +4,14 @@ set -eo pipefail
 
 export DUNE_PROFILE=devnet
 
-source buildkite/scripts/export-git-env-vars.sh
-
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y git python3 apt-transport-https ca-certificates make curl
+
+# Source the environment script to get the proper ${VERSION}. Must be executed after installing git but before installing mina.
+source buildkite/scripts/export-git-env-vars.sh
+
 echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
 apt-get install --allow-downgrades -y curl mina-devnet=${VERSION}
