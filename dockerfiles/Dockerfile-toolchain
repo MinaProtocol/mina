@@ -20,7 +20,8 @@ ARG OPAMREUSEBUILDDIR=false
 ENV DEBIAN_FRONTEND=noninteractive
 
 # OS package dependencies
-RUN sudo apt-get update && sudo apt-get install --yes \
+RUN sudo apt-get update -y \
+  && sudo apt-get install -y \
     cmake \
     jq \
     libboost-dev \
