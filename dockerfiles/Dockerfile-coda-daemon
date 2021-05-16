@@ -1,22 +1,12 @@
-FROM debian:buster-slim
-# Run with `docker build --build-arg coda_deb_version=<version>`
-ARG coda_deb_version
-ARG deb_repo=stable
+ARG deb_release=buster
+FROM debian:${deb_release}-slim
+# Run with `docker build --build-arg deb_version=<version>`
+ARG deb_version
+ARG deb_repo=alpha
+ARG deb_release=buster
 ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN echo "Building image with version $coda_deb_version"
-
-COPY scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
-RUN chmod +x /healthcheck/utilities.sh
-
-COPY scripts/daemon-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-COPY scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
-RUN chmod +x /cron_job_dump_ledger.sh
-
-COPY ./auxiliary_entrypoints /entrypoint.d
 
 # Dependencies
 RUN apt-get -y update && \
@@ -33,26 +23,45 @@ RUN apt-get -y update && \
     libffi6 \
     libgmp10 \
     libgomp1 \
-    libjemalloc-dev \
     libssl1.1 \
-    postgresql \
-    strace \
+    libpq-dev \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-
-RUN apt-get update && apt-get install -y google-cloud-sdk kubectl
-
-# coda package
-RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
+# Install google-cloud-sdk for GCLOUD_UPLOAD feature
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+  && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - \
   && apt-get update \
-  && apt-get install -y --allow-downgrades "mina-$network=$coda_deb_version"
+  && apt-get install -y google-cloud-sdk
 
-WORKDIR /root
+# Mina daemon package
+# jemalloc is also installed automatically here to match the package dependencies for this $deb_release
+RUN echo "Building image with version $deb_version from repo $deb_codename $deb_repo for network $network" \
+  && echo "deb [trusted=yes] http://packages.o1test.net $deb_repo $deb_codename" > /etc/apt/sources.list.d/o1.list \
+  && apt-get update \
+  && apt-get install -y --allow-downgrades "mina-$network=$deb_version"
+
+
+COPY --chown=42 scripts/healthcheck-utilities.sh /healthcheck/utilities.sh
+COPY --chown=42 scripts/cron_job_dump_ledger.sh /cron_job_dump_ledger.sh
+COPY --chown=42 scripts/daemon-entrypoint.sh /entrypoint.sh
+
+# Solve this by marking scripts executable in git
+# RUN chmod +x /healthcheck/utilities.sh /cron_job_dump_ledger.sh /entrypoint.sh
+
+COPY --chown=42 ./auxiliary_entrypoints /entrypoint.d
+
+# Create a mina user to execute the daemon with
+RUN mkdir /mina \
+  && adduser --uid 42 --disabled-password --gecos '' mina \
+  && passwd -l mina \
+  && chown -R mina:mina /mina
+
+WORKDIR /mina
+USER mina
 
 ENV CODA_TIME_OFFSET 0
+# for future use
+ENV MINA_TIME_OFFSET 0
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
