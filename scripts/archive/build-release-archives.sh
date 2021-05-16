@@ -64,7 +64,7 @@ ls -lh mina*.deb
 rm -r "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
-Package: ${PROJECT}-testnet
+Package: ${PROJECT}-devnet
 Version: ${VERSION}
 Section: base
 Priority: optional
@@ -102,7 +102,7 @@ find "${BUILD_DIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-testnet_${VERSION}.deb
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-devnet_${VERSION}.deb
 ls -lh mina*.deb
 
 ###### archiver deb with mainnet signatures
