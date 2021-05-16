@@ -19,19 +19,19 @@ CODA_COMMIT_SHA1=$(git rev-parse HEAD)
 
 # TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
 echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
-LIBP2P_NIXLESS=1 make libp2p_helper
+make -C src/app/libp2p_helper
 
 echo "--- Build generate-keypair and validate-keypair binaries"
 dune build --profile=${DUNE_PROFILE} src/app/generate_keypair/generate_keypair.exe src/app/validate_keypair/validate_keypair.exe 2>&1 | tee /tmp/buildocaml2.log
 
 echo "--- Build runtime_genesis_ledger binary"
-dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+dune build --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
-echo "--- Generate runtime_genesis_ledger with 10k accounts"
-dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/phase_three/config.json
+echo "--- Generate runtime_genesis_ledger for mainnet"
+dune exec --profile=${DUNE_PROFILE} src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --config-file genesis_ledgers/mainnet.json
 
-echo "--- Upload genesis data"
-./scripts/upload-genesis.sh
+# echo "--- Upload genesis data"
+# ./scripts/upload-genesis.sh
 
 echo "--- Build logproc + coda + rosetta"
 echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
@@ -47,11 +47,11 @@ dune build --profile=${DUNE_PROFILE} \
 echo "--- Build replayer"
 dune build --profile=${DUNE_PROFILE} src/app/replayer/replayer.exe 2>&1 | tee /tmp/buildocaml4.log
 
-echo "--- Build deb package with pvkeys"
+echo "--- Build deb package without pvkeys"
 make deb
 
-echo "--- Store genesis keys"
-make genesiskeys
+# echo "--- Store genesis keys"
+# make genesiskeys
 
 echo "--- Upload deb to repo"
 make publish_debs
