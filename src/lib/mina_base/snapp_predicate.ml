@@ -589,7 +589,7 @@ module Protocol_state = struct
              , 'amount
              , 'epoch_data )
              t =
-          { (* TODO: 
+          { (* TODO:
              We should include staged ledger hash again! It only changes once per
              block. *)
             snarked_ledger_hash: 'snarked_ledger_hash
@@ -1202,7 +1202,9 @@ let check ({self_predicate; other; fee_payer; protocol_state_predicate} : t)
         match other_account.snapp with
         | None ->
             assert_
-              (other.account_vk = Ignore)
+              (match other.account_vk with
+               | Ignore -> true
+               | _ -> false)
               "other_account_vk must be ignore for user account"
         | Some snapp ->
             Hash.(check ~label:"other_account_vk" Tc.field)

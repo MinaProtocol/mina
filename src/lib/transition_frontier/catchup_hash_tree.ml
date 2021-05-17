@@ -106,8 +106,11 @@ let check_for_parent t h ~parent:p ~check_has_breadcrumb =
           ; ("tree", to_yojson t) ]
         "hash tree invariant broken: $parent not found in $tree for $hash"
   | Some x ->
-      if check_has_breadcrumb && x.state <> Have_breadcrumb then
-        [%log' debug t.logger]
+    if check_has_breadcrumb &&
+       (match x.state with
+       | Node.State.Have_breadcrumb -> false
+       | Part_of_catchups _ -> true) then
+      [%log' debug t.logger]
           ~metadata:
             [ ("parent", State_hash.to_yojson p)
             ; ("hash", State_hash.to_yojson h)

@@ -29,8 +29,17 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'f t = Shifted_value of 'f
-    [@@deriving sexp, compare, eq, yojson, hash]
+    [@@deriving sexp, compare, yojson, hash]
+
+    (* the equal later in the file need not return a bool
+       if we derive eq, we'd get this for free, but also
+       an unused instance at toplevel, which the compiler
+       complains of
+    *)
+    let equal equal (Shifted_value f1) (Shifted_value f2) : bool =
+      equal f1 f2
   end
+
 end]
 
 let typ f =

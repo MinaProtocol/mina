@@ -61,4 +61,4 @@ val snoc : 'e t -> 'e -> 'e t
     contain all elements with index >= i *)
 val split_at : 'e t -> int -> 'e t * 'e t
 
-val find : 'e t -> f:('e -> sexp_bool) -> 'e sexp_option
+val find : 'e t -> f:('e -> bool) -> 'e option

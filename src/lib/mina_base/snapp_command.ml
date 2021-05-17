@@ -465,10 +465,10 @@ let token_id (t : t) : Token_id.t =
 let assert_ b lab = if b then Ok () else Or_error.error_string lab
 
 let is_non_neg (x : Amount.Signed.t) : bool =
-  Amount.(equal zero) x.magnitude || x.sgn = Pos
+  Amount.(equal zero) x.magnitude || Sgn.equal x.sgn Pos
 
 let is_non_pos (x : Amount.Signed.t) : bool =
-  Amount.(equal zero) x.magnitude || x.sgn = Neg
+  Amount.(equal zero) x.magnitude || Sgn.equal x.sgn Neg
 
 let is_neg x = not (is_non_neg x)
 
@@ -650,9 +650,9 @@ let as_transfer (t : t) : transfer =
 
 let native_excess t = Option.try_with (fun () -> native_excess_exn t)
 
-(* Currently we ensure that 
+(* Currently we ensure that
 
-   other fee payer is present => native excess is zero 
+   other fee payer is present => native excess is zero
 
    so that there is only one token involved in the fee.
 *)

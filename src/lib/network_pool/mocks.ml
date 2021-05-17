@@ -43,8 +43,8 @@ module Transition_frontier = struct
   type t =
     { refcount_table: table
     ; mutable ledger: Base_ledger.t
-    ; diff_writer: diff Broadcast_pipe.Writer.t sexp_opaque
-    ; diff_reader: diff Broadcast_pipe.Reader.t sexp_opaque }
+    ; diff_writer: (diff Broadcast_pipe.Writer.t [@sexp.opaque])
+    ; diff_reader: (diff Broadcast_pipe.Reader.t [@sexp.opaque]) }
   [@@deriving sexp]
 
   let add_statements table stmts =

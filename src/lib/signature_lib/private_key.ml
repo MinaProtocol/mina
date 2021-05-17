@@ -19,6 +19,11 @@ module Stable = struct
   module V1 = struct
     type t = Inner_curve.Scalar.t
 
+    (* deriver not working, apparently *)
+    let sexp_of_t = [%sexp_of: Inner_curve.Scalar.t]
+
+    let t_of_sexp = [%of_sexp: Inner_curve.Scalar.t]
+
     let to_latest = Fn.id
 
     [%%ifdef
@@ -36,11 +41,10 @@ module Stable = struct
     [%%endif]
   end
 
-  (* see lib/module_version/README-version-asserted.md *)
   module Tests = struct
     (* these tests check not only whether the serialization of the version-asserted type has changed,
        but also whether the serializations for the consensus and nonconsensus code are identical
-     *)
+    *)
 
     [%%if
     curve_size = 255]

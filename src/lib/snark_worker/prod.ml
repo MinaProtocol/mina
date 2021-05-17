@@ -66,14 +66,14 @@ module Inputs = struct
           let statement = Work.Single.Spec.statement single in
           let process k =
             let start = Time.now () in
-            match%map.Async k () with
+            match%map.Async.Deferred k () with
             | Error e ->
                 let logger = Logger.create () in
                 [%log error] "SNARK worker failed: $error"
                   ~metadata:
                     [ ("error", Error_json.error_to_yojson e)
                     ; ( "spec"
-                        (* the sexp_opaque in Work.Single.Spec.t means we can't derive yojson,
+                        (* the [@sexp.opaque] in Work.Single.Spec.t means we can't derive yojson,
 		       so we use the less-desirable sexp here
                     *)
                       , `String (Sexp.to_string (sexp_of_single_spec single))

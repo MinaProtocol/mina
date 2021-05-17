@@ -1,7 +1,13 @@
 open Core
 open Snark_params.Tick
 
-type t [@@deriving sexp, eq, compare, hash, yojson]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t
+    [@@deriving sexp, eq, compare, hash, yojson]
+  end
+end]
 
 include Hashable with type t := t
 
@@ -21,15 +27,6 @@ val genesis :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> genesis_ledger_hash:Ledger_hash.t
   -> t
-
-module Stable : sig
-  module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-  end
-
-  module Latest : module type of V1
-end
 
 module Aux_hash : sig
   type t

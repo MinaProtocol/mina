@@ -82,7 +82,7 @@ module Time : sig
   end
 
   module Span : sig
-    type t [@@deriving sexp, compare, yojson]
+    type t [@@deriving sexp, compare, eq, yojson]
 
     module Stable : sig
       module V1 : sig

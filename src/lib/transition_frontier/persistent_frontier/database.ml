@@ -31,6 +31,7 @@ module Schema = struct
     module Prefixed_state_hash = struct
       [%%versioned
       module Stable = struct
+        [@@@no_toplevel_latest_type]
         module V1 = struct
           type t = string * State_hash.Stable.V1.t
 

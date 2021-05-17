@@ -104,16 +104,16 @@ module Worker_state = struct
                  let proof_level = proof_level
                end)
 
-               let _ = Pickles.Cache_handle.generate_or_load B.cache_handle
+               let _ : Pickles.Dirty.t = Pickles.Cache_handle.generate_or_load B.cache_handle
 
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Protocol_state.Value.t)
                    (block : Snark_transition.value) (t : Ledger_proof.t option)
                    state_for_handler pending_coinbase =
-                 let%map.Async res =
+                 let%map.Async.Deferred res =
                    Deferred.Or_error.try_with ~here:[%here] (fun () ->
                        let t = ledger_proof_opt chain next_state t in
-                       let%map.Async proof =
+                       let%map.Async.Deferred proof =
                          B.step
                            ~handler:
                              (Consensus.Data.Prover_state.handler

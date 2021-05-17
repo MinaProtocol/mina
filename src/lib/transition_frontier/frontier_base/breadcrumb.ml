@@ -10,7 +10,7 @@ module T = struct
 
   type t =
     { validated_transition: External_transition.Validated.t
-    ; staged_ledger: Staged_ledger.t sexp_opaque
+    ; staged_ledger: Staged_ledger.t [@sexp.opaque]
     ; just_emitted_a_proof: bool
     ; transition_receipt_time: Time.t option }
   [@@deriving sexp, fields]
@@ -263,7 +263,10 @@ module For_tests = struct
               sender_account
             |> Or_error.ok_exn
           in
-          assert (status = `Existed) ;
+          assert (match status with
+              | `Existed -> true
+              | `Added -> false
+            ) ;
           (Option.value_exn (Ledger.get ledger account_location)).nonce
         in
         let send_amount = Currency.Amount.of_int 1 in

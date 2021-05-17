@@ -595,7 +595,7 @@ module Rpcs = struct
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int
-            ; block_height_opt: int option [@default None] }
+            ; block_height_opt: int option [@default None]}
           [@@deriving to_yojson, of_yojson]
 
           let to_latest = Fn.id
@@ -908,7 +908,7 @@ let online_broadcaster ~constraint_constants time_controller received_messages
       let%map () = Broadcast_pipe.Writer.write online_writer `Online in
       Block_time.Timeout.cancel time_controller old_timeout () ;
       setup_timer ~constraint_constants time_controller online_writer )
-  |> Deferred.ignore |> don't_wait_for ;
+  |> Deferred.ignore_m |> don't_wait_for ;
   online_reader
 
 let wrap_rpc_data_in_envelope conn data =

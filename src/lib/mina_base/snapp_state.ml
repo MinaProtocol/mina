@@ -29,7 +29,7 @@ module V = struct
   let to_list = Vector.to_list
 end
 
-let _ =
+let () =
   let _f : type a.
       unit -> (a V.t, a Vector.With_length(Max_state_size).t) Type_equal.t =
    fun () -> Type_equal.T
@@ -55,7 +55,7 @@ module Value = struct
 
   type t = Snapp_basic.F.t V.t [@@deriving sexp, eq, yojson, hash, compare]
 
-  let _ =
+  let () =
     let _f : unit -> (t, Stable.Latest.t) Type_equal.t =
      fun () -> Type_equal.T
     in

@@ -20,19 +20,18 @@ let validate_transition ~consensus_constants ~logger ~frontier
   let root_breadcrumb = Transition_frontier.root frontier in
   let%bind () =
     Option.fold (Transition_frontier.find frontier transition_hash)
-      ~init:Result.ok_unit ~f:(fun _ _ ->
+      ~init:Result.(Ok ()) ~f:(fun _ _ ->
         Result.Error (`In_frontier transition_hash) )
   in
   let%bind () =
     Option.fold
       (Unprocessed_transition_cache.final_state unprocessed_transition_cache
-         enveloped_transition) ~init:Result.ok_unit ~f:(fun _ final_state ->
+         enveloped_transition) ~init:Result.(Ok ()) ~f:(fun _ final_state ->
         Result.Error (`In_process final_state) )
   in
   let%map () =
     Result.ok_if_true
-      ( `Take
-      = Consensus.Hooks.select ~constants:consensus_constants
+      (match Consensus.Hooks.select ~constants:consensus_constants
           ~logger:
             (Logger.extend logger
                [("selection_context", `String "Transition_handler.Validator")])
@@ -41,7 +40,9 @@ let validate_transition ~consensus_constants ~logger ~frontier
                root_breadcrumb)
           ~candidate:
             (With_hash.map ~f:External_transition.consensus_state transition)
-      )
+      with
+      | `Take -> true
+      | `Keep -> false)
       ~error:`Disconnected
   in
   (* we expect this to be Ok since we just checked the cache *)

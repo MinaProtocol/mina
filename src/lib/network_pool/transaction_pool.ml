@@ -48,7 +48,7 @@ module Diff_versioned = struct
   (* We defer do any checking on signed-commands until the call to
    [add_from_gossip_gossip_exn].
 
-   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor 
+   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor
    [add_from_gossip_gossip_exn] into [check_from_gossip_exn] (which just does
    the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
    and do the same for snapp commands as well.
@@ -210,14 +210,14 @@ struct
 
     module Config = struct
       type t =
-        { trust_system: Trust_system.t sexp_opaque
+        { trust_system: (Trust_system.t [@sexp.opaque])
         ; pool_max_size: int
-              (* note this value needs to be mostly the same across gossipping nodes, so
-      nodes with larger pools don't send nodes with smaller pools lots of
-      low fee transactions the smaller-pooled nodes consider useless and get
-      themselves banned.
-   *)
-        ; verifier: Verifier.t sexp_opaque }
+        (* note this value needs to be mostly the same across gossipping nodes, so
+           nodes with larger pools don't send nodes with smaller pools lots of
+           low fee transactions the smaller-pooled nodes consider useless and get
+           themselves banned.
+        *)
+        ; verifier: (Verifier.t [@sexp.opaque]) }
       [@@deriving sexp_of, make]
     end
 
@@ -232,7 +232,7 @@ struct
         type t = User_command.t list [@@deriving hash]
       end
 
-      module Q = Hash_queue.Make_with_table (Int) (Int.Table)
+      module Q = Hash_queue.Make (Int)
 
       type t = unit Q.t
 
@@ -240,14 +240,15 @@ struct
 
       let add t h =
         if not (Q.mem t h) then (
-          if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
+          if Q.length t >= max_size then ignore (Q.dequeue_front t : 'a option);
           Q.enqueue_back_exn t h () )
-        else Q.lookup_and_move_to_back t h |> ignore
+        else
+          ignore (Q.lookup_and_move_to_back t h : unit option)
     end
 
     type t =
       { mutable pool: Indexed_pool.t
-      ; recently_seen: Lru_cache.t sexp_opaque
+      ; recently_seen: (Lru_cache.t [@sexp.opaque])
       ; locally_generated_uncommitted:
           ( Transaction_hash.User_command_with_valid_signature.t
           , Time.t )
@@ -260,10 +261,10 @@ struct
           Hashtbl.t
             (** Ones that are included in the current best tip. *)
       ; config: Config.t
-      ; logger: Logger.t sexp_opaque
+      ; logger: (Logger.t [@sexp.opaque])
       ; batcher: Batcher.t
-      ; mutable best_tip_diff_relay: unit Deferred.t sexp_opaque Option.t
-      ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
+      ; mutable best_tip_diff_relay: (unit Deferred.t [@sexp.opaque]) Option.t
+      ; mutable best_tip_ledger: (Base_ledger.t [@sexp.opaque]) Option.t }
     [@@deriving sexp_of]
 
     let member t x =
@@ -655,7 +656,7 @@ struct
               [ ( "cmd"
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd ) ] ;
-          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
+          ignore (Hashtbl.find_and_remove t.locally_generated_uncommitted cmd : Time.t option)
       ) ;
       t.pool <- pool ;
       Deferred.unit
@@ -1392,14 +1393,14 @@ let%test_module _ =
 
     let pool_max_size = 25
 
-    let _ =
+    let () =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
     (** Assert the invariants of the locally generated command tracking system.
     *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
-      let _ =
+      ignore (
         Hashtbl.merge pool.locally_generated_committed
           pool.locally_generated_uncommitted ~f:(fun ~key -> function
           | `Both (committed, uncommitted) ->
@@ -1419,9 +1420,9 @@ let%test_module _ =
               assert (
                 Indexed_pool.member pool.pool
                   (Transaction_hash.User_command.of_checked key) ) ;
-              Some cmd )
-      in
-      ()
+              Some cmd ) : ( Transaction_hash.User_command_with_valid_signature.t
+                           , Time.t )
+            Hashtbl.t)
 
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
@@ -2210,10 +2211,9 @@ let%test_module _ =
           (* When transactions expire from rebroadcast pool they are gone. This
              doesn't affect the main pool.
           *)
-          let _ =
+          ignore (
             Test.Resource_pool.get_rebroadcastable pool
-              ~has_timed_out:(Fn.const `Timed_out)
-          in
+              ~has_timed_out:(Fn.const `Timed_out): User_command.t list list);
           assert_pool_txs (List.drop local_cmds' 4 @ remote_cmds') ;
           assert_rebroadcastable pool [] ;
           Deferred.unit )

@@ -13,7 +13,7 @@ exception Invalid_base58_character of string
 (** the Mina base 58 alphabet *)
 val mina_alphabet : B58.alphabet
 
-module Make (M : sig
+module Make (_ : sig
   val description : string
 
   val version_byte : char

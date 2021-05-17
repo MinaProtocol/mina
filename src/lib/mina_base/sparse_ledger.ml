@@ -213,11 +213,12 @@ let get_or_initialize_exn account_id t idx =
 let sub_account_creation_fee
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
     (amount : Currency.Amount.t) =
-  if action = `Added then
+  match action with
+  | `Added ->
     Option.value_exn
       Currency.Amount.(
         sub amount (of_fee constraint_constants.account_creation_fee))
-  else amount
+  | _ -> amount
 
 let apply_user_command_exn
     ~(constraint_constants : Genesis_constants.Constraint_constants.t)
@@ -343,9 +344,11 @@ let apply_user_command_exn
         let receiver_amount =
           if Token_id.(equal default) token then
             sub_account_creation_fee ~constraint_constants action amount
-          else if action = `Added then
-            failwith "Receiver account does not exist, and we cannot create it"
-          else amount
+          else
+            match action with
+            | `Added ->
+              failwith "Receiver account does not exist, and we cannot create it"
+            | _ -> amount
         in
         let receiver_account =
           { receiver_account with
@@ -357,7 +360,9 @@ let apply_user_command_exn
         let source_account =
           let account =
             if Account_id.equal source receiver then (
-              assert (action = `Existed) ;
+              assert (match action with
+                  | `Existed -> true
+                  | `Added -> false);
               receiver_account )
             else get_exn t source_idx
           in
@@ -389,12 +394,13 @@ let apply_user_command_exn
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        if not (action = `Added) then
+        (match action with
+        | `Added -> ()
+        | `Existed ->
           raise
             (Reject
                (Failure
-                  "Token owner account for newly created token already \
-                   exists?!?!")) ;
+                  "Token owner account for newly created token already exists")));
         let receiver_account =
           { receiver_account with
             token_permissions=
@@ -417,8 +423,10 @@ let apply_user_command_exn
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        if action = `Existed then
-          failwith "Attempted to create an account that already exists" ;
+        (match action with
+        | `Existed ->
+          failwith "Attempted to create an account that already exists"
+        | `Added -> ());
         let receiver_account =
           { receiver_account with
             token_permissions= Token_permissions.Not_owned {account_disabled}
@@ -472,7 +480,9 @@ let apply_user_command_exn
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        assert (action = `Existed) ;
+        assert (match action with
+            |`Existed -> true
+            |`Added -> false);
         let receiver_account =
           { receiver_account with
             balance=

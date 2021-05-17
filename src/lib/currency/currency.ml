@@ -565,10 +565,9 @@ module Fee = struct
 
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, eq]
+      [@@deriving sexp, compare, hash, eq, yojson]
 
-      [%%define_from_scope
-      to_yojson, of_yojson, dhall_type]
+      let dhall_type = dhall_type
 
       let to_latest = Fn.id
     end
@@ -643,7 +642,9 @@ module Balance = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
+      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson]
+
+      let equal = Amount.Stable.V1.equal
 
       let to_latest = Fn.id
 
@@ -731,7 +732,7 @@ let%test_module "sub_flagged module" =
     let run_test (module M : Sub_flagged_S) =
       let open M in
       let sub_flagged_unchecked (x, y) =
-        if x < y then (zero, true) else (Option.value_exn (x - y), false)
+        if compare_magnitude x y < 0 then (zero, true) else (Option.value_exn (x - y), false)
       in
       let sub_flagged_checked =
         let f (x, y) =

@@ -46,7 +46,7 @@ module Transaction_with_witness = struct
         ; init_stack:
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness: Mina_base.Sparse_ledger.Stable.V1.t sexp_opaque }
+        ; ledger_witness: Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque] }
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -286,7 +286,7 @@ module Make_statement_scanner
     (M : Monad_with_Or_error_intf) (Verifier : sig
         type t
 
-        val verify : verifier:t -> P.t list -> sexp_bool M.Or_error.t
+        val verify : verifier:t -> P.t list -> bool M.Or_error.t
     end) =
 struct
   module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)

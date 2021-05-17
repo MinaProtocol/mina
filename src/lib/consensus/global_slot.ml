@@ -71,11 +71,14 @@ let to_epoch_and_slot t = (epoch t, slot t)
 
 let ( + ) (x : t) n : t = {x with slot_number= T.add x.slot_number (T.of_int n)}
 
-let ( < ) (t : t) (t' : t) = t.slot_number < t'.slot_number
+let ( < ) (t : t) (t' : t) = UInt32.compare t.slot_number t'.slot_number < 0
 
 let ( - ) (t : t) (t' : t) = T.sub t.slot_number t'.slot_number
 
-let max t1 t2 = if t2 > t1 then t2 else t1
+let max (t1:t) (t2:t) =
+  (* slots_per_epoch assumed same for t1, t2 *)
+  let slot_number = Mina_numbers.Global_slot.max t1.slot_number t2.slot_number
+  in { t1 with slot_number }
 
 let succ (t : t) = {t with slot_number= T.succ t.slot_number}
 
@@ -103,7 +106,7 @@ let diff ~(constants : Constants.t) (t : t) (other_epoch, other_slot) =
   let open UInt32.Infix in
   let epoch, slot = to_epoch_and_slot t in
   let old_epoch =
-    epoch - other_epoch - (UInt32.of_int @@ if other_slot > slot then 1 else 0)
+    epoch - other_epoch - (UInt32.of_int @@ if UInt32.compare other_slot slot > 0 then 1 else 0)
   in
   let old_slot =
     (slot - other_slot) mod Length.to_uint32 constants.epoch_size

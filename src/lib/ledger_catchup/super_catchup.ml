@@ -395,12 +395,13 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
                 !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
                 peer
             in
-            ignore
+            let%bind.Deferred () =
               Trust_system.(
                 record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
-                    , Some (error_msg, []) )) ;
+                    , Some (error_msg, []) ))
+            in
             Deferred.Result.fail `Invalid_transition_chain_proof
       in
       Deferred.return
@@ -560,7 +561,10 @@ let check_invariant ~downloader t =
   [%test_eq: int]
     (Downloader.total_jobs downloader)
     (Hashtbl.count t.nodes ~f:(fun node ->
-         Node.State.enum node.state = To_download ))
+         match Node.State.enum node.state with
+         | To_download -> true
+         | _ -> false
+       ))
 
 let download s d ~key ~attempts =
   let logger = Logger.create () in
@@ -796,7 +800,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             ; ( "donwload_number"
               , `Int
                   (Hashtbl.count t.nodes ~f:(fun node ->
-                       Node.State.enum node.state = To_download )) )
+                       match Node.State.enum node.state with
+                       | To_download -> true
+                       | _ -> false
+                     )) )
             ; ("total_nodes", `Int (Hashtbl.length t.nodes))
             ; ( "node_states"
               , let s = Node.State.Enum.Table.create () in
@@ -858,7 +865,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                   record trust_system logger peer
                     Actions.(Sent_invalid_proof, None))
                 |> don't_wait_for ) ;
-            let _ = Cached.invalidate_with_failure tv in
+            ignore (Cached.invalidate_with_failure tv : External_transition.Initial_validated.t Envelope.Incoming.t);
             failed ~sender:iv.sender `Verify
         | Ok (Ok av) ->
             let av =
@@ -873,13 +880,13 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
     | Wait_for_parent av ->
         let%bind parent =
           step
-            ( match%map.Async
+            ( match%map.Async.Deferred
                 Ivar.read (Hashtbl.find_exn t.nodes node.parent).result
               with
             | Ok x ->
                 Ok x
             | Error _ ->
-                let _ = Cached.invalidate_with_failure av in
+                ignore (Cached.invalidate_with_failure av: External_transition.Almost_validated.t Envelope.Incoming.t);
                 finish t node (Error ()) ;
                 Error `Finished )
         in
@@ -897,7 +904,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             |> Deferred.map ~f:Result.return )
         with
         | Error e ->
-            let _ = Cached.invalidate_with_failure c in
+            ignore (Cached.invalidate_with_failure c : External_transition.Almost_validated.t Envelope.Incoming.t);
             let e =
               match e with
               | `Exn e ->
@@ -1071,18 +1078,17 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                       let node =
                         create_node ~downloader t (`Initial_validated c)
                       in
-                      run_node node |> ignore )) ;
-             List.fold state_hashes
-               ~init:(root.state_hash, root.blockchain_length)
-               ~f:(fun (parent, l) h ->
-                 let l = Length.succ l in
-                 ( if not (Hashtbl.mem t.nodes h) then
-                   let node =
-                     create_node t ~downloader (`Hash (h, l, parent))
-                   in
-                   don't_wait_for (run_node node >>| ignore) ) ;
-                 (h, l) )
-             |> ignore) )
+                      ignore (run_node node : (unit, [ `Finished ]) Deferred.Result.t)));
+             ignore(List.fold state_hashes
+                 ~init:(root.state_hash, root.blockchain_length)
+                 ~f:(fun (parent, l) h ->
+                     let l = Length.succ l in
+                     ( if not (Hashtbl.mem t.nodes h) then
+                         let node =
+                           create_node t ~downloader (`Hash (h, l, parent))
+                         in
+                         don't_wait_for (run_node node >>| ignore) ) ;
+                     (h, l) ) : State_hash.t * Length.t)))
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
     ~catchup_job_reader ~catchup_breadcrumbs_writer

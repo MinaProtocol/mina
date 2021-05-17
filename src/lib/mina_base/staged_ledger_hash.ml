@@ -99,7 +99,7 @@ module Non_snark = struct
         { ledger_hash: Ledger_hash.Stable.V1.t
         ; aux_hash: Aux_hash.Stable.V1.t
         ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -174,7 +174,7 @@ module Poly = struct
     module V1 = struct
       type ('non_snark, 'pending_coinbase_hash) t =
         {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-      [@@deriving sexp, eq, compare, hash, yojson, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, hlist]
     end
   end]
 end

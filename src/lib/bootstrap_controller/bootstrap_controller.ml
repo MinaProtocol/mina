@@ -50,8 +50,7 @@ let time_deferred deferred =
   (Time.diff end_time start_time, result)
 
 let worth_getting_root t candidate =
-  `Take
-  = Consensus.Hooks.select ~constants:t.consensus_constants
+  match Consensus.Hooks.select ~constants:t.consensus_constants
       ~logger:
         (Logger.extend t.logger
            [ ( "selection_context"
@@ -60,7 +59,9 @@ let worth_getting_root t candidate =
         ( t.best_seen_transition
         |> External_transition.Validation.forget_validation_with_hash
         |> With_hash.map ~f:External_transition.consensus_state )
-      ~candidate
+      ~candidate with
+  |  `Take -> true
+  |`Keep -> false
 
 let received_bad_proof t host e =
   Trust_system.(
@@ -176,7 +177,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
             [ ("state_hash", State_hash.to_yojson (With_hash.hash transition))
             ; ( "external_transition"
               , External_transition.to_yojson (With_hash.data transition) ) ] ;
-        Deferred.ignore
+        Deferred.ignore_m
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
              transition )
       else Deferred.unit )
@@ -188,9 +189,10 @@ let external_transition_compare consensus_constants =
       if State_hash.equal (With_hash.hash existing) (With_hash.hash candidate)
       then 0
       else if
-        `Keep
-        = Consensus.Hooks.select ~constants:consensus_constants ~existing
-            ~candidate ~logger:(Logger.null ())
+          match Consensus.Hooks.select ~constants:consensus_constants ~existing
+                  ~candidate ~logger:(Logger.null ()) with
+            `Keep -> true
+          |`Take -> false
       then -1
       else 1 )
     ~f:(With_hash.map ~f:External_transition.consensus_state)
@@ -348,7 +350,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~pending_coinbases ~get_state
                 in
                 ignore
-                  (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask) ;
+                  (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask : Ledger.unattached_mask) ;
                 Result.map result
                   ~f:
                     (const
@@ -527,13 +529,14 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     |> External_transition.Validation
                        .forget_validation_with_hash
                   in
-                  `Take
-                  = Consensus.Hooks.select ~constants:t.consensus_constants
+                  match Consensus.Hooks.select ~constants:t.consensus_constants
                       ~existing:root_consensus_state
                       ~candidate:
                         (With_hash.map ~f:External_transition.consensus_state
                            transition)
-                      ~logger )
+                      ~logger with
+                    `Take -> true
+                  |`Keep -> false)
             in
             [%log debug] "Sorting filtered transitions by consensus state"
               ~metadata:[] ;
@@ -745,8 +748,8 @@ let%test_module "Bootstrap_controller tests" =
         Fn.compose Consensus.Data.Consensus_state.blockchain_length
           External_transition.consensus_state
       in
-      List.fold_result ~init:root incoming_transitions
-        ~f:(fun max_acc incoming_transition ->
+      ignore (List.fold_result ~init:root incoming_transitions
+                ~f:(fun max_acc incoming_transition ->
           let With_hash.{data= transition; _}, _ =
             Envelope.Incoming.data incoming_transition
           in
@@ -760,7 +763,7 @@ let%test_module "Bootstrap_controller tests" =
                    "The blocks are not sorted in increasing order")
           in
           transition )
-      |> Or_error.ok_exn |> ignore
+            |> Or_error.ok_exn : External_transition.t)
 
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1

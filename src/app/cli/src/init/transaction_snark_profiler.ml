@@ -209,7 +209,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
 let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
     preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let _ =
+  ignore (
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
         ~prover:
@@ -246,14 +246,13 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.Valid.t list)
             ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
-        sparse_ledger' )
-  in
+        sparse_ledger' ) : Sparse_ledger.t);
   "Base constraint system satisfied"
 
 let generate_base_snarks_witness sparse_ledger0
     (transitions : Transaction.Valid.t list) preeval =
   let constraint_constants = Genesis_constants.Constraint_constants.compiled in
-  let _ =
+  ignore (
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
         ~prover:
@@ -291,8 +290,7 @@ let generate_base_snarks_witness sparse_ledger0
             ; block_data= Lazy.force state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
-        sparse_ledger' )
-  in
+        sparse_ledger' ) : Sparse_ledger.t);
   "Base constraint system satisfied"
 
 let run profiler num_transactions repeats preeval =

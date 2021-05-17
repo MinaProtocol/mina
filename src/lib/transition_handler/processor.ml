@@ -342,7 +342,7 @@ let run ~logger ~(precomputed_values : Precomputed_values.t) ~verifier
                    Gauge.dec_one
                      Transition_frontier_controller.transitions_being_processed)
              | `Partially_valid_transition transition ->
-                 process_transition ~transition ) ))
+                 process_transition ~transition ) ) : unit Deferred.t)
 
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
@@ -447,7 +447,7 @@ let%test_module "Transition_handler.Processor tests" =
                                              newly_added_transition
                                          |> Unsigned.UInt32.to_int ) ) ]
                                  "transition of $height passed processor" ;
-                               if tail = [] then `Stop true else `Continue tail
+                               if List.is_empty tail then `Stop true else `Continue tail
                            | [] ->
                                `Stop false ) ))
                 with

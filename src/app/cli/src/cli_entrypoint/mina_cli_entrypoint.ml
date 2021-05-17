@@ -841,7 +841,7 @@ let setup_daemon logger =
       Option.iter
         ~f:(fun password ->
           match Sys.getenv Secrets.Keypair.env with
-          | Some env_pass when env_pass <> password ->
+          | Some env_pass when not (String.equal env_pass password) ->
               [%log warn]
                 "$envkey environment variable doesn't match value provided on \
                  command-line or daemon.json. Using value from $envkey"
@@ -901,7 +901,7 @@ let setup_daemon logger =
             client_trustlist
       in
       Stream.iter
-        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context @@ t ())
+        (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
         ~f:(fun (span, context) ->
           let secs = Time_ns.Span.to_sec span in
@@ -927,7 +927,7 @@ let setup_daemon logger =
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
           ) ;
       Stream.iter
-        Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
+        Async_kernel.Async_kernel_scheduler.long_jobs_with_context
         ~f:(fun (context, span) ->
           let secs = Time_ns.Span.to_sec span in
           [%log debug]
@@ -1575,7 +1575,7 @@ let () =
   (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
    let is_version_cmd = make_list_mem ["version"; "-version"] in
    let is_help_flag = make_list_mem ["-help"; "-?"] in
-   match Sys.argv with
+   match Sys.get_argv () with
    | [|_coda_exe; version|] when is_version_cmd version ->
        Mina_version.print_version ()
    | [|coda_exe; version; help|]

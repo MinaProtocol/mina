@@ -171,7 +171,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             diff
       in
       match%map
-        let%bind.Deferred.Result.Let_syntax diff = return diff in
+        let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
@@ -688,7 +688,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
-                    let%bind.Async () =
+                    let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
                     [%log debug] ~metadata
@@ -829,11 +829,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    | `Produce_now (data, winner_pk) ->
                        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                        let%map () = generate_genesis_proof_if_needed () in
-                       Interruptible.finally
+                       ignore (Interruptible.finally
                          (Singleton_supervisor.dispatch production_supervisor
                             (now, data, winner_pk))
-                         ~f:check_next_block_timing
-                       |> ignore
+                         ~f:check_next_block_timing : (unit,unit) Interruptible.t)
                    | `Produce (time, data, winner_pk) ->
                        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                        let scheduled_time = time_of_ms time in
@@ -868,7 +867,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 (Singleton_supervisor.dispatch
                                    production_supervisor
                                    (scheduled_time, data, winner_pk))
-                                ~f:check_next_block_timing) ) ;
+                                ~f:check_next_block_timing : (unit,unit) Interruptible.t)) ;
                        Deferred.return ()) )
       in
       let start () =
@@ -902,7 +901,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
            milliseconds before starting block producer" ;
         ignore
           (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
-               start () )) )
+               start () ) : unit Time.Timeout.t) )
 
 let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     ~frontier_reader ~transition_writer ~precomputed_blocks
@@ -1030,7 +1029,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             [("state_hash", State_hash.to_yojson protocol_state_hash)]
           in
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
-          let%bind.Async () =
+          let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
           [%log debug] ~metadata

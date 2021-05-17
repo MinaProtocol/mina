@@ -331,22 +331,22 @@ let%test_module "predicates" =
     let one_of xs t = List.mem xs ~equal t
 
     let%test_unit "is_payment" =
-      test_predicate Unpacked.is_payment (( = ) Payment)
+      test_predicate Unpacked.is_payment (equal Payment)
 
     let%test_unit "is_stake_delegation" =
-      test_predicate Unpacked.is_stake_delegation (( = ) Stake_delegation)
+      test_predicate Unpacked.is_stake_delegation (equal Stake_delegation)
 
     let%test_unit "is_create_account" =
-      test_predicate Unpacked.is_create_account (( = ) Create_account)
+      test_predicate Unpacked.is_create_account (equal Create_account)
 
     let%test_unit "is_mint_tokens" =
-      test_predicate Unpacked.is_mint_tokens (( = ) Mint_tokens)
+      test_predicate Unpacked.is_mint_tokens (equal Mint_tokens)
 
     let%test_unit "is_fee_transfer" =
-      test_predicate Unpacked.is_fee_transfer (( = ) Fee_transfer)
+      test_predicate Unpacked.is_fee_transfer (equal Fee_transfer)
 
     let%test_unit "is_coinbase" =
-      test_predicate Unpacked.is_coinbase (( = ) Coinbase)
+      test_predicate Unpacked.is_coinbase (equal Coinbase)
 
     let%test_unit "is_user_command" =
       test_predicate Unpacked.is_user_command

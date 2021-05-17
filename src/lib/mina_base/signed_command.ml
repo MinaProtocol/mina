@@ -345,11 +345,13 @@ module With_valid_signature = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
+      type t = Stable.V1.t [@@deriving sexp, yojson, hash]
 
       let to_latest = Stable.V1.to_latest
 
       let compare = Stable.V1.compare
+
+      let equal = Stable.V1.equal
 
       module Gen = Gen
     end

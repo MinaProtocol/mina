@@ -92,7 +92,7 @@ module type Protocol_state = sig
     [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('state_hash, 'body) t [@@deriving eq, hash, sexp, to_yojson]
+        type ('state_hash, 'body) t [@@deriving equal, hash, sexp, to_yojson]
       end
     end]
   end
@@ -136,7 +136,7 @@ module type Protocol_state = sig
     module Stable : sig
       module V1 : sig
         type t = (State_hash.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, eq, compare]
+        [@@deriving sexp, equal, compare]
       end
     end]
   end
@@ -447,7 +447,7 @@ module type S = sig
         [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, sexp, yojson]
+            type t [@@deriving hash, equal, compare, sexp, yojson]
           end
         end]
 

@@ -401,10 +401,16 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                          ())
               | Some _ ->
                   () ) ;
-              if `Empty = first_connection then (
+              if match first_connection with
+                | `Empty -> true
+                | _ -> false
+              then (
                 [%str_log info] Connecting ;
                 `Connecting )
-              else if `Empty = first_message then (
+              else if
+                match first_message with
+                | `Empty -> true
+                            | _ -> false then (
                 [%str_log info] Listening ;
                 `Listening )
               else `Offline
@@ -464,7 +470,10 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           ()
     in
     let handle_status_change status =
-      if status = `Offline then start_offline_timeout ()
+      if match status with
+        | `Offline -> true
+        | _ -> false
+      then start_offline_timeout ()
       else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
@@ -822,7 +831,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
     Work_selection_method.remove t.snark_job_state spec
   in
-  let _ = Or_error.try_with (fun () -> update_metrics ()) in
+  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t);
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
@@ -988,7 +997,7 @@ let perform_compaction t =
             | `Producing ->
                 perform (span slot_duration_ms)
             | `Producing_in_ms ms ->
-                if ms < expected_time_for_compaction then
+                if Float.(<) ms expected_time_for_compaction then
                   (*too close to block production; perform compaction after block production*)
                   perform (span slot_duration_ms ~incr:ms)
                 else (
@@ -1561,10 +1570,12 @@ let create ?wallets (config : Config.t) =
                               Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
-                            if v = `Accept then
+                            match v with
+                            | `Accept ->
                               Mina_networking.broadcast_state net
                                 (External_transition.Validation
-                                 .forget_validation_with_hash et)) ;
+                                 .forget_validation_with_hash et)
+                            | _ -> ());
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~precomputed_values:config.precomputed_values )
@@ -1609,13 +1620,15 @@ let create ?wallets (config : Config.t) =
                   with
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if not (source = `Internal) then
-                        [%str_log' info config.logger]
-                          ~metadata:
-                            [ ( "external_transition"
-                              , External_transition.Validated.to_yojson
-                                  transition ) ]
-                          (Rebroadcast_transition {state_hash= hash}) ;
+                    (match source with
+                      `Internal -> ()
+                    | _ ->
+                      [%str_log' info config.logger]
+                        ~metadata:
+                          [ ( "external_transition"
+                            , External_transition.Validated.to_yojson
+                                transition ) ]
+                        (Rebroadcast_transition {state_hash= hash})) ;
                       External_transition.Validated.broadcast transition
                   | Error reason -> (
                       let timing_error_json =
