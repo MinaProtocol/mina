@@ -2,7 +2,7 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on debian buster-slim
 #################################################################################################
-ARG CODENAME=buster
+ARG CODENAME=stretch
 FROM debian:${CODENAME}-slim AS build-deps
 
 # Ocaml Version
@@ -66,15 +66,6 @@ RUN curl -sL \
   -o /usr/bin/opam \
   && chmod +x /usr/bin/opam
 
-# bubblewrap was disabled in other builds via the dockerfile-toolchain images, and in the default opam2 image.
-# Importantly, this also allows the entire container to be built with a permissionless builder, avoiding docker-in-docker
-# Keeping the exact install steps from the official opam image in case we want to re-enable in the future.
-#RUN curl -fL https://github.com/projectatomic/bubblewrap/releases/download/v0.4.1/bubblewrap-0.4.1.tar.xz | \
-#   tar -xJ && \
-#   cd bubblewrap-0.4.1 && ./configure --prefix=/usr/local && make && sudo make install && \
-#   cd - && rm -rf bubblewrap-0.4.1
-
-
 # Golang install of a given GO_VERSION (add -v for spam output of each file from the go dist)
 # TODO: rosetta requires binary file downloads of this sort to be hashed + validated
 RUN curl -s "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/lib/
@@ -132,13 +123,6 @@ RUN git clone \
   && opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git \
   && opam switch create "${OCAML_VERSION}" "${OCAML_PACKAGE}.${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}"
-
-# Alternate variants for 4.07 that are included in the official opam image
-#  opam switch create 4.07+afl ocaml-variants.4.07.1+afl && \
-#  opam switch create 4.07+flambda ocaml-variants.4.07.1+flambda && \
-#  opam switch create 4.07+default-unsafe-string ocaml-variants.4.07.1+default-unsafe-string && \
-#  opam switch create 4.07+force-safe-string ocaml-variants.4.07.1+force-safe-string && \
-
 
 #################################################################################################
 # The "opam-deps" Stage
@@ -300,6 +284,7 @@ RUN eval $(opam config env) \
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
+ARG CODENAME=stretch
 FROM debian:${CODENAME}-slim AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
@@ -324,8 +309,9 @@ RUN apt-get -y update \
     libffi6 \
     libgmp10 \
     libgomp1 \
-    libjemalloc2 \
+    libjemalloc1 \
     libssl1.1 \
+    libprocps6 \
     postgresql \
     postgresql-contrib \
     tzdata

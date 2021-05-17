@@ -4,7 +4,7 @@ set -eou pipefail
 
 BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD)
 DOCKER_BRANCH=$(echo "${BRANCH}" | sed 's!/!-!; s!_!-!g')
-CODENAME="${CODENAME:=buster}"
+CODENAME="${CODENAME:=stretch}"
 TAG="${CODENAME}-${DOCKER_BRANCH}"
 echo "--- Building and pushing gcr.io/o1labs-192920/mina-deb-builder:${TAG}"
 

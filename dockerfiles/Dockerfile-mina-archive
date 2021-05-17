@@ -1,4 +1,5 @@
-FROM debian:buster-slim
+
+FROM debian:stretch-slim
 
 # Run with `docker build --build-arg coda_deb_version=<version>`
 ARG coda_deb_version
