@@ -6,7 +6,7 @@ echo "Exporting Variables: "
 
 export GITHASH=$(git rev-parse --short=7 HEAD)
 export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g' )
-export GITTAG=$(git describe --abbrev=0 | sed 's!/!-!g; s!_!-!g')
+export GITTAG=$(git describe --always --abbrev=0 | sed 's!/!-!g; s!_!-!g')
 
 
 # Identify All Artifacts by Branch and Git Hash
