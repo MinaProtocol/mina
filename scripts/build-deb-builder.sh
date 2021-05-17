@@ -12,7 +12,8 @@ time cat dockerfiles/Dockerfile-deb-builder | docker build \
   --target builder \
   --build-arg CODENAME=${CODENAME} \
   --build-arg OPAM_BRANCH=${BRANCH} \
-  --build-arg MINA_BRANCH=$(git rev-parse HEAD) \
+  --build-arg MINA_BRANCH=${BRANCH} \
+  --build-arg MINA_COMMIT=$(git rev-parse HEAD) \
   -t gcr.io/o1labs-192920/mina-deb-builder:${TAG} -
 
 docker push gcr.io/o1labs-192920/mina-deb-builder:${TAG}

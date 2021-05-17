@@ -223,6 +223,8 @@ ARG DUNE_PROFILE=devnet
 # can also be a tagged release
 ARG MINA_BRANCH=compatible
 
+ARG MINA_COMMIT=OVERRIDE_THIS_TO_INVALIDATE_THE_DOCKER_CACHE
+
 # repo to checkout the branch from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
 
