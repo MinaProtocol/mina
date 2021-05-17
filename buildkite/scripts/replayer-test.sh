@@ -7,6 +7,8 @@ set -eo pipefail
 
 echo "Updating apt, installing packages"
 apt-get update
+# Don't prompt for answers during apt-get install
+export DEBIAN_FRONTEND=noninteractive
 # time zone = US Pacific
 /bin/echo -e "12\n10" | apt-get install -y tzdata
 apt-get install -y git postgresql apt-transport-https ca-certificates curl
@@ -14,8 +16,6 @@ apt-get install -y git postgresql apt-transport-https ca-certificates curl
 export DUNE_PROFILE=devnet
 
 source buildkite/scripts/export-git-env-vars.sh
-# Don't prompt for answers during apt-get install
-export DEBIAN_FRONTEND=noninteractive
 
 echo "deb [trusted=yes] http://packages.o1test.net alpha buster" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
