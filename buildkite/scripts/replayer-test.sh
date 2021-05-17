@@ -8,7 +8,7 @@ set -eo pipefail
 echo "Updating apt, installing packages"
 apt-get update
 # time zone = US Pacific
-/bin/echo -e "12\n10" || apt-get install -y tzdata
+/bin/echo -e "12\n10" | apt-get install -y tzdata
 apt-get install -y git postgresql apt-transport-https ca-certificates curl
 
 export DUNE_PROFILE=devnet
