@@ -1,0 +1,7 @@
+(executable
+ (name snarkette_bindings)
+ (libraries snarkette integers_stubs_js js_of_ocaml)
+ (modes js)
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_version js_of_ocaml-ppx)))

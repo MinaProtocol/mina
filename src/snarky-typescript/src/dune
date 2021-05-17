@@ -1,0 +1,5 @@
+(rule
+ (targets snarkette_bindings.bc.js)
+ (mode promote)
+ (action
+  (copy ../snarkette/snarkette_bindings.bc.js snarkette_bindings.bc.js)))
