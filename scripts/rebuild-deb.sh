@@ -9,7 +9,7 @@ cd "${SCRIPTPATH}/../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GITTAG=$(git describe --abbrev=0)
+GITTAG=$(git describe --always --abbrev=0)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 # Identify All Artifacts by Branch and Git Hash
