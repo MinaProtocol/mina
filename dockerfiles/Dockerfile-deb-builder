@@ -221,8 +221,6 @@ ARG DUNE_PROFILE=devnet
 
 # branch to checkout on first clone (this will be the only availible branch in the container)
 # can also be a tagged release
-# TODO: change this to two distinct variables, one for opam/dependency clone
-#       and a distinct one for the mina codebase in the next stage
 ARG MINA_BRANCH=compatible
 
 # repo to checkout the branch from
