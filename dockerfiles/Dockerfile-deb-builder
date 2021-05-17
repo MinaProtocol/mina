@@ -223,7 +223,7 @@ ARG DUNE_PROFILE=devnet
 # can also be a tagged release
 ARG MINA_BRANCH=compatible
 
-ARG MINA_COMMIT=OVERRIDE_THIS_TO_INVALIDATE_THE_DOCKER_CACHE
+ARG MINA_COMMIT
 
 # repo to checkout the branch from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
@@ -231,23 +231,26 @@ ARG MINA_REPO=https://github.com/MinaProtocol/mina
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
 
+ENV CODA_COMMIT_SHA1=${MINA_COMMIT}
+
 ENV PATH "$PATH:/usr/lib/go/bin:$HOME/.cargo/bin"
 
 # git will clone into an empty dir, but this also helps us set the workdir in advance
-RUN cd $HOME && rm -rf $HOME/${MINA_DIR} \
+RUN cd $HOME \
+  && rm -rf ${HOME}/${MINA_DIR} \
   && git clone \
-  -b "${MINA_BRANCH}" \
-  --depth 1 \
+  -b ${MINA_BRANCH} \
   --shallow-submodules \
   --recurse-submodules \
-  ${MINA_REPO:-https://github.com/MinaProtocol/mina} ${HOME}/${MINA_DIR}
+  ${MINA_REPO:-https://github.com/MinaProtocol/mina} ${HOME}/${MINA_DIR} \
+  && cd ${HOME}/${MINA_DIR} \
+  && git reset --hard ${MINA_COMMIT}
 
 WORKDIR $HOME/${MINA_DIR}
 
 # Build libp2p_helper and clear go module caches
 # Could maybe also delete go during this step / build it as part of the deps stage?
-RUN git pull \
-   && cd src/app/libp2p_helper/src \
+RUN cd src/app/libp2p_helper/src \
    && go mod download \
    && cd generate_methodidx \
    && go build -o ${HOME}/app/generate_methodidx \
@@ -260,7 +263,6 @@ RUN ./scripts/zexe-standardize.sh
 
 # --- Build all major tagets required for packaging
 RUN echo "--- Build all major tagets required for packaging" \
-   && export CODA_COMMIT_SHA1="$(git rev-parse HEAD)" \
    && echo "Building from Commit SHA: ${CODA_COMMIT_SHA1}" \
    && eval $(opam config env) \
    && dune build --profile=${DUNE_PROFILE} \
@@ -282,7 +284,6 @@ RUN echo "--- Build all major tagets required for packaging" \
 
 # --- MAKE DEB
 RUN eval $(opam config env) \
-   && export CODA_COMMIT_SHA1="$(git rev-parse HEAD)" \
    && echo "Building from Commit SHA: ${CODA_COMMIT_SHA1}" \
    && ./scripts/rebuild-deb.sh
 
