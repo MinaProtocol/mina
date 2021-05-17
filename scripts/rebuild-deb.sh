@@ -113,9 +113,11 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 sudo cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 sudo cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-ls -l ../src/app/libp2p_helper/result/bin
+
+libp2p_location=../src/app/libp2p_helper/result/bin
+ls -l ../src/app/libp2p_helper/result/bin || libp2p_location=$HOME/app/
 p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
-cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
+cp $libp2p_location/libp2p_helper $p2p_path
 chmod +w $p2p_path
 # Only for nix builds
 # patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
@@ -200,7 +202,6 @@ echo "------------------------------------------------------------"
 # Overwrite binaries (sudo to fix permissions error)
 sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
 sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
-ls -l ../src/app/libp2p_helper/result/bin
 
 # Switch the default configuration to devnet.json:
 sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"
