@@ -17,7 +17,7 @@ export DUNE_PROFILE=mainnet
 
 source buildkite/scripts/export-git-env-vars.sh
 
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net alpha buster" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
 apt-get install --allow-downgrades -y mina-mainnet=${VERSION}
 
