@@ -36,6 +36,48 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+func min(a, b uint64) uint64 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
+const MAX_MESSAGE_LENGTH uint64 = 2 << 30  // 2gb
+const MESSAGE_BUFFER_SIZE uint64 = 2 << 20 // 2mb
+
+type streamState int
+
+const (
+	STREAM_DATA_UNEXPECTED streamState = iota
+	STREAM_DATA_EXPECTED
+)
+
+type messageBuffer [MESSAGE_BUFFER_SIZE]byte
+
+type messageBufferPool struct {
+	pool sync.Pool
+}
+
+func newMessageBufferPool() messageBufferPool {
+	return messageBufferPool{
+		pool: sync.Pool{
+			New: func() interface{} {
+				return new(messageBuffer)
+			},
+		},
+	}
+}
+
+func (p *messageBufferPool) Get() *messageBuffer {
+	return p.pool.Get().(*messageBuffer)
+}
+
+func (p *messageBufferPool) Put(buffer *messageBuffer) {
+	p.pool.Put(buffer)
+}
+
 type subscription struct {
 	Sub    *pubsub.Subscription
 	Idx    int
@@ -56,6 +98,7 @@ type app struct {
 	Validators               map[int]*validationStatus
 	ValidatorMutex           *sync.Mutex
 	Streams                  map[int]net.Stream
+	StreamStates             map[int]streamState
 	StreamsMutex             sync.Mutex
 	Out                      *bufio.Writer
 	OutChan                  chan interface{}
@@ -64,6 +107,8 @@ type app struct {
 	UnsafeNoTrustIP          bool
 	MetricsRefreshTime       time.Duration
 	metricsCollectionStarted bool
+
+	messageBufferPool messageBufferPool
 
 	// development configuration options
 	NoMDNS    bool
@@ -686,44 +731,87 @@ type incomingMsgUpcall struct {
 }
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
+	// create buffer stream for non-blocking read
+	r := bufio.NewReader(stream)
+	buffer := app.messageBufferPool.Get()
+
 	go func() {
 		defer func() {
 			_ = stream.Close()
 		}()
 
-		buf := make([]byte, 4096)
-		tot := uint64(0)
 		for {
-			len, err := stream.Read(buf)
-
-			if len != 0 {
-				app.writeMsg(incomingMsgUpcall{
-					Upcall:    "incomingStreamMsg",
-					Data:      codaEncode(buf[:len]),
+			length, err := readLEB128ToUint64(r)
+			if err == io.EOF {
+				app.writeMsg(streamReadCompleteUpcall{
+					Upcall:    "streamReadComplete",
 					StreamIdx: idx,
 				})
-			}
-
-			if err != nil && err != io.EOF {
+				return
+			} else if err != nil {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
 					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
 				})
-				break
+				return
+			} else if length > MAX_MESSAGE_LENGTH {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    fmt.Sprintf("message length too long: %d", length),
+				})
+				return
 			}
 
-			tot += uint64(len)
+			if length == 0 {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    "invalid length prefix byte (cannot be 0)",
+				})
+				return
+			}
 
-			if err == io.EOF {
-				app.P2p.MsgStats.UpdateMetrics(tot)
-				break
+			app.StreamsMutex.Lock()
+			streamState := app.StreamStates[idx]
+			if streamState == STREAM_DATA_EXPECTED {
+				app.StreamStates[idx] = STREAM_DATA_UNEXPECTED
+			} else {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    "received new message before we responded to previous message",
+				})
+				app.StreamsMutex.Unlock()
+				return
+			}
+			app.StreamsMutex.Unlock()
+
+			app.P2p.MsgStats.UpdateMetrics(length)
+
+			bytesToRead := length
+			for bytesToRead > 0 {
+				bufferReadSize := min(MESSAGE_BUFFER_SIZE, bytesToRead)
+				n, err := io.ReadFull(r, buffer[:bufferReadSize])
+				if err != nil {
+					app.writeMsg(streamLostUpcall{
+						Upcall:    "streamLost",
+						StreamIdx: idx,
+						Reason:    fmt.Sprintf("read failure: %s, read %d bytes", err.Error(), n),
+					})
+					return
+				}
+
+				// shouldn't need to worry about underflow here
+				bytesToRead -= bufferReadSize
+				app.writeMsg(incomingMsgUpcall{
+					Upcall:    "incomingStreamMsg",
+					Data:      codaEncode(buffer[:bufferReadSize]),
+					StreamIdx: idx,
+				})
 			}
 		}
-		app.writeMsg(streamReadCompleteUpcall{
-			Upcall:    "streamReadComplete",
-			StreamIdx: idx,
-		})
 	}()
 }
 
@@ -768,6 +856,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
+	app.StreamStates[streamIdx] = STREAM_DATA_EXPECTED
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
 		time.Sleep(250 * time.Millisecond)
@@ -836,10 +925,16 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
+		msgLen := uint64(len(data))
+		lenBytes := uint64ToLEB128(msgLen)
+		data = append(lenBytes, data...)
+
 		n, err := stream.Write(data)
 		if err != nil {
 			return nil, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
 		}
+
+		app.StreamStates[cs.StreamIdx] = STREAM_DATA_EXPECTED
 		return "sendStreamMsg success", nil
 	}
 	return nil, badRPC(errors.New("unknown stream_idx"))
@@ -1574,6 +1669,7 @@ func newApp() *app {
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
 		MetricsRefreshTime:       time.Minute,
+		messageBufferPool:        newMessageBufferPool(),
 		metricsCollectionStarted: false,
 	}
 }
@@ -1727,3 +1823,38 @@ func main() {
 }
 
 var _ json.Marshaler = (*methodIdx)(nil)
+
+func uint64ToLEB128(in uint64) []byte {
+	var out []byte
+	for {
+		b := uint8(in & 0x7f)
+		in >>= 7
+		if in != 0 {
+			b |= 0x80
+		}
+		out = append(out, b)
+		if in == 0 {
+			break
+		}
+	}
+	return out
+}
+
+func readLEB128ToUint64(r io.Reader) (uint64, error) {
+	buffer := make([]byte, 1)
+	var out uint64
+	var shift uint
+	for {
+		_, err := io.ReadFull(r, buffer)
+		if err != nil {
+			return 0, err
+		}
+		b := buffer[0]
+		out |= uint64(0x7F&b) << shift
+		if b&0x80 == 0 {
+			break
+		}
+		shift += 7
+	}
+	return out, nil
+}
