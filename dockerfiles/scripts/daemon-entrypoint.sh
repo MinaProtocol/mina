@@ -26,7 +26,7 @@ touch .mina-config/mina-verifier.log
 touch .mina-config/mina-best-tip.log
 
 while true; do
-  rm -f /root/.mina-config/.mina-lock
+  rm -f .mina-config/.mina-lock
   mina $INPUT_ARGS 2>&1 >mina.log &
   coda_pid=$!
 
