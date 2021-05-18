@@ -45,10 +45,12 @@ function circuit(c: Circuit): void {
         }
     }
     // Check each box has exactly 1 of each digit
+    var box_positions = [0, 3, 6, 27, 30, 33, 54, 57, 60];
     for (var digit = 1; digit <= 9; digit++) {
         for (var i = 0; i < 9; i++) {
-            var i_x = i * 3 % 9;
-            var i_y = Math.floor(i / 3);
+            var box_pos = box_positions[i]
+            var i_x = box_pos % 3;
+            var i_y = Math.floor(box_pos / 3);
             var box_matches: Bool[] = []
             for (var j = 0; j < 0; j++) {
                 var j_x = i_x + (j % 3);
