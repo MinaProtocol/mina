@@ -23,7 +23,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     exit 0
 fi
 
-CODENAME=buster
+CODENAME=stretch
 
 # Determine deb repo to use
 case $BUILDKITE_BRANCH in
