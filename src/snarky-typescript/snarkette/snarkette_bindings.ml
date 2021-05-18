@@ -1,3 +1,4 @@
+open Core_kernel
 open Js_of_ocaml
 
 let mk_field (type t nat)
@@ -33,6 +34,13 @@ let mk_field (type t nat)
     method ofString x = Js.to_string x |> Fp.of_string
 
     method ofInt x = Fp.of_int x
+
+    method equal x y = Fp.equal x y |> Js.bool
+
+    method pack xs =
+      Js.to_array xs |> Array.map ~f:Js.to_bool |> Array.to_list |> Fp.of_bits |> Js.Opt.option
+
+    method unpack x = Fp.to_bits x |> Array.of_list |> Array.map ~f:Js.bool |> Js.array
   end
 
 let _ =

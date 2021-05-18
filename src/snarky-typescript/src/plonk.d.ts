@@ -177,6 +177,30 @@ export class Circuit {
     x: T,
     y: T
   ): void;
+
+  equal<T>(
+    ctor: { toFieldElements(x: T): Field[] },
+    x: T,
+    y: T
+  ): Bool;
+
+  equal<T extends { toFieldElements(this: T): Field[] }>(
+    x: T,
+    y: T
+  ): Bool;
+
+  if<T>(
+    b: AsBool<Bool>,
+    ctor: AsFieldElements<T>,
+    x: T,
+    y: T
+  ): T;
+
+  if<T extends AsFieldElements<T>>(
+    b: AsBool<Bool>,
+    x: T,
+    y: T
+  ): T;
 }
 
 /* TODO: Figure out types for these. */
