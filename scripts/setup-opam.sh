@@ -10,7 +10,7 @@ export OPAMYES=1
 # Set term to xterm if not set
 export TERM=${TERM:-xterm}
 
-SWITCH='ocaml-variants.4.07.1+logoom'
+SWITCH='4.11.2'
 
 if [[ -d ~/.opam ]]; then
   # ocaml environment
