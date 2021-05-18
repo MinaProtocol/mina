@@ -27,5 +27,5 @@
 	url = https://github.com/o1-labs/ppx_version.git
 [submodule "src/external/ppx_deriving_yojson"]
 	path = src/external/ppx_deriving_yojson
-	url = git@github.com:MinaProtocol/ppx_deriving_yojson.git
+	url = https://github.com/MinaProtocol/ppx_deriving_yojson.git
 	branch = master
