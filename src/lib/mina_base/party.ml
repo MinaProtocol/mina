@@ -49,6 +49,7 @@ module Update = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
+      (* TODO: Have to check that the public key is not = Public_key.Compressed.empty here.  *)
       type t =
         ( F.Stable.V1.t Set_or_keep.Stable.V1.t
         , Public_key.Compressed.Stable.V1.t Set_or_keep.Stable.V1.t
@@ -86,12 +87,14 @@ module Update = struct
             ~f:Permissions.Checked.to_input ]
   end
 
-  let dummy : t =
+  let noop : t =
     { app_state=
         Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
     ; delegate= Keep
     ; verification_key= Keep
     ; permissions= Keep }
+
+  let dummy = noop
 
   let to_input ({app_state; delegate; verification_key; permissions} : t) =
     let open Random_oracle_input in
@@ -219,6 +222,43 @@ module Predicate = struct
     end
   end]
 
+  let accept = lazy Random_oracle.(digest (salt "MinaPartyAccept"))
+
+  let digest (t : t) =
+    let digest x =
+      Random_oracle.(
+        hash ~init:Hash_prefix_states.party_predicate (pack_input x))
+    in
+    match t with
+    | Full a ->
+        Snapp_predicate.Account.to_input a |> digest
+    | Nonce n ->
+        Account.Nonce.to_input n |> digest
+    | Accept ->
+        Lazy.force accept
+
+  module Checked = struct
+    type t =
+      | Nonce_or_accept of {nonce: Account.Nonce.Checked.t; accept: Boolean.var}
+      | Full of Snapp_predicate.Account.Checked.t
+
+    let digest (t : t) =
+      let digest x =
+        Random_oracle.Checked.(
+          hash ~init:Hash_prefix_states.party_predicate (pack_input x))
+      in
+      match t with
+      | Full a ->
+          Snapp_predicate.Account.Checked.to_input a |> digest
+      | Nonce_or_accept {nonce; accept= b} ->
+          let open Impl in
+          Field.(
+            if_ b
+              ~then_:(constant (Lazy.force accept))
+              ~else_:
+                (digest (run_checked (Account.Nonce.Checked.to_input nonce))))
+  end
+
   let typ () : (Snapp_predicate.Account.Checked.t, t) Typ.t =
     Typ.transport
       (Snapp_predicate.Account.typ ())
@@ -254,6 +294,14 @@ module Predicated = struct
     end
   end]
 
+  let to_input ({body; predicate} : t) =
+    List.reduce_exn ~f:Random_oracle_input.append
+      [ Body.to_input body
+      ; Random_oracle_input.field (Predicate.digest predicate) ]
+
+  let digest (t : t) =
+    Random_oracle.(hash ~init:Hash_prefix.party (pack_input (to_input t)))
+
   let typ () : (_, t) Typ.t =
     let open Poly in
     Typ.of_hlistable
@@ -261,12 +309,27 @@ module Predicated = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
+  module Checked = struct
+    type t = (Body.Checked.t, Predicate.Checked.t) Poly.t
+
+    let to_input ({body; predicate} : t) =
+      List.reduce_exn ~f:Random_oracle_input.append
+        [ Body.Checked.to_input body
+        ; Random_oracle_input.field (Predicate.Checked.digest predicate) ]
+
+    let digest (t : t) =
+      Random_oracle.Checked.(
+        hash ~init:Hash_prefix.party (pack_input (to_input t)))
+  end
+
   module Proved = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t =
-          (Body.Stable.V1.t, Snapp_predicate.Stable.V1.t) Poly.Stable.V1.t
+          ( Body.Stable.V1.t
+          , Snapp_predicate.Account.Stable.V1.t )
+          Poly.Stable.V1.t
         [@@deriving sexp, eq, yojson, hash, compare]
 
         let to_latest = Fn.id
@@ -280,6 +343,10 @@ module Predicated = struct
         type t = (Body.Digested.Checked.t, Field.Var.t) Poly.t
       end
     end
+
+    module Checked = struct
+      type t = (Body.Checked.t, Snapp_predicate.Account.Checked.t) Poly.t
+    end
   end
 
   module Signed = struct
@@ -292,22 +359,6 @@ module Predicated = struct
         let to_latest = Fn.id
       end
     end]
-
-    let to_input ?protocol_state ({body; predicate= nonce} : t) =
-      List.reduce_exn ~f:Random_oracle_input.append
-        ( [Body.to_input body; Account.Nonce.to_input nonce]
-        @ Option.(
-            to_list
-              (map protocol_state ~f:Snapp_predicate.Protocol_state.to_input))
-        )
-
-    module Digested = struct
-      type t = (Body.Digested.t, Account_nonce.t) Poly.t
-
-      module Checked = struct
-        type t = (Body.Digested.Checked.t, Account_nonce.Checked.t) Poly.t
-      end
-    end
 
     module Checked = struct
       type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
@@ -369,12 +420,6 @@ module Signed = struct
 
   let account_id (t : t) : Account_id.t =
     Account_id.create t.data.body.pk t.data.body.token_id
-
-  let create ?protocol_state ~private_key (t : Predicated.Signed.t) : t =
-    let s =
-      Schnorr.sign private_key (Predicated.Signed.to_input ?protocol_state t)
-    in
-    {authorization= s; data= t}
 end
 
 module Empty = struct
@@ -407,9 +452,3 @@ let account_id (t : t) : Account_id.t =
 let of_signed ({data; authorization} : Signed.t) : t =
   { authorization= Signature authorization
   ; data= {data with predicate= Nonce data.predicate} }
-
-(*
-
-let account_id (t : ((Body.t, _) Predicated.Poly.t, _) Poly.t) : Account_id.t =
-  Account_id.create t.data.body.pk t.data.body.token_id
-*)
