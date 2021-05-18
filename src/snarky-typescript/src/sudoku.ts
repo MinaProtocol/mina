@@ -14,7 +14,7 @@ const field_array = TArray(TArray<Field>(Field, 9), 9);
 
 function circuit(c: Circuit): void {
     let template = c.witness(number_array, field_array, fetchSudokuTemplate);
-    let solution = c.witness(number_array, field_array, fetchSudokuTemplate);
+    let solution = c.witness(number_array, field_array, fetchSudokuSolution);
     // Check that the solution matches the template
     for (var i = 0; i < 9; i++) {
         for (var j = 0; j < 9; j++) {
