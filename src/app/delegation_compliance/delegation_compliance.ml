@@ -115,6 +115,18 @@ let compute_delegated_stake staking_ledger delegatee =
       | None ->
           accum )
 
+let account_balance ledger pk =
+  let account_id = Account_id.create pk Token_id.default in
+  match Ledger.location_of_account ledger account_id with
+  | Some location -> (
+    match Ledger.get ledger location with
+    | Some account ->
+        account.balance
+    | None ->
+        failwith "account_balance: Could not find account for public key" )
+  | None ->
+      failwith "account_balance: Could not find location for account"
+
 let get_account_balance_as_amount ledger pk =
   let account_id = Account_id.create pk Token_id.default in
   match Ledger.location_of_account ledger account_id with
@@ -144,13 +156,47 @@ let block_ids_in_epoch pool delegatee_id epoch =
         ~creator:delegatee_id ~low_slot ~high_slot )
     ~item:"block ids for delegatee in epoch"
 
-let main ~input_file ~archive_uri ~payout_addresses () =
+let write_csv_header ~csv_out_channel =
+  let line =
+    String.concat ~sep:","
+      [ "Payout address"
+      ; "Balance"
+      ; "Delegatee"
+      ; "Total delegation"
+      ; "Blocks won"
+      ; "Payout obligation"
+      ; "Payout received"
+      ; "Check" ]
+  in
+  Out_channel.output_string csv_out_channel line ;
+  Out_channel.newline csv_out_channel
+
+let write_csv_line ~csv_out_channel ~payout_addr ~balance ~delegatee
+    ~delegation ~blocks_won ~payout_obligation ~payout_received =
+  let check = Currency.Amount.( >= ) payout_received payout_obligation in
+  let line =
+    String.concat ~sep:","
+      [ Public_key.Compressed.to_base58_check payout_addr
+      ; Currency.Balance.to_formatted_string balance
+      ; Public_key.Compressed.to_base58_check delegatee
+      ; Currency.Amount.to_formatted_string delegation
+      ; Int.to_string blocks_won
+      ; Currency.Amount.to_formatted_string payout_obligation
+      ; Currency.Amount.to_formatted_string payout_received
+      ; Bool.to_string check ]
+  in
+  Out_channel.output_string csv_out_channel line ;
+  Out_channel.newline csv_out_channel
+
+let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
   let logger = Logger.create () in
   if List.is_empty payout_addresses then (
     [%log error]
       "Please provide at least one payout address on the command line" ;
     Core.exit 1 ) ;
   let json = Yojson.Safe.from_file input_file in
+  let csv_out_channel = Out_channel.create csv_file in
+  write_csv_header ~csv_out_channel ;
   let input =
     match input_of_yojson json with
     | Ok inp ->
@@ -246,7 +292,7 @@ let main ~input_file ~archive_uri ~payout_addresses () =
         try_slot max_slot num_tries
       in
       let block_ids =
-        (* only examine blocks in current epoch up through slot 3500 in next epoch *)
+        (* only examine blocks from start of current epoch up through slot 3500 in next epoch *)
         let min_slot = input.epoch * slots_per_epoch in
         let max_slot_int64 =
           min_slot + slots_per_epoch + 3500 |> Int64.of_int
@@ -337,15 +383,34 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               let open Sql.User_command in
               Int64.compare p1.global_slot p2.global_slot
             in
-            (* only payments in canonical chain *)
+            (* only payments in canonical chain, starting at slot 3501 of this epoch *)
+            let min_payment_slot =
+              (input.epoch * slots_per_epoch) + 3501 |> Int64.of_int
+            in
             let payments_from_delegatee =
               List.filter payments_from_delegatee_raw ~f:(fun payment ->
-                  Int.Set.mem block_ids payment.block_id )
+                  Int.Set.mem block_ids payment.block_id
+                  && payment.global_slot >= min_payment_slot )
               |> List.sort ~compare:compare_by_global_slot
             in
             let payment_amount_and_slot (user_cmd : Sql.User_command.t) =
               `Assoc
                 [ ( "amount"
+                  , Option.value_map user_cmd.amount ~default:`Null
+                      ~f:(fun amt ->
+                        `String
+                          ( Int64.to_string amt |> Currency.Amount.of_string
+                          |> Currency.Amount.to_formatted_string ) ) )
+                ; ( "global_slot"
+                  , `String (Int64.to_string user_cmd.global_slot) ) ]
+            in
+            let payment_sender_amount_and_slot sender_pk
+                (user_cmd : Sql.User_command.t) =
+              `Assoc
+                [ ( "sender"
+                  , `String (Public_key.Compressed.to_base58_check sender_pk)
+                  )
+                ; ( "amount"
                   , Option.value_map user_cmd.amount ~default:`Null
                       ~f:(fun amt ->
                         `String
@@ -380,7 +445,7 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                      the delegatee %s is the block creator, %s"
                     delegatee_str (Caqti_error.show err) ()
             in
-            let%map payments_by_coinbase_receivers =
+            let%bind payments_by_coinbase_receivers =
               match%map
                 Archive_lib.Processor.deferred_result_list_fold
                   coinbase_receiver_ids ~init:[]
@@ -396,14 +461,15 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                             ~receiver_id:payout_id )
                         ~item:
                           (sprintf
-                             "payments from coinbase receiver with id %d to \
+                             "Payments from coinbase receiver with id %d to \
                               payment address"
                              coinbase_receiver_id)
                     in
                     let payments =
-                      (* only payments in canonical chain *)
+                      (* only payments in canonical chain, starting at slot 3501 of this epoch *)
                       List.filter payments_raw ~f:(fun payment ->
-                          Int.Set.mem block_ids payment.block_id )
+                          Int.Set.mem block_ids payment.block_id
+                          && payment.global_slot >= min_payment_slot )
                       |> List.sort ~compare:compare_by_global_slot
                     in
                     Ok ((cb_receiver_pk, payments) :: accum) )
@@ -439,8 +505,49 @@ let main ~input_file ~archive_uri ~payout_addresses () =
               List.concat_map payments_by_coinbase_receivers
                 ~f:(fun (_cb_receiver, payments) -> payments)
             in
-            let payments =
+            let payments_from_known_senders =
               payments_from_delegatee @ payments_from_coinbase_receivers
+            in
+            let%bind payments_from_anyone =
+              let%map payments_raw =
+                query_db pool
+                  ~f:(fun db ->
+                    Sql.User_command.run_payments_by_receiver db
+                      ~receiver_id:payout_id )
+                  ~item:"Payments to payment address"
+              in
+              (* only payments in canonical chain, starting at slot 3501 of this epoch
+                 don't include payments from delegatee or coinbase receivers
+              *)
+              List.filter payments_raw ~f:(fun payment ->
+                  Int.Set.mem block_ids payment.block_id
+                  && payment.global_slot >= min_payment_slot
+                  && not
+                       (List.mem payments_from_known_senders payment
+                          ~equal:Sql.User_command.equal) )
+              |> List.sort ~compare:compare_by_global_slot
+            in
+            let%map senders_and_payments_from_anyone =
+              Deferred.List.map payments_from_anyone ~f:(fun payment ->
+                  let%map sender_pk = pk_of_pk_id pool payment.source_id in
+                  (sender_pk, payment) )
+            in
+            if not (List.is_empty senders_and_payments_from_anyone) then
+              [%log info]
+                "Payments from others, neither the delegatee $delegatee nor a \
+                 coinbase receiver, to payout address $payout_addr"
+                ~metadata:
+                  [ ("delegatee", Public_key.Compressed.to_yojson delegatee)
+                  ; ("payout_addr", Public_key.Compressed.to_yojson payout_pk)
+                  ; ( "payments_from_others"
+                    , `Assoc
+                        (List.map senders_and_payments_from_anyone
+                           ~f:(fun (sender_pk, payment) ->
+                             ( "payment"
+                             , payment_sender_amount_and_slot sender_pk payment
+                             ) )) ) ] ;
+            let payments =
+              payments_from_known_senders @ payments_from_anyone
             in
             { payout_pk
             ; payout_id
@@ -580,8 +687,15 @@ let main ~input_file ~archive_uri ~payout_addresses () =
                 (Currency.Amount.to_formatted_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
                 (Currency.Amount.to_formatted_string total_payout_obligation) ;
+            write_csv_line ~csv_out_channel ~payout_addr:payout_info.payout_pk
+              ~balance:(account_balance ledger payout_info.payout_pk)
+              ~delegatee:payout_info.delegatee ~delegation:delegated_stake
+              ~blocks_won:num_blocks_produced
+              ~payout_obligation:total_payout_obligation
+              ~payout_received:payment_total_as_amount ;
             return () )
       in
+      Out_channel.close csv_out_channel ;
       Deferred.unit
 
 let () =
@@ -597,6 +711,10 @@ let () =
                "file File containing the starting staking ledger and epoch \
                 number"
              Param.(required string)
+         and csv_file =
+           Param.flag "--csv-file"
+             ~doc:"file CSV file to write containing payment statuses"
+             Param.(required string)
          and archive_uri =
            Param.flag "--archive-uri"
              ~doc:
@@ -606,4 +724,4 @@ let () =
          and payout_addresses =
            Param.anon Anons.(sequence ("PAYOUT ADDRESSES" %: Param.string))
          in
-         main ~input_file ~archive_uri ~payout_addresses)))
+         main ~input_file ~csv_file ~archive_uri ~payout_addresses)))

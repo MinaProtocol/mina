@@ -920,17 +920,23 @@ let export_ledger =
     let t =
       Command.Param.Arg_type.of_alist_exn
         (List.map
-           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
-           ~f:(fun s -> (s, s)))
+           [ "staged-ledger"
+           ; "snarked-ledger"
+           ; "staking-epoch-ledger"
+           ; "next-epoch-ledger" ] ~f:(fun s -> (s, s)))
     in
     Command.Param.(
-      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
+      anon
+        ( "staged-ledger|snarked-ledger|staking-epoch-ledger|next-epoch-ledger"
+        %: t ))
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
   Command.async
     ~summary:
-      "Print the specified ledger (default: staged ledger at the best tip)"
+      "Print the specified ledger (default: staged ledger at the best tip). \
+       Note: Exporting snarked ledger is an expensive operation and can take \
+       a few seconds"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (state_hash, plaintext, ledger_kind) ->
          let check_for_state_hash () =
@@ -946,6 +952,14 @@ let export_ledger =
                  Option.map ~f:State_hash.of_base58_check_exn state_hash
                in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+                 state_hash port
+           | "snarked-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
+               in
+               printf
+                 "Generating snarked ledger(this may take a few seconds)...\n" ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
                  state_hash port
            | "staking-epoch-ledger" ->
                check_for_state_hash () ;
@@ -1932,7 +1946,7 @@ let compile_time_constants =
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+                 ~logger:(Logger.null ()) ~proof_level:None
            >>| Or_error.ok_exn
          in
          let all_constants =

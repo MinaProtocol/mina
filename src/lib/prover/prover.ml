@@ -387,3 +387,47 @@ let prove t ~prev_state ~prev_state_proof ~next_state
     Gauge.set Cryptography.blockchain_proving_time_ms
       (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
   Blockchain_snark.Blockchain.proof chain
+
+let create_genesis_block t (genesis_inputs : Genesis_proof.Inputs.t) =
+  let start_time = Core.Time.now () in
+  let genesis_ledger = Genesis_ledger.Packed.t genesis_inputs.genesis_ledger in
+  let constraint_constants = genesis_inputs.constraint_constants in
+  let consensus_constants = genesis_inputs.consensus_constants in
+  let prev_state =
+    Protocol_state.negative_one ~genesis_ledger
+      ~genesis_epoch_data:genesis_inputs.genesis_epoch_data
+      ~constraint_constants ~consensus_constants
+  in
+  let genesis_epoch_ledger =
+    match genesis_inputs.genesis_epoch_data with
+    | None ->
+        genesis_ledger
+    | Some data ->
+        data.staking.ledger
+  in
+  let open Pickles_types in
+  let blockchain_dummy = Pickles.Proof.dummy Nat.N2.n Nat.N2.n Nat.N2.n in
+  let snark_transition =
+    Snark_transition.genesis ~constraint_constants ~consensus_constants
+      ~genesis_ledger
+  in
+  let pending_coinbase =
+    { Mina_base.Pending_coinbase_witness.pending_coinbases=
+        Mina_base.Pending_coinbase.create
+          ~depth:constraint_constants.pending_coinbase_depth ()
+        |> Or_error.ok_exn
+    ; is_new_stack= true }
+  in
+  let prover_state : Consensus_mechanism.Data.Prover_state.t =
+    Consensus.Data.Prover_state.genesis_data ~genesis_epoch_ledger
+  in
+  let%map chain =
+    extend_blockchain t
+      (Blockchain.create ~proof:blockchain_dummy ~state:prev_state)
+      genesis_inputs.protocol_state_with_hash.data snark_transition None
+      prover_state pending_coinbase
+  in
+  Mina_metrics.(
+    Gauge.set Cryptography.blockchain_proving_time_ms
+      (Core.Time.Span.to_ms @@ Core.Time.diff (Core.Time.now ()) start_time)) ;
+  chain

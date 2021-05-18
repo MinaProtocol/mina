@@ -24,8 +24,7 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     TestExecutive.build "integration_tests",
     TestExecutive.execute "reliability" dependsOn,
-    TestExecutive.execute "send-payment" dependsOn,
-    TestExecutive.execute "gossip-consis" dependsOn,
-    TestExecutive.execute "common-prefix" dependsOn
+    TestExecutive.execute "payment" dependsOn,
+    TestExecutive.execute "gossip-consis" dependsOn
   ]
 }

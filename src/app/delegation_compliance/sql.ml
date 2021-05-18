@@ -88,7 +88,7 @@ module User_command = struct
     ; fee_payer_balance: int
     ; source_balance: int option
     ; receiver_balance: int option }
-  [@@deriving yojson, hlist]
+  [@@deriving yojson, hlist, equal]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
@@ -178,6 +178,36 @@ module User_command = struct
       (module Conn : Caqti_async.CONNECTION) ~source_id ~receiver_id =
     Conn.collect_list query_payments_by_source_and_receiver
       (source_id, receiver_id)
+
+  let query_payments_by_receiver =
+    Caqti_request.collect Caqti_type.int typ
+      {sql| SELECT type,fee_payer_id, source_id, receiver_id, fee,fee_token,
+               token, amount, valid_until, memo, nonce, blocks.id, blocks.global_slot,
+               parent.global_slot_since_genesis, sequence_no, status, created_token,
+               fee_payer_balance, source_balance, receiver_balance
+
+            FROM (SELECT * FROM user_commands WHERE receiver_id = $1
+                                              AND type = 'payment') AS uc
+
+            INNER JOIN blocks_user_commands AS buc
+
+            ON uc.id = buc.user_command_id
+
+            INNER JOIN blocks
+
+            ON blocks.id = buc.block_id
+
+            INNER JOIN blocks as parent
+
+            ON parent.id = blocks.parent_id
+
+            WHERE buc.status = 'applied'
+
+       |sql}
+
+  let run_payments_by_receiver (module Conn : Caqti_async.CONNECTION)
+      ~receiver_id =
+    Conn.collect_list query_payments_by_receiver receiver_id
 end
 
 module Public_key = struct
