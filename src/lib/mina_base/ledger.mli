@@ -209,6 +209,22 @@ val apply_transaction :
   -> Transaction.t
   -> Transaction_applied.t Or_error.t
 
+val apply_parties_unchecked :
+     constraint_constants:Genesis_constants.Constraint_constants.t
+  -> state_view:Snapp_predicate.Protocol_state.View.t
+  -> t
+  -> Parties.t
+  -> ( Transaction_applied.Parties_applied.t
+     * ( ( (Party.t * Snapp_predicate.Protocol_state.t option) list
+         , Token_id.t
+         , Currency.Amount.t
+         , t
+         , bool
+         , unit )
+         Parties_logic.Local_state.t
+       * Currency.Amount.t ) )
+     Or_error.t
+
 val undo :
      constraint_constants:Genesis_constants.Constraint_constants.t
   -> t
@@ -260,3 +276,5 @@ type init_state =
 
 (** Apply a generated state to a blank, concrete ledger. *)
 val apply_initial_ledger_state : t -> init_state -> unit
+
+module Ledger_inner : Transaction_logic.Ledger_intf with type t = t
