@@ -44,14 +44,15 @@ RUN sudo apt-get update -y \
     python-jinja2 \
     python-pip \
     python3-pip \
+    python3-jinja2 \
     rubygems \
     zlib1g-dev \
     libbz2-dev \
     apt-transport-https
 
 # -- python dependencies
-RUN sudo pip3 install awscli readchar
-RUN sudo pip3 install sexpdata
+RUN sudo pip install awscli readchar sexpdata \
+    && sudo pip3 install awscli readchar sexpdata
 
 # --- deb-s3 tool (deprecated! replace somehow!)
 RUN sudo gem install deb-s3
