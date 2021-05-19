@@ -28,12 +28,12 @@ touch .mina-config/mina-best-tip.log
 while true; do
   rm -f .mina-config/.mina-lock
   mina $INPUT_ARGS 2>&1 >mina.log &
-  coda_pid=$!
+  mina_pid=$!
 
   tail -q -f mina.log -f .mina-config/mina-prover.log -f .mina-config/mina-verifier.log -f .mina-config/mina-best-tip.log &
   tail_pid=$!
 
-  wait "$coda_pid"
+  wait "$mina_pid"
   echo "Mina process exited with status code $?"
   sleep 10
 
