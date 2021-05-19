@@ -2869,7 +2869,9 @@ module Mutations = struct
         let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async.Deferred Mina_networking.add_peer net peer ~seed with
+              match%map.Async.Deferred
+                Mina_networking.add_peer net peer ~seed
+              with
               | Ok () ->
                   None
               | Error err ->
