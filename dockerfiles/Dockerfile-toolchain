@@ -28,11 +28,14 @@ ENV DEBIAN_FRONTEND=noninteractive
     # libgmp10 \
     # libgomp1 \
 
+# Workaround terrible postgresql package requirements with man
+RUN mkdir -p /usr/share/man/man7 /usr/share/man/man1
 
 # OS package dependencies
 RUN sudo apt-get update -y \
   && sudo apt-get install -y \
     apt-transport-https \
+    apt-utils \
     awscli \
     cmake \
     jq \
@@ -49,8 +52,11 @@ RUN sudo apt-get update -y \
     libssl-dev \
     lsb-release \
     m4 \
+    man \
     pandoc \
     patchelf \
+    postgresql \
+    postgresql-contrib \
     perl \
     pkg-config \
     python \
