@@ -22,6 +22,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # OS package dependencies
 RUN sudo apt-get update -y \
   && sudo apt-get install -y \
+    awscli \
     cmake \
     jq \
     libboost-dev \
@@ -41,20 +42,22 @@ RUN sudo apt-get update -y \
     python \
     perl \
     pkg-config \
-    python-jinja2 \
     python-flake8 \
+    python-jinja2 \
     python-pip \
-    python3-jinja2 \
+    python-sexpdata \
     python3-flake8 \
+    python3-jinja2 \
     python3-pip \
+    python3-sexpdata \
     rubygems \
     zlib1g-dev \
     libbz2-dev \
     apt-transport-https
 
-# -- python dependencies
-RUN sudo pip install awscli readchar sexpdata \
-    && sudo pip3 install awscli readchar sexpdata
+# -- python dependencies (largely installed above from apt)
+RUN sudo pip install readchar \
+    && sudo pip3 install readchar
 
 # --- deb-s3 tool (deprecated! replace somehow!)
 RUN sudo gem install deb-s3
