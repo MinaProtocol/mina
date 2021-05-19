@@ -26,7 +26,7 @@ let commands : List Cmd.Type =
       ),
       -- Dockerhub: Build and release toolchain image
       Cmd.run (
-        "source ${deployEnv} && docker build --rm --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/mina-toolchain:\\\$DOCKER_TAG-\\\$GITHASH && " ++
+        "source ${deployEnv} && cat dockerfiles/Dockerfile-toolchain | docker build --rm --tag codaprotocol/mina-toolchain:\\\$DOCKER_TAG-\\\$GITHASH - && " ++
           "docker push codaprotocol/mina-toolchain:\\\$DOCKER_TAG-\\\$GITHASH"
       ),
       -- GCR: Build and release toolchain image
