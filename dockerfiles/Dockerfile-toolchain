@@ -1,5 +1,5 @@
 #FROM ocaml/opam2:debian-10-ocaml-4.08
-FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256sum:ccdd76fb9a8ba9bcb5fd70c98aff68596aac7503f83023f985d84c55320e48d0
+FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256sum:3cc21ddf546350407f5a5f63bb59c4aec9bbaf680b2ac89bb834e23c5a0ae07d
 
 # if updated, also change in Dockerfile
 ARG OCAML_VERSION=4.07.1
