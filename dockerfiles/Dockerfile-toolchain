@@ -42,9 +42,11 @@ RUN sudo apt-get update -y \
     perl \
     pkg-config \
     python-jinja2 \
+    python-flake8 \
     python-pip \
-    python3-pip \
     python3-jinja2 \
+    python3-flake8 \
+    python3-pip \
     rubygems \
     zlib1g-dev \
     libbz2-dev \
