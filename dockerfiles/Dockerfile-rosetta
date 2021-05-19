@@ -282,7 +282,7 @@ RUN eval $(opam config env) \
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM debian:buster-slim AS production
+FROM debian:stretch-slim AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG MINA_DAEMON_PORT=10101
@@ -305,7 +305,7 @@ RUN apt-get -y update \
     libffi6 \
     libgmp10 \
     libgomp1 \
-    libjemalloc-dev \
+    libjemalloc1 \
     libssl1.1 \
     postgresql \
     postgresql-contrib \

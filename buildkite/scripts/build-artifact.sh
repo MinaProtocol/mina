@@ -9,7 +9,7 @@ eval `opam config env`
 export PATH=/home/opam/.cargo/bin:/usr/lib/go/bin:$PATH
 export GO=/usr/lib/go/bin/go
 
-CODA_COMMIT_SHA1=$(git rev-parse HEAD)
+MINA_COMMIT_SHA1=$(git rev-parse HEAD)
 
 # TODO: Stop building lib_p2p multiple times by pulling from buildkite-agent artifacts or docker or somewhere
 echo "--- Build libp2p_helper TODO: use the previously uploaded build artifact"
@@ -23,7 +23,7 @@ make -C src/app/libp2p_helper
 # ./scripts/upload-genesis.sh
 
 echo "--- Build all major tagets required for packaging"
-echo "Building from Commit SHA: $CODA_COMMIT_SHA1"
+echo "Building from Commit SHA: $MINA_COMMIT_SHA1"
 dune build --profile=${DUNE_PROFILE} \
   src/app/logproc/logproc.exe \
   src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \

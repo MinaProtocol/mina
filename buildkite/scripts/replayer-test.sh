@@ -9,6 +9,7 @@ echo "Updating apt, installing packages"
 apt-get update
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
+
 # time zone = US Pacific
 /bin/echo -e "12\n10" | apt-get install -y tzdata
 apt-get install -y git postgresql apt-transport-https ca-certificates curl
@@ -17,11 +18,11 @@ export DUNE_PROFILE=devnet
 
 source buildkite/scripts/export-git-env-vars.sh
 
-echo "deb [trusted=yes] http://packages.o1test.net alpha buster" | tee /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
 
-echo "Installing archive node package: mina-archive-devnet=${VERSION}"
-apt-get install --allow-downgrades -y mina-archive-devnet=${VERSION}
+echo "Installing archive node package: mina-archive-devnet=${MINA_DEB_VERSION}"
+apt-get install --allow-downgrades -y mina-archive-devnet=${MINA_DEB_VERSION}
 
 echo "Generating locale for Postgresql"
 locale-gen en_US.UTF-8

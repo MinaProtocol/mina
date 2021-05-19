@@ -12,9 +12,10 @@ apt-get install -y git python3 apt-transport-https ca-certificates make curl
 # Source the environment script to get the proper ${VERSION}. Must be executed after installing git but before installing mina.
 source buildkite/scripts/export-git-env-vars.sh
 
-echo "deb [trusted=yes] http://packages.o1test.net alpha buster" | tee /etc/apt/sources.list.d/coda.list
+echo "Installing mina daemon package: mina-devnet=${MINA_DEB_VERSION}"
+echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} ${MINA_DEB_RELEASE}" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
-apt-get install --allow-downgrades -y curl mina-devnet=${VERSION}
+apt-get install --allow-downgrades -y curl "mina-devnet=${MINA_DEB_VERSION}"
 
 mina daemon --seed --proof-level none --rest-port 8080 &
 

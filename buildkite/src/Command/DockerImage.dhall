@@ -26,11 +26,11 @@ let ReleaseSpec = {
   default = {
     deps = [] : List Command.TaggedKey.Type,
     deploy_env_file = "DOCKER_DEPLOY_ENV",
-    service = "\\\${CODA_SERVICE}",
-    version = "\\\${CODA_VERSION}",
-    commit = "\\\${CODA_GIT_HASH}",
+    service = "\\\${MINA_SERVICE}",
+    version = "\\\${MINA_VERSION}",
+    commit = "\\\${MINA_GIT_HASH}",
     build_rosetta_override = False,
-    extra_args = "--build-arg deb_version=\\\${CODA_DEB_VERSION} --build-arg deb_release=\\\${CODA_DEB_RELEASE} --build-arg deb_codename=\\\${CODA_DEB_CODENAME} --build-arg network=mainnet --build-arg CODA_VERSION=\\\${CODA_VERSION} --build-arg CODA_BRANCH=\\\${CODA_GIT_BRANCH}",
+    extra_args = "--build-arg deb_version=\\\${MINA_DEB_VERSION} --build-arg deb_release=\\\${MINA_DEB_RELEASE} --build-arg deb_codename=\\\${MINA_DEB_CODENAME} --build-arg network=mainnet --build-arg MINA_VERSION=\\\${MINA_VERSION} --build-arg MINA_BRANCH=\\\${MINA_GIT_BRANCH}",
     step_key = "mina-docker-image"
   }
 }

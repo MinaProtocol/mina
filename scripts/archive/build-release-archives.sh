@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script makes a .deb archive for the Coda Archive process
+# This script makes a .deb archive for the Mina Archive process
 # and releases it to the AWS .deb repository packages.o1test.net
 
 set -euo pipefail
@@ -41,6 +41,7 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
@@ -87,6 +88,7 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
+cp ./_build/default/src/app/archive/archive_testnet_signatures.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./_build/default/src/app/archive/archive_testnet_signatures.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
@@ -133,6 +135,7 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
+cp ./_build/default/src/app/archive/archive_mainnet_signatures.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
 cp ./_build/default/src/app/archive/archive_mainnet_signatures.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
@@ -203,11 +206,12 @@ if [ -n "${BUILDKITE+x}" ]; then
     set -x
 
     # Export variables for use with downstream steps
-    echo "export CODA_SERVICE=coda-archive" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_DEB_REPO=${CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
-    echo "export CODA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_SERVICE=mina-archive" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_VERSION=${DOCKER_TAG}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_DEB_VERSION=${VERSION}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_DEB_RELEASE=${MINA_DEB_RELEASE}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_DEB_CODENAME=${MINA_DEB_CODENAME}" >> ./ARCHIVE_DOCKER_DEPLOY
+    echo "export MINA_GIT_HASH=${GITHASH}" >> ./ARCHIVE_DOCKER_DEPLOY
 
     set +x
 else
@@ -217,11 +221,12 @@ else
     echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
     docker build \
-      -t codaprotocol/coda-archive:$DOCKER_TAG \
+      -t codaprotocol/mina-archive:$DOCKER_TAG \
       -f "../../dockerfiles/Dockerfile-mina-archive" \
-      --build-arg coda_deb_version=$VERSION \
-      --build-arg deb_repo=$CODENAME \
+      --build-arg deb_version=$VERSION \
+      --build-arg deb_codename=$MINA_DEB_CODENAME \
+      --build-arg deb_release=$MINA_DEB_RELEASE \
       docker_build
 
-    docker push codaprotocol/coda-archive:$DOCKER_TAG
+    docker push codaprotocol/mina-archive:$DOCKER_TAG
 fi

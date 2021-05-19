@@ -278,8 +278,8 @@ ls -lh mina*.deb
 
 
 # Export variables for use with downstream circle-ci steps (see buildkite/scripts/publish-deb.sh for BK DOCKER_DEPLOY_ENV)
-echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
-echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export MINA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export MINA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export MINA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export MINA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export MINA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
