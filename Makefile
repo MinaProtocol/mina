@@ -220,7 +220,7 @@ macos-setup-download:
 	./scripts/macos-setup-brew.sh
 
 setup-opam:
-	./scripts/setup-opam.sh
+	eval $$(opam config env) && ./scripts/setup-opam.sh
 
 macos-setup:
 	./scripts/macos-setup-brew.sh
