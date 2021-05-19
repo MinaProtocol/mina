@@ -176,25 +176,13 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     exit 0
 else
     set -u
-    # Determine deb repo to use
-    case $GITBRANCH in
-        master)
-            CODENAME='release'
-            ;;
-        master-qa)
-            CODENAME='pre-release'
-            ;;
-        *)
-            CODENAME='unstable'
-            ;;
-    esac
 
     echo "Publishing debs:"
     ls mina-*.deb
     set -x
     # Upload the deb files to s3.
     # If this fails, attempt to remove the lockfile and retry.
-    ${DEBS3} --codename ${CODENAME} --component main mina-*.deb \
+    ${DEBS3} --codename ${MINA_DEB_CODENAME} --component main mina-*.deb \
     || (  scripts/clear-deb-s3-lockfile.sh \
        && ${DEBS3} --codename main mina-*.deb)
 fi

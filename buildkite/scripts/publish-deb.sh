@@ -29,7 +29,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 source "${SCRIPTPATH}/export-git-env-vars.sh"
 set -x
 
-echo "Publishing debs: ${DEBS}"
+echo "Publishing debs: ${DEBS} to Release: ${MINA_DEB_RELEASE} and Codename: ${MINA_DEB_CODENAME}"
 set -x
 # Upload the deb files to s3.
 # If this fails, attempt to remove the lockfile and retry.
