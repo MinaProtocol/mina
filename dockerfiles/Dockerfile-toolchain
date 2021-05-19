@@ -19,14 +19,26 @@ ARG OPAMREUSEBUILDDIR=false
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# buster-only packages
+    # python3-sexpdata \
+    # python-sexpdata \
+    # libjemalloc2 \
+    # libprocps8 \
+    # libffi7 \
+    # libgmp10 \
+    # libgomp1 \
+
+
 # OS package dependencies
 RUN sudo apt-get update -y \
   && sudo apt-get install -y \
+    apt-transport-https \
     awscli \
     cmake \
     jq \
     libboost-dev \
     libboost-program-options-dev \
+    libbz2-dev \
     libffi-dev \
     libgmp-dev \
     libgmp3-dev \
@@ -39,25 +51,21 @@ RUN sudo apt-get update -y \
     m4 \
     pandoc \
     patchelf \
-    python \
     perl \
     pkg-config \
+    python \
     python-flake8 \
     python-jinja2 \
     python-pip \
-    python-sexpdata \
     python3-flake8 \
     python3-jinja2 \
     python3-pip \
-    python3-sexpdata \
     rubygems \
-    zlib1g-dev \
-    libbz2-dev \
-    apt-transport-https
+    zlib1g-dev
 
 # -- python dependencies (largely installed above from apt)
-RUN sudo pip install readchar \
-    && sudo pip3 install readchar
+RUN sudo pip install readchar sexpdata \
+    && sudo pip3 install readchar sexpdata
 
 # --- deb-s3 tool (deprecated! replace somehow!)
 RUN sudo gem install deb-s3
