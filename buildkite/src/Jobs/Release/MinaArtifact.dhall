@@ -52,7 +52,7 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             "MINA_BRANCH=$BUILDKITE_BRANCH",
             "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
-            -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
+            -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
           label = "Build Mina daemon debian package",
@@ -102,7 +102,7 @@ Pipeline.build
       let rosettaDuneSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         deploy_env_file="export-git-env-vars.sh",
-        service="coda-rosetta",
+        service="mina-rosetta",
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",

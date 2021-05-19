@@ -18,7 +18,7 @@ export DUNE_PROFILE=devnet
 
 source buildkite/scripts/export-git-env-vars.sh
 
-echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/coda.list
+echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_RELEASE" | tee /etc/apt/sources.list.d/mina.list
 apt-get update
 
 echo "Installing archive node package: mina-archive-devnet=${MINA_DEB_VERSION}"
