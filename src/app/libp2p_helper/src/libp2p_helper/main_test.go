@@ -1080,9 +1080,9 @@ func TestLibp2pMetrics(t *testing.T) {
 	server.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":9001", server)
 
-	go appA.checkPeerCount(appA.P2p.Me)
-	go appA.checkMessageExchanged(appA.P2p.Me)
-	go appB.checkMessageStats(appB.P2p.Me)
+	go appA.checkPeerCount()
+	// go appA.checkMessageExchanged(appA.P2p.Me)
+	go appB.checkMessageStats()
 
 	// Send multiple messages from A to B
 	sendStreamMessage(t, appA, appB, createMessage(maxStatsMsg))
