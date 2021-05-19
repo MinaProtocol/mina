@@ -34,7 +34,7 @@ Pipeline.build
           S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
           S.exactly "dockerfiles/Dockerfile-mina-daemon" "",
           S.exactly "dockerfiles/Dockerfile-mina-daemon-puppeteered" "",
-          S.exactly "dockerfiles/mina_daemon_puppeteer" "py",
+          S.exactly "dockerfiles/puppeteer-context/mina_daemon_puppeteer" "py",
           S.exactly "dockerfiles/scripts/healthcheck-utilities" "sh",
           S.strictlyStart (S.contains "scripts")
         ],
