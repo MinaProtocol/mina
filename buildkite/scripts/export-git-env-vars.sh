@@ -33,7 +33,7 @@ else
     export GENERATE_KEYPAIR_VERSION=${GITTAG}-${GITHASH}
 fi
 
-
+export MINA_DEB_VERSION=${VERSION}
 export MINA_DEB_CODENAME=stretch
 
 # Determine deb repo to use
