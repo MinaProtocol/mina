@@ -120,11 +120,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         (check_peers ~logger all_nodes)
     in
     let%bind _ =
-      section "blocks are produced"
+      section_soft "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 2))
     in
     let%bind () =
-      section "short bootstrap"
+      section_soft "short bootstrap"
         (let%bind () = Node.stop node_c in
          let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
          let%bind () = Node.start ~fresh_state:true node_c in
@@ -137,11 +137,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
     in
     let%bind () =
-      section "network is fully connected after one node is restarted"
+      section_soft "network is fully connected after one node is restarted"
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
          check_peers ~logger all_nodes)
     in
-    section "nodes share common prefix no greater than 2 block back"
+    section_soft "nodes share common prefix no greater than 2 block back"
       (let%bind chains =
          Malleable_error.List.map all_nodes
            ~f:(Network.Node.must_get_best_chain ~logger)
