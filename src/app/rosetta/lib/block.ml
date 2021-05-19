@@ -634,7 +634,9 @@ module Specific = struct
       in
       let coinbase_receiver =
         List.find block_info.internal_info ~f:(fun info ->
-            info.Internal_command_info.kind = `Coinbase )
+            match info.Internal_command_info.kind with
+            | `Coinbase -> true
+            | `Fee_transfer_via_coinbase|`Fee_transfer -> false)
         |> Option.map ~f:(fun cmd -> cmd.Internal_command_info.receiver)
       in
       let%map internal_transactions =

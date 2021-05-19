@@ -150,7 +150,7 @@ FROM build-deps AS opam-deps
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
-# branch to checkout on first clone (this will be the only availible branch in the container)
+# branch to checkout on first clone (this will be the only available branch in the container)
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the mina codebase in the next stage
@@ -223,7 +223,7 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the mina codebase in the next stage
-ARG MINA_BRANCH=develop
+ARG MINA_BRANCH=feature/ocaml-4.11.2
 
 # repo to checkout the branch from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
