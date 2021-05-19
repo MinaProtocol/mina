@@ -241,10 +241,10 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
           ~item:"max slot"
       in
       [%log info] "Maximum global slot in blocks is %d" max_slot ;
-      if max_slot < ((input.epoch + 1) * slots_per_epoch) + 3500 then (
+      if max_slot < ((input.epoch + 1) * slots_per_epoch) - 1 then (
         [%log fatal]
-          "Insufficient archive data: maximum global slot is less than slot \
-           3500 in the succeeding epoch" ;
+          "Insufficient archive data: maximum global slot is less than final \
+           slot in the current epoch" ;
         Core_kernel.exit 1 ) ;
       (* find longest canonical chain
          a slot may represent several blocks, only one of which can be on canonical chain
@@ -292,11 +292,9 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
         try_slot max_slot num_tries
       in
       let block_ids =
-        (* only examine blocks from start of current epoch up through slot 3500 in next epoch *)
+        (* only examine blocks in current epoch *)
         let min_slot = input.epoch * slots_per_epoch in
-        let max_slot_int64 =
-          min_slot + slots_per_epoch + 3500 |> Int64.of_int
-        in
+        let max_slot_int64 = min_slot + slots_per_epoch - 1 |> Int64.of_int in
         let min_slot_int64 = Int64.of_int min_slot in
         let relevant_block_infos =
           List.filter block_infos ~f:(fun {global_slot; _} ->
@@ -383,9 +381,9 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               let open Sql.User_command in
               Int64.compare p1.global_slot p2.global_slot
             in
-            (* only payments in canonical chain, starting at slot 3501 of this epoch *)
+            (* only payments in canonical chain *)
             let min_payment_slot =
-              (input.epoch * slots_per_epoch) + 3501 |> Int64.of_int
+              input.epoch * slots_per_epoch |> Int64.of_int
             in
             let payments_from_delegatee =
               List.filter payments_from_delegatee_raw ~f:(fun payment ->
@@ -466,7 +464,7 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                              coinbase_receiver_id)
                     in
                     let payments =
-                      (* only payments in canonical chain, starting at slot 3501 of this epoch *)
+                      (* only payments in canonical chain *)
                       List.filter payments_raw ~f:(fun payment ->
                           Int.Set.mem block_ids payment.block_id
                           && payment.global_slot >= min_payment_slot )
@@ -516,7 +514,7 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                       ~receiver_id:payout_id )
                   ~item:"Payments to payment address"
               in
-              (* only payments in canonical chain, starting at slot 3501 of this epoch
+              (* only payments in canonical chain
                  don't include payments from delegatee or coinbase receivers
               *)
               List.filter payments_raw ~f:(fun payment ->
@@ -610,8 +608,8 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               List.fold payments_next_epoch ~init:0L ~f:add_payment
             in
             [%log info]
-              "In epoch %d through slot 3500, delegatee %s made payments \
-               totaling %Ld to payout address %s"
+              "In epoch %d, delegatee %s made payments totaling %Ld to payout \
+               address %s"
               (input.epoch + 1)
               (Public_key.Compressed.to_base58_check payout_info.delegatee)
               payment_total_in_next_epoch
@@ -669,20 +667,19 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                 total_payout_obligation
             then
               [%log error]
-                "DELINQUENCY: In epoch %d through slot 3500 of epoch %d, \
-                 delegatee %s paid a total of %s to payout address %s, which \
-                 is less than the payout obligation of %s"
-                input.epoch (input.epoch + 1)
+                "DELINQUENCY: In epoch %d, delegatee %s paid a total of %s to \
+                 payout address %s, which is less than the payout obligation \
+                 of %s"
+                input.epoch
                 (Public_key.Compressed.to_base58_check payout_info.delegatee)
                 (Currency.Amount.to_formatted_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
                 (Currency.Amount.to_formatted_string total_payout_obligation)
             else
               [%log info]
-                "In epoch %d through slot 3500 of epoch %d, delegatee %s paid \
-                 a total of %s to payout address %s, satisfying the payout \
-                 obligation of %s"
-                input.epoch (input.epoch + 1)
+                "In epoch %d, delegatee %s paid a total of %s to payout \
+                 address %s, satisfying the payout obligation of %s"
+                input.epoch
                 (Public_key.Compressed.to_base58_check payout_info.delegatee)
                 (Currency.Amount.to_formatted_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
