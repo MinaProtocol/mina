@@ -29,7 +29,7 @@ ENV DEBIAN_FRONTEND=noninteractive
     # libgomp1 \
 
 # Workaround terrible postgresql package requirements with man
-RUN mkdir -p /usr/share/man/man7 /usr/share/man/man1
+RUN sudo mkdir -p /usr/share/man/man7 /usr/share/man/man1
 
 # OS package dependencies
 RUN sudo apt-get update -y \
