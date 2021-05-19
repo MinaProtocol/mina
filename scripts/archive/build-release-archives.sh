@@ -23,7 +23,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libjemalloc1 | libjemalloc-dev | libjemalloc2, libgomp1, libssl1.1, libpq-dev
+Depends: libjemalloc1, libgomp1, libssl1.1, libpq-dev
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -70,7 +70,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libjemalloc1 | libjemalloc-dev | libjemalloc2, libgomp1, libssl1.1, libpq-dev
+Depends: libjemalloc1, libgomp1, libssl1.1, libpq-dev
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -117,7 +117,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libjemalloc1 | libjemalloc-dev | libjemalloc2, libgomp1, libssl1.1, libpq-dev
+Depends: libjemalloc1, libgomp1, libssl1.1, libpq-dev
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -182,9 +182,9 @@ else
     set -x
     # Upload the deb files to s3.
     # If this fails, attempt to remove the lockfile and retry.
-    ${DEBS3} --codename ${MINA_DEB_CODENAME} --component main mina-*.deb \
+    ${DEBS3} --component "${MINA_DEB_RELEASE}" --codename "${MINA_DEB_CODENAME}" mina-*.deb \
     || (  scripts/clear-deb-s3-lockfile.sh \
-       && ${DEBS3} --codename main mina-*.deb)
+       && ${DEBS3} --component "${MINA_DEB_RELEASE}" --codename "${MINA_DEB_CODENAME}" mina-*.deb)
 fi
 
 ###
