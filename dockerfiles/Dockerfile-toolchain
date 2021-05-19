@@ -1,7 +1,7 @@
-FROM ocaml/opam2:debian-9-ocaml-4.08
+FROM ocaml/opam:debian-10-ocaml-4.11
 
 # if updated, also change in Dockerfile
-ARG OCAML_VERSION=4.07.1
+ARG OCAML_VERSION=4.11.2
 
 # location of repo used for pins and external package commits
 ARG CODA_DIR=/coda
@@ -101,7 +101,7 @@ RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 # we used to delete the repo here
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
-RUN sudo apt-get install --yes wget 
+RUN sudo apt-get install --yes wget
 RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.15.8.linux-amd64.tar.gz && sudo tar -xvf go1.15.8.linux-amd64.tar.gz && sudo rm go1.15.8.linux-amd64.tar.gz
 RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
