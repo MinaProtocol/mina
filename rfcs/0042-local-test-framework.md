@@ -1,12 +1,12 @@
-# Summary:
+# Summary
 
-Currently, the test integration framework has the capabilities to upload and test a network to a cloud environment (specifically GCP) but in addition to this, we want to add functionality to deploy and test a network on a local user machine. The cloud integration uses Terraform and Helm to deploy to a GKE environment to deploy the network and specified nodes. While this method works for cloud environments, we would like a more lightweight solution to run locally. Thus, we have chosen `Docker Swarm` as the tool of choice for container orchestration. 
+Currently, the test integration framework has the capabilities to upload and test a network to a cloud environment (specifically GCP) but in addition to this, we want to add functionality to deploy and test a network on a local user machine. The cloud integration uses Terraform and Helm to deploy to a GKE environment to deploy the network and specified nodes. While this method works for cloud environments, we would like a more lightweight solution to run locally. Thus, we have chosen `Docker Swarm` as the tool of choice for container orchestration.
 
 Docker swarm can configure a "swarm" on a local machine to deploy and manage containers on that specific swarm. Docker Swarm takes as input a `docker-compose` file in which all container information is specified and will handle the deployment of all containers on that local swarm. When we want to run a network test locally, we can create a swarm and have all the containers deploy via a `docker-compose.json` file that is built from specified network configurations. Docker swarm also gives us the ability to get logs of all the containers running in an aggregated way, meaning we do not have to query individual containers for their logs. This gives us a way to apply event filters to specific nodes (block producers, snark workers, seed nodes, etc), and check for test success/failure in a portable way.
 
 # Requirements
 
-The new local testing framework should be run on a user's local system using Docker as its main engine to create a network and spawn nodes. This feature will be built on top of the existing Test Executive which runs our cloud integration tests. By implementing the interface specified in `src/lib/integration_test_lib/intf.ml`, we will have an abstract way to specify different testing engines when running the Test Executive. 
+The new local testing framework should be run on a user's local system using Docker as its main engine to create a network and spawn nodes. This feature will be built on top of the existing test executive which runs our cloud integration tests. By implementing the interface specified in `src/lib/integration_test_lib/intf.ml`, we will have an abstract way to specify different testing engines when running the test executive.
 
 The specific interface to implement would be:
 
@@ -42,12 +42,12 @@ The new local testing engine must implement all existing features which include:
 - Streaming event logs from nodes for further processing
 - Spawning nodes based on a test configuration
 
-Additionally, the test engine should take a Docker image as input in the CLI. 
+Additionally, the test engine should take a Docker image as input in the CLI.
 
 An example command of using the local testing framework could look like this:
 
 ```bash
-$ test_executive local send-payment --mina-image codaprotocol/coda-daemon-puppeteered:  
+$ test_executive local send-payment --mina-image codaprotocol/coda-daemon-puppeteered:
 1.1.5-compatible --debug | tee test.log | logproc -i inline -f '!(.level in \["Spam", "Debug"\])'
 ```
 
@@ -55,15 +55,15 @@ Note that this is very similar to the current command of calling the cloud testi
 
 # Detailed Design
 
-## Orchestration:
+## Orchestration
 
-To handle container orchestration, we will be utilizing `Docker Swarm` to spawn and manage containers. Docker Swarm lets us create a cluster and run containers on a cluster to manage availability. We have opted for Docker Swarm instead of other orchestration tools like Kubernetes due to Docker being much easier to run on a local machine while still giving us much of the same benefits. Kubernetes is more complex and is somewhat overkill for what we are trying to achieve with the local testing framework. Both Docker Swarm and Kubernetes can handle container orchestration but the complexity of dealing with Kubernetes does not give much payoff. Additionally, if we want community members to also use this tool, setting up Kubernetes on end-user systems would be even more of a hassle. 
+To handle container orchestration, we will be utilizing `Docker Swarm` to spawn and manage containers. Docker Swarm lets us create a cluster and run containers on a cluster to manage availability. We have opted for Docker Swarm instead of other orchestration tools like Kubernetes due to Docker being much easier to run on a local machine while still giving us much of the same benefits. Kubernetes is more complex and is somewhat overkill for what we are trying to achieve with the local testing framework. Both Docker Swarm and Kubernetes can handle container orchestration but the complexity of dealing with Kubernetes does not give much payoff. Additionally, if we want community members to also use this tool, setting up Kubernetes on end-user systems would be even more of a hassle.
 
 Docker Swarm takes a `docker-compose` file in which it will generate the desired network state. A cluster can be defined in Docker Swarm by issuing `docker swarm init` which creates the environment in which all containers will be orchestrated on. In the context of our system, we do not need to take advantage of different machines to run these containers on, rather we will run all containers on the local system. Thus, the end result of the swarm will be all containers running locally while Docker Swarm provides availability and other resource management options.
 
 ## Creating a docker-compose file for local instead of terraform on cloud
 
-In the current cloud architecture, we launch a given network with `Terraform`. We specify a `Network_config.t` data structure which holds all necessary information about creating the network and then it is transformed into a `Terraform` file like so: 
+In the current cloud architecture, we launch a given network with `Terraform`. We specify a `Network_config.t` data structure which holds all necessary information about creating the network and then it is transformed into a `Terraform` file like so:
 
 ```ocaml
 type terraform_config =
@@ -107,7 +107,7 @@ We can leverage some of this existing work by specifying a config for Docker Swa
 
 ```ocaml
 type docker_compose_config =
-    { 
+    {
     ; coda_image: string
     ; coda_agent_image: string
     ; coda_bots_image: string
@@ -133,12 +133,12 @@ type t =
 [@@deriving to_yojson]
 ```
 
-By taking a `Network_config.t` struct, we can transform the data structure into a corresponding `docker-compose` file that specifies all containers to run as well as any other configurations. 
+By taking a `Network_config.t` struct, we can transform the data structure into a corresponding `docker-compose` file that specifies all containers to run as well as any other configurations.
 After computing the corresponding `docker-compose` file, we can simply call `docker stack deploy -c local-docker-compose.json testnet_name`
 
 <img src="./res/local-test-integration-docker-compose.png" alt="drawing" width="500"/>
 
-The resulting `docker-compose.json` file can have a service for each type of node that we want to spawn. Services in Docker Swarm are similar to pods in Kubernetes as they will schedule containers to nodes to run specified tasks. 
+The resulting `docker-compose.json` file can have a service for each type of node that we want to spawn. Services in Docker Swarm are similar to pods in Kubernetes as they will schedule containers to nodes to run specified tasks.
 
 A very generic example format of what the `docker-compose.json` could look as follows:
 
@@ -192,29 +192,23 @@ A very generic example format of what the `docker-compose.json` could look as fo
 }
 ```
 
-## Logging:
+## Logging
 
-Docker Swarm aggregates all logs from containers based on the running services. This makes it easy for us to parse out all logs on a container level without specifying specific containers. 
+For logging every single event that the network produces, we must be mindful of the volume logs that could potentially come through. Because the integration framework expects log messages for its wait conditions, we can not risk any missed log statements. Relying on the Docker API could prove to be problematic if there are any errors that occur due to any sort of latency. For this reason, we can adopt a pipe pushed-based approach where the test executives create a shared pipe and mounts the file in every container specified in the docker-compose file. This pipe then acts as the communication between all container logs and the test executive.
 
-The following is an example of the logs aggregated by Docker Swarm with 2 containers running the ping command.
+On startup, the test executive will create a pipe in the current directory and will include that file as a bind mount for each container in the docker-compose file. As a result, each container will be able to redirect all stdout to the specified pipe by using a puppeteer script which is then read by the test executive.
 
-```ocaml
-$ docker service create --name ping --replicas 2 alpine ping 8.8.8.8
+A further optimization we can do is apply `logproc` to all container output before it's written to the pipe. `logproc` can help us filter logs and reduce the load that the test executive has to process.
 
-$ docker service logs ping
-ping.2.odlt7ajje64e@node1    | PING 8.8.8.8 (8.8.8.8): 56 data bytes
-...
-ping.1.egjtdoz7tvkt@node1    | PING 8.8.8.8 (8.8.8.8): 56 data bytes
-...
-```
+One important thing to note is that Docker will store all container logs on the user's local system by default. This can be an issue as the logs generated could potentially consume the disk of the user if there is no logging rotation set up. Docker by default sets its logging driver to be [json-file](https://docs.docker.com/config/containers/logging/json-file/) which means all logs gathered by using `docker container logs` are located at a specific path on the user in a json format with no logging rotation. Because all container stdout is being sent to a pipe for the test executive to read, storing the logs of the containers to use via the Docker CLI does not need full persistence. Instead, we can use the [local logging driver](https://docs.docker.com/config/containers/logging/local/) which is optimized for performance and disk use and we can additionally set a cap to the log file size so that Docker will rewrite the used log files instead of consuming all the disk space. We can add a flag as the `local` command for the max-file size a user wants to keep on their system in case they want less/more logs stored by Docker.
 
-For our use case, we can specify different node types to be different services. For example, in our docker-compose configuration, we could specify a service for seed nodes, block producers, and snark workers and parse out the logs individually for each service. We can additionally do further computation on the logs to parse out which container is emitting these logs for a more granular level.
+The following is a diagram outlining the architecture used for gathering logs:
 
-These logs can be polled on an interval and processed by a filter as they come in. 
+<img src="./res/local-test-integration-logging.jpg" alt="drawing" width="500"/>
 
-## Interface To Develop:
+## Interface To Develop
 
-The current logging for the cloud framework is done by creating a Google Stackdriver subscription and issuing poll requests for logs while doing some pre-defined filtering. 
+The current logging for the cloud framework is done by creating a Google Stackdriver subscription and issuing poll requests for logs while doing some pre-defined filtering.
 
 An example of this is shown below:
 
@@ -246,9 +240,16 @@ let rec pull_subscription_in_background ~logger ~network ~event_writer
 
 [https://github.com/MinaProtocol/mina/blob/67cc4205cc95138cf729a2f14b57b754f9e9204e/src/lib/integration_test_cloud_engine/stack_driver_log_engine.ml#L269](https://github.com/MinaProtocol/mina/blob/67cc4205cc95138cf729a2f14b57b754f9e9204e/src/lib/integration_test_cloud_engine/stack_driver_log_engine.ml#L269)
 
-A similar interface can be written for Docker-Swarm instead. By defining a `Service.pull` function with a given logger, we can leverage a lot of the work already done by modifying parts of the code where the log formats diverge. All logs can be specified to an output stream, such as stdout or a specified file by the user on their local system. 
+A similar interface can be written for Docker-Swarm instead. We can write an interface to read from the local pipe specified as log entries are sent from containers.
 
-<img src="./res/local-test-integration-logging.png" alt="drawing" width="500"/>
+## Cleanup
+
+Cleaning up a Docker Swarm is done by issuing `docker stack rm <stack-name>` and it will handle all teardown of services Docker created to originally spin up.
+Additionally, we'll delete the created pipe by the test executive on the users machine.
+
+# Drawbacks
+
+- The test executive is vulnerable to being overloaded if there are too many logs being written in the pipe.
 
 # Work Breakdown/Prio
 
@@ -256,17 +257,16 @@ The following will be a work breakdown of what needs to be done to see this feat
 
 1. Implement the `Network_Config` interface to accept a network configuration and create a corresponding `docker-compose.json` file.
 2. Implement the `Network_manager` interface to take a corresponding `docker-compose.json` file and create a local swarm with the specified container configuration
-3. Implement functionality to simply log all container logs into a single stream (stdout or a file, maybe this can be specified in startup?)
-4. Implement filter on event functionality
+3. Implement the pipe logging interface that will be used by the test executive to read the forwarded stdout
+4. Implement filter on test event functionality
 5. Ensure that current integration test specs are able to run on the local framework with success
-
 
 # Unresolved Questions
 
-- Is compiling a docker-compose file the right approach for scheduling the containers? The nice thing about using a docker-compose file is that all network management should be automatic.
+- ~~Is compiling a docker-compose file the right approach for scheduling the containers? The nice thing about using a docker-compose file is that all network management should be automatic.~~
 
 - Is using a different service for each type of node the best effective approach? Would it be better to launch all nodes under the same service in the docker-compose file?
 
-- Is polling each service and then aggregating those logs the best approach? Would it be better to do filtering before aggregating?
+- ~~Is polling each service and then aggregating those logs the best approach? Would it be better to do filtering before aggregating?~~
 
-- Does this plan capture the overall direction we want the local testing framework to go?
+- ~~Does this plan capture the overall direction we want the local testing framework to go?~~
