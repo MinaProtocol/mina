@@ -276,7 +276,8 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
     Error.raise err
   in
   let create_worker () =
-    let%map connection, process =
+    [%log info] "Starting a new verifier process" ;
+    let%map.Deferred.Or_error.Let_syntax connection, process =
       (* This [try_with] isn't really here to catch an error that throws while
          the process is being spawned. Indeed, the immediate [ok_exn] will
          ensure that any errors that occur during that time are immediately
@@ -301,7 +302,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
             ~shutdown_on:Disconnect ~connection_state_init_arg:()
             {conf_dir; logger; proof_level} )
-      >>| Result.ok_exn
+      |> Deferred.Result.map_error ~f:Error.of_exn
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger process
       ~module_:__MODULE__ ~location:__LOC__ ;
@@ -336,7 +337,7 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
                 ~metadata:[("stderr", `String stderr)] ) ;
     {connection; process; exit_or_signal}
   in
-  let%map worker = create_worker () in
+  let%map worker = create_worker () |> Deferred.Or_error.ok_exn in
   let worker_ref = ref (Ivar.create_full worker) in
   let rec on_worker {connection= _; process; exit_or_signal} =
     let restart_after = Time.Span.(of_min (15. |> plus_or_minus ~delta:2.5)) in
@@ -404,9 +405,21 @@ let create ~logger ~proof_level ~pids ~conf_dir : t Deferred.t =
            Ivar.fill_if_empty create_worker_trigger ()) ;
         don't_wait_for
           (let%bind () = Ivar.read create_worker_trigger in
-           let%map worker = create_worker () in
-           on_worker worker ;
-           Ivar.fill new_worker worker) )
+           let rec try_create_worker () =
+             match%bind create_worker () with
+             | Ok worker ->
+                 on_worker worker ;
+                 Ivar.fill new_worker worker ;
+                 return ()
+             | Error err ->
+                 [%log error]
+                   "Failed to create a new verifier process: $err. Retrying..."
+                   ~metadata:[("err", Error_json.error_to_yojson err)] ;
+                 (* Wait 5s before retrying. *)
+                 let%bind () = after Time.Span.(of_sec 5.) in
+                 try_create_worker ()
+           in
+           try_create_worker ()) )
   in
   on_worker worker ;
   {worker= worker_ref; logger}
