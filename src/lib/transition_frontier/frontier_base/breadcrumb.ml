@@ -182,6 +182,8 @@ let block_producer = lift External_transition.Validated.block_producer
 
 let commands = lift External_transition.Validated.commands
 
+let completed_works = lift External_transition.Validated.completed_works
+
 let payments = lift External_transition.Validated.payments
 
 let mask = Fn.compose Staged_ledger.ledger staged_ledger
