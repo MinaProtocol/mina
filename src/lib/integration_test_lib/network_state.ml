@@ -45,7 +45,7 @@ module Make
       let state = f (Broadcast_pipe.Reader.peek r) in
       [%log debug] "updated network state to: $state"
         ~metadata:[("state", to_yojson state)] ;
-      ignore (Broadcast_pipe.Writer.write w state) ;
+      ignore (Broadcast_pipe.Writer.write w state : unit Deferred.t) ;
       Deferred.return `Continue
     in
     ignore
@@ -67,7 +67,7 @@ module Make
                  ; snarked_ledgers_generated=
                      state.snarked_ledgers_generated
                      + snarked_ledgers_generated }
-               else state ) )) ;
+               else state ) ) : _ Event_router.event_subscription) ;
     ignore
       (Event_router.on event_router
          Event_type.Transition_frontier_diff_application
@@ -84,7 +84,7 @@ module Make
                      String.Map.set state.best_tips_by_node ~key:(Node.id node)
                        ~data:new_best_tip
                    in
-                   {state with best_tips_by_node= best_tips_by_node'} ) ) )) ;
+                   {state with best_tips_by_node= best_tips_by_node'} ) ) ) : _ Event_router.event_subscription) ;
     let handle_gossip_received event_type =
       ignore
         (Event_router.on event_router event_type
@@ -111,7 +111,7 @@ module Make
                                       (event_type, gossip_with_direction)) ) ] ;
                          Gossip_state.add gossip_state event_type
                            gossip_with_direction ;
-                         gossip_state ) } ) ))
+                         gossip_state ) } ) ) : _ Event_router.event_subscription)
     in
     handle_gossip_received Block_gossip ;
     handle_gossip_received Snark_work_gossip ;
@@ -127,6 +127,6 @@ module Make
                  String.Map.set state.node_initialization ~key:(Node.id node)
                    ~data:true
                in
-               {state with node_initialization= node_initialization'} ) )) ;
+               {state with node_initialization= node_initialization'} ) ) : _ Event_router.event_subscription) ;
     (r, w)
 end

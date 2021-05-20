@@ -53,7 +53,7 @@ module Node = struct
         "%s -c %s exec -i $( %s get pod -l \"app=%s\" -o name) -- %s"
         base_kube_cmd node.container_id base_kube_cmd node.pod_id cmd
     in
-    let%bind.Deferred.Let_syntax cwd = Unix.getcwd () in
+    let%bind.Deferred cwd = Unix.getcwd () in
     Malleable_error.return (Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd])
 
   let start ~fresh_state node : unit Malleable_error.t =
@@ -432,7 +432,7 @@ module Node = struct
                 (Yojson.Safe.to_string other)
                 () )
     in
-    let%bind.Deferred.Let_syntax () =
+    let%bind.Deferred () =
       Deferred.List.iter state_hash_and_blocks
         ~f:(fun (state_hash_json, block_json) ->
           let double_quoted_state_hash =
@@ -444,7 +444,7 @@ module Node = struct
           in
           let block = Yojson.Safe.pretty_to_string block_json in
           let filename = state_hash ^ ".json" in
-          match%map.Deferred.Let_syntax Sys.file_exists filename with
+          match%map.Deferred Sys.file_exists filename with
           | `Yes ->
               [%log info]
                 "File already exists for precomputed block with state hash %s"
@@ -524,7 +524,7 @@ let initialize ~logger network =
     let%bind pod_statuses = get_pod_statuses () in
     (* TODO: detect "bad statuses" (eg CrashLoopBackoff) and terminate early *)
     let bad_pod_statuses =
-      List.filter pod_statuses ~f:(fun (_, status) -> status <> "Running")
+      List.filter pod_statuses ~f:(fun (_, status) -> not (String.equal status "Running"))
     in
     if List.is_empty bad_pod_statuses then return ()
     else if n < max_polls then
