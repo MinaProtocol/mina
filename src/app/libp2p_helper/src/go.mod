@@ -14,6 +14,8 @@ require (
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-cmp v0.5.4 // indirect
+	github.com/google/pprof v0.0.0-20210506205249-923b5ab0fc1a // indirect
+	github.com/ianlancetaylor/demangle v0.0.0-20210406231658-61c622dd7d50 // indirect
 	github.com/ipfs/go-ds-badger v0.2.4
 	github.com/ipfs/go-log v1.0.4
 	github.com/ipfs/go-log/v2 v2.1.1
