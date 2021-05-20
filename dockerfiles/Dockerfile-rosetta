@@ -325,10 +325,7 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.jso
 # COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
 # COPY --from=builder /tmp/mina_cache_dir /tmp/mina_cache_dir
 
-# Set up mina config dir with demo mode keys and genesis
-COPY --from=builder /home/opam/demo-genesis ${MINA_CONFIG_DIR}/demo-genesis
-# Fix a bad symlink by also putting this data in /home/opam
-COPY --from=builder /home/opam/demo-genesis /home/opam/demo-genesis
+# Set up mina config dir with genesis template
 COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json.template
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
