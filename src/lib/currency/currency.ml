@@ -559,17 +559,19 @@ module Fee = struct
 
   include T
 
+
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, eq, yojson]
+      [@@deriving sexp, compare, hash, equal]
 
-      let dhall_type = dhall_type
+      [%%define_from_scope to_yojson, of_yojson,dhall_type]
 
       let to_latest = Fn.id
+
     end
   end]
 
@@ -642,9 +644,7 @@ module Balance = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson]
-
-      let equal = Amount.Stable.V1.equal
+      type t = Amount.Stable.V1.t [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 

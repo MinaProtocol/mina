@@ -17,13 +17,10 @@ module Fee : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, compare, hash]
+      type t [@@deriving sexp, compare, equal, hash]
 
-      (* TODO : use Yojsonable.S *)
       val to_yojson : t -> Yojson.Safe.t
       val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
-
-      val equal : t -> t -> bool
 
       (* not automatically derived *)
       val dhall_type : Ppx_dhall_type.Dhall_type.t
@@ -67,13 +64,10 @@ module Amount : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, compare, hash]
+      type t [@@deriving sexp, compare, equal, hash]
 
-      (* TODO : use Yojsonable.S *)
       val to_yojson : t -> Yojson.Safe.t
       val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
-
-      val equal : t -> t -> bool
 
       (* not automatically derived *)
       val dhall_type : Ppx_dhall_type.Dhall_type.t
@@ -130,13 +124,10 @@ module Balance : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, compare, hash]
+      type t [@@deriving sexp, compare, equal, hash]
 
-      (* TODO : use Yojsonable.S *)
       val to_yojson : t -> Yojson.Safe.t
       val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
-
-      val equal : t -> t -> bool
 
       (* not automatically derived *)
       val dhall_type : Ppx_dhall_type.Dhall_type.t

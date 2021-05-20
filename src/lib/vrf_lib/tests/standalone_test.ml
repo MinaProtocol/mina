@@ -45,19 +45,13 @@ let%test_module "vrf-test" =
     module Curve = struct
       open Impl
 
-      type var = Field.Var.t * Field.Var.t
-
-      include Snarky.Libsnark.Mnt6.G1
+      include Snark_params.Tick.Inner_curve
 
       module Checked = struct
         include Snarky_curves.Make_weierstrass_checked
                   (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
-                  (struct
-                    include Snarky.Libsnark.Mnt6.G1
-
-                    let scale = scale_field
-                  end)
-                  (Snarky.Libsnark.Mnt6.G1.Coefficients)
+                  (Snark_params.Tick.Inner_curve)
+                  (Snark_params.Tick.Inner_curve.Params)
                   (struct
                     let add = None
                   end)
@@ -97,7 +91,7 @@ let%test_module "vrf-test" =
 
       let negate = Curve.negate
 
-      let scale = Curve.scale_field
+      let scale = Curve.scale
 
       let generator = Curve.one
 

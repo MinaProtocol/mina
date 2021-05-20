@@ -225,7 +225,7 @@ module Precomputed_block = struct
     | Ok _ ->
         ()
     | Error err ->
-        failwith err
+      failwith err
 
   let%test_unit "JSON serialization roundtrips" =
     let serialized_block =

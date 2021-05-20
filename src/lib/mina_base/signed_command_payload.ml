@@ -106,7 +106,6 @@ module Common = struct
       let to_latest = Fn.id
     end
   end]
-
   [%%endif]
 
   let to_input ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t) =
