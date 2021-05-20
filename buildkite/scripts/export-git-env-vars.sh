@@ -27,15 +27,16 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
 if [[ -n ${THIS_COMMIT_TAG} ]]; then # If the commit is tagged
-    export DEB_VERSION="${GITTAG}-${GITHASH}"
+    export VERSION="${GITTAG}-${GITHASH}"
     export GENERATE_KEYPAIR_VERSION=${VERSION}
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
 else
-    export DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
+    export VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
     export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
     export GENERATE_KEYPAIR_VERSION=${GITTAG}-${GITHASH}
 fi
 
+export MINA_DOCKER_TAG=${DOCKER_TAG}
 export MINA_DEB_VERSION=${VERSION}
 export MINA_DEB_CODENAME=stretch
 
