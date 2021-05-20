@@ -27,6 +27,8 @@ BUILD_URL=${BUILDKITE_BUILD_URL}
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
+VERSION="${MINA_DEB_VERSION}"
+
 cd "${SCRIPTPATH}/../_build"
 
 if [[ "$1" == "optimized" ]] ; then
