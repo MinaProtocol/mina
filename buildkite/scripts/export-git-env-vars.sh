@@ -6,7 +6,10 @@ echo "Exporting Variables: "
 
 export GITHASH=$(git rev-parse --short=7 HEAD)
 export GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!g; s!_!-!g' )
+# GITTAG is the closest tagged commit to this commit, while THIS_COMMIT_TAG only has a value when the current commit is tagged
 export GITTAG=$(git describe --always --abbrev=0 | sed 's!/!-!g; s!_!-!g')
+export THIS_COMMIT_TAG=$(git tag --points-at HEAD)
+
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
@@ -23,7 +26,7 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
-if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
+if [[ -n ${THIS_COMMIT_TAG} ]]; then # If the commit is tagged
     export DEB_VERSION="${GITTAG}-${GITHASH}"
     export GENERATE_KEYPAIR_VERSION=${VERSION}
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
@@ -37,29 +40,33 @@ export MINA_DEB_VERSION=${VERSION}
 export MINA_DEB_CODENAME=stretch
 
 # Determine deb repo to use
-case $BUILDKITE_BRANCH in
+case $GITBRANCH in
     master)
         RELEASE=stable ;;
-    compatible|master|enable-alpha-builds|release/*)
-        case "$(git tag --points-at HEAD)" in
-          *alpha*)
+    compatible|master|enable-alpha-builds|release/*) # whitelist of branches that can be tagged
+        case "${THIS_COMMIT_TAG}" in
+          *alpha*) # any tag including the string `alpha`
             RELEASE=alpha ;;
-          *beta*)
+          *beta*) # any tag including the string `beta`
             RELEASE=beta ;;
-          "")
-            RELEASE=unstable ;;
-          *)
+          ?*) # Any other non-empty tag. ? matches a single character and * matches 0 or more characters.
             RELEASE=stable ;;
+          "") # No tag
+            RELEASE=unstable ;;
+          *) # The above set of cases should be exhaustive, if they're not then still set RELEASE=unstable
+            RELEASE=unstable
+            echo "git tag --points-at HEAD may have failed, falling back to unstable. Value: \"$(git tag --points-at HEAD)\""
+            ;;
         esac ;;
     *)
         RELEASE=unstable ;;
 esac
 
+echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH}\" and tag \"${THIS_COMMIT_TAG}\""
+[[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 export MINA_DEB_RELEASE="${RELEASE}"
 
-echo "${RELEASE} for tag $(git tag --points-at HEAD)"
-
-case $BUILDKITE_BRANCH in master|compatible|develop|enable-alpha-builds|rosetta*)
+case $GITBRANCH in master|compatible|develop|enable-alpha-builds|rosetta*)
   export BUILD_ROSETTA=true
 esac
 
