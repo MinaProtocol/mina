@@ -275,7 +275,7 @@ func TestConfigurationMsg(t *testing.T) {
 		Privk:               keyEnc,
 		NetworkID:           string(testProtocol),
 		ListenOn:            []string{"/ip4/127.0.0.1/tcp/7000"},
-		MetricsPort:         "9000",
+		MetricsPort:         "",
 		External:            external,
 		ValidationQueueSize: 16,
 	}
@@ -1055,9 +1055,8 @@ func TestLibp2pMetrics(t *testing.T) {
 	server.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(":9001", server)
 
-	go appA.checkPeerCount(appA.P2p.Me)
-	go appA.checkMessageExchanged(appA.P2p.Me)
-	go appB.checkMessageStats(appB.P2p.Me)
+	go appB.checkPeerCount()
+	go appB.checkMessageStats()
 
 	// Send multiple messages from A to B
 	testDirectionalStream(t, appA, appB, func(stream net.Stream) {
@@ -1072,8 +1071,8 @@ func TestLibp2pMetrics(t *testing.T) {
 	time.Sleep(5 * time.Second) // Wait for metrics to be reported.
 
 	avgStatsMsg := (maxStatsMsg + minStatsMsg) / 2 // Total message sent count
-	expectedPeerCount := appA.P2p.Host.Network().Peers()
-	expectedCurrentConnCount := appA.P2p.ConnectionManager.GetInfo().ConnCount
+	expectedPeerCount := len(appB.P2p.Host.Network().Peers())
+	expectedCurrentConnCount := appB.P2p.ConnectionManager.GetInfo().ConnCount
 
 	resp, err := http.Get("http://localhost:9001/metrics")
 	require.NoError(t, err)
@@ -1083,19 +1082,19 @@ func TestLibp2pMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	respBody := string(body)
-	peerCount := getMetricsValue(t, respBody, "\npeer_count_"+appA.P2p.Me.String())
-	require.Equal(t, strconv.Itoa(expectedCurrentConnCount), peerCount)
+	peerCount := getMetricsValue(t, respBody, "\nMina_libp2p_peer_count")
+	require.Equal(t, strconv.Itoa(expectedPeerCount), peerCount)
 
-	peerConn := getMetricsValue(t, respBody, "\nmessage_exchanged_"+appA.P2p.Me.String())
-	require.Equal(t, strconv.Itoa(len(expectedPeerCount)), peerConn)
+	connectedPeerCount := getMetricsValue(t, respBody, "\nMina_libp2p_connected_peer_count")
+	require.Equal(t, strconv.Itoa(expectedCurrentConnCount), connectedPeerCount)
 
-	maxStats := getMetricsValue(t, respBody, "\nmessage_max_stats_"+appB.P2p.Me.String())
+	maxStats := getMetricsValue(t, respBody, "\nMina_libp2p_message_max_stats")
 	require.Equal(t, strconv.Itoa(maxStatsMsg), maxStats)
 
-	avgStats := getMetricsValue(t, respBody, "\nmessage_avg_stats_"+appB.P2p.Me.String())
+	avgStats := getMetricsValue(t, respBody, "\nMina_libp2p_message_avg_stats")
 	require.Equal(t, strconv.Itoa(avgStatsMsg), avgStats)
 
-	minStats := getMetricsValue(t, respBody, "\nmessage_min_stats_"+appB.P2p.Me.String())
+	minStats := getMetricsValue(t, respBody, "\nMina_libp2p_message_min_stats")
 	require.Equal(t, strconv.Itoa(minStatsMsg), minStats)
 }
 
