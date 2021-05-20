@@ -4,7 +4,7 @@ open Snarky_blake2
 let%test_module "blake2-equality test" =
   ( module struct
     (* Delete once the snarky pr lands *)
-    module Impl = Snarky.Snark0.Make (Snarky.Backends.Bn128.Default)
+    module Impl = Snark_params.Tick
     include Make (Impl)
 
     let checked_to_unchecked typ1 typ2 checked input =
@@ -19,7 +19,7 @@ let%test_module "blake2-equality test" =
       in
       checked_result
 
-    let test_equal (type a) ?(sexp_of_t = sexp_of_opaque) ?(equal = ( = )) typ1
+    let test_equal (type a) ?(sexp_of_t = sexp_of_opaque) ?(equal = Caml.( = )) typ1
         typ2 checked unchecked input =
       let checked_result = checked_to_unchecked typ1 typ2 checked input in
       let sexp_of_a = sexp_of_t in

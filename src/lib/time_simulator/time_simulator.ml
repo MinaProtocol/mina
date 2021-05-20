@@ -32,12 +32,12 @@ module Controller = struct
   type nonrec t =
     { mutable last_time: t
     ; mutable last_snapshot: Time.t
-    ; actions: Action.t Heap.t }
+    ; actions: Action.t Pairing_heap.t }
 
   let create () =
     { last_time= Int64.zero
     ; last_snapshot= Time.now ()
-    ; actions= Heap.create ~cmp:Action.compare () }
+    ; actions= Pairing_heap.create ~cmp:Action.compare () }
 
   let fast_forward t time =
     if time < t.last_time then ()
@@ -73,13 +73,13 @@ module Controller = struct
    *)
   let tick t =
     let exec t =
-      let {Action.perform; at; afterwards} = Heap.pop_exn t.actions in
+      let {Action.perform; at; afterwards} = Pairing_heap.pop_exn t.actions in
       fast_forward t at ;
       Ivar.fill_if_empty perform t.last_time ;
       afterwards
     in
     let rec go once =
-      match (Heap.top t.actions, once) with
+      match (Pairing_heap.top t.actions, once) with
       | Some _, `First ->
           let%bind () = exec t in
           go `No
@@ -97,14 +97,14 @@ end
 let now = Controller.now
 
 module Timeout = struct
-  type 'a t = {d: 'a Deferred.t; elt: Action.t Heap.Elt.t; cancel: 'a Ivar.t}
+  type 'a t = {d: 'a Deferred.t; elt: Action.t Pairing_heap.Elt.t; cancel: 'a Ivar.t}
 
   let create (ctrl : Controller.t) span ~f =
     let ivar = Ivar.create () in
     let cancel = Ivar.create () in
     let d = Deferred.any [Ivar.read ivar >>| f; Ivar.read cancel] in
     let elt =
-      Heap.add_removable ctrl.actions
+      Pairing_heap.add_removable ctrl.actions
         { Action.at= add (now ctrl) span
         ; perform= ivar
         ; afterwards= d >>| ignore }
@@ -116,7 +116,7 @@ module Timeout = struct
   let peek {d; _} = Deferred.peek d
 
   let cancel (ctrl : Controller.t) {elt; cancel; _} a =
-    Heap.remove ctrl.actions elt ;
+    Pairing_heap.remove ctrl.actions elt ;
     Ivar.fill_if_empty cancel a
 end
 
@@ -137,7 +137,7 @@ let%test_unit "tick triggers timeouts and fast-forwards to event time" =
       [%test_result: Bool.t] ~message:"We ticked" ~expect:true !fired ;
       [%test_result: Bool.t]
         ~message:"Time fast-forwads to at least event time" ~expect:true
-        (diff (now ctrl) start >= Int64.of_int 5000) )
+        (Int64.(>=) (diff (now ctrl) start) (Int64.of_int 5000) ))
 
 let%test_unit "tick triggers timeouts and adjusts to system time" =
   let ctrl = Controller.create () in
@@ -160,17 +160,16 @@ let%test_unit "tick triggers timeouts and adjusts to system time" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        (diff (now ctrl) start >= Int64.of_int 5) )
+        (Int64.(>=) (diff (now ctrl) start) (Int64.of_int 5) ))
 
 let%test_unit "tick handles multiple timeouts if necessary" =
   let ctrl = Controller.create () in
   let start = now ctrl in
   let count = ref 0 in
   let timeout x =
-    Timeout.create ctrl
+    ignore(Timeout.create ctrl
       (Span.of_ms (Int64.of_int x))
-      ~f:(fun _t -> count := !count + 1)
-    |> ignore
+      ~f:(fun _t -> count := !count + 1) : _ Timeout.t)
   in
   List.iter [2; 3; 5; 500] ~f:timeout ;
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -187,7 +186,7 @@ let%test_unit "tick handles multiple timeouts if necessary" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        (diff (now ctrl) start >= Int64.of_int 7) )
+        (Int64.(>=) (diff (now ctrl) start) (Int64.of_int 7) ))
 
 let%test_unit "cancelling a timeout means it won't fire" =
   let ctrl = Controller.create () in

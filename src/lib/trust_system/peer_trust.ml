@@ -318,10 +318,9 @@ let%test_module "peer_trust" =
               match Peer_trust_test.lookup_ip db peer0 with
               | [(_, {trust= decayed_trust; banned= Unbanned})] ->
                 (* N.b. the floating point equality operator has a built in
-                 tolerance i.e. it's approximate equality.
-                 TODO: not sure this is true, use Float.Robust_compare
+                   tolerance i.e. it's approximate equality.
                 *)
-                Float.(=) decayed_trust (start_trust /. 2.0)
+                Float.(=.) decayed_trust (start_trust /. 2.0)
               | _ ->
                   false )
           | _ ->

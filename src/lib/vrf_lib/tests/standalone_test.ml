@@ -4,12 +4,12 @@ open Vrf_lib.Standalone
 let%test_module "vrf-test" =
   ( module struct
     (* Nothing in here is secure, it's just for the test *)
-    module Impl = Snarky.Snark.Make (Snarky.Backends.Mnt4.GM)
-    module Other_impl = Snarky.Snark.Make (Snarky.Backends.Mnt6.GM)
+    module Impl = Snark_params.Tick
+    module Other_impl = Snark_params.Tock
     module B = Bigint
 
     module Scalar = struct
-      include Snarky.Libsnark.Mnt6.Field
+      include Snark_params.Tock.Field
 
       let of_bits = Other_impl.Field.project
 

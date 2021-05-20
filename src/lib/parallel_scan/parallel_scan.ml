@@ -1450,7 +1450,7 @@ let assert_job_count t t' ~completed_job_count ~base_job_count ~value_emitted =
     done_before +. completed_job_count -. jobs_from_delete_tree
   in
   assert (
-    Float.equal todo_after expected_todo_after && not (Float.equal done_after expected_done_after ))
+    Float.equal todo_after expected_todo_after && Float.equal done_after expected_done_after )
 
 let test_update t ~data ~completed_jobs =
   let result_opt, t' = update ~data ~completed_jobs t |> Or_error.ok_exn in

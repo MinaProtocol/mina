@@ -20,23 +20,23 @@ end
 module Time_queue = struct
   type 'action t =
     { mutable curr_time: Time.Span.t
-    ; pending_actions: ('action * Time.Span.t) Heap.t
+    ; pending_actions: ('action * Time.Span.t) Pairing_heap.t
     ; mutable on_new_action: unit Ivar.t option }
 
   let handle_in_future t ~after action =
     Option.iter t.on_new_action ~f:(fun ivar ->
         Ivar.fill_if_empty ivar () ;
         t.on_new_action <- None ) ;
-    Heap.add t.pending_actions (action, Time.Span.(after + t.curr_time))
+    Pairing_heap.add t.pending_actions (action, Time.Span.(after + t.curr_time))
 
   let create ~now =
     { curr_time= now
     ; pending_actions=
-        Heap.create ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts') ()
+        Pairing_heap.create ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts') ()
     ; on_new_action= None }
 
   let actions_ready t =
-    match (Heap.top t.pending_actions, t.on_new_action) with
+    match (Pairing_heap.top t.pending_actions, t.on_new_action) with
     | Some _, _ ->
         return ()
     | None, Some ivar ->
@@ -49,10 +49,10 @@ module Time_queue = struct
   let tick_forwards t ~f =
     let rec go () =
       let do_next_action () =
-        let action, _ = Heap.pop_exn t.pending_actions in
+        let action, _ = Pairing_heap.pop_exn t.pending_actions in
         f action
       in
-      match Heap.top t.pending_actions with
+      match Pairing_heap.top t.pending_actions with
       | None ->
           return ()
       | Some (_, at) ->
@@ -61,10 +61,10 @@ module Time_queue = struct
           else (
             t.curr_time <- at ;
             let rec loop () =
-              match Heap.top t.pending_actions with
+              match Pairing_heap.top t.pending_actions with
               | None ->
                   return ()
-              | Some (_, at) when t.curr_time >= at ->
+              | Some (_, at) when Time.Span.(>=) t.curr_time at ->
                   let%bind () = do_next_action () in
                   loop ()
               | Some _ ->
@@ -127,7 +127,7 @@ end
 
 module type Fake_timer_transport_s = functor
   (Message :sig
-            
+
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
@@ -237,28 +237,28 @@ end
 
 module type S = functor
   (State :sig
-          
+
           type t [@@deriving eq, sexp, yojson]
         end)
   (Message :sig
-            
+
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
   (Message_label :sig
-                  
+
                   type label [@@deriving enum, sexp]
 
                   include Hashable.S with type t = label
                 end)
   (Timer_label :sig
-                
+
                 type label [@@deriving enum, sexp]
 
                 include Hashable.S with type t = label
               end)
   (Condition_label :sig
-                    
+
                     type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label

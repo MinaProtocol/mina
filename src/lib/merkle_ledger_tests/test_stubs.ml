@@ -138,7 +138,7 @@ module Key = struct
   module Stable = struct
     module V1 = struct
       type t = Mina_base.Account.Key.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash]
+      [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
     end
@@ -165,7 +165,7 @@ module Account_id = struct
   module Stable = struct
     module V1 = struct
       type t = Mina_base.Account_id.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash]
+      [@@deriving sexp, equal, compare, hash]
 
       let to_latest = Fn.id
     end
