@@ -60,12 +60,23 @@ let wait_for_process_log_errors ~logger process ~module_ ~location =
         (* Eagerly force [Process.wait], so that it won't be captured
            elsewhere on exit.
         *)
-        let waiting = Process.wait process in
+        let waiting =
+          Monitor.try_with ~run:`Now
+            ~rest:
+              (`Call
+                (fun exn ->
+                  let err = Error.of_exn exn in
+                  Logger.error logger ~module_ ~location
+                    "Saw a deferred exception $exn after waiting for process"
+                    ~metadata:[("exn", Error_json.error_to_yojson err)] ))
+            (fun () -> Process.wait process)
+        in
         don't_wait_for
-          ( match%map Monitor.try_with_or_error (fun () -> waiting) with
+          ( match%map waiting with
           | Ok _ ->
               ()
-          | Error err ->
+          | Error exn ->
+              let err = Error.of_exn exn in
               Logger.error logger ~module_ ~location
                 "Saw a deferred exception $exn while waiting for process"
                 ~metadata:[("exn", Error_json.error_to_yojson err)] ) )
