@@ -1,4 +1,4 @@
-FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256:1a09a76ba987c6294075fe68a9391df8851c2a7809dab9d7808b72ae11be5f05
+FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256:2a56ffdfde8ffe889918c3610548b5c218ee93cedfe8f36e841d3142ccaf57e8
 
 # if updated, also change in Dockerfile
 ARG OCAML_VERSION=4.11.2

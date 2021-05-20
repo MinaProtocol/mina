@@ -1,8 +1,8 @@
 #################################################################################################
 # The "build-deps" stage
-# - Installs all compilers/interpreters, tools, and OS packages on debian buster-slim
+# - Installs all compilers/interpreters, tools, and OS packages on debian stretch-slim
 #################################################################################################
-FROM debian:buster-slim AS build-deps
+FROM debian:stretch-slim AS build-deps
 
 # Ocaml Version
 ARG OCAML_VERSION=4.11
@@ -12,7 +12,7 @@ ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.13.10
+ARG GO_VERSION=1.14.15
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
 ARG RUST_VERSION=1.45.2
@@ -280,7 +280,7 @@ RUN eval $(opam config env) \
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM debian:buster-slim AS production
+FROM debian:stretch-slim AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG MINA_DAEMON_PORT=10101
@@ -291,7 +291,6 @@ ARG PK=B62qiZfzW27eavtPrnF6DeDSAKEjXuGFdkouC3T5STRa6rrYLiDUP2p
 ENV DEBIAN_FRONTEND noninteractive
 
 # Dependencies
-# buster-slim configures apt to not store any cache, so no need to rm it
 # TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
   && apt -y install \
@@ -303,7 +302,7 @@ RUN apt-get -y update \
     libffi6 \
     libgmp10 \
     libgomp1 \
-    libjemalloc-dev \
+    libjemalloc1 \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
