@@ -24,11 +24,11 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
 if [[ "$BUILDKITE_BRANCH" == "master" ]]; then
-    export VERSION="${GITTAG}-${GITHASH}"
+    export DEB_VERSION="${GITTAG}-${GITHASH}"
     export GENERATE_KEYPAIR_VERSION=${VERSION}
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
 else
-    export VERSION="${GITTAG}+${BUILD_NUM}-${GITBRANCH}-${GITHASH}"
+    export DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
     export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
     export GENERATE_KEYPAIR_VERSION=${GITTAG}-${GITHASH}
 fi
@@ -39,14 +39,27 @@ export MINA_DEB_CODENAME=stretch
 # Determine deb repo to use
 case $BUILDKITE_BRANCH in
     master)
-        export MINA_DEB_RELEASE=release ;;
-    enable-alpha-builds)
-        export MINA_DEB_RELEASE=alpha ;;
+        RELEASE=stable ;;
+    compatible|master|enable-alpha-builds|release/*)
+        case "$(git tag --points-at HEAD)" in
+          *alpha*)
+            RELEASE=alpha ;;
+          *beta*)
+            RELEASE=beta ;;
+          "")
+            RELEASE=unstable ;;
+          *)
+            RELEASE=stable ;;
+        esac ;;
     *)
-        export MINA_DEB_RELEASE=unstable ;;
+        RELEASE=unstable ;;
 esac
 
-case $BUILDKITE_BRANCH in master|develop|rosetta*)
+export MINA_DEB_RELEASE="${RELEASE}"
+
+echo "${RELEASE} for tag $(git tag --points-at HEAD)"
+
+case $BUILDKITE_BRANCH in master|compatible|develop|enable-alpha-builds|rosetta*)
   export BUILD_ROSETTA=true
 esac
 
