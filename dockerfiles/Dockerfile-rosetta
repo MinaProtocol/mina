@@ -268,9 +268,6 @@ RUN eval $(opam config env) \
     src/app/generate_keypair/generate_keypair.exe \
     src/app/rosetta/test-agent/agent.exe \
     src/app/rosetta/ocaml-signer/signer.exe \
-  && _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
-    --config-file src/app/rosetta/demo-config.json \
-    --genesis-dir ${HOME}/demo-genesis \
   && mv _build/default/src/app $HOME/app \
   && rm -rf _build
 
@@ -327,10 +324,7 @@ COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.jso
 # COPY --from=builder /tmp/s3_cache_dir /tmp/s3_cache_dir
 # COPY --from=builder /tmp/mina_cache_dir /tmp/mina_cache_dir
 
-# Set up mina config dir with demo mode keys and genesis
-COPY --from=builder /home/opam/demo-genesis ${MINA_CONFIG_DIR}/demo-genesis
-# Fix a bad symlink by also putting this data in /home/opam
-COPY --from=builder /home/opam/demo-genesis /home/opam/demo-genesis
+# Copy the demo daemon.json.template
 COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json.template
 
 RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
