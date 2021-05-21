@@ -142,7 +142,9 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          check_peers ~logger all_nodes)
     in
     section_soft "nodes share common prefix no greater than 2 block back"
-      (let%bind chains =
+      (let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
+       (* the common prefix test relies on 4 blocks having been produced.  previous sections altogether have already produced 3.  if previous sections change, then this may need to be re-adjusted*)
+       let%bind chains =
          Malleable_error.List.map all_nodes
            ~f:(Network.Node.must_get_best_chain ~logger)
        in
