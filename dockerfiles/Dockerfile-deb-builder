@@ -139,7 +139,7 @@ ARG MINA_DIR=mina
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the mina codebase in the next stage
-ARG OPAM_BRANCH=enable-alpha-builds
+ARG OPAM_BRANCH=compatible
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external

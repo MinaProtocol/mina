@@ -44,7 +44,7 @@ export MINA_DEB_CODENAME=stretch
 case $GITBRANCH in
     master)
         RELEASE=stable ;;
-    compatible|master|enable-alpha-builds|release/*) # whitelist of branches that can be tagged
+    compatible|master|release/*) # whitelist of branches that can be tagged
         case "${THIS_COMMIT_TAG}" in
           *alpha*) # any tag including the string `alpha`
             RELEASE=alpha ;;
@@ -67,7 +67,7 @@ echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 export MINA_DEB_RELEASE="${RELEASE}"
 
-case $GITBRANCH in master|compatible|develop|enable-alpha-builds|rosetta*)
+case $GITBRANCH in master|compatible|develop|rosetta*)
   export BUILD_ROSETTA=true
 esac
 
