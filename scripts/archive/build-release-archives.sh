@@ -218,7 +218,7 @@ else
 
     docker build \
       -t codaprotocol/coda-archive:$DOCKER_TAG \
-      -f $SCRIPTPATH/Dockerfile \
+      -f "../../dockerfiles/Dockerfile-mina-archive" \
       --build-arg coda_deb_version=$VERSION \
       --build-arg deb_repo=$CODENAME \
       docker_build

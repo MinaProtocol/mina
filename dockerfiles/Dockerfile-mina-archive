@@ -7,6 +7,9 @@ ARG deb_repo=stable
 ENV DEBIAN_FRONTEND noninteractive
 RUN echo "Building image with version $coda_deb_version"
 
+COPY scripts/archive-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
@@ -33,3 +36,5 @@ RUN mkdir /healthcheck && curl https://raw.githubusercontent.com/MinaProtocol/mi
 RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/apt/sources.list.d/o1.list \
   && apt-get -y update \
   && apt-get install -y "mina-archive=$coda_deb_version"
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/entrypoint.sh"]
