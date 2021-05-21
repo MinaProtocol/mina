@@ -94,14 +94,17 @@ def stop_daemon():
 def inactive_loop():
   global active_daemon_request
 
-  server = HTTPServer(('0.0.0.0', 3085), MockRequestHandler)
-  while True:
-    server.handle_request()
-    signal.sigtimedwait(ALL_SIGNALS, 0)
-    if active_daemon_request:
-      start_daemon()
-      active_daemon_request = False
-      break
+  try:
+    server = HTTPServer(('0.0.0.0', 3085), MockRequestHandler)
+    while True:
+      server.handle_request()
+      signal.sigtimedwait(ALL_SIGNALS, 0)
+      if active_daemon_request:
+        start_daemon()
+        active_daemon_request = False
+        break
+  finally:
+    server.close()
 
   active_loop()
 
