@@ -176,6 +176,8 @@ let%test_module "vrf-test" =
                   let of_sexpable = Curve.of_affine
                 end)
 
+      type value = t [@@deriving sexp]
+
       type var = Curve.var
 
       let typ = Curve.typ
