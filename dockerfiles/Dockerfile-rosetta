@@ -340,10 +340,13 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
 
 USER postgres
 
+# TODO: variable pg_version based on deb_release
+ARG POSTGRES_VERSION=9
+
 # TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
 # TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
-RUN pg_dropcluster --stop 11 main \
-    && pg_createcluster --start 11 -d ${POSTGRES_DATA_DIR} main \
+RUN pg_dropcluster --stop ${POSTGRES_VERSION} main \
+    && pg_createcluster --start ${POSTGRES_VERSION} -d ${POSTGRES_DATA_DIR} main \
     && echo "data_directory = '/data/postgresql'" >> /etc/postgresql/11/main/postgresql.conf \
     && echo "listen_addresses='*'" >> /etc/postgresql/11/main/postgresql.conf \
     && echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/11/main/pg_hba.conf \
