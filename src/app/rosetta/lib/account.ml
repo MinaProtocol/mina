@@ -20,7 +20,7 @@ module Get_balance =
       }
       initialPeers
       daemonStatus {
-        peers { peerId }
+        chainId
       }
       account(publicKey: $public_key, token: $token_id) {
         balance {
@@ -186,8 +186,8 @@ LIMIT 1
       | None, None ->
           (* We've never heard of this account, at least as of the block_identifier provided *)
           (* This means they requested a block from before account creation;
-           * this is ambiguous in the spec but Coinbase confirmed we can return 0.
-           * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
+         * this is ambiguous in the spec but Coinbase confirmed we can return 0.
+         * https://community.rosetta-api.org/t/historical-balance-requests-with-block-identifiers-from-before-account-was-created/369 *)
           Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), None ->
           (* This account has no special vesting, so just use its last known balance *)
@@ -212,8 +212,8 @@ LIMIT 1
             , last_relevant_command_balance )
         , Some timing_info ) ->
           (* This block was in the genesis ledger and has been involved in at least one user or internal command. We need
-           * to compute the change in its balance between the most recent command and the start block (if it has vesting
-           * it may have changed). *)
+         * to compute the change in its balance between the most recent command and the start block (if it has vesting
+         * it may have changed). *)
           let incremental_balance_between_slots =
             compute_incremental_balance timing_info
               ~start_slot:
@@ -235,7 +235,7 @@ LIMIT 1
           Deferred.Result.return 0L
       | Some (_, last_relevant_command_balance), _ ->
           (* This account was involved in a command and we don't care about its vesting, so just use the last known
-           * balance from the command *)
+         * balance from the command *)
           Deferred.Result.return last_relevant_command_balance
       | None, Some timing_info ->
           (* This account hasn't seen any transactions but was in the genesis ledger, so use its genesis balance  *)
@@ -457,7 +457,11 @@ module Balance = struct
                    [ { Amount.value= "66000"
                      ; currency=
                          {Currency.symbol= "CODA"; decimals= 9l; metadata= None}
-                     ; metadata= None } ]
+                     ; metadata=
+                         Some
+                           (`Assoc
+                             [ ("locked_balance", `Intlit "0")
+                             ; ("total_balance", `Intlit "66000") ]) } ]
                ; metadata= Some (`Assoc [("nonce", `Intlit "2")]) })
     end )
 end

@@ -275,6 +275,9 @@ let block_winner =
 
 let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
 
+let completed_works =
+  Fn.compose Staged_ledger_diff.completed_works staged_ledger_diff
+
 let to_yojson t =
   `Assoc
     [ ("protocol_state", Protocol_state.value_to_yojson (protocol_state t))
@@ -888,6 +891,8 @@ module With_validation = struct
 
   let commands t = lift commands t
 
+  let completed_works t = lift completed_works t
+
   let transactions ~constraint_constants t =
     lift (transactions ~constraint_constants) t
 
@@ -1057,6 +1062,7 @@ module Validated = struct
     , supercharge_coinbase
     , transactions
     , commands
+    , completed_works
     , payments
     , global_slot
     , erase

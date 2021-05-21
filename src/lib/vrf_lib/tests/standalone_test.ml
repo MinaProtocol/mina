@@ -9,7 +9,12 @@ let%test_module "vrf-test" =
     module B = Bigint
 
     module Scalar = struct
-      include Snark_params.Tock.Field
+      include (
+        Snark_params.Tick.Inner_curve.Scalar :
+          module type of Snark_params.Tick.Inner_curve.Scalar
+          with type t = Snark_params.Tick.Inner_curve.Scalar.t
+           and type var := Snark_params.Tick.Inner_curve.Scalar.var
+          with module Checked := Snark_params.Tick.Inner_curve.Scalar.Checked )
 
       let of_bits = Other_impl.Field.project
 
@@ -45,7 +50,25 @@ let%test_module "vrf-test" =
     module Curve = struct
       open Impl
 
-      include Snark_params.Tick.Inner_curve
+      type var = Field.Var.t * Field.Var.t
+
+      include (
+        Snark_params.Tick.Inner_curve :
+          module type of Snark_params.Tick.Inner_curve
+          with type var := Snark_params.Tick.Inner_curve.var
+          with module Checked := Snark_params.Tick.Inner_curve.Checked )
+
+      type 'a or_infinity = 'a Marlin_plonk_bindings_types.Or_infinity.t =
+        | Infinity
+        | Finite of 'a
+      [@@deriving equal]
+
+      let equal x y =
+        Snark_params.Tick.Inner_curve.(
+          equal_or_infinity Affine.equal (to_affine_or_infinity x)
+            (to_affine_or_infinity y))
+
+      let scale_field = scale
 
       module Checked = struct
         include Snarky_curves.Make_weierstrass_checked
@@ -169,6 +192,8 @@ let%test_module "vrf-test" =
 
                   let of_sexpable = Curve.of_affine
                 end)
+
+      type value = t [@@deriving sexp]
 
       type var = Curve.var
 
