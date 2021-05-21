@@ -143,7 +143,12 @@ let validate_transaction =
 
 module Vrf = struct
   let generate_witness =
-    Command.async ~summary:"Generate a vrf evaluation witness"
+    Command.async
+      ~summary:
+        "Generate a vrf evaluation witness. This may be used to calculate \
+         whether a given private key will win a given slot (by checking \
+         threshold_met = true in the JSON output), or to generate a witness \
+         that a 3rd party can use to verify a vrf evaluation."
       (let open Command.Let_syntax in
       let env = Secrets.Keypair.env in
       if Option.is_some (Sys.getenv env) then
@@ -289,7 +294,15 @@ module Vrf = struct
 
   let batch_check_witness =
     Command.async
-      ~summary:"Check a batch of vrf evaluation witnesses read on stdin"
+      ~summary:
+        "Check a batch of vrf evaluation witnesses read on stdin. Outputs the \
+         verified vrf evaluations (or no vrf output if the witness is \
+         invalid), and whether the vrf output satisfies the threshold values \
+         if given. The threshold should be included in the JSON for each vrf \
+         as the 'vrfThreshold' field, of format {delegatedStake: 1000, \
+         totalStake: 1000000000}. The threshold is not checked against a \
+         ledger; this should be done manually to confirm whether \
+         threshold_met in the output corresponds to an actual won block."
       ( Command.Param.return @@ Exceptions.handle_nicely
       @@ fun () ->
       let open Deferred.Let_syntax in

@@ -3320,7 +3320,7 @@
             },
             {
               "name": "epochSeed",
-              "description": null,
+              "description": "Formatted with base58check",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3368,7 +3368,7 @@
             },
             {
               "name": "epochSeed",
-              "description": null,
+              "description": "Formatted with base58check",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -7977,7 +7977,7 @@
             },
             {
               "name": "index",
-              "description": "The index of this account in the ledger",
+              "description": "The index of this account in the ledger, or null if this account does not yet have a known position in the best tip ledger",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -9989,7 +9989,7 @@
             },
             {
               "name": "evaluateVrf",
-              "description": "Evaluate a vrf for the given public key",
+              "description": "Evaluate a vrf for the given public key. This includes a witness which may be verified without access to the private key for this vrf evaluation.",
               "args": [
                 {
                   "name": "vrfThreshold",
@@ -10044,7 +10044,7 @@
             },
             {
               "name": "checkVrf",
-              "description": "Check a vrf evaluation commitment",
+              "description": "Check a vrf evaluation commitment. This can be used to check vrf evaluations without needing to reveal the private key, in the format returned by evaluateVrf",
               "args": [
                 {
                   "name": "input",

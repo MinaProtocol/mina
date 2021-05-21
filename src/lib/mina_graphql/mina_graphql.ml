@@ -1132,7 +1132,10 @@ module Types = struct
                    | Not_owned {account_disabled} ->
                        account_disabled )
              ; field "index" ~typ:int
-                 ~doc:"The index of this account in the ledger"
+                 ~doc:
+                   "The index of this account in the ledger, or null if this \
+                    account does not yet have a known position in the best \
+                    tip ledger"
                  ~args:Arg.[]
                  ~resolve:(fun _ {index; _} -> index) ] ))
 
@@ -2003,7 +2006,8 @@ module Types = struct
           ; delegator_index } )
         ~fields:
           [ arg "globalSlot" ~typ:(non_null uint32_arg)
-          ; arg "epochSeed" ~typ:(non_null string)
+          ; arg "epochSeed" ~doc:"Formatted with base58check"
+              ~typ:(non_null string)
           ; arg "delegatorIndex"
               ~doc:"Position in the ledger of the delegator's account"
               ~typ:(non_null int) ]
@@ -3773,7 +3777,11 @@ module Queries = struct
         Signed_command.check_signature user_command )
 
   let evaluate_vrf =
-    io_field "evaluateVrf" ~doc:"Evaluate a vrf for the given public key"
+    io_field "evaluateVrf"
+      ~doc:
+        "Evaluate a vrf for the given public key. This includes a witness \
+         which may be verified without access to the private key for this vrf \
+         evaluation."
       ~typ:(non_null Types.vrf_evaluation)
       ~args:
         Arg.
@@ -3809,7 +3817,11 @@ module Queries = struct
             t )
 
   let check_vrf =
-    field "checkVrf" ~doc:"Check a vrf evaluation commitment"
+    field "checkVrf"
+      ~doc:
+        "Check a vrf evaluation commitment. This can be used to check vrf \
+         evaluations without needing to reveal the private key, in the format \
+         returned by evaluateVrf"
       ~typ:(non_null Types.vrf_evaluation)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.vrf_evaluation)]
       ~resolve:(fun {ctx= mina; _} () evaluation ->
