@@ -132,7 +132,7 @@ module type Transition_frontier_intf = sig
 
   val snark_pool_refcount_pipe :
        t
-    -> (int * int Transaction_snark_work.Statement.Table.t)
+    -> Transition_frontier.Extensions.Snark_pool_refcount.view
        Pipe_lib.Broadcast_pipe.Reader.t
 end
 
@@ -158,19 +158,34 @@ struct
       end
 
       type transition_frontier_diff =
-        [ `New_refcount_table of
-          int * int Transaction_snark_work.Statement.Table.t
+        [ `New_refcount_table of Extensions.Snark_pool_refcount.view
         | `New_best_tip of Base_ledger.t ]
 
       type t =
         { snark_tables: Snark_tables.t
         ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
         ; mutable ref_table: int Statement_table.t option
+              (** Tracks the number of blocks that have each work statement in
+                  their scan state.
+                  Work is included iff it is a member of some block scan state.
+                  Used to filter the pool, ensuring that only work referenced
+                  within the frontier is kept.
+              *)
+        ; mutable best_tip_table:
+            Transaction_snark_work.Statement.Hash_set.t option
+              (** The set of all snark work statements present in the scan
+                  state for the last 10 blocks in the best chain.
+                  Used to filter broadcasts of locally produced work, so that
+                  irrelevant work is not broadcast.
+              *)
         ; config: Config.t
         ; logger: Logger.t sexp_opaque
         ; mutable removed_counter: int
+              (** A counter for transition frontier breadcrumbs removed. When
+                  this reaches a certain value, unreferenced snark work is
+                  removed from ref_table
+              *)
         ; account_creation_fee: Currency.Fee.t
-              (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
         ; batcher: Batcher.Snark_pool.t }
       [@@deriving sexp]
 
@@ -197,6 +212,7 @@ struct
             constraint_constants
               .Genesis_constants.Constraint_constants.account_creation_fee
         ; ref_table= None
+        ; best_tip_table= None
         ; config
         ; logger
         ; removed_counter= removed_breadcrumb_wait }
@@ -262,9 +278,29 @@ struct
                   Hashtbl.remove t.snark_tables.rebroadcastable key ;
                 keep ) ;
             return ()
-        | `New_refcount_table (removed, refcount_table) ->
+        | `New_refcount_table
+            { Extensions.Snark_pool_refcount.removed
+            ; refcount_table
+            ; inclusion_table
+            ; best_tip_table } ->
             t.ref_table <- Some refcount_table ;
+            t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;
+            (* Remove any purchased snark work from the rebroadcast table, to
+               avoid unnecessary messages to the network.
+            *)
+            Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
+              ~f:(fun stmt ->
+                let drop = Hashtbl.mem inclusion_table stmt in
+                if drop then
+                  [%log' debug t.logger]
+                    "No longer rebroadcasting SNARK with statement $stmt, it \
+                     has been seen in a block"
+                    ~metadata:
+                      [ ( "stmt"
+                        , One_or_two.to_yojson
+                            Transaction_snark.Statement.to_yojson stmt ) ] ;
+                not drop ) ;
             if t.removed_counter < removed_breadcrumb_wait then return ()
             else (
               t.removed_counter <- 0 ;
@@ -285,6 +321,7 @@ struct
           ~tf_diff_writer =
         (* start with empty ref table *)
         t.ref_table <- None ;
+        t.best_tip_table <- None ;
         let tf_deferred =
           Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
             | Some tf ->
@@ -308,6 +345,7 @@ struct
                 return ()
             | None ->
                 t.ref_table <- None ;
+                t.best_tip_table <- None ;
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
@@ -324,6 +362,7 @@ struct
           ; logger
           ; config
           ; ref_table= None
+          ; best_tip_table= None
           ; account_creation_fee=
               constraint_constants
                 .Genesis_constants.Constraint_constants.account_creation_fee
@@ -453,8 +492,8 @@ struct
                 match Signature_lib.Public_key.decompress prover with
                 | None ->
                     (* We may need to decompress the key when paying the fee
-                 transfer, so check that we can do it now.
-              *)
+                       transfer, so check that we can do it now.
+                    *)
                     [%log' error t.logger]
                       "Proof had an invalid key: $public_key"
                       ~metadata:
@@ -496,27 +535,22 @@ struct
     include T
     module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
-    let get_rebroadcastable t ~has_timed_out =
-      Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
-        ~f:(fun ~key:stmt ~data:(_proof, time) ->
-          match has_timed_out time with
-          | `Timed_out ->
-              [%log' debug t.logger]
-                "No longer rebroadcasting SNARK with statement $stmt, it was \
-                 added at $time its rebroadcast period is now expired"
-                ~metadata:
-                  [ ( "stmt"
-                    , One_or_two.to_yojson
-                        Transaction_snark.Statement.to_yojson stmt )
-                  ; ( "time"
-                    , `String (Time.to_string_abs ~zone:Time.Zone.utc time) )
-                  ] ;
-              false
-          | `Ok ->
-              true ) ;
+    (** Returns locally-generated snark work for re-broadcast.
+        This is limited to recent work which is yet to appear in a block.
+    *)
+    let get_rebroadcastable t ~has_timed_out:_ =
+      let in_best_tip_table =
+        match t.best_tip_table with
+        | Some best_tip_table ->
+            Hash_set.mem best_tip_table
+        | None ->
+            Fn.const false
+      in
       Hashtbl.to_alist t.snark_tables.rebroadcastable
-      |> List.map ~f:(fun (stmt, (snark, _time)) ->
-             Diff.Add_solved_work (stmt, snark) )
+      |> List.filter_map ~f:(fun (stmt, (snark, _time)) ->
+             if in_best_tip_table stmt then
+               Some (Diff.Add_solved_work (stmt, snark))
+             else None )
 
     let remove_solved_work t work =
       Statement_table.remove t.snark_tables.all work ;
@@ -1013,18 +1047,25 @@ let%test_module "random set test" =
       in
       let tf = Mocks.Transition_frontier.create [] in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create (Some tf) in
-      let stmt1, stmt2 =
+      let stmt1, stmt2, stmt3, stmt4 =
+        let gen_not_any l =
+          Quickcheck.Generator.filter
+            Mocks.Transaction_snark_work.Statement.gen ~f:(fun x ->
+              List.for_all l ~f:(fun y ->
+                  Mocks.Transaction_snark_work.Statement.compare x y <> 0 ) )
+        in
+        let open Quickcheck.Generator.Let_syntax in
         Quickcheck.random_value ~seed:(`Deterministic "")
-          (Quickcheck.Generator.filter
-             ~f:(fun (a, b) ->
-               Mocks.Transaction_snark_work.Statement.compare a b <> 0 )
-             (Quickcheck.Generator.tuple2
-                Mocks.Transaction_snark_work.Statement.gen
-                Mocks.Transaction_snark_work.Statement.gen))
+          (let%bind a = gen_not_any [] in
+           let%bind b = gen_not_any [a] in
+           let%bind c = gen_not_any [a; b] in
+           let%map d = gen_not_any [a; b; c] in
+           (a, b, c, d))
       in
-      let fee1, fee2 =
+      let fee1, fee2, fee3, fee4 =
         Quickcheck.random_value ~seed:(`Deterministic "")
-          (Quickcheck.Generator.tuple2 Fee_with_prover.gen Fee_with_prover.gen)
+          (Quickcheck.Generator.tuple4 Fee_with_prover.gen Fee_with_prover.gen
+             Fee_with_prover.gen Fee_with_prover.gen)
       in
       let fake_sender =
         Envelope.Sender.Remote
@@ -1044,7 +1085,8 @@ let%test_module "random set test" =
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
           let%bind () =
-            Mocks.Transition_frontier.refer_statements tf [stmt1; stmt2]
+            Mocks.Transition_frontier.refer_statements tf
+              [stmt1; stmt2; stmt3; stmt4]
           in
           let%bind res1 =
             apply_diff ~sender:fake_sender resource_pool stmt1 fee1
@@ -1074,11 +1116,60 @@ let%test_module "random set test" =
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
             rebroadcastable2
             [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
+          let%bind res3 = apply_diff resource_pool stmt3 fee3 in
+          let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
+          ok_exn res3 |> ignore ;
           let rebroadcastable3 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~has_timed_out:(Fn.const `Ok)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable3
+            (let open Mock_snark_pool.Resource_pool.Diff in
+            List.sort
+              ~compare:(fun x y ->
+                match (x, y) with
+                | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
+                    Transaction_snark_work.Statement.compare stmt1 stmt2
+                | _ ->
+                    assert false )
+              [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
+              ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ]) ;
+          (* Mark work as included in a block. *)
+          let%bind () =
+            Mocks.Transition_frontier.completed_work_statements tf
+              [stmt1; stmt2]
+          in
+          let rebroadcastable4 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~has_timed_out:(Fn.const `Ok)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable4
+            [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+          (* Keep rebroadcasting even after the timeout, as long as the work
+             hasn't appeared in a block yet.
+          *)
+          let rebroadcastable5 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Timed_out)
           in
           [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable3 [] ;
+            rebroadcastable5
+            [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+          let%bind res6 = apply_diff resource_pool stmt4 fee4 in
+          let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
+          ok_exn res6 |> ignore ;
+          (* Mark best tip as not including stmt3. *)
+          let%bind () =
+            Mocks.Transition_frontier.remove_from_best_tip tf [stmt3]
+          in
+          let rebroadcastable6 =
+            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
+              ~has_timed_out:(Fn.const `Ok)
+          in
+          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+            rebroadcastable6
+            [Add_solved_work (stmt4, {proof= proof4; fee= fee4})] ;
           Deferred.unit )
   end )
