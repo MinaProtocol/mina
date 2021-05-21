@@ -22,13 +22,6 @@ echo "deb [trusted=yes] http://packages.o1test.net $MINA_DEB_CODENAME $MINA_DEB_
 apt-get update
 apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 
-# Disabled as genesis proofs are no longer needed to connect
-# Generate genesis proof and then crash due to no peers
-# mina daemon \
-#   -config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
-#   -generate-genesis-proof true \
-# || true
-
 # Remove lockfile if present
 rm ~/.mina-config/.mina-lock ||:
 

@@ -172,12 +172,6 @@ ls -lh mina*.deb
 echo "------------------------------------------------------------"
 echo "Building testnet signatures deb without keys:"
 
-#300     curl \
-#301     ca-certificates \
-#302     dnsutils \
-#304     gettext \
-#312     tzdata
-
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: mina-devnet
 Version: ${VERSION}
@@ -260,16 +254,6 @@ do
         fi
     done
 done
-
-# echo contents of deb
-# echo "------------------------------------------------------------"
-# echo "Deb Contents:"
-# find "${BUILDDIR}"
-
-# Build the package
-# echo "------------------------------------------------------------"
-# fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
-# ls -lh mina*.deb
 
 #remove build dir to prevent running out of space on the host machine
 rm -rf "${BUILDDIR}"
