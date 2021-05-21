@@ -1,5 +1,15 @@
+module type Iffable = sig
+  type bool
+
+  type t
+
+  val if_ : bool -> then_:t -> else_:t -> t
+end
+
 module type Bool_intf = sig
   type t
+
+  include Iffable with type t := t and type bool := t
 
   val true_ : t
 
@@ -12,14 +22,6 @@ module type Bool_intf = sig
   val ( && ) : t -> t -> t
 
   val assert_ : t -> unit
-end
-
-module type Iffable = sig
-  type bool
-
-  type t
-
-  val if_ : bool -> then_:t -> else_:t -> t
 end
 
 module type Amount_intf = sig
@@ -47,15 +49,29 @@ module type Token_id_intf = sig
 end
 
 module Local_state = struct
-  type ('parties, 'token_id, 'excess, 'ledger, 'bool) t =
-    { parties: 'parties
-    ; all_parties: 'parties
-    ; token_id: 'token_id
-    ; excess: 'excess
-    ; ledger: 'ledger
-    ; success: 'bool
-    ; will_succeed: 'bool }
-  [@@deriving fields]
+  open Core_kernel
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('parties, 'token_id, 'excess, 'ledger, 'bool, 'comm) t =
+        { parties: 'parties
+              (* Commitment to all parts of the transaction EXCEPT for the fee payer *)
+        ; transaction_commitment: 'comm
+        ; token_id: 'token_id
+        ; excess: 'excess
+        ; ledger: 'ledger
+        ; success: 'bool
+        ; will_succeed: 'bool }
+      [@@deriving compare, equal, hash, sexp, yojson, fields, hlist]
+    end
+  end]
+
+  let typ parties token_id excess ledger bool comm =
+    Pickles.Impls.Step.Typ.of_hlistable
+      [parties; comm; token_id; excess; ledger; bool; bool]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 end
 
 module type Parties_intf = sig
@@ -88,16 +104,18 @@ module Eff = struct
     | Check_inclusion :
         'ledger * 'account * 'inclusion_proof
         -> ( unit
-           , < ledger: 'ledger ; inclusion_proof: 'inclusion_proof ; .. > )
+           , < ledger: 'ledger
+             ; inclusion_proof: 'inclusion_proof
+             ; account: 'account
+             ; .. > )
            t
     | Check_predicate :
-        'party * 'account * 'global_state * 'protocol_state_predicate option
+        'bool * 'party * 'account * 'global_state
         -> ( 'bool
            , < bool: 'bool
              ; party: 'party
              ; account: 'account
              ; global_state: 'global_state
-             ; protocol_state_predicate: 'protocol_state_predicate
              ; .. > )
            t
     | Set_account_if :
@@ -109,6 +127,9 @@ module Eff = struct
              ; account: 'account
              ; .. > )
            t
+    | Get_global_ledger :
+        'global_state
+        -> ('ledger, < global_state: 'global_state ; ledger: 'ledger ; .. >) t
     | Modify_global_excess :
         'global_state * ('amount -> 'amount)
         -> ( 'global_state
@@ -124,18 +145,18 @@ module Eff = struct
         -> ('token_id, < party: 'party ; token_id: 'token_id ; .. >) t
     | Check_auth_and_update_account :
         { is_start: 'bool
-        ; protocol_state_predicate: 'protocol_state_predicate option
         ; party: 'party
         ; account: 'account
-        ; all_parties: 'all_parties
+        ; transaction_commitment: 'transaction_commitment
+        ; global_state: 'global_state
         ; inclusion_proof: 'ip }
         -> ( 'account * 'bool
            , < inclusion_proof: 'ip
              ; bool: 'bool
              ; party: 'party
-             ; all_parties: 'all_parties
+             ; transaction_commitment: 'transaction_commitment
              ; account: 'account
-             ; protocol_state_predicate: 'protocol_state_predicate
+             ; global_state: 'global_state
              ; .. > )
            t
     | Balance :
@@ -144,6 +165,16 @@ module Eff = struct
     | Finalize_local_state :
         'bool * 'local_state
         -> (unit, < local_state: 'local_state ; bool: 'bool ; .. >) t
+    | Transaction_commitment_on_start :
+        { start_party: 'party
+        ; other_parties: 'parties }
+        -> ( 'transaction_commitment option
+           , < party: 'party
+             ; parties: 'parties
+             ; bool: 'bool
+             ; transaction_commitment: 'transaction_commitment
+             ; .. > )
+           t
 end
 
 type 'e handler = {perform: 'r. ('r, 'e) Eff.t -> 'r}
@@ -153,13 +184,30 @@ module type Inputs_intf = sig
 
   module Ledger : Ledger_intf with type bool := Bool.t
 
-  module Account : Iffable with type bool := Bool.t
+  module Account : sig
+    type t
+  end
 
   module Amount : Amount_intf with type bool := Bool.t
 
   module Token_id : Token_id_intf with type bool := Bool.t
 
   module Parties : Parties_intf with type bool := Bool.t
+
+  module Transaction_commitment : sig
+    include Iffable with type bool := Bool.t
+  end
+end
+
+module Start_data = struct
+  open Core_kernel
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('parties, 'bool) t = {parties: 'parties; will_succeed: 'bool}
+    end
+  end]
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -168,10 +216,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let apply (type global_state)
       (* (step_or_start : [`Start of Inputs.Parties.t | `Step]) *)
-      start_parties protocol_state_predicate
+      (start_data : _ Start_data.t)
       (h :
         (< global_state: global_state
-         ; all_parties: Ps.t
+         ; transaction_commitment: Transaction_commitment.t
          ; amount: Amount.t
          ; bool: Bool.t
          ; .. >
@@ -181,41 +229,61 @@ module Make (Inputs : Inputs_intf) = struct
       ((global_state : global_state), (local_state : _ Local_state.t)) =
     let open Inputs in
     let is_start = Ps.is_empty local_state.parties in
+    let local_state =
+      { local_state with
+        ledger=
+          Inputs.Ledger.if_ is_start
+            ~then_:(h.perform (Get_global_ledger global_state))
+            ~else_:local_state.ledger }
+    in
     let (party, remaining), local_state =
       let to_pop =
-        Ps.if_ is_start ~then_:start_parties ~else_:local_state.parties
+        Ps.if_ is_start ~then_:start_data.parties ~else_:local_state.parties
       in
       let party, remaining = Ps.pop to_pop in
+      let transaction_commitment =
+        match
+          h.perform
+            (Transaction_commitment_on_start
+               {start_party= party; other_parties= remaining})
+        with
+        | None ->
+            local_state.transaction_commitment
+        | Some on_start ->
+            Transaction_commitment.if_ is_start ~then_:on_start
+              ~else_:local_state.transaction_commitment
+      in
       let local_state =
         { local_state with
-          all_parties=
-            Ps.if_ is_start ~then_:remaining ~else_:local_state.parties
+          transaction_commitment
         ; token_id=
             Token_id.if_ is_start ~then_:Token_id.default
               ~else_:local_state.token_id }
       in
       ((party, remaining), local_state)
     in
-    let local_state = {local_state with parties= remaining} in
+    let local_state =
+      { local_state with
+        parties= remaining
+      ; will_succeed=
+          Bool.if_ is_start ~then_:start_data.will_succeed
+            ~else_:local_state.will_succeed }
+    in
     let a, inclusion_proof =
       h.perform (Get_account (party, local_state.ledger))
     in
     h.perform (Check_inclusion (local_state.ledger, a, inclusion_proof)) ;
     let predicate_satisfied : Bool.t =
-      h.perform
-        (Check_predicate (party, a, global_state, protocol_state_predicate))
+      h.perform (Check_predicate (is_start, party, a, global_state))
     in
     let a', update_permitted =
-      let parties_for_auth =
-        Ps.if_ is_start ~then_:start_parties ~else_:local_state.all_parties
-      in
       h.perform
         (Check_auth_and_update_account
            { is_start
+           ; global_state
            ; party
            ; account= a
-           ; all_parties= parties_for_auth
-           ; protocol_state_predicate
+           ; transaction_commitment= local_state.transaction_commitment
            ; inclusion_proof })
     in
     let party_succeeded = Bool.( && ) predicate_satisfied update_permitted in
@@ -275,8 +343,8 @@ module Make (Inputs : Inputs_intf) = struct
     let global_state =
       let curr_is_default = Token_id.(equal default) local_state.token_id in
       let should_perform_second_excess_merge =
-        (* The first party's fee always gets merged in *)
-        Bool.(curr_is_default && (is_last_party || is_start))
+        (* See: https://github.com/MinaProtocol/mina/issues/8921 *)
+        Bool.(curr_is_default && is_last_party)
       in
       h.perform
         (Modify_global_excess
@@ -296,8 +364,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (global_state, local_state)
 
-  let step h state = apply Ps.empty None h state
+  let step h state =
+    apply {parties= Ps.empty; will_succeed= Bool.true_} h state
 
-  let start ~protocol_state parties h state =
-    apply parties (Some protocol_state) h state
+  let start start_data h state = apply start_data h state
 end
