@@ -1121,7 +1121,8 @@ let%test_module "random set test" =
             [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
           let%bind res3 = apply_diff resource_pool stmt3 fee3 in
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
-          ok_exn res3 |> ignore ;
+          ignore (ok_exn res3: Mock_snark_pool.Resource_pool.Diff.verified *
+                               Mock_snark_pool.Resource_pool.Diff.rejected);
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
@@ -1162,7 +1163,8 @@ let%test_module "random set test" =
             [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
           let%bind res6 = apply_diff resource_pool stmt4 fee4 in
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
-          ok_exn res6 |> ignore ;
+          ignore (ok_exn res6 :   Mock_snark_pool.Resource_pool.Diff.verified *
+                                  Mock_snark_pool.Resource_pool.Diff.rejected);
           (* Mark best tip as not including stmt3. *)
           let%bind () =
             Mocks.Transition_frontier.remove_from_best_tip tf [stmt3]
