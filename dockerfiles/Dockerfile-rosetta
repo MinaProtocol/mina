@@ -341,7 +341,7 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
 USER postgres
 
 # TODO: variable pg_version based on deb_release
-ARG POSTGRES_VERSION=9
+ARG POSTGRES_VERSION=9.6
 
 # TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
 # TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
