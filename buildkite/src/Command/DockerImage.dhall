@@ -27,11 +27,11 @@ let ReleaseSpec = {
     deps = [] : List Command.TaggedKey.Type,
     deploy_env_file = "DOCKER_DEPLOY_ENV",
     service = "\\\${MINA_SERVICE}",
-    version = "\\\${MINA_VERSION}",
+    version = "\\\${MINA_VERSION}-devnet",
     commit = "\\\${MINA_GIT_HASH}",
     build_rosetta_override = False,
-    extra_args = "--build-arg deb_version=\\\${MINA_DEB_VERSION} --build-arg deb_release=\\\${MINA_DEB_RELEASE} --build-arg deb_codename=\\\${MINA_DEB_CODENAME} --build-arg network=mainnet --build-arg MINA_VERSION=\\\${MINA_VERSION} --build-arg MINA_BRANCH=\\\${MINA_GIT_BRANCH}",
-    step_key = "mina-docker-image"
+    extra_args = "--build-arg deb_version=\\\${MINA_DEB_VERSION} --build-arg deb_release=\\\${MINA_DEB_RELEASE} --build-arg deb_codename=\\\${MINA_DEB_CODENAME} --build-arg network=devnet --build-arg MINA_VERSION=\\\${MINA_VERSION} --build-arg MINA_BRANCH=\\\${MINA_GIT_BRANCH}",
+    step_key = "mina-devnet-docker-image"
   }
 }
 
