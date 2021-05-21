@@ -387,15 +387,10 @@ module Data = struct
                     ; ("error", `String str) ] ;
                 create_new_uuids ()
           in
-          let both_files_present =
-            Sys.file_exists (ledger_location epoch_ledger_uuids.staking)
-            && Sys.file_exists (ledger_location epoch_ledger_uuids.next)
-          in
           (*If the genesis hash matches and both the files are present. If only one of them is present then it could be stale data and might cause the node to never be able to bootstrap*)
           if
             Mina_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
               genesis_state_hash
-            && both_files_present
           then epoch_ledger_uuids
           else
             (*Clean-up outdated epoch ledgers*)
@@ -986,6 +981,22 @@ module Data = struct
       let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs
 
       let genesis_winner = keypairs.(0)
+
+      let genesis_stake_proof :
+          genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> Stake_proof.t =
+       fun ~genesis_epoch_ledger ->
+        let pk, sk = genesis_winner in
+        let dummy_sparse_ledger =
+          Mina_base.Sparse_ledger.of_ledger_subset_exn
+            (Lazy.force genesis_epoch_ledger)
+            [Mina_base.(Account_id.create pk Token_id.default)]
+        in
+        { delegator= 0
+        ; delegator_pk= pk
+        ; coinbase_receiver_pk= pk
+        ; ledger= dummy_sparse_ledger
+        ; producer_private_key= sk
+        ; producer_public_key= Public_key.decompress_exn pk }
 
       let handler :
              constraint_constants:Genesis_constants.Constraint_constants.t
@@ -2597,6 +2608,8 @@ module Data = struct
   module Prover_state = struct
     include Stake_proof
 
+    let genesis_data = Vrf.Precomputed.genesis_stake_proof
+
     let precomputed_handler = Vrf.Precomputed.handler
 
     let handler
@@ -2646,7 +2659,7 @@ module Data = struct
 end
 
 module Coinbase_receiver = struct
-  type t = [`Producer | `Other of Public_key.Compressed.t]
+  type t = [`Producer | `Other of Public_key.Compressed.t] [@@deriving yojson]
 
   let resolve ~self : t -> Public_key.Compressed.t = function
     | `Producer ->

@@ -2,10 +2,11 @@
 # this dockerfile in a production environment. See `coda_daemon_puppeteer.py`
 # for more details.
 
+# This dockerfile needs to be run with `dockerfiles/puppeteer-context` as the
+# build context.
+
 ARG CODA_VERSION
 FROM codaprotocol/coda-daemon:${CODA_VERSION}
-
-ARG CODA_BRANCH
 
 RUN echo '#!/bin/bash\n\
 pgrep -f --newest "python3 /root/coda_daemon_puppeteer.py"'\
@@ -23,7 +24,6 @@ while [ -f daemon-active ]; do sleep 1; done'\
 
 RUN chmod +x find_puppeteer.sh start.sh stop.sh
 
-RUN curl -sL "https://raw.githubusercontent.com/MinaProtocol/mina/${CODA_BRANCH}/dockerfiles/coda_daemon_puppeteer.py" \
-  -o /root/coda_daemon_puppeteer.py
+ADD coda_daemon_puppeteer.py .
 
 ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/coda_daemon_puppeteer.py"]

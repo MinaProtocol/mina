@@ -49,7 +49,8 @@ if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then u
 
 case $SERVICE in
 coda-archive)
-  DOCKERFILE_PATH="scripts/archive/Dockerfile"
+  DOCKERFILE_PATH="dockerfiles/Dockerfile-mina-archive"
+  DOCKER_CONTEXT="dockerfiles/"
   ;;
 bot)
   DOCKERFILE_PATH="frontend/bot/Dockerfile"
@@ -61,10 +62,7 @@ coda-daemon)
   ;;
 coda-daemon-puppeteered)
   DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-daemon-puppeteered"
-  DOCKER_CONTEXT="dockerfiles/"
-  ;;
-coda-demo)
-  DOCKERFILE_PATH="dockerfiles/Dockerfile-coda-demo"
+  DOCKER_CONTEXT="dockerfiles/puppeteer-context"
   ;;
 coda-rosetta)
   if [[ "$BUILD_ROSETTA" != "true" ]]; then
