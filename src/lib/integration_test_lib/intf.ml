@@ -276,10 +276,9 @@ module Dsl = struct
 
     type t
 
-    val section : string -> 'a Malleable_error.t -> 'a Malleable_error.t
+    val section_hard : string -> 'a Malleable_error.t -> 'a Malleable_error.t
 
-    val section_soft :
-      string -> unit Malleable_error.t -> unit Malleable_error.t
+    val section : string -> unit Malleable_error.t -> unit Malleable_error.t
 
     val network_state : t -> Network_state.t
 

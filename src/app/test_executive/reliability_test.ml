@@ -116,15 +116,15 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     let%bind () =
-      section_soft "network is fully connected upon initialization"
+      section "network is fully connected upon initialization"
         (check_peers ~logger all_nodes)
     in
     let%bind _ =
-      section_soft "blocks are produced"
+      section "blocks are produced"
         (wait_for t (Wait_condition.blocks_to_be_produced 2))
     in
     let%bind () =
-      section_soft "short bootstrap"
+      section "short bootstrap"
         (let%bind () = Node.stop node_c in
          let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
          let%bind () = Node.start ~fresh_state:true node_c in
@@ -137,11 +137,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
                      (Time.Span.of_ms (15. *. 60. *. 1000.))) ))
     in
     let%bind () =
-      section_soft "network is fully connected after one node is restarted"
+      section "network is fully connected after one node is restarted"
         (let%bind () = Malleable_error.lift (after (Time.Span.of_sec 180.0)) in
          check_peers ~logger all_nodes)
     in
-    section_soft "nodes share common prefix no greater than 2 block back"
+    section "nodes share common prefix no greater than 2 block back"
       (let%bind _ = wait_for t (Wait_condition.blocks_to_be_produced 1) in
        (* the common prefix test relies on 4 blocks having been produced.  previous sections altogether have already produced 3.  if previous sections change, then this may need to be re-adjusted*)
        let%bind chains =
