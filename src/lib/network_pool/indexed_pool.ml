@@ -1104,7 +1104,9 @@ let%test_module _ =
                 [%test_eq:
                   Transaction_hash.User_command_with_valid_signature.t
                   Sequence.t] dropped' (Sequence.singleton cmd) ;
-                [%test_eq: t] pool pool''
+                (* TODO: derive compare, equal for t *)
+                let compare = Caml.compare in
+                [%test_eq: t] ~equal:Poly.( = ) pool pool''
             | _ ->
                 failwith "should've succeeded" )
 

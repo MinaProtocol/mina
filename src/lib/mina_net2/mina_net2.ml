@@ -673,10 +673,6 @@ module Helper = struct
               ; ("party", `String (name_participant who_closed)) ] ;
           stream.state
         in
-        (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
-        let us_them_eq a b =
-          match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
-        in
         let release () =
           match Hashtbl.find_and_remove net.streams stream.idx with
           | Some _ ->
@@ -691,7 +687,8 @@ module Helper = struct
            | FullyOpen ->
                HalfClosed who_closed
            | HalfClosed other ->
-               if us_them_eq other who_closed then ignore (double_close ())
+               if [%equal: [`Us | `Them]] other who_closed then
+                 ignore (double_close ())
                else release () ;
                FullyClosed
            | FullyClosed ->
@@ -1455,7 +1452,7 @@ module Protocol_handler = struct
 
   let close_connections (net : net) for_protocol =
     Hashtbl.filter_inplace net.streams ~f:(fun stream ->
-        if stream.protocol <> for_protocol then true
+        if not (String.equal stream.protocol for_protocol) then true
         else (
           don't_wait_for
             (* TODO: this probably needs to be more thorough than a reset. Also force the write pipe closed? *)
@@ -1693,7 +1690,8 @@ let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
           let v = Or_error.try_with (fun () -> Yojson.Safe.from_string line) in
           ( match
               Or_error.map v ~f:(fun v ->
-                  if member "upcall" v = `Null then Helper.handle_response t v
+                  if Yojson.Safe.equal (member "upcall" v) `Null then
+                    Helper.handle_response t v
                   else Helper.handle_upcall t v )
             with
           | Ok (Ok ()) ->
@@ -1914,7 +1912,7 @@ let%test_module "coda network tests" =
         (* give time for [a] to notice the reset finish. *)
         let%bind () = after (Time.Span.of_sec 1.) in
         let msg = Queue.to_list msg |> String.concat in
-        assert (msg = testmsg) ;
+        assert (String.equal msg testmsg) ;
         assert !handler_finished ;
         let%bind () = Protocol_handler.close echo_handler in
         let%map () = shutdown () in

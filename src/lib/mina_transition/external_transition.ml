@@ -858,7 +858,8 @@ let skip_protocol_versions_validation
   (t, Validation.Unsafe.set_valid_protocol_versions validation)
 
 module With_validation = struct
-  let compare (t1, _) (t2, _) = compare (With_hash.data t1) (With_hash.data t2)
+  let compare (t1, _) (t2, _) =
+    Poly.compare (With_hash.data t1) (With_hash.data t2)
 
   let state_hash (t, _) = With_hash.hash t
 

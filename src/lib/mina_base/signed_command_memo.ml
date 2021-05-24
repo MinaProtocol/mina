@@ -15,7 +15,7 @@ open Crypto_params
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = string [@@deriving sexp, eq, compare, hash]
+    type t = string [@@deriving sexp, equal, compare, hash]
 
     let to_latest = Fn.id
 

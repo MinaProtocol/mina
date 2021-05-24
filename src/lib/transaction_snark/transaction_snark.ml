@@ -48,7 +48,7 @@ module Pending_coinbase_stack_state = struct
     module Stable = struct
       module V1 = struct
         type t = Base of Pending_coinbase.Stack_versioned.Stable.V1.t | Merge
-        [@@deriving sexp, hash, compare, eq, yojson]
+        [@@deriving sexp, hash, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -61,7 +61,7 @@ module Pending_coinbase_stack_state = struct
       module V1 = struct
         type 'pending_coinbase t =
           {source: 'pending_coinbase; target: 'pending_coinbase}
-        [@@deriving sexp, hash, compare, eq, fields, yojson, hlist]
+        [@@deriving sexp, hash, compare, equal, fields, yojson, hlist]
 
         let to_latest pending_coinbase {source; target} =
           {source= pending_coinbase source; target= pending_coinbase target}
@@ -77,14 +77,14 @@ module Pending_coinbase_stack_state = struct
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
     {source: 'pending_coinbase; target: 'pending_coinbase}
-  [@@deriving sexp, hash, compare, eq, fields, yojson]
+  [@@deriving sexp, hash, compare, equal, fields, yojson]
 
   (* State of the coinbase stack for the current transaction snark *)
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-      [@@deriving sexp, hash, compare, eq, yojson]
+      [@@deriving sexp, hash, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -405,7 +405,8 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       type t = Pickles.Proof.Branching_2.Stable.V1.t
-      [@@deriving version {asserted}, yojson, bin_io, compare, sexp, hash]
+      [@@deriving
+        version {asserted}, yojson, bin_io, compare, equal, sexp, hash]
 
       let to_latest = Fn.id
     end
@@ -417,7 +418,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, yojson, hash]
+    [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
   end
@@ -4880,8 +4881,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
-                token_owner_account.token_permissions
-                = Token_owned {disable_new_accounts= false} ) ) )
+                Token_permissions.equal token_owner_account.token_permissions
+                  (Token_owned {disable_new_accounts= false}) ) ) )
 
     let%test_unit "create new token for a different pk" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4916,8 +4917,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
-                token_owner_account.token_permissions
-                = Token_owned {disable_new_accounts= false} ) ) )
+                Token_permissions.equal token_owner_account.token_permissions
+                  (Token_owned {disable_new_accounts= false}) ) ) )
 
     let%test_unit "create new token for a different pk new accounts disabled" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4951,8 +4952,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
-                token_owner_account.token_permissions
-                = Token_owned {disable_new_accounts= true} ) ) )
+                Token_permissions.equal token_owner_account.token_permissions
+                  (Token_owned {disable_new_accounts= true}) ) ) )
 
     let%test_unit "create own new token account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4999,8 +5000,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "create new token account for a different pk" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5047,8 +5048,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "create new token account for a different pk in a locked \
                    token" =
@@ -5096,8 +5097,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "create new own locked token account in a locked token" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5144,8 +5145,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= true} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= true}) ) ) )
 
     let%test_unit "create new token account fails for locked token, non-owner \
                    fee-payer" =
@@ -5442,8 +5443,8 @@ let%test_module "transaction_snark" =
                 Public_key.Compressed.equal receiver_pk
                   (Option.value_exn receiver_account.delegate) ) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "mint tokens in owner's account" =
       Test_util.with_randomness 123456789 (fun () ->

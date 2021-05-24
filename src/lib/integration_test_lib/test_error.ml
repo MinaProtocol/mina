@@ -13,7 +13,7 @@ type internal_error =
         [@compare
           fun a b ->
             String.compare (Error.to_string_hum a) (Error.to_string_hum b)] }
-[@@deriving eq, sexp, compare]
+[@@deriving equal, sexp, compare]
 
 let internal_error error = {occurrence_time= Time.now (); error}
 
@@ -26,12 +26,12 @@ let compare_time a b = Time.compare (occurrence_time a) (occurrence_time b)
 module Error_accumulator = struct
   type 'error contextualized_errors =
     {introduction_time: Time.t; errors_by_time: 'error list Time.Map.t}
-  [@@deriving eq, sexp_of, compare]
+  [@@deriving equal, sexp_of, compare]
 
   type 'error t =
     { from_current_context: 'error list
     ; contextualized_errors: 'error contextualized_errors String.Map.t }
-  [@@deriving eq, sexp_of, compare]
+  [@@deriving equal, sexp_of, compare]
 
   let empty_contextualized_errors () =
     {introduction_time= Time.now (); errors_by_time= Time.Map.empty}

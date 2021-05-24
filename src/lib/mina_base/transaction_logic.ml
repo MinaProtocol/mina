@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Currency
 open Signature_lib
 module Global_slot = Mina_numbers.Global_slot
@@ -447,14 +447,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
       amount =
     let fee = constraint_constants.account_creation_fee in
-    if action = `Added then
-      error_opt
-        (sprintf
-           !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
-             transaction amount %{sexp: Currency.Amount.t} insufficient"
-           fee amount)
-        Amount.(sub amount (of_fee fee))
-    else Ok amount
+    match action with
+    | `Added ->
+        error_opt
+          (sprintf
+             !"Error subtracting account creation fee %{sexp: \
+               Currency.Fee.t}; transaction amount %{sexp: Currency.Amount.t} \
+               insufficient"
+             fee amount)
+          Amount.(sub amount (of_fee fee))
+    | _ ->
+        Ok amount
 
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
@@ -519,7 +522,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 c.balances )
   end
 
-  let previous_empty_accounts action pk = if action = `Added then [pk] else []
+  let previous_empty_accounts action pk =
+    match action with `Added -> [pk] | _ -> []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in
@@ -850,9 +854,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
-          if not (receiver_location = `New) then
-            failwith
-              "Token owner account for newly created token already exists?!?!" ;
+          ( match receiver_location with
+          | `New ->
+              ()
+          | _ ->
+              failwith
+                "Token owner account for newly created token already exists?!?!"
+          ) ;
           let receiver_account =
             { receiver_account with
               token_permissions=
@@ -1129,18 +1137,21 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind delegate =
       if Token_id.(equal default) a.token_id then
         update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:(( = ) Set_or_keep.Keep) ~update:(fun u x ->
-            match u with Keep -> x | Set y -> Some y )
+          ~is_keep:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep)
+          ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
       else return a.delegate
     in
     let%bind snapp =
       let%map app_state =
         update a.permissions.edit_state app_state init.app_state
-          ~is_keep:(Vector.for_all ~f:(( = ) Set_or_keep.Keep))
+          ~is_keep:
+            (Vector.for_all
+               ~f:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep))
           ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
       and verification_key =
         update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:(( = ) Set_or_keep.Keep)
+          init.verification_key
+          ~is_keep:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep)
           ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
       in
@@ -1149,7 +1160,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%bind permissions =
       update a.permissions.set_delegate permissions a.permissions
-        ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
+        ~is_keep:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep)
+        ~update:Set_or_keep.set_or_keep
     in
     Ok {a with balance; snapp; delegate; permissions; timing}
 
@@ -1362,7 +1374,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         Fn.flip Permissions.Auth_required.check
                           (Control.tag authorization)
                   in
-                  apply_body ~check_auth body acct2' ~is_new:(loc2 = `New)
+                  apply_body ~check_auth body acct2'
+                    ~is_new:(match loc2 with `New -> true | _ -> false)
                 in
                 Some (loc2, res)
             | _ ->

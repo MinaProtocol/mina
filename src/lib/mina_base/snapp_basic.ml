@@ -21,7 +21,7 @@ module Transition = struct
   module Stable = struct
     module V1 = struct
       type 'a t = {prev: 'a; next: 'a}
-      [@@deriving hlist, sexp, eq, yojson, hash, compare]
+      [@@deriving hlist, sexp, equal, yojson, hash, compare]
     end
   end]
 
@@ -90,7 +90,7 @@ module Set_or_keep = struct
   module Stable = struct
     module V1 = struct
       type 'a t = Set of 'a | Keep
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -158,7 +158,7 @@ module Or_ignore = struct
   module Stable = struct
     module V1 = struct
       type 'a t = Check of 'a | Ignore
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -235,7 +235,7 @@ module Account_state = struct
   module Stable = struct
     module V1 = struct
       type t = Empty | Non_empty | Any
-      [@@deriving sexp, eq, yojson, hash, compare, enum]
+      [@@deriving sexp, equal, yojson, hash, compare, enum]
 
       let to_latest = Fn.id
     end

@@ -447,7 +447,8 @@ let%test_module "Transition_handler.Processor tests" =
                                              newly_added_transition
                                          |> Unsigned.UInt32.to_int ) ) ]
                                  "transition of $height passed processor" ;
-                               if tail = [] then `Stop true else `Continue tail
+                               if List.is_empty tail then `Stop true
+                               else `Continue tail
                            | [] ->
                                `Stop false ) ))
                 with

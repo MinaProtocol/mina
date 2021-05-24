@@ -345,7 +345,7 @@ module Existentially_comparable = Comparable.Make (struct
   type t = existential [@@deriving sexp]
 
   (* polymorphic compare should be safe to use here as the variants in ['a t] are shallow *)
-  let compare = Pervasives.compare
+  let compare = Poly.compare
 end)
 
 module Map = Existentially_comparable.Map

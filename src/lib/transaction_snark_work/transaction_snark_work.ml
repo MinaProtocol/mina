@@ -21,7 +21,7 @@ module Statement = struct
 
     module V1 = struct
       type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
-      [@@deriving eq, compare, hash, sexp, yojson]
+      [@@deriving equal, compare, hash, sexp, yojson]
 
       let to_latest = Fn.id
 
@@ -31,7 +31,7 @@ module Statement = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, eq]
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, equal]
 
   include Hashable.Make (Stable.Latest)
 

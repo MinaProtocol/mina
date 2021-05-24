@@ -32,16 +32,18 @@ module Make (M : Monad.S) (Input : Inputs_intf with module M := M) :
   let prove ?length ~context last =
     let open M.Let_syntax in
     let rec find_path ~length value =
-      if length = Some 0 then M.return (value, [])
-      else
-        match%bind get_previous ~context value with
-        | None ->
-            M.return (value, [])
-        | Some parent ->
-            let%map first, proofs =
-              find_path ~length:(Option.map length ~f:pred) parent
-            in
-            (first, to_proof_elem value :: proofs)
+      match length with
+      | Some 0 ->
+          M.return (value, [])
+      | _ -> (
+          match%bind get_previous ~context value with
+          | None ->
+              M.return (value, [])
+          | Some parent ->
+              let%map first, proofs =
+                find_path ~length:(Option.map length ~f:pred) parent
+              in
+              (first, to_proof_elem value :: proofs) )
     in
     let%map first, proofs = find_path ~length last in
     (first, List.rev proofs)

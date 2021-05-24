@@ -498,7 +498,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                  let current_transition =
                    Broadcast_pipe.Reader.peek most_recent_valid_block_reader
                  in
-                 if
+                 match
                    Consensus.Hooks.select
                      ~constants:precomputed_values.consensus_constants
                      ~existing:
@@ -512,11 +512,12 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                        |> With_hash.map ~f:External_transition.consensus_state
                        )
                      ~logger
-                   = `Take
-                 then
-                   Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                     incoming_transition
-                 else Deferred.unit ) ;
+                 with
+                 | `Take ->
+                     Broadcast_pipe.Writer.write most_recent_valid_block_writer
+                       incoming_transition
+                 | `Keep ->
+                     Deferred.unit ) ;
           don't_wait_for
           @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
                ~f:(fun enveloped_transition ->

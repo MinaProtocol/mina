@@ -4,14 +4,14 @@ open Signature_lib
 
 module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
-  [@@deriving sexp, yojson, eq]
+  [@@deriving sexp, yojson, equal]
 
   include Hashable.S with type t := t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, compare, sexp, version, yojson, eq]
+        type t [@@deriving bin_io, compare, sexp, version, yojson, equal]
 
         include Hashable.S_binable with type t := t
       end

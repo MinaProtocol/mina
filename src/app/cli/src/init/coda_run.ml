@@ -236,12 +236,11 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   Yojson.Safe.to_file (temp_config ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
-  let _ =
-    if Core.Sys.file_exists daemon_config = `Yes then
-      Core.Sys.command
-        (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
-      |> ignore
-  in
+  (match Core.Sys.file_exists daemon_config with
+  | `Yes ->
+    ignore (Core.Sys.command
+              (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json")) : int)
+  | _ -> ());
   (*Zip them all up*)
   let tmp_files =
     [ "coda_short.log"
@@ -250,7 +249,12 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
     ; "coda_status.json"
     ; "crash_summary.json"
     ; "daemon.json" ]
-    |> List.filter ~f:(fun f -> Core.Sys.file_exists (temp_config ^/ f) = `Yes)
+    |> List.filter ~f:(fun f ->
+           match Core.Sys.file_exists (temp_config ^/ f) with
+           | `Yes ->
+               true
+           | `Unknown | `No ->
+               false )
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =

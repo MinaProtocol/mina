@@ -841,7 +841,7 @@ let setup_daemon logger =
       Option.iter
         ~f:(fun password ->
           match Sys.getenv Secrets.Keypair.env with
-          | Some env_pass when env_pass <> password ->
+          | Some env_pass when not (String.equal env_pass password) ->
               [%log warn]
                 "$envkey environment variable doesn't match value provided on \
                  command-line or daemon.json. Using value from $envkey"
