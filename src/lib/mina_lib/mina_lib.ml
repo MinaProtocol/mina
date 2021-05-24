@@ -200,7 +200,8 @@ module Snark_worker = struct
       snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
     don't_wait_for
       ( match%bind
-          Monitor.try_with (fun () -> Process.wait snark_worker_process)
+          Monitor.try_with ~here:[%here] (fun () ->
+              Process.wait snark_worker_process )
         with
       | Ok signal_or_error -> (
         match signal_or_error with
@@ -496,35 +497,121 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 let best_ledger = compose_of_option best_ledger_opt
 
 let get_ledger t state_hash_opt =
-  let open Deferred.Or_error.Let_syntax in
+  let open Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
+    Option.value_map state_hash_opt ~f:Or_error.return
       ~default:
         ( match best_tip t with
         | `Active bc ->
-            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
-            Deferred.Or_error.error_string
+            Or_error.error_string
               "get_ledger: can't get staged ledger hash while bootstrapping" )
   in
-  let%bind frontier =
-    Deferred.return (t.components.transition_frontier |> peek_frontier)
-  in
-  match
-    List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
-        let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
-        if
-          State_hash.equal
-            (Transition_frontier.Breadcrumb.state_hash b)
-            state_hash
-        then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
-        else None )
-  with
-  | Some x ->
-      Deferred.Or_error.return x
+  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  match Transition_frontier.find frontier state_hash with
+  | Some b ->
+      let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
+      Ok (Ledger.to_list (Staged_ledger.ledger staged_ledger))
   | None ->
-      Deferred.Or_error.error_string
+      Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
+
+let get_snarked_ledger t state_hash_opt =
+  let open Or_error.Let_syntax in
+  let%bind state_hash =
+    Option.value_map state_hash_opt ~f:Or_error.return
+      ~default:
+        ( match best_tip t with
+        | `Active bc ->
+            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+        | `Bootstrapping ->
+            Or_error.error_string
+              "get_snarked_ledger: can't get snarked ledger hash while \
+               bootstrapping" )
+  in
+  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  match Transition_frontier.find frontier state_hash with
+  | Some b ->
+      let root_snarked_ledger =
+        Transition_frontier.root_snarked_ledger frontier
+      in
+      let ledger = Ledger.of_database root_snarked_ledger in
+      let path = Transition_frontier.path_map frontier b ~f:Fn.id in
+      let%bind _ =
+        List.fold_until ~init:(Ok ()) path
+          ~f:(fun _acc b ->
+            if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
+              match
+                Staged_ledger.proof_txns_with_state_hashes
+                  (Transition_frontier.Breadcrumb.staged_ledger b)
+              with
+              | None ->
+                  Stop
+                    (Or_error.error_string
+                       (sprintf
+                          "No transactions corresponding to the emitted proof \
+                           for state_hash:%s"
+                          (State_hash.to_string
+                             (Transition_frontier.Breadcrumb.state_hash b))))
+              | Some txns -> (
+                match
+                  List.fold_until ~init:(Ok ())
+                    (Non_empty_list.to_list txns)
+                    ~f:(fun _acc (txn, state_hash) ->
+                      (*Validate transactions against the protocol state associated with the transaction*)
+                      match
+                        Transition_frontier.find_protocol_state frontier
+                          state_hash
+                      with
+                      | Some state -> (
+                          let txn_state_view =
+                            Mina_state.Protocol_state.body state
+                            |> Mina_state.Protocol_state.Body.view
+                          in
+                          match
+                            Ledger.apply_transaction
+                              ~constraint_constants:
+                                t.config.precomputed_values
+                                  .constraint_constants ~txn_state_view ledger
+                              txn.data
+                          with
+                          | Ok _ ->
+                              Continue (Ok ())
+                          | e ->
+                              Stop (Or_error.map e ~f:ignore) )
+                      | None ->
+                          Stop
+                            (Or_error.errorf
+                               !"Coudln't find protocol state with hash %s"
+                               (State_hash.to_string state_hash)) )
+                    ~finish:Fn.id
+                with
+                | Ok _ ->
+                    Continue (Ok ())
+                | e ->
+                    Stop e )
+            else Continue (Ok ()) )
+          ~finish:Fn.id
+      in
+      let snarked_ledger_hash =
+        Transition_frontier.Breadcrumb.blockchain_state b
+        |> Mina_state.Blockchain_state.snarked_ledger_hash
+      in
+      let merkle_root = Ledger.merkle_root ledger in
+      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
+        let res = Ledger.to_list ledger in
+        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
+        Ok res )
+      else
+        Or_error.errorf
+          "Expected snarked ledger hash %s but got %s for state hash %s"
+          (Frozen_ledger_hash.to_string snarked_ledger_hash)
+          (Frozen_ledger_hash.to_string merkle_root)
+          (State_hash.to_string state_hash)
+  | None ->
+      Or_error.error_string
+        "get_snarked_ledger: state hash not found in transition frontier"
 
 let get_account t aid =
   let open Participating_state.Let_syntax in
@@ -1004,13 +1091,14 @@ let create ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
           let%bind prover =
-            Monitor.try_with
+            Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
                   (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
@@ -1020,14 +1108,15 @@ let create ?wallets (config : Config.t) =
             >>| Result.ok_exn
           in
           let%bind verifier =
-            Monitor.try_with
+            Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
                   (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
               (fun () ->
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger

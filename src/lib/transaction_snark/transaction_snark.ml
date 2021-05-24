@@ -405,7 +405,7 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       type t = Pickles.Proof.Branching_2.Stable.V1.t
-      [@@deriving version {asserted}, yojson, bin_io, compare, sexp]
+      [@@deriving version {asserted}, yojson, bin_io, compare, sexp, hash]
 
       let to_latest = Fn.id
     end
@@ -417,7 +417,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, yojson]
+    [@@deriving compare, fields, sexp, version, yojson, hash]
 
     let to_latest = Fn.id
   end
@@ -6094,4 +6094,256 @@ let%test_module "account timing check" =
             unchecked_timing unchecked_min_balance
       | _ ->
           false
+  end )
+
+let%test_module "transaction_undos" =
+  ( module struct
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let genesis_constants = Genesis_constants.for_unit_tests
+
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants
+        ~protocol_constants:genesis_constants.protocol
+
+    let state_body =
+      let compile_time_genesis =
+        Mina_state.Genesis_protocol_state.t
+          ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+          ~constraint_constants ~consensus_constants
+      in
+      compile_time_genesis.data |> Mina_state.Protocol_state.body
+
+    let txn_state_view = Mina_state.Protocol_state.Body.view state_body
+
+    let gen_user_commands ~length ledger_init_state =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map cmds =
+        User_command.Valid.Gen.sequence ~length:(length / 2) ~sign_type:`Real
+          ledger_init_state
+      in
+      let cmds = List.map ~f:User_command.forget_check cmds in
+      (* Cmds with new receiver accounts *)
+      let amount =
+        Currency.Fee.scale constraint_constants.account_creation_fee 2
+        |> Option.value_exn |> Currency.Amount.of_fee
+      in
+      let senders =
+        Array.filter_map ledger_init_state
+          ~f:(fun ((keypair, balance, _, _) as s) ->
+            let sender_pk = Public_key.compress keypair.public_key in
+            let account_id = Account_id.create sender_pk Token_id.default in
+            if
+              List.find cmds ~f:(fun cmd ->
+                  Account_id.equal (User_command.fee_payer cmd) account_id )
+              |> Option.is_some
+            then None
+            else if Currency.Amount.(balance >= amount) then Some s
+            else None )
+      in
+      let new_cmds =
+        let source_accounts =
+          List.take (Array.to_list senders) (length - List.length cmds)
+        in
+        assert (not (List.is_empty source_accounts)) ;
+        let new_keys =
+          List.init (List.length source_accounts) ~f:(fun _ ->
+              Signature_lib.Keypair.create () )
+        in
+        List.map (List.zip_exn source_accounts new_keys)
+          ~f:(fun ((s, _, nonce, _), r) ->
+            let sender_pk = Public_key.compress s.public_key in
+            let reciever_pk = Public_key.compress r.public_key in
+            let fee = Currency.Fee.of_int 10 in
+            let payload : Signed_command.Payload.t =
+              Signed_command.Payload.create ~fee ~fee_token:Token_id.default
+                ~fee_payer_pk:sender_pk ~nonce ~memo:Signed_command_memo.dummy
+                ~valid_until:None
+                ~body:
+                  (Payment
+                     { source_pk= sender_pk
+                     ; receiver_pk= reciever_pk
+                     ; token_id= Token_id.default
+                     ; amount })
+            in
+            let c = Signed_command.sign s payload in
+            User_command.Signed_command (Signed_command.forget_check c) )
+      in
+      List.map ~f:(fun c -> Transaction.Command c) (cmds @ new_cmds)
+
+    let gen_fee_transfers ~length ledger_init_state =
+      let open Quickcheck.Generator.Let_syntax in
+      let count = 3 in
+      let new_keys =
+        Array.init count ~f:(fun _ -> Signature_lib.Keypair.create ())
+      in
+      let fee_transfers ?(new_accounts = false) accounts count =
+        let max_fee =
+          Currency.Fee.scale constraint_constants.account_creation_fee 10
+          |> Option.value_exn |> Currency.Fee.to_int
+        in
+        let min_fee =
+          if new_accounts then
+            constraint_constants.account_creation_fee |> Currency.Fee.to_int
+          else 0
+        in
+        let%map singles =
+          Quickcheck.Generator.list_with_length count
+            (Fee_transfer.Single.Gen.with_random_receivers ~keys:accounts
+               ~max_fee ~min_fee
+               ~token:(Quickcheck.Generator.return Token_id.default))
+        in
+        One_or_two.group_list singles
+        |> List.map ~f:(Fn.compose Or_error.ok_exn Fee_transfer.of_singles)
+      in
+      let%bind fee_transfer_new_accounts =
+        fee_transfers new_keys count ~new_accounts:true
+      in
+      let remaining = max count (length - count) in
+      let%map fee_transfer_existing_accounts =
+        fee_transfers
+          (Array.init remaining ~f:(fun _ ->
+               let keypair, _, _, _ =
+                 Array.random_element_exn ledger_init_state
+               in
+               keypair ))
+          remaining
+      in
+      List.map
+        ~f:(fun c -> Transaction.Fee_transfer c)
+        (fee_transfer_new_accounts @ fee_transfer_existing_accounts)
+
+    let gen_coinbases ~length ledger_init_state =
+      let open Quickcheck.Generator.Let_syntax in
+      let count = 3 in
+      let%bind coinbase_new_accounts =
+        Quickcheck.Generator.list_with_length count
+          (Quickcheck.Generator.map ~f:fst
+             (Coinbase.Gen.gen ~constraint_constants))
+      in
+      let%map coinbase_existing_accounts =
+        let remaining = max count (length - count) in
+        let keys =
+          Array.init remaining ~f:(fun _ ->
+              let keypair, _, _, _ =
+                Array.random_element_exn ledger_init_state
+              in
+              keypair )
+        in
+        let min_amount =
+          Option.value_exn
+            (Currency.Fee.scale constraint_constants.account_creation_fee 2)
+          |> Currency.Fee.to_int
+        in
+        let max_amount =
+          Currency.Amount.to_int constraint_constants.coinbase_amount
+        in
+        Quickcheck.Generator.list_with_length remaining
+          (Coinbase.Gen.with_random_receivers ~keys ~min_amount ~max_amount
+             ~fee_transfer:
+               (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
+                  ~min_fee:constraint_constants.account_creation_fee))
+      in
+      List.map
+        ~f:(fun c -> Transaction.Coinbase c)
+        (coinbase_new_accounts @ coinbase_existing_accounts)
+
+    let test_undo ledger transaction =
+      let merkle_root_before = Ledger.merkle_root ledger in
+      let applied_txn =
+        Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
+          transaction
+        |> Or_error.ok_exn
+      in
+      let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
+      let new_ledger = Ledger.register_mask ledger new_mask in
+      let _ =
+        Ledger.undo ~constraint_constants new_ledger applied_txn
+        |> Or_error.ok_exn
+      in
+      assert (
+        Ledger_hash.equal merkle_root_before (Ledger.merkle_root new_ledger) ) ;
+      (merkle_root_before, applied_txn)
+
+    let test_undos ledger transactions =
+      let res =
+        List.fold ~init:[] transactions ~f:(fun acc t ->
+            test_undo ledger t :: acc )
+      in
+      List.iter res ~f:(fun (root_before, u) ->
+          let _ =
+            Ledger.undo ~constraint_constants ledger u |> Or_error.ok_exn
+          in
+          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) )
+
+    let%test_unit "undo_coinbase" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%map coinbases = gen_coinbases ~length:5 ledger_init_state in
+        (ledger_init_state, coinbases)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, coinbase_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger coinbase_list ) )
+
+    let%test_unit "undo_fee_transfers" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%map fts = gen_fee_transfers ~length:5 ledger_init_state in
+        (ledger_init_state, fts)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "fee-transfer undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, ft_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger ft_list ) )
+
+    let%test_unit "undo_user_commands" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%map cmds = gen_user_commands ~length:10 ledger_init_state in
+        (ledger_init_state, cmds)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "user-command undo")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, cmd_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger cmd_list ) )
+
+    let%test_unit "undo_all_txns" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%bind coinbase = gen_coinbases ~length:4 ledger_init_state in
+        let%bind fee_transfers =
+          gen_fee_transfers ~length:6 ledger_init_state
+        in
+        let%bind cmds = gen_user_commands ~length:6 ledger_init_state in
+        let%map txns =
+          let%map txns = Quickcheck_lib.shuffle (fee_transfers @ coinbase) in
+          List.take cmds 3 @ List.take txns 5 @ List.drop cmds 3
+          @ List.drop txns 5
+        in
+        (ledger_init_state, txns)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "all-transaction undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, txn_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger txn_list ) )
   end )

@@ -3,7 +3,7 @@
 # test replayer on known archive db
 
 REPLAYER_DIR=src/app/replayer
-DB=archive_db
+DB=archive
 
 DOCKER_IMAGE=12.4-alpine
 CONTAINER_FILE=docker.container
@@ -50,7 +50,7 @@ echo "Populating archive database"
 psql -U postgres -d $DB < $REPLAYER_DIR/test/archive_db.sql
 
 echo "Building replayer"
-dune b $REPLAYER_DIR/replayer.exe --profile=mainnet
+make replayer
 
 echo "Running replayer"
 ./_build/default/src/app/replayer/replayer.exe --archive-uri $PG_CONN --input-file $REPLAYER_DIR/test/input.json --output-file /dev/null

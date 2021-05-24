@@ -58,7 +58,7 @@ spec:
           mountPath: /root/wallet-keys
         - name: config-dir
           mountPath: /root/.mina-config
-        env: 
+        env:
           - name: CODA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
       {{ if $config.libp2pSecret -}}
@@ -84,7 +84,7 @@ spec:
         image: {{ $.Values.userAgent.image }}
         command: ["bash"]
         args: ["-c", "python3 agent.py"]
-        env: 
+        env:
           {{ if ne $.Values.userAgent.minFee "" -}}
           - name: AGENT_MIN_FEE
             value: {{ $.Values.userAgent.minFee | quote }}
@@ -118,7 +118,7 @@ spec:
             value: {{ $.Values.coda.privkeyPass | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
-        ports: 
+        ports:
         - name: metrics-port
           containerPort: {{ $.Values.userAgent.ports.metrics }}
 {{- include "healthcheck.userAgent.allChecks" $.Values | indent 8 }}
@@ -181,6 +181,9 @@ spec:
           {{- if $.Values.coda.logPrecomputedBlocks }}
           "-log-precomputed-blocks", "true",
           {{- end -}}
+          {{- if $.Values.coda.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
           {{- if $config.isolated }}
           "-isolate-network", "true",
           {{- end -}}
@@ -232,7 +235,7 @@ spec:
           value: "/gcloud/keyfile.json"
         - name: NETWORK_NAME
           value: {{ $.Values.testnetName }}
-        - name: GCLOUD_BLOCK_UPLOAD_BUCKET 
+        - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
         - name: CODA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
@@ -246,16 +249,16 @@ spec:
           value: "true"
         ports:
         - name: client-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.client }}
         - name: graphql-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.graphql }}
         - name: metrics-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ $.Values.coda.ports.metrics }}
         - name: external-port
-          protocol: TCP 
+          protocol: TCP
           containerPort: {{ default $.Values.coda.ports.p2p $config.externalPort }}
           hostPort: {{ default $.Values.coda.ports.external $config.externalPort }}
 {{$data := dict "name" $config.name "healthcheck" $.Values.healthcheck }}

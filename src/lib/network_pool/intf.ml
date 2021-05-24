@@ -241,7 +241,7 @@ module type Snark_pool_diff_intf = sig
     { work: Transaction_snark_work.Statement.t
     ; fee: Currency.Fee.t
     ; prover: Signature_lib.Public_key.Compressed.t }
-  [@@deriving yojson]
+  [@@deriving yojson, hash]
 
   include
     Resource_pool_diff_intf
