@@ -1807,6 +1807,7 @@ let%test_module _ =
             List.map ~f:User_command.forget_check
               (expires_later2 :: List.drop few_now 1)
           in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           (*Add new commands, remove old commands some of which are now expired*)
           let expired_command =
@@ -1843,6 +1844,7 @@ let%test_module _ =
               ( expires_later1 :: expires_later2 :: unexpired_command
               :: List.drop few_now 1 )
           in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           (*after 5 block times there should be no expired transactions*)
           let%bind () =
@@ -1855,6 +1857,7 @@ let%test_module _ =
           let cmds_wo_check =
             List.map ~f:User_command.forget_check (List.drop few_now 1)
           in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs cmds_wo_check ;
           Deferred.unit )
 
