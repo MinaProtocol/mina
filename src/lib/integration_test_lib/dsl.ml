@@ -51,7 +51,10 @@ module Make (Engine : Intf.Engine.S) () :
     let t = {logger; network; event_router; network_state_reader} in
     `Don't_call_in_tests t
 
-  let section = Malleable_error.contextualize
+  let section_hard = Malleable_error.contextualize
+
+  let section context m =
+    m |> Malleable_error.soften_error |> Malleable_error.contextualize context
 
   let hard_wait_for_network_state_predicate ~logger ~hard_timeout
       ~network_state_reader ~init ~check =
