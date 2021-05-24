@@ -736,11 +736,10 @@ module Data = struct
       let open Message in
       let open Local_state in
       let open Snapshot in
-      let best_vrf = ref None in
-      Hashtbl.iteri
+      Hashtbl.fold ~init:None
         ( Snapshot.delegators epoch_snapshot public_key_compressed
         |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
-        ~f:(fun ~key:delegator ~data:account ->
+        ~f:(fun ~key:delegator ~data:account best_vrf ->
           let vrf_result =
             T.eval ~constraint_constants ~private_key
               {global_slot; seed; delegator}
@@ -770,39 +769,39 @@ module Data = struct
               Blake2.(Fn.compose to_raw_string digest_string)
             in
             let vrf_eval = string_of_blake2 truncated_vrf_result in
-            let replace_prev_best_vrf () =
-              best_vrf :=
-                Some
-                  ( vrf_eval
-                  , ( { Block_data.stake_proof=
-                          { producer_private_key= private_key
-                          ; producer_public_key= public_key
-                          ; delegator
-                          ; delegator_pk= account.public_key
-                          ; coinbase_receiver_pk= coinbase_receiver
-                          ; ledger=
-                              Local_state.Snapshot.Ledger_snapshot
-                              .ledger_subset
-                                [ Mina_base.(
-                                    Account_id.create
-                                      (Public_key.compress public_key)
-                                      Token_id.default)
-                                ; Mina_base.(
-                                    Account_id.create account.public_key
-                                      Token_id.default) ]
-                                epoch_snapshot.ledger }
-                      ; global_slot
-                      ; global_slot_since_genesis
-                      ; vrf_result }
-                    , account.public_key ) )
+            let this_vrf () =
+              Some
+                ( vrf_eval
+                , ( { Block_data.stake_proof=
+                        { producer_private_key= private_key
+                        ; producer_public_key= public_key
+                        ; delegator
+                        ; delegator_pk= account.public_key
+                        ; coinbase_receiver_pk= coinbase_receiver
+                        ; ledger=
+                            Local_state.Snapshot.Ledger_snapshot.ledger_subset
+                              [ Mina_base.(
+                                  Account_id.create
+                                    (Public_key.compress public_key)
+                                    Token_id.default)
+                              ; Mina_base.(
+                                  Account_id.create account.public_key
+                                    Token_id.default) ]
+                              epoch_snapshot.ledger }
+                    ; global_slot
+                    ; global_slot_since_genesis
+                    ; vrf_result }
+                  , account.public_key ) )
             in
-            match !best_vrf with
+            match best_vrf with
             | Some (prev_best_vrf_eval, _) ->
                 if String.compare prev_best_vrf_eval vrf_eval < 0 then
-                  replace_prev_best_vrf ()
+                  this_vrf ()
+                else best_vrf
             | None ->
-                replace_prev_best_vrf () ) ;
-      Option.map ~f:snd !best_vrf
+                this_vrf ()
+          else best_vrf )
+      |> Option.map ~f:snd
   end
 
   module Optional_state_hash = struct
