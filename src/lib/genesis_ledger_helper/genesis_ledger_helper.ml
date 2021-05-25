@@ -525,8 +525,7 @@ module Genesis_proof = struct
         | Ok () ->
             file_exists filename Cache_dir.s3_install_path
         | Error e ->
-            [%log info]
-              "Could not download genesis proof file from $uri: $error"
+            [%log info] "Could not download genesis proof file from $uri"
               ~metadata:
                 [ ("uri", `String s3_path)
                 ; ("error", Error_json.error_to_yojson e) ] ;
@@ -747,6 +746,8 @@ module Genesis_proof = struct
                       ; ("error", Error_json.error_to_yojson err) ] )
         in
         Ok (values, filename)
+
+  let create_values_no_proof = Genesis_proof.create_values_no_proof
 end
 
 let load_config_json filename =
@@ -882,10 +883,10 @@ let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
 let init_from_config_file ?genesis_dir ~logger ~proof_level
     (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
-  let%bind inputs, config =
+  let%map inputs, config =
     inputs_from_config_file ?genesis_dir ~logger ~proof_level config
   in
-  let%map values = init_from_inputs ?genesis_dir ~logger inputs in
+  let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)
 
 let upgrade_old_config ~logger filename json =
