@@ -87,7 +87,7 @@ Pipeline.build
 
       -- puppeteered image
       let puppeteeredSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn # [{ name = "MinaArtifact", key = "mina-devnet-docker-image" }],
+        deps=dependsOn # [{ name = "MinaArtifact", key = "devnet-docker-image" }],
         service="\\\${MINA_SERVICE}-puppeteered",
         step_key="puppeteered-docker-image"
       }
