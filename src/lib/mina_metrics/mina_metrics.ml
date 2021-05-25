@@ -344,6 +344,10 @@ module Network = struct
     let help = "# of peers seen through gossip net" in
     Gauge.v "peers" ~help ~namespace ~subsystem
 
+  let all_peers : Gauge.t =
+    let help = "# of peers ever seen through gossip net" in
+    Gauge.v "all_peers" ~help ~namespace ~subsystem
+
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem

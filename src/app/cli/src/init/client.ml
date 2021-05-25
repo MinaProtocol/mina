@@ -1775,6 +1775,7 @@ let generate_libp2p_keypair =
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd
+              ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
@@ -2423,7 +2424,8 @@ let advanced =
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
-    ; ("chain-id-inputs", chain_id_inputs) ]
+    ; ("chain-id-inputs", chain_id_inputs)
+    ; ("vrf", Cli_lib.Commands.Vrf.command_group) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"
