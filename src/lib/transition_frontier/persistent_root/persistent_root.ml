@@ -89,7 +89,7 @@ module Instance = struct
 
   let write_potential_snarked_ledgers_to_disk t =
     Yojson.Safe.to_file
-      (Locations.potential_snarked_ledgers t.factory, directory)
+      (Locations.potential_snarked_ledgers t.factory.directory)
       (potential_snarked_ledgers_to_yojson t.potential_snarked_ledgers)
 
   let enqueue_snarked_ledger ~location t =
@@ -139,7 +139,7 @@ module Instance = struct
           in
           let potential_snarked_ledger_hash =
             Frozen_ledger_hash.of_ledger_hash
-            @@ Ledger.Db.merkle_root_potential_snarked_ledger
+            @@ Ledger.Db.merkle_root potential_snarked_ledger
           in
           if
             Frozen_ledger_hash.equal potential_snarked_ledger_hash
