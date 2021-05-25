@@ -12,7 +12,7 @@ INPUT_ARGS="$@"
 
 # These arrays can be overwritten or extended in scripts to adjust verbosity
 # Example: LOG_FILES+=("${VERBOSE_LOG_FILES[@]}")
-declare -a LOG_FILES=('mina.log')
+declare -a LOG_FILES=('mina.log' 'added-transitions.log')
 declare -a VERBOSE_LOG_FILES=('.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
@@ -34,6 +34,8 @@ while true; do
   rm -f .mina-config/.mina-lock
   mina $INPUT_ARGS 2>&1 >mina.log &
   mina_pid=$!
+
+  tail -f .mina-config/mina-best-tip.log | jq -r '"[NEW_BLOCK] Added State Hash: " + .metadata.added_transitions[0].state_hash' > added-transitions.log &
 
   tail -q -f "${LOG_FILES[@]}" &
   tail_pid=$!
