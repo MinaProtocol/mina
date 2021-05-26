@@ -8,6 +8,8 @@ coda:
   logPrecomputedBlocks: false
   logTxnPoolGossip: false
   image: codaprotocol/coda-daemon:0.0.16-beta7-develop
+  useCustomEntrypoint: false
+  customEntrypoint: ""
   privkeyPass: "naughty blue worm"
   seedPeers:
     - /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/p2p/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH
@@ -60,6 +62,7 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
+    useCustomEntrypoint: false
   - name: "test-3"
     runWithUserAgent: false
     runWithBots: true
@@ -70,6 +73,7 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
+    useCustomEntrypoint: false
   - name: "test-4"
     runWithUserAgent: true
     runWithBots: true
@@ -80,6 +84,7 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
+    useCustomEntrypoint: false
 
 healthcheck:
   enabled: true

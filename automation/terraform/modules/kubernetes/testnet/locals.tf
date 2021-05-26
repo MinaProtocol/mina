@@ -13,6 +13,8 @@ locals {
   coda_vars = {
     runtimeConfig        = var.runtime_config
     image                = var.coda_image
+    useCustomEntrypoint = var.use_custom_entrypoint
+    customEntrypoint = var.custom_entrypoint
     privkeyPass          = var.block_producer_key_pass
     seedPeers            = local.peers
     logLevel             = var.log_level
