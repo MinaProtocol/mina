@@ -441,7 +441,7 @@ end = struct
             ((p, List.rev js), Knowledge_summary.score summary) )
       in
       let useful_exists =
-        List.exists knowledge ~f:(fun (_, s) -> Float.is_positive s)
+        List.exists knowledge ~f:(fun (_, s) -> Float.(s > 0.))
       in
       let best =
         List.max_elt

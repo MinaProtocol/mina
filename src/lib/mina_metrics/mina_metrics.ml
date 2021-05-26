@@ -47,7 +47,7 @@ module TextFormat_0_0_4 = struct
     match Float.classify v with
     | Normal | Subnormal | Zero ->
         Fmt.float f v
-    | Infinite when Float.is_positive v ->
+    | Infinite when Float.(v > 0.) ->
         Fmt.string f "+Inf"
     | Infinite ->
         Fmt.string f "-Inf"
