@@ -41,7 +41,7 @@ module Fork_constants = struct
         { previous_state_hash: Pickles.Backend.Tick.Field.Stable.V1.t
         ; previous_length: Mina_numbers.Length.Stable.V1.t
         ; previous_global_slot: Mina_numbers.Global_slot.Stable.V1.t }
-      [@@deriving sexp, equal, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -70,7 +70,7 @@ module Constraint_constants = struct
         ; supercharged_coinbase_factor: int
         ; account_creation_fee: Currency.Fee.Stable.V1.t
         ; fork: Fork_constants.Stable.V1.t option }
-      [@@deriving sexp, equal, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end

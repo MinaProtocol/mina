@@ -37,6 +37,12 @@ module Time = struct
 
     type t = unit -> Time.Span.t [@@deriving sexp]
 
+    (* NB: All instances are identical by construction (see basic below). *)
+    let equal _ _ = true
+
+    (* NB: All instances are identical by construction (see basic below). *)
+    let compare _ _ = 0
+
     let time_offset = ref None
 
     let setting_enabled = ref None
@@ -88,7 +94,7 @@ module Time = struct
 
     [%%else]
 
-    type t = unit [@@deriving sexp]
+    type t = unit [@@deriving sexp, equal, compare]
 
     let create () = ()
 

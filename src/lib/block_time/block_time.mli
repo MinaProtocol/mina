@@ -15,7 +15,7 @@ module Time : sig
   include Hashable.S with type t := t
 
   module Controller : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, equal, compare]
 
     val create : t -> t
 
