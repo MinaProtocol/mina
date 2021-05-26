@@ -1131,21 +1131,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind delegate =
       if Token_id.(equal default) a.token_id then
         update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep)
-          ~update:(fun u x -> match u with Keep -> x | Set y -> Some y)
+          ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
+            match u with Keep -> x | Set y -> Some y )
       else return a.delegate
     in
     let%bind snapp =
       let%map app_state =
         update a.permissions.edit_state app_state init.app_state
-          ~is_keep:
-            (Vector.for_all
-               ~f:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep))
+          ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
           ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
       and verification_key =
         update a.permissions.set_verification_key verification_key
-          init.verification_key
-          ~is_keep:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep)
+          init.verification_key ~is_keep:Set_or_keep.is_keep
           ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
       in
@@ -1154,8 +1151,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%bind permissions =
       update a.permissions.set_delegate permissions a.permissions
-        ~is_keep:((Set_or_keep.equal Poly.( = )) Set_or_keep.Keep)
-        ~update:Set_or_keep.set_or_keep
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     Ok {a with balance; snapp; delegate; permissions; timing}
 

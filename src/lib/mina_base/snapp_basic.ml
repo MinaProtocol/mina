@@ -102,6 +102,10 @@ module Set_or_keep = struct
 
   let set_or_keep t x = match t with Keep -> x | Set y -> y
 
+  let is_set = function Set _ -> true | _ -> false
+
+  let is_keep = function Keep -> true | _ -> false
+
   [%%ifdef
   consensus_mechanism]
 
