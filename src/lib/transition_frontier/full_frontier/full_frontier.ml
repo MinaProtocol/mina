@@ -493,20 +493,20 @@ let calculate_diffs t breadcrumb =
       in
       (* check if new breadcrumb will be best tip *)
       let diffs =
-        match
-          Consensus.Hooks.select
-            ~constants:t.precomputed_values.consensus_constants
-            ~existing:(Breadcrumb.consensus_state_with_hash current_best_tip)
-            ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
-            ~logger:
-              (Logger.extend t.logger
-                 [ ( "selection_context"
-                   , `String "comparing new breadcrumb to best tip" ) ])
-        with
-        | `Take ->
-            Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
-        | `Keep ->
-            diffs
+        if
+          Consensus.Hooks.equal_select_status
+            (Consensus.Hooks.select
+               ~constants:t.precomputed_values.consensus_constants
+               ~existing:
+                 (Breadcrumb.consensus_state_with_hash current_best_tip)
+               ~candidate:(Breadcrumb.consensus_state_with_hash breadcrumb)
+               ~logger:
+                 (Logger.extend t.logger
+                    [ ( "selection_context"
+                      , `String "comparing new breadcrumb to best tip" ) ]))
+            `Take
+        then Full.E.E (Best_tip_changed breadcrumb_hash) :: diffs
+        else diffs
       in
       (* reverse diffs so that they are applied in the correct order *)
       List.rev diffs )
@@ -742,7 +742,9 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync ~has_long_catchup_job =
   in
   [%log' trace t.logger] "after applying diffs to full frontier" ;
   if
-    (match enable_epoch_ledger_sync with `Disabled -> false | _ -> true)
+    (not
+       ([%equal: [`Enabled of _ | `Disabled]] enable_epoch_ledger_sync
+          `Disabled))
     && not has_long_catchup_job
   then
     Debug_assert.debug_assert (fun () ->

@@ -34,13 +34,12 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
         Filename.temp_dir_name
         ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
-  ( match Core.Sys.file_exists conf_dir with
-  | `No ->
-      ()
-  | `Unknown | `Yes ->
-      failwithf
-        "cannot configure coda process because directory already exists: %s"
-        conf_dir () ) ;
+  if
+    not ([%equal: [`Yes | `No | `Unknown]] (Core.Sys.file_exists conf_dir) `No)
+  then
+    failwithf
+      "cannot configure coda process because directory already exists: %s"
+      conf_dir () ;
   let config =
     { Coda_worker.Input.addrs_and_ports
     ; libp2p_keypair

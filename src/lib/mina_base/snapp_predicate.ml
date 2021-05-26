@@ -1202,7 +1202,7 @@ let check ({self_predicate; other; fee_payer; protocol_state_predicate} : t)
         match other_account.snapp with
         | None ->
             assert_
-              (match other.account_vk with Ignore -> true | _ -> false)
+              ([%equal: _ Or_ignore.t] other.account_vk Ignore)
               "other_account_vk must be ignore for user account"
         | Some snapp ->
             Hash.(check ~label:"other_account_vk" Tc.field)

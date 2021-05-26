@@ -187,20 +187,16 @@ module Make (Inputs : Inputs_intf) :
         Best_tip_prover.prove ~logger frontier
       in
       let is_tip_better =
-        match
-          Consensus.Hooks.select ~constants:consensus_constants
-            ~logger:
-              (Logger.extend logger
-                 [("selection_context", `String "Root.prove")])
-            ~existing:
-              (With_hash.map ~f:External_transition.consensus_state
-                 best_tip_with_witness.data)
-            ~candidate:seen_consensus_state
-        with
-        | `Keep ->
-            true
-        | `Take ->
-            false
+        Consensus.Hooks.equal_select_status
+          (Consensus.Hooks.select ~constants:consensus_constants
+             ~logger:
+               (Logger.extend logger
+                  [("selection_context", `String "Root.prove")])
+             ~existing:
+               (With_hash.map ~f:External_transition.consensus_state
+                  best_tip_with_witness.data)
+             ~candidate:seen_consensus_state)
+          `Keep
       in
       let%map () = Option.some_if is_tip_better () in
       { best_tip_with_witness with
@@ -215,20 +211,16 @@ module Make (Inputs : Inputs_intf) :
           peer_root
       in
       let is_before_best_tip candidate =
-        match
-          Consensus.Hooks.select ~constants:consensus_constants
-            ~logger:
-              (Logger.extend logger
-                 [("selection_context", `String "Root.verify")])
-            ~existing:
-              (With_hash.map ~f:External_transition.consensus_state
-                 best_tip_transition)
-            ~candidate
-        with
-        | `Keep ->
-            true
-        | `Take ->
-            false
+        Consensus.Hooks.equal_select_status
+          (Consensus.Hooks.select ~constants:consensus_constants
+             ~logger:
+               (Logger.extend logger
+                  [("selection_context", `String "Root.verify")])
+             ~existing:
+               (With_hash.map ~f:External_transition.consensus_state
+                  best_tip_transition)
+             ~candidate)
+          `Keep
       in
       let%map () =
         Deferred.return

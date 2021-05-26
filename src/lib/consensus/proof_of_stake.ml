@@ -1009,7 +1009,7 @@ module Data = struct
         else {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
       in
       let staking_data', next_data', epoch_count' =
-        if Epoch.( > ) next_epoch prev_epoch then
+        if Epoch.(next_epoch > prev_epoch) then
           ( next_to_staking next_data
           , { Poly.seed= next_data.seed
             ; ledger= next_staking_ledger
@@ -2583,7 +2583,7 @@ module Hooks = struct
     let epoch_is_not_finalized =
       let is_genesis_epoch = Length.equal epoch Length.zero in
       let epoch_is_finalized =
-        Length.( > ) consensus_state.next_epoch_data.epoch_length constants.k
+        Length.(consensus_state.next_epoch_data.epoch_length > constants.k)
       in
       (not epoch_is_finalized) && not is_genesis_epoch
     in
@@ -2764,12 +2764,13 @@ module Hooks = struct
         sync {snapshot_id= Next_epoch_snapshot; expected_root= next}
 
   let received_within_window ~constants (epoch, slot) ~time_received =
-    let open Time in
     let open Int64 in
-    let ( < ) x y = Poly.(compare x y < 0) in
-    let ( >= ) x y = Poly.(compare x y >= 0) in
+    let ( < ) x y = compare x y < 0 in
+    let ( >= ) x y = compare x y >= 0 in
     let time_received =
-      of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
+      Time.(
+        of_span_since_epoch
+          (Span.of_ms (Unix_timestamp.to_int64 time_received)))
     in
     let slot_diff =
       Epoch.diff_in_slots ~constants
@@ -2804,6 +2805,8 @@ module Hooks = struct
         Mina_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
           c2.staking_epoch_data.lock_checkpoint
       else pred_case c1 c2 || pred_case c2 c1
+
+  type select_status = [`Keep | `Take] [@@deriving equal]
 
   let select ~constants ~existing:existing_with_hash
       ~candidate:candidate_with_hash ~logger =
@@ -3695,7 +3698,7 @@ let%test_module "Proof of stake tests" =
       in
       let tolerance = 100. in
       (* 100 is a reasonable choice for samples = 1000 and for very low likelihood of failure; this should be recalculated if sample count was to be adjusted *)
-      let within_tolerance = Float.( < ) diff tolerance in
+      let within_tolerance = Float.(diff < tolerance) in
       if not within_tolerance then
         failwithf "actual vs. expected: %d vs %f" actual expected ()
 
@@ -4231,20 +4234,14 @@ let%test_module "Proof of stake tests" =
     let is_selected ?(log = false) (a, b) =
       let logger = if log then Logger.create () else Logger.null () in
       let constants = Lazy.force Constants.for_unit_tests in
-      match Hooks.select ~constants ~existing:a ~candidate:b ~logger with
-      | `Take ->
-          true
-      | `Keep ->
-          false
+      Hooks.equal_select_status `Take
+        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
 
     let is_not_selected ?(log = false) (a, b) =
       let logger = if log then Logger.create () else Logger.null () in
       let constants = Lazy.force Constants.for_unit_tests in
-      match Hooks.select ~constants ~existing:a ~candidate:b ~logger with
-      | `Keep ->
-          true
-      | `Take ->
-          false
+      Hooks.equal_select_status `Keep
+        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
 
     let assert_selected =
       assert_hashed_consensus_state_pair ~assertion:"trigger selection"
@@ -4373,11 +4370,10 @@ let%test_module "Proof of stake tests" =
           (assert_hashed_consensus_state_pair
              ~assertion:"chains do not trigger a selection cycle"
              ~f:(fun (a, b) ->
-               match (select a b, select b a) with
-               | `Take, `Take ->
-                   false
-               | _ ->
-                   true ))
+               not
+                 ([%equal: Hooks.select_status * Hooks.select_status]
+                    (select a b, select b a)
+                    (`Take, `Take)) ))
 
     (* We define a homogeneous binary relation for consensus states by adapting the binary chain
      * selection rule and extending it to consider equality of chains. From this, we can test

@@ -4,7 +4,7 @@ open Signature_lib
 
 module Statement : sig
   type t = Transaction_snark.Statement.t One_or_two.t
-  [@@deriving sexp, yojson, equal]
+  [@@deriving compare, sexp, yojson, equal]
 
   include Hashable.S with type t := t
 
@@ -36,7 +36,7 @@ module Info : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving to_yojson, version, sexp, bin_io]
+        type t [@@deriving compare, to_yojson, version, sexp, bin_io]
       end
     end
     with type V1.t = t
@@ -52,7 +52,7 @@ type t =
   { fee: Fee.t
   ; proofs: Ledger_proof.t One_or_two.t
   ; prover: Public_key.Compressed.t }
-[@@deriving sexp, yojson]
+[@@deriving compare, sexp, yojson]
 
 val fee : t -> Fee.t
 
@@ -63,7 +63,7 @@ val statement : t -> Statement.t
 module Stable :
   sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io, yojson, version]
+      type t [@@deriving sexp, compare, bin_io, yojson, version]
     end
   end
   with type V1.t = t
@@ -75,7 +75,7 @@ module Checked : sig
     { fee: Fee.t
     ; proofs: Ledger_proof.t One_or_two.t
     ; prover: Public_key.Compressed.t }
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp, compare, to_yojson]
 
   module Stable : module type of Stable
 

@@ -213,7 +213,7 @@ let create' (type a b c)
   end in
   let delta_duration = Slot.duration_ms * (delta + M.one) in
   let num_days = 3. in
-  assert (Float.( < ) num_days 14.) ;
+  assert (Float.(num_days < 14.)) ;
   (* We forgo updating the min density for the first [num_days] days (or epoch, whichever comes first)
       of the network's operation. The reasoning is as follows:
 

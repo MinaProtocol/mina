@@ -7,7 +7,7 @@ open Network_peer
 module Timeout = Timeout_lib.Core_time_ns
 
 module Validation_callback = struct
-  type validation_result = [`Accept | `Reject | `Ignore]
+  type validation_result = [`Accept | `Reject | `Ignore] [@@deriving equal]
 
   type t = {expiration: Time_ns.t option; signal: validation_result Ivar.t}
 

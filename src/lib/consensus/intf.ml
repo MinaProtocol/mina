@@ -605,6 +605,8 @@ module type S = sig
       -> time_received:Unix_timestamp.t
       -> (unit, [`Too_early | `Too_late of int64]) result
 
+    type select_status = [`Keep | `Take] [@@deriving equal]
+
     (**
      * Select between two ledger builder controller tips given the consensus
      * states for the two tips. Returns `\`Keep` if the first tip should be
@@ -615,7 +617,7 @@ module type S = sig
       -> existing:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
-      -> [`Keep | `Take]
+      -> select_status
 
     type block_producer_timing =
       [ `Check_again of Unix_timestamp.t

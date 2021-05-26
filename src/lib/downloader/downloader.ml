@@ -455,7 +455,7 @@ end = struct
       | None ->
           if useful_exists then `Useful_but_busy else `No_peers
       | Some ((p, k), score) ->
-          if Float.( <= ) score 0. then `Stalled else `Useful (p, k)
+          if Float.(score <= 0.) then `Stalled else `Useful (p, k)
 
     type update =
       | Refreshed_peers of {all_peers: Peer.Set.t}
@@ -656,8 +656,7 @@ end = struct
   let enqueue t e = Q.enqueue t.pending e
 
   let enqueue_exn t e =
-    assert (
-      match enqueue t e with `Ok -> true | `Key_already_present -> false )
+    assert ([%equal: [`Ok | `Key_already_present]] (enqueue t e) `Ok)
 
   let active_jobs t =
     Q.to_list t.pending

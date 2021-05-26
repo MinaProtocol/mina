@@ -64,7 +64,7 @@ module Time_queue = struct
               match Heap.top t.pending_actions with
               | None ->
                   return ()
-              | Some (_, at) when Time.Span.( >= ) t.curr_time at ->
+              | Some (_, at) when Time.Span.(t.curr_time >= at) ->
                   let%bind () = do_next_action () in
                   loop ()
               | Some _ ->

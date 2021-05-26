@@ -1062,7 +1062,7 @@ module T = struct
     let%map ((_, _, `Staged_ledger new_staged_ledger, _) as res) =
       apply_diff
         ~skip_verification:
-          (match skip_verification with Some `All -> true | _ -> false)
+          ([%equal: [`All | `Proofs] option] skip_verification (Some `All))
         ~constraint_constants t
         (forget_prediff_info prediff)
         ~logger ~current_state_view ~state_and_body_hash
@@ -1141,7 +1141,7 @@ module T = struct
       retaining it to preserve that information in the
       staged_ledger_diff. It will be checked in apply_diff before adding*)
       Option.some_if
-        (Fee.( > ) cw.fee Fee.zero)
+        Fee.(cw.fee > Fee.zero)
         (Coinbase.Fee_transfer.create ~receiver_pk:cw.prover ~fee:cw.fee)
 
     let cheapest_two_work (works : Transaction_snark_work.Checked.t Sequence.t)
@@ -1400,7 +1400,7 @@ module T = struct
         | Error _ ->
             0
         | Ok b ->
-            if Fee.( > ) b Fee.zero then 1 else 0
+            if Fee.(b > Fee.zero) then 1 else 0
       in
       let other_provers =
         Public_key.Compressed.Map.filter_keys t.fee_transfers

@@ -498,26 +498,25 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                  let current_transition =
                    Broadcast_pipe.Reader.peek most_recent_valid_block_reader
                  in
-                 match
-                   Consensus.Hooks.select
-                     ~constants:precomputed_values.consensus_constants
-                     ~existing:
-                       ( External_transition.Validation
-                         .forget_validation_with_hash current_transition
-                       |> With_hash.map ~f:External_transition.consensus_state
-                       )
-                     ~candidate:
-                       ( External_transition.Validation
-                         .forget_validation_with_hash incoming_transition
-                       |> With_hash.map ~f:External_transition.consensus_state
-                       )
-                     ~logger
-                 with
-                 | `Take ->
-                     Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                       incoming_transition
-                 | `Keep ->
-                     Deferred.unit ) ;
+                 if
+                   Consensus.Hooks.equal_select_status `Take
+                     (Consensus.Hooks.select
+                        ~constants:precomputed_values.consensus_constants
+                        ~existing:
+                          ( External_transition.Validation
+                            .forget_validation_with_hash current_transition
+                          |> With_hash.map
+                               ~f:External_transition.consensus_state )
+                        ~candidate:
+                          ( External_transition.Validation
+                            .forget_validation_with_hash incoming_transition
+                          |> With_hash.map
+                               ~f:External_transition.consensus_state )
+                        ~logger)
+                 then
+                   Broadcast_pipe.Writer.write most_recent_valid_block_writer
+                     incoming_transition
+                 else Deferred.unit ) ;
           don't_wait_for
           @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
                ~f:(fun enveloped_transition ->

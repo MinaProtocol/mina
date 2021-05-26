@@ -876,7 +876,7 @@ let%test_module "random set test" =
                 Option.value_exn
                   (Mock_snark_pool.Resource_pool.request_proof t work)
               in
-              assert (Currency.Fee.( <= ) fee fee_upper_bound) ) )
+              assert (Currency.Fee.(fee <= fee_upper_bound)) ) )
 
     let%test_unit "A priced proof of a work will replace an existing priced \
                    proof of the same work only if it's fee is smaller than \

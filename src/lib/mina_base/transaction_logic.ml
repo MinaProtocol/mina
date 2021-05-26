@@ -3,6 +3,8 @@ open Currency
 open Signature_lib
 module Global_slot = Mina_numbers.Global_slot
 
+type account_state = [`Added | `Existed] [@@deriving equal]
+
 module type Ledger_intf = sig
   type t
 
@@ -15,15 +17,10 @@ module type Ledger_intf = sig
   val set : t -> location -> Account.t -> unit
 
   val get_or_create :
-       t
-    -> Account_id.t
-    -> ([`Added | `Existed] * Account.t * location) Or_error.t
+    t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
 
   val get_or_create_account :
-       t
-    -> Account_id.t
-    -> Account.t
-    -> ([`Added | `Existed] * location) Or_error.t
+    t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t
 
   val remove_accounts_exn : t -> Account_id.t list -> unit
 
@@ -447,17 +444,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
       amount =
     let fee = constraint_constants.account_creation_fee in
-    match action with
-    | `Added ->
-        error_opt
-          (sprintf
-             !"Error subtracting account creation fee %{sexp: \
-               Currency.Fee.t}; transaction amount %{sexp: Currency.Amount.t} \
-               insufficient"
-             fee amount)
-          Amount.(sub amount (of_fee fee))
-    | _ ->
-        Ok amount
+    if equal_account_state action `Added then
+      error_opt
+        (sprintf
+           !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
+             transaction amount %{sexp: Currency.Amount.t} insufficient"
+           fee amount)
+        Amount.(sub amount (of_fee fee))
+    else Ok amount
 
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
@@ -523,7 +517,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   end
 
   let previous_empty_accounts action pk =
-    match action with `Added -> [pk] | _ -> []
+    if equal_account_state action `Added then [pk] else []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in

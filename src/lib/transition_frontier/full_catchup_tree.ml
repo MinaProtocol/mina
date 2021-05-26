@@ -77,7 +77,7 @@ module Node = struct
           | Wait_for_parent
           | To_build_breadcrumb
           | Root
-        [@@deriving sexp, hash, compare, yojson, bin_io_unversioned]
+        [@@deriving sexp, hash, equal, compare, yojson, bin_io_unversioned]
       end
 
       include T
