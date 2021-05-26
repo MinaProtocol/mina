@@ -91,9 +91,10 @@ module Worker = struct
             map_error ~diff_type:`New_node ~diff_type_name:"New_node" r )
     | Root_transitioned {new_root; garbage= Lite garbage; just_emitted_a_proof}
       ->
-        if just_emitted_a_proof then
+        if just_emitted_a_proof then (
+          [%log' info t.logger] "Dequeued a snarked ledger" ;
           Persistent_root.Instance.dequeue_snarked_ledger
-            t.persistent_root_instance ;
+            t.persistent_root_instance ) ;
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
           ( Database.move_root t.db ~new_root ~garbage

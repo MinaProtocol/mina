@@ -431,6 +431,7 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         Ledger.Db.make_checkpoint t.persistent_root_instance.snarked_ledger
           ~directory_name:location
       in
+      [%log' info t.logger] "Enqueued a snarked ledger" ;
       Persistent_root.Instance.enqueue_snarked_ledger ~location
         t.persistent_root_instance ;
       let s = t.root_ledger in
