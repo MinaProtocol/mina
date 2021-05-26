@@ -1,15 +1,15 @@
 # This dockerfile is part of a temporary hack for integration tests. Do not use
-# this dockerfile in a production environment. See `coda_daemon_puppeteer.py`
+# this dockerfile in a production environment. See `mina_daemon_puppeteer.py`
 # for more details.
 
 # This dockerfile needs to be run with `dockerfiles/puppeteer-context` as the
 # build context.
 
-ARG CODA_VERSION
-FROM codaprotocol/coda-daemon:${CODA_VERSION}
+ARG MINA_VERSION
+FROM codaprotocol/mina-daemon:${MINA_VERSION}
 
 RUN echo '#!/bin/bash\n\
-pgrep -f --newest "python3 /root/coda_daemon_puppeteer.py"'\
+pgrep -f --newest "python3 /root/mina_daemon_puppeteer.py"'\
 > find_puppeteer.sh
 
 RUN echo '#!/bin/bash\n\
@@ -24,6 +24,6 @@ while [ -f daemon-active ]; do sleep 1; done'\
 
 RUN chmod +x find_puppeteer.sh start.sh stop.sh
 
-ADD coda_daemon_puppeteer.py .
+ADD mina_daemon_puppeteer.py .
 
-ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/coda_daemon_puppeteer.py"]
+ENTRYPOINT ["/usr/bin/dumb-init", "python3", "/root/mina_daemon_puppeteer.py"]

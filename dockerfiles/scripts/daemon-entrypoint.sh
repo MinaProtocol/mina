@@ -5,10 +5,15 @@ set -euo pipefail
 # If glob doesn't match anything, return empty string rather than literal pattern
 shopt -s nullglob
 
-# Print all commands executed if DEBUG mode enabled
-[ -n "${DEBUG:-""}" ] && set -x
 
-INPUT_ARGS = ( "$@" )
+set -x
+
+INPUT_ARGS="$@"
+
+# These arrays can be overwritten or extended in scripts to adjust verbosity
+# Example: LOG_FILES+=("${VERBOSE_LOG_FILES[@]}")
+declare -a LOG_FILES=('mina.log')
+declare -a VERBOSE_LOG_FILES=('.mina-config/mina-prover.log' '.mina-config/mina-verifier.log' '.mina-config/mina-best-tip.log')
 
 # Attempt to execute or source custom entrypoint scripts accordingly
 for script in /entrypoint.d/*; do
@@ -26,19 +31,19 @@ touch .mina-config/mina-verifier.log
 touch .mina-config/mina-best-tip.log
 
 while true; do
-  rm -f /root/.mina-config/.mina-lock
+  rm -f .mina-config/.mina-lock
   mina $INPUT_ARGS 2>&1 >mina.log &
-  coda_pid=$!
+  mina_pid=$!
 
-  tail -q -f mina.log -f .mina-config/mina-prover.log -f .mina-config/mina-verifier.log -f .mina-config/mina-best-tip.log &
+  tail -q -f "${LOG_FILES[@]}" &
   tail_pid=$!
 
-  wait "$coda_pid"
+  wait "$mina_pid"
   echo "Mina process exited with status code $?"
-  sleep 10
 
   kill "$tail_pid"
   if [ ! -f stay_alive ]; then
+    sleep 10
     exit 0
   fi
 done
