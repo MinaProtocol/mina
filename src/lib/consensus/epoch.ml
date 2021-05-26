@@ -55,11 +55,11 @@ let diff_in_slots ~(constants : Constants.t) ((epoch, slot) : t * Slot.t)
     ((epoch', slot') : t * Slot.t) : int64 =
   let ( < ) x y =
     let open Core_kernel in
-    Int.( < ) (Int64.compare x y) 0
+    Int64.compare x y < 0
   in
   let ( > ) x y =
     let open Core_kernel in
-    Int.( > ) (Int64.compare x y) 0
+    Int64.compare x y > 0
   in
   let open Int64.Infix in
   let of_uint32 = UInt32.to_int64 in
