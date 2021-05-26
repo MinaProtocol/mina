@@ -21,12 +21,83 @@ type payout_information =
   ; delegation_source: delegation_source
   ; delegatee: Public_key.Compressed.t
   ; delegatee_id: int
-  ; payments: Sql.User_command.t list }
+  ; payments: Sql.User_command.t list
+  ; payments_to_slot_3500: Sql.User_command.t list
+  ; payments_past_slot_3500: Sql.User_command.t list }
 [@@deriving yojson]
+
+type csv_data =
+  { payout_addr: Public_key.Compressed.t
+  ; balance: Currency.Balance.t
+  ; delegatee: Public_key.Compressed.t
+  ; delegation: Currency.Amount.t
+  ; blocks_won: int
+  ; payout_obligation: Currency.Amount.t
+  ; payout_received: Currency.Amount.t
+  ; deficit: Currency.Amount.t
+  ; check: bool }
+
+module Delegatee_payout_address = struct
+  type t =
+    { delegatee: Public_key.Compressed.Stable.Latest.t
+    ; payout_addr: Public_key.Compressed.Stable.Latest.t }
+  [@@deriving hash, bin_io_unversioned, compare, sexp]
+end
+
+module Deficit = Hashable.Make_binable (Delegatee_payout_address)
+
+type previous_epoch_status =
+  {payout_received: Currency.Amount.t; deficit: Currency.Amount.t}
+
+(* map from delegatee, payout address to payment_received, deficit from previous epoch *)
+let deficit_tbl : previous_epoch_status Deficit.Table.t =
+  Deficit.Table.create ()
+
+let csv_data_of_strings ss =
+  match ss with
+  | [ payout_address
+    ; balance
+    ; delegatee
+    ; total_delegation
+    ; blocks_won
+    ; payout_obligation
+    ; payout_received
+    ; deficit
+    ; check ] ->
+      let payout_addr =
+        Public_key.Compressed.of_base58_check_exn payout_address
+      in
+      let balance = Currency.Balance.of_formatted_string balance in
+      let delegatee = Public_key.Compressed.of_base58_check_exn delegatee in
+      let delegation = Currency.Amount.of_formatted_string total_delegation in
+      let blocks_won = Int.of_string blocks_won in
+      let payout_obligation =
+        Currency.Amount.of_formatted_string payout_obligation
+      in
+      let payout_received =
+        Currency.Amount.of_formatted_string payout_received
+      in
+      let deficit = Currency.Amount.of_formatted_string deficit in
+      let check = Bool.of_string check in
+      { payout_addr
+      ; balance
+      ; delegatee
+      ; delegation
+      ; blocks_won
+      ; payout_obligation
+      ; payout_received
+      ; deficit
+      ; check }
+  | _ ->
+      failwith "Incorrect number of fields in CSV line"
 
 let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let proof_level = Genesis_constants.Proof_level.Full
+
+let currency_string_of_int64 i64 =
+  Currency.Amount.of_uint64 (Unsigned.UInt64.of_int64 i64)
+  |> Currency.Amount.to_formatted_string
 
 (* map from global slots to state hash, ledger hash pairs *)
 let global_slot_hashes_tbl : (Int64.t, State_hash.t * Ledger_hash.t) Hashtbl.t
@@ -166,6 +237,7 @@ let write_csv_header ~csv_out_channel =
       ; "Blocks won"
       ; "Payout obligation"
       ; "Payout received"
+      ; "Deficit"
       ; "Check" ]
   in
   Out_channel.output_string csv_out_channel line ;
@@ -174,6 +246,13 @@ let write_csv_header ~csv_out_channel =
 let write_csv_line ~csv_out_channel ~payout_addr ~balance ~delegatee
     ~delegation ~blocks_won ~payout_obligation ~payout_received =
   let check = Currency.Amount.( >= ) payout_received payout_obligation in
+  let deficit =
+    match Currency.Amount.( - ) payout_obligation payout_received with
+    | Some diff ->
+        diff
+    | None ->
+        Currency.Amount.zero
+  in
   let line =
     String.concat ~sep:","
       [ Public_key.Compressed.to_base58_check payout_addr
@@ -183,12 +262,27 @@ let write_csv_line ~csv_out_channel ~payout_addr ~balance ~delegatee
       ; Int.to_string blocks_won
       ; Currency.Amount.to_formatted_string payout_obligation
       ; Currency.Amount.to_formatted_string payout_received
+      ; Currency.Amount.to_formatted_string deficit
       ; Bool.to_string check ]
   in
   Out_channel.output_string csv_out_channel line ;
   Out_channel.newline csv_out_channel
 
-let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
+let write_csv_line_of_csv_data ~csv_out_channel
+    { payout_addr
+    ; balance
+    ; delegatee
+    ; delegation
+    ; blocks_won
+    ; payout_obligation
+    ; payout_received
+    ; deficit= _
+    ; check= _ } =
+  write_csv_line ~csv_out_channel ~payout_addr ~balance ~delegatee ~delegation
+    ~blocks_won ~payout_obligation ~payout_received
+
+let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
+    ~payout_addresses () =
   let logger = Logger.create () in
   if List.is_empty payout_addresses then (
     [%log error]
@@ -205,6 +299,41 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
         failwith
           (sprintf "Could not parse JSON in input file \"%s\": %s" input_file
              msg)
+  in
+  ( match preliminary_csv_file_opt with
+  | None ->
+      if input.epoch > 0 then
+        failwith
+          "Preliminary CSV file must be provided if epoch is greater than 0"
+  | Some _ ->
+      if input.epoch = 0 then
+        failwith "Preliminary CSV file must not be provided if epoch is 0" ) ;
+  let csv_datas =
+    match preliminary_csv_file_opt with
+    | None ->
+        []
+    | Some prelim_csv_file ->
+        let prelim_csv_in_channel = In_channel.create prelim_csv_file in
+        (* discard header line *)
+        let lines =
+          In_channel.input_lines prelim_csv_in_channel |> List.tl_exn
+        in
+        let split_lines =
+          List.map lines ~f:(String.split_on_chars ~on:[','])
+        in
+        let csv_datas = List.map split_lines ~f:csv_data_of_strings in
+        List.iter csv_datas
+          ~f:(fun ({payout_addr; delegatee; payout_received; deficit; _} :
+                    csv_data)
+             ->
+            let key : Delegatee_payout_address.t = {delegatee; payout_addr} in
+            let data : previous_epoch_status = {payout_received; deficit} in
+            match Deficit.Table.add deficit_tbl ~key ~data with
+            | `Ok ->
+                ()
+            | `Duplicate ->
+                failwith "Duplicate deficit table entry" ) ;
+        csv_datas
   in
   let archive_uri = Uri.of_string archive_uri in
   match Caqti_async.connect_pool ~max_size:128 archive_uri with
@@ -241,10 +370,10 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
           ~item:"max slot"
       in
       [%log info] "Maximum global slot in blocks is %d" max_slot ;
-      if max_slot < ((input.epoch + 1) * slots_per_epoch) + 3500 then (
+      if max_slot < (input.epoch * slots_per_epoch) + 3500 then (
         [%log fatal]
           "Insufficient archive data: maximum global slot is less than slot \
-           3500 in the succeeding epoch" ;
+           3500 slot in the next epoch" ;
         Core_kernel.exit 1 ) ;
       (* find longest canonical chain
          a slot may represent several blocks, only one of which can be on canonical chain
@@ -292,11 +421,9 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
         try_slot max_slot num_tries
       in
       let block_ids =
-        (* only examine blocks from start of current epoch up through slot 3500 in next epoch *)
+        (* examine blocks in current epoch *)
         let min_slot = input.epoch * slots_per_epoch in
-        let max_slot_int64 =
-          min_slot + slots_per_epoch + 3500 |> Int64.of_int
-        in
+        let max_slot_int64 = min_slot + slots_per_epoch - 1 |> Int64.of_int in
         let min_slot_int64 = Int64.of_int min_slot in
         let relevant_block_infos =
           List.filter block_infos ~f:(fun {global_slot; _} ->
@@ -341,6 +468,7 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                  | `Duplicate ->
                      failwith "Duplicate account in initial staking ledger" ))
       ) ;
+      let slot_3500 = (input.epoch * slots_per_epoch) + 3500 |> Int64.of_int in
       [%log info] "Computing delegation information for payout addresses" ;
       let%bind payout_infos =
         (* sets for quick lookups *)
@@ -383,9 +511,9 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               let open Sql.User_command in
               Int64.compare p1.global_slot p2.global_slot
             in
-            (* only payments in canonical chain, starting at slot 3501 of this epoch *)
+            (* only payments in canonical chain *)
             let min_payment_slot =
-              (input.epoch * slots_per_epoch) + 3501 |> Int64.of_int
+              input.epoch * slots_per_epoch |> Int64.of_int
             in
             let payments_from_delegatee =
               List.filter payments_from_delegatee_raw ~f:(fun payment ->
@@ -466,7 +594,7 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                              coinbase_receiver_id)
                     in
                     let payments =
-                      (* only payments in canonical chain, starting at slot 3501 of this epoch *)
+                      (* only payments in canonical chain *)
                       List.filter payments_raw ~f:(fun payment ->
                           Int.Set.mem block_ids payment.block_id
                           && payment.global_slot >= min_payment_slot )
@@ -516,7 +644,7 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
                       ~receiver_id:payout_id )
                   ~item:"Payments to payment address"
               in
-              (* only payments in canonical chain, starting at slot 3501 of this epoch
+              (* only payments in canonical chain
                  don't include payments from delegatee or coinbase receivers
               *)
               List.filter payments_raw ~f:(fun payment ->
@@ -549,15 +677,18 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
             let payments =
               payments_from_known_senders @ payments_from_anyone
             in
+            let payments_to_slot_3500, payments_past_slot_3500 =
+              List.partition_tf payments ~f:(fun payment ->
+                  Int64.( <= ) payment.global_slot slot_3500 )
+            in
             { payout_pk
             ; payout_id
             ; delegation_source
             ; delegatee
             ; delegatee_id
-            ; payments } )
-      in
-      let end_epoch_slot =
-        (input.epoch * slots_per_epoch) + slots_per_epoch - 1 |> Int64.of_int
+            ; payments
+            ; payments_to_slot_3500
+            ; payments_past_slot_3500 } )
       in
       let epoch_uint32 = input.epoch |> Unsigned.UInt32.of_int in
       let%bind () =
@@ -566,11 +697,6 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               "Examining payments from delegatee %s to payout address %s"
               (Public_key.Compressed.to_base58_check payout_info.delegatee)
               (Public_key.Compressed.to_base58_check payout_info.payout_pk) ;
-            let payments_in_epoch, payments_next_epoch =
-              List.partition_tf payout_info.payments
-                ~f:(fun {global_slot; _} ->
-                  Int64.( <= ) global_slot end_epoch_slot )
-            in
             let%bind num_blocks_produced =
               (* blocks produced in current epoch *)
               let%map creator_block_ids =
@@ -581,7 +707,8 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               in
               List.length filtered_block_ids
             in
-            if num_blocks_produced > 0 && List.is_empty payments_in_epoch then
+            if num_blocks_produced > 0 && List.is_empty payout_info.payments
+            then
               [%log error]
                 "DELINQUENCY: In epoch %d, delegatee %s made no payments to \
                  payout address %s"
@@ -596,29 +723,136 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               | Some amount ->
                   Int64.( + ) amount total
             in
+            let deficit_tbl_key : Delegatee_payout_address.t =
+              { payout_addr= payout_info.payout_pk
+              ; delegatee= payout_info.delegatee }
+            in
+            let { payout_received= prev_payout_received
+                ; deficit= prev_epoch_deficit } =
+              if input.epoch = 0 then
+                { payout_received= Currency.Amount.zero
+                ; deficit= Currency.Amount.zero }
+              else Deficit.Table.find_exn deficit_tbl deficit_tbl_key
+            in
+            let total_to_slot_3500 =
+              List.fold payout_info.payments_to_slot_3500 ~init:0L
+                ~f:add_payment
+            in
+            let to_slot_3500_available_for_this_epoch =
+              if Currency.Amount.( > ) prev_epoch_deficit Currency.Amount.zero
+              then (
+                [%log info]
+                  "In epoch %d, delegatee %s had a deficit amount of %s to \
+                   payout address %s; "
+                  (input.epoch - 1)
+                  (Currency.Amount.to_formatted_string prev_epoch_deficit)
+                  (Public_key.Compressed.to_base58_check payout_info.delegatee)
+                  (Public_key.Compressed.to_base58_check payout_info.payout_pk) ;
+                let total_to_slot_3500_as_currency =
+                  total_to_slot_3500 |> Unsigned.UInt64.of_int64
+                  |> Currency.Amount.of_uint64
+                in
+                let remaining_deficit =
+                  match
+                    Currency.Amount.( - ) prev_epoch_deficit
+                      total_to_slot_3500_as_currency
+                  with
+                  | None ->
+                      Currency.Amount.zero
+                  | Some diff ->
+                      diff
+                in
+                if Currency.Amount.( > ) remaining_deficit Currency.Amount.zero
+                then
+                  [%log error]
+                    "DELINQUENCY: Deficit in epoch %d from delegatee \
+                     $delegatee to payout address $payout_addr is not \
+                     satisified by payments through slot 3500 in epoch %d, \
+                     remaining deficit is $remaining_deficit"
+                    (input.epoch - 1) input.epoch
+                    ~metadata:
+                      [ ( "delegatee"
+                        , Public_key.Compressed.to_yojson payout_info.delegatee
+                        )
+                      ; ( "payout_addr"
+                        , Public_key.Compressed.to_yojson payout_info.payout_pk
+                        )
+                      ; ( "remaining_deficit"
+                        , `String
+                            (Currency.Amount.to_formatted_string
+                               remaining_deficit) ) ]
+                else
+                  [%log info]
+                    "Deficit in epoch %d from delegatee $delegatee to payout \
+                     address $payout_addr is satisified by payments through \
+                     slot 3500 in epoch %d"
+                    (input.epoch - 1) input.epoch
+                    ~metadata:
+                      [ ( "delegatee"
+                        , Public_key.Compressed.to_yojson payout_info.delegatee
+                        )
+                      ; ( "payout_addr"
+                        , Public_key.Compressed.to_yojson payout_info.payout_pk
+                        ) ] ;
+                ( if input.epoch > 0 then
+                  let deficit_reduction =
+                    match
+                      Currency.Amount.( - ) prev_epoch_deficit
+                        remaining_deficit
+                    with
+                    | Some diff ->
+                        diff
+                    | None ->
+                        failwith "Underflow calculating deficit reduction"
+                  in
+                  let updated_payout_received =
+                    match
+                      Currency.Amount.( + ) prev_payout_received
+                        deficit_reduction
+                    with
+                    | Some sum ->
+                        sum
+                    | None ->
+                        failwith "Overflow calculating updated payout received"
+                  in
+                  let data =
+                    { payout_received= updated_payout_received
+                    ; deficit= remaining_deficit }
+                  in
+                  Deficit.Table.set deficit_tbl ~key:deficit_tbl_key ~data ) ;
+                let to_slot_3500_available =
+                  match
+                    Currency.Amount.( - ) total_to_slot_3500_as_currency
+                      remaining_deficit
+                  with
+                  | None ->
+                      Currency.Amount.zero
+                  | Some diff ->
+                      diff
+                in
+                to_slot_3500_available |> Currency.Amount.to_uint64
+                |> Unsigned.UInt64.to_int64 )
+              else total_to_slot_3500
+            in
+            if Int64.( > ) to_slot_3500_available_for_this_epoch Int64.zero
+            then
+              [%log info]
+                "Total payments through slot 3500 in next epoch were %s, of \
+                 which allocated %s to this epoch"
+                (currency_string_of_int64 total_to_slot_3500)
+                (currency_string_of_int64 to_slot_3500_available_for_this_epoch) ;
             let payment_total_in_epoch =
-              List.fold payments_in_epoch ~init:0L ~f:add_payment
+              Int64.( + ) to_slot_3500_available_for_this_epoch
+                (List.fold payout_info.payments_past_slot_3500 ~init:0L
+                   ~f:add_payment)
             in
             [%log info]
-              "In epoch %d, delegatee %s made payments totaling %Ld to payout \
+              "In epoch %d, delegatee %s made payments totaling %sto payout \
                address %s"
               input.epoch
               (Public_key.Compressed.to_base58_check payout_info.delegatee)
-              payment_total_in_epoch
+              (currency_string_of_int64 payment_total_in_epoch)
               (Public_key.Compressed.to_base58_check payout_info.payout_pk) ;
-            let payment_total_in_next_epoch =
-              List.fold payments_next_epoch ~init:0L ~f:add_payment
-            in
-            [%log info]
-              "In epoch %d through slot 3500, delegatee %s made payments \
-               totaling %Ld to payout address %s"
-              (input.epoch + 1)
-              (Public_key.Compressed.to_base58_check payout_info.delegatee)
-              payment_total_in_next_epoch
-              (Public_key.Compressed.to_base58_check payout_info.payout_pk) ;
-            let payment_total =
-              Int64.( + ) payment_total_in_epoch payment_total_in_next_epoch
-            in
             let delegated_stake =
               compute_delegated_stake ledger payout_info.delegatee
             in
@@ -662,27 +896,27 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               payout_obligation_per_block
               (Currency.Amount.to_formatted_string total_payout_obligation) ;
             let payment_total_as_amount =
-              Int64.to_string payment_total |> Currency.Amount.of_string
+              Int64.to_string payment_total_in_epoch
+              |> Currency.Amount.of_string
             in
             if
               Currency.Amount.( < ) payment_total_as_amount
                 total_payout_obligation
             then
               [%log error]
-                "DELINQUENCY: In epoch %d through slot 3500 of epoch %d, \
-                 delegatee %s paid a total of %s to payout address %s, which \
-                 is less than the payout obligation of %s"
-                input.epoch (input.epoch + 1)
+                "DELINQUENCY: In epoch %d, delegatee %s paid a total of %s to \
+                 payout address %s, which is less than the payout obligation \
+                 of %s"
+                input.epoch
                 (Public_key.Compressed.to_base58_check payout_info.delegatee)
                 (Currency.Amount.to_formatted_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
                 (Currency.Amount.to_formatted_string total_payout_obligation)
             else
               [%log info]
-                "In epoch %d through slot 3500 of epoch %d, delegatee %s paid \
-                 a total of %s to payout address %s, satisfying the payout \
-                 obligation of %s"
-                input.epoch (input.epoch + 1)
+                "In epoch %d, delegatee %s paid a total of %s to payout \
+                 address %s, satisfying the payout obligation of %s"
+                input.epoch
                 (Public_key.Compressed.to_base58_check payout_info.delegatee)
                 (Currency.Amount.to_formatted_string payment_total_as_amount)
                 (Public_key.Compressed.to_base58_check payout_info.payout_pk)
@@ -695,6 +929,32 @@ let main ~input_file ~csv_file ~archive_uri ~payout_addresses () =
               ~payout_received:payment_total_as_amount ;
             return () )
       in
+      ( match preliminary_csv_file_opt with
+      | None ->
+          ()
+      | Some prelim_csv_file ->
+          (* write finalized CSV for previous epoch *)
+          let finalized_csv_file = prelim_csv_file ^ ".finalized" in
+          let csv_out_channel = Out_channel.create finalized_csv_file in
+          let updated_csv_datas =
+            List.map csv_datas
+              ~f:(fun ({payout_addr; delegatee; _} as csv_data) ->
+                let key : Delegatee_payout_address.t =
+                  {payout_addr; delegatee}
+                in
+                let {payout_received; deficit} =
+                  Deficit.Table.find_exn deficit_tbl key
+                in
+                let current_check =
+                  Currency.Amount.equal deficit Currency.Amount.zero
+                in
+                {csv_data with payout_received; deficit; check= current_check}
+            )
+          in
+          write_csv_header ~csv_out_channel ;
+          List.iter updated_csv_datas
+            ~f:(write_csv_line_of_csv_data ~csv_out_channel) ;
+          Out_channel.close csv_out_channel ) ;
       Out_channel.close csv_out_channel ;
       Deferred.unit
 
@@ -712,9 +972,13 @@ let () =
                 number"
              Param.(required string)
          and csv_file =
-           Param.flag "--csv-file"
+           Param.flag "--output-csv-file"
              ~doc:"file CSV file to write containing payment statuses"
              Param.(required string)
+         and preliminary_csv_file_opt =
+           Param.flag "--preliminary-csv-file"
+             ~doc:"file Preliminary CSV file from previous epoch"
+             Param.(optional string)
          and archive_uri =
            Param.flag "--archive-uri"
              ~doc:
@@ -724,4 +988,5 @@ let () =
          and payout_addresses =
            Param.anon Anons.(sequence ("PAYOUT ADDRESSES" %: Param.string))
          in
-         main ~input_file ~csv_file ~archive_uri ~payout_addresses)))
+         main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
+           ~payout_addresses)))

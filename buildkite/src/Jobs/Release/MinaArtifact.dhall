@@ -72,10 +72,24 @@ Pipeline.build
 
       DockerImage.generateStep daemonSpec,
 
+      -- mainnet image
+      let mainnetSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-daemon",
+        version = "\\\${MINA_VERSION}-mainnet",
+        step_key="mainnet-docker-image",
+        extra_args = "--build-arg deb_version=\\\${MINA_DEB_VERSION} --build-arg deb_release=\\\${MINA_DEB_RELEASE} --build-arg deb_codename=\\\${MINA_DEB_CODENAME} --build-arg network=mainnet --build-arg MINA_VERSION=\\\${MINA_VERSION} --build-arg MINA_BRANCH=\\\${MINA_GIT_BRANCH}"
+      }
+
+      in
+
+      DockerImage.generateStep mainnetSpec,
+
       -- puppeteered image
       let puppeteeredSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn # [{ name = "MinaArtifact", key = "mina-docker-image" }],
+        deps=dependsOn # [{ name = "MinaArtifact", key = "devnet-docker-image" }],
         service="\\\${MINA_SERVICE}-puppeteered",
+        extra_args = "--build-arg network=devnet --build-arg MINA_VERSION=\\\${MINA_VERSION}-devnet",
         step_key="puppeteered-docker-image"
       }
 
