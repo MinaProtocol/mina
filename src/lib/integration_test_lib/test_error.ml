@@ -3,17 +3,16 @@ open Core
 type remote_error = {node_id: string; error_message: Logger.Message.t}
 
 (* NB: equality on internal errors ignores timestamp *)
-type internal_error =
-  { occurrence_time: Time.t sexp_opaque
-        [@equal fun _ _ -> true] [@compare fun _ _ -> 0]
-  ; error: Error.t
-        [@equal
-          fun a b ->
-            String.equal (Error.to_string_hum a) (Error.to_string_hum b)]
-        [@compare
-          fun a b ->
-            String.compare (Error.to_string_hum a) (Error.to_string_hum b)] }
-[@@deriving equal, sexp, compare]
+type internal_error = {occurrence_time: Time.t sexp_opaque; error: Error.t}
+[@@deriving sexp]
+
+let equal_internal_error {occurrence_time= _; error= err1}
+    {occurrence_time= _; error= err2} =
+  String.equal (Error.to_string_hum err1) (Error.to_string_hum err2)
+
+let compare_internal_error {occurrence_time= _; error= err1}
+    {occurrence_time= _; error= err2} =
+  String.compare (Error.to_string_hum err1) (Error.to_string_hum err2)
 
 let internal_error error = {occurrence_time= Time.now (); error}
 
