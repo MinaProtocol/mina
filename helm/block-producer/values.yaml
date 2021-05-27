@@ -62,7 +62,6 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
-    useCustomEntrypoint: false
   - name: "test-3"
     runWithUserAgent: false
     runWithBots: true
@@ -73,7 +72,6 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
-    useCustomEntrypoint: false
   - name: "test-4"
     runWithUserAgent: true
     runWithBots: true
@@ -84,7 +82,6 @@ blockProducerConfigs:
     libp2pSecret: "libp2pYolo"
     enableArchive: false
     archiveAddress: archive-1:3086
-    useCustomEntrypoint: false
 
 healthcheck:
   enabled: true
