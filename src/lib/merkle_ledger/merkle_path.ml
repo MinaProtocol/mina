@@ -15,7 +15,7 @@ module type S = sig
 end
 
 module Make (Hash : sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, equal]
 
   val merge : height:int -> t -> t -> t
 
@@ -39,5 +39,6 @@ end) : S with type hash := Hash.t = struct
         (acc, height + 1) )
     |> fst
 
-  let check_path t leaf_hash root_hash = Hash.equal (implied_root t leaf_hash) root_hash
+  let check_path t leaf_hash root_hash =
+    Hash.equal (implied_root t leaf_hash) root_hash
 end

@@ -97,7 +97,8 @@ end
 let now = Controller.now
 
 module Timeout = struct
-  type 'a t = {d: 'a Deferred.t; elt: Action.t Pairing_heap.Elt.t; cancel: 'a Ivar.t}
+  type 'a t =
+    {d: 'a Deferred.t; elt: Action.t Pairing_heap.Elt.t; cancel: 'a Ivar.t}
 
   let create (ctrl : Controller.t) span ~f =
     let ivar = Ivar.create () in
@@ -137,7 +138,7 @@ let%test_unit "tick triggers timeouts and fast-forwards to event time" =
       [%test_result: Bool.t] ~message:"We ticked" ~expect:true !fired ;
       [%test_result: Bool.t]
         ~message:"Time fast-forwads to at least event time" ~expect:true
-        (Int64.(>=) (diff (now ctrl) start) (Int64.of_int 5000) ))
+        Int64.(diff (now ctrl) start >= Int64.of_int 5000) )
 
 let%test_unit "tick triggers timeouts and adjusts to system time" =
   let ctrl = Controller.create () in
@@ -160,16 +161,18 @@ let%test_unit "tick triggers timeouts and adjusts to system time" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        (Int64.(>=) (diff (now ctrl) start) (Int64.of_int 5) ))
+        (Int64.( >= ) (diff (now ctrl) start) (Int64.of_int 5)) )
 
 let%test_unit "tick handles multiple timeouts if necessary" =
   let ctrl = Controller.create () in
   let start = now ctrl in
   let count = ref 0 in
   let timeout x =
-    ignore(Timeout.create ctrl
-      (Span.of_ms (Int64.of_int x))
-      ~f:(fun _t -> count := !count + 1) : _ Timeout.t)
+    ignore
+      ( Timeout.create ctrl
+          (Span.of_ms (Int64.of_int x))
+          ~f:(fun _t -> count := !count + 1)
+        : _ Timeout.t )
   in
   List.iter [2; 3; 5; 500] ~f:timeout ;
   Async.Thread_safe.block_on_async_exn (fun () ->
@@ -186,7 +189,7 @@ let%test_unit "tick handles multiple timeouts if necessary" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        (Int64.(>=) (diff (now ctrl) start) (Int64.of_int 7) ))
+        Int64.(diff (now ctrl) start >= Int64.of_int 7) )
 
 let%test_unit "cancelling a timeout means it won't fire" =
   let ctrl = Controller.create () in

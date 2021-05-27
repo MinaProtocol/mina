@@ -83,9 +83,7 @@ module Stack_id : sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson, compare]
-
-  val equal : t -> t -> bool
+  type t = Stable.Latest.t [@@deriving sexp, compare, equal, to_yojson]
 
   val of_int : int -> t
 
@@ -396,7 +394,7 @@ module Update = struct
           | Update_one
           | Update_two_coinbase_in_first
           | Update_two_coinbase_in_second
-        [@@deriving sexp, to_yojson]
+        [@@deriving equal, sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -1465,10 +1463,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
       (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
-      let proof_emitted = match action with
-          Update_none -> false
-        | _ -> true
-      in
+      let proof_emitted = not Update.Action.(equal action Update_none) in
       let unchecked_after_pop =
         if proof_emitted then
           remove_coinbase_stack ~depth unchecked |> Or_error.ok_exn |> snd

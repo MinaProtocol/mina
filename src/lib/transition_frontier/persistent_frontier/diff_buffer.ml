@@ -73,7 +73,7 @@ let flush t =
       t.flush_job <- None ;
       Deferred.unit )
   in
-  assert (Option.is_none t.flush_job);
+  assert (Option.is_none t.flush_job) ;
   if DynArray.length t.diff_array > 0 then t.flush_job <- Some (flush_job t)
 
 let create ~(constraint_constants : Genesis_constants.Constraint_constants.t)

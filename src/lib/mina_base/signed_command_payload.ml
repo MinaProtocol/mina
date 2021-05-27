@@ -37,7 +37,7 @@ module Common = struct
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
-        [@@deriving compare, eq, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
   end
@@ -106,6 +106,7 @@ module Common = struct
       let to_latest = Fn.id
     end
   end]
+
   [%%endif]
 
   let to_input ({fee; fee_token; fee_payer_pk; nonce; valid_until; memo} : t) =

@@ -8,7 +8,7 @@ module Poly = struct
         | Command of 'command
         | Fee_transfer of Fee_transfer.Stable.V1.t
         | Coinbase of Coinbase.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end

@@ -1,17 +1,11 @@
 open Core
 open Snark_params.Tick
 
-[%%versioned:
-module Stable : sig
-  module V1 : sig
-    type t
-    [@@deriving sexp, eq, compare, hash, yojson]
-  end
-end]
+type t [@@deriving sexp, equal, compare, hash, yojson]
 
 include Hashable with type t := t
 
-type value [@@deriving sexp, eq, compare, hash]
+type value [@@deriving sexp, equal, compare, hash]
 
 type var
 
@@ -28,13 +22,22 @@ val genesis :
   -> genesis_ledger_hash:Ledger_hash.t
   -> t
 
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t
+    [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
+  end
+
+  module Latest : module type of V1
+end
+
 module Aux_hash : sig
   type t
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      [@@deriving bin_io, sexp, equal, compare, hash, yojson, version]
     end
 
     module Latest : module type of V1

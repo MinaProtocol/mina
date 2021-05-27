@@ -480,13 +480,13 @@ end
    one generated at compile-time.
 *)
 module Base_hash : sig
-  type t [@@deriving eq, yojson]
+  type t [@@deriving equal, yojson]
 
   val create : id:Pickles.Verification_key.Id.t -> state_hash:State_hash.t -> t
 
   val to_string : t -> string
 end = struct
-  type t = string [@@deriving eq, yojson]
+  type t = string [@@deriving equal, yojson]
 
   let to_string = Fn.id
 

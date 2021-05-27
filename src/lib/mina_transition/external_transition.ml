@@ -20,6 +20,8 @@ module Validate_content = struct
 
   let sexp_of_t _ = sexp_of_unit ()
 
+  let compare _ _ = 0
+
   let __versioned__ = ()
 end
 
@@ -37,7 +39,7 @@ module Raw_versioned__ = struct
         ; current_protocol_version: Protocol_version.Stable.V1.t
         ; proposed_protocol_version_opt: Protocol_version.Stable.V1.t option
         ; mutable validation_callback: Validate_content.t }
-      [@@deriving sexp, fields]
+      [@@deriving compare, sexp, fields]
 
       let to_latest = Fn.id
 
@@ -95,7 +97,8 @@ Raw_versioned__.
   , current_protocol_version
   , proposed_protocol_version_opt
   , validation_callback
-  , set_validation_callback )]
+  , set_validation_callback
+  , compare )]
 
 [%%define_locally
 Stable.Latest.(create, sexp_of_t, t_of_sexp)]
@@ -225,7 +228,7 @@ module Precomputed_block = struct
     | Ok _ ->
         ()
     | Error err ->
-      failwith err
+        failwith err
 
   let%test_unit "JSON serialization roundtrips" =
     let serialized_block =
@@ -858,8 +861,7 @@ let skip_protocol_versions_validation
   (t, Validation.Unsafe.set_valid_protocol_versions validation)
 
 module With_validation = struct
-  (* TODO : is this meaningful? *)
-  let compare (t1, _) (t2, _) = Caml.compare (With_hash.data t1) (With_hash.data t2)
+  let compare (t1, _) (t2, _) = compare (With_hash.data t1) (With_hash.data t2)
 
   let state_hash (t, _) = With_hash.hash t
 

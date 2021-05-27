@@ -226,11 +226,11 @@ let reader_to_strict_pipe_with_logging :
      iterate over it and drop everything. Since Strict_pipe enforces a single
      reader this is safe. *)
   don't_wait_for
-    (
-      match pipe with
-      | `No_pipe ->
+    ( match pipe with
+    | `No_pipe ->
         Strict_pipe.Reader.iter client_r ~f:(Fn.const Deferred.unit)
-      | _ -> Deferred.unit ) ;
+    | _ ->
+        Deferred.unit ) ;
   client_r
 
 let start_custom :

@@ -32,7 +32,9 @@ module Time_queue = struct
   let create ~now =
     { curr_time= now
     ; pending_actions=
-        Pairing_heap.create ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts') ()
+        Pairing_heap.create
+          ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts')
+          ()
     ; on_new_action= None }
 
   let actions_ready t =
@@ -64,7 +66,7 @@ module Time_queue = struct
               match Pairing_heap.top t.pending_actions with
               | None ->
                   return ()
-              | Some (_, at) when Time.Span.(>=) t.curr_time at ->
+              | Some (_, at) when Time.Span.(t.curr_time >= at) ->
                   let%bind () = do_next_action () in
                   loop ()
               | Some _ ->
@@ -127,7 +129,7 @@ end
 
 module type Fake_timer_transport_s = functor
   (Message :sig
-
+            
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
@@ -144,7 +146,7 @@ end)
 struct
   module Token = Int
 
-  type tok = Token.t [@@deriving eq, sexp]
+  type tok = Token.t [@@deriving equal, sexp]
 
   type message = Message.t
 
@@ -221,14 +223,14 @@ struct
 end
 
 module type Trivial_peer_intf = sig
-  type t = int [@@deriving eq, hash, compare, sexp, yojson]
+  type t = int [@@deriving equal, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
 
 module Trivial_peer : Trivial_peer_intf = struct
   module T = struct
-    type t = int [@@deriving eq, hash, compare, sexp, yojson]
+    type t = int [@@deriving equal, hash, compare, sexp, yojson]
   end
 
   include Hashable.Make (T)
@@ -237,28 +239,28 @@ end
 
 module type S = functor
   (State :sig
-
-          type t [@@deriving eq, sexp, yojson]
+          
+          type t [@@deriving equal, sexp, yojson]
         end)
   (Message :sig
-
+            
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
   (Message_label :sig
-
+                  
                   type label [@@deriving enum, sexp]
 
                   include Hashable.S with type t = label
                 end)
   (Timer_label :sig
-
+                
                 type label [@@deriving enum, sexp]
 
                 include Hashable.S with type t = label
               end)
   (Condition_label :sig
-
+                    
                     type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
@@ -302,7 +304,7 @@ module type S = functor
 end
 
 module Make (State : sig
-  type t [@@deriving eq, sexp, yojson]
+  type t [@@deriving equal, sexp, yojson]
 end) (Message : sig
   type t
 end)
@@ -463,7 +465,7 @@ let%test_module "Distributed_dsl" =
 
     module State = struct
       type t = Start | Wait_msg | Sent_msg | Got_msg of int | Timeout
-      [@@deriving eq, sexp, yojson]
+      [@@deriving equal, sexp, yojson]
     end
 
     module Message = struct

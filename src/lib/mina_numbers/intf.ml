@@ -163,16 +163,7 @@ module type UInt32 = sig
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt32.t
-      [@@deriving sexp, compare, hash]
-
-      (* don't want to derive these, they're in S below
-         when we switch to ppx_yojson_conv, these
-         are in an interface Yojsonable.S we can include
-      *)
-      val to_yojson : t -> Yojson.Safe.t
-      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
-
-      val equal : t -> t -> bool
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -188,16 +179,7 @@ module type UInt64 = sig
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt64.t
-      [@@deriving sexp, compare, hash]
-
-      (* don't want to derive these, they're in S below
-         when we switch to ppx_yojson_conv, these
-         are in an interface Yojsonable.S we can include
-      *)
-      val to_yojson : t -> Yojson.Safe.t
-      val of_yojson : Yojson.Safe.t -> t Ppx_deriving_yojson_runtime.error_or
-
-      val equal : t -> t -> bool
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -210,7 +192,7 @@ end
 
 module type F = functor
   (N :sig
-
+      
       type t [@@deriving bin_io, sexp, compare, hash]
 
       include Unsigned_extended.S with type t := t

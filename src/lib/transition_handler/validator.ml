@@ -33,8 +33,8 @@ let validate_transition ~consensus_constants ~logger ~frontier
   in
   let%map () =
     Result.ok_if_true
-      ( match
-          Consensus.Hooks.select ~constants:consensus_constants
+      (Consensus.Hooks.equal_select_status `Take
+         (Consensus.Hooks.select ~constants:consensus_constants
             ~logger:
               (Logger.extend logger
                  [("selection_context", `String "Transition_handler.Validator")])
@@ -42,12 +42,7 @@ let validate_transition ~consensus_constants ~logger ~frontier
               (Transition_frontier.Breadcrumb.consensus_state_with_hash
                  root_breadcrumb)
             ~candidate:
-              (With_hash.map ~f:External_transition.consensus_state transition)
-        with
-      | `Take ->
-          true
-      | `Keep ->
-          false )
+              (With_hash.map ~f:External_transition.consensus_state transition)))
       ~error:`Disconnected
   in
   (* we expect this to be Ok since we just checked the cache *)

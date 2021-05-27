@@ -21,7 +21,7 @@ let pred_to_yojson _f _x = `String "<opaque>"
 let sexp_opaque_to_yojson _f _x = `String "<opaque>"
 
 module Claimed_knowledge = struct
-  type 'key t = [`All | `Some of 'key list | `Call of 'key pred [@sexp.opaque]]
+  type 'key t = [`All | `Some of 'key list | `Call of 'key pred[@sexp.opaque]]
   [@@deriving sexp, to_yojson]
 
   let to_yojson f t =
@@ -218,18 +218,23 @@ end = struct
             c
 
       let clear t =
-        let rec go t = match Pairing_heap.pop t with None -> () | Some _ -> go t in
+        let rec go t =
+          match Pairing_heap.pop t with None -> () | Some _ -> go t
+        in
         go t.heap ; Hashtbl.clear t.table
 
-      let create () = {heap= Pairing_heap.create ~cmp (); table= Peer.Table.create ()}
+      let create () =
+        {heap= Pairing_heap.create ~cmp (); table= Peer.Table.create ()}
 
       let add t (p, time) =
         Option.iter (Hashtbl.find t.table p) ~f:(fun elt ->
             Pairing_heap.remove t.heap elt ) ;
-        Hashtbl.set t.table ~key:p ~data:(Pairing_heap.add_removable t.heap (p, time))
+        Hashtbl.set t.table ~key:p
+          ~data:(Pairing_heap.add_removable t.heap (p, time))
 
       let sexp_of_t (t : t) =
-        List.sexp_of_t [%sexp_of: Peer.t * Time.t] (Pairing_heap.to_list t.heap)
+        List.sexp_of_t [%sexp_of: Peer.t * Time.t]
+          (Pairing_heap.to_list t.heap)
 
       let t_of_sexp s =
         let elts = [%of_sexp: (Peer.t * Time.t) list] s in
@@ -254,17 +259,17 @@ end = struct
     type t =
       { downloading_peers: Peer.Hash_set.t
       ; knowledge_requesting_peers: Peer.Hash_set.t
-      ; temporary_ignores: ((unit, unit) Clock.Event.t [@sexp.opaque]) Peer.Table.t
+      ; temporary_ignores:
+          ((unit, unit) Clock.Event.t[@sexp.opaque]) Peer.Table.t
       ; mutable all_preferred: Preferred_heap.t
       ; knowledge: Knowledge.t Peer.Table.t
             (* Written to when something changes. *)
-      ; r: (unit Strict_pipe.Reader.t [@sexp.opaque])
+      ; r: (unit Strict_pipe.Reader.t[@sexp.opaque])
       ; w:
           (( unit
-          , Strict_pipe.drop_head Strict_pipe.buffered
-          , unit )
-          Strict_pipe.Writer.t
-          [@sexp.opaque]) }
+           , Strict_pipe.drop_head Strict_pipe.buffered
+           , unit )
+           Strict_pipe.Writer.t[@sexp.opaque]) }
     [@@deriving sexp]
 
     let reset_knowledge t ~all_peers =
@@ -440,7 +445,9 @@ end = struct
             in
             ((p, List.rev js), Knowledge_summary.score summary) )
       in
-      let useful_exists = List.exists knowledge ~f:(fun (_, s) -> Float.is_positive s) in
+      let useful_exists =
+        List.exists knowledge ~f:(fun (_, s) -> Float.(s > 0.))
+      in
       let best =
         List.max_elt
           (List.filter knowledge ~f:(fun ((p, _), _) ->
@@ -453,7 +460,7 @@ end = struct
       | None ->
           if useful_exists then `Useful_but_busy else `No_peers
       | Some ((p, k), score) ->
-          if Float.(<=) score 0. then `Stalled else `Useful (p, k)
+          if Float.(score <= 0.) then `Stalled else `Useful (p, k)
 
     type update =
       | Refreshed_peers of {all_peers: Peer.Set.t}
@@ -653,9 +660,8 @@ end = struct
 
   let enqueue t e = Q.enqueue t.pending e
 
-  let enqueue_exn t e = assert (match enqueue t e with
-      | `Ok -> true
-      | `Key_already_present -> false)
+  let enqueue_exn t e =
+    assert ([%equal: [`Ok | `Key_already_present]] (enqueue t e) `Ok)
 
   let active_jobs t =
     Q.to_list t.pending

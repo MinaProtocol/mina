@@ -300,12 +300,10 @@ module Interpreter = struct
         Option.map2
           (interpret_value_exp json x)
           (interpret_value_exp json y)
-          ~f:(Yojson.Safe.equal)
+          ~f:Yojson.Safe.equal
         |> Option.value ~default:false
     | Cmp_neq (x, y) ->
-        Option.map2
-          (interpret_value_exp json x)
-          (interpret_value_exp json y)
+        Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)
           ~f:(fun json1 json2 -> not (Yojson.Safe.equal json1 json2))
         |> Option.value ~default:false
     | Cmp_in (x, y) ->

@@ -167,7 +167,8 @@ let iter_lines_prefixed_with input_channel output_channel ~prefix ~on_hit
 (* TODO: check for common filter errors (e.g. invalid level provided) *)
 let main timezone_str interpolation_config filter_str =
   let filter =
-    if String.is_empty filter_str then Result.ok_or_failwith (Filter.Parser.parse "true")
+    if String.is_empty filter_str then
+      Result.ok_or_failwith (Filter.Parser.parse "true")
     else
       let error s =
         eprintf !"ERROR PARSING FILTER: %s\n%!" s ;

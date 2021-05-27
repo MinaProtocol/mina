@@ -466,13 +466,15 @@ module Data = struct
               ~default:
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch_and_slot.of_time_exn now ~constants in
-                 (epoch, UInt32.(if compare slot zero > 0 then sub slot one else slot)))
+                 ( epoch
+                 , UInt32.(
+                     if compare slot zero > 0 then sub slot one else slot) ))
         ; last_epoch_delegatee_table= None
         ; epoch_ledger_uuids= old.epoch_ledger_uuids
         ; epoch_ledger_location= old.epoch_ledger_location }
 
     type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
-    [@@deriving to_yojson,equal]
+    [@@deriving to_yojson, equal]
 
     let get_snapshot (t : t) id =
       match id with
@@ -1007,7 +1009,7 @@ module Data = struct
         else {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
       in
       let staking_data', next_data', epoch_count' =
-        if Epoch.(>) next_epoch prev_epoch then
+        if Epoch.(next_epoch > prev_epoch) then
           ( next_to_staking next_data
           , { Poly.seed= next_data.seed
             ; ledger= next_staking_ledger
@@ -1124,9 +1126,11 @@ module Data = struct
               Sub_window.(of_int i < next_relative_sub_window)
             in
             let within_range =
-              (* TODO: add `compare` to Global_sub_window *)
-              if UInt32.compare prev_relative_sub_window next_relative_sub_window < 0 then
-                gt_prev_sub_window && lt_next_sub_window
+              if
+                UInt32.compare prev_relative_sub_window
+                  next_relative_sub_window
+                < 0
+              then gt_prev_sub_window && lt_next_sub_window
               else gt_prev_sub_window || lt_next_sub_window
             in
             if same_sub_window then length
@@ -1139,8 +1143,10 @@ module Data = struct
       let min_window_density =
         if
           same_sub_window
-          || UInt32.compare (Global_slot.slot_number next_global_slot)
-             constants.grace_period_end < 0
+          || UInt32.compare
+               (Global_slot.slot_number next_global_slot)
+               constants.grace_period_end
+             < 0
         then prev_min_window_density
         else Length.min new_window_length prev_min_window_density
       in
@@ -1291,8 +1297,10 @@ module Data = struct
           let min_window_density =
             if
               sub_window_diff = 0
-              || UInt32.compare (Global_slot.slot_number next_global_slot)
-                 constants.grace_period_end < 0
+              || UInt32.compare
+                   (Global_slot.slot_number next_global_slot)
+                   constants.grace_period_end
+                 < 0
             then prev_min_window_density
             else Length.min new_window_length prev_min_window_density
           in
@@ -1743,7 +1751,9 @@ module Data = struct
         / constants.checkpoint_window_size_in_slots)
 
     let same_checkpoint_window_unchecked ~constants slot1 slot2 =
-      UInt32.equal (checkpoint_window slot1 ~constants) (checkpoint_window slot2 ~constants)
+      UInt32.equal
+        (checkpoint_window slot1 ~constants)
+        (checkpoint_window slot2 ~constants)
 
     let update ~(constants : Constants.t) ~(previous_consensus_state : Value.t)
         ~(consensus_transition : Consensus_transition.t)
@@ -2573,7 +2583,7 @@ module Hooks = struct
     let epoch_is_not_finalized =
       let is_genesis_epoch = Length.equal epoch Length.zero in
       let epoch_is_finalized =
-        Length.(>) consensus_state.next_epoch_data.epoch_length constants.k
+        Length.(consensus_state.next_epoch_data.epoch_length > constants.k)
       in
       (not epoch_is_finalized) && not is_genesis_epoch
     in
@@ -2754,12 +2764,13 @@ module Hooks = struct
         sync {snapshot_id= Next_epoch_snapshot; expected_root= next}
 
   let received_within_window ~constants (epoch, slot) ~time_received =
-    let open Time in
     let open Int64 in
-    let ( < ) x y = Caml.(compare x y < 0) in
-    let ( >= ) x y = Caml.(compare x y >= 0) in
+    let ( < ) x y = compare x y < 0 in
+    let ( >= ) x y = compare x y >= 0 in
     let time_received =
-      of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
+      Time.(
+        of_span_since_epoch
+          (Span.of_ms (Unix_timestamp.to_int64 time_received)))
     in
     let slot_diff =
       Epoch.diff_in_slots ~constants
@@ -2794,6 +2805,8 @@ module Hooks = struct
         Mina_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
           c2.staking_epoch_data.lock_checkpoint
       else pred_case c1 c2 || pred_case c2 c1
+
+  type select_status = [`Keep | `Take] [@@deriving equal]
 
   let select ~constants ~existing:existing_with_hash
       ~candidate:candidate_with_hash ~logger =
@@ -3027,7 +3040,8 @@ module Hooks = struct
             ~finish:(fun () -> None)
         in
         let rec find_winning_slot (slot : Slot.t) =
-          if UInt32.compare slot constants.epoch_size >= 0 then Deferred.return None
+          if UInt32.compare slot constants.epoch_size >= 0 then
+            Deferred.return None
           else
             match%bind
               Local_state.seen_slot local_state epoch slot |> Deferred.return
@@ -3113,9 +3127,9 @@ module Hooks = struct
 
   let should_bootstrap_len ~(constants : Constants.t) ~existing ~candidate =
     let open UInt32.Infix in
-    UInt32.compare
-      (candidate - existing)
-      ((UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1)) > 0
+    UInt32.compare (candidate - existing)
+      ((UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1))
+    > 0
 
   let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger
       =
@@ -3684,7 +3698,7 @@ let%test_module "Proof of stake tests" =
       in
       let tolerance = 100. in
       (* 100 is a reasonable choice for samples = 1000 and for very low likelihood of failure; this should be recalculated if sample count was to be adjusted *)
-      let within_tolerance = Float.(<) diff tolerance in
+      let within_tolerance = Float.(diff < tolerance) in
       if not within_tolerance then
         failwithf "actual vs. expected: %d vs %f" actual expected ()
 
@@ -4220,16 +4234,14 @@ let%test_module "Proof of stake tests" =
     let is_selected ?(log = false) (a, b) =
       let logger = if log then Logger.create () else Logger.null () in
       let constants = Lazy.force Constants.for_unit_tests in
-      match Hooks.select ~constants ~existing:a ~candidate:b ~logger with
-      | `Take -> true
-      | `Keep -> false
+      Hooks.equal_select_status `Take
+        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
 
     let is_not_selected ?(log = false) (a, b) =
       let logger = if log then Logger.create () else Logger.null () in
       let constants = Lazy.force Constants.for_unit_tests in
-      match Hooks.select ~constants ~existing:a ~candidate:b ~logger with
-      |`Keep -> true
-      | `Take -> false
+      Hooks.equal_select_status `Keep
+        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
 
     let assert_selected =
       assert_hashed_consensus_state_pair ~assertion:"trigger selection"
@@ -4358,9 +4370,10 @@ let%test_module "Proof of stake tests" =
           (assert_hashed_consensus_state_pair
              ~assertion:"chains do not trigger a selection cycle"
              ~f:(fun (a, b) ->
-                 match select a b, select b a with
-                 | `Take, `Take -> false
-                 | _ -> true))
+               not
+                 ([%equal: Hooks.select_status * Hooks.select_status]
+                    (select a b, select b a)
+                    (`Take, `Take)) ))
 
     (* We define a homogeneous binary relation for consensus states by adapting the binary chain
      * selection rule and extending it to consider equality of chains. From this, we can test

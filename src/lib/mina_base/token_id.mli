@@ -17,9 +17,7 @@ open Import
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp, hash, compare, yojson]
-
-    val equal : t -> t -> bool
+    type t [@@deriving sexp, equal, hash, compare, yojson]
   end
 end]
 

@@ -255,7 +255,8 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                 !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
                 peer
             in
-            let%bind.Deferred () = Trust_system.(
+            let%bind.Deferred () =
+              Trust_system.(
                 record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
@@ -509,8 +510,11 @@ let verify_transitions_and_build_breadcrumbs ~logger
             ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
-          ignore (List.map acc ~f:Cached.invalidate_with_failure : External_transition.Initial_validated.t Envelope.Incoming.t list);
-          Deferred.Or_error.fail e
+            ignore
+              ( List.map acc ~f:Cached.invalidate_with_failure
+                : External_transition.Initial_validated.t Envelope.Incoming.t
+                  list ) ;
+            Deferred.Or_error.fail e
         | Ok (`In_frontier initial_hash) ->
             Deferred.Or_error.return
             @@ Continue_or_stop.Stop (acc, initial_hash)
@@ -572,8 +576,11 @@ let verify_transitions_and_build_breadcrumbs ~logger
           ; ("error", `String (Error.to_string_hum e)) ]
         "build of breadcrumbs failed with $error" ;
       ( try
-          ignore (List.map transitions_with_initial_validation
-              ~f:Cached.invalidate_with_failure : External_transition.Initial_validated.t Envelope.Incoming.t list)
+          ignore
+            ( List.map transitions_with_initial_validation
+                ~f:Cached.invalidate_with_failure
+              : External_transition.Initial_validated.t Envelope.Incoming.t
+                list )
         with e ->
           [%log error]
             ~metadata:[("exn", `String (Exn.to_string e))]
@@ -582,7 +589,9 @@ let verify_transitions_and_build_breadcrumbs ~logger
 
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
-      ignore (Rose_tree.map subtree ~f:Cached.invalidate_with_failure : 'a Rose_tree.t));
+      ignore
+        ( Rose_tree.map subtree ~f:Cached.invalidate_with_failure
+          : 'a Rose_tree.t ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
@@ -1006,16 +1015,17 @@ let%test_module "Ledger_catchup tests" =
                   cache failing_transition
               in
               let%bind () = after (Core.Time.Span.of_sec 1.) in
-              ignore (Cache_lib.Cached.invalidate_with_failure
-                   cached_failing_transition : External_transition.Initial_validated.t Envelope.Incoming.t);
+              ignore
+                ( Cache_lib.Cached.invalidate_with_failure
+                    cached_failing_transition
+                  : External_transition.Initial_validated.t Envelope.Incoming.t
+                  ) ;
               let%map result =
                 Block_time.Timeout.await_exn time_controller
                   ~timeout_duration:(Block_time.Span.of_ms 10000L)
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
-              match result with
-              `Failed -> ()
-              | _ ->
+              if not ([%equal: [`Failed | `Success of _]] result `Failed) then
                 failwith "expected ledger catchup to fail, but it succeeded" )
           )
 

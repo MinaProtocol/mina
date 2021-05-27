@@ -193,8 +193,9 @@ let%test_module "Archive node unit tests" =
                         if
                           Unsigned.UInt32.compare
                             (Transition_frontier.Breadcrumb.blockchain_length
-                            breadcrumb)
-                          (Unsigned.UInt32.of_int 1) > 0
+                               breadcrumb)
+                            (Unsigned.UInt32.of_int 1)
+                          > 0
                         then
                           Processor.For_test.assert_parent_exist ~parent_id
                             ~parent_hash:

@@ -3,7 +3,7 @@ open Async
 
 module Level = struct
   type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, compare, show {with_path= false}, enumerate]
+  [@@deriving sexp, equal, compare, show {with_path= false}, enumerate]
 
   let of_string str =
     try Ok (t_of_sexp (Sexp.Atom str))
@@ -91,7 +91,7 @@ module Message = struct
     ; source: Source.t option [@default None]
     ; message: string
     ; metadata: Metadata.t
-    ; event_id: Structured_log_events.id option [@default None]}
+    ; event_id: Structured_log_events.id option [@default None] }
   [@@deriving yojson]
 
   let check_invariants (t : t) =
@@ -129,7 +129,8 @@ module Processor = struct
         let json =
           if Level.compare msg.level Level.Spam = 0 then
             `Assoc
-              (List.filter msg_json_fields ~f:(fun (k, _) -> not (String.equal k "source")))
+              (List.filter msg_json_fields ~f:(fun (k, _) ->
+                   not (String.equal k "source") ))
           else `Assoc msg_json_fields
         in
         Some (Yojson.Safe.to_string json)

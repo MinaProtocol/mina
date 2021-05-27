@@ -151,8 +151,8 @@ struct
 
       module Config = struct
         type t =
-          { trust_system: (Trust_system.t [@sexp.opaque])
-          ; verifier: (Verifier.t [@sexp.opaque])
+          { trust_system: (Trust_system.t[@sexp.opaque])
+          ; verifier: (Verifier.t[@sexp.opaque])
           ; disk_location: string }
         [@@deriving sexp, make]
       end
@@ -163,7 +163,7 @@ struct
 
       type t =
         { snark_tables: Snark_tables.t
-        ; best_tip_ledger: ((unit -> Base_ledger.t option) [@sexp.opaque])
+        ; best_tip_ledger: (unit -> Base_ledger.t option[@sexp.opaque])
         ; mutable ref_table: int Statement_table.t option
               (** Tracks the number of blocks that have each work statement in
                   their scan state.
@@ -179,7 +179,7 @@ struct
                   irrelevant work is not broadcast.
               *)
         ; config: Config.t
-        ; logger: (Logger.t [@sexp.opaque])
+        ; logger: (Logger.t[@sexp.opaque])
         ; mutable removed_counter: int
               (** A counter for transition frontier breadcrumbs removed. When
                   this reaches a certain value, unreferenced snark work is
@@ -876,7 +876,7 @@ let%test_module "random set test" =
                 Option.value_exn
                   (Mock_snark_pool.Resource_pool.request_proof t work)
               in
-              assert (Currency.Fee.(<=) fee fee_upper_bound) ) )
+              assert (Currency.Fee.(fee <= fee_upper_bound)) ) )
 
     let%test_unit "A priced proof of a work will replace an existing priced \
                    proof of the same work only if it's fee is smaller than \
@@ -906,9 +906,8 @@ let%test_module "random set test" =
               let%map res = apply_diff t work expensive_fee in
               assert (Result.is_error res) ;
               assert (
-                Currency.Fee.equal
-                cheap_fee.fee
-                (Option.value_exn
+                Currency.Fee.equal cheap_fee.fee
+                  (Option.value_exn
                      (Mock_snark_pool.Resource_pool.request_proof t work))
                     .fee
                     .fee ) ) )
@@ -959,7 +958,9 @@ let%test_module "random set test" =
                      Mock_snark_pool.Resource_pool.request_proof pool fake_work
                    with
                  | Some {proof; fee= _} ->
-                     assert ([%equal: Ledger_proof.t One_or_two.t] proof priced_proof.proof)
+                     assert (
+                       [%equal: Ledger_proof.t One_or_two.t] proof
+                         priced_proof.proof )
                  | None ->
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
@@ -1033,7 +1034,11 @@ let%test_module "random set test" =
                      | Mock_snark_pool.Resource_pool.Diff.Empty ->
                          assert false
                    in
-                   assert (List.mem works work ~equal:[%equal: Transaction_snark.Statement.t One_or_two.t]);
+                   assert (
+                     List.mem works work
+                       ~equal:
+                         [%equal: Transaction_snark.Statement.t One_or_two.t]
+                   ) ;
                    Deferred.unit ) ;
             Deferred.unit
           in
@@ -1100,8 +1105,10 @@ let%test_module "random set test" =
             | Error (`Locally_generated _) ->
                 failwith "rejected because locally generated"
           in
-          ignore (ok_exn res1 : Mock_snark_pool.Resource_pool.Diff.verified *
-                                Mock_snark_pool.Resource_pool.Diff.rejected);
+          ignore
+            ( ok_exn res1
+              : Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
@@ -1110,8 +1117,10 @@ let%test_module "random set test" =
             rebroadcastable1 [] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
-          ignore (ok_exn res2 : Mock_snark_pool.Resource_pool.Diff.verified *
-                                Mock_snark_pool.Resource_pool.Diff.rejected);
+          ignore
+            ( ok_exn res2
+              : Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
@@ -1121,8 +1130,10 @@ let%test_module "random set test" =
             [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
           let%bind res3 = apply_diff resource_pool stmt3 fee3 in
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
-          ignore (ok_exn res3: Mock_snark_pool.Resource_pool.Diff.verified *
-                               Mock_snark_pool.Resource_pool.Diff.rejected);
+          ignore
+            ( ok_exn res3
+              : Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           let rebroadcastable3 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
@@ -1163,8 +1174,10 @@ let%test_module "random set test" =
             [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
           let%bind res6 = apply_diff resource_pool stmt4 fee4 in
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
-          ignore (ok_exn res6 :   Mock_snark_pool.Resource_pool.Diff.verified *
-                                  Mock_snark_pool.Resource_pool.Diff.rejected);
+          ignore
+            ( ok_exn res6
+              : Mock_snark_pool.Resource_pool.Diff.verified
+                * Mock_snark_pool.Resource_pool.Diff.rejected ) ;
           (* Mark best tip as not including stmt3. *)
           let%bind () =
             Mocks.Transition_frontier.remove_from_best_tip tf [stmt3]

@@ -7,9 +7,7 @@ module Stable : sig
     type t = private
       { receiver_pk: Public_key.Compressed.Stable.V1.t
       ; fee: Currency.Fee.Stable.V1.t }
-    [@@deriving sexp, compare, yojson, hash]
-
-    val equal : t -> t -> bool
+    [@@deriving sexp, compare, equal, yojson, hash]
   end
 end]
 

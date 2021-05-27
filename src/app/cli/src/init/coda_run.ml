@@ -177,7 +177,9 @@ let remove_prev_crash_reports ~conf_dir =
 
 let summary exn_json =
   let uname = Core.Unix.uname () in
-  let daemon_command = sprintf !"Command: %{sexp: string array}" (Sys.get_argv ()) in
+  let daemon_command =
+    sprintf !"Command: %{sexp: string array}" (Sys.get_argv ())
+  in
   `Assoc
     [ ("OS_type", `String Sys.os_type)
     ; ("Release", `String (Core.Unix.Utsname.release uname))
@@ -236,11 +238,14 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   Yojson.Safe.to_file (temp_config ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
-  (match Core.Sys.file_exists daemon_config with
-  | `Yes ->
-    ignore (Core.Sys.command
-              (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json")) : int)
-  | _ -> ());
+  let eq = [%equal: [`Yes | `Unknown | `No]] in
+  let _ =
+    if eq (Core.Sys.file_exists daemon_config) `Yes then
+      ignore
+        ( Core.Sys.command
+            (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
+          : int )
+  in
   (*Zip them all up*)
   let tmp_files =
     [ "coda_short.log"
@@ -250,9 +255,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
     ; "crash_summary.json"
     ; "daemon.json" ]
     |> List.filter ~f:(fun f ->
-        match Core.Sys.file_exists (temp_config ^/ f) with
-        | `Yes -> true
-        | `Unknown|`No -> false)
+           eq (Core.Sys.file_exists (temp_config ^/ f)) `Yes )
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
@@ -551,7 +554,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                               Mina_compile_config.rpc_heartbeat_timeout_sec)
                          ~send_every:
                            (Time_ns.Span.of_sec
-                              Mina_compile_config.rpc_heartbeat_send_every_sec) () )
+                              Mina_compile_config.rpc_heartbeat_send_every_sec)
+                         ())
                     reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn
@@ -610,7 +614,9 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref
   (* attempt to free up some memory before handling crash *)
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
-  |> List.iter ~f:(fun pid -> ignore (Signal.send Signal.kill (`Pid pid): [`No_such_process | `Ok]));
+  |> List.iter ~f:(fun pid ->
+         ignore (Signal.send Signal.kill (`Pid pid) : [`No_such_process | `Ok])
+     ) ;
   let exn_json = Error_json.error_to_yojson (Error.of_exn ~backtrace:`Get e) in
   [%log' fatal top_logger]
     "Unhandled top-level exception: $exn\nGenerating crash report"

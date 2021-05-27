@@ -43,6 +43,7 @@ module Binable_arg = struct
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = int * string
 
@@ -142,11 +143,13 @@ let of_int_exn ~ledger_depth index =
   if index >= 1 lsl ledger_depth then failwith "Index is too large"
   else
     let buf = create_bitstring ledger_depth in
-    ignore (Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-              (ledger_depth - 1) 0
-            |> Sequence.fold ~init:index ~f:(fun i pos ->
-                Bitstring.put buf pos (i % 2) ;
-                i / 2 ) : int);
+    ignore
+      ( Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+          (ledger_depth - 1) 0
+        |> Sequence.fold ~init:index ~f:(fun i pos ->
+               Bitstring.put buf pos (i % 2) ;
+               i / 2 )
+        : int ) ;
     buf
 
 let dirs_from_root t =

@@ -329,7 +329,7 @@ let destroy_database_exn t =
   File_system.remove_dir t.directory
 
 let create_instance_exn t =
-  assert (Option.is_none t.instance);
+  assert (Option.is_none t.instance) ;
   let instance = Instance.create t in
   t.instance <- Some instance ;
   instance

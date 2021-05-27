@@ -23,7 +23,7 @@ type t =
   | Mint_tokens
   | Fee_transfer
   | Coinbase
-[@@deriving enum, eq, sexp]
+[@@deriving enum, equal, sexp]
 
 let to_string = function
   | Payment ->
@@ -44,7 +44,7 @@ let gen =
       Option.value_exn (of_enum i) )
 
 module Bits = struct
-  type t = bool * bool * bool [@@deriving eq]
+  type t = bool * bool * bool [@@deriving equal]
 
   let of_int i : t =
     let test_mask mask = i land mask = mask in
@@ -92,7 +92,7 @@ module Unpacked = struct
       ; is_fee_transfer: 'bool
       ; is_coinbase: 'bool
       ; is_user_command: 'bool }
-    [@@deriving eq, hlist]
+    [@@deriving equal, hlist]
 
     [%%ifdef
     consensus_mechanism]
@@ -106,7 +106,7 @@ module Unpacked = struct
     [%%endif]
   end
 
-  type t = bool Poly.t [@@deriving eq]
+  type t = bool Poly.t [@@deriving equal]
 
   (* An invalid value with all types empty. Do not use directly. *)
   let empty : t =

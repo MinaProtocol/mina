@@ -55,7 +55,8 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, equal, hash]
+      type t = (Field.t, bool) Poly.Stable.V1.t
+      [@@deriving compare, equal, hash]
 
       (* dummy type for inserting constraint
          adding constraint to t produces "unused rec" error

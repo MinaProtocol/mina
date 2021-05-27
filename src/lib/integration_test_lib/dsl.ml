@@ -194,13 +194,11 @@ module Make (Engine : Intf.Engine.S) () :
                  failwith "unexpected log level encountered"
            in
            DynArray.add acc (node, message) ;
-           (match message.level with
-             | Fatal -> (
-                 [%log fatal] "Error occured $error"
-                   ~metadata:[("error", Logger.Message.to_yojson message)] ;
-                 on_fatal_error message )
-             | _ -> ());
-           Deferred.return `Continue ) : _ Event_router.event_subscription) ;
+           if Logger.Level.equal message.level Fatal then (
+             [%log fatal] "Error occured $error"
+               ~metadata:[("error", Logger.Message.to_yojson message)] ;
+             on_fatal_error message ) ;
+           Deferred.return `Continue )) ;
     log_error_accumulator
 
   let lift_accumulated_log_errors {warn; faulty_peer; error; fatal} =

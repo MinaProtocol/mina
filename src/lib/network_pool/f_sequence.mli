@@ -20,7 +20,7 @@
 *)
 open Core
 
-type 'e t
+type 'e t [@@deriving compare, equal, sexp_of]
 
 val is_empty : 'e t -> bool
 
@@ -43,10 +43,6 @@ val iter : 'e t -> f:('e -> unit) -> unit
 val to_seq : 'e t -> 'e Sequence.t
 
 val to_list : 'e t -> 'e list
-
-val sexp_of_t : ('e -> Sexp.t) -> 'e t -> Sexp.t
-
-val equal : ('e -> 'e -> bool) -> 'e t -> 'e t -> bool
 
 val empty : 'e t
 

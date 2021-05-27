@@ -12,7 +12,7 @@ module Reason = struct
     | Status
     | Target
     | Type
-  [@@deriving eq, sexp, show]
+  [@@deriving equal, sexp, show]
 end
 
 module Account = struct

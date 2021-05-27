@@ -7,7 +7,7 @@ open Network_peer
 module Timeout = Timeout_lib.Core_time_ns
 
 module Validation_callback = struct
-  type validation_result = [`Accept | `Reject | `Ignore]
+  type validation_result = [`Accept | `Reject | `Ignore] [@@deriving equal]
 
   type t = {expiration: Time_ns.t option; signal: validation_result Ivar.t}
 
@@ -673,10 +673,6 @@ module Helper = struct
               ; ("party", `String (name_participant who_closed)) ] ;
           stream.state
         in
-        (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
-        let us_them_eq a b =
-          match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
-        in
         let release () =
           match Hashtbl.find_and_remove net.streams stream.idx with
           | Some _ ->
@@ -691,8 +687,8 @@ module Helper = struct
            | FullyOpen ->
                HalfClosed who_closed
            | HalfClosed other ->
-             if us_them_eq other who_closed then
-               ignore (double_close () : stream_state)
+               if [%equal: [`Us | `Them]] other who_closed then
+                 ignore (double_close ())
                else release () ;
                FullyClosed
            | FullyClosed ->
@@ -921,8 +917,9 @@ module Helper = struct
                       ~metadata:[("topic", `String sub.topic)]
                   else
                     Deferred.don't_wait_for
-                      (Strict_pipe.Writer.write sub.write_pipe
-                         (wrap m.sender data) |> Deferred.ignore_m)
+                      ( Strict_pipe.Writer.write sub.write_pipe
+                          (wrap m.sender data)
+                      |> Deferred.ignore_m )
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -1694,7 +1691,8 @@ let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
           let v = Or_error.try_with (fun () -> Yojson.Safe.from_string line) in
           ( match
               Or_error.map v ~f:(fun v ->
-                  if Yojson.Safe.equal (member "upcall" v) `Null then Helper.handle_response t v
+                  if Yojson.Safe.equal (member "upcall" v) `Null then
+                    Helper.handle_response t v
                   else Helper.handle_upcall t v )
             with
           | Ok (Ok ()) ->

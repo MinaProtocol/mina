@@ -25,8 +25,7 @@ let%test_module "merkle_tree" =
         assert (get_exn tree i = i)
       done
 
-    let%test "key_nonexist" =
-      Option.is_none (get tree n)
+    let%test "key_nonexist" = Option.is_none (get tree n)
 
     let%test_unit "modify" =
       let key = 5 in
@@ -39,6 +38,9 @@ let%test_module "merkle_tree" =
       for key = 0 to n - 1 do
         let path = get_path tree key in
         (* need poly equality here *)
-        assert (Caml.(=) (implied_root ~merge key (hash (Some key)) path) (root tree))
+        assert (
+          Poly.( = )
+            (implied_root ~merge key (hash (Some key)) path)
+            (root tree) )
       done
   end )

@@ -9,6 +9,8 @@ module Node = struct
     module Ids = struct
       type t = Catchup_job_id.Hash_set.t
 
+      let equal = Hash_set.equal
+
       let to_yojson (t : t) =
         `List
           (List.map (Hash_set.to_list t) ~f:(fun x ->
@@ -16,7 +18,7 @@ module Node = struct
     end
 
     type t = Have_breadcrumb | Part_of_catchups of Ids.t
-    [@@deriving to_yojson]
+    [@@deriving to_yojson, equal]
   end
 
   type t =
@@ -106,11 +108,9 @@ let check_for_parent t h ~parent:p ~check_has_breadcrumb =
           ; ("tree", to_yojson t) ]
         "hash tree invariant broken: $parent not found in $tree for $hash"
   | Some x ->
-    if check_has_breadcrumb &&
-       (match x.state with
-       | Node.State.Have_breadcrumb -> false
-       | Part_of_catchups _ -> true) then
-      [%log' debug t.logger]
+      if check_has_breadcrumb && not (Node.State.equal x.state Have_breadcrumb)
+      then
+        [%log' debug t.logger]
           ~metadata:
             [ ("parent", State_hash.to_yojson p)
             ; ("hash", State_hash.to_yojson h)

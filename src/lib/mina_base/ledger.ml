@@ -48,8 +48,7 @@ module Ledger_inner = struct
 
         let to_latest = Fn.id
 
-        include Hashable.Make_binable (Arg) [@@deriving
-                                              sexp, compare, hash, equal, yojson]
+        include Hashable.Make_binable (Arg)
 
         let to_string = Ledger_hash.to_string
 
@@ -249,14 +248,12 @@ module Ledger_inner = struct
     let action, _ =
       get_or_create_account t account_id account |> Or_error.ok_exn
     in
-    match action with
-    | `Existed ->
+    if [%equal: [`Existed | `Added]] action `Existed then
       failwith
         (sprintf
            !"Could not create a new account with pk \
              %{sexp:Public_key.Compressed.t}: Account already exists"
            (Account_id.public_key account_id))
-    | _ -> ()
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
