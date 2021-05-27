@@ -14,7 +14,7 @@ module "kubernetes_testnet" {
 
   coda_image         = var.coda_image
   use_custom_entrypoint = true
-  custom_entrypoint = "/usr/bin/dumb-init python3 /root/coda_daemon_puppeteer.py"
+  custom_entrypoint = "/usr/bin/dumb-init python3 /mina_daemon_puppeteer.py"
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
   coda_bots_image    = var.coda_bots_image
