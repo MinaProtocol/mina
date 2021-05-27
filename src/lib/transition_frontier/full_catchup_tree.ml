@@ -109,7 +109,7 @@ module Node = struct
     ; state_hash: State_hash.t
     ; blockchain_length: Length.t
     ; parent: State_hash.t
-    ; result: (Breadcrumb.t, Attempt_history.t) Result.t Ivar.t }
+    ; mutable result: (Breadcrumb.t, Attempt_history.t) Result.t Ivar.t }
 end
 
 (* Invariant: The length of the path from each best tip to its oldest
@@ -150,7 +150,8 @@ let finish t (node : Node.t) b =
         (Finished b, Ok b)
   in
   set_state t node s ;
-  Ivar.fill_if_empty node.result r
+  (*Update the breadcrumbs in the result as well because root breadcrumb gets replaced and the old breadcrumb will have a detached ledger *)
+  node.result <- Ivar.create_full r
 
 let to_yojson =
   let module T = struct
