@@ -280,7 +280,7 @@ let get_public_keys =
 
 let read_json filepath ~flag =
   let%map res =
-    Deferred.Or_error.try_with (fun () ->
+    Deferred.Or_error.try_with ~here:[%here] (fun () ->
         let%map json_contents = Reader.file_contents filepath in
         Ok (Yojson.Safe.from_string json_contents) )
   in
@@ -482,6 +482,9 @@ let batch_send_payments =
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
           let signer_pk = Public_key.compress keypair.public_key in
+          let receiver_pk =
+            Public_key.of_base58_check_decompress_exn receiver
+          in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
@@ -489,8 +492,7 @@ let batch_send_payments =
             ~body:
               (Payment
                  { source_pk= signer_pk
-                 ; receiver_pk=
-                     Public_key.Compressed.of_base58_check_exn receiver
+                 ; receiver_pk
                  ; token_id= Token_id.default
                  ; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
@@ -772,7 +774,7 @@ let send_rosetta_transactions_graphql =
          let lexbuf = Lexing.from_channel In_channel.stdin in
          let lexer = Yojson.init_lexer () in
          match%bind
-           Deferred.Or_error.try_with (fun () ->
+           Deferred.Or_error.try_with ~here:[%here] (fun () ->
                Deferred.repeat_until_finished () (fun () ->
                    try
                      let transaction_json =
@@ -890,9 +892,11 @@ let dump_keypair =
 
 let handle_export_ledger_response ~json = function
   | Error e ->
-      Daemon_rpcs.Client.print_rpc_error e
+      Daemon_rpcs.Client.print_rpc_error e ;
+      exit 1
   | Ok (Error e) ->
-      printf !"Ledger not found: %s\n" (Error.to_string_hum e)
+      printf !"Ledger not found: %s\n" (Error.to_string_hum e) ;
+      exit 1
   | Ok (Ok accounts) ->
       if json then (
         Yojson.Safe.pretty_print Format.std_formatter
@@ -900,7 +904,8 @@ let handle_export_ledger_response ~json = function
              (List.map accounts ~f:(fun a ->
                   Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
         printf "\n" )
-      else printf !"%{sexp:Account.t list}\n" accounts
+      else printf !"%{sexp:Account.t list}\n" accounts ;
+      return ()
 
 let export_ledger =
   let state_hash_flag =
@@ -915,17 +920,23 @@ let export_ledger =
     let t =
       Command.Param.Arg_type.of_alist_exn
         (List.map
-           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
-           ~f:(fun s -> (s, s)))
+           [ "staged-ledger"
+           ; "snarked-ledger"
+           ; "staking-epoch-ledger"
+           ; "next-epoch-ledger" ] ~f:(fun s -> (s, s)))
     in
     Command.Param.(
-      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
+      anon
+        ( "staged-ledger|snarked-ledger|staking-epoch-ledger|next-epoch-ledger"
+        %: t ))
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
   Command.async
     ~summary:
-      "Print the specified ledger (default: staged ledger at the best tip)"
+      "Print the specified ledger (default: staged ledger at the best tip). \
+       Note: Exporting snarked ledger is an expensive operation and can take \
+       a few seconds"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (state_hash, plaintext, ledger_kind) ->
          let check_for_state_hash () =
@@ -942,6 +953,14 @@ let export_ledger =
                in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
                  state_hash port
+           | "snarked-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
+               in
+               printf
+                 "Generating snarked ledger(this may take a few seconds)...\n" ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
+                 state_hash port
            | "staking-epoch-ledger" ->
                check_for_state_hash () ;
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
@@ -954,7 +973,7 @@ let export_ledger =
                (* unreachable *)
                failwithf "Unknown ledger kind: %s" ledger_kind ()
          in
-         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+         response >>= handle_export_ledger_response ~json:(not plaintext) ))
 
 let hash_ledger =
   let open Command.Let_syntax in
@@ -1756,6 +1775,7 @@ let generate_libp2p_keypair =
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd
+              ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
@@ -1927,7 +1947,7 @@ let compile_time_constants =
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+                 ~logger:(Logger.null ()) ~proof_level:None
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2438,7 +2458,8 @@ let advanced =
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
-    ; ("runtime-config", runtime_config) ]
+    ; ("runtime-config", runtime_config)
+    ; ("vrf", Cli_lib.Commands.Vrf.command_group) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"

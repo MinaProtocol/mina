@@ -232,6 +232,20 @@ module Go_log = struct
       ; event_id= None }
 end
 
+(** Set of peers, represented as a host/port pair. We ignore the peer ID so
+    that the same node restarting and attaining a new peer ID will not be
+    double (or triple, etc.) counted.
+*)
+module Peers_no_ids = struct
+  module T = struct
+    type t = {libp2p_port: int; host: string}
+    [@@deriving sexp, compare, yojson]
+  end
+
+  include T
+  module Set = Set.Make (T)
+end
+
 module Helper = struct
   type t =
     { subprocess: Child_processes.t
@@ -256,6 +270,7 @@ module Helper = struct
     ; subscriptions: (int, erased_magic subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
+    ; mutable all_peers_seen: Peers_no_ids.Set.t option
     ; mutable banned_ips: Unix.Inet_addr.t list
     ; mutable peer_connected_callback: (string -> unit) option
     ; mutable peer_disconnected_callback: (string -> unit) option
@@ -1027,6 +1042,15 @@ module Helper = struct
         let%bind m = Incoming_stream.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
         let protocol = m.protocol in
+        Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
+            let all_peers_seen =
+              Set.add all_peers_seen
+                {libp2p_port= m.peer.libp2p_port; host= m.peer.host}
+            in
+            t.all_peers_seen <- Some all_peers_seen ;
+            Mina_metrics.(
+              Gauge.set Network.all_peers
+                (Set.length all_peers_seen |> Int.to_float)) ) ;
         let stream = make_stream t stream_idx protocol m.peer in
         match Hashtbl.find t.protocol_handlers protocol with
         | Some ph ->
@@ -1039,7 +1063,8 @@ module Helper = struct
                   [Tcp.Server.create]. See [handle_protocol] doc comment.
                *)
                 match%map
-                  Monitor.try_with ~extract_exn:true (fun () -> ph.f stream)
+                  Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
+                      ph.f stream )
                 with
                 | Ok () ->
                     ()
@@ -1563,7 +1588,8 @@ let set_connection_gating_config net (config : connection_gating) =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
+let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
+    ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1651,6 +1677,9 @@ let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
         ; streams= Hashtbl.create (module Int)
+        ; all_peers_seen=
+            ( if all_peers_seen_metric then Some Peers_no_ids.Set.empty
+            else None )
         ; peer_connected_callback= None
         ; peer_disconnected_callback= None
         ; protocol_handlers= Hashtbl.create (module String)
@@ -1710,6 +1739,34 @@ let create ~on_unexpected_termination ~logger ~pids ~conf_dir =
                   ; ("err", Error_json.error_to_yojson e) ] ) ;
           Deferred.unit )
       |> don't_wait_for ;
+      ( if all_peers_seen_metric then
+        let log_all_peers_interval = Time.Span.of_hr 2.0 in
+        let log_message_batch_size = 50 in
+        every log_all_peers_interval (fun () ->
+            Option.iter t.all_peers_seen ~f:(fun all_peers_seen ->
+                let num_batches, num_in_batch, batches, batch =
+                  Set.fold_right all_peers_seen ~init:(0, 0, [], [])
+                    ~f:(fun peer (num_batches, num_in_batch, batches, batch) ->
+                      if num_in_batch >= log_message_batch_size then
+                        (num_batches + 1, 1, batch :: batches, [peer])
+                      else
+                        (num_batches, num_in_batch + 1, batches, peer :: batch)
+                  )
+                in
+                let num_batches, batches =
+                  if num_in_batch > 0 then (num_batches + 1, batch :: batches)
+                  else (num_batches, batches)
+                in
+                List.iteri batches ~f:(fun batch_num batch ->
+                    [%log info]
+                      "All peers seen by this node, batch \
+                       $batch_num/$num_batches"
+                      ~metadata:
+                        [ ("batch_num", `Int batch_num)
+                        ; ("num_batches", `Int num_batches)
+                        ; ( "peers"
+                          , `List (List.map ~f:Peers_no_ids.to_yojson batch) )
+                        ] ) ) ) ) ;
       Deferred.Or_error.return t
 
 let%test_module "coda network tests" =
@@ -1727,7 +1784,7 @@ let%test_module "coda network tests" =
       let%bind b_tmp = Unix.mkdtemp "p2p_helper_test_b" in
       let%bind c_tmp = Unix.mkdtemp "p2p_helper_test_c" in
       let%bind a =
-        create
+        create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [("name", `String "a")])
           ~conf_dir:a_tmp ~pids
           ~on_unexpected_termination:(fun () ->
@@ -1735,7 +1792,7 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       in
       let%bind b =
-        create
+        create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [("name", `String "b")])
           ~conf_dir:b_tmp ~pids
           ~on_unexpected_termination:(fun () ->
@@ -1743,7 +1800,7 @@ let%test_module "coda network tests" =
         >>| Or_error.ok_exn
       in
       let%bind c =
-        create
+        create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [("name", `String "c")])
           ~conf_dir:c_tmp ~pids
           ~on_unexpected_termination:(fun () ->

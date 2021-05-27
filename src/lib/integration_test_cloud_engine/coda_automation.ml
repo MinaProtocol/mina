@@ -344,7 +344,7 @@ module Network_manager = struct
         ~constraint_constants ~genesis_constants
     in
     let%bind (_, genesis_proof_filename) =
-      Genesis_ledger_helper.Genesis_proof.load_or_generate ~logger ~genesis_dir ~may_generate:true
+      Genesis_ledger_helper.Genesis_proof.load_or_generate ~logger ~genesis_dir 
         inputs
     in
     *)

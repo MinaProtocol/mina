@@ -44,6 +44,9 @@ spec:
           "-snark-worker-fee", "$(CODA_SNARK_FEE)",
           "-work-selection", "$(WORK_SELECTION)",
           "-enable-peer-exchange", "true",
+          {{- if $.Values.coda.logTxnPoolGossip }}
+          "-log-txn-pool-gossip", "true",
+          {{- end -}}
           {{- if $.Values.coda.runtimeConfig }}
           "-config-file", "/config/daemon.json",
           {{- end }}
