@@ -12,6 +12,7 @@
    random_oracle_nonconsensus
    mina_signature_kind
    snark_params_nonconsensus
+   js_of_ocaml
    yojson)
  (preprocessor_deps ../../config.mlh)
  (preprocess
