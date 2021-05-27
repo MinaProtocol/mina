@@ -320,7 +320,7 @@ let%test_module "peer_trust" =
                   (* N.b. the floating point equality operator has a built in
                      tolerance i.e. it's approximate equality.
                   *)
-                  Float.(decayed_trust = start_trust /. 2.0)
+                  Float.(decayed_trust =. start_trust /. 2.0)
               | _ ->
                   false )
           | _ ->
