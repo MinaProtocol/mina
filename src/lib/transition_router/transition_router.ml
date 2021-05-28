@@ -429,7 +429,7 @@ let wait_till_genesis ~logger ~time_controller
     in
     Time.Timeout.await ~timeout_duration:time_till_genesis time_controller
       (logger_loop ())
-    |> Deferred.ignore
+    |> Deferred.ignore_m
 
 let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~time_controller ~consensus_local_state ~persistent_root_location

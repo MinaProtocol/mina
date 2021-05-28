@@ -110,4 +110,4 @@ let assert_similar_operations ~logger ~situation ~expected ~actual =
                   list}, raw: %s"
                 situation es (Operation.show op))
            `Invariant_violation )
-  |> Result.ignore |> Deferred.return
+  |> Result.ignore_m |> Deferred.return

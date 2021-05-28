@@ -1022,7 +1022,7 @@ let hash_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             ignore (exit 1))
+             ignore (exit 1 : 'a))
 
 let currency_in_ledger =
   let open Command.Let_syntax in
@@ -1090,7 +1090,7 @@ let currency_in_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             ignore (exit 1))
+             ignore (exit 1 : 'a))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1767,7 +1767,7 @@ let generate_libp2p_keypair =
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
-    Deferred.ignore
+    Deferred.ignore_m
       (let open Deferred.Let_syntax in
       (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
       let logger = Logger.null () in

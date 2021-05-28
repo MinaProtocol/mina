@@ -58,7 +58,7 @@ module Coding = struct
     let len1 = len_to_string @@ Array.length t.field_elements in
     let fields =
       (* We only support 32byte fields *)
-      let _ =
+      let () =
         match t.field_elements with
         | [|x; _|] ->
             assert (String.length (string_of_field x) = 32)
