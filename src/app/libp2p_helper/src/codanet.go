@@ -43,7 +43,7 @@ import (
 	mplex "github.com/libp2p/go-mplex"
 )
 
-const NodeStatusTimeout = 1000 * time.Millisecond
+const NodeStatusTimeout = 10 * time.Second
 
 func parseCIDR(cidr string) gonet.IPNet {
 	_, ipnet, err := gonet.ParseCIDR(cidr)

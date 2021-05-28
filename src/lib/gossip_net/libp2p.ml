@@ -37,7 +37,8 @@ module Config = struct
     ; seed_peer_list_url: Uri.t option
     ; max_connections: int
     ; validation_queue_size: int
-    ; mutable keypair: Mina_net2.Keypair.t option }
+    ; mutable keypair: Mina_net2.Keypair.t option
+    ; all_peers_seen_metric: bool }
   [@@deriving make]
 end
 
@@ -151,9 +152,11 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let conf_dir = config.conf_dir ^/ "mina_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
-        Monitor.try_with ~rest:`Raise (fun () ->
+        Monitor.try_with ~here:[%here] ~rest:`Raise (fun () ->
             trace "mina_net2" (fun () ->
-                Mina_net2.create ~logger:config.logger ~conf_dir ~pids
+                Mina_net2.create
+                  ~all_peers_seen_metric:config.all_peers_seen_metric
+                  ~logger:config.logger ~conf_dir ~pids
                   ~on_unexpected_termination ) )
       with
       | Ok (Ok net2) -> (
@@ -596,7 +599,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> q Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout ~rpc_name t peer transport dispatch query ->
       let call () =
-        Monitor.try_with (fun () ->
+        Monitor.try_with ~here:[%here] (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
             Async_rpc_kernel.Rpc.Connection.with_close
               ~heartbeat_config:

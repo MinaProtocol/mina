@@ -354,8 +354,8 @@ module T = struct
           ()
       in
       let%bind precomputed_values, _runtime_config =
-        Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:true
-          ~proof_level:None runtime_config
+        Genesis_ledger_helper.init_from_config_file ~logger ~proof_level:None
+          runtime_config
         >>| Or_error.ok_exn
       in
       let constraint_constants = precomputed_values.constraint_constants in
@@ -426,7 +426,8 @@ module T = struct
               ; validation_queue_size= 150
               ; peer_exchange= true
               ; mina_peer_exchange= true
-              ; keypair= Some libp2p_keypair }
+              ; keypair= Some libp2p_keypair
+              ; all_peers_seen_metric= false }
           in
           let net_config =
             { Mina_networking.Config.logger

@@ -1,6 +1,5 @@
 open Core
 open Integration_test_lib
-open Signature_lib
 
 module Make (Inputs : Intf.Test.Inputs_intf) = struct
   open Inputs
@@ -26,11 +25,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
             {Block_producer.balance= block_producer_balance; timing= Untimed}
         ) }
 
-  let expected_error_event_reprs = []
-
-  let pk_of_keypair keypairs n =
-    Public_key.compress (List.nth_exn keypairs n).Keypair.public_key
-
   let wait_for_all_to_initialize ~logger network t =
     let open Malleable_error.Let_syntax in
     let producers = Network.block_producers network in
@@ -51,8 +45,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       else
         let%bind () =
           let%map () =
-            Network.Node.must_send_payment ~retry_on_graphql_error:false
-              ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee node
+            Network.Node.must_send_payment ~logger ~sender_pub_key
+              ~receiver_pub_key ~amount ~fee node
           in
           [%log info] "gossip_consistency test: payment #%d sent." n ;
           ()

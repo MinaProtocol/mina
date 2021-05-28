@@ -10,6 +10,7 @@
   (pps
     ppx_bin_prot
     ppx_coda
+    ppx_here
     ppx_custom_printf
     ppx_deriving_yojson
     ppx_inline_test

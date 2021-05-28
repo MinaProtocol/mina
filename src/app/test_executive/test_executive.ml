@@ -40,16 +40,14 @@ let engines : engine list =
 
 let tests : test list =
   [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
-  ; ("send-payment", (module Send_payment_test.Make : Intf.Test.Functor_intf))
-  ; ( "pmt-timed-accts"
-    , (module Payments_timed_accounts_test.Make : Intf.Test.Functor_intf) )
+  ; ("payments", (module Payments_test.Make : Intf.Test.Functor_intf))
     (*
   ; ( "bp-timed-accts"
     , (module Block_production_timed_accounts_test.Make : Intf.Test.Functor_intf) )
   *)
   ; ("archive-node", (module Archive_node_test.Make : Intf.Test.Functor_intf))
   ; ("gossip-consis", (module Gossip_consistency.Make : Intf.Test.Functor_intf))
-  ; ("common-prefix", (module Common_prefix.Make : Intf.Test.Functor_intf)) ]
+  ]
 
 let report_test_errors ~log_error_set ~internal_error_set =
   (* TODO: we should be able to show which sections passed as well *)
@@ -297,7 +295,7 @@ let main inputs =
                 (Yojson.Safe.to_string (Logger.Message.to_yojson message)))
            ~test_result:(Malleable_error.return ()))
     in
-    Monitor.try_with ~extract_exn:false (fun () ->
+    Monitor.try_with ~here:[%here] ~extract_exn:false (fun () ->
         let init_result =
           let open Deferred.Or_error.Let_syntax in
           let lift = Deferred.map ~f:Or_error.return in

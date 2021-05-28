@@ -188,7 +188,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                           we have information about which of these different
                           kinds of exception were seen, if any.
                        *)
-                       Deferred.Or_error.try_with_join (fun () ->
+                       Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
                            Or_error.try_with (fun () ->
                                Async.Process.run () ~prog:"bash"
                                  ~args:["-c"; command]
