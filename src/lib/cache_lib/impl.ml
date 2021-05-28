@@ -221,7 +221,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Error err ->
           [%log' error (Cache.logger (cache t))]
             "Cached.sequence_result called on an already consumed Cached.t" ;
-          ignore (invalidate_with_failure t : (a, 'e) Result.t);
+          ignore (invalidate_with_failure t : (a, 'e) Result.t) ;
           Error err
   end
 
@@ -289,7 +289,7 @@ let%test_module "cache_lib test instance" =
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               let x = Cache.register_exn cache data in
-              ignore (Cached.invalidate_with_success x : string));
+              ignore (Cached.invalidate_with_success x : string) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
@@ -299,7 +299,8 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              ignore (Cache.register_exn cache data : (string,string) Cached.t));
+              ignore (Cache.register_exn cache data : (string, string) Cached.t)
+          ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -309,7 +310,8 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_item ~f:(fun data ->
           with_cache ~logger ~f:(fun cache ->
-              ignore (Cache.register_exn cache data : (string,string) Cached.t));
+              ignore (Cache.register_exn cache data : (string, string) Cached.t)
+          ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -321,7 +323,7 @@ let%test_module "cache_lib test instance" =
               let cached = Cache.register_exn cache data in
               Gc.full_major () ;
               assert (!dropped_cache_items = 0) ;
-              ignore (Cached.invalidate_with_success cached : string)));
+              ignore (Cached.invalidate_with_success cached : string) ) ) ;
       Gc.full_major () ;
       assert (!dropped_cache_items = 0)
 
@@ -331,10 +333,11 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              ignore (
-                Cache.register_exn cache data
-                |> Cached.transform ~f:(Fn.const 5)
-                |> Cached.transform ~f:(Fn.const ()) : (unit,string) Cached.t));
+              ignore
+                ( Cache.register_exn cache data
+                  |> Cached.transform ~f:(Fn.const 5)
+                  |> Cached.transform ~f:(Fn.const ())
+                  : (unit, string) Cached.t ) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -347,7 +350,7 @@ let%test_module "cache_lib test instance" =
               Cache.register_exn cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
-              |> Cached.invalidate_with_success);
+              |> Cached.invalidate_with_success ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
@@ -363,7 +366,7 @@ let%test_module "cache_lib test instance" =
                 |> Cached.transform ~f:(Fn.const 5)
                 |> Cached.transform ~f:(Fn.const ())
               in
-              ignore (Cached.invalidate_with_success src : string));
+              ignore (Cached.invalidate_with_success src : string) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 

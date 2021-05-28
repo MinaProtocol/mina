@@ -399,8 +399,7 @@ struct
               ; c= coeffs } ) ;
         g
 
-  let finalize t =
-    ignore (finalize_and_get_gates t : Gates.t)
+  let finalize t = ignore (finalize_and_get_gates t : Gates.t)
 
   let accumulate_sorted_terms (c0, i0) terms =
     Sequence.of_list terms

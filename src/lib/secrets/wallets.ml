@@ -98,8 +98,10 @@ let import_keypair_helper t keypair write_keypair =
   let privkey_path = get_path t compressed_pk in
   let%bind () = write_keypair privkey_path in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
-  ignore (Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-    ~data:(Unlocked (get_privkey_filename compressed_pk, keypair)) : [ `Duplicate | `Ok ] );
+  ignore
+    ( Public_key.Compressed.Table.add t.cache ~key:compressed_pk
+        ~data:(Unlocked (get_privkey_filename compressed_pk, keypair))
+      : [`Duplicate | `Ok] ) ;
   compressed_pk
 
 let import_keypair t keypair ~password =
@@ -130,8 +132,10 @@ let create_hd_account t ~hd_index :
   let%map () =
     Unix.chmod index_path ~perm:0o600 |> Deferred.map ~f:Result.return
   in
-  ignore (Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-      ~data:(Hd_account hd_index) : [ `Duplicate | `Ok ]);
+  ignore
+    ( Public_key.Compressed.Table.add t.cache ~key:compressed_pk
+        ~data:(Hd_account hd_index)
+      : [`Duplicate | `Ok] ) ;
   compressed_pk
 
 let delete ({cache; _} as t : t) (pk : Public_key.Compressed.t) :

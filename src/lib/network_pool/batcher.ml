@@ -142,7 +142,7 @@ let rec start_verifier : type proof partial r. (proof, partial, r) t -> unit =
                   acc
               | Some ({weight; _} as proof) ->
                   if weight <= capacity then (
-                    ignore (Q.remove_first t.queue : (proof, r) elt option);
+                    ignore (Q.remove_first t.queue : (proof, r) elt option) ;
                     take (capacity - weight) (proof :: acc) )
                   else acc
             in
@@ -183,18 +183,20 @@ let verify (type p r partial) (t : (p, partial, r) t) (proof : p) :
   let elt =
     {id= Id.create (); data= proof; weight= t.weight proof; res= Ivar.create ()}
   in
-  ignore ( match (t.how_to_add, t.compare_init) with
-  | `Enqueue_back, _ | `Insert, None ->
-      Q.insert_last t.queue elt
-  | `Insert, Some compare -> (
-      (* Find the first element that [proof] is less than *)
-      let compare = compare_elt ~compare in
-      match Q.find_elt t.queue ~f:(fun e -> compare elt e < 0) with
-      | None ->
-          (* [proof] is greater than all elts in the queue, and so goes in the back. *)
+  ignore
+    ( match (t.how_to_add, t.compare_init) with
+      | `Enqueue_back, _ | `Insert, None ->
           Q.insert_last t.queue elt
-      | Some succ ->
-          Q.insert_before t.queue succ elt ) : (p, r) elt Q.Elt.t);
+      | `Insert, Some compare -> (
+          (* Find the first element that [proof] is less than *)
+          let compare = compare_elt ~compare in
+          match Q.find_elt t.queue ~f:(fun e -> compare elt e < 0) with
+          | None ->
+              (* [proof] is greater than all elts in the queue, and so goes in the back. *)
+              Q.insert_last t.queue elt
+          | Some succ ->
+              Q.insert_before t.queue succ elt )
+      : (p, r) elt Q.Elt.t ) ;
   (match t.state with Verifying _ -> () | Waiting -> start_verifier t) ;
   Ivar.read elt.res
 

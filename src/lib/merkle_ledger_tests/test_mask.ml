@@ -404,7 +404,9 @@ module Make (Test : Test_intf) = struct
             List.map2_exn subset_accounts subset_balances
               ~f:(fun account balance ->
                 let updated_account = {account with balance} in
-                ignore (create_existing_account_exn mask2 updated_account : Test.Location.t);
+                ignore
+                  ( create_existing_account_exn mask2 updated_account
+                    : Test.Location.t ) ;
                 updated_account )
           in
           let updated_accounts_map =

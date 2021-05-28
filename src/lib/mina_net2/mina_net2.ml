@@ -916,10 +916,10 @@ module Helper = struct
                        dropping message."
                       ~metadata:[("topic", `String sub.topic)]
                   else
-                    Deferred.don't_wait_for
+                    ignore
                       ( Strict_pipe.Writer.write sub.write_pipe
                           (wrap m.sender data)
-                      |> Deferred.ignore_m )
+                        : unit Deferred.t )
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
