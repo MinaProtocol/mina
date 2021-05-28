@@ -778,7 +778,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
-					Reason:    "invalid length prefix byte (cannot be 0)",
+					Reason:    "invalid length prefix (cannot be 0)",
 				})
 				return
 			}
@@ -799,6 +799,16 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			app.StreamsMutex.Unlock()
 
 			app.P2p.MsgStats.UpdateMetrics(length)
+
+			msgType, err := r.ReadByte()
+			if err != nil {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    "failed to read message type prefix",
+				})
+			}
+			_ = msgType // TODO: check and use message type
 
 			bytesToRead := length
 			_, err = r.Read(buffer[:1])
