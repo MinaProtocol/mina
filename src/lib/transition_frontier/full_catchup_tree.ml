@@ -46,7 +46,7 @@ end
 module Node = struct
   module State = struct
     type t =
-      | Finished of Breadcrumb.t
+      | Finished
       | Failed
       | To_download of Downloader_job.t
       | To_initial_validate of External_transition.t Envelope.Incoming.t
@@ -59,7 +59,7 @@ module Node = struct
           , State_hash.t )
           Cached.t
       | To_build_breadcrumb of
-          ( [`Parent of Breadcrumb.t]
+          ( [`Parent of State_hash.t]
           * ( External_transition.Almost_validated.t Envelope.Incoming.t
             , State_hash.t )
             Cached.t )
@@ -97,7 +97,7 @@ module Node = struct
           To_build_breadcrumb
       | Root _ ->
           Root
-      | Finished _ ->
+      | Finished ->
           Finished
       | Failed ->
           Failed
@@ -109,7 +109,7 @@ module Node = struct
     ; state_hash: State_hash.t
     ; blockchain_length: Length.t
     ; parent: State_hash.t
-    ; mutable result: (Breadcrumb.t, Attempt_history.t) Result.t Ivar.t }
+    ; result: ([`Added_to_frontier], Attempt_history.t) Result.t Ivar.t }
 end
 
 (* Invariant: The length of the path from each best tip to its oldest
@@ -125,7 +125,7 @@ type t =
 let tear_down {nodes; states; _} =
   Hashtbl.iter nodes ~f:(fun x ->
       match x.state with
-      | Root _ | Failed | Finished _ ->
+      | Root _ | Failed | Finished ->
           ()
       | Wait_for_parent _
       | To_download _
@@ -143,15 +143,11 @@ let set_state t (node : Node.t) s =
 
 let finish t (node : Node.t) b =
   let s, r =
-    match b with
-    | Error _ ->
-        (Node.State.Failed, Error node.attempts)
-    | Ok b ->
-        (Finished b, Ok b)
+    if Result.is_error b then (Node.State.Failed, Error node.attempts)
+    else (Finished, Ok `Added_to_frontier)
   in
   set_state t node s ;
-  (*Update the breadcrumbs in the result as well because root breadcrumb gets replaced and the old breadcrumb will have a detached ledger *)
-  node.result <- Ivar.create_full r
+  Ivar.fill_if_empty node.result r
 
 let to_yojson =
   let module T = struct
@@ -169,7 +165,7 @@ let max_catchup_chain_length (t : t) =
     | None ->
         let n =
           match node.state with
-          | Root _ | Finished _ ->
+          | Root _ | Finished ->
               0
           | Failed
           | Wait_for_parent _
@@ -192,12 +188,12 @@ let max_catchup_chain_length (t : t) =
 let create_node_full t b : unit =
   let h = Breadcrumb.state_hash b in
   let node : Node.t =
-    { state= Finished b
+    { state= Finished
     ; state_hash= h
     ; blockchain_length= Breadcrumb.blockchain_length b
     ; attempts= Attempt_history.empty
     ; parent= Breadcrumb.parent_hash b
-    ; result= Ivar.create_full (Ok b) }
+    ; result= Ivar.create_full (Ok `Added_to_frontier) }
   in
   Hashtbl.incr t.states (Node.State.enum node.state) ;
   Hashtbl.add_exn t.nodes ~key:h ~data:node
@@ -208,9 +204,9 @@ let breadcrumb_added (t : t) b =
   | None ->
       create_node_full t b
   | Some node -> (
-      Ivar.fill_if_empty node.result (Ok b) ;
+      Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
       match node.state with
-      | Root _ | Failed | Finished _ ->
+      | Root _ | Failed | Finished ->
           ()
       | To_download _
       (* TODO: Cancel download job somehow.. maybe wait on the ivar? *)
@@ -218,14 +214,14 @@ let breadcrumb_added (t : t) b =
       | To_initial_validate _
       | To_verify _
       | To_build_breadcrumb _ ->
-          set_state t node (Finished b) )
+          set_state t node Finished )
 
 let remove_node' t (node : Node.t) =
   Hashtbl.remove t.nodes node.state_hash ;
   Hashtbl.decr t.states (Node.State.enum node.state) ;
   Ivar.fill_if_empty node.result (Error node.attempts) ;
   match node.state with
-  | Root _ | Failed | Finished _ ->
+  | Root _ | Failed | Finished ->
       ()
   | Wait_for_parent c ->
       Cached.invalidate_with_failure c |> ignore
