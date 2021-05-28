@@ -811,19 +811,6 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			_ = msgType // TODO: check and use message type
 
 			bytesToRead := length
-			_, err = r.Read(buffer[:1])
-			if err != nil {
-				app.writeMsg(streamLostUpcall{
-					Upcall:    "streamLost",
-					StreamIdx: idx,
-					Reason:    fmt.Sprintf("read failure: %s", err.Error()),
-				})
-				return
-			}
-
-			msgType := buffer[0]
-			_ = msgType // TODO: use message type
-
 			for bytesToRead > 0 {
 				bufferReadSize := min(MESSAGE_BUFFER_SIZE, bytesToRead)
 				n, err := io.ReadFull(r, buffer[:bufferReadSize])
