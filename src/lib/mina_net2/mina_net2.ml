@@ -688,7 +688,7 @@ module Helper = struct
                HalfClosed who_closed
            | HalfClosed other ->
                if [%equal: [`Us | `Them]] other who_closed then
-                 ignore (double_close ())
+                 ignore (double_close () : stream_state)
                else release () ;
                FullyClosed
            | FullyClosed ->

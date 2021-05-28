@@ -172,7 +172,7 @@ module type UInt32 = sig
   val to_uint32 : t -> uint32
 
   val of_uint32 : uint32 -> t
-end
+end [@@warning "-32"]
 
 module type UInt64 = sig
   [%%versioned:
@@ -188,7 +188,7 @@ module type UInt64 = sig
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
-end
+end [@@warning "-32"]
 
 module type F = functor
   (N :sig

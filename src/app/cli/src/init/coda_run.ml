@@ -239,7 +239,7 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   (*copy daemon_json to the temp dir *)
   let daemon_config = conf_dir ^/ "daemon.json" in
   let eq = [%equal: [`Yes | `Unknown | `No]] in
-  let _ =
+  let () =
     if eq (Core.Sys.file_exists daemon_config) `Yes then
       ignore
         ( Core.Sys.command
