@@ -37,5 +37,5 @@ let main () =
   exit 0
 
 let () =
-  ignore (main () : 'a) ;
+  main () ;
   never_returns (Scheduler.go ())
