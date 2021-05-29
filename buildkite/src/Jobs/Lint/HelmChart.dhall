@@ -17,6 +17,7 @@ Pipeline.build
     spec = JobSpec::{
       dirtyWhen = [
         S.contains "helm/",
+        S.contains "helm/dockerfiles/",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Lint/HelmChart"),
         -- trigger on HelmRelease job change due to dependency
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/HelmRelease"),
