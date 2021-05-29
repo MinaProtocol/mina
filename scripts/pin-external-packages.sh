@@ -1,10 +1,6 @@
 #!/bin/sh
 
-eval $(opam config env)
-
-# Extlib gets automatically installed, but we want our pin, so we should
-# uninstall here
-opam uninstall extlib
+# update and pin packages, used by CI
 
 PACKAGES="ocaml-sodium capnp-ocaml rpc_parallel ocaml-extlib async_kernel coda_base58 graphql_ppx ppx_deriving_yojson"
 
