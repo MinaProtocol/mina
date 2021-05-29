@@ -81,6 +81,7 @@ genesis_ledger: ocaml_checks
 
 build: ocaml_checks git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
+	eval $(opam config env)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
@@ -220,11 +221,13 @@ macos-setup-download:
 
 setup-opam:
 	./scripts/setup-opam.sh
+	eval $(opam config env)
 	./scripts/pin-external-packages.sh
 
 macos-setup:
 	./scripts/macos-setup-brew.sh
 	./scripts/setup-opam.sh
+	eval $(opam config env)
 	./scripts/pin-external-packages.sh
 
 ########################################
