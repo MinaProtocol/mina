@@ -19,9 +19,9 @@ export TERM=${TERM:-xterm}
 # initialize opam
 if ! [[ -d ~/.opam ]]; then
   opam init
+  eval $(opam config env)
 fi
 
-eval $(opam config env)
 opam update
 
 # needed paths for macOS
