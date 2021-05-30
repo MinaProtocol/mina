@@ -46,8 +46,8 @@ module Worker_state = struct
           (let bc_vk = Precomputed_values.blockchain_verification ()
            and tx_vk = Precomputed_values.transaction_verification () in
            let module M = struct
-             let verify_commands (cs : User_command.Verifiable.t list) : _ list Deferred.t
-                 =
+             let verify_commands (cs : User_command.Verifiable.t list) :
+                 _ list Deferred.t =
                let cs = List.map cs ~f:Common.check in
                let to_verify =
                  List.concat_map cs ~f:(function
