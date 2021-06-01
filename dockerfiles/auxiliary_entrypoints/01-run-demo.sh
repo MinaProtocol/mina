@@ -37,7 +37,7 @@ if [[ -n ${RUN_DEMO} ]]; then
     CODA_PRIVKEY_PASS=${CODA_PRIVKEY_PASS:-""}
     MINA_PRIVKEY_PASS=${MINA_PRIVKEY_PASS:-""}
 
-    exec mina daemon --generate-genesis-proof true --seed --demo-mode --config-dir ${MINA_CONFIG_DIR} --block-producer-pubkey ${PK} --run-snark-worker ${SNARK_PK} -insecure-rest-server $@
+    exec mina daemon --generate-genesis-proof true --seed --demo-mode --proof-level none --config-dir ${MINA_CONFIG_DIR} --block-producer-pubkey ${PK} --run-snark-worker ${SNARK_PK} -insecure-rest-server $@
 
     rc=$?
     echo "Exiting Mina demo." && exit $rc
