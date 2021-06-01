@@ -1138,18 +1138,22 @@ let%test_module "random set test" =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
           in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable3
-            (let open Mock_snark_pool.Resource_pool.Diff in
-            List.sort
-              ~compare:(fun x y ->
-                match (x, y) with
-                | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
-                    Transaction_snark_work.Statement.compare stmt1 stmt2
-                | _ ->
-                    assert false )
-              [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
-              ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ]) ;
+          let () =
+            let open Mock_snark_pool.Resource_pool.Diff in
+            let compare x y =
+              match (x, y) with
+              | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
+                Transaction_snark_work.Statement.compare stmt1 stmt2
+              | _ ->
+                assert false
+            in
+            [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
+              (List.sort  ~compare rebroadcastable3)
+              (List.sort
+                 ~compare
+                 [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
+                 ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ])
+          in
           (* Mark work as included in a block. *)
           let%bind () =
             Mocks.Transition_frontier.completed_work_statements tf
