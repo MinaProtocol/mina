@@ -3,7 +3,7 @@ open Core
 type remote_error = {node_id: string; error_message: Logger.Message.t}
 
 (* NB: equality on internal errors ignores timestamp *)
-type internal_error = {occurrence_time: Time.t sexp_opaque; error: Error.t}
+type internal_error = {occurrence_time: Time.t [@sexp.opaque]; error: Error.t}
 [@@deriving sexp]
 
 let equal_internal_error {occurrence_time= _; error= err1}
