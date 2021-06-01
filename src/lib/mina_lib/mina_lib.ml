@@ -1582,9 +1582,15 @@ let create ?wallets (config : Config.t) =
             (network_pipe, api_pipe, new_blocks_pipe)
           in
           trace_task "transaction pool broadcast loop" (fun () ->
+              let ready_to_send = ref (Deferred.return ()) in
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun x ->
+                  let%bind () = !ready_to_send in
+                  (* Wait 15s to avoid our messages being dropped for being
+                     over the rate limit.
+                  *)
+                  ready_to_send := after (Time.Span.of_sec 15.) ;
                   Mina_networking.broadcast_transaction_pool_diff net x ;
                   Deferred.unit ) ) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
