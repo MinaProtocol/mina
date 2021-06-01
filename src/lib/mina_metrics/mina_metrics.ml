@@ -308,6 +308,10 @@ module Transaction_pool = struct
       "Time at which useful transactions were seen (seconds since 1/1/1970)"
     in
     Gauge.v "useful_transactions_received_time_sec" ~help ~namespace ~subsystem
+
+  let pool_size : Gauge.t =
+    let help = "Number of transactions in the pool" in
+    Gauge.v "size" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
