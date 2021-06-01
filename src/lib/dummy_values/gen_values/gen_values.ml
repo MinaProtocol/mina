@@ -37,5 +37,5 @@ let main () =
   exit 0
 
 let () =
-  main () ;
+  ignore (main () : 'a Deferred.t);
   never_returns (Scheduler.go ())
