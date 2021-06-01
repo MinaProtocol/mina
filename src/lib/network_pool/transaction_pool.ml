@@ -581,7 +581,7 @@ struct
         (Indexed_pool.size t.pool) (Indexed_pool.size pool'')
         (Sequence.length dropped_backtrack) ;
       Mina_metrics.(
-        Gauge.set Transaction_pool.size
+        Gauge.set Transaction_pool.pool_size
           (Float.of_int (Indexed_pool.size pool''))) ;
       t.pool <- pool'' ;
       List.iter locally_generated_dropped ~f:(fun cmd ->
@@ -645,7 +645,7 @@ struct
                           , Transaction_hash.User_command_with_valid_signature
                             .to_yojson cmd ) ] ;
                     Mina_metrics.(
-                      Gauge.set Transaction_pool.size
+                      Gauge.set Transaction_pool.pool_size
                         (Float.of_int (Indexed_pool.size pool'''))) ;
                     t.pool <- pool''' )
               | None ->
@@ -664,7 +664,7 @@ struct
           Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
       ) ;
       Mina_metrics.(
-        Gauge.set Transaction_pool.size (Float.of_int (Indexed_pool.size pool))) ;
+        Gauge.set Transaction_pool.pool_size (Float.of_int (Indexed_pool.size pool))) ;
       t.pool <- pool ;
       Deferred.unit
 
@@ -779,7 +779,7 @@ struct
                      of %i previously in pool"
                    (Sequence.length dropped) (Indexed_pool.size t.pool) ;
                  Mina_metrics.(
-                   Gauge.set Transaction_pool.size
+                   Gauge.set Transaction_pool.pool_size
                      (Float.of_int (Indexed_pool.size new_pool))) ;
                  t.pool <- new_pool ;
                  t.best_tip_diff_relay
@@ -1077,7 +1077,7 @@ struct
                                 drop_until_below_max_size pool' ~pool_max_size
                               in
                               Mina_metrics.(
-                                Gauge.set Transaction_pool.size
+                                Gauge.set Transaction_pool.pool_size
                                   (Float.of_int (Indexed_pool.size pool''))) ;
                               t.pool <- pool'' ;
                               let%bind _ =
