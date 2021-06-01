@@ -1022,7 +1022,7 @@ let hash_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             exit 1)
+             ignore (exit 1 : 'a Deferred.t))
 
 let currency_in_ledger =
   let open Command.Let_syntax in
@@ -1090,7 +1090,7 @@ let currency_in_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             exit 1)
+             ignore (exit 1 : 'a Deferred.t))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
