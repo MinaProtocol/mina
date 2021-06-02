@@ -5,7 +5,7 @@
 
 This RFC proposes an overhauling refactor for how our libp2p helper and daemon processes interface. This document will cover a new IPC interface, model for separation of concerns, and code abstraction details that should give us more performance options and flexibility as we continue to build on top of our existing gossip network implementation.
 
-NOTE: This RFC is kept abstract IPC details related to moving towards bitswap. Additions to this IPC design will be discussed in a separate RFC for bitswap after this RFC is completed and agreed upon.
+NOTE: This RFC is kept abstract of IPC details related to moving towards bitswap. Additions to this IPC design will be discussed in a separate RFC for bitswap after this RFC is completed and agreed upon.
 
 ## Motivation
 [motivation]: #motivation
@@ -25,11 +25,11 @@ NOTE: The scope of the design discussed in this document is the full refactor, i
 
 ### Security
 
-Up front, let's identify the security aspects we aiming to achieve in this RFC. This RFC will not cover security issues relating to rate limiting (which will be covered by the trust scoring RFC), nor issues relating to the maximum message size (which will be covered by the bitswap RFC). Our main security goals we are considering in this RFC are focused around the IPC protocol between the daemon and helper processes. Specifically, the design proposed in this RFC intentially avoids situations in which adversarial nodes could control the number of IPC messages sent between the daemon and the helper (independent of the number of messages sent over the network). In other words, this design is such that the number of IPC messages exchanged between the processes is O(1) in relation to the number of incoming network messages (this is not true of the existing design). In addition, this design limits synchronized state between the 2 processes, which prevents vulnerabilities in which an adversary may be able to desynchronize state between the daemon and helper processes.
+Up front, let's identify the security aspects we are aiming to achieve in this RFC. This RFC will not cover security issues relating to rate limiting (which will be covered by the trust scoring RFC), nor issues relating to the maximum message size (which will be covered by the bitswap RFC). Our main security goals we are considering in this RFC are focused around the IPC protocol between the daemon and helper processes. Specifically, the design proposed in this RFC intentially avoids situations in which adversarial nodes could control the number of IPC messages sent between the daemon and the helper (independent of the number of messages sent over the network). In other words, this design is such that the number of IPC messages exchanged between the processes is O(1) in relation to the number of incoming network messages (this is not true of the existing design). In addition, this design limits synchronized state between the 2 processes, which prevents vulnerabilities in which an adversary may be able to desynchronize state between the daemon and helper processes.
 
 ### IPC
 
-The new libp2p helper IPC protocol improves upon the previous design in a number of ways. It updates the serialization format so that there is no longer a need to base64 encode/decode messages on each side of the protocol, and it also replaces the singular bidirectional data stream over stdin/stdout with a system with multiple concurrent data streams between the two processes. In order to achieve the latter of these, the libp2p helper process will now be need to be aware of message types for messages it receives over the network (the work for which is already being completed in [#8725](https://github.com/MinaProtocol/mina/pull/8725)).
+The new libp2p helper IPC protocol improves upon the previous design in a number of ways. It updates the serialization format so that there is no longer a need to base64 encode/decode messages on each side of the protocol, and it also replaces the singular bidirectional data stream over stdin/stdout with a system with multiple concurrent data streams between the two processes. In order to achieve the latter of these, the libp2p helper process will now be need to be aware of message types for messages it receives over the network (see [#8725](https://github.com/MinaProtocol/mina/pull/8725)).
 
 #### Data Streams
 
@@ -41,7 +41,7 @@ The helper and daemon will now exchange messages over a variety of data streams,
 
 The transport layer we will use for these data streams will be Unix pipes. The parent daemon process can create all the required Unix pipes for the various data streams, and pass the correct file descriptors (either the write or read descriptors depending on the direction of the pipe) to the child helper process when it initializes. Pipes are considered preferable over shared memory for the data streams since they already provide synchronization primitives for reading/writing and are easier to implement correctly, though shared memory would be likely be slightly more optimized.
 
-Below is a proposed set of data streams we would setup for the helper IPC protocol. Keep in mind that some of these pipes cannot be setup without helper message type awareness, and thus will not be available separately until we perfrom a hard-fork update.
+Below is a proposed set of data streams we would setup for the helper IPC protocol. Keep in mind that some of these pipes require some form of message type awareness in order to be implemented. We have ongoing work that adds message type awareness to the helper process, but this work requires a hard fork. If we want to split up message-specific pipes before a hard fork, we would need to add support for message peeking to the helper (which would involve making the helper aware of at least part of the encoding format for RPC messages).
 
 - stdin (used only for initialization message, then closed)
 - stdout (used only for helper logging)
@@ -52,7 +52,8 @@ Below is a proposed set of data streams we would setup for the helper IPC protoc
 - response\_in (incoming RPC responses)
 - request\_in (incoming RPC requests)
 - validation\_out (all validations except request validations, which are bundled with responses)
-- data\_out (responses, broadcasts)
+- response\_out (outgoing RPC responses)
+- broadcast\_out (outgoing broadcast messages)
 
 The rough priorities for reading the incoming pipes from the daemon process would be:
 
@@ -191,7 +192,7 @@ type AbstractPeerGraph struct {
 
 In contrast to the prior implementation, the query control flow in the new protocol always follows the following pattern:
 
-1) The daemon sends 1 message to the helper to begin the query (this message may instruct the helper to 1 or more requests, with control over maximum parallelism).
+1) The daemon sends 1 message to the helper to begin the query (this message may instruct the helper to begin sending out 1 or more requests, with control over maximum parallelism).
 2) The helper continuously and concurrently runs the following protocol until a successful response is found:
   2.a) The helper picks a peer it has not already queried based on the daemon's request and sends a request to this peer.
   2.b) The helper streams the response back to the daemon.
