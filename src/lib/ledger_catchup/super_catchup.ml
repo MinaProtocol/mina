@@ -84,7 +84,7 @@ module G = Graph.Graphviz.Dot (struct
       | Failed ->
           (* red *)
           0xFF3333
-      | Root _ | Finished _ ->
+      | Root _ | Finished ->
           (* green *)
           0x00CC00
       | To_download _ ->
@@ -575,11 +575,11 @@ let create_node ~downloader t x =
   let state, h, blockchain_length, parent, result =
     match x with
     | `Root root ->
-        ( Node.State.Finished root
+        ( Node.State.Finished
         , Breadcrumb.state_hash root
         , Breadcrumb.blockchain_length root
         , Breadcrumb.parent_hash root
-        , Ivar.create_full (Ok root) )
+        , Ivar.create_full (Ok `Added_to_frontier) )
     | `Hash (h, l, parent) ->
         ( Node.State.To_download
             (download "create_node" downloader ~key:(h, l) ~attempts)
@@ -787,7 +787,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
       run_node node
     in
     match node.state with
-    | Failed | Finished _ | Root _ ->
+    | Failed | Finished | Root _ ->
         return ()
     | To_download download_job ->
         let%bind b, attempts = step (Downloader.Job.result download_job) in
@@ -879,31 +879,40 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
     | Wait_for_parent av ->
         let%bind parent =
           step
-            ( match%map.Async
-                Ivar.read (Hashtbl.find_exn t.nodes node.parent).result
-              with
-            | Ok x ->
-                Ok x
-            | Error _ ->
-                ignore
-                  ( Cached.invalidate_with_failure av
-                    : External_transition.Almost_validated.t
-                      Envelope.Incoming.t ) ;
-                finish t node (Error ()) ;
-                Error `Finished )
+            (let parent = Hashtbl.find_exn t.nodes node.parent in
+             match%map.Async Ivar.read parent.result with
+             | Ok `Added_to_frontier ->
+                 Ok parent.state_hash
+             | Error _ ->
+                 ignore
+                   ( Cached.invalidate_with_failure av
+                     : External_transition.Almost_validated.t
+                       Envelope.Incoming.t ) ;
+                 finish t node (Error ()) ;
+                 Error `Finished)
         in
         set_state t node (To_build_breadcrumb (`Parent parent, av)) ;
         run_node node
-    | To_build_breadcrumb (`Parent parent, c) -> (
+    | To_build_breadcrumb (`Parent parent_hash, c) -> (
         let transition_receipt_time = Some (Time.now ()) in
         let av = Cached.peek c in
         match%bind
-          step
-            ( Transition_frontier.Breadcrumb.build ~logger
-                ~skip_staged_ledger_verification:`Proofs ~precomputed_values
-                ~verifier ~trust_system ~parent ~transition:av.data
-                ~sender:(Some av.sender) ~transition_receipt_time ()
-            |> Deferred.map ~f:Result.return )
+          let s =
+            let open Deferred.Result.Let_syntax in
+            let%bind parent =
+              Deferred.return
+                ( match Transition_frontier.find frontier parent_hash with
+                | None ->
+                    Error `Parent_breadcrumb_not_found
+                | Some breadcrumb ->
+                    Ok breadcrumb )
+            in
+            Transition_frontier.Breadcrumb.build ~logger
+              ~skip_staged_ledger_verification:`Proofs ~precomputed_values
+              ~verifier ~trust_system ~parent ~transition:av.data
+              ~sender:(Some av.sender) ~transition_receipt_time ()
+          in
+          step (Deferred.map ~f:Result.return s)
         with
         | Error e ->
             ignore
@@ -919,6 +928,13 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                   Error.tag e ~tag:"invalid staged ledger diff"
               | `Invalid_staged_ledger_hash e ->
                   Error.tag e ~tag:"invalid staged ledger hash"
+              | `Parent_breadcrumb_not_found ->
+                  Error.tag
+                    (Error.of_string
+                       (sprintf
+                          "Parent breadcrumb with state_hash %s not found"
+                          (State_hash.to_string parent_hash)))
+                    ~tag:"parent breadcrumb not found"
             in
             failed ~error:e ~sender:av.sender `Build_breadcrumb
         | Ok breadcrumb ->
@@ -934,8 +950,8 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
               (* The cached value is "freed" by the transition processor in [add_and_finalize]. *)
               step (Deferred.map (Ivar.read finished) ~f:Result.return)
             in
-            Ivar.fill_if_empty node.result (Ok breadcrumb) ;
-            set_state t node (Finished breadcrumb) ;
+            Ivar.fill_if_empty node.result (Ok `Added_to_frontier) ;
+            set_state t node Finished ;
             return () )
   in
   (* TODO: Maybe add everything from transition frontier at the beginning? *)
