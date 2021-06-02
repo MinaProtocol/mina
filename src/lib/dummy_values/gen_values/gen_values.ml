@@ -34,7 +34,7 @@ let main () =
   in
   let loc = Ppxlib.Location.none in
   Pprintast.top_phrase fmt (Ptop_def (str ~loc)) ;
-  exit 0
+  ignore (exit 0 : 'a Deferred.t)
 
 let () =
   main () ;
