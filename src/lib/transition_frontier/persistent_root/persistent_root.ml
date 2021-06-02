@@ -111,7 +111,7 @@ let create ~logger ~directory ~ledger_depth =
   {directory; logger; instance= None; ledger_depth}
 
 let create_instance_exn t =
-  assert (t.instance = None) ;
+  assert (Option.is_none t.instance) ;
   let instance = Instance.create t in
   t.instance <- Some instance ;
   instance
@@ -123,7 +123,7 @@ let with_instance_exn t ~f =
 
 let reset_to_genesis_exn t ~precomputed_values =
   let open Deferred.Let_syntax in
-  assert (t.instance = None) ;
+  assert (Option.is_none t.instance) ;
   let%map () = File_system.remove_dir t.directory in
   with_instance_exn t ~f:(fun instance ->
       ignore

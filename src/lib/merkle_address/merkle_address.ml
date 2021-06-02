@@ -42,6 +42,8 @@ let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 module Binable_arg = struct
   [%%versioned
   module Stable = struct
+    [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t = int * string
 
@@ -275,7 +277,7 @@ module Make_test (Input : sig
 end) =
 struct
   let%test "the merkle root should have no path" =
-    dirs_from_root (root ()) = []
+    List.is_empty (dirs_from_root (root ()))
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]

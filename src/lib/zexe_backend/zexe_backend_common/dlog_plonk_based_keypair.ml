@@ -5,7 +5,7 @@ open Unsigned.Size_t
 module type Stable_v1 = sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, eq]
+      type t [@@deriving version, bin_io, sexp, compare, yojson, hash, equal]
     end
 
     module Latest = V1

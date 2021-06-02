@@ -401,10 +401,11 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                          ())
               | Some _ ->
                   () ) ;
-              if `Empty = first_connection then (
+              let is_empty = function `Empty -> true | _ -> false in
+              if is_empty first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
-              else if `Empty = first_message then (
+              else if is_empty first_message then (
                 [%str_log info] Listening ;
                 `Listening )
               else `Offline
@@ -464,7 +465,8 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           ()
     in
     let handle_status_change status =
-      if status = `Offline then start_offline_timeout ()
+      if match status with `Offline -> true | _ -> false then
+        start_offline_timeout ()
       else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
@@ -988,7 +990,7 @@ let perform_compaction t =
             | `Producing ->
                 perform (span slot_duration_ms)
             | `Producing_in_ms ms ->
-                if ms < expected_time_for_compaction then
+                if Float.(ms < expected_time_for_compaction) then
                   (*too close to block production; perform compaction after block production*)
                   perform (span slot_duration_ms ~incr:ms)
                 else (
@@ -1561,7 +1563,10 @@ let create ?wallets (config : Config.t) =
                               Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
-                            if v = `Accept then
+                            if
+                              Mina_net2.Validation_callback
+                              .equal_validation_result v `Accept
+                            then
                               Mina_networking.broadcast_state net
                                 (External_transition.Validation
                                  .forget_validation_with_hash et)) ;
@@ -1658,7 +1663,11 @@ let create ?wallets (config : Config.t) =
                   with
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if not (source = `Internal) then
+                      if
+                        not
+                          ([%equal: [`Catchup | `Gossip | `Internal]] source
+                             `Internal)
+                      then
                         [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"

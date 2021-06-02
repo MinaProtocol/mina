@@ -524,7 +524,8 @@ let initialize ~logger network =
     let%bind pod_statuses = get_pod_statuses () in
     (* TODO: detect "bad statuses" (eg CrashLoopBackoff) and terminate early *)
     let bad_pod_statuses =
-      List.filter pod_statuses ~f:(fun (_, status) -> status <> "Running")
+      List.filter pod_statuses ~f:(fun (_, status) ->
+          not (String.equal status "Running") )
     in
     if List.is_empty bad_pod_statuses then return ()
     else if n < max_polls then

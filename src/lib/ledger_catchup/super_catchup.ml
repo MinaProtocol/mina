@@ -560,7 +560,7 @@ let check_invariant ~downloader t =
   [%test_eq: int]
     (Downloader.total_jobs downloader)
     (Hashtbl.count t.nodes ~f:(fun node ->
-         Node.State.enum node.state = To_download ))
+         Node.State.Enum.equal (Node.State.enum node.state) To_download ))
 
 let download s d ~key ~attempts =
   let logger = Logger.create () in
@@ -796,7 +796,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
             ; ( "donwload_number"
               , `Int
                   (Hashtbl.count t.nodes ~f:(fun node ->
-                       Node.State.enum node.state = To_download )) )
+                       Node.State.Enum.equal
+                         (Node.State.enum node.state)
+                         To_download )) )
             ; ("total_nodes", `Int (Hashtbl.length t.nodes))
             ; ( "node_states"
               , let s = Node.State.Enum.Table.create () in

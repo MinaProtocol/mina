@@ -1015,7 +1015,7 @@ let%test_module "Ledger_catchup tests" =
                   ~timeout_duration:(Block_time.Span.of_ms 10000L)
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
-              if result <> `Failed then
+              if not ([%equal: [`Failed | `Success of _]] result `Failed) then
                 failwith "expected ledger catchup to fail, but it succeeded" )
           )
 

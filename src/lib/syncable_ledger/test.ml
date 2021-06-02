@@ -337,7 +337,7 @@ module Mask = struct
               Maskable.get_or_create_account maskable account_id account
               |> Or_error.ok_exn
             in
-            assert (action = `Added) ) ;
+            assert ([%equal: [`Added | `Existed]] action `Added) ) ;
         let mask = Mask.create ~depth:Input.depth () in
         let attached_mask = Maskable.register_mask maskable mask in
         (* On the mask, all the children will have different values *)

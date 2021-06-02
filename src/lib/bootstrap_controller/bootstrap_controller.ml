@@ -50,17 +50,17 @@ let time_deferred deferred =
   (Time.diff end_time start_time, result)
 
 let worth_getting_root t candidate =
-  `Take
-  = Consensus.Hooks.select ~constants:t.consensus_constants
-      ~logger:
-        (Logger.extend t.logger
-           [ ( "selection_context"
-             , `String "Bootstrap_controller.worth_getting_root" ) ])
-      ~existing:
-        ( t.best_seen_transition
-        |> External_transition.Validation.forget_validation_with_hash
-        |> With_hash.map ~f:External_transition.consensus_state )
-      ~candidate
+  Consensus.Hooks.equal_select_status `Take
+  @@ Consensus.Hooks.select ~constants:t.consensus_constants
+       ~logger:
+         (Logger.extend t.logger
+            [ ( "selection_context"
+              , `String "Bootstrap_controller.worth_getting_root" ) ])
+       ~existing:
+         ( t.best_seen_transition
+         |> External_transition.Validation.forget_validation_with_hash
+         |> With_hash.map ~f:External_transition.consensus_state )
+       ~candidate
 
 let received_bad_proof t host e =
   Trust_system.(
@@ -188,9 +188,9 @@ let external_transition_compare consensus_constants =
       if State_hash.equal (With_hash.hash existing) (With_hash.hash candidate)
       then 0
       else if
-        `Keep
-        = Consensus.Hooks.select ~constants:consensus_constants ~existing
-            ~candidate ~logger:(Logger.null ())
+        Consensus.Hooks.equal_select_status `Keep
+        @@ Consensus.Hooks.select ~constants:consensus_constants ~existing
+             ~candidate ~logger:(Logger.null ())
       then -1
       else 1 )
     ~f:(With_hash.map ~f:External_transition.consensus_state)
@@ -527,13 +527,13 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     |> External_transition.Validation
                        .forget_validation_with_hash
                   in
-                  `Take
-                  = Consensus.Hooks.select ~constants:t.consensus_constants
-                      ~existing:root_consensus_state
-                      ~candidate:
-                        (With_hash.map ~f:External_transition.consensus_state
-                           transition)
-                      ~logger )
+                  Consensus.Hooks.equal_select_status `Take
+                  @@ Consensus.Hooks.select ~constants:t.consensus_constants
+                       ~existing:root_consensus_state
+                       ~candidate:
+                         (With_hash.map ~f:External_transition.consensus_state
+                            transition)
+                       ~logger )
             in
             [%log debug] "Sorting filtered transitions by consensus state"
               ~metadata:[] ;
