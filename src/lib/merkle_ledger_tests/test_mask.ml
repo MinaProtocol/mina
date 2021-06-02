@@ -320,7 +320,7 @@ module Make (Test : Test_intf) = struct
         let maskable_merkle_path =
           Maskable.merkle_path_at_addr_exn maskable address
         in
-        mask_merkle_path = maskable_merkle_path )
+        [%equal: Mask.Attached.Path.t] mask_merkle_path maskable_merkle_path )
 
   let%test "mask and parent agree on Merkle root before set" =
     Test.with_instances (fun maskable mask ->

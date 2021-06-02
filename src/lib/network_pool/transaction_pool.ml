@@ -50,7 +50,7 @@ module Diff_versioned = struct
   (* We defer do any checking on signed-commands until the call to
    [add_from_gossip_gossip_exn].
 
-   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor 
+   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor
    [add_from_gossip_gossip_exn] into [check_from_gossip_exn] (which just does
    the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
    and do the same for snapp commands as well.

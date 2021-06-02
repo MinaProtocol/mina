@@ -19,7 +19,8 @@ let rec rmrf path =
       |> Array.iter ~f:(fun name -> rmrf (Filename.concat path name)) ;
       Core.Unix.rmdir path
   | _ ->
-      if Core.Sys.file_exists path = `Yes then Core.Sys.remove path
+      if [%equal: [`Yes | `No | `Unknown]] (Core.Sys.file_exists path) `Yes
+      then Core.Sys.remove path
 
 let try_finally ~(f : unit -> 'a Deferred.t)
     ~(finally : unit -> unit Deferred.t) =

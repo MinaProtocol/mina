@@ -214,7 +214,7 @@ module Transaction_pool = struct
   (* A partially verified transaction is either valid, or valid assuming that some list of
      (verification key, statement, proof) triples will verify. That is, the transaction has
      already been validated in all ways, except the proofs were in a batch that failed to
-     verify. 
+     verify.
   *)
   type partial_item =
     [ `Valid of User_command.Valid.t

@@ -113,7 +113,7 @@ module Complement = struct
         ; token_id: 'token_id
         ; account2_nonce: 'nonce
         ; other_fee_payer_opt: 'fee_payer_opt }
-      [@@deriving hlist, sexp, eq, yojson, hash, compare]
+      [@@deriving hlist, sexp, equal, yojson, hash, compare]
     end
 
     open Mina_numbers
@@ -201,7 +201,7 @@ module Complement = struct
     module Poly = struct
       type ('token_id, 'fee_payer_opt) t =
         {token_id: 'token_id; other_fee_payer_opt: 'fee_payer_opt}
-      [@@deriving hlist, sexp, eq, yojson, hash, compare]
+      [@@deriving hlist, sexp, equal, yojson, hash, compare]
     end
 
     type t = (Token_id.t, Other_fee_payer.Payload.t option) Poly.t
