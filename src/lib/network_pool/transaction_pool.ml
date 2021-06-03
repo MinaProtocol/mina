@@ -980,11 +980,10 @@ struct
                   let tx = User_command.Signed_command tx in
                   (*                   let tx = User_command.forget_check tx' in *)
                   let tx' = Transaction_hash.User_command.create tx in
-                  if Indexed_pool.member t.pool tx' then (
+                  if Indexed_pool.member t.pool tx' then
                     if is_sender_local then (
                       [%log' info t.logger]
-                        "Resetting rebroadcast interval for $cmd already \
-                         present in the pool"
+                        "Rebroadcasting $cmd already present in the pool"
                         ~metadata:[("cmd", User_command.to_yojson tx)] ;
                       Option.iter (check_command tx) ~f:(fun cmd ->
                           (* Re-register to reset the rebroadcast
@@ -993,14 +992,17 @@ struct
                           register_locally_generated t
                             Transaction_hash.(
                               User_command_with_valid_signature.make cmd
-                                (User_command.hash tx')) ) ) ;
-                    let%bind _ =
-                      trust_record (Trust_system.Actions.Sent_old_gossip, None)
-                    in
-                    go txs''
-                      ( accepted
-                      , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
-                      ) )
+                                (User_command.hash tx')) ) ;
+                      go txs'' (tx :: accepted, rejected) )
+                    else
+                      let%bind _ =
+                        trust_record
+                          (Trust_system.Actions.Sent_old_gossip, None)
+                      in
+                      go txs''
+                        ( accepted
+                        , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
+                        )
                   else
                     let account ledger account_id =
                       Option.bind
