@@ -1,5 +1,5 @@
 use crate::caml_pointer::{self, CamlPointer};
-use algebra::pasta::fq::Fq;
+use mina_curves::pasta::fq::Fq;
 
 pub type CamlPastaFqVector = CamlPointer<Vec<Fq>>;
 
@@ -19,10 +19,7 @@ pub fn caml_pasta_fq_vector_emplace_back(mut v: CamlPastaFqVector, x: Fq) {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_vector_get(
-    v: CamlPastaFqVector,
-    i: ocaml::Int,
-) -> Result<Fq, ocaml::Error> {
+pub fn caml_pasta_fq_vector_get(v: CamlPastaFqVector, i: ocaml::Int) -> Result<Fq, ocaml::Error> {
     match v.get(i as usize) {
         Some(x) => Ok(*x),
         None => Err(ocaml::Error::invalid_argument("caml_pasta_fq_vector_get")

@@ -1,11 +1,10 @@
 use crate::bigint_256;
-use algebra::biginteger::BigInteger256;
-use algebra::{
-    fields::{Field, FpParameters, PrimeField, SquareRootField},
-    pasta::fp::{Fp, FpParameters as Fp_params},
-    FftField, One, UniformRand, Zero,
+use ark_ff::{
+    biginteger::BigInteger256, FftField, Field, FpParameters, One, PrimeField, SquareRootField,
+    UniformRand, Zero,
 };
-use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};

@@ -1,6 +1,6 @@
-use algebra::pasta::{
-    vesta::{Affine as GAffine, VestaParameters},
+use mina_curves::pasta::{
     fp::Fp,
+    vesta::{Affine as GAffine, VestaParameters},
 };
 
 use oracle::{

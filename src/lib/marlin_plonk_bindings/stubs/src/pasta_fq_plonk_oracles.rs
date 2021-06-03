@@ -1,6 +1,6 @@
-use algebra::pasta::{
-    pallas::{Affine as GAffine, PallasParameters},
+use mina_curves::pasta::{
     fq::Fq,
+    pallas::{Affine as GAffine, PallasParameters},
 };
 
 use oracle::{

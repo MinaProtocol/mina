@@ -14,27 +14,22 @@ crate-type = ["staticlib"]
 ################################# Dependencies ################################
 
 [dependencies]
-groupmap = { path = "../../marlin/zexe/groupmap" }
+ark-ff = { version = "0.3.0", features = ["parallel"] }
+ark-ec = { version = "0.3.0", features = ["parallel"] }
+ark-poly = { version = "0.3.0", features = ["parallel"] }
 libc = { version = "0.2.0" }
-algebra = { path = "../../marlin/zexe/algebra", features = [ "asm", "parallel", "pasta", "ocaml_types" ] }
-ff-fft = { path = "../../marlin/zexe/ff-fft", features = [ "parallel" ] }
-rand = { version = "0.7" }
+rand = { version = "0.8.0" }
 num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
 rand_core = { version = "0.5" }
 rayon = { version = "1" }
 ocaml = { version = "0.18.1" }
 
+groupmap = { path = "../../marlin/groupmap" }
+mina-curves = { path = "../../marlin/curves" }
 oracle = { path = "../../marlin/oracle" }
-dlog_solver = { path = "../../marlin/dlog_solver" }
-marlin_circuits = { path = "../../marlin/circuits/marlin" }
 plonk_circuits = { path = "../../marlin/circuits/plonk", features = [ "ocaml_types" ] }
-
-commitment_pairing = { path = "../../marlin/pairing/commitment" }
-marlin_protocol_pairing = { path = "../../marlin/pairing/marlin" }
-
 commitment_dlog = { path = "../../marlin/dlog/commitment", features = [ "ocaml_types" ] }
-marlin_protocol_dlog = { path = "../../marlin/dlog/marlin/" }
 plonk_protocol_dlog = { path = "../../marlin/dlog/plonk", features = [ "ocaml_types" ] }
 
 [profile.release]

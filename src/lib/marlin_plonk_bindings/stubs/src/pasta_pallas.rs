@@ -1,11 +1,9 @@
-use algebra::{
-    curves::{AffineCurve, ProjectiveCurve},
-    pasta::{
-        pallas::{Affine as GAffine, Projective as GProjective},
-        fp::Fp,
-        fq::Fq,
-    },
-    One, UniformRand,
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ff::{One, UniformRand};
+use mina_curves::pasta::{
+    fp::Fp,
+    fq::Fq,
+    pallas::{Affine as GAffine, Projective as GProjective},
 };
 use rand::rngs::StdRng;
 

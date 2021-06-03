@@ -1,8 +1,6 @@
-use algebra::{
-    pasta::{pallas::Affine as GAffine, fq::Fq},
-    One, Zero,
-};
-use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
+use ark_ff::{One, Zero};
+use ark_poly::{DensePolynomial, EvaluationDomain, Evaluations};
+use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
 
 use commitment_dlog::{
     commitment::{b_poly_coefficients, PolyComm},

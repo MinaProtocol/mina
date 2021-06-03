@@ -1,22 +1,23 @@
 use crate::caml_pointer;
 use crate::index_serialization;
+use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
+use crate::pasta_fp_urs::CamlPastaFpUrs;
 use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
     CamlPlonkVerifierIndex,
 };
-use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
-use crate::pasta_fp_urs::CamlPastaFpUrs;
-use algebra::{
-    curves::AffineCurve,
-    pasta::{vesta::Affine as GAffine, pallas::Affine as GAffineOther, fp::Fp},
-    One,
+use ark_ec::AffineCurve;
+use ark_ff::One;
+use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
+
+use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+
+use commitment_dlog::{
+    commitment::PolyComm,
+    srs::{SRSValue, SRS},
 };
-
-use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-
-use commitment_dlog::{commitment::PolyComm, srs::{SRS, SRSValue}};
 use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
-use plonk_protocol_dlog::index::{VerifierIndex as DlogVerifierIndex};
+use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
 
 use std::{
     fs::{File, OpenOptions},

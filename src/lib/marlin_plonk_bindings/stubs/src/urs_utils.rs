@@ -1,4 +1,4 @@
-use algebra::{fields::PrimeField, One, UniformRand, VariableBaseMSM, Zero};
+use ark_ff::{One, PrimeField, UniformRand, VariableBaseMSM, Zero};
 
 use commitment_dlog::{
     commitment::{b_poly_coefficients, CommitmentCurve},
