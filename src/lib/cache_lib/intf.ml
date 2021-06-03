@@ -181,8 +181,8 @@ module Transmuter_cache = struct
 
     module Make
         (Transmuter : Transmuter.S)
-        (_ : Registry.S with type element := Transmuter.Target.t)
-        (_ : Constant.S with type t := string) :
+        (Registry : Registry.S with type element := Transmuter.Target.t)
+        (Name : Constant.S with type t := string) :
       S
       with module Cached := Cached
        and module Cache := Cache
