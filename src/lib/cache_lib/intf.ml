@@ -188,6 +188,7 @@ module Transmuter_cache = struct
        and module Cache := Cache
        and type source = Transmuter.Source.t
        and type target = Transmuter.Target.t
+           [@@warning "-67"]
   end
 end
 

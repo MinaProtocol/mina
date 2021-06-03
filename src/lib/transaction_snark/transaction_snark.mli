@@ -349,7 +349,7 @@ module Make (Inputs : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val proof_level : Genesis_constants.Proof_level.t
-end) : S
+end) : S [@@warning "-67"]
 
 val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t
