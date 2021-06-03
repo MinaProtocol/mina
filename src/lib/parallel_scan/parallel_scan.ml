@@ -1731,8 +1731,9 @@ let%test_module "scans" =
               in
               let buf = Bin_prot.Common.create_buf sz in
               ignore
-                (State.Stable.Latest.bin_write_t Int64.bin_write_t
-                   Int64.bin_write_t buf ~pos:0 s) ;
+                ( State.Stable.Latest.bin_write_t Int64.bin_write_t
+                    Int64.bin_write_t buf ~pos:0 s
+                  : int ) ;
               let deserialized =
                 State.Stable.Latest.bin_read_t Int64.bin_read_t
                   Int64.bin_read_t ~pos_ref:(ref 0) buf

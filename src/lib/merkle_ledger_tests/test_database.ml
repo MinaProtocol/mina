@@ -414,7 +414,8 @@ let%test_module "test functor on in memory databases" =
             let max_height = Int.min (MT.depth mdb) 5 in
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
-                create_new_account_exn mdb account |> ignore ) ;
+                ignore (create_new_account_exn mdb account : Test.Location.t)
+            ) ;
             [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb) )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =

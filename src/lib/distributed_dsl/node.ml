@@ -212,7 +212,7 @@ struct
 
   let add_back_timers t ~key ~data =
     if List.length data > 0 then
-      let _ = Timer_label.Table.set t.timers ~key ~data in
+      let () = Timer_label.Table.set t.timers ~key ~data in
       ()
     else Timer_label.Table.remove t.timers key
 
@@ -247,9 +247,7 @@ struct
             t.triggered_timers_r f ) ;
     tok
 
-  let timeout' t label ts ~f =
-    let _ = timeout t label ts ~f in
-    ()
+  let timeout' t label ts ~f = ignore (timeout t label ts ~f : Timer.tok)
 
   let state_changed t =
     not (Option.equal State.equal (Some t.state) t.last_state)
@@ -342,7 +340,9 @@ struct
               |> Sexp.to_string_hum )
               () )
     | false, Some transition, _ ->
-        let _ = Linear_pipe.read_now t.triggered_timers_r in
+        ignore
+          ( Linear_pipe.read_now t.triggered_timers_r
+            : [`Eof | `Nothing_available | `Ok of transition] ) ;
         let%map t' = transition t t.state >>| with_new_state t in
         [%log' debug t.logger]
           ~metadata:
@@ -352,7 +352,9 @@ struct
           "Making transition from $source to $destination at $peer via timer" ;
         t'
     | false, None, Some msg -> (
-        let _ = Linear_pipe.read_now t.message_pipe in
+        ignore
+          ( Linear_pipe.read_now t.message_pipe
+            : [`Eof | `Nothing_available | `Ok of Message.t] ) ;
         let checks = Message_label.Table.to_alist t.message_handlers in
         let matches =
           List.filter checks ~f:(fun (_, (cond, _)) -> cond msg t.state)

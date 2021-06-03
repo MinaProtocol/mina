@@ -703,7 +703,7 @@ module Helper = struct
                HalfClosed who_closed
            | HalfClosed other ->
                if [%equal: [`Us | `Them]] other who_closed then
-                 ignore (double_close ())
+                 ignore (double_close () : stream_state)
                else release () ;
                FullyClosed
            | FullyClosed ->
@@ -931,9 +931,10 @@ module Helper = struct
                        dropping message."
                       ~metadata:[("topic", `String sub.topic)]
                   else
-                    Strict_pipe.Writer.write sub.write_pipe
-                      (wrap m.sender data)
-                    |> ignore
+                    ignore
+                      ( Strict_pipe.Writer.write sub.write_pipe
+                          (wrap m.sender data)
+                        : unit Deferred.t )
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -1445,7 +1446,7 @@ let listening_addrs net =
     shutdown. Replace kill invocation with an RPC. *)
 let shutdown (net : net) =
   net.finished <- true ;
-  Deferred.ignore (Child_processes.kill net.subprocess)
+  Deferred.ignore_m (Child_processes.kill net.subprocess)
 
 module Stream = struct
   type t = Helper.stream

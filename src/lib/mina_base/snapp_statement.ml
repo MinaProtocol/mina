@@ -134,7 +134,9 @@ module Complement = struct
            ; other_fee_payer_opt } :
             t) ~one:({predicate; body1; body2} as one : Checked.t) :
           Snapp_command.Payload.One_proved.Digested.Checked.t =
-        let _ = Checked.to_field_elements one in
+        let (_ : Pickles.Impls.Step.Field.t array) =
+          Checked.to_field_elements one
+        in
         let ( ! ) x = Set_once.get_exn (With_hash.hash x) [%here] in
         { Snapp_command.Payload.Inner.second_starts_empty
         ; second_ends_empty
@@ -225,8 +227,12 @@ module Complement = struct
       let complete ({token_id; other_fee_payer_opt} : t) ~(one : Checked.t)
           ~(two : Checked.t) :
           Snapp_command.Payload.Two_proved.Digested.Checked.t =
-        let _ = Checked.to_field_elements one in
-        let _ = Checked.to_field_elements two in
+        let (_ : Pickles.Impls.Step.Field.t array) =
+          Checked.to_field_elements one
+        in
+        let (_ : Pickles.Impls.Step.Field.t array) =
+          Checked.to_field_elements two
+        in
         let ( ! ) x = Set_once.get_exn (With_hash.hash x) [%here] in
         { Snapp_command.Payload.Inner.second_starts_empty= Boolean.false_
         ; second_ends_empty= Boolean.false_

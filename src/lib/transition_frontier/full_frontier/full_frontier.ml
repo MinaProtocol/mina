@@ -100,8 +100,9 @@ let best_tip t = find_exn t t.best_tip
 let close ~loc t =
   Mina_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
-    (Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
-       (Breadcrumb.mask (root t)))
+    ( Ledger.Maskable.unregister_mask_exn ~loc ~grandchildren:`Recursive
+        (Breadcrumb.mask (root t))
+      : Ledger.unattached_mask )
 
 let create ~logger ~root_data ~root_ledger ~consensus_local_state ~max_length
     ~precomputed_values ~time_controller =
@@ -389,7 +390,9 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
-        ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask) ;
+        ignore
+          ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mask
+            : Ledger.unattached_mask ) ;
         Hashtbl.remove t.table hash ) ;
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
@@ -436,15 +439,18 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
             |> Protocol_state.Body.view
           in
           ignore
-            (Or_error.ok_exn
-               (Ledger.apply_transaction
-                  ~constraint_constants:
-                    t.precomputed_values.constraint_constants ~txn_state_view
-                  mt txn.data)) ) ;
+            ( Or_error.ok_exn
+                (Ledger.apply_transaction
+                   ~constraint_constants:
+                     t.precomputed_values.constraint_constants ~txn_state_view
+                   mt txn.data)
+              : Ledger.Transaction_applied.t ) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
-      ignore (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt) ) ;
+      ignore
+        ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ mt
+          : Ledger.unattached_mask ) ) ;
     new_staged_ledger
   in
   (* rewrite the new root breadcrumb to contain the new root mask *)

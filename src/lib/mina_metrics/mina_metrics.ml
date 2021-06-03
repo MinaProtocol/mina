@@ -965,7 +965,7 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
         Server.respond_string ~status:`Bad_request "Bad request"
   in
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
-    (Async_extra.Tcp.Where_to_listen.of_port port)
+    (Async.Tcp.Where_to_listen.of_port port)
     callback
 
 let server ?forward_uri ~port ~logger () =
