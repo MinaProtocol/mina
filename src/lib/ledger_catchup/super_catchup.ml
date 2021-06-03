@@ -884,7 +884,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              | Ok `Added_to_frontier ->
                  Ok parent.state_hash
              | Error _ ->
-                 ignore (Cached.invalidate_with_failure av : External_transition.Almost_validated.t Envelope.Incoming.t);
+                 ignore
+                   ( Cached.invalidate_with_failure av
+                     : External_transition.Almost_validated.t
+                       Envelope.Incoming.t ) ;
                  finish t node (Error ()) ;
                  Error `Finished)
         in
