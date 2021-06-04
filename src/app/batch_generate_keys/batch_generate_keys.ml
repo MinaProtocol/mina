@@ -68,17 +68,16 @@ let output_cmds =
                of_int txns_per_block /. of_int slot_time *. fill_rate
                *. of_int rate_limit_interval)
            in
-           let limit =
-             Float.(min slot_limit (of_int rate_limit_level) *. 1000.)
-           in
+           let limit = min (Float.to_int slot_limit) rate_limit_level in
            Some limit
          else None
        in
        let batch_count = ref 0 in
        List.iter (gen_keys count) ~f:(fun pk ->
            Option.iter rate_limit ~f:(fun rate_limit ->
-               if !batch_count >= rate_limit_level then (
-                 Format.printf "sleep %f@." rate_limit ;
+               if !batch_count >= rate_limit then (
+                 Format.printf "sleep %f@."
+                   Float.(of_int rate_limit_interval /. 1000.) ;
                  batch_count := 0 )
                else incr batch_count ) ;
            Format.printf
