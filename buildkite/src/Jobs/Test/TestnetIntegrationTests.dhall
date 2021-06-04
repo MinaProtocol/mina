@@ -7,7 +7,7 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifact", key = "mainnet-docker-image" },
+    { name = "MinaArtifact", key = "devnet-docker-image" },
     { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
 ]
 
