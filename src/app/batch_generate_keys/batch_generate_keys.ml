@@ -32,7 +32,7 @@ let output_cmds =
        flag "--slot-time" ~aliases:["slot-time"]
          ~doc:
            "NUM_MILLISECONDS Slot duration in milliseconds. (default: 180000)"
-         (optional_with_default 3000 int)
+         (optional_with_default 180000 int)
      and fill_rate =
        flag "--fill-rate" ~aliases:["fill-rate"]
          ~doc:"FILL_RATE Fill rate (default: 0.75)"
