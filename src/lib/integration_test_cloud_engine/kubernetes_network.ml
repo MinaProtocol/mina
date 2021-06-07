@@ -67,13 +67,13 @@ module Node = struct
         Malleable_error.return ()
       else Malleable_error.return ()
     in
-    let%bind _ = run_in_container node "./start.sh" in
+    let%bind _ = run_in_container node "/start.sh" in
     Malleable_error.return ()
 
   let stop node =
     let open Malleable_error.Let_syntax in
     let%bind _ = run_in_container node "ps aux" in
-    let%bind _ = run_in_container node "./stop.sh" in
+    let%bind _ = run_in_container node "/stop.sh" in
     let%bind _ = run_in_container node "ps aux" in
     return ()
 
