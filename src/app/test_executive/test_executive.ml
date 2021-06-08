@@ -36,7 +36,8 @@ let validate_inputs {coda_image; _} =
     failwith "Coda image cannot be an empt string"
 
 let engines : engine list =
-  [("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))]
+  [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S))
+  ; ("local", (module Integration_test_local_engine : Intf.Engine.S)) ]
 
 let tests : test list =
   [ ("reliability", (module Reliability_test.Make : Intf.Test.Functor_intf))
