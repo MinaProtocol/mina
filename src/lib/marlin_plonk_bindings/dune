@@ -6,21 +6,16 @@
    marlin_plonk_bindings_types
    ;; Biginteger types backing fields
    marlin_plonk_bindings_bigint_256
-   marlin_plonk_bindings_bigint_384
    ;; Finite fields
    marlin_plonk_bindings_pasta_fp
    marlin_plonk_bindings_pasta_fq
    marlin_plonk_bindings_tweedle_fp
    marlin_plonk_bindings_tweedle_fq
-   marlin_plonk_bindings_bn_382_fp
-   marlin_plonk_bindings_bn_382_fq
    ;; Finite field vectors
    marlin_plonk_bindings_pasta_fp_vector
    marlin_plonk_bindings_pasta_fq_vector
    marlin_plonk_bindings_tweedle_fp_vector
    marlin_plonk_bindings_tweedle_fq_vector
-   marlin_plonk_bindings_bn_382_fp_vector
-   marlin_plonk_bindings_bn_382_fq_vector
    ;; Groups
    marlin_plonk_bindings_pasta_vesta
    marlin_plonk_bindings_pasta_pallas
