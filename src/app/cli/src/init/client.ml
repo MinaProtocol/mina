@@ -917,18 +917,18 @@ let export_ledger =
         (optional string))
   in
   let ledger_kind =
+    let available_ledgers =
+      [ "staged-ledger"
+      ; "snarked-ledger"
+      ; "staking-epoch-ledger"
+      ; "next-epoch-ledger" ]
+    in
     let t =
       Command.Param.Arg_type.of_alist_exn
-        (List.map
-           [ "staged-ledger"
-           ; "snarked-ledger"
-           ; "staking-epoch-ledger"
-           ; "next-epoch-ledger" ] ~f:(fun s -> (s, s)))
+        (List.map available_ledgers ~f:(fun s -> (s, s)))
     in
-    Command.Param.(
-      anon
-        ( "staged-ledger|snarked-ledger|staking-epoch-ledger|next-epoch-ledger"
-        %: t ))
+    let ledger_args = String.concat ~sep:"|" available_ledgers in
+    Command.Param.(anon (ledger_args %: t))
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
