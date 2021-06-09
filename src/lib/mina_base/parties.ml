@@ -151,7 +151,6 @@ module With_hashes = struct
 
   let create {other_parties; fee_payer; protocol_state= _} : Party.t t =
     let parties =
-      (*       let all_parties = List.map other_parties ~f:(fun p -> (p, None)) in *)
       let p = fee_payer in
       { Party.authorization= Control.Signature p.authorization
       ; data= {p.data with predicate= Party.Predicate.Nonce p.data.predicate}
