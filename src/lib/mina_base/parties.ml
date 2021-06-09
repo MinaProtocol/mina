@@ -146,6 +146,9 @@ module With_hashes = struct
     let h_tl = match t with [] -> empty | (_, h_tl) :: _ -> h_tl in
     (data, cons_hash hash h_tl) :: t
 
+  let hash (t : _ t) : Random_oracle.Digest.t =
+    match t with [] -> empty | (_, h) :: _ -> h
+
   let create {other_parties; fee_payer; protocol_state= _} : Party.t t =
     let parties =
       (*       let all_parties = List.map other_parties ~f:(fun p -> (p, None)) in *)
@@ -180,6 +183,8 @@ module Transaction_commitment = struct
   module Stable = Zexe_backend.Pasta.Fp.Stable
 
   type t = Stable.Latest.t
+
+  let empty = Outside_hash_image.t
 
   let create ~other_parties_hash ~protocol_state_predicate_hash : t =
     Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate

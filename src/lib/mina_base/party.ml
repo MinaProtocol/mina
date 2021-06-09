@@ -382,6 +382,9 @@ module Predicated = struct
 
     let create body : t = {body; predicate= ()}
   end
+
+  let of_signed ({body; predicate} : Signed.t) : t =
+    {body; predicate= Nonce predicate}
 end
 
 module Poly (Data : Type) (Auth : Type) = struct
@@ -450,5 +453,4 @@ let account_id (t : t) : Account_id.t =
   Account_id.create t.data.body.pk t.data.body.token_id
 
 let of_signed ({data; authorization} : Signed.t) : t =
-  { authorization= Signature authorization
-  ; data= {data with predicate= Nonce data.predicate} }
+  {authorization= Signature authorization; data= Predicated.of_signed data}
