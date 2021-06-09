@@ -333,7 +333,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
           Mina_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
-          Mina_lib.get_ledger coda lh |> return )
+          (* getting the ledger may take more time than a heartbeat timeout
+             run in thread to allow RPC heartbeats to proceed
+          *)
+          Async.In_thread.run (fun () -> Mina_lib.get_ledger coda lh) )
     ; implement Daemon_rpcs.Get_snarked_ledger.rpc (fun () lh ->
           Mina_lib.get_snarked_ledger coda lh |> return )
     ; implement Daemon_rpcs.Get_staking_ledger.rpc (fun () which ->
