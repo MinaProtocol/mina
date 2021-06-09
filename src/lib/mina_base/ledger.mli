@@ -215,7 +215,7 @@ val apply_parties_unchecked :
   -> t
   -> Parties.t
   -> ( Transaction_applied.Parties_applied.t
-     * ( ( (Party.t * Snapp_predicate.Protocol_state.t option) list
+     * ( ( Party.t list
          , Token_id.t
          , Currency.Amount.t
          , t
