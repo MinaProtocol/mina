@@ -25,10 +25,7 @@ end]
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
-      | Proof of unit
-      | Signature of Signature.Stable.V1.t
-      | None_given
+    type t = Proof of unit | Signature of Signature.Stable.V1.t | None_given
     [@@deriving sexp, eq, yojson, hash, compare]
 
     let to_latest = Fn.id
