@@ -322,7 +322,7 @@ module type S = sig
     -> ledger
     -> Parties.t
     -> ( Transaction_applied.Parties_applied.t
-       * ( ( (Party.t * Snapp_predicate.Protocol_state.t option) list
+       * ( ( Party.t list
            , Token_id.t
            , Amount.t
            , ledger
@@ -1254,6 +1254,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let true_ = true
 
+        let false_ = false
+
         let equal = Bool.equal
 
         let not = not
@@ -1271,6 +1273,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
       module Transaction_commitment = struct
         type t = unit
+
+        let empty = ()
 
         let if_ = Parties.value_if
       end
@@ -1305,8 +1309,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       end
 
       module Parties = struct
-        type party = Party.t * Snapp_predicate.Protocol_state.t option
-        [@@deriving yojson]
+        type party = Party.t [@@deriving yojson]
 
         type t = party list
 
@@ -1342,7 +1345,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             , Transaction_commitment.t )
             Parties_logic.Local_state.t
         ; protocol_state_predicate: Snapp_predicate.Protocol_state.t
-        ; transaction_commitment: Transaction_commitment.t >
+        ; transaction_commitment: unit >
     end in
     let original_account_states =
       List.map (Parties.accounts_accessed c) ~f:(fun id ->
@@ -1357,34 +1360,31 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Get_global_ledger _ ->
           ledger
       | Transaction_commitment_on_start _ ->
-          None
+          ()
       | Finalize_local_state (is_last_party, local_state) ->
           if is_last_party then
             if local_state.will_succeed && not local_state.success then
               raise E.Did_not_succeed
       | Balance a ->
           Balance.to_amount a.balance
-      | Get_account ((p, _), l) ->
+      | Get_account (p, l) ->
           let loc, acct =
             Or_error.ok_exn (get_with_location l (Party.account_id p))
           in
           (acct, loc)
       | Check_inclusion (_ledger, _account, _loc) ->
           ()
-      | Check_predicate
-          (_is_start, (party, protocol_state_pred), account, global_state) -> (
-          Option.value_map ~default:true protocol_state_pred ~f:(fun p ->
-              Snapp_predicate.Protocol_state.check p
-                global_state.protocol_state
-              |> Or_error.is_ok )
-          &&
-          match party.data.predicate with
-          | Accept ->
-              true
-          | Nonce n ->
-              Account.Nonce.equal account.nonce n
-          | Full p ->
-              Or_error.is_ok (Snapp_predicate.Account.check p account) )
+      | Check_protocol_state_predicate (pred, global_state) ->
+          Snapp_predicate.Protocol_state.check pred global_state.protocol_state
+          |> Or_error.is_ok
+      | Check_predicate (_is_start, party, account, _global_state) -> (
+        match party.data.predicate with
+        | Accept ->
+            true
+        | Nonce n ->
+            Account.Nonce.equal account.nonce n
+        | Full p ->
+            Or_error.is_ok (Snapp_predicate.Account.check p account) )
       | Set_account_if (b, l, a, loc) ->
           if b then set_with_location l loc a ;
           l
@@ -1392,12 +1392,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           {s with fee_excess= f s.fee_excess}
       | Modify_global_ledger (s, f) ->
           {s with ledger= f s.ledger}
-      | Party_token_id (p, _) ->
+      | Party_token_id p ->
           p.data.body.token_id
       | Check_auth_and_update_account
           { is_start
           ; global_state= _
-          ; party= p, _
+          ; party= p
           ; account= a
           ; transaction_commitment= ()
           ; inclusion_proof= loc } -> (
@@ -1411,8 +1411,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               ~is_new:(match loc with `Existing _ -> false | `New -> true)
               p.data a
           with
-          | Error e ->
-              printf "error is %s\n" (Transaction_status.Failure.to_string e) ;
+          | Error _e ->
+              (* TODO: Use this in the failure reason. *)
               (a, false)
           | Ok a ->
               (a, true) )
@@ -1440,9 +1440,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 Parties_logic.Local_state.t
               [@@deriving to_yojson]
             end in
-            if l.will_succeed then
-              printf "fail\n %s\n"
-                (Yojson.Safe.pretty_to_string (J.to_yojson l)) ;
             `Did_not_succeed
         | exception e ->
             `Error e
@@ -1450,17 +1447,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             step_all s
     in
     let init ~will_succeed : Inputs.Global_state.t * _ =
-      let all_parties = List.map c.other_parties ~f:(fun p -> (p, None)) in
       let parties =
         let p = c.fee_payer in
-        ( { Party.authorization= Control.Signature p.authorization
-          ; data=
-              {p.data with predicate= Party.Predicate.Nonce p.data.predicate}
-          }
-        , Some c.protocol_state )
-        :: all_parties
+        { Party.authorization= Control.Signature p.authorization
+        ; data= {p.data with predicate= Party.Predicate.Nonce p.data.predicate}
+        }
+        :: c.other_parties
       in
-      M.start {parties; will_succeed} {perform}
+      M.start
+        {parties; will_succeed; protocol_state_predicate= c.protocol_state}
+        {perform}
         ( {protocol_state= state_view; ledger; fee_excess= Amount.zero}
         , { parties= []
           ; transaction_commitment= ()
@@ -1973,8 +1969,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           match a with Some a -> `Fst (id, a) | None -> `Snd id )
     in
     let to_update =
-      (* TODO: Should be no dupes. *)
-      let () = assert false in
       List.dedup_and_sort
         ~compare:(fun (x, _) (y, _) -> Account_id.compare x y)
         to_update
@@ -2238,7 +2232,7 @@ module For_tests = struct
                   ; token_id= Token_id.default
                   ; delta= Amount.Signed.(negate (of_unsigned total)) }
               ; predicate= sender_nonce }
-              (* TODO: Use real signature *)
+              (* Real signature added in below *)
           ; authorization= Signature.dummy }
       ; other_parties=
           [ { data=
@@ -2254,11 +2248,15 @@ module For_tests = struct
     let signature =
       Schnorr.sign sender.private_key
         (Random_oracle.Input.field
-           (Parties.Transaction_commitment.create
-              ~other_parties_hash:
-                (Parties.With_hashes.other_parties_hash parties)
-              ~protocol_state_predicate_hash:
-                (Snapp_predicate.Protocol_state.digest parties.protocol_state)))
+           ( Parties.Transaction_commitment.create
+               ~other_parties_hash:
+                 (Parties.With_hashes.other_parties_hash parties)
+               ~protocol_state_predicate_hash:
+                 (Snapp_predicate.Protocol_state.digest parties.protocol_state)
+           |> Parties.Transaction_commitment.with_fee_payer
+                ~fee_payer_hash:
+                  (Party.Predicated.digest
+                     (Party.Predicated.of_signed parties.fee_payer.data)) ))
     in
     {parties with fee_payer= {parties.fee_payer with authorization= signature}}
 
