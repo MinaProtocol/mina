@@ -679,6 +679,8 @@ module Balance = struct
   module Checked = struct
     include Amount.Checked
 
+    let to_amount = Fn.id
+
     let add_signed_amount = add_signed
 
     let add_amount = add
