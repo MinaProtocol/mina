@@ -128,10 +128,8 @@ module Make
           match has_lower_fee pool work ~fee:fee.fee ~sender with
           | Ok () ->
               verify ()
-          | _ ->
-              Deferred.Or_error.error_string
-                "snark pool diff fee is equal to or higher than what's \
-                 already in the pool " )
+          | Error e ->
+              Deferred.return (Error e) )
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
