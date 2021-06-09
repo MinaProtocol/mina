@@ -13,6 +13,8 @@ module type Bool_intf = sig
 
   val true_ : t
 
+  val false_ : t
+
   val equal : t -> t -> t
 
   val not : t -> t
@@ -118,6 +120,14 @@ module Eff = struct
              ; global_state: 'global_state
              ; .. > )
            t
+    | Check_protocol_state_predicate :
+        'protocol_state_pred * 'global_state
+        -> ( 'bool
+           , < bool: 'bool
+             ; global_state: 'global_state
+             ; protocol_state_predicate: 'protocol_state_pred
+             ; .. > )
+           t
     | Set_account_if :
         'bool * 'ledger * 'account * 'inclusion_proof
         -> ( 'ledger
@@ -167,11 +177,13 @@ module Eff = struct
         -> (unit, < local_state: 'local_state ; bool: 'bool ; .. >) t
     | Transaction_commitment_on_start :
         { start_party: 'party
+        ; protocol_state_predicate: 'protocol_state_pred
         ; other_parties: 'parties }
-        -> ( 'transaction_commitment option
+        -> ( 'transaction_commitment
            , < party: 'party
              ; parties: 'parties
              ; bool: 'bool
+             ; protocol_state_predicate: 'protocol_state_pred
              ; transaction_commitment: 'transaction_commitment
              ; .. > )
            t
@@ -196,6 +208,8 @@ module type Inputs_intf = sig
 
   module Transaction_commitment : sig
     include Iffable with type bool := Bool.t
+
+    val empty : t
   end
 end
 
@@ -205,7 +219,10 @@ module Start_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type ('parties, 'bool) t = {parties: 'parties; will_succeed: 'bool}
+      type ('parties, 'protocol_state_pred, 'bool) t =
+        { parties: 'parties
+        ; protocol_state_predicate: 'protocol_state_pred
+        ; will_succeed: 'bool }
     end
   end]
 end
@@ -215,8 +232,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Ps = Inputs.Parties
 
   let apply (type global_state)
-      (* (step_or_start : [`Start of Inputs.Parties.t | `Step]) *)
-      (start_data : _ Start_data.t)
+      ~(is_start : [`Yes of _ Start_data.t | `No | `Compute of _ Start_data.t])
       (h :
         (< global_state: global_state
          ; transaction_commitment: Transaction_commitment.t
@@ -228,36 +244,72 @@ module Make (Inputs : Inputs_intf) = struct
         handler)
       ((global_state : global_state), (local_state : _ Local_state.t)) =
     let open Inputs in
-    let is_start = Ps.is_empty local_state.parties in
+    let is_start' =
+      let is_start' = Ps.is_empty local_state.parties in
+      ( match is_start with
+      | `Compute _ ->
+          ()
+      | `Yes _ ->
+          Bool.assert_ is_start'
+      | `No ->
+          Bool.assert_ (Bool.not is_start') ) ;
+      match is_start with
+      | `Yes _ ->
+          Bool.true_
+      | `No ->
+          Bool.false_
+      | `Compute _ ->
+          is_start'
+    in
     let local_state =
       { local_state with
         ledger=
-          Inputs.Ledger.if_ is_start
+          Inputs.Ledger.if_ is_start'
             ~then_:(h.perform (Get_global_ledger global_state))
             ~else_:local_state.ledger }
     in
+    let protocol_state_predicate_satisfied =
+      match is_start with
+      | `Yes start_data | `Compute start_data ->
+          h.perform
+            (Check_protocol_state_predicate
+               (start_data.protocol_state_predicate, global_state))
+      | `No ->
+          Bool.true_
+    in
     let (party, remaining), local_state =
       let to_pop =
-        Ps.if_ is_start ~then_:start_data.parties ~else_:local_state.parties
+        match is_start with
+        | `Compute start_data ->
+            Ps.if_ is_start' ~then_:start_data.parties
+              ~else_:local_state.parties
+        | `Yes start_data ->
+            start_data.parties
+        | `No ->
+            local_state.parties
       in
       let party, remaining = Ps.pop to_pop in
       let transaction_commitment =
-        match
-          h.perform
-            (Transaction_commitment_on_start
-               {start_party= party; other_parties= remaining})
-        with
-        | None ->
+        match is_start with
+        | `No ->
             local_state.transaction_commitment
-        | Some on_start ->
-            Transaction_commitment.if_ is_start ~then_:on_start
+        | `Yes start_data | `Compute start_data ->
+            let on_start =
+              h.perform
+                (Transaction_commitment_on_start
+                   { start_party= party
+                   ; protocol_state_predicate=
+                       start_data.protocol_state_predicate
+                   ; other_parties= remaining })
+            in
+            Transaction_commitment.if_ is_start' ~then_:on_start
               ~else_:local_state.transaction_commitment
       in
       let local_state =
         { local_state with
           transaction_commitment
         ; token_id=
-            Token_id.if_ is_start ~then_:Token_id.default
+            Token_id.if_ is_start' ~then_:Token_id.default
               ~else_:local_state.token_id }
       in
       ((party, remaining), local_state)
@@ -266,27 +318,39 @@ module Make (Inputs : Inputs_intf) = struct
       { local_state with
         parties= remaining
       ; will_succeed=
-          Bool.if_ is_start ~then_:start_data.will_succeed
-            ~else_:local_state.will_succeed }
+          ( match is_start with
+          | `Yes start_data ->
+              start_data.will_succeed
+          | `No ->
+              local_state.will_succeed
+          | `Compute start_data ->
+              Bool.if_ is_start' ~then_:start_data.will_succeed
+                ~else_:local_state.will_succeed ) }
     in
     let a, inclusion_proof =
       h.perform (Get_account (party, local_state.ledger))
     in
     h.perform (Check_inclusion (local_state.ledger, a, inclusion_proof)) ;
     let predicate_satisfied : Bool.t =
-      h.perform (Check_predicate (is_start, party, a, global_state))
+      h.perform (Check_predicate (is_start', party, a, global_state))
     in
     let a', update_permitted =
       h.perform
         (Check_auth_and_update_account
-           { is_start
+           { is_start= is_start'
            ; global_state
            ; party
            ; account= a
            ; transaction_commitment= local_state.transaction_commitment
            ; inclusion_proof })
     in
-    let party_succeeded = Bool.( && ) predicate_satisfied update_permitted in
+    let party_succeeded =
+      Bool.(
+        protocol_state_predicate_satisfied && predicate_satisfied
+        && update_permitted)
+    in
+    (* The first party must succeed. *)
+    Bool.(assert_ ((not is_start') || party_succeeded)) ;
     let local_state =
       { local_state with
         success= Bool.( && ) local_state.success party_succeeded }
@@ -327,12 +391,19 @@ module Make (Inputs : Inputs_intf) = struct
       The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      let should_apply = Bool.( || ) is_start local_state.will_succeed in
+      let should_apply = Bool.( || ) is_start' local_state.will_succeed in
       h.perform
         (Set_account_if (should_apply, local_state.ledger, a', inclusion_proof))
     in
-    let local_state = {local_state with ledger= new_ledger} in
     let is_last_party = Ps.is_empty remaining in
+    let local_state =
+      { local_state with
+        ledger= new_ledger
+      ; transaction_commitment=
+          Transaction_commitment.if_ is_last_party
+            ~then_:Transaction_commitment.empty
+            ~else_:local_state.transaction_commitment }
+    in
     h.perform (Finalize_local_state (is_last_party, local_state)) ;
     (*
        In the SNARK, this will be
@@ -364,8 +435,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (global_state, local_state)
 
-  let step h state =
-    apply {parties= Ps.empty; will_succeed= Bool.true_} h state
+  let step h state = apply ~is_start:`No h state
 
-  let start start_data h state = apply start_data h state
+  let start start_data h state = apply ~is_start:(`Yes start_data) h state
 end
