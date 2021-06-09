@@ -1619,7 +1619,7 @@ let create ?wallets (config : Config.t) =
           in
           trace_task "transaction pool broadcast loop" (fun () ->
               let rl = Network_pool.Transaction_pool.create_rate_limiter () in
-              log_rate_limiter_occasionally rl ~label:"local_transactions" ;
+              log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun x ->
@@ -1740,7 +1740,7 @@ let create ?wallets (config : Config.t) =
           in
           trace_task "snark pool broadcast loop" (fun () ->
               let rl = Network_pool.Snark_pool.create_rate_limiter () in
-              log_rate_limiter_occasionally rl ~label:"local_snark_work" ;
+              log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
                 ~f:(fun x ->
                   let%bind () =

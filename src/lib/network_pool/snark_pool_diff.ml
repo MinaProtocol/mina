@@ -130,8 +130,8 @@ module Make
               verify ()
           | _ ->
               Deferred.Or_error.error_string
-                "snark pool diff fee is not high enough to be included in \
-                 snark pool" )
+                "snark pool diff fee is equal to or higher than what's \
+                 already in the pool " )
 
   (* This is called after verification has occurred.*)
   let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
