@@ -93,9 +93,9 @@ module Worker = struct
       ->
         if just_emitted_a_proof then (
           [%log' info t.logger] "Dequeued a snarked ledger" ;
-          Persistent_root.Instance.dequeue_snarked_ledger
-            t.persistent_root_instance ;
-          failwith "crash for test purpose" ) ;
+          failwith "crash for test purpose"
+          (*Persistent_root.Instance.dequeue_snarked_ledger
+            t.persistent_root_instance*) ) ;
         map_error ~diff_type:`Root_transitioned
           ~diff_type_name:"Root_transitioned"
           ( Database.move_root t.db ~new_root ~garbage
