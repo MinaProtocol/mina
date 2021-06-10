@@ -238,13 +238,14 @@ struct
 
       type t = unit Q.t
 
-      let mem t h = Q.mem t h
-
       let add t h =
         if not (Q.mem t h) then (
-          if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
-          Q.enqueue_back_exn t h () )
-        else Q.lookup_and_move_to_back t h |> ignore
+          if Q.length t >= max_size then ignore (Q.dequeue_front t : 'a option) ;
+          Q.enqueue_back_exn t h () ;
+          `Already_mem false )
+        else (
+          ignore (Q.lookup_and_move_to_back t h : unit option) ;
+          `Already_mem true )
     end
 
     type t =
@@ -876,6 +877,7 @@ struct
           verified Envelope.Incoming.t Deferred.Or_error.t =
         let open Deferred.Let_syntax in
         let sender = Envelope.Incoming.sender diffs in
+        let is_sender_local = Envelope.Sender.(equal sender Local) in
         let diffs_are_valid () =
           List.for_all (Envelope.Incoming.data diffs) ~f:(fun cmd ->
               let is_valid = not (User_command.has_insufficient_fee cmd) in
@@ -891,9 +893,13 @@ struct
               is_valid )
         in
         let h = Lru_cache.T.hash diffs.data in
-        let already_mem = Lru_cache.mem t.recently_seen h in
-        Lru_cache.add t.recently_seen h ;
-        if already_mem then Deferred.Or_error.error_string "already saw this"
+        let (`Already_mem already_mem) = Lru_cache.add t.recently_seen h in
+        if already_mem && not is_sender_local then
+          (* We only reject here if the command was from the network: the user
+             may want to re-issue a transaction if it is no longer being
+             rebroadcast but also never made it into a block for some reason.
+          *)
+          Deferred.Or_error.error_string "already saw this"
         else if not (diffs_are_valid ()) then
           Deferred.Or_error.error_string
             "at least one user command had an insufficient fee"
@@ -929,6 +935,25 @@ struct
                 Deferred.Or_error.return diffs'
                 (* Currently we defer all verification to [apply] *) )
 
+      let register_locally_generated t txn =
+        Hashtbl.update t.locally_generated_uncommitted txn ~f:(function
+          | Some (_, `Batch batch_num) ->
+              (* Use the existing [batch_num] on a re-issue, to avoid splitting
+                 existing batches.
+              *)
+              (Time.now (), `Batch batch_num)
+          | None ->
+              let batch_num =
+                if t.remaining_in_batch > 0 then (
+                  t.remaining_in_batch <- t.remaining_in_batch - 1 ;
+                  t.current_batch )
+                else (
+                  t.remaining_in_batch <- max_per_15_seconds - 1 ;
+                  t.current_batch <- t.current_batch + 1 ;
+                  t.current_batch )
+              in
+              (Time.now (), `Batch batch_num) )
+
       let apply t (env : verified Envelope.Incoming.t) =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
@@ -956,13 +981,28 @@ struct
                   (*                   let tx = User_command.forget_check tx' in *)
                   let tx' = Transaction_hash.User_command.create tx in
                   if Indexed_pool.member t.pool tx' then
-                    let%bind _ =
-                      trust_record (Trust_system.Actions.Sent_old_gossip, None)
-                    in
-                    go txs''
-                      ( accepted
-                      , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
-                      )
+                    if is_sender_local then (
+                      [%log' info t.logger]
+                        "Rebroadcasting $cmd already present in the pool"
+                        ~metadata:[("cmd", User_command.to_yojson tx)] ;
+                      Option.iter (check_command tx) ~f:(fun cmd ->
+                          (* Re-register to reset the rebroadcast
+                             timer.
+                          *)
+                          register_locally_generated t
+                            Transaction_hash.(
+                              User_command_with_valid_signature.make cmd
+                                (User_command.hash tx')) ) ;
+                      go txs'' (tx :: accepted, rejected) )
+                    else
+                      let%bind _ =
+                        trust_record
+                          (Trust_system.Actions.Sent_old_gossip, None)
+                      in
+                      go txs''
+                        ( accepted
+                        , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
+                        )
                   else
                     let account ledger account_id =
                       Option.bind
@@ -1065,21 +1105,8 @@ struct
                           in
                           match add_res with
                           | Ok (verified, pool', dropped) ->
-                              ( if is_sender_local then
-                                let batch_num =
-                                  if t.remaining_in_batch > 0 then (
-                                    t.remaining_in_batch
-                                    <- t.remaining_in_batch - 1 ;
-                                    t.current_batch )
-                                  else (
-                                    t.remaining_in_batch
-                                    <- max_per_15_seconds - 1 ;
-                                    t.current_batch <- t.current_batch + 1 ;
-                                    t.current_batch )
-                                in
-                                Hashtbl.add_exn t.locally_generated_uncommitted
-                                  ~key:verified
-                                  ~data:(Time.now (), `Batch batch_num) ) ;
+                              if is_sender_local then
+                                register_locally_generated t verified ;
                               let pool'', dropped_for_size =
                                 drop_until_below_max_size pool' ~pool_max_size
                               in
@@ -1144,10 +1171,10 @@ struct
                               (Insufficient_replace_fee
                                 (`Replace_fee rfee, fee)) ->
                               (* We can't punish peers for this, since an
-                             attacker can simultaneously send different
-                             transactions at the same nonce to different
-                             nodes, which will then naturally gossip them.
-                          *)
+                                 attacker can simultaneously send different
+                                 transactions at the same nonce to different
+                                 nodes, which will then naturally gossip them.
+                              *)
                               let f_log =
                                 if is_sender_local then [%log' error t.logger]
                                 else [%log' debug t.logger]
