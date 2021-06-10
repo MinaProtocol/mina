@@ -70,7 +70,7 @@ let wait_for_process_log_errors ~logger process ~module_ ~location =
            elsewhere on exit.
         *)
         let waiting =
-          Monitor.try_with ~run:`Now
+          Monitor.try_with ~here:[%here] ~run:`Now
             ~rest:
               (`Call
                 (fun exn ->

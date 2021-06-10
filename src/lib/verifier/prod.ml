@@ -263,7 +263,7 @@ let wait_safe ~logger process =
   match
     Or_error.try_with (fun () ->
         let deferred_wait =
-          Monitor.try_with ~run:`Now
+          Monitor.try_with ~here:[%here] ~run:`Now
             ~rest:
               (`Call
                 (fun exn ->
