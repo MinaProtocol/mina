@@ -74,6 +74,17 @@ spec:
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
       {{- end }}
+      {{- if eq $.Values.coda.runtimeConfigSrc "download" -}}
+      - name: download-runtime-config
+        image: {{ $.Values.coda.image | quote }}
+        command:
+        - bash
+        - -c
+        - curl {{ $.Values.coda.runtimeConfigUri | quote}} -o /config/daemon.json
+        volumeMounts:
+        - name: daemon-config
+          mountPath: /config
+      {{- end }}
       containers:
       {{ if $config.runWithUserAgent -}}
       - name: user-agent
@@ -212,7 +223,7 @@ spec:
           {{- if $.Values.coda.uploadBlocksToGCloud }}
           "-upload-blocks-to-gcloud", "true",
           {{- end }}
-          {{- if $.Values.coda.runtimeConfig }}
+          {{- if ne $.Values.coda.runtimeConfigSrc "" }}
           "-config-file", "/config/daemon.json",
           {{- end -}}
           "-generate-genesis-proof", {{ $.Values.coda.generateGenesisProof | quote }},
@@ -277,7 +288,7 @@ spec:
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if $.Values.coda.runtimeConfig }}
+        {{- if ne $.Values.coda.runtimeConfigSrc "" }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
@@ -329,10 +340,15 @@ spec:
         emptyDir: {}
       - name: actual-libp2p
         emptyDir: {}
-      {{- if $.Values.coda.runtimeConfig }}
+      {{- if ne $.Values.coda.runtimeConfigSrc "" }}
       - name: daemon-config
+        {{- if eq $.Values.coda.runtimeConfigSrc "direct" }}
         configMap:
           name: block-producer-daemon-config
+        {{- end }}
+        {{- if eq $.Values.coda.runtimeConfigSrc "download" }}
+        emptyDir: {}
+        {{- end }}
       {{- end }}
       {{- if $.Values.coda.uploadBlocksToGCloud }}
       - name: gcloud-keyfile

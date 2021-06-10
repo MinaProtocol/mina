@@ -250,9 +250,14 @@ let main inputs =
     ; bots= "codaprotocol/coda-bots:0.0.13-beta-1"
     ; points= "codaprotocol/coda-points-hack:32b.4" }
   in
+  [%log spam] "Loading keypairs from keypool" ;
+  let network_keypairs =
+    Network_keypair.Pool.load ~logger ~pool_filepath:"keypool" ~size:(Test_config.keypair_count T.config)
+  in
+  [%log spam] "Expanding network config" ;
   let network_config =
     Engine.Network_config.expand ~logger ~test_name ~cli_inputs
-      ~debug:inputs.debug ~test_config:T.config ~images
+      ~debug:inputs.debug ~test_config:T.config ~images ~network_keypairs
   in
   (* resources which require additional cleanup at end of test *)
   let net_manager_ref : Engine.Network_manager.t option ref = ref None in
@@ -300,25 +305,31 @@ let main inputs =
         let init_result =
           let open Deferred.Or_error.Let_syntax in
           let lift = Deferred.map ~f:Or_error.return in
+          [%log spam] "Creating network manager" ;
           let%bind net_manager =
             lift @@ Engine.Network_manager.create ~logger network_config
           in
           net_manager_ref := Some net_manager ;
+          [%log spam] "Deploying network" ;
           let%bind network =
             lift @@ Engine.Network_manager.deploy net_manager
           in
+          [%log spam] "Creating logging engine" ;
           let%map log_engine = Engine.Log_engine.create ~logger ~network in
           log_engine_ref := Some log_engine ;
+          [%log spam] "Creating event router" ;
           let event_router =
             Dsl.Event_router.create ~logger
               ~event_reader:(Engine.Log_engine.event_reader log_engine)
           in
           error_accumulator_ref :=
             Some (Dsl.watch_log_errors ~logger ~event_router ~on_fatal_error) ;
+          [%log spam] "Listening to network state" ;
           let network_state_reader, network_state_writer =
             Dsl.Network_state.listen ~logger event_router
           in
           network_state_writer_ref := Some network_state_writer ;
+          [%log spam] "Initializing DSL" ;
           let (`Don't_call_in_tests dsl) =
             Dsl.create ~logger ~network ~event_router ~network_state_reader
           in

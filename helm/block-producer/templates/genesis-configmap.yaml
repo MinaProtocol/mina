@@ -1,4 +1,4 @@
-{{- if .Values.coda.runtimeConfig }}
+{{- if eq $.Values.coda.runtimeConfigSrc "direct" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

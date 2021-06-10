@@ -108,7 +108,17 @@ variable "additional_peers" {
   default = []
 }
 
+variable "runtime_config_src" {
+  type    = string
+  default = "direct"
+}
+
 variable "runtime_config" {
+  type    = string
+  default = ""
+}
+
+variable "runtime_config_uri" {
   type    = string
   default = ""
 }

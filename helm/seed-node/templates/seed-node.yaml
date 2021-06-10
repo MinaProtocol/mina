@@ -38,6 +38,17 @@ spec:
         - name: actual-libp2p
           mountPath: /root/libp2p-keys
       {{- end }}
+      {{- if eq $.Values.coda.runtimeConfigSrc "download" }}
+      - name: download-runtime-config
+        image: {{ $.Values.coda.image | quote }}
+        command:
+        - bash
+        - -c
+        - curl {{ $.Values.coda.runtimeConfigUri | quote}} -o /config/daemon.json
+        volumeMounts:
+        - name: daemon-config
+          mountPath: /config
+      {{- end }}
       containers:
       - name: coda
         resources:
@@ -68,7 +79,7 @@ spec:
           {{- if $.Values.coda.seedPeersURL }}
           "-peer-list-url", {{ $.Values.coda.seedPeersURL | quote }},
           {{- end -}}
-          {{- if $.Values.coda.runtimeConfig }}
+          {{- if ne $.Values.coda.runtimeConfigSrc "" }}
           "-config-file", "/config/daemon.json",
           {{- end }}
           {{- if $config.libp2pSecret }}
@@ -137,15 +148,20 @@ spec:
         - name: gcloud-keyfile
           mountPath: "/gcloud/"
         {{- end }}
-        {{- if $.Values.coda.runtimeConfig }}
+        {{- if ne $.Values.coda.runtimeConfigSrc "" }}
         - name: daemon-config
           mountPath: "/config/"
         {{- end }}
       volumes:
-      {{- if $.Values.coda.runtimeConfig }}
+      {{- if ne $.Values.coda.runtimeConfigSrc "" }}
       - name: daemon-config
+        {{- if eq $.Values.coda.runtimeConfigSrc "direct" }}
         configMap:
           name: seed-daemon-config
+        {{- end }}
+        {{- if eq $.Values.coda.runtimeConfigSrc "download" }}
+        emptyDir: {}
+        {{- end }}
       {{- end }}
       {{- if $config.privateKeySecret }}
       - name: private-keys

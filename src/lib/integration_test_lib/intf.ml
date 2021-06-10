@@ -24,6 +24,7 @@ module Engine = struct
       -> debug:bool
       -> test_config:Test_config.t
       -> images:Test_config.Container_images.t
+      -> network_keypairs:Network_keypair.t list
       -> t
   end
 

@@ -38,6 +38,9 @@ type t =
   ; snark_worker_fee: string
   ; snark_worker_public_key: string }
 
+let keypair_count {block_producers; additional_accounts; _} =
+  List.length block_producers + List.length additional_accounts
+
 let default =
   { requires_graphql= false
   ; k= 20

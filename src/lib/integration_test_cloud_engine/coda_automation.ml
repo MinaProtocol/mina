@@ -19,13 +19,22 @@ let cluster_region = "us-west1"
 
 let cluster_zone = "us-west1a"
 
+let list_init_in_batches size max_batch_size ~f ~after_batch =
+  let num_batches = size / max_batch_size + if size mod max_batch_size > 0 then 1 else 0 in
+  List.concat @@ List.init num_batches ~f:(fun i ->
+    let offset = (num_batches - i - 1) * max_batch_size in
+    let batch_size = min (size - offset) max_batch_size in
+    let values = List.init batch_size ~f:(fun j -> f (offset + j)) in
+    after_batch ~count:(offset + batch_size) ~values ;
+    values)
+
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
   type block_producer_config =
     { name: string
     ; id: string
-    ; keypair: Network_keypair.t
+    ; keypair: Network_keypair.Stable.Latest.t
     ; public_key: string
     ; private_key: string
     ; keypair_secret: string
@@ -44,9 +53,6 @@ module Network_config = struct
     ; coda_bots_image: string
     ; coda_points_image: string
     ; coda_archive_image: string
-          (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
-    ; runtime_config: Yojson.Safe.t
-          [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
     ; block_producer_configs: block_producer_config list
     ; log_precomputed_blocks: bool
     ; archive_node_count: int
@@ -59,8 +65,9 @@ module Network_config = struct
   type t =
     { coda_automation_location: string
     ; debug_arg: bool
-    ; keypairs: Network_keypair.t list
+    ; keypairs: Network_keypair.Stable.Latest.t list
     ; constants: Test_config.constants
+    ; runtime_config: Runtime_config.t
     ; terraform: terraform_config }
   [@@deriving to_yojson]
 
@@ -143,59 +150,42 @@ module Network_config = struct
     ; delegate
     ; timing }
 
-  let distribute_keypairs ~logger
+  type prepared_keypair =
+    { secret_name: string
+    ; network_keypair: Network_keypair.t }
+
+  let distribute_keypairs ~logger ~network_keypairs
       (account_configs : Test_config.Account_config.t accounts) :
-      Network_keypair.t accounts * Runtime_config.Accounts.Single.t accounts =
-    let keypair_pool =
-      (* the first keypair is the genesis winner and is assumed to be untimed. Therefore dropping it, and not assigning it to any block producer *)
-      let sample_keypairs =
-        Lazy.force Sample_keypairs.keypairs
-        |> Array.to_list |> List.tl_exn
-        |> List.map ~f:(fun (public_key, private_key) ->
-               { Keypair.public_key= Public_key.decompress_exn public_key
-               ; private_key } )
-      in
-      (* we may not have enough sample keypairs available for our config, so we generate some more keypairs as needed *)
-      let num_keypairs_to_generate =
-        max 0 (count_accounts account_configs - List.length sample_keypairs)
-      in
-      let additional_keypairs =
-        if num_keypairs_to_generate > 0 then (
-          [%log warn]
-            "There are not enough sample keypairs to create the network \
-             config. Generating $num_to_generate keypairs."
-            ~metadata:[("num_to_generate", `Int num_keypairs_to_generate)] ;
-          List.init num_keypairs_to_generate ~f:(fun _n -> Keypair.create ()) )
-        else []
-      in
-      sample_keypairs @ additional_keypairs
-    in
+      prepared_keypair accounts * Runtime_config.Accounts.Single.t accounts =
     let assign_keypair pool _ =
       match pool with
       | keypair :: rest ->
           (rest, keypair)
       | [] ->
-          failwith "not enough sample keypairs to generate test config"
+          failwith "not enough network keypairs to generate test config"
       (* should probably log a message when this happens and generate them anyway, despite expense *)
       (* can be done upfront before we do the fold by simply counting the account configs *)
     in
-    let _lefotver_samples, keypairs =
-      fold_map_accounts account_configs ~init:keypair_pool ~f:assign_keypair
+    [%log spam] "Assigning keypairs" ;
+    let _leftover_samples, assigned_keypairs =
+      fold_map_accounts account_configs ~init:network_keypairs ~f:assign_keypair
     in
+    [%log spam] "Generating accounts" ;
     let accounts =
+      let keypairs = map_accounts assigned_keypairs ~f:(fun {Network_keypair.keypair; _} -> keypair) in
       zip_accounts_exn keypairs account_configs
       |> map_accounts ~f:(fun (keypair, config) ->
              generate_account keypairs keypair config )
     in
-    let network_keypairs =
-      id_mapi_accounts keypairs ~f:(fun id index keypair ->
-          let secret_name = "test-keypair-" ^ id ^ "-" ^ Int.to_string index in
-          Network_keypair.create_network_keypair ~keypair ~secret_name )
+    let prepared_keypairs =
+      id_mapi_accounts assigned_keypairs ~f:(fun id index network_keypair ->
+        let secret_name = Printf.sprintf "test-keypair-%s-%d" id index in
+        {secret_name; network_keypair})
     in
-    (network_keypairs, accounts)
+    (prepared_keypairs, accounts)
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
+      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t) ~network_keypairs
       =
     let { Test_config.k
         ; delta
@@ -223,10 +213,12 @@ module Network_config = struct
     (* see ./src/app/test_executive/README.md for information regarding the namespace name format and length restrictions *)
     let testnet_name = "it-" ^ user ^ "-" ^ git_commit ^ "-" ^ test_name in
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
+    [%log spam] "Distributing keypairs" ;
     let account_keypairs, runtime_accounts =
-      distribute_keypairs ~logger {block_producers; additional_accounts}
+      distribute_keypairs ~logger ~network_keypairs {block_producers; additional_accounts}
     in
     (* DAEMON CONFIG *)
+    [%log spam] "Building runtime config" ;
     let proof_config =
       (* TODO: lift configuration of these up Test_config.t *)
       { Runtime_config.Proof_keys.level= Some proof_level
@@ -282,20 +274,22 @@ module Network_config = struct
     let block_producer_config index keypair =
       { name= "test-block-producer-" ^ Int.to_string (index + 1)
       ; id= Int.to_string index
-      ; keypair
+      ; keypair= keypair.network_keypair
       ; keypair_secret= keypair.secret_name
-      ; public_key= keypair.public_key_file
-      ; private_key= keypair.private_key_file
+      ; public_key= keypair.network_keypair.public_key_file
+      ; private_key= keypair.network_keypair.private_key_file
       ; libp2p_secret= "" }
     in
+    (* NETWORK CONFIG *)
     let mina_archive_schema =
       "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
     in
-    (* NETWORK CONFIG *)
+    [%log spam] "Generating network config" ;
     { coda_automation_location= cli_inputs.coda_automation_location
     ; debug_arg= debug
-    ; keypairs= flatten_accounts account_keypairs
+    ; keypairs= flatten_accounts account_keypairs |> List.map ~f:(fun {network_keypair; _} -> network_keypair)
     ; constants
+    ; runtime_config
     ; terraform=
         { cluster_name
         ; cluster_region
@@ -307,7 +301,6 @@ module Network_config = struct
         ; coda_bots_image= images.bots
         ; coda_points_image= images.points
         ; coda_archive_image= images.archive_node
-        ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_configs=
             List.mapi account_keypairs.block_producers ~f:block_producer_config
         ; log_precomputed_blocks
@@ -432,6 +425,12 @@ module Network_manager = struct
         inputs
     in
     *)
+    Out_channel.with_file ~fail_if_exists:true (testnet_dir ^/ "daemon.json")
+      ~f:(fun ch ->
+        network_config.runtime_config
+        |> Runtime_config.to_yojson
+        |> Yojson.Safe.to_string
+        |> Out_channel.output_string ch) ;
     Out_channel.with_file ~fail_if_exists:true (testnet_dir ^/ "main.tf.json")
       ~f:(fun ch ->
         Network_config.to_terraform network_config

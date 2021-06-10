@@ -46,10 +46,6 @@ variable "coda_points_image" {
   type = string
 }
 
-variable "runtime_config" {
-  type = string
-}
-
 variable "snark_worker_replicas" {
   type = number
 }
