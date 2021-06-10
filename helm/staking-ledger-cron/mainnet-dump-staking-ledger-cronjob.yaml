@@ -3,10 +3,7 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  annotations:
   name: mainnet-dump-staking-ledger-cronjob
-  namespace: mainnet
-  selfLink: /apis/batch/v1beta1/namespaces/mainnet/cronjobs/mainnet-dump-staking-ledger-cronjob
 spec:
   concurrencyPolicy: Replace
   failedJobsHistoryLimit: 1
