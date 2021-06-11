@@ -152,25 +152,21 @@ let report_test_errors ~log_error_set ~internal_error_set =
   (* determine if test is passed/failed and exit accordingly *)
   let test_failed =
     match (log_errors_severity, internal_errors_severity) with
-    | _, `Hard | _, `Soft ->
+    | `Hard, _ | _, `Hard | _, `Soft ->
         true
     (* TODO: re-enable log error checks after libp2p logs are cleaned up *)
-    | `Hard, _ | `Soft, _ | `None, `None ->
+    | `Soft, _ | `None, `None ->
         false
   in
   Print.eprintf "\n" ;
-  let result =
-    if test_failed then (
-      color_eprintf Bash_colors.red
-        "The test has failed. See the above errors for details.\n\n" ;
-      false )
-    else (
-      color_eprintf Bash_colors.green
-        "The test has completed successfully.\n\n" ;
-      true )
-  in
+  if test_failed then
+    color_eprintf Bash_colors.red
+      "The test has failed. See the above errors for details.\n\n"
+  else
+    color_eprintf Bash_colors.green
+      "The test has completed successfully.\n\n" ;
   let%bind () = Writer.(flushed (Lazy.force stderr)) in
-  return result
+  return (not test_failed)
 
 (* TODO: refactor cleanup system (smells like a monad for composing linear resources would help a lot) *)
 
