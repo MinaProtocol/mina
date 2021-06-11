@@ -129,7 +129,7 @@ module T = struct
                     update_best_tip_table (blocks_remaining - 1)
                       (Breadcrumb.parent_hash breadcrumb)
             in
-            let num_blocks_to_include = 10 in
+            let num_blocks_to_include = 3 in
             Hash_set.clear t.best_tip_table ;
             update_best_tip_table num_blocks_to_include new_best_tip_hash ;
             {num_removed; is_added= true} )
