@@ -208,6 +208,16 @@ reformat-diff:
 	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
+	$(info PATH $(PATH))
+	ls -a /
+	ls -a /home
+	ls -a /home/opam
+	ls -a .
+	echo $(PWD)
+	ls -a /home/opam/.opam
+	ls -a /home/opam/.opam/4.07/bin
+	which dune
+	ls -a src
 	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
 
 check-snarky-submodule:
