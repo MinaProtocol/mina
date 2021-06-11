@@ -104,7 +104,7 @@ def inactive_loop():
         active_daemon_request = False
         break
   finally:
-    server.shutdown()
+    server.server_close()
 
   active_loop()
 
