@@ -35,10 +35,6 @@ module Node = struct
     let%bind cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" ["-c"; kubectl_cmd]
 
-  (* 
-    Maybe we get rid of this? We are redirecting all logs to stdout which the test executive will pick up
-    in a directed pipe  
-  *)
   let get_logs_in_container node =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
@@ -72,7 +68,15 @@ module Node = struct
         Malleable_error.return ()
       else Malleable_error.return ()
     in
-    let%bind _ = run_in_container node "./start.sh" in
+    let cmd =
+      match String.substr_index node.service_id ~pattern:"snark-worker" with
+      | Some _ ->
+          (* Snark-workers should wait for work to be generated so they don't error a 'get_work' RPC call*)
+          "/bin/bash -c 'sleep 120 && ./start.sh'"
+      | None ->
+          "./start.sh"
+    in
+    let%bind _ = run_in_container node cmd in
     Malleable_error.return ()
 
   let stop node =
