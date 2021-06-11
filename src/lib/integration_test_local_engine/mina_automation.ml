@@ -23,18 +23,20 @@ module Network_config = struct
     ; libp2p_secret: string }
   [@@deriving to_yojson]
 
+  type snark_coordinator_configs =
+    {name: string; id: string; public_key: string; snark_worker_fee: string}
+  [@@deriving to_yojson]
+
   type docker_config =
     { version: string
     ; stack_name: string
     ; coda_image: string
     ; docker_volume_configs: docker_volume_configs list
     ; block_producer_configs: block_producer_config list
+    ; snark_coordinator_configs: snark_coordinator_configs list
     ; log_precomputed_blocks: bool
     ; archive_node_count: int
     ; mina_archive_schema: string
-    ; snark_worker_replicas: int
-    ; snark_worker_fee: string
-    ; snark_worker_public_key: string
     ; runtime_config: Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)] }
   [@@deriving to_yojson]
@@ -186,6 +188,23 @@ module Network_config = struct
     let block_producer_configs =
       List.mapi block_producer_keypairs ~f:block_producer_config
     in
+    let snark_coordinator_configs =
+      if num_snark_workers > 0 then
+        List.mapi
+          (List.init num_snark_workers ~f:(const 0))
+          ~f:(fun index _ ->
+            { name= "test-snark-worker-" ^ Int.to_string (index + 1)
+            ; id= Int.to_string index
+            ; snark_worker_fee
+            ; public_key= snark_worker_public_key } )
+        (* Add one snark coordinator for all workers *)
+        |> List.append
+             [ { name= "test-snark-coordinator"
+               ; id= "1"
+               ; snark_worker_fee
+               ; public_key= snark_worker_public_key } ]
+      else []
+    in
     (* Combine configs for block producer configs and runtime config to be a docker bind volume *)
     let docker_volume_configs =
       List.map block_producer_configs ~f:(fun config ->
@@ -209,98 +228,16 @@ module Network_config = struct
         ; docker_volume_configs
         ; runtime_config= Runtime_config.to_yojson runtime_config
         ; block_producer_configs
+        ; snark_coordinator_configs
         ; log_precomputed_blocks
         ; archive_node_count= num_archive_nodes
-        ; mina_archive_schema
-        ; snark_worker_replicas= num_snark_workers
-        ; snark_worker_public_key
-        ; snark_worker_fee } }
+        ; mina_archive_schema } }
 
   let to_docker network_config =
-    let default_seed_envs =
-      [ ("DAEMON_REST_PORT", "3085")
-      ; ("DAEMON_CLIENT_PORT", "8301")
-      ; ("DAEMON_METRICS_PORT", "10001")
-      ; ("CODA_LIBP2P_PASS", "") ]
-    in
-    let default_block_producer_envs =
-      [ ("DAEMON_REST_PORT", "3085")
-      ; ("DAEMON_CLIENT_PORT", "8301")
-      ; ("DAEMON_METRICS_PORT", "10001")
-      ; ("CODA_PRIVKEY_PASS", "naughty blue worm")
-      ; ("CODA_LIBP2P_PASS", "") ]
-    in
-    let default_seed_command ~runtime_config =
-      [ "daemon"
-      ; "-log-level"
-      ; "Debug"
-      ; "-log-json"
-      ; "-log-snark-work-gossip"
-      ; "true"
-      ; "-client-port"
-      ; "8301"
-      ; "-generate-genesis-proof"
-      ; "true"
-      ; "-peer"
-      ; "/dns4/mina_seed-node/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"
-      ; "-seed"
-      ; "-config-file"
-      ; runtime_config ]
-    in
-    let default_block_producer_command ~runtime_config ~private_key_config =
-      [ "daemon"
-      ; "-log-level"
-      ; "Debug"
-      ; "-log-json"
-      ; "-log-snark-work-gossip"
-      ; "true"
-      ; "-log-txn-pool-gossip"
-      ; "true"
-      ; "-enable-peer-exchange"
-      ; "true"
-      ; "-enable-flooding"
-      ; "true"
-      ; "-peer"
-      ; "/dns4/mina_seed-node/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"
-      ; "-client-port"
-      ; "8301"
-      ; "-generate-genesis-proof"
-      ; "true"
-      ; "-block-producer-key"
-      ; private_key_config
-      ; "-config-file"
-      ; runtime_config ]
-    in
-    let default_snark_coord_command ~runtime_config ~snark_coordinator_key
-        ~snark_worker_fee =
-      [ "daemon"
-      ; "-log-level"
-      ; "Debug"
-      ; "-log-json"
-      ; "-log-snark-work-gossip"
-      ; "true"
-      ; "-log-txn-pool-gossip"
-      ; "true"
-      ; "-external-port"
-      ; "10909"
-      ; "-rest-port"
-      ; "3085"
-      ; "-client-port"
-      ; "8301"
-      ; "-work-selection"
-      ; "seq"
-      ; "-peer"
-      ; "/dns4/mina_seed-node/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"
-      ; "-run-snark-coordinator"
-      ; snark_coordinator_key
-      ; "-snark-worker-fee"
-      ; snark_worker_fee
-      ; "-config-file"
-      ; runtime_config ]
-    in
     let open Docker_compose.Compose in
+    let open Node_constants in
     let runtime_config = Service.Volume.create "runtime_config" in
-    let service_map =
+    let blocks_seed_map =
       List.fold network_config.docker.block_producer_configs
         ~init:DockerMap.empty ~f:(fun accum config ->
           let private_key_config =
@@ -310,39 +247,57 @@ module Network_config = struct
             ~data:
               { Service.image= network_config.docker.coda_image
               ; volumes= [private_key_config; runtime_config]
-              ; deploy= {replicas= 1}
               ; command=
                   default_block_producer_command
                     ~runtime_config:runtime_config.target
                     ~private_key_config:private_key_config.target
               ; environment=
                   Service.Environment.create default_block_producer_envs } )
+      (* Add a seed node to the map as well*)
       |> Map.set ~key:"seed"
            ~data:
              { Service.image= network_config.docker.coda_image
              ; volumes= [runtime_config]
-             ; deploy= {replicas= 1}
              ; command=
                  default_seed_command ~runtime_config:runtime_config.target
              ; environment= Service.Environment.create default_seed_envs }
     in
-    let service_map =
-      if network_config.docker.snark_worker_replicas > 0 then
-        Map.set service_map ~key:"snark_worker"
-          ~data:
-            { Service.image= network_config.docker.coda_image
-            ; volumes= [runtime_config]
-            ; deploy= {replicas= network_config.docker.snark_worker_replicas}
-            ; command=
-                default_snark_coord_command
-                  ~runtime_config:runtime_config.target
-                  ~snark_coordinator_key:
-                    network_config.docker.snark_worker_public_key
-                  ~snark_worker_fee:network_config.docker.snark_worker_fee
-            ; environment= Service.Environment.create default_seed_envs }
-      else service_map
+    let snark_worker_map =
+      List.fold network_config.docker.snark_coordinator_configs
+        ~init:DockerMap.empty ~f:(fun accum config ->
+          let command, environment =
+            match String.substr_index config.name ~pattern:"coordinator" with
+            | Some _ ->
+                let coordinator_command =
+                  default_snark_coord_command
+                    ~runtime_config:runtime_config.target
+                    ~snark_coordinator_key:config.public_key
+                    ~snark_worker_fee:config.snark_worker_fee
+                in
+                let coordinator_environment =
+                  Service.Environment.create
+                    (default_snark_coord_envs
+                       ~snark_coordinator_key:config.public_key
+                       ~snark_worker_fee:config.snark_worker_fee)
+                in
+                (coordinator_command, coordinator_environment)
+            | None ->
+                let worker_command =
+                  default_snark_worker_command
+                    ~daemon_address:"test-snark-coordinator"
+                in
+                let worker_environment = Service.Environment.create [] in
+                (worker_command, worker_environment)
+          in
+          Map.set accum ~key:config.name
+            ~data:
+              { Service.image= network_config.docker.coda_image
+              ; volumes= [runtime_config]
+              ; command
+              ; environment } )
     in
-    {version; services= service_map}
+    let services = merge_maps blocks_seed_map snark_worker_map in
+    {version; services}
 end
 
 module Network_manager = struct
@@ -355,6 +310,7 @@ module Network_manager = struct
     ; seed_nodes: Swarm_network.Node.t list
     ; nodes_by_app_id: Swarm_network.Node.t String.Map.t
     ; block_producer_nodes: Swarm_network.Node.t list
+    ; snark_coordinator_configs: Swarm_network.Node.t list
     ; mutable deployed: bool
     ; keypairs: Keypair.t list }
 
@@ -428,6 +384,13 @@ module Network_manager = struct
             (network_config.docker.stack_name ^ "_" ^ bp_config.name)
             (Some bp_config.keypair) )
     in
+    let snark_coordinator_configs =
+      List.map network_config.docker.snark_coordinator_configs
+        ~f:(fun snark_config ->
+          cons_node network_config.docker.stack_name
+            (network_config.docker.stack_name ^ "_" ^ snark_config.name)
+            None )
+    in
     let nodes_by_app_id =
       let all_nodes = seed_nodes @ block_producer_nodes in
       all_nodes
@@ -441,6 +404,7 @@ module Network_manager = struct
       ; constants= network_config.constants
       ; seed_nodes
       ; block_producer_nodes
+      ; snark_coordinator_configs
       ; nodes_by_app_id
       ; deployed= false
       ; testnet_log_filter= ""
@@ -453,17 +417,18 @@ module Network_manager = struct
     if t.deployed then failwith "network already deployed" ;
     [%log' info t.logger] "Deploying network" ;
     [%log' info t.logger] "Stack_name in deploy: %s" t.stack_name ;
-    let%map _ =
+    let%map s =
       run_cmd_exn t "docker"
         ["stack"; "deploy"; "-c"; "compose.json"; t.stack_name]
     in
+    [%log' info t.logger] "DEPLOYED STRING: %s" s ;
     t.deployed <- true ;
     let result =
       { Swarm_network.namespace= t.stack_name
       ; constants= t.constants
       ; seeds= t.seed_nodes
       ; block_producers= t.block_producer_nodes
-      ; snark_coordinators= []
+      ; snark_coordinators= t.snark_coordinator_configs
       ; archive_nodes= []
       ; nodes_by_app_id= t.nodes_by_app_id
       ; testnet_log_filter= t.testnet_log_filter

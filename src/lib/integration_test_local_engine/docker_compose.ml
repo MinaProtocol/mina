@@ -10,7 +10,6 @@ module Compose = struct
   module Service = struct
     module Volume = struct
       type t = {type_: string; source: string; target: string}
-      [@@deriving to_yojson]
 
       let create name =
         {type_= "bind"; source= "." ^/ name; target= "/root" ^/ name}
@@ -37,18 +36,21 @@ module Compose = struct
         `Assoc (m |> Map.map ~f:(fun x -> `String x) |> Map.to_alist)
     end
 
-    type replicas = {replicas: int} [@@deriving to_yojson]
-
     type t =
       { image: string
       ; volumes: Volume.t list
-      ; deploy: replicas
       ; command: string list
       ; environment: Environment.t }
     [@@deriving to_yojson]
   end
 
   type service_map = Service.t DockerMap.t
+
+  (* Used to combine different type of service maps. There is an assumption that these maps
+  are disjoint and will not conflict *)
+  let merge_maps (map_a : service_map) (map_b : service_map) =
+    Map.fold map_b ~init:map_a ~f:(fun ~key ~data acc ->
+        Map.update acc key ~f:(function None -> data | Some data' -> data') )
 
   let service_map_to_yojson m =
     `Assoc (m |> Map.map ~f:Service.to_yojson |> Map.to_alist)
