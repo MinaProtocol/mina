@@ -49,16 +49,18 @@ let fee_lower_bound_exn (t : t) : Currency.Fee.t =
     *)
       List.fold_until t.other_parties ~init:x.magnitude ~finish:Fn.id
         ~f:(fun acc p ->
-          let y = p.data.body.delta in
-          match y.sgn with
-          | Neg ->
-              Continue acc
-          | Pos -> (
-            match Currency.Amount.sub acc y.magnitude with
-            | None ->
-                Stop Currency.Amount.zero
-            | Some acc' ->
-                Continue acc' ) )
+          if Token_id.(p.data.body.token_id <> default) then Continue acc
+          else
+            let y = p.data.body.delta in
+            match y.sgn with
+            | Neg ->
+                Continue acc
+            | Pos -> (
+              match Currency.Amount.sub acc y.magnitude with
+              | None ->
+                  Stop Currency.Amount.zero
+              | Some acc' ->
+                  Continue acc' ) )
       |> Currency.Amount.to_fee
   | Pos ->
       assert false

@@ -31,6 +31,8 @@ module type Amount_intf = sig
 
   module Signed : sig
     type t
+
+    val is_pos : t -> bool
   end
 
   val zero : t
@@ -356,6 +358,8 @@ module Make (Inputs : Inputs_intf) = struct
         success= Bool.( && ) local_state.success party_succeeded }
     in
     let local_delta =
+      (* TODO: This is wasteful as it repeats a computation performed inside
+         the account update. *)
       Amount.(h.perform (Balance a) - h.perform (Balance a'))
     in
     let party_token = h.perform (Party_token_id party) in
@@ -363,6 +367,11 @@ module Make (Inputs : Inputs_intf) = struct
       let curr_token : Token_id.t = local_state.token_id in
       let same_token = Token_id.equal curr_token party_token in
       let curr_is_default = Token_id.(equal default) curr_token in
+      Bool.(
+        assert_
+          ( (not is_start')
+          || (curr_is_default && same_token && Amount.Signed.is_pos local_delta)
+          )) ;
       let should_merge = Bool.( && ) (Bool.not same_token) curr_is_default in
       let to_merge_amount =
         Amount.if_ should_merge ~then_:local_state.excess ~else_:Amount.zero
@@ -411,19 +420,23 @@ module Make (Inputs : Inputs_intf) = struct
             (not is_last_party ||
             equal local_state.will_succeed local_state.success)) ;
        *)
-    let global_state =
+    let global_state, local_state =
       let curr_is_default = Token_id.(equal default) local_state.token_id in
       let should_perform_second_excess_merge =
         (* See: https://github.com/MinaProtocol/mina/issues/8921 *)
         Bool.(curr_is_default && is_last_party)
       in
-      h.perform
-        (Modify_global_excess
-           ( global_state
-           , fun amt ->
-               Amount.if_ should_perform_second_excess_merge
-                 ~then_:Amount.(amt + local_state.excess)
-                 ~else_:amt ))
+      ( h.perform
+          (Modify_global_excess
+             ( global_state
+             , fun amt ->
+                 Amount.if_ should_perform_second_excess_merge
+                   ~then_:Amount.(amt + local_state.excess)
+                   ~else_:amt ))
+      , { local_state with
+          excess=
+            Amount.if_ is_last_party ~then_:Amount.zero
+              ~else_:local_state.excess } )
     in
     let global_state =
       h.perform
