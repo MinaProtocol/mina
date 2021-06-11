@@ -1,7 +1,6 @@
 module "kubernetes_testnet" {
   providers  = { google = google.gke }
   source     = "../kubernetes/testnet"
-  # depends_on = [google_storage_bucket_object.runtime_config]
 
   use_local_charts    = true
   expose_graphql      = var.deploy_graphql_ingress
@@ -23,11 +22,12 @@ module "kubernetes_testnet" {
   log_snark_work_gossip = true
 
   additional_peers = [local.seed_peer.multiaddr]
-  runtime_config_src = "download"
-  runtime_config_uri = google_storage_bucket_object.runtime_config.media_link
 
-  seed_zone   = "us-west1-a"
-  seed_region = "us-west1"
+  runtime_config_src = "download"
+  runtime_config_uri = data.google_storage_object_signed_url.runtime_config.signed_url
+
+  seed_zone    = "us-west1-a"
+  seed_region  = "us-west1"
   seed_configs = [local.seed_config]
 
   archive_configs = local.archive_node_configs

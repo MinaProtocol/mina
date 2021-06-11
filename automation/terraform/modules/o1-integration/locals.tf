@@ -4,7 +4,7 @@ locals {
   block_producer_starting_host_port = 10010
 
   integration_test_bucket    = "o1labs-integration-tests"
-  runtime_config_object_name = "${var.testnet_name}-runtime-config.json"
+  runtime_config_object_name = "${filesha256("daemon.json")}.json"
   # runtime_config_object_uri   = "https://storage.cloud.google.com/${local.integration_test_bucket}/${local.runtime_config_object_name}"
 
   seed_peer = {
