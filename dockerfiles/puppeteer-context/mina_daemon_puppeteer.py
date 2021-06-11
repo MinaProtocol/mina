@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # This is a temporary hack for the integration test framework to be able to stop
 # and start nodes dyamically in a kubernetes environment. This script takes
 # mina arguments and will start and monitor a mina process with those arguments.
@@ -93,7 +95,7 @@ def stop_daemon():
 
 def inactive_loop():
   global active_daemon_request
-
+  server = None
   try:
     server = HTTPServer(('0.0.0.0', 3085), MockRequestHandler)
     while True:
@@ -103,8 +105,12 @@ def inactive_loop():
         start_daemon()
         active_daemon_request = False
         break
+  except Exception as err:
+    print("inactive_loop experienced an error: ")
+    print(err)
   finally:
-    server.shutdown()
+    if server != None:
+      server.server_close()
 
   active_loop()
 
