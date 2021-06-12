@@ -1263,7 +1263,9 @@ let create (config : Config.t)
          don't_wait_for
            (let%map initial_peers = Gossip_net.Any.peers gossip_net in
             if List.is_empty initial_peers && not config.is_seed then (
-              [%log fatal] "Failed to connect to any initial peers" ;
+              [%log fatal]
+                "Failed to connect to any initial peers, possible chain id \
+                 mismatch" ;
               raise No_initial_peers )) )) ;
   (* TODO: Think about buffering:
         I.e., what do we do when too many messages are coming in, or going out.
