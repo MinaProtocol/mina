@@ -10,6 +10,8 @@ open Pipe_lib
 open Signature_lib
 open Network_peer
 
+let max_per_15_seconds = 10
+
 (* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
   type t
@@ -48,7 +50,7 @@ module Diff_versioned = struct
   (* We defer do any checking on signed-commands until the call to
    [add_from_gossip_gossip_exn].
 
-   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor 
+   The real solution would be to have more explicit queueing to make sure things don't happen out of order, factor
    [add_from_gossip_gossip_exn] into [check_from_gossip_exn] (which just does
    the checks) and [set_from_gossip_exn] (which just does the mutating the pool),
    and do the same for snapp commands as well.
@@ -240,9 +242,9 @@ struct
 
       let add t h =
         if not (Q.mem t h) then (
-          if Q.length t >= max_size then Q.dequeue_front t |> ignore ;
+          if Q.length t >= max_size then ignore (Q.dequeue_front t : 'a option) ;
           Q.enqueue_back_exn t h () )
-        else Q.lookup_and_move_to_back t h |> ignore
+        else ignore (Q.lookup_and_move_to_back t h : unit option)
     end
 
     type t =
@@ -250,15 +252,17 @@ struct
       ; recently_seen: Lru_cache.t sexp_opaque
       ; locally_generated_uncommitted:
           ( Transaction_hash.User_command_with_valid_signature.t
-          , Time.t )
+          , Time.t * [`Batch of int] )
           Hashtbl.t
             (** Commands generated on this machine, that are not included in the
                 current best tip, along with the time they were added. *)
       ; locally_generated_committed:
           ( Transaction_hash.User_command_with_valid_signature.t
-          , Time.t )
+          , Time.t * [`Batch of int] )
           Hashtbl.t
             (** Ones that are included in the current best tip. *)
+      ; mutable current_batch: int
+      ; mutable remaining_in_batch: int
       ; config: Config.t
       ; logger: Logger.t sexp_opaque
       ; batcher: Batcher.t
@@ -661,10 +665,12 @@ struct
               [ ( "cmd"
                 , Transaction_hash.User_command_with_valid_signature.to_yojson
                     cmd ) ] ;
-          Hashtbl.find_and_remove t.locally_generated_uncommitted cmd |> ignore
-      ) ;
+          ignore
+            ( Hashtbl.find_and_remove t.locally_generated_uncommitted cmd
+              : (Time.t * [`Batch of int]) option ) ) ;
       Mina_metrics.(
-        Gauge.set Transaction_pool.pool_size (Float.of_int (Indexed_pool.size pool))) ;
+        Gauge.set Transaction_pool.pool_size
+          (Float.of_int (Indexed_pool.size pool))) ;
       t.pool <- pool ;
       Deferred.unit
 
@@ -682,6 +688,8 @@ struct
             Hashtbl.create
               ( module Transaction_hash.User_command_with_valid_signature.Stable
                        .Latest )
+        ; current_batch= 0
+        ; remaining_in_batch= max_per_15_seconds
         ; config
         ; logger
         ; batcher= Batcher.create config.verifier
@@ -840,7 +848,7 @@ struct
 
       let score x = Int.max 1 (List.length x)
 
-      let max_per_15_seconds = 10
+      let max_per_15_seconds = max_per_15_seconds
 
       let verified_size = List.length
 
@@ -1070,9 +1078,21 @@ struct
                           in
                           match add_res with
                           | Ok (verified, pool', dropped) ->
-                              if is_sender_local then
+                              ( if is_sender_local then
+                                let batch_num =
+                                  if t.remaining_in_batch > 0 then (
+                                    t.remaining_in_batch
+                                    <- t.remaining_in_batch - 1 ;
+                                    t.current_batch )
+                                  else (
+                                    t.remaining_in_batch
+                                    <- max_per_15_seconds - 1 ;
+                                    t.current_batch <- t.current_batch + 1 ;
+                                    t.current_batch )
+                                in
                                 Hashtbl.add_exn t.locally_generated_uncommitted
-                                  ~key:verified ~data:(Time.now ()) ;
+                                  ~key:verified
+                                  ~data:(Time.now (), `Batch batch_num) ) ;
                               let pool'', dropped_for_size =
                                 drop_until_below_max_size pool' ~pool_max_size
                               in
@@ -1267,48 +1287,70 @@ struct
     end
 
     let get_rebroadcastable (t : t) ~has_timed_out =
-      let metadata ~key ~data =
+      let metadata ~key ~time =
         [ ( "cmd"
           , Transaction_hash.User_command_with_valid_signature.to_yojson key )
-        ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc data)) ]
+        ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc time)) ]
       in
       let added_str =
         "it was added at $time and its rebroadcast period is now expired."
       in
       let logger = t.logger in
       Hashtbl.filteri_inplace t.locally_generated_uncommitted
-        ~f:(fun ~key ~data ->
-          match has_timed_out data with
+        ~f:(fun ~key ~data:(time, `Batch _) ->
+          match has_timed_out time with
           | `Timed_out ->
               [%log info]
                 "No longer rebroadcasting uncommitted command $cmd, %s"
-                added_str ~metadata:(metadata ~key ~data) ;
+                added_str ~metadata:(metadata ~key ~time) ;
               false
           | `Ok ->
               true ) ;
       Hashtbl.filteri_inplace t.locally_generated_committed
-        ~f:(fun ~key ~data ->
-          match has_timed_out data with
+        ~f:(fun ~key ~data:(time, `Batch _) ->
+          match has_timed_out time with
           | `Timed_out ->
               [%log debug]
                 "Removing committed locally generated command $cmd from \
                  possible rebroadcast pool, %s"
-                added_str ~metadata:(metadata ~key ~data) ;
+                added_str ~metadata:(metadata ~key ~time) ;
               false
           | `Ok ->
               true ) ;
       (* Important to maintain ordering here *)
       let rebroadcastable_txs =
-        Hashtbl.keys t.locally_generated_uncommitted
+        Hashtbl.to_alist t.locally_generated_uncommitted
+        |> List.sort
+             ~compare:(fun (txn1, (_, `Batch batch1))
+                      (txn2, (_, `Batch batch2))
+                      ->
+               let cmp = compare batch1 batch2 in
+               let get_hash =
+                 Transaction_hash.User_command_with_valid_signature.hash
+               in
+               let get_nonce txn =
+                 Transaction_hash.User_command_with_valid_signature.command txn
+                 |> User_command.nonce_exn
+               in
+               if cmp <> 0 then cmp
+               else
+                 let cmp =
+                   Mina_numbers.Account_nonce.compare (get_nonce txn1)
+                     (get_nonce txn2)
+                 in
+                 if cmp <> 0 then cmp
+                 else Transaction_hash.compare (get_hash txn1) (get_hash txn2)
+           )
+        |> List.group
+             ~break:(fun (_, (_, `Batch batch1)) (_, (_, `Batch batch2)) ->
+               batch1 <> batch2 )
         |> List.map
-             ~f:Transaction_hash.User_command_with_valid_signature.command
+             ~f:
+               (List.map ~f:(fun (txn, _) ->
+                    Transaction_hash.User_command_with_valid_signature.command
+                      txn ))
       in
-      if List.is_empty rebroadcastable_txs then []
-      else
-        [ List.sort rebroadcastable_txs ~compare:(fun tx1 tx2 ->
-              User_command.(
-                Mina_numbers.Account_nonce.compare (nonce_exn tx1)
-                  (nonce_exn tx2)) ) ]
+      rebroadcastable_txs
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
@@ -1406,36 +1448,37 @@ let%test_module _ =
 
     let pool_max_size = 25
 
-    let _ =
+    let () =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true
 
     (** Assert the invariants of the locally generated command tracking system.
     *)
     let assert_locally_generated (pool : Test.Resource_pool.t) =
-      let _ =
-        Hashtbl.merge pool.locally_generated_committed
-          pool.locally_generated_uncommitted ~f:(fun ~key -> function
-          | `Both (committed, uncommitted) ->
-              failwithf
-                !"Command \
-                  %{sexp:Transaction_hash.User_command_with_valid_signature.t} \
-                  in both locally generated committed and uncommitted with \
-                  times %s and %s"
-                key (Time.to_string committed)
-                (Time.to_string uncommitted)
-                ()
-          | `Left cmd ->
-              Some cmd
-          | `Right cmd ->
-              (* Locally generated uncommitted transactions should be in the
+      ignore
+        ( Hashtbl.merge pool.locally_generated_committed
+            pool.locally_generated_uncommitted ~f:(fun ~key -> function
+            | `Both ((committed, _), (uncommitted, _)) ->
+                failwithf
+                  !"Command \
+                    %{sexp:Transaction_hash.User_command_with_valid_signature.t} \
+                    in both locally generated committed and uncommitted with \
+                    times %s and %s"
+                  key (Time.to_string committed)
+                  (Time.to_string uncommitted)
+                  ()
+            | `Left cmd ->
+                Some cmd
+            | `Right cmd ->
+                (* Locally generated uncommitted transactions should be in the
                  pool, so long as we're not in the middle of updating it. *)
-              assert (
-                Indexed_pool.member pool.pool
-                  (Transaction_hash.User_command.of_checked key) ) ;
-              Some cmd )
-      in
-      ()
+                assert (
+                  Indexed_pool.member pool.pool
+                    (Transaction_hash.User_command.of_checked key) ) ;
+                Some cmd )
+          : ( Transaction_hash.User_command_with_valid_signature.t
+            , Time.t * [`Batch of int] )
+            Hashtbl.t )
 
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
@@ -2227,10 +2270,10 @@ let%test_module _ =
           (* When transactions expire from rebroadcast pool they are gone. This
              doesn't affect the main pool.
           *)
-          let _ =
-            Test.Resource_pool.get_rebroadcastable pool
-              ~has_timed_out:(Fn.const `Timed_out)
-          in
+          ignore
+            ( Test.Resource_pool.get_rebroadcastable pool
+                ~has_timed_out:(Fn.const `Timed_out)
+              : User_command.t list list ) ;
           assert_pool_txs (List.drop local_cmds' 4 @ remote_cmds') ;
           assert_rebroadcastable pool [] ;
           Deferred.unit )
