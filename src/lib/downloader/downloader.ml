@@ -14,7 +14,7 @@ module Job = struct
   let result t = Ivar.read t.res
 end
 
-type 'a pred = 'a -> bool [@@deriving sexp]
+type 'a pred = 'a -> bool [@@deriving sexp_of]
 
 let pred_to_yojson _f _x = `String "<opaque>"
 
@@ -22,7 +22,7 @@ let sexp_opaque_to_yojson _f _x = `String "<opaque>"
 
 module Claimed_knowledge = struct
   type 'key t = [`All | `Some of 'key list | `Call of 'key pred[@sexp.opaque]]
-  [@@deriving sexp, to_yojson]
+  [@@deriving sexp_of, to_yojson]
 
   let to_yojson f t =
     match t with
@@ -184,7 +184,7 @@ end = struct
 
     type t =
       {claimed: Key.t Claimed_knowledge.t option; tried_and_failed: Key_set.t}
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp_of, to_yojson]
 
     let clear t = Hash_set.clear t.tried_and_failed
 
@@ -236,12 +236,6 @@ end = struct
         List.sexp_of_t [%sexp_of: Peer.t * Time.t]
           (Pairing_heap.to_list t.heap)
 
-      let t_of_sexp s =
-        let elts = [%of_sexp: (Peer.t * Time.t) list] s in
-        let t = create () in
-        List.iter elts ~f:(add t) ;
-        t
-
       let of_list xs =
         let now = Time.now () in
         let t = create () in
@@ -270,7 +264,7 @@ end = struct
            , Strict_pipe.drop_head Strict_pipe.buffered
            , unit )
            Strict_pipe.Writer.t[@sexp.opaque]) }
-    [@@deriving sexp]
+    [@@deriving sexp_of]
 
     let reset_knowledge t ~all_peers =
       (* Reset preferred *)
