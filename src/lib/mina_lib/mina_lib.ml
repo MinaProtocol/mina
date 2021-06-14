@@ -197,7 +197,7 @@ module Snark_worker = struct
                ~shutdown_on_disconnect:false )
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger
-      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
     don't_wait_for
       ( match%bind
           Monitor.try_with ~here:[%here] (fun () ->

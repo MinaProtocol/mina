@@ -299,8 +299,8 @@ let setup_daemon logger =
   and libp2p_peer_list_file =
     flag "--peer-list-file" ~aliases:["peer-list-file"]
       ~doc:
-        "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
-         discovery inside a file delimited by new-lines (\\n)"
+        "PATH path to a file containing \"bootstrap\" peers for discovery, \
+         one multiaddress per line"
       (optional string)
   and seed_peer_list_url =
     flag "--peer-list-url" ~aliases:["peer-list-url"]
