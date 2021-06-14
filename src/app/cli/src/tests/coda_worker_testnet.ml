@@ -305,7 +305,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
      in
      go ()) ;
   don't_wait_for
-    (Deferred.ignore
+    (Deferred.ignore_m
        (Linear_pipe.fold ~init:chains all_transitions_r
           ~f:(fun chains (_, _, i) ->
             let%map path = Api.best_path testnet i in

@@ -176,7 +176,7 @@ let sync_ledger t ~preferred ~root_sync_ledger ~transition_graph
             [ ("state_hash", State_hash.to_yojson (With_hash.hash transition))
             ; ( "external_transition"
               , External_transition.to_yojson (With_hash.data transition) ) ] ;
-        Deferred.ignore
+        Deferred.ignore_m
         @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
              transition )
       else Deferred.unit )
@@ -348,7 +348,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                     ~pending_coinbases ~get_state
                 in
                 ignore
-                  (Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask) ;
+                  ( Ledger.Maskable.unregister_mask_exn ~loc:__LOC__ temp_mask
+                    : Ledger.unattached_mask ) ;
                 Result.map result
                   ~f:
                     (const
@@ -745,22 +746,24 @@ let%test_module "Bootstrap_controller tests" =
         Fn.compose Consensus.Data.Consensus_state.blockchain_length
           External_transition.consensus_state
       in
-      List.fold_result ~init:root incoming_transitions
-        ~f:(fun max_acc incoming_transition ->
-          let With_hash.{data= transition; _}, _ =
-            Envelope.Incoming.data incoming_transition
-          in
-          let open Result.Let_syntax in
-          let%map () =
-            Result.ok_if_true
-              Mina_numbers.Length.(
-                blockchain_length max_acc <= blockchain_length transition)
-              ~error:
-                (Error.of_string
-                   "The blocks are not sorted in increasing order")
-          in
-          transition )
-      |> Or_error.ok_exn |> ignore
+      ignore
+        ( List.fold_result ~init:root incoming_transitions
+            ~f:(fun max_acc incoming_transition ->
+              let With_hash.{data= transition; _}, _ =
+                Envelope.Incoming.data incoming_transition
+              in
+              let open Result.Let_syntax in
+              let%map () =
+                Result.ok_if_true
+                  Mina_numbers.Length.(
+                    blockchain_length max_acc <= blockchain_length transition)
+                  ~error:
+                    (Error.of_string
+                       "The blocks are not sorted in increasing order")
+              in
+              transition )
+          |> Or_error.ok_exn
+          : External_transition.t )
 
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1

@@ -197,7 +197,7 @@ module Snark_worker = struct
                ~shutdown_on_disconnect:false )
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger
-      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
     don't_wait_for
       ( match%bind
           Monitor.try_with ~here:[%here] (fun () ->
@@ -824,7 +824,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
     Work_selection_method.remove t.snark_job_state spec
   in
-  let _ = Or_error.try_with (fun () -> update_metrics ()) in
+  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for

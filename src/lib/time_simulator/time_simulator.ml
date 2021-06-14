@@ -160,17 +160,18 @@ let%test_unit "tick triggers timeouts and adjusts to system time" =
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
         ~expect:true
-        (diff (now ctrl) start >= Int64.of_int 5) )
+        (Int64.( >= ) (diff (now ctrl) start) (Int64.of_int 5)) )
 
 let%test_unit "tick handles multiple timeouts if necessary" =
   let ctrl = Controller.create () in
   let start = now ctrl in
   let count = ref 0 in
   let timeout x =
-    Timeout.create ctrl
-      (Span.of_ms (Int64.of_int x))
-      ~f:(fun _t -> count := !count + 1)
-    |> ignore
+    ignore
+      ( Timeout.create ctrl
+          (Span.of_ms (Int64.of_int x))
+          ~f:(fun _t -> count := !count + 1)
+        : _ Timeout.t )
   in
   List.iter [2; 3; 5; 500] ~f:timeout ;
   Async.Thread_safe.block_on_async_exn (fun () ->

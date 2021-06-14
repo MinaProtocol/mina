@@ -170,7 +170,7 @@ let stop_snark_worker (conn, _, _) =
 
 let disconnect ((conn, proc, _) as t) ~logger =
   Child_processes.Termination.wait_for_process_log_errors ~logger proc
-    ~module_:__MODULE__ ~location:__LOC__ ;
+    ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
   (* This kills any straggling snark worker process *)
   let%bind () =
     match%map

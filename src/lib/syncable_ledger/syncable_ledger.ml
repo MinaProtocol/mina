@@ -709,7 +709,7 @@ end = struct
             `Ok t.tree )
 
   let fetch t rh ~data ~equal =
-    new_goal t rh ~data ~equal |> ignore ;
+    ignore (new_goal t rh ~data ~equal : [`New | `Repeat | `Update_data]) ;
     wait_until_valid t rh
 
   let create mt ~logger ~trust_system =

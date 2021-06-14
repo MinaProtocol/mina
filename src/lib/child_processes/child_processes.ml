@@ -291,7 +291,7 @@ let start_custom :
       ; ("args", `List (List.map args ~f:(fun a -> `String a)))
       ; ("pid", `Int (Process.pid process |> Pid.to_int)) ] ;
   Termination.wait_for_process_log_errors ~logger process ~module_:__MODULE__
-    ~location:__LOC__ ;
+    ~location:__LOC__ ~here:[%here] ;
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ Async.Writer.save lock_path
