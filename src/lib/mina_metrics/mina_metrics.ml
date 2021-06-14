@@ -734,6 +734,10 @@ module Catchup = struct
   let build_breadcrumb_time : Gauge.t =
     let help = "time to build breadcrumb in ms" in
     Gauge.v "build_breadcrumb_time" ~help ~namespace ~subsystem
+
+  let initial_catchup_time : Gauge.t =
+    let help = "time for initial catchup in min" in
+    Gauge.v "initial_catchup_time" ~help ~namespace ~subsystem
 end
 
 module Transition_frontier_controller = struct
