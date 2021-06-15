@@ -2,9 +2,7 @@ import { Circuit, Field, AsField, toFieldElements, ofFieldElements, sizeInFieldE
 import { poseidon } from './poseidon';
 import { Group, Scalar } from './group';
 import { prop, CircuitValue, Tuple } from './circuit_value';
-import { MerkleCollection, MerkleProof, Amount, Nonce, Permission, Permissions, Snapp, method } from './mina';
-
-type PublicKey = Group;
+import { PublicKey, MerkleCollection, MerkleProof, Amount, Nonce, Permission, Permissions, Snapp, method } from './mina';
 
 class Signature extends CircuitValue {
   @prop r: Field;
@@ -63,8 +61,44 @@ class MemberSignature extends CircuitValue {
   }
 }
 
+class CanReceiveIfYouSudokoSolution extends Snapp {
+  @method receive(s : SudokuSolution) {
+    ...
+  }
+}
+
+// TODO: have a JS api for creating inductive proof systems
+
+class TheApplication {
+  @method applyBatchOfUpdates() {
+  }
+}
+
+/*
+
+- user generates some data (which may or may not involve creating a proof)
+- sends to server
+- server maps that data into some kind of state update
+- server batches state updates with a rollup
+- broadcasts to chain
+
+users ->HTTP-> application operator -batch proof-> construct snapp transaction and broadcast to chain
+*/
+
+let privateMultisigAccount : PrivateMultisig = ...;
+let sudokuGuardedReceiver : CanReceiveIfYouSudokoSolution = ..;
+
+let sudokuSolution = ..;
+let multiSigSendData = ..;
+let c = new SnappContext();
+c.run(privateMultisigAccount.send(multiSigSendData));
+c.run(sudokuGuardedReceiver.receive(sudokuSolution));
+c.execute(); // Generate 2 proofs, construct the transaction, submit to the chain
+
+
 class PrivateMultisig extends Snapp {
   keys: MerkleCollection<PublicKey>;
+  // TODO: Use state decorator to provide mapping of snapp state onto class properties
 
   @method init() {
     this.permissions.receive = Permission.NoAuthRequired;

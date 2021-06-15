@@ -3,6 +3,13 @@
 import { prop, CircuitValue } from './circuit_value';
 import { Field, Bool } from './plonk';
 
+// TODO. Also, don't make user ever talk about distinction b/w compressed and non-compressed keys
+type PublicKey = void;
+
+// TODO
+class SetOrKeep<A> extends CircuitValue {
+}
+
 class OrIgnore<A> extends CircuitValue {
   @prop value: A;
   @prop shouldIgnore: Field;
@@ -55,12 +62,28 @@ class Delta<A> extends CircuitValue {
   }
 }
 
-class Party extends CircuitValue {
-  @prop nonce: OrIgnore<Nonce>;
-  @prop balance: Delta<Amount>;
+class Predicate extends CircuitValue {
+};
 
-  constructor(nonce: OrIgnore<Nonce>, balance: Delta<Amount>) {
+class Party extends CircuitValue {
+  @prop publicKey: PublicKey;
+  @prop state: Array<SetOrKeep<Field>>;
+  @prop delegate: SetOrKeep<PublicKey>;
+  @prop verificationKey: SetOrKeep<VerificationKey>;
+  @prop permissions: SetOrKeep<Permissions>;
+  @prop tokenId: TokenId;
+  @prop balance: Delta<Amount>;
+  @prop predicate: Predicate;
+
+  constructor(
+    publicKey: PublicKey,
+    state: Array<SetOrKeep<Field>>,
+    nonce: OrIgnore<Nonce>,
+    balance: Delta<Amount>
+  ) {
     super();
+    this.publicKey = publicKey;
+    this.state = state;
     this.nonce = nonce;
     this.balance = balance;
   }
