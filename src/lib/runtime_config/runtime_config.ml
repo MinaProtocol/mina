@@ -300,7 +300,6 @@ module Json_layout = struct
       ; delta: (int option[@default None])
       ; slots_per_epoch: (int option[@default None])
       ; slots_per_sub_window: (int option[@default None])
-      ; sub_windows_per_window: (int option[@default None])
       ; genesis_state_timestamp: (string option[@default None]) }
     [@@deriving yojson, dhall_type]
 
@@ -719,7 +718,6 @@ module Genesis = struct
     ; delta: int option
     ; slots_per_epoch: int option
     ; slots_per_sub_window: int option
-    ; sub_windows_per_window: int option
     ; genesis_state_timestamp: string option }
   [@@deriving bin_io_unversioned]
 
@@ -736,9 +734,6 @@ module Genesis = struct
   let combine t1 t2 =
     { k= opt_fallthrough ~default:t1.k t2.k
     ; delta= opt_fallthrough ~default:t1.delta t2.delta
-    ; sub_windows_per_window=
-        opt_fallthrough ~default:t1.sub_windows_per_window
-          t2.sub_windows_per_window
     ; slots_per_epoch=
         opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
     ; slots_per_sub_window=
