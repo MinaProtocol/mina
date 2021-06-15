@@ -87,7 +87,7 @@ def stop_daemon():
   mina_process.wait()
   for child_pid in child_pids:
       wait_for_pid(child_pid)
-  Path('daemon-active').unlink()
+  Path('daemon-active').remove()
   mina_process = None
 
 # technically, doing the loops like this will eventually result in a stack overflow
