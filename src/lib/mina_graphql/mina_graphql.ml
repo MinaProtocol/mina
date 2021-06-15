@@ -155,6 +155,9 @@ module Types = struct
 
   let token_id = token_id ()
 
+  let json : ('context, Yojson.Basic.t option) typ =
+    scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:Fn.id
+
   let epoch_seed = epoch_seed ()
 
   let sync_status : ('context, Sync_status.t option) typ =
@@ -3789,6 +3792,15 @@ module Queries = struct
         in
         Signed_command.check_signature user_command )
 
+  let runtime_config =
+    field "runtimeConfig"
+      ~doc:"The runtime configuration passed to the daemon at start-up"
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= mina; _} () ->
+        Mina_lib.runtime_config mina
+        |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
+
   let evaluate_vrf =
     io_field "evaluateVrf"
       ~doc:
@@ -3872,7 +3884,8 @@ module Queries = struct
     ; next_available_token
     ; validate_payment
     ; evaluate_vrf
-    ; check_vrf ]
+    ; check_vrf
+    ; runtime_config ]
 end
 
 let schema =

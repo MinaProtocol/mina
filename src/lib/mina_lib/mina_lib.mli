@@ -188,3 +188,5 @@ val top_level_logger : t -> Logger.t
 val config : t -> Config.t
 
 val net : t -> Mina_networking.t
+
+val runtime_config : t -> Runtime_config.t
