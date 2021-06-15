@@ -40,13 +40,16 @@ class MockRequestHandler(BaseHTTPRequestHandler):
 # just nooping on this signal suffices, since merely trapping it will cause
 # `signal.pause()` to resume
 def handle_child_termination(signum, frame):
+  print("puppeteer script: SIGCHLD received, passing " )
   pass
 
 def handle_start_request(signum, frame):
+  print("puppeteer script: SIGUSR1 handle_start_request received, setting active_daemon_request to True" )
   global active_daemon_request
   active_daemon_request = True
 
 def handle_stop_request(signum, frame):
+  print("puppeteer script: SIGUSR2 handle_stop_request received, setting inactive_daemon_request to True" )
   global inactive_daemon_request
   inactive_daemon_request = True
 
@@ -70,6 +73,7 @@ def wait_for_pid(pid):
         time.sleep(0.25)
 
 def start_daemon():
+  print("puppeteer script: start_daemon called" )
   global mina_process
   with open('mina.log', 'a') as f:
     mina_process = subprocess.Popen(
@@ -77,16 +81,22 @@ def start_daemon():
         stdout=f,
         stderr=subprocess.STDOUT
     )
+  print("puppeteer script: touching /root/daemon-active" )
   Path('daemon-active').touch()
 
 def stop_daemon():
+  print("puppeteer script: stop_daemon called" )
   global mina_process
   mina_process.send_signal(signal.SIGTERM)
 
   child_pids = get_child_processes(mina_process.pid)
+  print("child_pids: " + child_pids )
   mina_process.wait()
   for child_pid in child_pids:
+      print("waiting for child_pid: " + child_pid )
       wait_for_pid(child_pid)
+      print("done waiting for: " + child_pid )
+  print("puppeteer script: removing /root/daemon-active" )
   Path('daemon-active').remove()
   mina_process = None
 
@@ -94,6 +104,7 @@ def stop_daemon():
 # however, you would need to do a lot of starts and stops to hit this condition
 
 def inactive_loop():
+  print("puppeteer script: inactive_loop beginning" )
   global active_daemon_request
   server = None
   try:
@@ -102,27 +113,32 @@ def inactive_loop():
       server.handle_request()
       signal.sigtimedwait(ALL_SIGNALS, 0)
       if active_daemon_request:
+        print("inactive_loop: active_daemon_request received, starting daemon" )
         start_daemon()
         active_daemon_request = False
         break
   except Exception as err:
-    print("inactive_loop experienced an error: ")
+    print("puppeteer script: inactive_loop experienced an error: ")
     print(err)
   finally:
     if server != None:
       server.server_close()
-
+    print("puppeteer script: mock server closed. inactive_loop terminating" )
+    
   active_loop()
 
 def active_loop():
+  print("puppeteer script: active_loop beginning" )
   global mina_process, inactive_daemon_request
 
   while True:
     signal.pause()
     status = mina_process.poll()
     if status != None:
+      print("active_loop: status not None, cleaning up and exiting")
       cleanup_and_exit(status)
     elif inactive_daemon_request:
+      print("active_loop: inactive daemon request detected, stopping daemon")
       stop_daemon()
       inactive_daemon_request = False
       break
