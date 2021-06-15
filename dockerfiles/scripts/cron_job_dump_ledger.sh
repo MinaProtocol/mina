@@ -7,6 +7,20 @@ sleep 480
 
 echo "done sleeping"
 
+# wait until daemon is sync'ed
+while true; do
+  STATUS=$(mina client status | grep "Sync status")
+  echo "$STATUS" | grep "Synced"
+  RESULT=$?
+  if [ $RESULT -eq 0 ] ; then
+      echo "daemon is synced"
+      break
+  else
+      echo "waiting for daemon to sync"
+      sleep 60
+  fi
+done
+
 # retry getting the staking ledger until the node is fully up and the command returns exit code 0
 while true; do
   mina ledger export staking-epoch-ledger > staking_epoch_ledger.json
