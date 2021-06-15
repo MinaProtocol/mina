@@ -431,6 +431,38 @@ let make_constraint_constants
             ; previous_global_slot=
                 Mina_numbers.Global_slot.of_int previous_global_slot } ) }
 
+let runtime_config_of_constraint_constants
+    ~(proof_level : Genesis_constants.Proof_level.t)
+    (constraint_constants : Genesis_constants.Constraint_constants.t) :
+    Runtime_config.Proof_keys.t =
+  { level=
+      ( match proof_level with
+      | Full ->
+          Some Full
+      | Check ->
+          Some Check
+      | None ->
+          Some None )
+  ; sub_windows_per_window= Some constraint_constants.sub_windows_per_window
+  ; ledger_depth= Some constraint_constants.ledger_depth
+  ; work_delay= Some constraint_constants.work_delay
+  ; block_window_duration_ms=
+      Some constraint_constants.block_window_duration_ms
+  ; transaction_capacity=
+      Some (Log_2 constraint_constants.transaction_capacity_log_2)
+  ; coinbase_amount= Some constraint_constants.coinbase_amount
+  ; supercharged_coinbase_factor=
+      Some constraint_constants.supercharged_coinbase_factor
+  ; account_creation_fee= Some constraint_constants.account_creation_fee
+  ; fork=
+      Option.map constraint_constants.fork
+        ~f:(fun {previous_state_hash; previous_length; previous_global_slot} ->
+          { Runtime_config.Fork_config.previous_state_hash=
+              State_hash.to_base58_check previous_state_hash
+          ; previous_length= Mina_numbers.Length.to_int previous_length
+          ; previous_global_slot=
+              Mina_numbers.Global_slot.to_int previous_global_slot } ) }
+
 let make_genesis_constants ~logger ~(default : Genesis_constants.t)
     (config : Runtime_config.t) =
   let open Or_error.Let_syntax in
@@ -478,3 +510,34 @@ let make_genesis_constants ~logger ~(default : Genesis_constants.t)
       Option.value_map ~default:default.num_accounts
         (config.ledger >>= fun cfg -> cfg.num_accounts)
         ~f:(fun num_accounts -> Some num_accounts) }
+
+let runtime_config_of_genesis_constants
+    (genesis_constants : Genesis_constants.t) : Runtime_config.Genesis.t =
+  { k= Some genesis_constants.protocol.k
+  ; delta= Some genesis_constants.protocol.delta
+  ; slots_per_epoch= Some genesis_constants.protocol.slots_per_epoch
+  ; slots_per_sub_window= Some genesis_constants.protocol.slots_per_sub_window
+  ; genesis_state_timestamp=
+      Some
+        (Genesis_constants.genesis_timestamp_to_string
+           genesis_constants.protocol.genesis_state_timestamp) }
+
+let runtime_config_of_precomputed_values (precomputed_values : Genesis_proof.t)
+    : Runtime_config.t =
+  Runtime_config.combine precomputed_values.runtime_config
+    { daemon=
+        Some
+          { txpool_max_size=
+              Some precomputed_values.genesis_constants.txpool_max_size
+          ; peer_list_url= None }
+    ; genesis=
+        Some
+          (runtime_config_of_genesis_constants
+             precomputed_values.genesis_constants)
+    ; proof=
+        Some
+          (runtime_config_of_constraint_constants
+             ~proof_level:precomputed_values.proof_level
+             precomputed_values.constraint_constants)
+    ; ledger= None
+    ; epoch_data= None }

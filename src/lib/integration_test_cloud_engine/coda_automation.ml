@@ -170,8 +170,6 @@ module Network_config = struct
             { k= Some k
             ; delta= Some delta
             ; slots_per_epoch= Some slots_per_epoch
-            ; sub_windows_per_window=
-                Some constraint_constants.supercharged_coinbase_factor
             ; slots_per_sub_window= Some slots_per_sub_window
             ; genesis_state_timestamp=
                 Some Core.Time.(to_string_abs ~zone:Zone.utc (now ())) }
