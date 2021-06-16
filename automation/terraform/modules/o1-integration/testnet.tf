@@ -19,7 +19,6 @@ module "kubernetes_testnet" {
   coda_points_image  = var.coda_points_image
 
   log_level             = "Trace"
-  log_txn_pool_gossip   = true
   log_snark_work_gossip = true
 
   additional_peers = [local.seed_peer.multiaddr]
@@ -32,6 +31,7 @@ module "kubernetes_testnet" {
   archive_configs = local.archive_node_configs
 
   log_precomputed_blocks = var.log_precomputed_blocks
+  log_txn_pool_gossip = true
 
   archive_node_count   = var.archive_node_count
   mina_archive_schema  = var.mina_archive_schema

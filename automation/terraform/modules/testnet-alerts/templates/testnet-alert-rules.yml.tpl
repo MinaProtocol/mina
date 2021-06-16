@@ -15,6 +15,17 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} cluster nodes have crashed"
       description: "{{ $value }} Cluster nodes have crashed on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/WatchdogClusterCrashes-1741e31b59ef4467a3bd19158418c4d8"
+
+  - alert: MultipleNodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 600000) > 2
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: critical
+    annotations:
+      summary: "At least 3 nodes on {{ $labels.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+      runbook: "https://www.notion.so/minaprotocol/MultipleNodeRestarted-360bc1ed48a24dfca4bcbae1e29d0584"
 
   - alert: HighDisconnectedBlocksPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_no_common_ancestor ${rule_filter} [${alert_timeframe}])) > 3
@@ -53,8 +64,9 @@ groups:
       testnet: "{{ $labels.testnet }}"
       severity: critical
     annotations:
-      summary: "{{ $labels.testnet }} has pods which have not logged in 10 minutes"
-      description: "There are no new logs in the last 10 minutes for {{ $value }} pods on network {{ $labels.testnet }}."
+      summary: "{{ $labels.testnet }} has pods which have not logged in an hour"
+      description: "There are no new logs in the last hour for {{ $value }} pods on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/WatchdogNoNewLogs-7ffb7a74bad542c78961abddd9004489"
 
   - alert: SeedListDown
     expr: min by (testnet) (min_over_time(Coda_watchdog_seeds_reachable ${rule_filter} [${alert_timeframe}])) == 0
@@ -263,6 +275,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has a fork of length at least 8"
       description: "Fork of length {{ $value }} on network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/MediumFork-0a530813af2e40c491cdf01b3a2b2304"
 
   - alert: NoTransactionsInAtLeastOneBlock
     expr: max by (testnet) (Coda_Transition_frontier_empty_blocks_at_best_tip ${rule_filter}) > 0
@@ -272,6 +285,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 block without transactions at the tip"
       description: "{{ $value }} Blocks without transactions on tip of network {{ $labels.testnet }}."
+      runbook: "https://www.notion.so/minaprotocol/NoTransactionsInAtLeastOneBlock-049250ff7ae84de990233c7b6d35f763"
 
   - alert: LowMinWindowDensity
     expr: min by (testnet) (Coda_Transition_frontier_min_window_density ${rule_filter}) <= 35
@@ -303,6 +317,7 @@ groups:
     annotations:
       summary: "One or more {{ $labels.testnet }} nodes are stuck at an old block height (Observed block height did not increase in the last 30m)"
       description: "{{ $value }} blocks have been validated on network {{ $labels.testnet }} in the last hour (according to some node)."
+      runbook: "https://www.notion.so/minaprotocol/FewBlocksPerHour-47a6356f093242d988b0d9527ce23478"
 
 
   - alert: LowDisconnectedBlocksPerHour
@@ -313,6 +328,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 blocks that have been produced on a remote side chains in the last hour"
       description: "{{ $value }} blocks have been produced that share no common ancestor with our transition frontier on network {{ $labels.test }} in the last hour."
+      runbook: "https://www.notion.so/minaprotocol/LowDisconnectedBlocksPerHour-32bd49852fbb499090106fe63a504859"
 
 
   - alert: LowOldBlocksPerHour
@@ -323,6 +339,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 blocks that are not selected over the root of our transition frontier in the last hour"
       description: "{{ $value }} blocks have been produced that are not selected over the root of our transition frontier in the last hour"
+      runbook: "https://www.notion.so/minaprotocol/LowOldBlocksPerHour-1cc2e92b8ca944869d810f7afd7c2d78"
 
   - alert: LowInvalidProofPerHour
     expr: max by (testnet) (increase(Coda_Rejected_blocks_invalid_proof ${rule_filter} [${alert_timeframe}])) > 0
@@ -332,6 +349,7 @@ groups:
     annotations:
       summary: "{{ $labels.testnet }} has at least 1 blocks that contains an invalid blockchain snark proof in last hour"
       description: "{{ $value }} blocks have been produced that contains an invalid blockchain snark proof in last hour"
+      runbook: "https://www.notion.so/minaprotocol/LowInvalidProofPerHour-b6e88b9ae84f47169e7f86017ab9e340"
 
   - alert: LowPostgresBlockHeightGrowth
     expr: min by (testnet) (increase(Coda_Archive_max_block_height ${rule_filter} [${alert_timeframe}])) < 1
@@ -343,6 +361,16 @@ groups:
       summary: "{{ $labels.testnet }} rate of archival of network blocks in Postgres DB is lower than expected"
       description: "The rate of {{ $value }} new blocks observed by archive postgres instances is low on network {{ $labels.testnet }}."
       runbook: "https://www.notion.so/minaprotocol/Archive-Node-Metrics-9edf9c51dd344f1fbf6722082a2e2465"
+
+  - alert: NodeRestarted
+    expr: count by (testnet) (Coda_Runtime_process_uptime_ms_total ${rule_filter} < 360000) > 0
+    labels:
+      testnet: "{{ $labels.testnet }}"
+      severity: warning
+    annotations:
+      summary: "At least one of the nodes on {{ $labels.testnet }} restarted"
+      description: "{{ $value }} nodes on {{ $labels.testnet }} restarted"
+      runbook: "https://www.notion.so/minaprotocol/NodeRestarted-99a1cf710ff14aa6930a9f12ad5813a5"
 
   - alert: UnparentedBlocksObserved
     expr: max by (testnet) (Coda_Archive_unparented_blocks ${rule_filter}) > 1

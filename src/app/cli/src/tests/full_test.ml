@@ -149,7 +149,8 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; max_connections= 50
           ; validation_queue_size= 150
-          ; keypair= None }
+          ; keypair= None
+          ; all_peers_seen_metric= false }
       in
       let net_config =
         Mina_networking.Config.
@@ -185,8 +186,7 @@ let run_test () : unit Deferred.t =
       let start_time = Time.now () in
       let%bind precomputed_values =
         Deferred.Or_error.ok_exn
-        @@ Genesis_ledger_helper.init_from_inputs ~logger ~may_generate:true
-             precomputed_values
+        @@ Genesis_ledger_helper.init_from_inputs ~logger precomputed_values
       in
       let%bind coda =
         Mina_lib.create

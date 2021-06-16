@@ -201,7 +201,7 @@ end
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving compare, sexp, yojson]
+    type t [@@deriving compare, sexp, yojson, hash]
   end
 end]
 
@@ -232,19 +232,22 @@ type tag =
   , Nat.N2.n )
   Pickles.Tag.t
 
-val verify : (t * Sok_message.t) list -> key:Pickles.Verification_key.t -> bool
+val verify :
+     (t * Sok_message.t) list
+  -> key:Pickles.Verification_key.t
+  -> bool Async.Deferred.t
 
 module Verification : sig
   module type S = sig
     val tag : tag
 
-    val verify : (t * Sok_message.t) list -> bool
+    val verify : (t * Sok_message.t) list -> bool Async.Deferred.t
 
     val id : Pickles.Verification_key.Id.t Lazy.t
 
     val verification_key : Pickles.Verification_key.t Lazy.t
 
-    val verify_against_digest : t -> bool
+    val verify_against_digest : t -> bool Async.Deferred.t
 
     val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
   end
