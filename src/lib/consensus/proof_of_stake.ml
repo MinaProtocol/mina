@@ -3119,22 +3119,22 @@ module Hooks = struct
             ~metadata:
               [ ("epoch", `Int (Epoch.to_int epoch))
               ; ("slot", `Int (Slot.to_int slot)) ] ;
-          Vrf.check ~constraint_constants
-            ~global_slot:(Global_slot.slot_number global_slot)
-            ~global_slot_since_genesis ~seed:epoch_data.seed ~epoch_snapshot
-            ~coinbase_receiver ~total_stake ~logger ~staking_keypairs
+          Async.In_thread.run (fun () ->
+              Vrf.check ~constraint_constants
+                ~global_slot:(Global_slot.slot_number global_slot)
+                ~global_slot_since_genesis ~seed:epoch_data.seed
+                ~epoch_snapshot ~coinbase_receiver ~total_stake ~logger
+                ~staking_keypairs )
         in
         let rec find_winning_slot (slot : Slot.t) =
           if UInt32.compare slot constants.epoch_size >= 0 then
             Deferred.return None
           else
-            match%bind
-              Local_state.seen_slot local_state epoch slot |> Deferred.return
-            with
+            match Local_state.seen_slot local_state epoch slot with
             | `All_seen ->
                 find_winning_slot (Slot.succ slot)
             | `Unseen pks -> (
-                match%bind block_data pks slot |> Deferred.return with
+                match%bind block_data pks slot with
                 | None ->
                     find_winning_slot (Slot.succ slot)
                 | Some (data, delegator_pk) ->
