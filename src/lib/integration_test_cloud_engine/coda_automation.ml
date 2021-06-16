@@ -20,13 +20,16 @@ let cluster_region = "us-west1"
 let cluster_zone = "us-west1a"
 
 let list_init_in_batches size max_batch_size ~f ~after_batch =
-  let num_batches = size / max_batch_size + if size mod max_batch_size > 0 then 1 else 0 in
-  List.concat @@ List.init num_batches ~f:(fun i ->
-    let offset = (num_batches - i - 1) * max_batch_size in
-    let batch_size = min (size - offset) max_batch_size in
-    let values = List.init batch_size ~f:(fun j -> f (offset + j)) in
-    after_batch ~count:(offset + batch_size) ~values ;
-    values)
+  let num_batches =
+    (size / max_batch_size) + if size mod max_batch_size > 0 then 1 else 0
+  in
+  List.concat
+  @@ List.init num_batches ~f:(fun i ->
+         let offset = (num_batches - i - 1) * max_batch_size in
+         let batch_size = min (size - offset) max_batch_size in
+         let values = List.init batch_size ~f:(fun j -> f (offset + j)) in
+         after_batch ~count:(offset + batch_size) ~values ;
+         values )
 
 module Network_config = struct
   module Cli_inputs = Cli_inputs
@@ -151,8 +154,7 @@ module Network_config = struct
     ; timing }
 
   type prepared_keypair =
-    { secret_name: string
-    ; network_keypair: Network_keypair.t }
+    {secret_name: string; network_keypair: Network_keypair.t}
 
   let distribute_keypairs ~logger ~network_keypairs
       (account_configs : Test_config.Account_config.t accounts) :
@@ -168,25 +170,29 @@ module Network_config = struct
     in
     [%log spam] "Assigning keypairs" ;
     let _leftover_samples, assigned_keypairs =
-      fold_map_accounts account_configs ~init:network_keypairs ~f:assign_keypair
+      fold_map_accounts account_configs ~init:network_keypairs
+        ~f:assign_keypair
     in
     [%log spam] "Generating accounts" ;
     let accounts =
-      let keypairs = map_accounts assigned_keypairs ~f:(fun {Network_keypair.keypair; _} -> keypair) in
+      let keypairs =
+        map_accounts assigned_keypairs ~f:(fun {Network_keypair.keypair; _} ->
+            keypair )
+      in
       zip_accounts_exn keypairs account_configs
       |> map_accounts ~f:(fun (keypair, config) ->
              generate_account keypairs keypair config )
     in
     let prepared_keypairs =
       id_mapi_accounts assigned_keypairs ~f:(fun id index network_keypair ->
-        let secret_name = Printf.sprintf "test-keypair-%s-%d" id index in
-        {secret_name; network_keypair})
+          let secret_name = Printf.sprintf "test-keypair-%s-%d" id index in
+          {secret_name; network_keypair} )
     in
     (prepared_keypairs, accounts)
 
   let expand ~logger ~test_name ~(cli_inputs : Cli_inputs.t) ~(debug : bool)
-      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t) ~network_keypairs
-      =
+      ~(test_config : Test_config.t) ~(images : Test_config.Container_images.t)
+      ~network_keypairs =
     let { Test_config.k
         ; delta
         ; slots_per_epoch
@@ -215,7 +221,8 @@ module Network_config = struct
     (* GENERATE ACCOUNTS AND KEYPAIRS *)
     [%log spam] "Distributing keypairs" ;
     let account_keypairs, runtime_accounts =
-      distribute_keypairs ~logger ~network_keypairs {block_producers; additional_accounts}
+      distribute_keypairs ~logger ~network_keypairs
+        {block_producers; additional_accounts}
     in
     (* DAEMON CONFIG *)
     [%log spam] "Building runtime config" ;
@@ -287,7 +294,9 @@ module Network_config = struct
     [%log spam] "Generating network config" ;
     { coda_automation_location= cli_inputs.coda_automation_location
     ; debug_arg= debug
-    ; keypairs= flatten_accounts account_keypairs |> List.map ~f:(fun {network_keypair; _} -> network_keypair)
+    ; keypairs=
+        flatten_accounts account_keypairs
+        |> List.map ~f:(fun {network_keypair; _} -> network_keypair)
     ; constants
     ; runtime_config
     ; terraform=
@@ -427,10 +436,9 @@ module Network_manager = struct
     *)
     Out_channel.with_file ~fail_if_exists:true (testnet_dir ^/ "daemon.json")
       ~f:(fun ch ->
-        network_config.runtime_config
-        |> Runtime_config.to_yojson
+        network_config.runtime_config |> Runtime_config.to_yojson
         |> Yojson.Safe.to_string
-        |> Out_channel.output_string ch) ;
+        |> Out_channel.output_string ch ) ;
     Out_channel.with_file ~fail_if_exists:true (testnet_dir ^/ "main.tf.json")
       ~f:(fun ch ->
         Network_config.to_terraform network_config

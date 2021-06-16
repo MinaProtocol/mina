@@ -163,8 +163,7 @@ let report_test_errors ~log_error_set ~internal_error_set =
     color_eprintf Bash_colors.red
       "The test has failed. See the above errors for details.\n\n"
   else
-    color_eprintf Bash_colors.green
-      "The test has completed successfully.\n\n" ;
+    color_eprintf Bash_colors.green "The test has completed successfully.\n\n" ;
   let%bind () = Writer.(flushed (Lazy.force stderr)) in
   return (not test_failed)
 
@@ -248,7 +247,8 @@ let main inputs =
   in
   [%log spam] "Loading keypairs from keypool" ;
   let network_keypairs =
-    Network_keypair.Pool.load ~logger ~pool_filepath:"keypool" ~size:(Test_config.keypair_count T.config)
+    Network_keypair.Pool.load ~logger ~pool_filepath:"keypool"
+      ~size:(Test_config.keypair_count T.config)
   in
   [%log spam] "Expanding network config" ;
   let network_config =

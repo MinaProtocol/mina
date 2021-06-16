@@ -80,6 +80,25 @@ struct
     ; soft_timeout= Slots soft_timeout_in_slots
     ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
 
+  let blocks_to_be_produced_by ~node n =
+    let read_blocks_generated state =
+      Node.id node
+      |> String.Map.find state.blocks_generated_by_node
+      |> Option.value ~default:0
+    in
+    let init state = Predicate_continuation (read_blocks_generated state) in
+    let check init_blocks_generated state =
+      if read_blocks_generated state - init_blocks_generated >= n then
+        Predicate_passed
+      else Predicate_continuation init_blocks_generated
+    in
+    let soft_timeout_in_slots = 2 * n in
+    { description=
+        Printf.sprintf "%d blocks to be produced by %s" n (Node.id node)
+    ; predicate= Network_state_predicate (init, check)
+    ; soft_timeout= Slots soft_timeout_in_slots
+    ; hard_timeout= Slots (soft_timeout_in_slots * 2) }
+
   let nodes_to_synchronize (nodes : Node.t list) =
     let all_equal ls =
       Option.value_map (List.hd ls) ~default:true ~f:(fun h ->

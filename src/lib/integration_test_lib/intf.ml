@@ -209,6 +209,7 @@ module Dsl = struct
       ; snarked_ledgers_generated: int
       ; blocks_generated: int
       ; node_initialization: bool String.Map.t
+      ; blocks_generated_by_node: int String.Map.t
       ; gossip_received: Gossip_state.t String.Map.t
       ; best_tips_by_node: State_hash.t String.Map.t }
 
@@ -239,6 +240,8 @@ module Dsl = struct
     val node_to_initialize : Engine.Network.Node.t -> t
 
     val blocks_to_be_produced : int -> t
+
+    val blocks_to_be_produced_by : node:Engine.Network.Node.t -> int -> t
 
     val nodes_to_synchronize : Engine.Network.Node.t list -> t
 

@@ -22,6 +22,8 @@ module Make
     ; blocks_generated: int
     ; node_initialization: bool String.Map.t
           [@to_yojson map_to_yojson ~f:(fun b -> `Bool b)]
+    ; blocks_generated_by_node: int String.Map.t
+          [@to_yojson map_to_yojson ~f:(fun b -> `Int b)]
     ; gossip_received: Gossip_state.t String.Map.t
           [@to_yojson map_to_yojson ~f:Gossip_state.to_yojson]
     ; best_tips_by_node: State_hash.t String.Map.t
@@ -35,6 +37,7 @@ module Make
     ; snarked_ledgers_generated= 0
     ; blocks_generated= 0
     ; node_initialization= String.Map.empty
+    ; blocks_generated_by_node= String.Map.empty
     ; gossip_received= String.Map.empty
     ; best_tips_by_node= String.Map.empty }
 
@@ -55,6 +58,11 @@ module Make
            update ~f:(fun state ->
                [%log debug] "handling block production from $node"
                  ~metadata:[("node", `String (Node.id node))] ;
+               let blocks_generated_by_node =
+                 String.Map.update state.blocks_generated_by_node
+                   (Node.id node)
+                   ~f:(Option.value_map ~default:1 ~f:(( + ) 1))
+               in
                if block_produced.block_height > state.block_height then
                  let snarked_ledgers_generated =
                    if block_produced.snarked_ledger_generated then 1 else 0
@@ -66,8 +74,9 @@ module Make
                  ; blocks_generated= state.blocks_generated + 1
                  ; snarked_ledgers_generated=
                      state.snarked_ledgers_generated
-                     + snarked_ledgers_generated }
-               else state ) )) ;
+                     + snarked_ledgers_generated
+                 ; blocks_generated_by_node }
+               else {state with blocks_generated_by_node} ) )) ;
     ignore
       (Event_router.on event_router
          Event_type.Transition_frontier_diff_application
