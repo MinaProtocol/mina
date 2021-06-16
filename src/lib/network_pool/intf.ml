@@ -178,6 +178,8 @@ module type Network_pool_base_intf = sig
 
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
 
+  val create_rate_limiter : unit -> Rate_limiter.t
+
   val apply_and_broadcast :
        t
     -> resource_pool_diff_verified Envelope.Incoming.t
