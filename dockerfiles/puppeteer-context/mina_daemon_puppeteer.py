@@ -98,7 +98,7 @@ def stop_daemon():
       wait_for_pid(child_pid)
       print("done waiting for: " + str(child_pid) )
   print("puppeteer script: removing /root/daemon-active" )
-  Path('daemon-active').remove()
+  Path('daemon-active').unlink()
   mina_process = None
 
 # technically, doing the loops like this will eventually result in a stack overflow
