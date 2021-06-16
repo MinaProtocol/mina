@@ -90,13 +90,13 @@ def stop_daemon():
   mina_process.send_signal(signal.SIGTERM)
 
   child_pids = get_child_processes(mina_process.pid)
-  print("child_pids: " )
+  print("stop_daemon, child_pids: " )
   print(*child_pids)
   mina_process.wait()
   for child_pid in child_pids:
-      print("waiting for child_pid: " + child_pid )
+      print("waiting for child_pid: " + str(child_pid) )
       wait_for_pid(child_pid)
-      print("done waiting for: " + child_pid )
+      print("done waiting for: " + str(child_pid) )
   print("puppeteer script: removing /root/daemon-active" )
   Path('daemon-active').remove()
   mina_process = None
