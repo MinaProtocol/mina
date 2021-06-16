@@ -37,11 +37,9 @@ class MockRequestHandler(BaseHTTPRequestHandler):
     s.end_headers()
     s.wfile.write(b'<html><body>The daemon is currently offline.<br/><i>This broadcast was brought to you by the puppeteer mock server</i></body></html>')
 
-# just nooping on this signal suffices, since merely trapping it will cause
-# `signal.pause()` to resume
 def handle_child_termination(signum, frame):
-  print("puppeteer script: SIGCHLD received, passing " )
-  pass
+  print("puppeteer script: SIGCHLD received " )
+  os.waitpid(-1, os.WNOHANG)
 
 def handle_start_request(signum, frame):
   print("puppeteer script: SIGUSR1 handle_start_request received, setting active_daemon_request to True" )
