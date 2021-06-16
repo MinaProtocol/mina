@@ -7,7 +7,7 @@ module Stable = struct
       { fee_payer: Party.Signed.Stable.V1.t
       ; other_parties: Party.Stable.V1.t list
       ; protocol_state: Snapp_predicate.Protocol_state.Stable.V1.t }
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
 

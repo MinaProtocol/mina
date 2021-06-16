@@ -39,7 +39,7 @@ module Update = struct
           ; delegate: 'pk
           ; verification_key: 'vk
           ; permissions: 'perms }
-        [@@deriving compare, eq, sexp, hash, yojson, hlist]
+        [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
   end
@@ -58,7 +58,7 @@ module Update = struct
           Set_or_keep.Stable.V1.t
         , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving compare, eq, sexp, hash, yojson]
+      [@@deriving compare, equal, sexp, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -130,7 +130,7 @@ module Body = struct
       module V1 = struct
         type ('pk, 'update, 'token_id, 'signed_amount) t =
           {pk: 'pk; update: 'update; token_id: 'token_id; delta: 'signed_amount}
-        [@@deriving hlist, sexp, eq, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
   end
@@ -144,7 +144,7 @@ module Body = struct
         , Token_id.Stable.V1.t
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, eq, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -213,7 +213,7 @@ module Predicate = struct
         | Full of Snapp_predicate.Account.Stable.V1.t
         | Nonce of Account.Nonce.Stable.V1.t
         | Accept
-      [@@deriving sexp, eq, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -226,7 +226,7 @@ module Predicated = struct
     module Stable = struct
       module V1 = struct
         type ('body, 'predicate) t = {body: 'body; predicate: 'predicate}
-        [@@deriving hlist, sexp, eq, yojson, hash, compare]
+        [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
 
@@ -239,7 +239,7 @@ module Predicated = struct
   module Stable = struct
     module V1 = struct
       type t = (Body.Stable.V1.t, Predicate.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, eq, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -251,7 +251,7 @@ module Predicated = struct
       module V1 = struct
         type t =
           (Body.Stable.V1.t, Snapp_predicate.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, eq, yojson, hash, compare]
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
@@ -271,7 +271,7 @@ module Predicated = struct
     module Stable = struct
       module V1 = struct
         type t = (Body.Stable.V1.t, Account_nonce.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, eq, yojson, hash, compare]
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
@@ -299,7 +299,7 @@ module Predicated = struct
     module Stable = struct
       module V1 = struct
         type t = (Body.Stable.V1.t, unit) Poly.Stable.V1.t
-        [@@deriving sexp, eq, yojson, hash, compare]
+        [@@deriving sexp, equal, yojson, hash, compare]
 
         let to_latest = Fn.id
       end
@@ -325,7 +325,7 @@ module Proved = struct
             .t =
         { data: Predicated.Proved.Stable.V1.t
         ; authorization: Pickles.Side_loaded.Proof.Stable.V1.t }
-      [@@deriving sexp, eq, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -339,7 +339,7 @@ module Signed = struct
       type t = Poly(Predicated.Signed.Stable.V1)(Signature.Stable.V1).t =
         { data: Predicated.Signed.Stable.V1.t
         ; authorization: Signature.Stable.V1.t }
-      [@@deriving sexp, eq, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -352,7 +352,7 @@ module Empty = struct
     module V1 = struct
       type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
         {data: Predicated.Empty.Stable.V1.t; authorization: unit}
-      [@@deriving sexp, eq, yojson, hash, compare]
+      [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
     end
@@ -364,7 +364,7 @@ module Stable = struct
   module V1 = struct
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V1).t =
       {data: Predicated.Stable.V1.t; authorization: Control.Stable.V1.t}
-    [@@deriving sexp, eq, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
   end
