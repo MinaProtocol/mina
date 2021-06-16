@@ -167,34 +167,56 @@ let inferred_nonce ~get_current_nonce ~(fee_payer : Account_id.t) ~nonce_map =
       in
       (min_nonce, txn_pool_or_account_nonce, updated_map)
 
-(* If the receiver account doesn't exist yet (as far as we can tell) *and* the
- * user command isn't sufficient to cover the account creation fee, log a
- * warning. *)
-let warn_if_unable_to_pay_account_creation_fee ~get_account
-    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
-    user_command_payload =
-  let receiver_pk = Signed_command_payload.receiver_pk user_command_payload in
-  let token = Signed_command_payload.token user_command_payload in
+(* Return true when the receiver account doesn't exist yet (as far as we can
+ * tell) *and* the user command isn't sufficient to cover the account creation
+ * fee. *)
+let unable_to_pay_account_creation_fee ~get_account
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t)
+    (signed_command_payload_body : Signed_command_payload.Body.t) =
+  let receiver_pk =
+    Signed_command_payload.Body.receiver_pk signed_command_payload_body
+  in
+  let token = Signed_command_payload.Body.token signed_command_payload_body in
   let receiver = Account_id.create receiver_pk token in
   let receiver_account = get_account receiver in
-  let amount = Signed_command_payload.amount user_command_payload in
+  let amount =
+    Signed_command_payload.Body.amount signed_command_payload_body
+  in
   match (receiver_account, amount) with
   | `Bootstrapping, _ | `Active (Some _), _ | _, None ->
-      ()
+      false
   | `Active None, Some amount ->
       let open Currency.Amount in
       let account_creation_fee =
         of_fee constraint_constants.account_creation_fee
       in
-      if amount < account_creation_fee then
-        [%log warn]
-          "A transaction was submitted that is likely to fail because the \
-           receiver account doesn't appear to have been created already and \
-           the transaction amount of %s is smaller than the account creation \
-           fee of %s."
-          (to_formatted_string amount)
-          (to_formatted_string account_creation_fee) ;
-      ()
+      amount < account_creation_fee
+
+(* If the receiver account doesn't exist yet (as far as we can tell) *and* the
+ * user command isn't sufficient to cover the account creation fee, log a
+ * warning. *)
+let warn_if_unable_to_pay_account_creation_fee ~get_account
+    ~(constraint_constants : Genesis_constants.Constraint_constants.t) ~logger
+    (client_input : t) =
+  if
+    unable_to_pay_account_creation_fee ~get_account ~constraint_constants
+      client_input.payload.body
+  then (
+    let amount =
+      Option.value_exn
+        (Signed_command_payload.Body.amount client_input.payload.body)
+    in
+    let account_creation_fee =
+      Currency.Amount.of_fee constraint_constants.account_creation_fee
+    in
+    [%log warn]
+      "A transaction was submitted that is likely to fail because the \
+       receiver account doesn't appear to have been created already and the \
+       transaction amount of %s is smaller than the account creation fee of \
+       %s."
+      (Currency.Amount.to_formatted_string amount)
+      (Currency.Amount.to_formatted_string account_creation_fee) ;
+    () )
 
 let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
     ~get_account ~constraint_constants ~logger (client_input : t) =
@@ -217,7 +239,7 @@ let to_user_command ?(nonce_map = Account_id.Map.empty) ~get_current_nonce
   in
   let () =
     warn_if_unable_to_pay_account_creation_fee ~get_account
-      ~constraint_constants ~logger user_command_payload
+      ~constraint_constants ~logger client_input
   in
   let%map signed_user_command =
     sign ~signer:client_input.signer ~user_command_payload

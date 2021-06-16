@@ -90,10 +90,10 @@ module Snark_pool =
 {|
 query snarkPool {
   snarkPool {
-  fee @bsDecoder(fn: "Decoders.uint64")
-  prover @bsDecoder(fn: "Decoders.public_key")
-  work_ids: workIds
-}
+    fee @bsDecoder(fn: "Decoders.uint64")
+    prover @bsDecoder(fn: "Decoders.public_key")
+    work_ids: workIds
+  }
 }
 |}]
 
@@ -111,9 +111,9 @@ query pendingSnarkWork {
       }
       supply_increase: supplyIncrease @bsDecoder(fn: "Decoders.uint64")
       work_id: workId
-      }
     }
   }
+}
 |}]
 
 module Set_staking =
@@ -124,8 +124,8 @@ mutation ($public_key: PublicKey) {
     lastStaking @bsDecoder(fn: "Decoders.public_key_array")
     lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
     currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
-    }
   }
+}
 |}]
 
 module Set_coinbase_receiver =
@@ -144,9 +144,9 @@ module Set_snark_worker =
 {|
 mutation ($public_key: PublicKey) {
   setSnarkWorker (input : {publicKey: $public_key}) {
-      lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
-    }
+    lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
   }
+}
 |}]
 
 module Set_snark_work_fee =
@@ -155,7 +155,7 @@ module Set_snark_work_fee =
 mutation ($fee: UInt64!) {
   setSnarkWorkFee(input: {fee: $fee}) {
     lastFee @bsDecoder(fn: "Decoders.uint64")
-    }
+  }
 }
 |}]
 
@@ -165,11 +165,14 @@ module Send_payment =
 mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
-          $token: UInt64,                                                                                                                                                                                                                              $fee: UInt64!,
+          $token: UInt64,
+          $fee: UInt64!,
           $nonce: UInt32,
-          $memo: String) {
+          $memo: String,
+          $ignore_warnings: Boolean!) {
   sendPayment(input:
-    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+    {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo},
+    ignoreWarnings: $ignore_warnings) {
     payment {
       id
     }
@@ -339,7 +342,7 @@ module Archive_precomputed_block =
 {|
 mutation ($block: PrecomputedBlock!) {
   archivePrecomputedBlock(block: $block) {
-      applied
+    applied
   }
 }
 |}]
@@ -349,7 +352,7 @@ module Archive_extensional_block =
 {|
 mutation ($block: ExtensionalBlock!) {
   archiveExtensionalBlock(block: $block) {
-      applied
+    applied
   }
 }
 |}]

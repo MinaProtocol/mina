@@ -67,6 +67,12 @@ val create :
   -> unit
   -> t
 
+val unable_to_pay_account_creation_fee :
+     get_account:(Account_id.t -> Account.t option Participating_state.T.t)
+  -> constraint_constants:Genesis_constants.Constraint_constants.t
+  -> Signed_command_payload.Body.t
+  -> bool
+
 val to_user_command :
      ?nonce_map:(Account.Nonce.t * Account.Nonce.t) Account_id.Map.t
   -> get_current_nonce:(   Account_id.t

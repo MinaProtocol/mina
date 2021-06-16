@@ -2581,6 +2581,16 @@
                     }
                   },
                   "defaultValue": null
+                },
+                {
+                  "name": "ignoreWarnings",
+                  "description": "When true the payment will be attempted even if we anticipate an error (defaults to false)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
+                  },
+                  "defaultValue": null
                 }
               ],
               "type": {
@@ -9981,6 +9991,16 @@
                       "name": "SendPaymentInput",
                       "ofType": null
                     }
+                  },
+                  "defaultValue": null
+                },
+                {
+                  "name": "ignoreWarnings",
+                  "description": "When true warnings will be ignored when validating the payment (defaults to true)",
+                  "type": {
+                    "kind": "SCALAR",
+                    "name": "Boolean",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }

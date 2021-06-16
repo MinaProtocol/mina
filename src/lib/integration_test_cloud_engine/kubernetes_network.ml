@@ -137,7 +137,8 @@ module Node = struct
       $nonce: UInt32,
       $memo: String) {
         sendPayment(input:
-          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo},
+          ignoreWarnings: true) {
             payment {
               id
             }

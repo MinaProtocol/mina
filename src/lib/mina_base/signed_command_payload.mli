@@ -45,6 +45,8 @@ module Body : sig
   val source : next_available_token:Token_id.t -> t -> Account_id.t
 
   val token : t -> Token_id.t
+
+  val amount : t -> Currency.Amount.t option
 end
 
 module Common : sig
