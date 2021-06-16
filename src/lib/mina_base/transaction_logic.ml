@@ -1155,7 +1155,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth ~is_new
       ({ body=
            { pk= _
-           ; token_id= _
+           ; token_id
            ; update= {app_state; delegate; verification_key; permissions}
            ; delta }
        ; predicate } :
@@ -1165,6 +1165,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind balance =
       let%bind b = add_signed_amount a.balance delta in
       let fee = constraint_constants.account_creation_fee in
+      let%bind () =
+        (* TODO: Fix when we want to enable tokens. The trickiness here is we need to subtract
+           the account creation fee from somewhere (like the fee excess in the local state) *)
+        if Token_id.(equal default) token_id then Ok ()
+        else Error Transaction_status.Failure.Cannot_pay_creation_fee_in_token
+      in
       if is_new then
         Balance.sub_amount b (Amount.of_fee fee)
         |> opt_fail Amount_insufficient_to_create_account
@@ -1172,13 +1178,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     (* Check send/receive permissions *)
     let%bind () =
-      check Update_not_permitted
-        (check_auth
-           ( match delta.sgn with
-           | Pos ->
-               a.permissions.receive
-           | Neg ->
-               a.permissions.send ))
+      if Amount.(equal zero) delta.magnitude then Ok ()
+      else
+        check Update_not_permitted
+          (check_auth
+             ( match delta.sgn with
+             | Pos ->
+                 a.permissions.receive
+             | Neg ->
+                 a.permissions.send ))
     in
     (* Check timing. *)
     let%bind timing =
@@ -1237,9 +1245,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     Ok {a with balance; snapp; delegate; permissions; timing; nonce}
 
   let apply_parties_unchecked
-      ~
-      (*       ?local_state *)
-      (constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
       (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t
       =
@@ -1453,7 +1459,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             end in
             `Did_not_succeed
         | exception e ->
-            `Error e
+            `Error (Error.of_exn ~backtrace:`Get e)
         | s ->
             step_all s
     in
@@ -1483,7 +1489,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     match step_all (init ~will_succeed:true) with
     | `Error e ->
-        Error (Error.of_exn e)
+        Error e
     | `Ok (global_state, local_state) ->
         Ok
           ( { accounts= accounts ()
@@ -1510,7 +1516,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         |> L.remove_accounts_exn ledger ;
         match step_all (init ~will_succeed:false) with
         | `Error e ->
-            Error (Error.of_exn e)
+            Error e
         | `Did_not_succeed ->
             assert false
         | `Ok (global_state, local_state) ->

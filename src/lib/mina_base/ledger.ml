@@ -1,7 +1,6 @@
 open Core
 open Signature_lib
 open Merkle_ledger
-module Account0 = Account
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =

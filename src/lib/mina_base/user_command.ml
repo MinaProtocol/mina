@@ -192,8 +192,8 @@ let to_verifiable t ~ledger ~get ~location_of_account =
 let fee_exn : t -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
-  | Parties _ ->
-      failwith "Parties: not implemented"
+  | Parties p ->
+      Parties.fee_lower_bound_exn p
 
 (* for filtering *)
 let minimum_fee = Mina_compile_config.minimum_user_command_fee
@@ -212,7 +212,7 @@ let next_available_token (t : t) tok =
   | Signed_command x ->
       Signed_command.next_available_token x tok
   | Parties _ps ->
-      failwith "Parties: not implemented"
+      tok
 
 let to_base58_check (t : t) =
   match t with
