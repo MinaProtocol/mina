@@ -114,7 +114,7 @@ pub fn caml_bigint_256_to_bytes(x: ocaml::Pointer<BigInteger256>) -> ocaml::Valu
     let x_ptr: *const BigInteger256 = x.as_ref();
     unsafe {
         let mut input_bytes = vec![];
-        (*x_ptr).serialize(&mut input_bytes).expect("caml_bigint_256_to_bytes, serialize failed");
+        (*x_ptr).serialize(&mut input_bytes).expect("serialize failed");
         core::ptr::copy_nonoverlapping(input_bytes.as_ptr(), ocaml::sys::string_val(str), input_bytes.len());
     }
     ocaml::Value(str)
@@ -126,10 +126,7 @@ pub fn caml_bigint_256_of_bytes(x: &[u8]) -> Result<BigInteger256, ocaml::Error>
     if x.len() != len {
         ocaml::Error::failwith("caml_bigint_256_of_bytes")?;
     };
-    match BigInteger256::deserialize(&mut &x[..]) {
-        Ok(b) => Ok(b),
-        Err(_) => Err(ocaml::Error::invalid_argument("caml_bigint_256_of_bytes, deserialize failed").err().unwrap())
-    }
+    BigInteger256::deserialize(&mut &x[..]).map_err(|_| ocaml::Error::Message("deserialization error"))
 }
 
 #[ocaml::func]
