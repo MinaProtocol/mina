@@ -255,12 +255,13 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                 !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
                 peer
             in
-            ignore
+            let%bind.Deferred () =
               Trust_system.(
                 record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
-                    , Some (error_msg, []) )) ;
+                    , Some (error_msg, []) ))
+            in
             Deferred.Result.fail
             @@ `Invalid_transition_chain_proof (Error.of_string error_msg)
       in
@@ -373,7 +374,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
   Deferred.Or_error.List.concat_map
     (partition Transition_frontier.max_catchup_chunk_length
        hashes_of_missing_transitions) ~how:`Parallel ~f:(fun hashes ->
-      let%bind.Async peers = Mina_networking.peers network in
+      let%bind.Async.Deferred peers = Mina_networking.peers network in
       let peers =
         Peers_pool.create ~busy ~preferred:[preferred_peer]
           (List.permute peers)
@@ -399,7 +400,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     "requesting $n blocks from $peer for catchup to \
                      $target_hash" ;
                   let%bind transitions =
-                    match%map.Async
+                    match%map.Async.Deferred
                       Mina_networking.get_transition_chain network peer hashes
                     with
                     | Ok x ->
@@ -509,7 +510,10 @@ let verify_transitions_and_build_breadcrumbs ~logger
             ~trust_system ~frontier ~unprocessed_transition_cache transition
         with
         | Error e ->
-            List.map acc ~f:Cached.invalidate_with_failure |> ignore ;
+            ignore
+              ( List.map acc ~f:Cached.invalidate_with_failure
+                : External_transition.Initial_validated.t Envelope.Incoming.t
+                  list ) ;
             Deferred.Or_error.fail e
         | Ok (`In_frontier initial_hash) ->
             Deferred.Or_error.return
@@ -572,9 +576,11 @@ let verify_transitions_and_build_breadcrumbs ~logger
           ; ("error", `String (Error.to_string_hum e)) ]
         "build of breadcrumbs failed with $error" ;
       ( try
-          List.map transitions_with_initial_validation
-            ~f:Cached.invalidate_with_failure
-          |> ignore
+          ignore
+            ( List.map transitions_with_initial_validation
+                ~f:Cached.invalidate_with_failure
+              : External_transition.Initial_validated.t Envelope.Incoming.t
+                list )
         with e ->
           [%log error]
             ~metadata:[("exn", `String (Exn.to_string e))]
@@ -583,7 +589,9 @@ let verify_transitions_and_build_breadcrumbs ~logger
 
 let garbage_collect_subtrees ~logger ~subtrees =
   List.iter subtrees ~f:(fun subtree ->
-      Rose_tree.map subtree ~f:Cached.invalidate_with_failure |> ignore ) ;
+      ignore
+        ( Rose_tree.map subtree ~f:Cached.invalidate_with_failure
+          : 'a Rose_tree.t ) ) ;
   [%log trace] "garbage collected failed cached transitions"
 
 let run ~logger ~precomputed_values ~trust_system ~verifier ~network ~frontier
@@ -1008,14 +1016,16 @@ let%test_module "Ledger_catchup tests" =
               in
               let%bind () = after (Core.Time.Span.of_sec 1.) in
               ignore
-                (Cache_lib.Cached.invalidate_with_failure
-                   cached_failing_transition) ;
+                ( Cache_lib.Cached.invalidate_with_failure
+                    cached_failing_transition
+                  : External_transition.Initial_validated.t Envelope.Incoming.t
+                  ) ;
               let%map result =
                 Block_time.Timeout.await_exn time_controller
                   ~timeout_duration:(Block_time.Span.of_ms 10000L)
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
-              if result <> `Failed then
+              if not ([%equal: [`Failed | `Success of _]] result `Failed) then
                 failwith "expected ledger catchup to fail, but it succeeded" )
           )
 

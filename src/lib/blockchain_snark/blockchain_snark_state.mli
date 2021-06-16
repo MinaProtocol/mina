@@ -14,7 +14,7 @@ type tag =
 val verify :
      (Protocol_state.Value.t * Proof.t) list
   -> key:Pickles.Verification_key.t
-  -> bool
+  -> bool Async.Deferred.t
 
 val check :
      Witness.t
@@ -57,7 +57,7 @@ module Make (T : sig
   val constraint_constants : Genesis_constants.Constraint_constants.t
 
   val proof_level : Genesis_constants.Proof_level.t
-end) : S
+end) : S [@@warning "-67"]
 
 val constraint_system_digests :
      proof_level:Genesis_constants.Proof_level.t

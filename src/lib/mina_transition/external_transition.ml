@@ -20,6 +20,8 @@ module Validate_content = struct
 
   let sexp_of_t _ = sexp_of_unit ()
 
+  let compare _ _ = 0
+
   let __versioned__ = ()
 end
 
@@ -30,14 +32,14 @@ module Raw_versioned__ = struct
     module V1 = struct
       type t =
         { protocol_state: Protocol_state.Value.Stable.V1.t
-        ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+        ; protocol_state_proof: Proof.Stable.V1.t [@sexp.opaque]
         ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
         ; delta_transition_chain_proof:
             State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
         ; current_protocol_version: Protocol_version.Stable.V1.t
         ; proposed_protocol_version_opt: Protocol_version.Stable.V1.t option
         ; mutable validation_callback: Validate_content.t }
-      [@@deriving sexp, fields]
+      [@@deriving compare, sexp, fields]
 
       let to_latest = Fn.id
 
@@ -95,7 +97,8 @@ Raw_versioned__.
   , current_protocol_version
   , proposed_protocol_version_opt
   , validation_callback
-  , set_validation_callback )]
+  , set_validation_callback
+  , compare )]
 
 [%%define_locally
 Stable.Latest.(create, sexp_of_t, t_of_sexp)]
@@ -105,7 +108,7 @@ type external_transition = t
 (*
 type t_ = Raw_versioned__.t =
   { protocol_state: Protocol_state.Value.t
-  ; protocol_state_proof: Proof.t sexp_opaque
+  ; protocol_state_proof: Proof.t [@sexp.opaque]
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_protocol_version: Protocol_version.t

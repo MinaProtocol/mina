@@ -20,23 +20,25 @@ end
 module Time_queue = struct
   type 'action t =
     { mutable curr_time: Time.Span.t
-    ; pending_actions: ('action * Time.Span.t) Heap.t
+    ; pending_actions: ('action * Time.Span.t) Pairing_heap.t
     ; mutable on_new_action: unit Ivar.t option }
 
   let handle_in_future t ~after action =
     Option.iter t.on_new_action ~f:(fun ivar ->
         Ivar.fill_if_empty ivar () ;
         t.on_new_action <- None ) ;
-    Heap.add t.pending_actions (action, Time.Span.(after + t.curr_time))
+    Pairing_heap.add t.pending_actions (action, Time.Span.(after + t.curr_time))
 
   let create ~now =
     { curr_time= now
     ; pending_actions=
-        Heap.create ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts') ()
+        Pairing_heap.create
+          ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts')
+          ()
     ; on_new_action= None }
 
   let actions_ready t =
-    match (Heap.top t.pending_actions, t.on_new_action) with
+    match (Pairing_heap.top t.pending_actions, t.on_new_action) with
     | Some _, _ ->
         return ()
     | None, Some ivar ->
@@ -49,10 +51,10 @@ module Time_queue = struct
   let tick_forwards t ~f =
     let rec go () =
       let do_next_action () =
-        let action, _ = Heap.pop_exn t.pending_actions in
+        let action, _ = Pairing_heap.pop_exn t.pending_actions in
         f action
       in
-      match Heap.top t.pending_actions with
+      match Pairing_heap.top t.pending_actions with
       | None ->
           return ()
       | Some (_, at) ->
@@ -61,10 +63,10 @@ module Time_queue = struct
           else (
             t.curr_time <- at ;
             let rec loop () =
-              match Heap.top t.pending_actions with
+              match Pairing_heap.top t.pending_actions with
               | None ->
                   return ()
-              | Some (_, at) when t.curr_time >= at ->
+              | Some (_, at) when Time.Span.(t.curr_time >= at) ->
                   let%bind () = do_next_action () in
                   loop ()
               | Some _ ->
@@ -127,7 +129,7 @@ end
 
 module type Fake_timer_transport_s = functor
   (Message :sig
-            
+
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
@@ -135,6 +137,7 @@ module type Fake_timer_transport_s = functor
   -> Fake_timer_transport_intf
      with type message := Message.t
       and type peer := Peer.t
+[@@warning "-67"]
 
 module Fake_timer_transport (Message : sig
   type t
@@ -144,7 +147,7 @@ end)
 struct
   module Token = Int
 
-  type tok = Token.t [@@deriving eq, sexp]
+  type tok = Token.t [@@deriving equal, sexp]
 
   type message = Message.t
 
@@ -221,44 +224,45 @@ struct
 end
 
 module type Trivial_peer_intf = sig
-  type t = int [@@deriving eq, hash, compare, sexp, yojson]
+  type t = int [@@deriving equal, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
 
 module Trivial_peer : Trivial_peer_intf = struct
   module T = struct
-    type t = int [@@deriving eq, hash, compare, sexp, yojson]
+    type t = int [@@deriving equal, hash, compare, sexp, yojson]
   end
 
   include Hashable.Make (T)
   include T
 end
 
+[@@@warning "-67"]
 module type S = functor
   (State :sig
-          
-          type t [@@deriving eq, sexp, yojson]
+
+          type t [@@deriving equal, sexp, yojson]
         end)
   (Message :sig
-            
+
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
   (Message_label :sig
-                  
+
                   type label [@@deriving enum, sexp]
 
                   include Hashable.S with type t = label
                 end)
   (Timer_label :sig
-                
+
                 type label [@@deriving enum, sexp]
 
                 include Hashable.S with type t = label
               end)
   (Condition_label :sig
-                    
+
                     type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
@@ -300,9 +304,10 @@ module type S = functor
     -> stop:unit Deferred.t
     -> t
 end
+[@@@warning "+67"]
 
 module Make (State : sig
-  type t [@@deriving eq, sexp, yojson]
+  type t [@@deriving equal, sexp, yojson]
 end) (Message : sig
   type t
 end)
@@ -463,7 +468,7 @@ let%test_module "Distributed_dsl" =
 
     module State = struct
       type t = Start | Wait_msg | Sent_msg | Got_msg of int | Timeout
-      [@@deriving eq, sexp, yojson]
+      [@@deriving equal, sexp, yojson]
     end
 
     module Message = struct

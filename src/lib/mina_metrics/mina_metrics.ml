@@ -47,7 +47,7 @@ module TextFormat_0_0_4 = struct
     match Float.classify v with
     | Normal | Subnormal | Zero ->
         Fmt.float f v
-    | Infinite when v > 0.0 ->
+    | Infinite when Float.(v > 0.) ->
         Fmt.string f "+Inf"
     | Infinite ->
         Fmt.string f "-Inf"
@@ -308,6 +308,10 @@ module Transaction_pool = struct
       "Time at which useful transactions were seen (seconds since 1/1/1970)"
     in
     Gauge.v "useful_transactions_received_time_sec" ~help ~namespace ~subsystem
+
+  let pool_size : Gauge.t =
+    let help = "Number of transactions in the pool" in
+    Gauge.v "size" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -343,6 +347,10 @@ module Network = struct
   let peers : Gauge.t =
     let help = "# of peers seen through gossip net" in
     Gauge.v "peers" ~help ~namespace ~subsystem
+
+  let all_peers : Gauge.t =
+    let help = "# of peers ever seen through gossip net" in
+    Gauge.v "all_peers" ~help ~namespace ~subsystem
 
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
@@ -961,7 +969,7 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
         Server.respond_string ~status:`Bad_request "Bad request"
   in
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
-    (Async_extra.Tcp.Where_to_listen.of_port port)
+    (Async.Tcp.Where_to_listen.of_port port)
     callback
 
 let server ?forward_uri ~port ~logger () =

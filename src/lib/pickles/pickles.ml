@@ -244,7 +244,7 @@ module type Proof_intf = sig
 
   val id : Verification_key.Id.t Lazy.t
 
-  val verify : (statement * t) list -> bool
+  val verify : (statement * t) list -> bool Async.Deferred.t
 end
 
 module Prover = struct
@@ -717,7 +717,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             in
             M.f prevs
           in
-          let%bind.Async proof =
+          let%bind.Async.Deferred proof =
             step handler ~maxes:(module Maxes) prevs next_state
           in
           let proof =
@@ -729,7 +729,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                       (module Maxes)
                       proof.statement.pass_through } }
           in
-          let%map.Async proof =
+          let%map.Async.Deferred proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
               wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains
@@ -853,7 +853,11 @@ module Side_loaded = struct
                           Pow_2_roots_of_unity (Int.ceil_log2 input_size)
                       ; h= d.h } )
               ; index=
-                  (match vk.wrap_vk with None -> return false | Some x -> x)
+                  ( match vk.wrap_vk with
+                  | None ->
+                      return (Async.return false)
+                  | Some x ->
+                      x )
               ; data=
                   (* This isn't used in verify_heterogeneous, so we can leave this dummy *)
                   {constraints= 0} }
@@ -1033,7 +1037,10 @@ let%test_module "test no side-loaded" =
       in
       [(Field.Constant.zero, b0); (Field.Constant.one, b1)]
 
-    let%test_unit "verify" = assert (Blockchain_snark.Proof.verify xs)
+    let%test_unit "verify" =
+      assert (
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Blockchain_snark.Proof.verify xs ) )
   end )
 
 (*
@@ -1082,8 +1089,8 @@ let%test_module "test" =
 
       let dummy_constraints () =
         let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
-        let g = exists 
-            Step_main_inputs.Inner_curve.typ ~compute:(fun _ -> 
+        let g = exists
+            Step_main_inputs.Inner_curve.typ ~compute:(fun _ ->
                 Tick.Inner_curve.(to_affine_exn one))
         in
         let _ =

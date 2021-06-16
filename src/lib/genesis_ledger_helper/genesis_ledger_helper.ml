@@ -169,7 +169,7 @@ module Ledger = struct
       | Accounts accounts, _ ->
           search_local_and_s3 ~other_data:(accounts_hash accounts) "accounts"
       | Hash hash, None ->
-          assert (Some hash = config.hash) ;
+          assert ([%equal: string option] (Some hash) config.hash) ;
           return None
       | _, Some name ->
           search_local_and_s3 name )
@@ -397,7 +397,7 @@ module Ledger = struct
                   let%bind () =
                     Deferred.Or_error.try_with ~here:[%here] (fun () ->
                         Sys.remove link_name )
-                    |> Deferred.ignore
+                    |> Deferred.ignore_m
                   in
                   (* Add a symlink from the named path to the hash path. *)
                   let%map () = Unix.symlink ~target:tar_path ~link_name in
@@ -480,13 +480,13 @@ end
    one generated at compile-time.
 *)
 module Base_hash : sig
-  type t [@@deriving eq, yojson]
+  type t [@@deriving equal, yojson]
 
   val create : id:Pickles.Verification_key.Id.t -> state_hash:State_hash.t -> t
 
   val to_string : t -> string
 end = struct
-  type t = string [@@deriving eq, yojson]
+  type t = string [@@deriving equal, yojson]
 
   let to_string = Fn.id
 
@@ -525,8 +525,7 @@ module Genesis_proof = struct
         | Ok () ->
             file_exists filename Cache_dir.s3_install_path
         | Error e ->
-            [%log info]
-              "Could not download genesis proof file from $uri: $error"
+            [%log info] "Could not download genesis proof file from $uri"
               ~metadata:
                 [ ("uri", `String s3_path)
                 ; ("error", Error_json.error_to_yojson e) ] ;
@@ -747,6 +746,8 @@ module Genesis_proof = struct
                       ; ("error", Error_json.error_to_yojson err) ] )
         in
         Ok (values, filename)
+
+  let create_values_no_proof = Genesis_proof.create_values_no_proof
 end
 
 let load_config_json filename =
@@ -882,10 +883,10 @@ let init_from_inputs ?(genesis_dir = Cache_dir.autogen_path) ~logger
 let init_from_config_file ?genesis_dir ~logger ~proof_level
     (config : Runtime_config.t) =
   let open Deferred.Or_error.Let_syntax in
-  let%bind inputs, config =
+  let%map inputs, config =
     inputs_from_config_file ?genesis_dir ~logger ~proof_level config
   in
-  let%map values = init_from_inputs ?genesis_dir ~logger inputs in
+  let values = Genesis_proof.create_values_no_proof inputs in
   (values, config)
 
 let upgrade_old_config ~logger filename json =

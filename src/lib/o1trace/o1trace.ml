@@ -58,7 +58,7 @@ let trace_event (name : string) =
 let trace (name : string) (f : unit -> 'a) =
   let new_ctx =
     Execution_context.with_tid
-      Scheduler.(t () |> current_execution_context)
+      Scheduler.(current_execution_context ())
       !next_tid
   in
   next_tid := !next_tid + 1 ;
@@ -94,7 +94,7 @@ let measure (name : string) (f : unit -> 'a) : 'a =
 
 let forget_tid (f : unit -> 'a) =
   let new_ctx =
-    Execution_context.with_tid Scheduler.(t () |> current_execution_context) 0
+    Execution_context.with_tid Scheduler.(current_execution_context ()) 0
   in
   let res = Scheduler.within_context new_ctx f |> Result.ok in
   Option.value_exn res
@@ -102,7 +102,7 @@ let forget_tid (f : unit -> 'a) =
 let start_tracing wr =
   current_wr := Some wr ;
   let sch = Scheduler.t () in
-  Scheduler.set_on_end_of_cycle sch (fun () ->
+  Scheduler.Expert.set_on_end_of_cycle (fun () ->
       if not sch.cycle_started then
         emit_event wr
           {(new_event Cycle_end) with tid= sch.current_execution_context.tid} ;
@@ -114,7 +114,7 @@ let start_tracing wr =
 
 let stop_tracing () =
   let sch = Scheduler.t () in
-  Scheduler.set_on_end_of_cycle sch Fn.id ;
+  Scheduler.Expert.set_on_end_of_cycle Fn.id ;
   Option.iter !current_wr ~f:(fun wr ->
       emit_event wr
         {(new_event Trace_end) with tid= sch.current_execution_context.tid} ) ;

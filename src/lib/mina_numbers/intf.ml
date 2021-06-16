@@ -163,7 +163,7 @@ module type UInt32 = sig
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt32.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -172,14 +172,14 @@ module type UInt32 = sig
   val to_uint32 : t -> uint32
 
   val of_uint32 : uint32 -> t
-end
+end [@@warning "-32"]
 
 module type UInt64 = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt64.t
-      [@@deriving sexp, eq, compare, hash, yojson]
+      [@@deriving sexp, equal, compare, hash, yojson]
     end
   end]
 
@@ -188,11 +188,11 @@ module type UInt64 = sig
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
-end
+end [@@warning "-32"]
 
 module type F = functor
   (N :sig
-      
+
       type t [@@deriving bin_io, sexp, compare, hash]
 
       include Unsigned_extended.S with type t := t
@@ -208,6 +208,6 @@ consensus_mechanism]
 module type F_checked = functor
   (N : Unsigned_extended.S)
   (Bits : Bits_intf.Convertible_bits with type t := N.t)
-  -> S_checked with type unchecked := N.t
+  -> S_checked with type unchecked := N.t [@@warning "-67"]
 
 [%%endif]

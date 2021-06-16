@@ -2,20 +2,20 @@
 
 set -eo pipefail
 
-apt-get update
-apt-get install -y git python3
-
-export DUNE_PROFILE=mainnet
-
-source buildkite/scripts/export-git-env-vars.sh
+export DUNE_PROFILE=devnet
 
 # Don't prompt for answers during apt-get install
 export DEBIAN_FRONTEND=noninteractive
-
-apt-get install -y apt-transport-https ca-certificates make
-echo "deb [trusted=yes] http://packages.o1test.net unstable main" | tee /etc/apt/sources.list.d/coda.list
 apt-get update
-apt-get install --allow-downgrades -y curl ${PROJECT}-noprovingkeys=${VERSION}
+apt-get install -y git python3 apt-transport-https ca-certificates make curl
+
+# Source the environment script to get the proper ${VERSION}. Must be executed after installing git but before installing mina.
+source buildkite/scripts/export-git-env-vars.sh
+
+echo "Installing mina daemon package: mina-devnet=${MINA_DEB_VERSION}"
+echo "deb [trusted=yes] http://packages.o1test.net ${MINA_DEB_CODENAME} ${MINA_DEB_RELEASE}" | tee /etc/apt/sources.list.d/mina.list
+apt-get update
+apt-get install --allow-downgrades -y curl "mina-devnet=${MINA_DEB_VERSION}"
 
 mina daemon --seed --proof-level none --rest-port 8080 &
 

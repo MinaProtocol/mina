@@ -15,12 +15,12 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
           let%bind stat = Unix.stat dn in
           Deferred.return
           @@
-          if stat.kind <> `Directory then
+          if (Unix.File_kind.equal stat.kind `Directory) then Ok true
+          else
             corrupted_privkey
               (Error.createf
                  "%s exists and it is not a directory, can't store files there"
-                 dn)
-          else Ok true )
+                 dn) )
     with
     | Ok x ->
         return x

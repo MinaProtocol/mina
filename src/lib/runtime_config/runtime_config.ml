@@ -172,20 +172,19 @@ module Json_layout = struct
       end
 
       type t =
-        { pk: (string option[@default None])
-        ; sk: (string option[@default None])
+        { pk: string option [@default None]
+        ; sk: string option [@default None]
         ; balance: Currency.Balance.t
-        ; delegate: (string option[@default None])
-        ; timing: (Timed.t option[@default None])
-        ; token: (Unsigned_extended.UInt64.t option[@default None])
-        ; token_permissions: (Token_permissions.t option[@default None])
-        ; nonce:
-            (Mina_numbers.Account_nonce.t[@default
-                                           Mina_numbers.Account_nonce.zero])
-        ; receipt_chain_hash: (string option[@default None])
-        ; voting_for: (string option[@default None])
-        ; snapp: (Snapp_account.t option[@default None])
-        ; permissions: (Permissions.t option[@default None]) }
+        ; delegate: string option [@default None]
+        ; timing: Timed.t option [@default None]
+        ; token: Unsigned_extended.UInt64.t option [@default None]
+        ; token_permissions: Token_permissions.t option [@default None]
+        ; nonce: Mina_numbers.Account_nonce.t
+              [@default Mina_numbers.Account_nonce.zero]
+        ; receipt_chain_hash: string option [@default None]
+        ; voting_for: string option [@default None]
+        ; snapp: Snapp_account.t option [@default None]
+        ; permissions: Permissions.t option [@default None] }
       [@@deriving sexp, yojson, dhall_type]
 
       let fields =
@@ -229,12 +228,12 @@ module Json_layout = struct
     end
 
     type t =
-      { accounts: (Accounts.t option[@default None])
-      ; num_accounts: (int option[@default None])
-      ; balances: (Balance_spec.t list[@default []])
-      ; hash: (string option[@default None])
-      ; name: (string option[@default None])
-      ; add_genesis_winner: (bool option[@default None]) }
+      { accounts: Accounts.t option [@default None]
+      ; num_accounts: int option [@default None]
+      ; balances: Balance_spec.t list [@default []]
+      ; hash: string option [@default None]
+      ; name: string option [@default None]
+      ; add_genesis_winner: bool option [@default None] }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -251,9 +250,9 @@ module Json_layout = struct
   module Proof_keys = struct
     module Transaction_capacity = struct
       type t =
-        { log_2: (int option[@default None])
-              [@key "2_to_the"] [@dhall_type.key "two_to_the"]
-        ; txns_per_second_x10: (int option[@default None]) }
+        { log_2: int option
+              [@default None] [@key "2_to_the"] [@dhall_type.key "two_to_the"]
+        ; txns_per_second_x10: int option [@default None] }
       [@@deriving yojson, dhall_type]
 
       let fields = [|"2_to_the"; "txns_per_second_x10"|]
@@ -268,16 +267,16 @@ module Json_layout = struct
     end
 
     type t =
-      { level: (string option[@default None])
-      ; sub_windows_per_window: (int option[@default None])
-      ; ledger_depth: (int option[@default None])
-      ; work_delay: (int option[@default None])
-      ; block_window_duration_ms: (int option[@default None])
-      ; transaction_capacity: (Transaction_capacity.t option[@default None])
-      ; coinbase_amount: (Currency.Amount.t option[@default None])
-      ; supercharged_coinbase_factor: (int option[@default None])
-      ; account_creation_fee: (Currency.Fee.t option[@default None])
-      ; fork: (Fork_config.t option[@default None]) }
+      { level: string option [@default None]
+      ; sub_windows_per_window: int option [@default None]
+      ; ledger_depth: int option [@default None]
+      ; work_delay: int option [@default None]
+      ; block_window_duration_ms: int option [@default None]
+      ; transaction_capacity: Transaction_capacity.t option [@default None]
+      ; coinbase_amount: Currency.Amount.t option [@default None]
+      ; supercharged_coinbase_factor: int option [@default None]
+      ; account_creation_fee: Currency.Fee.t option [@default None]
+      ; fork: Fork_config.t option [@default None] }
     [@@deriving yojson, dhall_type]
 
     let fields =
@@ -300,7 +299,6 @@ module Json_layout = struct
       ; delta: (int option[@default None])
       ; slots_per_epoch: (int option[@default None])
       ; slots_per_sub_window: (int option[@default None])
-      ; sub_windows_per_window: (int option[@default None])
       ; genesis_state_timestamp: (string option[@default None]) }
     [@@deriving yojson, dhall_type]
 
@@ -317,8 +315,8 @@ module Json_layout = struct
 
   module Daemon = struct
     type t =
-      { txpool_max_size: (int option[@default None])
-      ; peer_list_url: (string option[@default None]) }
+      { txpool_max_size: int option [@default None]
+      ; peer_list_url: string option [@default None] }
     [@@deriving yojson, dhall_type]
 
     let fields = [|"txpool_max_size"; "peer_list_url"|]
@@ -347,11 +345,11 @@ module Json_layout = struct
   end
 
   type t =
-    { daemon: (Daemon.t option[@default None])
-    ; genesis: (Genesis.t option[@default None])
-    ; proof: (Proof_keys.t option[@default None])
-    ; ledger: (Ledger.t option[@default None])
-    ; epoch_data: (Epoch_data.t option[@default None]) }
+    { daemon: Daemon.t option [@default None]
+    ; genesis: Genesis.t option [@default None]
+    ; proof: Proof_keys.t option [@default None]
+    ; ledger: Ledger.t option [@default None]
+    ; epoch_data: Epoch_data.t option [@default None] }
   [@@deriving yojson, dhall_type]
 
   let fields = [|"daemon"; "ledger"; "genesis"; "proof"; "epoch_data"|]
@@ -550,7 +548,7 @@ end
 
 module Proof_keys = struct
   module Level = struct
-    type t = Full | Check | None [@@deriving bin_io_unversioned, eq]
+    type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
 
     let to_string = function
       | Full ->
@@ -719,7 +717,6 @@ module Genesis = struct
     ; delta: int option
     ; slots_per_epoch: int option
     ; slots_per_sub_window: int option
-    ; sub_windows_per_window: int option
     ; genesis_state_timestamp: string option }
   [@@deriving bin_io_unversioned]
 
@@ -736,9 +733,6 @@ module Genesis = struct
   let combine t1 t2 =
     { k= opt_fallthrough ~default:t1.k t2.k
     ; delta= opt_fallthrough ~default:t1.delta t2.delta
-    ; sub_windows_per_window=
-        opt_fallthrough ~default:t1.sub_windows_per_window
-          t2.sub_windows_per_window
     ; slots_per_epoch=
         opt_fallthrough ~default:t1.slots_per_epoch t2.slots_per_epoch
     ; slots_per_sub_window=

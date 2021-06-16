@@ -51,7 +51,10 @@ module Make (Engine : Intf.Engine.S) () :
     let t = {logger; network; event_router; network_state_reader} in
     `Don't_call_in_tests t
 
-  let section = Malleable_error.contextualize
+  let section_hard = Malleable_error.contextualize
+
+  let section context m =
+    m |> Malleable_error.soften_error |> Malleable_error.contextualize context
 
   let hard_wait_for_network_state_predicate ~logger ~hard_timeout
       ~network_state_reader ~init ~check =
@@ -194,11 +197,11 @@ module Make (Engine : Intf.Engine.S) () :
                  failwith "unexpected log level encountered"
            in
            DynArray.add acc (node, message) ;
-           if message.level = Fatal then (
+           if Logger.Level.equal message.level Fatal then (
              [%log fatal] "Error occured $error"
                ~metadata:[("error", Logger.Message.to_yojson message)] ;
              on_fatal_error message ) ;
-           Deferred.return `Continue )) ;
+           Deferred.return `Continue ) : 'a Event_router.event_subscription) ;
     log_error_accumulator
 
   let lift_accumulated_log_errors {warn; faulty_peer; error; fatal} =

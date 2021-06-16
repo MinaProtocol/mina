@@ -299,8 +299,8 @@ let setup_daemon logger =
   and libp2p_peer_list_file =
     flag "--peer-list-file" ~aliases:["peer-list-file"]
       ~doc:
-        "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
-         discovery inside a file delimited by new-lines (\\n)"
+        "PATH path to a file containing \"bootstrap\" peers for discovery, \
+         one multiaddress per line"
       (optional string)
   and seed_peer_list_url =
     flag "--peer-list-url" ~aliases:["peer-list-url"]
@@ -363,6 +363,12 @@ let setup_daemon logger =
         "true|false upload blocks to gcloud storage. Requires the environment \
          variables GCLOUD_KEYFILE, NETWORK_NAME, and \
          GCLOUD_BLOCK_UPLOAD_BUCKET"
+  and all_peers_seen_metric =
+    flag "--all-peers-seen-metric" ~aliases:["all-peers-seen-metric"]
+      (optional_with_default false bool)
+      ~doc:
+        "true|false whether to track the set of all peers ever seen for the \
+         all_peers metric (default: false)"
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -841,7 +847,7 @@ let setup_daemon logger =
       Option.iter
         ~f:(fun password ->
           match Sys.getenv Secrets.Keypair.env with
-          | Some env_pass when env_pass <> password ->
+          | Some env_pass when not (String.equal env_pass password) ->
               [%log warn]
                 "$envkey environment variable doesn't match value provided on \
                  command-line or daemon.json. Using value from $envkey"
@@ -901,7 +907,7 @@ let setup_daemon logger =
             client_trustlist
       in
       Stream.iter
-        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context @@ t ())
+        (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
         ~f:(fun (span, context) ->
           let secs = Time_ns.Span.to_sec span in
@@ -927,7 +933,7 @@ let setup_daemon logger =
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
           ) ;
       Stream.iter
-        Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
+        Async_kernel.Async_kernel_scheduler.long_jobs_with_context
         ~f:(fun (context, span) ->
           let secs = Time_ns.Span.to_sec span in
           [%log debug]
@@ -1065,7 +1071,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; max_connections
           ; validation_queue_size
           ; isolate= Option.value ~default:false isolate
-          ; keypair= libp2p_keypair }
+          ; keypair= libp2p_keypair
+          ; all_peers_seen_metric }
       in
       let net_config =
         { Mina_networking.Config.logger
@@ -1575,7 +1582,7 @@ let () =
   (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
    let is_version_cmd = make_list_mem ["version"; "-version"] in
    let is_help_flag = make_list_mem ["-help"; "-?"] in
-   match Sys.argv with
+   match Sys.get_argv () with
    | [|_coda_exe; version|] when is_version_cmd version ->
        Mina_version.print_version ()
    | [|coda_exe; version; help|]

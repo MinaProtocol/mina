@@ -55,7 +55,7 @@ let construct_staged_ledger_at_root
     Deferred.Or_error.List.iter transactions_with_protocol_state
       ~f:(fun (txn, protocol_state) ->
         Deferred.return
-        @@ let%bind.Or_error.Let_syntax txn_with_info =
+        @@ let%bind.Or_error txn_with_info =
              Ledger.apply_transaction
                ~constraint_constants:precomputed_values.constraint_constants
                mask
@@ -325,11 +325,11 @@ let create ~logger ~verifier ~time_controller ~directory =
   {logger; verifier; time_controller; directory; instance= None}
 
 let destroy_database_exn t =
-  assert (t.instance = None) ;
+  assert (Option.is_none t.instance) ;
   File_system.remove_dir t.directory
 
 let create_instance_exn t =
-  assert (t.instance = None) ;
+  assert (Option.is_none t.instance) ;
   let instance = Instance.create t in
   t.instance <- Some instance ;
   instance

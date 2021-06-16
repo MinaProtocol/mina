@@ -197,7 +197,7 @@ module Snark_worker = struct
                ~shutdown_on_disconnect:false )
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger
-      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
     don't_wait_for
       ( match%bind
           Monitor.try_with ~here:[%here] (fun () ->
@@ -401,10 +401,11 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                          ())
               | Some _ ->
                   () ) ;
-              if `Empty = first_connection then (
+              let is_empty = function `Empty -> true | _ -> false in
+              if is_empty first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
-              else if `Empty = first_message then (
+              else if is_empty first_message then (
                 [%str_log info] Listening ;
                 `Listening )
               else `Offline
@@ -464,7 +465,8 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           ()
     in
     let handle_status_change status =
-      if status = `Offline then start_offline_timeout ()
+      if match status with `Offline -> true | _ -> false then
+        start_offline_timeout ()
       else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
@@ -822,7 +824,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
     Work_selection_method.remove t.snark_job_state spec
   in
-  let _ = Or_error.try_with (fun () -> update_metrics ()) in
+  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
@@ -988,7 +990,7 @@ let perform_compaction t =
             | `Producing ->
                 perform (span slot_duration_ms)
             | `Producing_in_ms ms ->
-                if ms < expected_time_for_compaction then
+                if Float.(ms < expected_time_for_compaction) then
                   (*too close to block production; perform compaction after block production*)
                   perform (span slot_duration_ms ~incr:ms)
                 else (
@@ -1083,6 +1085,42 @@ let start_with_precomputed_blocks t blocks =
   in
   start t
 
+let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
+  (* HACK: Pretend we're a remote peer so that we can rate limit
+                 ourselves.
+              *)
+  let us =
+    { Network_peer.Peer.host= Unix.Inet_addr.of_string "127.0.0.1"
+    ; libp2p_port= 0
+    ; peer_id= "" }
+  in
+  let score = diff_score diff in
+  let rec able_to_send_or_wait () =
+    match
+      Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time.now ()) ~score
+    with
+    | `Within_capacity ->
+        Deferred.return ()
+    | `Capacity_exceeded ->
+        if score > max_per_15_seconds then (
+          (* This will never pass the rate limiting; pass it on
+                             to progress in the queue. *)
+          ignore
+            ( Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time.now ())
+                ~score:0
+              : [`Within_capacity | `Capacity_exceeded] ) ;
+          Deferred.return () )
+        else
+          let%bind () =
+            after
+              Time.(
+                diff (now ())
+                  (Network_pool.Rate_limiter.next_expires rl (Remote us)))
+          in
+          able_to_send_or_wait ()
+  in
+  able_to_send_or_wait ()
+
 let create ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1140,15 +1178,15 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
+          let log_rate_limiter_occasionally rl ~label =
+            let t = Time.Span.of_min 1. in
+            every t (fun () ->
+                [%log' debug config.logger]
+                  ~metadata:
+                    [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+                  !"%s $rate_limiter" label )
+          in
           let external_transitions_reader, external_transitions_writer =
-            let log_rate_limiter_occasionally rl =
-              let t = Time.Span.of_min 1. in
-              every t (fun () ->
-                  [%log' debug config.logger]
-                    ~metadata:
-                      [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
-                    !"new_block $rate_limiter" )
-            in
             let rl =
               Network_pool.Rate_limiter.create
                 ~capacity:
@@ -1158,7 +1196,7 @@ let create ?wallets (config : Config.t) =
                       (Block_time.Span.to_time_span
                          consensus_constants.slot_duration_ms) )
             in
-            log_rate_limiter_occasionally rl ;
+            log_rate_limiter_occasionally rl ~label:"new_block" ;
             let r, w = Strict_pipe.create Synchronous in
             ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
                   let sender = Envelope.Incoming.sender e in
@@ -1561,7 +1599,10 @@ let create ?wallets (config : Config.t) =
                               Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
-                            if v = `Accept then
+                            if
+                              Mina_net2.Validation_callback
+                              .equal_validation_result v `Accept
+                            then
                               Mina_networking.broadcast_state net
                                 (External_transition.Validation
                                  .forget_validation_with_hash et)) ;
@@ -1582,9 +1623,19 @@ let create ?wallets (config : Config.t) =
             (network_pipe, api_pipe, new_blocks_pipe)
           in
           trace_task "transaction pool broadcast loop" (fun () ->
+              let rl = Network_pool.Transaction_pool.create_rate_limiter () in
+              log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun x ->
+                  let%bind () =
+                    send_resource_pool_diff_or_wait ~rl
+                      ~diff_score:
+                        Network_pool.Transaction_pool.Resource_pool.Diff.score
+                      ~max_per_15_seconds:
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .max_per_15_seconds x
+                  in
                   Mina_networking.broadcast_transaction_pool_diff net x ;
                   Deferred.unit ) ) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
@@ -1609,7 +1660,11 @@ let create ?wallets (config : Config.t) =
                   with
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if not (source = `Internal) then
+                      if
+                        not
+                          ([%equal: [`Catchup | `Gossip | `Internal]] source
+                             `Internal)
+                      then
                         [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"
@@ -1693,8 +1748,18 @@ let create ?wallets (config : Config.t) =
                   ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
+              let rl = Network_pool.Snark_pool.create_rate_limiter () in
+              log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
                 ~f:(fun x ->
+                  let%bind () =
+                    send_resource_pool_diff_or_wait ~rl
+                      ~diff_score:
+                        Network_pool.Snark_pool.Resource_pool.Diff.score
+                      ~max_per_15_seconds:
+                        Network_pool.Snark_pool.Resource_pool.Diff
+                        .max_per_15_seconds x
+                  in
                   Mina_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
           Option.iter config.archive_process_location
@@ -1785,3 +1850,6 @@ let create ?wallets (config : Config.t) =
             ; block_production_status= ref `Free } ) )
 
 let net {components= {net; _}; _} = net
+
+let runtime_config {config= {precomputed_values; _}; _} =
+  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values

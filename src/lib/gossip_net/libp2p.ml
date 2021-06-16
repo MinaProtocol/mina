@@ -37,7 +37,8 @@ module Config = struct
     ; seed_peer_list_url: Uri.t option
     ; max_connections: int
     ; validation_queue_size: int
-    ; mutable keypair: Mina_net2.Keypair.t option }
+    ; mutable keypair: Mina_net2.Keypair.t option
+    ; all_peers_seen_metric: bool }
   [@@deriving make]
 end
 
@@ -153,7 +154,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with ~here:[%here] ~rest:`Raise (fun () ->
             trace "mina_net2" (fun () ->
-                Mina_net2.create ~logger:config.logger ~conf_dir ~pids
+                Mina_net2.create
+                  ~all_peers_seen_metric:config.all_peers_seen_metric
+                  ~logger:config.logger ~conf_dir ~pids
                   ~on_unexpected_termination ) )
       with
       | Ok (Ok net2) -> (
@@ -508,13 +511,13 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                 List.filter !ban_configuration.banned_peers ~f:(fun p ->
                     not (Peer.equal p banned_peer) ) } ;
           Mina_net2.set_connection_gating_config net2 !ban_configuration
-          |> Deferred.ignore ) ;
+          |> Deferred.ignore_m ) ;
         (let%bind net2 = !net2_ref in
          ban_configuration :=
            { !ban_configuration with
              banned_peers= banned_peer :: !ban_configuration.banned_peers } ;
          Mina_net2.set_connection_gating_config net2 !ban_configuration)
-        |> Deferred.ignore
+        |> Deferred.ignore_m
       in
       let%map () =
         Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
@@ -604,7 +607,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    ~send_every:(Time_ns.Span.of_sec 10.)
                    ~timeout:
                      (Option.value ~default:(Time_ns.Span.of_sec 120.)
-                        heartbeat_timeout))
+                        heartbeat_timeout) ())
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn

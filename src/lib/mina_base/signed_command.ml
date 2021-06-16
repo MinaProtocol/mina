@@ -23,7 +23,7 @@ module Poly = struct
     module V1 = struct
       type ('payload, 'pk, 'signature) t =
         {payload: 'payload; signer: 'pk; signature: 'signature}
-      [@@deriving compare, sexp, hash, yojson, eq]
+      [@@deriving compare, sexp, hash, yojson, equal]
     end
   end]
 end
@@ -345,11 +345,13 @@ module With_valid_signature = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
+      type t = Stable.V1.t [@@deriving sexp, equal, yojson, hash]
 
       let to_latest = Stable.V1.to_latest
 
       let compare = Stable.V1.compare
+
+      let equal = Stable.V1.equal
 
       module Gen = Gen
     end

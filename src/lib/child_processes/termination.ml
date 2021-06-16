@@ -59,7 +59,7 @@ let check_terminated_child (t : t) child_pid logger =
 (** wait for a [process], which may resolve immediately or in a Deferred.t,
     log any errors, attributing the source to the provided [module] and [location]
 *)
-let wait_for_process_log_errors ~logger process ~module_ ~location =
+let wait_for_process_log_errors ~logger process ~module_ ~location ~here =
   (* Handle implicit raciness in the wait syscall by calling [Process.wait]
      early, so that its value will be correctly cached when we actually need
      it.
@@ -69,14 +69,23 @@ let wait_for_process_log_errors ~logger process ~module_ ~location =
         (* Eagerly force [Process.wait], so that it won't be captured
            elsewhere on exit.
         *)
-        let waiting = Process.wait process in
+        let waiting =
+          Monitor.try_with ~here ~run:`Now
+            ~rest:
+              (`Call
+                (fun exn ->
+                  let err = Error.of_exn exn in
+                  Logger.error logger ~module_ ~location
+                    "Saw a deferred exception $exn after waiting for process"
+                    ~metadata:[("exn", Error_json.error_to_yojson err)] ))
+            (fun () -> Process.wait process)
+        in
         don't_wait_for
-          ( match%map
-              Monitor.try_with_or_error ~here:[%here] (fun () -> waiting)
-            with
+          ( match%map waiting with
           | Ok _ ->
               ()
-          | Error err ->
+          | Error exn ->
+              let err = Error.of_exn exn in
               Logger.error logger ~module_ ~location
                 "Saw a deferred exception $exn while waiting for process"
                 ~metadata:[("exn", Error_json.error_to_yojson err)] ) )

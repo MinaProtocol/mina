@@ -155,6 +155,9 @@ module Types = struct
 
   let token_id = token_id ()
 
+  let json : ('context, Yojson.Basic.t option) typ =
+    scalar "JSON" ~doc:"Arbitrary JSON" ~coerce:Fn.id
+
   let epoch_seed = epoch_seed ()
 
   let sync_status : ('context, Sync_status.t option) typ =
@@ -1115,7 +1118,7 @@ module Types = struct
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   match%map.Option.Let_syntax account.token_permissions with
+                   match%map.Option account.token_permissions with
                    | Token_owned _ ->
                        true
                    | Not_owned _ ->
@@ -1126,7 +1129,7 @@ module Types = struct
                     the associated token"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   match%map.Option.Let_syntax account.token_permissions with
+                   match%map.Option account.token_permissions with
                    | Token_owned _ ->
                        false
                    | Not_owned {account_disabled} ->
@@ -2666,7 +2669,7 @@ module Mutations = struct
         | Some _ ->
             return (pk, true)
         | None ->
-            let%map.Async pk =
+            let%map.Async.Deferred pk =
               Secrets.Wallets.import_keypair wallets keypair ~password
             in
             Ok (pk, false) )
@@ -3096,10 +3099,12 @@ module Mutations = struct
         in
         let net = Mina_lib.net coda in
         let seed = Option.value ~default:true seed in
-        let%bind.Async maybe_failure =
+        let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Mina_networking.add_peer net peer ~seed with
+              match%map.Async.Deferred
+                Mina_networking.add_peer net peer ~seed
+              with
               | Ok () ->
                   None
               | Error err ->
@@ -3787,6 +3792,15 @@ module Queries = struct
         in
         Signed_command.check_signature user_command )
 
+  let runtime_config =
+    field "runtimeConfig"
+      ~doc:"The runtime configuration passed to the daemon at start-up"
+      ~typ:(non_null Types.json)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= mina; _} () ->
+        Mina_lib.runtime_config mina
+        |> Runtime_config.to_yojson |> Yojson.Safe.to_basic )
+
   let evaluate_vrf =
     io_field "evaluateVrf"
       ~doc:
@@ -3870,7 +3884,8 @@ module Queries = struct
     ; next_available_token
     ; validate_payment
     ; evaluate_vrf
-    ; check_vrf ]
+    ; check_vrf
+    ; runtime_config ]
 end
 
 let schema =

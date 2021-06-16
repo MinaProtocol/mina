@@ -11,7 +11,7 @@ module UInt64 = struct
 
      TODO: Separate [Unsigned_extended] into snark and non-snark parts.
   *)
-  type t = Unsigned.UInt64.t [@@deriving ord, eq]
+  type t = Unsigned.UInt64.t [@@deriving ord, equal]
 
   let to_yojson x = `String (Unsigned.UInt64.to_string x)
 
@@ -51,14 +51,14 @@ module Kind = struct
             human-readable format
         *)
     }
-  [@@deriving yojson, sexp, ord, eq]
+  [@@deriving yojson, sexp, ord, equal]
 end
 
 module Constraint_constants = struct
   module Transaction_capacity = struct
     (** Transaction pool capacity *)
     type t = Log_2 of int | Txns_per_second_x10 of int
-    [@@deriving sexp, ord, eq]
+    [@@deriving sexp, ord, equal]
 
     let to_yojson t : Yojson.Safe.t =
       match t with
@@ -90,7 +90,7 @@ module Constraint_constants = struct
       { previous_state_hash: string
       ; previous_length: int
       ; previous_global_slot: int }
-    [@@deriving yojson, sexp, ord, eq]
+    [@@deriving yojson, sexp, ord, equal]
 
     let opt_to_yojson t : Yojson.Safe.t =
       match t with Some t -> to_yojson t | None -> `Assoc []
@@ -117,12 +117,12 @@ module Constraint_constants = struct
     ; fork:
         (Fork_config.t option[@to_yojson Fork_config.opt_to_yojson]
                              [@of_yojson Fork_config.opt_of_yojson]) }
-  [@@deriving yojson, sexp, ord, eq]
+  [@@deriving yojson, sexp, ord, equal]
 end
 
 module Commits = struct
   (** Commit identifiers *)
-  type t = {mina: string; marlin: string} [@@deriving yojson, sexp, ord, eq]
+  type t = {mina: string; marlin: string} [@@deriving yojson, sexp, ord, equal]
 end
 
 let header_version = 1
@@ -137,7 +137,7 @@ type t =
   ; commit_date: string
   ; constraint_system_hash: string
   ; identifying_hash: string }
-[@@deriving yojson, sexp, ord, eq]
+[@@deriving yojson, sexp, ord, equal]
 
 let prefix = "MINA_SNARK_KEYS\n"
 
@@ -239,7 +239,7 @@ let%test_module "Check parsing of header" =
     let valid_header_with_prefix = prefix ^ valid_header_string
 
     module Tests (Lexing : sig
-      val from_string : string -> Lexing.lexbuf
+      val from_string : ?with_positions:bool -> string -> Lexing.lexbuf
     end) =
     struct
       let%test "doesn't parse without prefix" =
@@ -285,7 +285,7 @@ let%test_module "Check parsing of header" =
     let%test_module "Parsing from part-way through a lexbuf" =
       ( module struct
         include Tests (struct
-          let from_string str =
+          let from_string ?with_positions:_ str =
             let prefix = "AAAAAAAAAA" in
             let prefix_len = String.length prefix in
             let lexbuf = Lexing.from_string (prefix ^ str) in
@@ -299,7 +299,7 @@ let%test_module "Check parsing of header" =
     let%test_module "Parsing with refill" =
       ( module struct
         include Tests (struct
-          let from_string str =
+          let from_string ?with_positions:_ str =
             let init = ref true in
             let initial_prefix = "AAAAAAAAAA" in
             let initial_prefix_len = String.length initial_prefix in

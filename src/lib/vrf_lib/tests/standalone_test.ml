@@ -68,8 +68,6 @@ let%test_module "vrf-test" =
           equal_or_infinity Affine.equal (to_affine_or_infinity x)
             (to_affine_or_infinity y))
 
-      let scale_field = scale
-
       module Checked = struct
         include Snarky_curves.Make_weierstrass_checked
                   (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
@@ -114,7 +112,7 @@ let%test_module "vrf-test" =
 
       let negate = Curve.negate
 
-      let scale = Curve.scale_field
+      let scale = Curve.scale
 
       let generator = Curve.one
 

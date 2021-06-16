@@ -14,7 +14,7 @@ let net_configs n =
         Mina_net2.create
           ~pids:(Child_processes.Termination.create_pid_table ())
           ~logger:(Logger.create ()) ~conf_dir:tmpd
-          ~on_unexpected_termination:(fun () ->
+          ~all_peers_seen_metric:false ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died )
       in
       let net = Or_error.ok_exn net in

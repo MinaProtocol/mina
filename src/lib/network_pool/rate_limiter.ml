@@ -56,7 +56,7 @@ module Record = struct
           in
           if is_old then (
             r.remaining_capacity <- Score.(r.remaining_capacity + n) ;
-            ignore (Queue.dequeue_exn r.elts) ;
+            ignore (Queue.dequeue_exn r.elts : int * Time.t) ;
             go () )
     in
     go ()
@@ -77,11 +77,11 @@ module Lru_table (Q : Hash_queue.S) = struct
   type t = {table: Record.t Q.t; initial_capacity: Score.t}
   [@@deriving sexp_of]
 
-  let add ({table; initial_capacity} : t) (k : Q.Key.t) ~now ~score =
+  let add ({table; initial_capacity} : t) (k : Q.key) ~now ~score =
     match Q.lookup_and_move_to_back table k with
     | None ->
         if Int.(Q.length table >= max_size) then
-          Q.dequeue_front table |> ignore ;
+          ignore (Q.dequeue_front table : Record.t option) ;
         Q.enqueue_back_exn table k
           {Record.remaining_capacity= initial_capacity; elts= Queue.create ()} ;
         `Ok
@@ -97,6 +97,13 @@ module Lru_table (Q : Hash_queue.S) = struct
         Score.(is_non_negative (r.remaining_capacity - score))
 
   let create ~initial_capacity = {initial_capacity; table= Q.create ()}
+
+  let next_expires ({table; _} : t) (k : Q.key) =
+    match Q.lookup table k with
+    | None ->
+        Time.now ()
+    | Some {elts; _} -> (
+      match Queue.peek elts with Some (_, time) -> time | None -> Time.now () )
 end
 
 module Ip = struct
@@ -131,10 +138,17 @@ let add {by_ip; by_peer_id} (sender : Envelope.Sender.t) ~now ~score =
         Ip.Lru.has_capacity by_ip ip ~now ~score
         && Peer_id.Lru.has_capacity by_peer_id id ~now ~score
       then (
-        Ip.Lru.add by_ip ip ~now ~score |> ignore ;
-        Peer_id.Lru.add by_peer_id id ~now ~score |> ignore ;
+        ignore (Ip.Lru.add by_ip ip ~now ~score : [`No_space | `Ok]) ;
+        ignore (Peer_id.Lru.add by_peer_id id ~now ~score : [`No_space | `Ok]) ;
         `Within_capacity )
       else `Capacity_exceeded
+
+let next_expires {by_peer_id; _} (sender : Envelope.Sender.t) =
+  match sender with
+  | Local ->
+      Time.now ()
+  | Remote {peer_id; _} ->
+      Peer_id.Lru.next_expires by_peer_id peer_id
 
 module Summary = struct
   type r = {capacity_used: Score.t} [@@deriving to_yojson]

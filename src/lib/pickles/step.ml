@@ -445,7 +445,7 @@ struct
         | None ->
             Snarky_backendless.Request.unhandled )
     in
-    let%map.Async (next_proof : Tick.Proof.t) =
+    let%map.Async.Deferred (next_proof : Tick.Proof.t) =
       let (T (input, conv)) =
         Impls.Step.input ~branching:Max_branching.n ~wrap_rounds:Tock.Rounds.n
       in

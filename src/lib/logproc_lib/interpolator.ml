@@ -35,12 +35,12 @@ let parser =
   let message =
     many1
       (choice
-         [ (take_while1 (not_f (( = ) '$')) >>| fun x -> `Raw x)
+         [ (take_while1 (not_f (Char.equal '$')) >>| fun x -> `Raw x)
          ; (interpolation >>| fun x -> `Interpolate x) ])
   in
   message <* end_of_input
 
-let parse = Angstrom.parse_string parser
+let parse = Angstrom.parse_string ~consume:All parser
 
 (* map and concat vs. fold: which is better for strings? *)
 let render ~max_interpolation_length ~format_json metadata items =
