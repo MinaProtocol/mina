@@ -12,7 +12,7 @@ terraform {
 module "o1testnet_alerts" {
   source = "../modules/testnet-alerts"
 
-  rule_filter            = "{testnet!~\"^(it-|ci-net).+\"}" # omit testnets deployed by integration/CI tests
+  rule_filter            = "{testnet!~\"^(it-|ci-net|test-).+\"}" # omit testnets deployed by integration/CI tests
   alert_timeframe        = "1h"
   alert_duration         = "10m"
   pagerduty_alert_filter = "devnet2|mainnet"

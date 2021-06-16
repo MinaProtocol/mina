@@ -13,13 +13,14 @@ module "kubernetes_testnet" {
   testnet_name   = var.testnet_name
 
   coda_image         = var.coda_image
+  use_custom_entrypoint = true
+  custom_entrypoint = "/mina_daemon_puppeteer.py"
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
   coda_bots_image    = var.coda_bots_image
   coda_points_image  = var.coda_points_image
 
   log_level             = "Trace"
-  log_txn_pool_gossip   = true
   log_snark_work_gossip = true
 
   additional_peers = [local.seed_peer.multiaddr]
@@ -32,6 +33,7 @@ module "kubernetes_testnet" {
   archive_configs = local.archive_node_configs
 
   log_precomputed_blocks = var.log_precomputed_blocks
+  log_txn_pool_gossip = true
 
   archive_node_count   = var.archive_node_count
   mina_archive_schema  = var.mina_archive_schema

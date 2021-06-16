@@ -20,6 +20,8 @@ module Validate_content = struct
 
   let sexp_of_t _ = sexp_of_unit ()
 
+  let compare _ _ = 0
+
   let __versioned__ = ()
 end
 
@@ -37,7 +39,7 @@ module Raw_versioned__ = struct
         ; current_protocol_version: Protocol_version.Stable.V1.t
         ; proposed_protocol_version_opt: Protocol_version.Stable.V1.t option
         ; mutable validation_callback: Validate_content.t }
-      [@@deriving sexp, fields]
+      [@@deriving compare, sexp, fields]
 
       let to_latest = Fn.id
 
@@ -95,7 +97,8 @@ Raw_versioned__.
   , current_protocol_version
   , proposed_protocol_version_opt
   , validation_callback
-  , set_validation_callback )]
+  , set_validation_callback
+  , compare )]
 
 [%%define_locally
 Stable.Latest.(create, sexp_of_t, t_of_sexp)]
@@ -274,6 +277,9 @@ let block_winner =
   Fn.compose Consensus.Data.Consensus_state.block_stake_winner consensus_state
 
 let commands = Fn.compose Staged_ledger_diff.commands staged_ledger_diff
+
+let completed_works =
+  Fn.compose Staged_ledger_diff.completed_works staged_ledger_diff
 
 let to_yojson t =
   `Assoc
@@ -887,6 +893,8 @@ module With_validation = struct
 
   let commands t = lift commands t
 
+  let completed_works t = lift completed_works t
+
   let transactions ~constraint_constants t =
     lift (transactions ~constraint_constants) t
 
@@ -1056,6 +1064,7 @@ module Validated = struct
     , supercharge_coinbase
     , transactions
     , commands
+    , completed_works
     , payments
     , global_slot
     , erase
@@ -1081,15 +1090,19 @@ let genesis ~precomputed_values =
   let genesis_protocol_state =
     Precomputed_values.genesis_state_with_hash precomputed_values
   in
-  let protocol_state_proof =
-    Precomputed_values.genesis_proof precomputed_values
-  in
   let empty_diff = Staged_ledger_diff.empty_diff in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
-           create ~protocol_state ~protocol_state_proof
+           create
+             ~protocol_state
+               (* We pass a dummy proof here, with the understanding that it will
+                never be validated except as part of the snark for the first
+                block produced (where we will explicitly generate the genesis
+                proof).
+             *)
+             ~protocol_state_proof:Proof.blockchain_dummy
              ~staged_ledger_diff:empty_diff
              ~validation_callback:
                (Mina_net2.Validation_callback.create_without_expiration ())

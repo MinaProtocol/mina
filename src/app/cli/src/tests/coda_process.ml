@@ -34,7 +34,9 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
         Filename.temp_dir_name
         ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
-  if Core.Sys.file_exists conf_dir <> `No then
+  if
+    not ([%equal: [`Yes | `No | `Unknown]] (Core.Sys.file_exists conf_dir) `No)
+  then
     failwithf
       "cannot configure coda process because directory already exists: %s"
       conf_dir () ;
@@ -168,10 +170,12 @@ let stop_snark_worker (conn, _, _) =
 
 let disconnect ((conn, proc, _) as t) ~logger =
   Child_processes.Termination.wait_for_process_log_errors ~logger proc
-    ~module_:__MODULE__ ~location:__LOC__ ;
+    ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
   (* This kills any straggling snark worker process *)
   let%bind () =
-    match%map Monitor.try_with (fun () -> stop_snark_worker t) with
+    match%map
+      Monitor.try_with ~here:[%here] (fun () -> stop_snark_worker t)
+    with
     | Ok () ->
         ()
     | Error exn ->
@@ -179,7 +183,7 @@ let disconnect ((conn, proc, _) as t) ~logger =
           ~metadata:[("exn", `String (Exn.to_string exn))]
   in
   let%bind () = Coda_worker.Connection.close conn in
-  match%map Monitor.try_with (fun () -> Process.wait proc) with
+  match%map Monitor.try_with ~here:[%here] (fun () -> Process.wait proc) with
   | Ok _ ->
       ()
   | Error e ->

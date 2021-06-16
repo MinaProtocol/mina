@@ -14,9 +14,9 @@ use algebra::{
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
-use commitment_dlog::{commitment::PolyComm, srs::SRS};
+use commitment_dlog::{commitment::PolyComm, srs::{SRS, SRSValue}};
 use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
-use plonk_protocol_dlog::index::{SRSValue, VerifierIndex as DlogVerifierIndex};
+use plonk_protocol_dlog::index::{VerifierIndex as DlogVerifierIndex};
 
 use std::{
     fs::{File, OpenOptions},

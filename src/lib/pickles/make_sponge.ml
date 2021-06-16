@@ -4,6 +4,8 @@ open Core_kernel
 module Rounds = struct
   let rounds_full = 63
 
+  let initial_ark = true
+
   let rounds_partial = 0
 end
 

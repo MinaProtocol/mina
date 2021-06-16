@@ -195,7 +195,9 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             , is_new_stack
             , pending_coinbase_update )
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-          raise (Error.to_exn e)
+          [%log error] "Failed to apply the diff: $error"
+            ~metadata:[("error", Error_json.error_to_yojson e)] ;
+          None
       | Error e ->
           ( match diff with
           | Ok diff ->
@@ -449,6 +451,37 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
   trace "block_producer" (fun () ->
       let constraint_constants = precomputed_values.constraint_constants in
       let consensus_constants = precomputed_values.consensus_constants in
+      let genesis_breadcrumb =
+        let started = ref false in
+        let genesis_breadcrumb_ivar = Ivar.create () in
+        fun () ->
+          if !started then Ivar.read genesis_breadcrumb_ivar
+          else (
+            started := true ;
+            let max_num_retries = 3 in
+            let rec go retries =
+              [%log info]
+                "Generating genesis proof ($attempts_remaining / $max_attempts)"
+                ~metadata:
+                  [ ("attempts_remaining", `Int retries)
+                  ; ("max_attempts", `Int max_num_retries) ] ;
+              match%bind
+                Prover.create_genesis_block prover
+                  (Genesis_proof.to_inputs precomputed_values)
+              with
+              | Ok res ->
+                  Ivar.fill genesis_breadcrumb_ivar (Ok res) ;
+                  return (Ok res)
+              | Error err ->
+                  [%log error] "Failed to generate genesis breadcrumb: $error"
+                    ~metadata:[("error", Error_json.error_to_yojson err)] ;
+                  if retries > 0 then go (retries - 1)
+                  else (
+                    Ivar.fill genesis_breadcrumb_ivar (Error err) ;
+                    return (Error err) )
+            in
+            go max_num_retries )
+      in
       let rejected_blocks_logger =
         Logger.create ~id:Logger.Logger_id.rejected_blocks ()
       in
@@ -481,9 +514,29 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               External_transition.protocol_state
                 (With_hash.data previous_transition)
             in
-            let previous_protocol_state_proof =
-              External_transition.protocol_state_proof
-                (With_hash.data previous_transition)
+            let%bind previous_protocol_state_proof =
+              if
+                Consensus.Data.Consensus_state.is_genesis_state
+                  (External_transition.consensus_state
+                     (With_hash.data previous_transition))
+                && Option.is_none precomputed_values.proof_data
+              then (
+                match%bind
+                  Interruptible.uninterruptible (genesis_breadcrumb ())
+                with
+                | Ok block ->
+                    let proof = Blockchain_snark.Blockchain.proof block in
+                    Interruptible.lift (Deferred.return proof)
+                      (Deferred.never ())
+                | Error _ ->
+                    [%log error]
+                      "Aborting block production: cannot generate a genesis \
+                       proof" ;
+                    Interruptible.lift (Deferred.never ()) (Deferred.return ()) )
+              else
+                return
+                  (External_transition.protocol_state_proof
+                     (With_hash.data previous_transition))
             in
             let transactions =
               Network_pool.Transaction_pool.Resource_pool.transactions ~logger
@@ -734,6 +787,21 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   Transition_frontier.best_tip transition_frontier
                   |> Breadcrumb.consensus_state
                 in
+                let generate_genesis_proof_if_needed () =
+                  match Broadcast_pipe.Reader.peek frontier_reader with
+                  | Some transition_frontier ->
+                      let consensus_state =
+                        Transition_frontier.best_tip transition_frontier
+                        |> Breadcrumb.consensus_state
+                      in
+                      if
+                        Consensus.Data.Consensus_state.is_genesis_state
+                          consensus_state
+                      then genesis_breadcrumb () |> Deferred.ignore_m
+                      else Deferred.return ()
+                  | None ->
+                      Deferred.return ()
+                in
                 (* TODO: Re-enable this assertion when it doesn't fail dev demos
                  *       (see #5354)
                  * assert (
@@ -743,7 +811,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    = None ) ; *)
                 don't_wait_for
                   (let now = Time.now time_controller in
-                   let%map next_producer_timing =
+                   let%bind next_producer_timing =
                      measure "asking consensus what to do" (fun () ->
                          Consensus.Hooks.next_producer_timing
                            ~constraint_constants ~constants:consensus_constants
@@ -756,25 +824,54 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                    match next_producer_timing with
                    | `Check_again time ->
                        Singleton_scheduler.schedule scheduler (time_of_ms time)
-                         ~f:check_next_block_timing
+                         ~f:check_next_block_timing ;
+                       Deferred.return ()
                    | `Produce_now (data, winner_pk) ->
                        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
-                       Interruptible.finally
-                         (Singleton_supervisor.dispatch production_supervisor
-                            (now, data, winner_pk))
-                         ~f:check_next_block_timing
-                       |> ignore
+                       let%map () = generate_genesis_proof_if_needed () in
+                       ignore
+                         ( Interruptible.finally
+                             (Singleton_supervisor.dispatch
+                                production_supervisor (now, data, winner_pk))
+                             ~f:check_next_block_timing
+                           : (unit, unit) Interruptible.t )
                    | `Produce (time, data, winner_pk) ->
                        Mina_metrics.(Counter.inc_one Block_producer.slots_won) ;
                        let scheduled_time = time_of_ms time in
+                       don't_wait_for
+                         ((* Attempt to generate a genesis proof in the slot
+                            immediately before we'll actually need it, so that
+                            it isn't limiting our block production time in the
+                            won slot.
+                            This also allows non-genesis blocks to be received
+                            in the meantime and alleviate the need to produce
+                            one at all, if this won't have block height 1.
+                         *)
+                          let scheduled_genesis_time =
+                            time_of_ms
+                              Int64.(
+                                time
+                                - of_int
+                                    constraint_constants
+                                      .block_window_duration_ms)
+                          in
+                          let span_till_time =
+                            Time.diff scheduled_genesis_time
+                              (Time.now time_controller)
+                            |> Time.Span.to_time_span
+                          in
+                          let%bind () = after span_till_time in
+                          generate_genesis_proof_if_needed ()) ;
                        Singleton_scheduler.schedule scheduler scheduled_time
                          ~f:(fun () ->
                            ignore
-                             (Interruptible.finally
-                                (Singleton_supervisor.dispatch
-                                   production_supervisor
-                                   (scheduled_time, data, winner_pk))
-                                ~f:check_next_block_timing) )) )
+                             ( Interruptible.finally
+                                 (Singleton_supervisor.dispatch
+                                    production_supervisor
+                                    (scheduled_time, data, winner_pk))
+                                 ~f:check_next_block_timing
+                               : (unit, unit) Interruptible.t ) ) ;
+                       Deferred.return ()) )
       in
       let start () =
         (* Schedule to wake up immediately on the next tick of the producer loop
@@ -806,8 +903,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
           "Node started before genesis: waiting $time_till_genesis \
            milliseconds before starting block producer" ;
         ignore
-          (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
-               start () )) )
+          ( Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
+                start () )
+            : unit Time.Timeout.t ) )
 
 let run_precomputed ~logger ~verifier ~trust_system ~time_controller
     ~frontier_reader ~transition_writer ~precomputed_blocks

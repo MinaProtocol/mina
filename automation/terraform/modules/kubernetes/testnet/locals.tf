@@ -13,11 +13,14 @@ locals {
   coda_vars = {
     runtimeConfig        = var.runtime_config
     image                = var.coda_image
+    useCustomEntrypoint  = var.use_custom_entrypoint
+    customEntrypoint     = var.custom_entrypoint
     privkeyPass          = var.block_producer_key_pass
     seedPeers            = local.peers
     logLevel             = var.log_level
     logSnarkWorkGossip   = var.log_snark_work_gossip
     logPrecomputedBlocks = var.log_precomputed_blocks
+    logTxnPoolGossip = var.log_txn_pool_gossip
     uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     seedPeersURL         = var.seed_peers_url
     exposeGraphql        = var.expose_graphql
@@ -35,11 +38,14 @@ locals {
     coda = {
       runtimeConfig = local.coda_vars.runtimeConfig
       image         = var.coda_image
+      useCustomEntrypoint  = var.use_custom_entrypoint
+      customEntrypoint     = var.custom_entrypoint
       privkeyPass   = var.block_producer_key_pass
       // TODO: Change this to a better name
       seedPeers          = local.peers
       logLevel           = var.log_level
       logSnarkWorkGossip = var.log_snark_work_gossip
+      logTxnPoolGossip = var.log_txn_pool_gossip
       ports = {
         client  = "8301"
         graphql = "3085"

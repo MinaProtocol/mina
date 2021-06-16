@@ -37,6 +37,8 @@ module Inputs = struct
 
   let rounds_full = 63
 
+  let initial_ark = true
+
   let rounds_partial = 0
 
   (* Computes x^5 *)
