@@ -14,6 +14,18 @@ deepStrictEqual(
   "Generated keypair could not be verified"
 );
 
+deepStrictEqual(
+  typeof CodaSDK.publicKeyToRaw(key.publicKey),
+  "string",
+  "Conversion to valid raw public key failed"
+);
+
+deepStrictEqual(
+  typeof CodaSDK.publicKeyToRaw(key.publicKey + "_"),
+  "undefined",
+  "Conversion to invalid raw public key returned a non undefined value"
+);
+
 let payment1 = CodaSDK.unsafeSignAny(
   { to: key.publicKey, from: key.publicKey, amount: "1", fee: "1", nonce: "0" },
   key
@@ -98,9 +110,8 @@ const signedRosettaTnxMock = `
   }
 `;
 
-const signedGraphQLCommand = CodaSDK.signedRosettaTransactionToSignedCommand(
-  signedRosettaTnxMock
-);
+const signedGraphQLCommand =
+  CodaSDK.signedRosettaTransactionToSignedCommand(signedRosettaTnxMock);
 const signedRosettaTnxMockJson = JSON.parse(signedRosettaTnxMock);
 const signedGraphQLCommandJson = JSON.parse(signedGraphQLCommand);
 

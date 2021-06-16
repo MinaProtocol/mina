@@ -117,3 +117,10 @@ export declare const verifyStakeDelegationSignature: (signedStakeDelegation: sig
   * @returns A string that represents the JSON conversion of a signed Rosetta transaction`.
    */
 export declare const signedRosettaTransactionToSignedCommand: (signedRosettaTxn: string) => string;
+/**
+* Return the hex-encoded format of a public key. This will raise an exception
+* and return `undefined` if the public key is invalid.
+* @param publicKey - A valid public key
+* @returns A string that represents the hex encoding of a public key or undefined otherwise.
+ */
+export declare const publicKeyToRaw: (publicKey: string) => (null | undefined | string);
