@@ -54,7 +54,7 @@ module Rolling_average (Spec : Metric_spec_intf) () :
     moving_average := None
 
   let update_avg ~avg ~count ~value =
-    ((avg /. count) +. value) *. (count +. 1.0)
+    ((avg *. count) +. value) /. (count +. 1.0)
 
   let update value =
     (moving_average :=
