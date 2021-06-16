@@ -717,7 +717,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
             in
             M.f prevs
           in
-          let%bind.Async proof =
+          let%bind.Async.Deferred proof =
             step handler ~maxes:(module Maxes) prevs next_state
           in
           let proof =
@@ -729,7 +729,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
                       (module Maxes)
                       proof.statement.pass_through } }
           in
-          let%map.Async proof =
+          let%map.Async.Deferred proof =
             Wrap.wrap ~max_branching:Max_branching.n full_signature.maxes
               wrap_requests ~dlog_plonk_index:wrap_vk.commitments wrap_main
               A_value.to_field_elements ~pairing_vk ~step_domains:b.domains

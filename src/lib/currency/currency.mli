@@ -55,7 +55,7 @@ module Fee : sig
   end
 
   [%%endif]
-end
+end [@@warning "-32"]
 
 module Amount : sig
   [%%versioned:
@@ -112,7 +112,7 @@ module Amount : sig
   end
 
   [%%endif]
-end
+end [@@warning "-32"]
 
 module Balance : sig
   [%%versioned:
@@ -179,4 +179,4 @@ module Balance : sig
   end
 
   [%%endif]
-end
+end [@@warning "-32"]

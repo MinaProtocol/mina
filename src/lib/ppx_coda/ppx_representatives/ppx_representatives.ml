@@ -127,10 +127,11 @@ let rec core_type ~loc (typ : core_type) : expression =
           (Ppx_representatives_runtime.Util.rev_concat
              [%e
                elist ~loc
-                 (List.rev_map rows ~f:(function
-                   | Rtag (name, _, _, []) ->
+                 (List.rev_map rows ~f:(fun row_field ->
+                      match row_field.prf_desc with
+                   | Rtag (name, _, []) ->
                        [%expr [[%e pexp_variant ~loc name.txt None]]]
-                   | Rtag (name, _, _, [typ]) ->
+                   | Rtag (name,_, [typ]) ->
                        [%expr
                          Stdlib.List.rev_map
                            (fun e ->

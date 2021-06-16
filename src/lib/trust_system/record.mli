@@ -24,4 +24,4 @@ val decay_rate : float
 
 module Make (Now : sig
   val now : unit -> Time.t
-end) : S
+end) : S [@@warning "-67"]

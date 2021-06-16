@@ -171,7 +171,7 @@ let generate_next_state ~constraint_constants ~previous_protocol_state
             diff
       in
       match%map
-        let%bind.Deferred.Result.Let_syntax diff = return diff in
+        let%bind.Deferred.Result diff = return diff in
         Staged_ledger.apply_diff_unchecked staged_ledger ~constraint_constants
           diff ~logger ~current_state_view:previous_state_view
           ~state_and_body_hash:
@@ -688,7 +688,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     in
                     Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
-                    let%bind.Async () =
+                    let%bind.Async.Deferred () =
                       Strict_pipe.Writer.write transition_writer breadcrumb
                     in
                     [%log debug] ~metadata
@@ -1033,7 +1033,7 @@ let run_precomputed ~logger ~verifier ~trust_system ~time_controller
             [("state_hash", State_hash.to_yojson protocol_state_hash)]
           in
           Mina_metrics.(Counter.inc_one Block_producer.blocks_produced) ;
-          let%bind.Async () =
+          let%bind.Async.Deferred () =
             Strict_pipe.Writer.write transition_writer breadcrumb
           in
           [%log debug] ~metadata

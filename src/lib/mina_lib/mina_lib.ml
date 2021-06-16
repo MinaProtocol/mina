@@ -1085,6 +1085,42 @@ let start_with_precomputed_blocks t blocks =
   in
   start t
 
+let send_resource_pool_diff_or_wait ~rl ~diff_score ~max_per_15_seconds diff =
+  (* HACK: Pretend we're a remote peer so that we can rate limit
+                 ourselves.
+              *)
+  let us =
+    { Network_peer.Peer.host= Unix.Inet_addr.of_string "127.0.0.1"
+    ; libp2p_port= 0
+    ; peer_id= "" }
+  in
+  let score = diff_score diff in
+  let rec able_to_send_or_wait () =
+    match
+      Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time.now ()) ~score
+    with
+    | `Within_capacity ->
+        Deferred.return ()
+    | `Capacity_exceeded ->
+        if score > max_per_15_seconds then (
+          (* This will never pass the rate limiting; pass it on
+                             to progress in the queue. *)
+          ignore
+            ( Network_pool.Rate_limiter.add rl (Remote us) ~now:(Time.now ())
+                ~score:0
+              : [`Within_capacity | `Capacity_exceeded] ) ;
+          Deferred.return () )
+        else
+          let%bind () =
+            after
+              Time.(
+                diff (now ())
+                  (Network_pool.Rate_limiter.next_expires rl (Remote us)))
+          in
+          able_to_send_or_wait ()
+  in
+  able_to_send_or_wait ()
+
 let create ?wallets (config : Config.t) =
   let catchup_mode = if config.super_catchup then `Super else `Normal in
   let constraint_constants = config.precomputed_values.constraint_constants in
@@ -1142,15 +1178,15 @@ let create ?wallets (config : Config.t) =
           Protocol_version.set_current config.initial_protocol_version ;
           Protocol_version.set_proposed_opt
             config.proposed_protocol_version_opt ;
+          let log_rate_limiter_occasionally rl ~label =
+            let t = Time.Span.of_min 1. in
+            every t (fun () ->
+                [%log' debug config.logger]
+                  ~metadata:
+                    [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
+                  !"%s $rate_limiter" label )
+          in
           let external_transitions_reader, external_transitions_writer =
-            let log_rate_limiter_occasionally rl =
-              let t = Time.Span.of_min 1. in
-              every t (fun () ->
-                  [%log' debug config.logger]
-                    ~metadata:
-                      [("rate_limiter", Network_pool.Rate_limiter.summary rl)]
-                    !"new_block $rate_limiter" )
-            in
             let rl =
               Network_pool.Rate_limiter.create
                 ~capacity:
@@ -1160,7 +1196,7 @@ let create ?wallets (config : Config.t) =
                       (Block_time.Span.to_time_span
                          consensus_constants.slot_duration_ms) )
             in
-            log_rate_limiter_occasionally rl ;
+            log_rate_limiter_occasionally rl ~label:"new_block" ;
             let r, w = Strict_pipe.create Synchronous in
             ( Strict_pipe.Reader.filter_map r ~f:(fun ((e, _, cb) as x) ->
                   let sender = Envelope.Incoming.sender e in
@@ -1587,58 +1623,19 @@ let create ?wallets (config : Config.t) =
             (network_pipe, api_pipe, new_blocks_pipe)
           in
           trace_task "transaction pool broadcast loop" (fun () ->
-              let rl =
-                Network_pool.Rate_limiter.create
-                  ~capacity:
-                    ( Network_pool.Transaction_pool.Resource_pool.Diff
-                      .max_per_15_seconds
-                    , `Per (Time.Span.of_sec 15.) )
-              in
-              (* HACK: Pretend we're a remote peer so that we can rate limit
-                 ourselves.
-              *)
-              let us =
-                { Network_peer.Peer.host= Unix.Inet_addr.of_string "127.0.0.1"
-                ; libp2p_port= 0
-                ; peer_id= "" }
-              in
+              let rl = Network_pool.Transaction_pool.create_rate_limiter () in
+              log_rate_limiter_occasionally rl ~label:"broadcast_transactions" ;
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun x ->
-                  let score =
-                    Network_pool.Transaction_pool.Resource_pool.Diff.score x
+                  let%bind () =
+                    send_resource_pool_diff_or_wait ~rl
+                      ~diff_score:
+                        Network_pool.Transaction_pool.Resource_pool.Diff.score
+                      ~max_per_15_seconds:
+                        Network_pool.Transaction_pool.Resource_pool.Diff
+                        .max_per_15_seconds x
                   in
-                  let rec able_to_send_or_wait () =
-                    match
-                      Network_pool.Rate_limiter.add rl (Remote us)
-                        ~now:(Time.now ()) ~score
-                    with
-                    | `Within_capacity ->
-                        Deferred.return ()
-                    | `Capacity_exceeded ->
-                        if
-                          score
-                          > Network_pool.Transaction_pool.Resource_pool.Diff
-                            .max_per_15_seconds
-                        then (
-                          (* This will never pass the rate limiting; pass it on
-                             to progress in the queue. *)
-                          ignore
-                            ( Network_pool.Rate_limiter.add rl (Remote us)
-                                ~now:(Time.now ()) ~score:0
-                              : [`Within_capacity | `Capacity_exceeded] ) ;
-                          Deferred.return () )
-                        else
-                          let%bind () =
-                            after
-                              Time.(
-                                diff (now ())
-                                  (Network_pool.Rate_limiter.next_expires rl
-                                     (Remote us)))
-                          in
-                          able_to_send_or_wait ()
-                  in
-                  let%bind () = able_to_send_or_wait () in
                   Mina_networking.broadcast_transaction_pool_diff net x ;
                   Deferred.unit ) ) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
@@ -1751,8 +1748,18 @@ let create ?wallets (config : Config.t) =
                   ~disk_location:config.wallets_disk_location
           in
           trace_task "snark pool broadcast loop" (fun () ->
+              let rl = Network_pool.Snark_pool.create_rate_limiter () in
+              log_rate_limiter_occasionally rl ~label:"broadcast_snark_work" ;
               Linear_pipe.iter (Network_pool.Snark_pool.broadcasts snark_pool)
                 ~f:(fun x ->
+                  let%bind () =
+                    send_resource_pool_diff_or_wait ~rl
+                      ~diff_score:
+                        Network_pool.Snark_pool.Resource_pool.Diff.score
+                      ~max_per_15_seconds:
+                        Network_pool.Snark_pool.Resource_pool.Diff
+                        .max_per_15_seconds x
+                  in
                   Mina_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
           Option.iter config.archive_process_location

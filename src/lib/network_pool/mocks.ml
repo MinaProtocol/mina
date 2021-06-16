@@ -42,11 +42,10 @@ module Transition_frontier = struct
 
   type t =
     { refcount_table: table
-    ; inclusion_table: table
     ; best_tip_table: Transaction_snark_work.Statement.Hash_set.t
     ; mutable ledger: Base_ledger.t
-    ; diff_writer: diff Broadcast_pipe.Writer.t sexp_opaque
-    ; diff_reader: diff Broadcast_pipe.Reader.t sexp_opaque }
+    ; diff_writer: (diff Broadcast_pipe.Writer.t [@sexp.opaque])
+    ; diff_reader: (diff Broadcast_pipe.Reader.t [@sexp.opaque]) }
   [@@deriving sexp]
 
   let add_statements table stmts =
@@ -60,18 +59,15 @@ module Transition_frontier = struct
   (*Create tf with some statements referenced to be able to add snark work for those statements to the pool*)
   let create _stmts : t =
     let refcount_table = Transaction_snark_work.Statement.Table.create () in
-    let inclusion_table = Transaction_snark_work.Statement.Table.create () in
     let best_tip_table = Transaction_snark_work.Statement.Hash_set.create () in
     (*add_statements table stmts ;*)
     let diff_reader, diff_writer =
       Broadcast_pipe.create
         { Extensions.Snark_pool_refcount.removed= 0
         ; refcount_table
-        ; inclusion_table
         ; best_tip_table }
     in
     { refcount_table
-    ; inclusion_table
     ; best_tip_table
     ; ledger= Account_id.Map.empty
     ; diff_writer
@@ -99,22 +95,6 @@ module Transition_frontier = struct
       Broadcast_pipe.Writer.write t.diff_writer
         { Transition_frontier.Extensions.Snark_pool_refcount.removed= 0
         ; refcount_table= t.refcount_table
-        ; inclusion_table= t.inclusion_table
-        ; best_tip_table= t.best_tip_table }
-    in
-    Async.Scheduler.yield_until_no_jobs_remain ()
-
-  (** Adds statements to the table of completed work. Snarks for only the
-     referenced, non-included statements are rebroadcast from the pool.
-  *)
-  let completed_work_statements (t : t) stmts =
-    let open Deferred.Let_syntax in
-    add_statements t.inclusion_table stmts ;
-    let%bind () =
-      Broadcast_pipe.Writer.write t.diff_writer
-        { Transition_frontier.Extensions.Snark_pool_refcount.removed= 0
-        ; refcount_table= t.refcount_table
-        ; inclusion_table= t.inclusion_table
         ; best_tip_table= t.best_tip_table }
     in
     Async.Scheduler.yield_until_no_jobs_remain ()
@@ -125,7 +105,6 @@ module Transition_frontier = struct
       Broadcast_pipe.Writer.write t.diff_writer
         { Transition_frontier.Extensions.Snark_pool_refcount.removed= 0
         ; refcount_table= t.refcount_table
-        ; inclusion_table= t.inclusion_table
         ; best_tip_table= t.best_tip_table }
     in
     Async.Scheduler.yield_until_no_jobs_remain ()

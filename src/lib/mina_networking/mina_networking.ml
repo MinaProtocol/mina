@@ -595,7 +595,7 @@ module Rpcs = struct
                 (State_hash.Stable.V1.t * string) list
             ; git_commit: string
             ; uptime_minutes: int
-            ; block_height_opt: int option [@default None] }
+            ; block_height_opt: int option [@default None]}
           [@@deriving to_yojson, of_yojson]
 
           let to_latest = Fn.id

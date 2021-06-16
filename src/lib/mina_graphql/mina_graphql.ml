@@ -1118,7 +1118,7 @@ module Types = struct
                  ~doc:"True if this account owns its associated token"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   match%map.Option.Let_syntax account.token_permissions with
+                   match%map.Option account.token_permissions with
                    | Token_owned _ ->
                        true
                    | Not_owned _ ->
@@ -1129,7 +1129,7 @@ module Types = struct
                     the associated token"
                  ~args:Arg.[]
                  ~resolve:(fun _ {account; _} ->
-                   match%map.Option.Let_syntax account.token_permissions with
+                   match%map.Option account.token_permissions with
                    | Token_owned _ ->
                        false
                    | Not_owned {account_disabled} ->
@@ -2669,7 +2669,7 @@ module Mutations = struct
         | Some _ ->
             return (pk, true)
         | None ->
-            let%map.Async pk =
+            let%map.Async.Deferred pk =
               Secrets.Wallets.import_keypair wallets keypair ~password
             in
             Ok (pk, false) )
@@ -3099,10 +3099,12 @@ module Mutations = struct
         in
         let net = Mina_lib.net coda in
         let seed = Option.value ~default:true seed in
-        let%bind.Async maybe_failure =
+        let%bind.Async.Deferred maybe_failure =
           (* Add peers until we find an error *)
           Deferred.List.find_map peers ~f:(fun peer ->
-              match%map.Async Mina_networking.add_peer net peer ~seed with
+              match%map.Async.Deferred
+                Mina_networking.add_peer net peer ~seed
+              with
               | Ok () ->
                   None
               | Error err ->

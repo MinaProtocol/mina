@@ -395,7 +395,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
                 !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
                 peer
             in
-            let%bind.Deferred.Let_syntax () =
+            let%bind.Deferred () =
               Trust_system.(
                 record trust_system logger peer
                   Actions.
@@ -880,7 +880,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
         let%bind parent =
           step
             (let parent = Hashtbl.find_exn t.nodes node.parent in
-             match%map.Async Ivar.read parent.result with
+             match%map.Async.Deferred Ivar.read parent.result with
              | Ok `Added_to_frontier ->
                  Ok parent.state_hash
              | Error _ ->

@@ -18,6 +18,8 @@ module Make (Hash : sig
   type t [@@deriving sexp, equal]
 
   val merge : height:int -> t -> t -> t
+
+  val equal : t -> t -> bool
 end) : S with type hash := Hash.t = struct
   type elem = [`Left of Hash.t | `Right of Hash.t] [@@deriving sexp, equal]
 

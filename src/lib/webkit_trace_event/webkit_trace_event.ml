@@ -63,11 +63,11 @@ module Output = struct
         | Trace_end ->
             8
       in
-      Bigstring.set_uint8 buf ~pos num ;
+      Bigstring.set_uint8_exn buf ~pos num ;
       pos + 1
 
     let emiti ~buf (i : int) pos =
-      Bigstring.set_uint64_le buf ~pos i ;
+      Bigstring.set_uint64_le_exn buf ~pos i ;
       pos + 8
 
     let emits ~buf (s : string) (pos : int) =

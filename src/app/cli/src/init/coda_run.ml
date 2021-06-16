@@ -177,7 +177,9 @@ let remove_prev_crash_reports ~conf_dir =
 
 let summary exn_json =
   let uname = Core.Unix.uname () in
-  let daemon_command = sprintf !"Command: %{sexp: string array}" Sys.argv in
+  let daemon_command =
+    sprintf !"Command: %{sexp: string array}" (Sys.get_argv ())
+  in
   `Assoc
     [ ("OS_type", `String Sys.os_type)
     ; ("Release", `String (Core.Unix.Utsname.release uname))
@@ -555,7 +557,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                               Mina_compile_config.rpc_heartbeat_timeout_sec)
                          ~send_every:
                            (Time_ns.Span.of_sec
-                              Mina_compile_config.rpc_heartbeat_send_every_sec))
+                              Mina_compile_config.rpc_heartbeat_send_every_sec)
+                         ())
                     reader writer
                     ~implementations:
                       (Rpc.Implementations.create_exn

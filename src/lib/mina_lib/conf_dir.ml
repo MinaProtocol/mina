@@ -107,9 +107,9 @@ let export_logs_to_tar ?basename ~conf_dir =
     Core.Sys.ls_dir conf_dir
     |> List.filter ~f:(String.is_substring ~substring:".log")
   in
-  let%bind.Deferred.Let_syntax linux_info =
+  let%bind.Deferred linux_info =
     if String.equal Sys.os_type "Unix" then
-      match%map.Deferred.Let_syntax
+      match%map.Deferred
         Process.run ~prog:"uname" ~args:["-a"] ()
       with
       | Ok s when String.is_prefix s ~prefix:"Linux" ->
@@ -118,7 +118,7 @@ let export_logs_to_tar ?basename ~conf_dir =
           None
     else Deferred.return None
   in
-  let%bind.Deferred.Let_syntax hw_info_opt =
+  let%bind.Deferred hw_info_opt =
     if Option.is_some linux_info then
       let open Deferred.Let_syntax in
       let linux_hw_progs =
@@ -147,7 +147,7 @@ let export_logs_to_tar ?basename ~conf_dir =
     else (* TODO: Mac, other Unixes *)
       Deferred.return None
   in
-  let%bind.Deferred.Let_syntax hw_file_opt =
+  let%bind.Deferred hw_file_opt =
     if Option.is_some hw_info_opt then
       let open Async in
       let hw_info = "hardware.info" in

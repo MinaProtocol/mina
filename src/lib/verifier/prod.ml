@@ -291,7 +291,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
   in
   let create_worker () =
     [%log info] "Starting a new verifier process" ;
-    let%map.Deferred.Or_error.Let_syntax connection, process =
+    let%map.Deferred.Or_error connection, process =
       (* This [try_with] isn't really here to catch an error that throws while
          the process is being spawned. Indeed, the immediate [ok_exn] will
          ensure that any errors that occur during that time are immediately

@@ -202,9 +202,9 @@ module T = struct
   type t =
     { scan_state: Scan_state.t
     ; ledger:
-        (* Invariant: this is the ledger after having applied all the
+        ((* Invariant: this is the ledger after having applied all the
            transactions in the above state. *)
-        Ledger.attached_mask sexp_opaque
+         Ledger.attached_mask[@sexp.opaque])
     ; constraint_constants: Genesis_constants.Constraint_constants.t
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
@@ -332,8 +332,8 @@ module T = struct
     let%bind _ =
       Deferred.Or_error.List.iter txs_with_protocol_state
         ~f:(fun (tx, protocol_state) ->
-          let%map.Async () = Async.Scheduler.yield () in
-          let%bind.Or_error.Let_syntax txn_with_info =
+          let%map.Async.Deferred () = Async.Scheduler.yield () in
+          let%bind.Or_error txn_with_info =
             Ledger.apply_transaction ~constraint_constants
               ~txn_state_view:
                 (Mina_state.Protocol_state.Body.view protocol_state.body)
@@ -1133,7 +1133,7 @@ module T = struct
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
       ; is_coinbase_receiver_new: bool
-      ; logger: Logger.t sexp_opaque }
+      ; logger: (Logger.t[@sexp.opaque]) }
     [@@deriving sexp_of]
 
     let coinbase_ft (cw : Transaction_snark_work.t) =

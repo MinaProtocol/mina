@@ -5,7 +5,7 @@ open Core
 (* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
 
 module T = struct
-  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+  type t = {uuid: Uuid.Stable.V1.t; db: (Rocks.t [@sexp.opaque])} [@@deriving sexp]
 end
 
 include T
@@ -165,10 +165,6 @@ let%test_unit "checkpoint read" =
                 ~expect:cp_sorted cp_alist ;
               close db ;
               close cp ;
-              let%bind () = File_system.remove_dir db_dir in
-              let%bind () = File_system.remove_dir cp_dir in
               Deferred.unit
           | _ ->
-              let%bind () = File_system.remove_dir db_dir in
-              let%bind () = File_system.remove_dir cp_dir in
               Deferred.unit ) )

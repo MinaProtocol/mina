@@ -77,7 +77,7 @@ module Lru_table (Q : Hash_queue.S) = struct
   type t = {table: Record.t Q.t; initial_capacity: Score.t}
   [@@deriving sexp_of]
 
-  let add ({table; initial_capacity} : t) (k : Q.Key.t) ~now ~score =
+  let add ({table; initial_capacity} : t) (k : Q.key) ~now ~score =
     match Q.lookup_and_move_to_back table k with
     | None ->
         if Int.(Q.length table >= max_size) then
@@ -98,7 +98,7 @@ module Lru_table (Q : Hash_queue.S) = struct
 
   let create ~initial_capacity = {initial_capacity; table= Q.create ()}
 
-  let next_expires ({table; _} : t) (k : Q.Key.t) =
+  let next_expires ({table; _} : t) (k : Q.key) =
     match Q.lookup table k with
     | None ->
         Time.now ()

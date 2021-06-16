@@ -239,7 +239,7 @@ module Parser = struct
   let parser = ws *> bool_exp <* ws <* end_of_input
 
   let parse str =
-    Result.map_error (parse_string parser str) ~f:(fun err ->
+    Result.map_error (parse_string ~consume:All parser str) ~f:(fun err ->
         let msg =
           match err with
           | ": end_of_input" ->
