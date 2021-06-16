@@ -90,7 +90,8 @@ def stop_daemon():
   mina_process.send_signal(signal.SIGTERM)
 
   child_pids = get_child_processes(mina_process.pid)
-  print("child_pids: " + child_pids )
+  print("child_pids: " )
+  print(*child_pids)
   mina_process.wait()
   for child_pid in child_pids:
       print("waiting for child_pid: " + child_pid )
@@ -152,6 +153,7 @@ def cleanup_and_exit(status):
   sys.exit(status)
 
 if __name__ == '__main__':
+  print("puppeteer script: starting...")
   signal.signal(signal.SIGCHLD, handle_child_termination)
   signal.signal(signal.SIGUSR1, handle_stop_request)
   signal.signal(signal.SIGUSR2, handle_start_request)
