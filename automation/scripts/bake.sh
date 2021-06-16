@@ -2,7 +2,7 @@
 
 # Set defaults before parsing args
 TESTNET=testworld
-DOCKER_TAG=0.1.1-41db206
+DOCKER_TAG=1.1.5-compatible-6869b2c
 GIT_PATHSPEC=$(git log -1 --pretty=format:%H)
 CONFIG_FILE=/root/daemon.json
 CLOUD=false
@@ -53,7 +53,7 @@ if [[ $CLOUD == true ]]
 then
   echo Building $gcr_baked_tag in the cloud
 
-  gcloud builds submit --timeout=900s --config=cloudbuild.yaml \
+  sudo gcloud builds submit --timeout=900s --config=cloudbuild.yaml \
   --substitutions=_BAKE_VERSION="$DOCKER_TAG",_COMMIT_HASH="$GIT_PATHSPEC",_TESTNET_NAME="$TESTNET",_CONFIG_FILE="$CONFIG_FILE",_GCR_BAKED_TAG="$gcr_baked_tag" .
 
   exit 0
@@ -65,15 +65,15 @@ for i in $(seq 60); do
   sleep 30
 done
 
-cat Dockerfile | docker build --no-cache \
+cat Dockerfile | sudo docker build --no-cache \
   -t "${hub_baked_tag}" \
   --build-arg "BAKE_VERSION=${DOCKER_TAG}" \
   --build-arg "COMMIT_HASH=${GIT_PATHSPEC}" \
   --build-arg "TESTNET_NAME=${TESTNET}" \
   --build-arg "CONFIG_FILE=${CONFIG_FILE}" -
 
-docker push "$hub_baked_tag"
-docker tag "$hub_baked_tag" "$gcr_baked_tag"
-docker push "$gcr_baked_tag"
+sudo docker push "$hub_baked_tag"
+sudo docker tag "$hub_baked_tag" "$gcr_baked_tag"
+sudo docker push "$gcr_baked_tag"
 echo "Built + Pushed Image: ${hub_baked_tag}"
 
