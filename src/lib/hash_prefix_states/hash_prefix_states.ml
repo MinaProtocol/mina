@@ -75,6 +75,8 @@ let signature =
 
 let vrf_output = salt vrf_output
 
+let vrf_evaluation = salt vrf_evaluation
+
 let epoch_seed = salt epoch_seed
 
 let transition_system_snark = salt transition_system_snark

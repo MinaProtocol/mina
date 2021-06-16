@@ -48,7 +48,7 @@ module Pending_coinbase_stack_state = struct
     module Stable = struct
       module V1 = struct
         type t = Base of Pending_coinbase.Stack_versioned.Stable.V1.t | Merge
-        [@@deriving sexp, hash, compare, eq, yojson]
+        [@@deriving sexp, hash, compare, equal, yojson]
 
         let to_latest = Fn.id
       end
@@ -61,7 +61,7 @@ module Pending_coinbase_stack_state = struct
       module V1 = struct
         type 'pending_coinbase t =
           {source: 'pending_coinbase; target: 'pending_coinbase}
-        [@@deriving sexp, hash, compare, eq, fields, yojson, hlist]
+        [@@deriving sexp, hash, compare, equal, fields, yojson, hlist]
 
         let to_latest pending_coinbase {source; target} =
           {source= pending_coinbase source; target= pending_coinbase target}
@@ -77,14 +77,14 @@ module Pending_coinbase_stack_state = struct
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
     {source: 'pending_coinbase; target: 'pending_coinbase}
-  [@@deriving sexp, hash, compare, eq, fields, yojson]
+  [@@deriving sexp, hash, compare, equal, fields, yojson]
 
   (* State of the coinbase stack for the current transaction snark *)
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-      [@@deriving sexp, hash, compare, eq, yojson]
+      [@@deriving sexp, hash, compare, equal, yojson]
 
       let to_latest = Fn.id
     end
@@ -596,7 +596,8 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       type t = Pickles.Proof.Branching_2.Stable.V1.t
-      [@@deriving version {asserted}, yojson, bin_io, compare, sexp]
+      [@@deriving
+        version {asserted}, yojson, bin_io, compare, equal, sexp, hash]
 
       let to_latest = Fn.id
     end
@@ -616,7 +617,7 @@ module Stable = struct
   module V1 = struct
     type t =
       {statement: Statement.With_sok.Stable.V1.t; proof: Proof.Stable.V1.t}
-    [@@deriving compare, fields, sexp, version, yojson]
+    [@@deriving compare, equal, fields, sexp, version, yojson, hash]
 
     let to_latest (t : t) : Latest.t =
       { statement= Statement.With_sok.Stable.V1.to_latest t.statement
@@ -1145,14 +1146,14 @@ module Base = struct
         fun () ->
           let b = exists Boolean.typ_unchecked ~compute:(fun _ -> true) in
           let g = exists Inner_curve.typ ~compute:(fun _ -> Inner_curve.one) in
-          let _ =
-            Pickles.Step_main_inputs.Ops.scale_fast g
-              (`Plus_two_to_len [|b; b|])
-          in
-          let _ =
-            Pickles.Pairing_main.Scalar_challenge.endo g (Scalar_challenge [b])
-          in
-          ())
+          ignore
+            ( Pickles.Step_main_inputs.Ops.scale_fast g
+                (`Plus_two_to_len [|b; b|])
+              : Pickles.Step_main_inputs.Inner_curve.t ) ;
+          ignore
+            ( Pickles.Pairing_main.Scalar_challenge.endo g
+                (Scalar_challenge [b])
+              : Field.t * Field.t ))
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
@@ -3007,13 +3008,13 @@ module Verification = struct
   module type S = sig
     val tag : tag
 
-    val verify : (t * Sok_message.t) list -> bool
+    val verify : (t * Sok_message.t) list -> bool Async.Deferred.t
 
     val id : Pickles.Verification_key.Id.t Lazy.t
 
     val verification_key : Pickles.Verification_key.t Lazy.t
 
-    val verify_against_digest : t -> bool
+    val verify_against_digest : t -> bool Async.Deferred.t
 
     val constraint_system_digests : (string * Md5_lib.t) list Lazy.t
   end
@@ -3087,17 +3088,18 @@ let check_transaction_union ?(preeval = false) ~constraint_constants
       ; sok_digest }
   in
   let open Tick in
-  Or_error.ok_exn
-    (run_and_check
-       (handle
-          (Checked.map ~f:As_prover.return
-             (let open Checked in
-             exists Statement.With_sok.typ
-               ~compute:(As_prover.return statement)
-             >>= Base.main ~constraint_constants))
-          handler)
-       ())
-  |> ignore
+  ignore
+    ( Or_error.ok_exn
+        (run_and_check
+           (handle
+              (Checked.map ~f:As_prover.return
+                 (let open Checked in
+                 exists Statement.With_sok.typ
+                   ~compute:(As_prover.return statement)
+                 >>= Base.main ~constraint_constants))
+              handler)
+           ())
+      : unit * unit )
 
 let check_transaction ?preeval ~constraint_constants ~sok_message ~source
     ~target ~init_stack ~pending_coinbase_stack_state
@@ -3183,15 +3185,18 @@ let generate_transaction_witness ?preeval ~constraint_constants ~sok_message
         pending_coinbase_stack_state handler
 
 let verify (ts : (t * _) list) ~key =
-  List.for_all ts ~f:(fun ({statement; _}, message) ->
-      Sok_message.Digest.equal
-        (Sok_message.digest message)
-        statement.sok_digest )
-  && Pickles.verify
-       (module Nat.N2)
-       (module Statement.With_sok)
-       key
-       (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
+  if
+    List.for_all ts ~f:(fun ({statement; _}, message) ->
+        Sok_message.Digest.equal
+          (Sok_message.digest message)
+          statement.sok_digest )
+  then
+    Pickles.verify
+      (module Nat.N2)
+      (module Statement.With_sok)
+      key
+      (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
+  else Async.return false
 
 let constraint_system_digests ~constraint_constants () =
   let digest = Tick.R1CS_constraint_system.digest in
@@ -3230,11 +3235,14 @@ struct
     Proof.verify [(statement, proof)]
 
   let verify ts =
-    List.for_all ts ~f:(fun (p, m) ->
-        Sok_message.Digest.equal (Sok_message.digest m) p.statement.sok_digest
-    )
-    && Proof.verify
-         (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
+    if
+      List.for_all ts ~f:(fun (p, m) ->
+          Sok_message.Digest.equal (Sok_message.digest m)
+            p.statement.sok_digest )
+    then
+      Proof.verify
+        (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
+    else Async.return false
 
   let of_transaction_union sok_digest source target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
@@ -4151,9 +4159,11 @@ let%test_module "transaction_snark" =
                   ; init_stack }
                 , state_body2 )
               in
-              Ledger.apply_user_command ~constraint_constants ledger
-                ~txn_global_slot:current_global_slot t1
-              |> Or_error.ok_exn |> ignore ;
+              ignore
+                ( Ledger.apply_user_command ~constraint_constants ledger
+                    ~txn_global_slot:current_global_slot t1
+                  |> Or_error.ok_exn
+                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -4172,9 +4182,11 @@ let%test_module "transaction_snark" =
                   ~txn_global_slot:current_global_slot sparse_ledger
                   (t2 :> Signed_command.t)
               in
-              Ledger.apply_user_command ledger ~constraint_constants
-                ~txn_global_slot:current_global_slot t2
-              |> Or_error.ok_exn |> ignore ;
+              ignore
+                ( Ledger.apply_user_command ledger ~constraint_constants
+                    ~txn_global_slot:current_global_slot t2
+                  |> Or_error.ok_exn
+                  : Ledger.Transaction_applied.Signed_command_applied.t ) ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -4183,7 +4195,9 @@ let%test_module "transaction_snark" =
                     merge ~sok_digest proof12 proof23 )
                 |> Or_error.ok_exn
               in
-              Proof.verify [(proof13.statement, proof13.proof)] ) )
+              Async.Thread_safe.block_on_async (fun () ->
+                  Proof.verify [(proof13.statement, proof13.proof)] )
+              |> Result.ok_exn ) )
 
     let%test "base_and_merge: transactions in one block (t1,t2 in b1), \
               carryforward the state from a previous transaction t0 in b1" =
@@ -4760,8 +4774,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
-                token_owner_account.token_permissions
-                = Token_owned {disable_new_accounts= false} ) ) )
+                Token_permissions.equal token_owner_account.token_permissions
+                  (Token_owned {disable_new_accounts= false}) ) ) )
 
     let%test_unit "create new token for a different pk" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4796,8 +4810,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
-                token_owner_account.token_permissions
-                = Token_owned {disable_new_accounts= false} ) ) )
+                Token_permissions.equal token_owner_account.token_permissions
+                  (Token_owned {disable_new_accounts= false}) ) ) )
 
     let%test_unit "create new token for a different pk new accounts disabled" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4831,8 +4845,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) token_owner_account.balance) ;
               assert (Option.is_none token_owner_account.delegate) ;
               assert (
-                token_owner_account.token_permissions
-                = Token_owned {disable_new_accounts= true} ) ) )
+                Token_permissions.equal token_owner_account.token_permissions
+                  (Token_owned {disable_new_accounts= true}) ) ) )
 
     let%test_unit "create own new token account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4879,8 +4893,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "create new token account for a different pk" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -4927,8 +4941,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "create new token account for a different pk in a locked \
                    token" =
@@ -4976,8 +4990,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "create new own locked token account in a locked token" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5024,8 +5038,8 @@ let%test_module "transaction_snark" =
               assert (Balance.(equal zero) receiver_account.balance) ;
               assert (Option.is_none receiver_account.delegate) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= true} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= true}) ) ) )
 
     let%test_unit "create new token account fails for locked token, non-owner \
                    fee-payer" =
@@ -5322,8 +5336,8 @@ let%test_module "transaction_snark" =
                 Public_key.Compressed.equal receiver_pk
                   (Option.value_exn receiver_account.delegate) ) ;
               assert (
-                receiver_account.token_permissions
-                = Not_owned {account_disabled= false} ) ) )
+                Token_permissions.equal receiver_account.token_permissions
+                  (Not_owned {account_disabled= false}) ) ) )
 
     let%test_unit "mint tokens in owner's account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -5974,4 +5988,256 @@ let%test_module "account timing check" =
             unchecked_timing unchecked_min_balance
       | _ ->
           false
+  end )
+
+let%test_module "transaction_undos" =
+  ( module struct
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
+    let genesis_constants = Genesis_constants.for_unit_tests
+
+    let consensus_constants =
+      Consensus.Constants.create ~constraint_constants
+        ~protocol_constants:genesis_constants.protocol
+
+    let state_body =
+      let compile_time_genesis =
+        Mina_state.Genesis_protocol_state.t
+          ~genesis_ledger:Genesis_ledger.(Packed.t for_unit_tests)
+          ~genesis_epoch_data:Consensus.Genesis_epoch_data.for_unit_tests
+          ~constraint_constants ~consensus_constants
+      in
+      compile_time_genesis.data |> Mina_state.Protocol_state.body
+
+    let txn_state_view = Mina_state.Protocol_state.Body.view state_body
+
+    let gen_user_commands ~length ledger_init_state =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map cmds =
+        User_command.Valid.Gen.sequence ~length:(length / 2) ~sign_type:`Real
+          ledger_init_state
+      in
+      let cmds = List.map ~f:User_command.forget_check cmds in
+      (* Cmds with new receiver accounts *)
+      let amount =
+        Currency.Fee.scale constraint_constants.account_creation_fee 2
+        |> Option.value_exn |> Currency.Amount.of_fee
+      in
+      let senders =
+        Array.filter_map ledger_init_state
+          ~f:(fun ((keypair, balance, _, _) as s) ->
+            let sender_pk = Public_key.compress keypair.public_key in
+            let account_id = Account_id.create sender_pk Token_id.default in
+            if
+              List.find cmds ~f:(fun cmd ->
+                  Account_id.equal (User_command.fee_payer cmd) account_id )
+              |> Option.is_some
+            then None
+            else if Currency.Amount.(balance >= amount) then Some s
+            else None )
+      in
+      let new_cmds =
+        let source_accounts =
+          List.take (Array.to_list senders) (length - List.length cmds)
+        in
+        assert (not (List.is_empty source_accounts)) ;
+        let new_keys =
+          List.init (List.length source_accounts) ~f:(fun _ ->
+              Signature_lib.Keypair.create () )
+        in
+        List.map (List.zip_exn source_accounts new_keys)
+          ~f:(fun ((s, _, nonce, _), r) ->
+            let sender_pk = Public_key.compress s.public_key in
+            let reciever_pk = Public_key.compress r.public_key in
+            let fee = Currency.Fee.of_int 10 in
+            let payload : Signed_command.Payload.t =
+              Signed_command.Payload.create ~fee ~fee_token:Token_id.default
+                ~fee_payer_pk:sender_pk ~nonce ~memo:Signed_command_memo.dummy
+                ~valid_until:None
+                ~body:
+                  (Payment
+                     { source_pk= sender_pk
+                     ; receiver_pk= reciever_pk
+                     ; token_id= Token_id.default
+                     ; amount })
+            in
+            let c = Signed_command.sign s payload in
+            User_command.Signed_command (Signed_command.forget_check c) )
+      in
+      List.map ~f:(fun c -> Transaction.Command c) (cmds @ new_cmds)
+
+    let gen_fee_transfers ~length ledger_init_state =
+      let open Quickcheck.Generator.Let_syntax in
+      let count = 3 in
+      let new_keys =
+        Array.init count ~f:(fun _ -> Signature_lib.Keypair.create ())
+      in
+      let fee_transfers ?(new_accounts = false) accounts count =
+        let max_fee =
+          Currency.Fee.scale constraint_constants.account_creation_fee 10
+          |> Option.value_exn |> Currency.Fee.to_int
+        in
+        let min_fee =
+          if new_accounts then
+            constraint_constants.account_creation_fee |> Currency.Fee.to_int
+          else 0
+        in
+        let%map singles =
+          Quickcheck.Generator.list_with_length count
+            (Fee_transfer.Single.Gen.with_random_receivers ~keys:accounts
+               ~max_fee ~min_fee
+               ~token:(Quickcheck.Generator.return Token_id.default))
+        in
+        One_or_two.group_list singles
+        |> List.map ~f:(Fn.compose Or_error.ok_exn Fee_transfer.of_singles)
+      in
+      let%bind fee_transfer_new_accounts =
+        fee_transfers new_keys count ~new_accounts:true
+      in
+      let remaining = max count (length - count) in
+      let%map fee_transfer_existing_accounts =
+        fee_transfers
+          (Array.init remaining ~f:(fun _ ->
+               let keypair, _, _, _ =
+                 Array.random_element_exn ledger_init_state
+               in
+               keypair ))
+          remaining
+      in
+      List.map
+        ~f:(fun c -> Transaction.Fee_transfer c)
+        (fee_transfer_new_accounts @ fee_transfer_existing_accounts)
+
+    let gen_coinbases ~length ledger_init_state =
+      let open Quickcheck.Generator.Let_syntax in
+      let count = 3 in
+      let%bind coinbase_new_accounts =
+        Quickcheck.Generator.list_with_length count
+          (Quickcheck.Generator.map ~f:fst
+             (Coinbase.Gen.gen ~constraint_constants))
+      in
+      let%map coinbase_existing_accounts =
+        let remaining = max count (length - count) in
+        let keys =
+          Array.init remaining ~f:(fun _ ->
+              let keypair, _, _, _ =
+                Array.random_element_exn ledger_init_state
+              in
+              keypair )
+        in
+        let min_amount =
+          Option.value_exn
+            (Currency.Fee.scale constraint_constants.account_creation_fee 2)
+          |> Currency.Fee.to_int
+        in
+        let max_amount =
+          Currency.Amount.to_int constraint_constants.coinbase_amount
+        in
+        Quickcheck.Generator.list_with_length remaining
+          (Coinbase.Gen.with_random_receivers ~keys ~min_amount ~max_amount
+             ~fee_transfer:
+               (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
+                  ~min_fee:constraint_constants.account_creation_fee))
+      in
+      List.map
+        ~f:(fun c -> Transaction.Coinbase c)
+        (coinbase_new_accounts @ coinbase_existing_accounts)
+
+    let test_undo ledger transaction =
+      let merkle_root_before = Ledger.merkle_root ledger in
+      let applied_txn =
+        Ledger.apply_transaction ~constraint_constants ~txn_state_view ledger
+          transaction
+        |> Or_error.ok_exn
+      in
+      let new_mask = Ledger.Mask.create ~depth:(Ledger.depth ledger) () in
+      let new_ledger = Ledger.register_mask ledger new_mask in
+      let () =
+        Ledger.undo ~constraint_constants new_ledger applied_txn
+        |> Or_error.ok_exn
+      in
+      assert (
+        Ledger_hash.equal merkle_root_before (Ledger.merkle_root new_ledger) ) ;
+      (merkle_root_before, applied_txn)
+
+    let test_undos ledger transactions =
+      let res =
+        List.fold ~init:[] transactions ~f:(fun acc t ->
+            test_undo ledger t :: acc )
+      in
+      List.iter res ~f:(fun (root_before, u) ->
+          let () =
+            Ledger.undo ~constraint_constants ledger u |> Or_error.ok_exn
+          in
+          assert (Ledger_hash.equal (Ledger.merkle_root ledger) root_before) )
+
+    let%test_unit "undo_coinbase" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%map coinbases = gen_coinbases ~length:5 ledger_init_state in
+        (ledger_init_state, coinbases)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "coinbase undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, coinbase_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger coinbase_list ) )
+
+    let%test_unit "undo_fee_transfers" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%map fts = gen_fee_transfers ~length:5 ledger_init_state in
+        (ledger_init_state, fts)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "fee-transfer undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, ft_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger ft_list ) )
+
+    let%test_unit "undo_user_commands" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%map cmds = gen_user_commands ~length:10 ledger_init_state in
+        (ledger_init_state, cmds)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "user-command undo")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, cmd_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger cmd_list ) )
+
+    let%test_unit "undo_all_txns" =
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%bind ledger_init_state = Ledger.gen_initial_ledger_state in
+        let%bind coinbase = gen_coinbases ~length:4 ledger_init_state in
+        let%bind fee_transfers =
+          gen_fee_transfers ~length:6 ledger_init_state
+        in
+        let%bind cmds = gen_user_commands ~length:6 ledger_init_state in
+        let%map txns =
+          let%map txns = Quickcheck_lib.shuffle (fee_transfers @ coinbase) in
+          List.take cmds 3 @ List.take txns 5 @ List.drop cmds 3
+          @ List.drop txns 5
+        in
+        (ledger_init_state, txns)
+      in
+      Async.Quickcheck.test ~seed:(`Deterministic "all-transaction undos")
+        ~sexp_of:[%sexp_of: Ledger.init_state * Transaction.t list] ~trials:2
+        gen ~f:(fun (ledger_init_state, txn_list) ->
+          Ledger.with_ephemeral_ledger ~depth:constraint_constants.ledger_depth
+            ~f:(fun ledger ->
+              Ledger.apply_initial_ledger_state ledger ledger_init_state ;
+              test_undos ledger txn_list ) )
   end )

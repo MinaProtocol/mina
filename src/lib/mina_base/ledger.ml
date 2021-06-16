@@ -1,7 +1,6 @@
 open Core
 open Signature_lib
 open Merkle_ledger
-module Account0 = Account
 
 module Ledger_inner = struct
   module Location_at_depth : Merkle_ledger.Location_intf.S =
@@ -43,14 +42,13 @@ module Ledger_inner = struct
     module Stable = struct
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
-        [@@deriving sexp, compare, hash, eq, yojson]
+        [@@deriving sexp, compare, hash, equal, yojson]
 
         type _unused = unit constraint t = Arg.t
 
         let to_latest = Fn.id
 
-        include Hashable.Make_binable (Arg) [@@deriving
-                                              sexp, compare, hash, eq, yojson]
+        include Hashable.Make_binable (Arg)
 
         let to_string = Ledger_hash.to_string
 
@@ -67,7 +65,7 @@ module Ledger_inner = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
+        type t = Account.Stable.V1.t [@@deriving equal, compare, sexp]
 
         let to_latest = Fn.id
 
@@ -247,8 +245,10 @@ module Ledger_inner = struct
     List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t account_id account =
-    let action, _ = get_or_create_account_exn t account_id account in
-    if action = `Existed then
+    let action, _ =
+      get_or_create_account t account_id account |> Or_error.ok_exn
+    in
+    if [%equal: [`Existed | `Added]] action `Existed then
       failwith
         (sprintf
            !"Could not create a new account with pk \
@@ -260,15 +260,23 @@ module Ledger_inner = struct
     Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
   let get_or_create ledger account_id =
-    let action, loc =
-      get_or_create_account_exn ledger account_id
-        (Account.initialize account_id)
+    let open Or_error.Let_syntax in
+    let%bind action, loc =
+      get_or_create_account ledger account_id (Account.initialize account_id)
     in
-    (action, Option.value_exn (get ledger loc), loc)
+    let%map account =
+      Result.of_option (get ledger loc)
+        ~error:
+          (Error.of_string
+             "get_or_create: Account was not found in the ledger after creation")
+    in
+    (action, account, loc)
 
-  let create_empty ledger account_id =
+  let create_empty_exn ledger account_id =
     let start_hash = merkle_root ledger in
-    match get_or_create_account_exn ledger account_id Account.empty with
+    match
+      get_or_create_account ledger account_id Account.empty |> Or_error.ok_exn
+    with
     | `Existed, _ ->
         failwith "create_empty for a key already present"
     | `Added, new_loc ->

@@ -280,7 +280,7 @@ let get_public_keys =
 
 let read_json filepath ~flag =
   let%map res =
-    Deferred.Or_error.try_with (fun () ->
+    Deferred.Or_error.try_with ~here:[%here] (fun () ->
         let%map json_contents = Reader.file_contents filepath in
         Ok (Yojson.Safe.from_string json_contents) )
   in
@@ -482,6 +482,9 @@ let batch_send_payments =
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
           let signer_pk = Public_key.compress keypair.public_key in
+          let receiver_pk =
+            Public_key.of_base58_check_decompress_exn receiver
+          in
           User_command_input.create ~signer:signer_pk ~fee
             ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
             ~fee_payer_pk:signer_pk ~memo:Signed_command_memo.empty
@@ -489,8 +492,7 @@ let batch_send_payments =
             ~body:
               (Payment
                  { source_pk= signer_pk
-                 ; receiver_pk=
-                     Public_key.Compressed.of_base58_check_exn receiver
+                 ; receiver_pk
                  ; token_id= Token_id.default
                  ; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
@@ -769,17 +771,15 @@ let send_rosetta_transactions_graphql =
       "Dispatch one or more transactions, provided to stdin in rosetta format"
     (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
        ~f:(fun graphql_endpoint () ->
-         let jsons = Yojson.Basic.stream_from_channel In_channel.stdin in
+         let lexbuf = Lexing.from_channel In_channel.stdin in
+         let lexer = Yojson.init_lexer () in
          match%bind
-           Deferred.Or_error.try_with (fun () ->
-               (* TODO: There must be a better way to stream from yojson *and*
-                  do the async calls, surely?
-               *)
-               let prev = ref (Deferred.return ()) in
-               Caml.Stream.iter
-                 (fun transaction_json ->
-                   prev :=
-                     let%bind () = !prev in
+           Deferred.Or_error.try_with ~here:[%here] (fun () ->
+               Deferred.repeat_until_finished () (fun () ->
+                   try
+                     let transaction_json =
+                       Yojson.Basic.from_lexbuf ~stream:true lexer lexbuf
+                     in
                      let%map response =
                        Graphql_client.query_exn
                          (Graphql_queries.Send_rosetta_transaction.make
@@ -790,10 +790,9 @@ let send_rosetta_transactions_graphql =
                        (response#sendRosettaTransaction)#userCommand
                      in
                      printf "Dispatched command with TRANSACTION_ID %s\n"
-                       user_command#id )
-                 jsons ;
-               don't_wait_for !prev ;
-               !prev )
+                       user_command#id ;
+                     `Repeat ()
+                   with Yojson.End_of_input -> return (`Finished ()) ) )
          with
          | Ok () ->
              Deferred.return ()
@@ -893,9 +892,11 @@ let dump_keypair =
 
 let handle_export_ledger_response ~json = function
   | Error e ->
-      Daemon_rpcs.Client.print_rpc_error e
+      Daemon_rpcs.Client.print_rpc_error e ;
+      exit 1
   | Ok (Error e) ->
-      printf !"Ledger not found: %s\n" (Error.to_string_hum e)
+      printf !"Ledger not found: %s\n" (Error.to_string_hum e) ;
+      exit 1
   | Ok (Ok accounts) ->
       if json then (
         Yojson.Safe.pretty_print Format.std_formatter
@@ -903,7 +904,8 @@ let handle_export_ledger_response ~json = function
              (List.map accounts ~f:(fun a ->
                   Genesis_ledger_helper.Accounts.Single.of_account a None ))) ;
         printf "\n" )
-      else printf !"%{sexp:Account.t list}\n" accounts
+      else printf !"%{sexp:Account.t list}\n" accounts ;
+      return ()
 
 let export_ledger =
   let state_hash_flag =
@@ -915,20 +917,26 @@ let export_ledger =
         (optional string))
   in
   let ledger_kind =
+    let available_ledgers =
+      [ "staged-ledger"
+      ; "snarked-ledger"
+      ; "staking-epoch-ledger"
+      ; "next-epoch-ledger" ]
+    in
     let t =
       Command.Param.Arg_type.of_alist_exn
-        (List.map
-           ["staged-ledger"; "staking-epoch-ledger"; "next-epoch-ledger"]
-           ~f:(fun s -> (s, s)))
+        (List.map available_ledgers ~f:(fun s -> (s, s)))
     in
-    Command.Param.(
-      anon ("staged-ledger|staking-epoch-ledger|next-epoch-ledger" %: t))
+    let ledger_args = String.concat ~sep:"|" available_ledgers in
+    Command.Param.(anon (ledger_args %: t))
   in
   let plaintext_flag = Cli_lib.Flag.plaintext in
   let flags = Args.zip3 state_hash_flag plaintext_flag ledger_kind in
   Command.async
     ~summary:
-      "Print the specified ledger (default: staged ledger at the best tip)"
+      "Print the specified ledger (default: staged ledger at the best tip). \
+       Note: Exporting snarked ledger is an expensive operation and can take \
+       a few seconds"
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (state_hash, plaintext, ledger_kind) ->
          let check_for_state_hash () =
@@ -945,6 +953,14 @@ let export_ledger =
                in
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
                  state_hash port
+           | "snarked-ledger" ->
+               let state_hash =
+                 Option.map ~f:State_hash.of_base58_check_exn state_hash
+               in
+               printf
+                 "Generating snarked ledger(this may take a few seconds)...\n" ;
+               Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_snarked_ledger.rpc
+                 state_hash port
            | "staking-epoch-ledger" ->
                check_for_state_hash () ;
                Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_staking_ledger.rpc
@@ -957,7 +973,7 @@ let export_ledger =
                (* unreachable *)
                failwithf "Unknown ledger kind: %s" ledger_kind ()
          in
-         response >>| handle_export_ledger_response ~json:(not plaintext) ))
+         response >>= handle_export_ledger_response ~json:(not plaintext) ))
 
 let hash_ledger =
   let open Command.Let_syntax in
@@ -1006,7 +1022,7 @@ let hash_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             ignore (exit 1))
+             ignore (exit 1 : 'a Deferred.t))
 
 let currency_in_ledger =
   let open Command.Let_syntax in
@@ -1074,7 +1090,7 @@ let currency_in_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             ignore (exit 1))
+             ignore (exit 1 : 'a Deferred.t))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1356,27 +1372,75 @@ let set_snark_work_fee =
                (Unsigned.UInt64.to_int (response#setSnarkWorkFee)#lastFee) ) )
 
 let import_key =
-  let privkey_path = Cli_lib.Flag.privkey_read_path in
-  let conf_dir = Cli_lib.Flag.conf_dir in
-  let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon.\n\
        Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
-    (Cli_lib.Background_daemon.graphql_init flags
-       ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
-         let open Deferred.Let_syntax in
-         let%bind home = Sys.home_directory () in
-         let conf_dir =
-           Option.value
-             ~default:(home ^/ Cli_lib.Default.conf_dir_name)
-             conf_dir
+    (let%map_open.Command.Let_syntax access_method =
+       choose_one
+         ~if_nothing_chosen:(`Default_to `None)
+         [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
+           |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
+         ; Cli_lib.Flag.conf_dir
+           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir)) ]
+     and privkey_path = Cli_lib.Flag.privkey_read_path in
+     fun () ->
+       let open Deferred.Let_syntax in
+       let initial_password = ref None in
+       let do_graphql graphql_endpoint =
+         let%bind password =
+           match Sys.getenv Secrets.Keypair.env with
+           | Some password ->
+               Deferred.return (Bytes.of_string password)
+           | None ->
+               let password =
+                 Secrets.Password.read_hidden_line ~error_help_message:""
+                   "Secret key password: "
+               in
+               initial_password := Some password ;
+               password
          in
+         let graphql =
+           Graphql_queries.Import_account.make ~path:privkey_path
+             ~password:(Bytes.to_string password) ()
+         in
+         match%map Graphql_client.query graphql graphql_endpoint with
+         | Ok res ->
+             let res = res#importAccount in
+             if res#already_imported then Ok (`Already_imported res#public_key)
+             else Ok (`Imported res#public_key)
+         | Error (`Failed_request _ as err) ->
+             Error err
+         | Error (`Graphql_error _ as err) ->
+             Ok err
+       in
+       let do_local conf_dir =
          let wallets_disk_location = conf_dir ^/ "wallets" in
          let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
-             privkey_path
+           let rec go () =
+             match !initial_password with
+             | None ->
+                 Secrets.Keypair.Terminal_stdin.read_exn ~which:"mina keypair"
+                   privkey_path
+             | Some password -> (
+                 (* We've already asked for the password once for a failed
+                   GraphQL query, try that one instead of asking again.
+                *)
+                 match%bind
+                   Secrets.Keypair.read ~privkey_path
+                     ~password:(Lazy.return password)
+                 with
+                 | Ok res ->
+                     return res
+                 | Error `Incorrect_password_or_corrupted_privkey ->
+                     printf "Wrong password! Please try again\n" ;
+                     initial_password := None ;
+                     go ()
+                 | Error err ->
+                     Secrets.Privkey_error.raise ~which:"mina keypair" err )
+           in
+           go ()
          in
          let pk = Public_key.compress public_key in
          let%bind wallets =
@@ -1386,26 +1450,52 @@ let import_key =
          (* Either we already are tracking it *)
          match Secrets.Wallets.check_locked wallets ~needle:pk with
          | Some _ ->
-             printf
-               !"Key already present, no need to import : %s\n"
-               (Public_key.Compressed.to_base58_check
-                  (Public_key.compress public_key)) ;
-             Deferred.unit
+             Deferred.return (`Already_imported pk)
          | None ->
              (* Or we import it *)
-             let%bind _ =
+             let%map pk =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
-             (* Attempt to reload, but if you can't connect to daemon, it's ok *)
-             let%map _response =
-               Graphql_client.query
-                 (Graphql_queries.Reload_accounts.make ())
-                 graphql_endpoint
-             in
+             `Imported pk
+       in
+       let print_result = function
+         | `Already_imported public_key ->
+             printf
+               !"Key already present, no need to import : %s\n"
+               (Public_key.Compressed.to_base58_check public_key)
+         | `Imported public_key ->
              printf
                !"\n😄 Imported account!\nPublic key: %s\n"
-               (Public_key.Compressed.to_base58_check
-                  (Public_key.compress public_key)) ))
+               (Public_key.Compressed.to_base58_check public_key)
+         | `Graphql_error _ as e ->
+             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn e)
+       in
+       match access_method with
+       | `GraphQL graphql_endpoint -> (
+           match%map do_graphql graphql_endpoint with
+           | Ok res ->
+               print_result res
+           | Error err ->
+               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err)
+           )
+       | `Conf_dir conf_dir ->
+           let%map res = do_local conf_dir in
+           print_result res
+       | `None -> (
+           let default_graphql_endpoint =
+             Cli_lib.Flag.(Uri.Client.{Types.name; value= default})
+           in
+           match%bind do_graphql default_graphql_endpoint with
+           | Ok res ->
+               Deferred.return (print_result res)
+           | Error _res ->
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               eprintf
+                 "%sWarning: Could not connect to a running daemon.\n\
+                  Importing to local directory %s%s\n"
+                 Bash_colors.orange conf_dir Bash_colors.none ;
+               let%map res = do_local conf_dir in
+               print_result res ))
 
 let export_key =
   let privkey_path = Cli_lib.Flag.privkey_write_path in
@@ -1488,31 +1578,87 @@ let export_key =
              Deferred.unit ))
 
 let list_accounts =
-  let open Command.Param in
   Command.async ~summary:"List all owned accounts"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun graphql_endpoint () ->
-         let%map response =
-           Graphql_client.query_exn
+    (let%map_open.Command.Let_syntax access_method =
+       choose_one
+         ~if_nothing_chosen:(`Default_to `None)
+         [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
+           |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
+         ; Cli_lib.Flag.conf_dir
+           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir)) ]
+     in
+     fun () ->
+       let do_graphql graphql_endpoint =
+         match%map
+           Graphql_client.query
              (Graphql_queries.Get_tracked_accounts.make ())
              graphql_endpoint
+         with
+         | Ok response -> (
+           match response#trackedAccounts with
+           | [||] ->
+               printf
+                 "😢 You have no tracked accounts!\n\
+                  You can make a new one using `mina accounts create`\n" ;
+               Ok ()
+           | accounts ->
+               Array.iteri accounts ~f:(fun i w ->
+                   printf
+                     "Account #%d:\n\
+                     \  Public key: %s\n\
+                     \  Balance: %s\n\
+                     \  Locked: %b\n"
+                     (i + 1)
+                     (Public_key.Compressed.to_base58_check w#public_key)
+                     (Currency.Balance.to_formatted_string (w#balance)#total)
+                     (Option.value ~default:true w#locked) ) ;
+               Ok () )
+         | Error (`Failed_request _ as err) ->
+             Error err
+         | Error (`Graphql_error _ as err) ->
+             don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
+             Ok ()
+       in
+       let do_local conf_dir =
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let%map wallets =
+           Secrets.Wallets.load ~logger:(Logger.create ())
+             ~disk_location:wallets_disk_location
          in
-         match response#trackedAccounts with
-         | [||] ->
+         match wallets |> Secrets.Wallets.pks with
+         | [] ->
              printf
                "😢 You have no tracked accounts!\n\
                 You can make a new one using `mina accounts create`\n"
          | accounts ->
-             Array.iteri accounts ~f:(fun i w ->
-                 printf
-                   "Account #%d:\n\
-                   \  Public key: %s\n\
-                   \  Balance: %s\n\
-                   \  Locked: %b\n"
-                   (i + 1)
-                   (Public_key.Compressed.to_base58_check w#public_key)
-                   (Currency.Balance.to_formatted_string (w#balance)#total)
-                   (Option.value ~default:true w#locked) ) ))
+             List.iteri accounts ~f:(fun i public_key ->
+                 printf "Account #%d:\n  Public key: %s\n" (i + 1)
+                   (Public_key.Compressed.to_base58_check public_key) )
+       in
+       match access_method with
+       | `GraphQL graphql_endpoint -> (
+           match%map do_graphql graphql_endpoint with
+           | Ok () ->
+               ()
+           | Error err ->
+               don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err)
+           )
+       | `Conf_dir conf_dir ->
+           do_local conf_dir
+       | `None -> (
+           let default_graphql_endpoint =
+             Cli_lib.Flag.(Uri.Client.{Types.name; value= default})
+           in
+           match%bind do_graphql default_graphql_endpoint with
+           | Ok () ->
+               Deferred.unit
+           | Error _res ->
+               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               eprintf
+                 "%sWarning: Could not connect to a running daemon.\n\
+                  Listing from local directory %s%s\n"
+                 Bash_colors.orange conf_dir Bash_colors.none ;
+               do_local conf_dir ))
 
 let create_account =
   let open Command.Param in
@@ -1621,7 +1767,7 @@ let generate_libp2p_keypair =
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
-    Deferred.ignore
+    Deferred.ignore_m
       (let open Deferred.Let_syntax in
       (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
       let logger = Logger.null () in
@@ -1629,6 +1775,7 @@ let generate_libp2p_keypair =
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
             Mina_net2.create ~logger ~conf_dir:tmpd
+              ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died )
@@ -1800,7 +1947,7 @@ let compile_time_constants =
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
            >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~may_generate:false ~proof_level:None
+                 ~logger:(Logger.null ()) ~proof_level:None
            >>| Or_error.ok_exn
          in
          let all_constants =
@@ -2160,6 +2307,39 @@ let hash_transaction =
        in
        printf "%s\n" (Transaction_hash.to_base58_check hash))
 
+let runtime_config =
+  Command.async
+    ~summary:"Compute the runtime configuration used by a running daemon"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%bind runtime_config =
+           Graphql_client.query
+             (Graphql_queries.Runtime_config.make ())
+             graphql_endpoint
+           |> Deferred.Result.map_error ~f:(function
+                | `Failed_request e ->
+                    Error.create "Unable to connect to Mina daemon" ()
+                      (fun () ->
+                        Sexp.List
+                          [ List
+                              [ Atom "uri"
+                              ; Atom (Uri.to_string graphql_endpoint.value) ]
+                          ; List [Atom "uri_flag"; Atom graphql_endpoint.name]
+                          ; List [Atom "error_message"; Atom e] ] )
+                | `Graphql_error e ->
+                    Error.createf "GraphQL error: %s" e )
+         in
+         match runtime_config with
+         | Ok runtime_config ->
+             Format.printf "%s@."
+               (Yojson.Basic.pretty_to_string runtime_config#runtimeConfig) ;
+             return ()
+         | Error err ->
+             Format.eprintf
+               "Failed to retrieve runtime configuration. Error:@.%s@."
+               (Error.to_string_hum err) ;
+             exit 1 ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2277,7 +2457,9 @@ let advanced =
     ; ("compute-receipt-chain-hash", receipt_chain_hash)
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
-    ; ("chain-id-inputs", chain_id_inputs) ]
+    ; ("chain-id-inputs", chain_id_inputs)
+    ; ("runtime-config", runtime_config)
+    ; ("vrf", Cli_lib.Commands.Vrf.command_group) ]
 
 let ledger =
   Command.group ~summary:"Ledger commands"

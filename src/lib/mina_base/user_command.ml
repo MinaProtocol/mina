@@ -5,14 +5,14 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type ('u, 's) t = Signed_command of 'u | Parties of 's
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
 
     module V1 = struct
       type ('u, 's) t = Signed_command of 'u | Snapp_command of 's
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest : _ t -> _ V2.t = function
         | Signed_command x ->
@@ -70,7 +70,7 @@ module Valid = struct
         ( Signed_command.With_valid_signature.Stable.V1.t
         , Parties.Valid.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -80,7 +80,7 @@ module Valid = struct
         ( Signed_command.With_valid_signature.Stable.V1.t
         , Snapp_command.Valid.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Poly.Stable.V1.to_latest
     end
@@ -93,7 +93,7 @@ end
 module Stable = struct
   module V2 = struct
     type t = (Signed_command.Stable.V1.t, Parties.Stable.V1.t) Poly.Stable.V2.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
@@ -101,7 +101,7 @@ module Stable = struct
   module V1 = struct
     type t =
       (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Poly.Stable.V1.to_latest
   end
@@ -116,7 +116,7 @@ include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
     module V1 = struct
       type t =
         (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 
@@ -133,7 +133,7 @@ module Zero_one_or_two = struct
   module Stable = struct
     module V1 = struct
       type 'a t = [`Zero | `One of 'a | `Two of 'a * 'a]
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
 end
@@ -149,7 +149,7 @@ module Verifiable = struct
             * Pickles.Side_loaded.Verification_key.Stable.V1.t option )
             list )
         Poly.Stable.V2.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -162,7 +162,7 @@ module Verifiable = struct
           Pickles.Side_loaded.Verification_key.Stable.V1.t
           Zero_one_or_two.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Poly.Stable.V1.to_latest
     end
@@ -192,8 +192,8 @@ let to_verifiable t ~ledger ~get ~location_of_account =
 let fee_exn : t -> Currency.Fee.t = function
   | Signed_command x ->
       Signed_command.fee x
-  | Parties _ ->
-      failwith "Parties: not implemented"
+  | Parties p ->
+      Parties.fee_lower_bound_exn p
 
 (* for filtering *)
 let minimum_fee = Mina_compile_config.minimum_user_command_fee
@@ -212,7 +212,7 @@ let next_available_token (t : t) tok =
   | Signed_command x ->
       Signed_command.next_available_token x tok
   | Parties _ps ->
-      failwith "Parties: not implemented"
+      tok
 
 let to_base58_check (t : t) =
   match t with

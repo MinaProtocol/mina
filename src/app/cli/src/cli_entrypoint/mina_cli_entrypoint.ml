@@ -299,8 +299,8 @@ let setup_daemon logger =
   and libp2p_peer_list_file =
     flag "--peer-list-file" ~aliases:["peer-list-file"]
       ~doc:
-        "/ip4/IPADDR/tcp/PORT/p2p/PEERID initial \"bootstrap\" peers for \
-         discovery inside a file delimited by new-lines (\\n)"
+        "PATH path to a file containing \"bootstrap\" peers for discovery, \
+         one multiaddress per line"
       (optional string)
   and seed_peer_list_url =
     flag "--peer-list-url" ~aliases:["peer-list-url"]
@@ -325,14 +325,9 @@ let setup_daemon logger =
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
-  and may_generate =
+  and _may_generate =
     flag "--generate-genesis-proof" ~aliases:["generate-genesis-proof"]
-      ~doc:
-        (sprintf
-           "true|false Generate a new genesis proof for the current \
-            configuration if none is found (default: %s)"
-           ( if Mina_compile_config.generate_genesis_proof then "false"
-           else "true" ))
+      ~doc:"true|false Deprecated. Passing this flag has no effect"
       (optional bool)
   and disable_node_status =
     flag "--disable-node-status" ~aliases:["disable-node-status"] no_arg
@@ -368,6 +363,12 @@ let setup_daemon logger =
         "true|false upload blocks to gcloud storage. Requires the environment \
          variables GCLOUD_KEYFILE, NETWORK_NAME, and \
          GCLOUD_BLOCK_UPLOAD_BUCKET"
+  and all_peers_seen_metric =
+    flag "--all-peers-seen-metric" ~aliases:["all-peers-seen-metric"]
+      (optional_with_default false bool)
+      ~doc:
+        "true|false whether to track the set of all peers ever seen for the \
+         all_peers metric (default: false)"
   in
   fun () ->
     let open Deferred.Let_syntax in
@@ -514,13 +515,6 @@ let setup_daemon logger =
     end in
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-    in
-    let may_generate =
-      (* Default is [true] if there is no compile-time genesis proof to fall
-         back on, or [false] otherwise.
-      *)
-      Option.value may_generate
-        ~default:(not Mina_compile_config.generate_genesis_proof)
     in
     (* FIXME adapt to new system, move into child_processes lib *)
     let pids = Child_processes.Termination.create_pid_table () in
@@ -676,7 +670,7 @@ let setup_daemon logger =
       let%bind precomputed_values =
         match%map
           Genesis_ledger_helper.init_from_config_file ~genesis_dir ~logger
-            ~may_generate ~proof_level config
+            ~proof_level config
         with
         | Ok (precomputed_values, _) ->
             precomputed_values
@@ -792,8 +786,14 @@ let setup_daemon logger =
         YJ.Util.to_string_option json
         |> Option.bind ~f:(fun pk_str ->
                match Public_key.Compressed.of_base58_check pk_str with
-               | Ok key ->
-                   Some key
+               | Ok key -> (
+                 match Public_key.decompress key with
+                 | None ->
+                     Mina_user_error.raisef ~where:"decompressing a public key"
+                       "The %s public key %s could not be decompressed." which
+                       pk_str
+                 | Some _ ->
+                     Some key )
                | Error _e ->
                    Mina_user_error.raisef ~where:"decoding a public key"
                      "The %s public key %s could not be decoded." which pk_str
@@ -847,7 +847,7 @@ let setup_daemon logger =
       Option.iter
         ~f:(fun password ->
           match Sys.getenv Secrets.Keypair.env with
-          | Some env_pass when env_pass <> password ->
+          | Some env_pass when not (String.equal env_pass password) ->
               [%log warn]
                 "$envkey environment variable doesn't match value provided on \
                  command-line or daemon.json. Using value from $envkey"
@@ -907,12 +907,27 @@ let setup_daemon logger =
             client_trustlist
       in
       Stream.iter
-        (Async.Scheduler.long_cycles
+        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context @@ t ())
            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
-        ~f:(fun span ->
+        ~f:(fun (span, context) ->
           let secs = Time_ns.Span.to_sec span in
+          let rec get_monitors accum monitor =
+            match Async_kernel.Monitor.parent monitor with
+            | None ->
+                List.rev accum
+            | Some parent ->
+                get_monitors (parent :: accum) parent
+          in
+          let monitors = get_monitors [context.monitor] context.monitor in
+          let monitor_infos =
+            List.map monitors ~f:(fun monitor ->
+                Async_kernel.Monitor.sexp_of_t monitor
+                |> Error_json.sexp_to_yojson )
+          in
           [%log debug]
-            ~metadata:[("long_async_cycle", `Float secs)]
+            ~metadata:
+              [ ("long_async_cycle", `Float secs)
+              ; ("monitors", `List monitor_infos) ]
             "Long async cycle, $long_async_cycle seconds" ;
           Mina_metrics.(
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
@@ -976,7 +991,8 @@ let setup_daemon logger =
             return []
         | Some file -> (
             match%bind
-              Monitor.try_with_or_error (fun () -> Reader.file_contents file)
+              Monitor.try_with_or_error ~here:[%here] (fun () ->
+                  Reader.file_contents file )
             with
             | Ok contents ->
                 return (Mina_net2.Multiaddr.of_file_contents ~contents)
@@ -1055,7 +1071,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
           ; max_connections
           ; validation_queue_size
           ; isolate= Option.value ~default:false isolate
-          ; keypair= libp2p_keypair }
+          ; keypair= libp2p_keypair
+          ; all_peers_seen_metric }
       in
       let net_config =
         { Mina_networking.Config.logger
@@ -1231,7 +1248,7 @@ let rec ensure_testnet_id_still_good logger =
   in
   let soon_minutes = Int.of_float (60.0 *. recheck_soon) in
   match%bind
-    Monitor.try_with_or_error (fun () ->
+    Monitor.try_with_or_error ~here:[%here] (fun () ->
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->

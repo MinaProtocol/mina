@@ -11,7 +11,7 @@ open Mina_state
 open Mina_transition
 open Network_peer
 
-type t [@@deriving sexp, eq, compare, to_yojson]
+type t [@@deriving sexp, equal, compare, to_yojson]
 
 type display =
   { state_hash: string
@@ -75,6 +75,8 @@ val block_producer : t -> Signature_lib.Public_key.Compressed.t
 val commands : t -> User_command.Valid.t With_status.t list
 
 val payments : t -> Signed_command.t With_status.t list
+
+val completed_works : t -> Transaction_snark_work.t list
 
 val mask : t -> Ledger.Mask.Attached.t
 

@@ -1,7 +1,9 @@
-open Core
+open Core_kernel
 open Currency
 open Signature_lib
 module Global_slot = Mina_numbers.Global_slot
+
+type account_state = [`Added | `Existed] [@@deriving equal]
 
 module type Ledger_intf = sig
   type t
@@ -15,10 +17,10 @@ module type Ledger_intf = sig
   val set : t -> location -> Account.t -> unit
 
   val get_or_create :
-    t -> Account_id.t -> [`Added | `Existed] * Account.t * location
+    t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
 
-  val get_or_create_account_exn :
-    t -> Account_id.t -> Account.t -> [`Added | `Existed] * location
+  val get_or_create_account :
+    t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t
 
   val remove_accounts_exn : t -> Account_id.t list -> unit
 
@@ -494,12 +496,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let set_with_location ledger location account =
     match location with
     | `Existing location ->
-        set ledger location account
+        Ok (set ledger location account)
     | `New ->
-        ignore
-        @@ get_or_create_account_exn ledger
-             (Account.identifier account)
-             account
+        Or_error.ignore_m
+        @@ get_or_create_account ledger (Account.identifier account) account
 
   let get' ledger tag location =
     error_opt (sprintf "%s account not found" tag) (get ledger location)
@@ -519,7 +519,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
       amount =
     let fee = constraint_constants.account_creation_fee in
-    if action = `Added then
+    if equal_account_state action `Added then
       error_opt
         (sprintf
            !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
@@ -591,7 +591,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                 c.balances )
   end
 
-  let previous_empty_accounts action pk = if action = `Added then [pk] else []
+  let previous_empty_accounts action pk =
+    if equal_account_state action `Added then [pk] else []
 
   let has_locked_tokens ~global_slot ~account_id ledger =
     let open Or_error.Let_syntax in
@@ -723,7 +724,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
        succeeds, to ensure that the network is compensated for processing this
        command.
     *)
-    set_with_location ledger fee_payer_location fee_payer_account ;
+    let%bind () =
+      set_with_location ledger fee_payer_location fee_payer_account
+    in
     let next_available_token = next_available_token ledger in
     let source = Signed_command.source ~next_available_token user_command in
     let receiver =
@@ -915,9 +918,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let receiver_location, receiver_account =
             get_with_location ledger receiver |> ok_or_reject
           in
-          if not (receiver_location = `New) then
-            failwith
-              "Token owner account for newly created token already exists?!?!" ;
+          ( match receiver_location with
+          | `New ->
+              ()
+          | _ ->
+              failwith
+                "Token owner account for newly created token already exists?!?!"
+          ) ;
           let receiver_account =
             { receiver_account with
               token_permissions=
@@ -1091,8 +1098,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         , auxiliary_data
         , applied_body ) ->
         (* Update the ledger. *)
-        List.iter located_accounts ~f:(fun (location, account) ->
-            set_with_location ledger location account ) ;
+        let%bind () =
+          List.fold located_accounts ~init:(Ok ())
+            ~f:(fun acc (location, account) ->
+              let%bind () = acc in
+              set_with_location ledger location account )
+        in
         let applied_common =
           { applied_common with
             source_timing= Some source_timing
@@ -1144,7 +1155,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ~(state_view : Snapp_predicate.Protocol_state.View.t) ~check_auth ~is_new
       ({ body=
            { pk= _
-           ; token_id= _
+           ; token_id
            ; update= {app_state; delegate; verification_key; permissions}
            ; delta }
        ; predicate } :
@@ -1154,6 +1165,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind balance =
       let%bind b = add_signed_amount a.balance delta in
       let fee = constraint_constants.account_creation_fee in
+      let%bind () =
+        (* TODO: Fix when we want to enable tokens. The trickiness here is we need to subtract
+           the account creation fee from somewhere (like the fee excess in the local state) *)
+        if Token_id.(equal default) token_id then Ok ()
+        else Error Transaction_status.Failure.Cannot_pay_creation_fee_in_token
+      in
       if is_new then
         Balance.sub_amount b (Amount.of_fee fee)
         |> opt_fail Amount_insufficient_to_create_account
@@ -1161,13 +1178,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     (* Check send/receive permissions *)
     let%bind () =
-      check Update_not_permitted
-        (check_auth
-           ( match delta.sgn with
-           | Pos ->
-               a.permissions.receive
-           | Neg ->
-               a.permissions.send ))
+      if Amount.(equal zero) delta.magnitude then Ok ()
+      else
+        check Update_not_permitted
+          (check_auth
+             ( match delta.sgn with
+             | Pos ->
+                 a.permissions.receive
+             | Neg ->
+                 a.permissions.send ))
     in
     (* Check timing. *)
     let%bind timing =
@@ -1193,18 +1212,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind delegate =
       if Token_id.(equal default) a.token_id then
         update a.permissions.set_delegate delegate a.delegate
-          ~is_keep:(( = ) Set_or_keep.Keep) ~update:(fun u x ->
+          ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match u with Keep -> x | Set y -> Some y )
       else return a.delegate
     in
     let%bind snapp =
       let%map app_state =
         update a.permissions.edit_state app_state init.app_state
-          ~is_keep:(Vector.for_all ~f:(( = ) Set_or_keep.Keep))
+          ~is_keep:(Vector.for_all ~f:Set_or_keep.is_keep)
           ~update:(Vector.map2 ~f:Set_or_keep.set_or_keep)
       and verification_key =
         update a.permissions.set_verification_key verification_key
-          init.verification_key ~is_keep:(( = ) Set_or_keep.Keep)
+          init.verification_key ~is_keep:Set_or_keep.is_keep
           ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x )
       in
@@ -1213,7 +1232,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let%bind permissions =
       update a.permissions.set_delegate permissions a.permissions
-        ~is_keep:(( = ) Set_or_keep.Keep) ~update:Set_or_keep.set_or_keep
+        ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
     in
     let nonce : Account.Nonce.t =
       (* TODO: Think about whether this is correct *)
@@ -1226,9 +1245,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     Ok {a with balance; snapp; delegate; permissions; timing; nonce}
 
   let apply_parties_unchecked
-      ~
-      (*       ?local_state *)
-      (constraint_constants : Genesis_constants.Constraint_constants.t)
+      ~(constraint_constants : Genesis_constants.Constraint_constants.t)
       ~(state_view : Snapp_predicate.Protocol_state.View.t) (ledger : L.t)
       (c : Parties.t) : (Transaction_applied.Parties_applied.t * _) Or_error.t
       =
@@ -1260,9 +1277,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let not = not
 
-        let ( || ) = ( || )
+        let ( ||| ) = ( || )
 
-        let ( && ) = ( && )
+        let ( &&& ) = ( && )
       end
 
       module Ledger = struct
@@ -1288,7 +1305,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let if_ = Parties.value_if
 
-        module Signed = Signed
+        module Signed = struct
+          include Signed
+
+          let is_pos (t : t) = Sgn.equal t.sgn Pos
+        end
 
         let zero = zero
 
@@ -1386,7 +1407,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         | Full p ->
             Or_error.is_ok (Snapp_predicate.Account.check p account) )
       | Set_account_if (b, l, a, loc) ->
-          if b then set_with_location l loc a ;
+          if b then Or_error.ok_exn (set_with_location l loc a) ;
           l
       | Modify_global_excess (s, f) ->
           {s with fee_excess= f s.fee_excess}
@@ -1442,7 +1463,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             end in
             `Did_not_succeed
         | exception e ->
-            `Error e
+            `Error (Error.of_exn ~backtrace:`Get e)
         | s ->
             step_all s
     in
@@ -1472,7 +1493,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     match step_all (init ~will_succeed:true) with
     | `Error e ->
-        Error (Error.of_exn e)
+        Error e
     | `Ok (global_state, local_state) ->
         Ok
           ( { accounts= accounts ()
@@ -1499,7 +1520,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         |> L.remove_accounts_exn ledger ;
         match step_all (init ~will_succeed:false) with
         | `Error e ->
-            Error (Error.of_exn e)
+            Error e
         | `Did_not_succeed ->
             assert false
         | `Ok (global_state, local_state) ->
@@ -1538,7 +1559,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            new account before we know that the transaction will go through and
            thus the creation fee has been paid.
         *)
-        let action, a, loc = get_or_create t account_id in
+        let%bind action, a, loc = get_or_create t account_id in
         let emptys = previous_empty_accounts action account_id in
         let%bind timing = modify_timing a in
         let%map balance = modify_balance action account_id a.balance ft.fee in
@@ -1550,7 +1571,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            new account before we know that the transaction will go through and
            thus the creation fee has been paid.
         *)
-        let action1, a1, l1 = get_or_create t account_id1 in
+        let%bind action1, a1, l1 = get_or_create t account_id1 in
         let emptys1 = previous_empty_accounts action1 account_id1 in
         let account_id2 = Fee_transfer.Single.receiver ft2 in
         if Account_id.equal account_id1 account_id2 then (
@@ -1566,7 +1587,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
              new account before we know that the transaction will go through
              and thus the creation fee has been paid.
           *)
-          let action2, a2, l2 = get_or_create t account_id2 in
+          let%bind action2, a2, l2 = get_or_create t account_id2 in
           let emptys2 = previous_empty_accounts action2 account_id2 in
           let%bind balance1 =
             modify_balance action1 account_id1 a1.balance ft1.fee
@@ -1660,7 +1681,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
-          let action, transferee_account, transferee_location =
+          let%bind action, transferee_account, transferee_location =
             (* TODO(#4496): Do not use get_or_create here; we should not create
                a new account before we know that the transaction will go
                through and thus the creation fee has been paid.
@@ -1684,7 +1705,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , Some transferee_account.timing )
     in
     let receiver_id = Account_id.create receiver Token_id.default in
-    let action2, receiver_account, receiver_location =
+    let%bind action2, receiver_account, receiver_location =
       (* TODO(#4496): Do not use get_or_create here; we should not create a new
          account before we know that the transaction will go through and thus
          the creation fee has been paid.
@@ -1983,7 +2004,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       |> Or_error.all
     in
     remove_accounts_exn ledger to_delete ;
-    List.iter to_update ~f:(Tuple2.uncurry (set_with_location ledger))
+    List.iter to_update ~f:(fun (location, account) ->
+        ignore @@ set_with_location ledger location account )
 
   let undo :
          constraint_constants:Genesis_constants.Constraint_constants.t
@@ -2112,6 +2134,7 @@ module For_tests = struct
               (Account_id.create
                  (Public_key.compress kp.public_key)
                  Token_id.default)
+            |> Or_error.ok_exn
           in
           L.set l loc {account with balance= Currency.Balance.of_int amount} )
 

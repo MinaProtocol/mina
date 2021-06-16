@@ -47,7 +47,7 @@ module TextFormat_0_0_4 = struct
     match Float.classify v with
     | Normal | Subnormal | Zero ->
         Fmt.float f v
-    | Infinite when v > 0.0 ->
+    | Infinite when Float.(v > 0.) ->
         Fmt.string f "+Inf"
     | Infinite ->
         Fmt.string f "-Inf"
@@ -308,6 +308,10 @@ module Transaction_pool = struct
       "Time at which useful transactions were seen (seconds since 1/1/1970)"
     in
     Gauge.v "useful_transactions_received_time_sec" ~help ~namespace ~subsystem
+
+  let pool_size : Gauge.t =
+    let help = "Number of transactions in the pool" in
+    Gauge.v "size" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -343,6 +347,10 @@ module Network = struct
   let peers : Gauge.t =
     let help = "# of peers seen through gossip net" in
     Gauge.v "peers" ~help ~namespace ~subsystem
+
+  let all_peers : Gauge.t =
+    let help = "# of peers ever seen through gossip net" in
+    Gauge.v "all_peers" ~help ~namespace ~subsystem
 
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
@@ -816,6 +824,40 @@ module Block_latency = struct
       ()
 end
 
+module Rejected_blocks = struct
+  let subsystem = "Rejected_blocks"
+
+  let worse_than_root =
+    let help =
+      "The number of blocks rejected due to the blocks are not selected over \
+       our root"
+    in
+    Counter.v "worse_than_root" ~help ~namespace ~subsystem
+
+  let no_common_ancestor =
+    let help =
+      "The number of blocks rejected due to the blocks do not share a common \
+       ancestor with our root"
+    in
+    Counter.v "no_common_ancestor" ~help ~namespace ~subsystem
+
+  let invalid_proof =
+    let help = "The number of blocks rejected due to invalid proof" in
+    Counter.v "invalid_proof" ~help ~namespace ~subsystem
+
+  let received_late =
+    let help =
+      "The number of blocks rejected due to blocks being received too late"
+    in
+    Counter.v "received_late" ~help ~namespace ~subsystem
+
+  let received_early =
+    let help =
+      "The number of blocks rejected due to blocks being received too early"
+    in
+    Counter.v "received_early" ~help ~namespace ~subsystem
+end
+
 module Object_lifetime_statistics = struct
   let subsystem = "Object_lifetime_statistics"
 
@@ -927,7 +969,7 @@ let generic_server ?forward_uri ~port ~logger ~registry () =
         Server.respond_string ~status:`Bad_request "Bad request"
   in
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
-    (Async_extra.Tcp.Where_to_listen.of_port port)
+    (Async.Tcp.Where_to_listen.of_port port)
     callback
 
 let server ?forward_uri ~port ~logger () =

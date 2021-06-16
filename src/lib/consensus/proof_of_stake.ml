@@ -13,8 +13,6 @@ module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
 module Length = Mina_numbers.Length
 
-let m = Snark_params.Tick.m
-
 let make_checked t =
   let open Snark_params.Tick in
   with_state (As_prover.return ()) (Run.make_checked t)
@@ -387,15 +385,10 @@ module Data = struct
                     ; ("error", `String str) ] ;
                 create_new_uuids ()
           in
-          let both_files_present =
-            Sys.file_exists (ledger_location epoch_ledger_uuids.staking)
-            && Sys.file_exists (ledger_location epoch_ledger_uuids.next)
-          in
           (*If the genesis hash matches and both the files are present. If only one of them is present then it could be stale data and might cause the node to never be able to bootstrap*)
           if
             Mina_base.State_hash.equal epoch_ledger_uuids.genesis_state_hash
               genesis_state_hash
-            && both_files_present
           then epoch_ledger_uuids
           else
             (*Clean-up outdated epoch ledgers*)
@@ -473,13 +466,15 @@ module Data = struct
               ~default:
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch_and_slot.of_time_exn now ~constants in
-                 (epoch, UInt32.(if slot > zero then sub slot one else slot)))
+                 ( epoch
+                 , UInt32.(
+                     if compare slot zero > 0 then sub slot one else slot) ))
         ; last_epoch_delegatee_table= None
         ; epoch_ledger_uuids= old.epoch_ledger_uuids
         ; epoch_ledger_location= old.epoch_ledger_location }
 
     type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
-    [@@deriving to_yojson]
+    [@@deriving to_yojson, equal]
 
     let get_snapshot (t : t) id =
       match id with
@@ -587,325 +582,8 @@ module Data = struct
   end
 
   module Vrf = struct
-    module Scalar = struct
-      type value = Tick.Inner_curve.Scalar.t
-
-      type var = Tick.Inner_curve.Scalar.var
-
-      let typ : (var, value) Typ.t = Tick.Inner_curve.Scalar.typ
-    end
-
-    module Group = struct
-      open Tick
-
-      type value = Inner_curve.t
-
-      type var = Inner_curve.var
-
-      let scale = Inner_curve.scale
-
-      module Checked = struct
-        include Inner_curve.Checked
-
-        let scale_generator shifted s ~init =
-          scale_known shifted Inner_curve.one s ~init
-      end
-    end
-
-    module Message = struct
-      module Global_slot = Mina_numbers.Global_slot
-
-      type ('global_slot, 'epoch_seed, 'delegator) t =
-        {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
-      [@@deriving sexp, hlist]
-
-      type value = (Global_slot.t, Epoch_seed.t, Mina_base.Account.Index.t) t
-      [@@deriving sexp]
-
-      type var =
-        ( Global_slot.Checked.t
-        , Epoch_seed.var
-        , Mina_base.Account.Index.Unpacked.var )
-        t
-
-      let to_input
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t)
-          ({global_slot; seed; delegator} : value) =
-        { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
-        ; bitstrings=
-            [| Global_slot.Bits.to_bits global_slot
-             ; Mina_base.Account.Index.to_bits
-                 ~ledger_depth:constraint_constants.ledger_depth delegator |]
-        }
-
-      let data_spec
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-        let open Tick.Data_spec in
-        [ Global_slot.typ
-        ; Epoch_seed.typ
-        ; Mina_base.Account.Index.Unpacked.typ
-            ~ledger_depth:constraint_constants.ledger_depth ]
-
-      let typ ~constraint_constants : (var, value) Typ.t =
-        Tick.Typ.of_hlistable
-          (data_spec ~constraint_constants)
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-      let hash_to_group ~constraint_constants msg =
-        Random_oracle.hash ~init:Mina_base.Hash_prefix.vrf_message
-          (Random_oracle.pack_input (to_input ~constraint_constants msg))
-        |> Group_map.to_group |> Tick.Inner_curve.of_affine
-
-      module Checked = struct
-        open Tick
-
-        let to_input ({global_slot; seed; delegator} : var) =
-          let open Tick.Checked.Let_syntax in
-          let%map global_slot = Global_slot.Checked.to_bits global_slot in
-          let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-          { Random_oracle.Input.field_elements=
-              [|Epoch_seed.var_to_hash_packed seed|]
-          ; bitstrings= [|s global_slot; delegator|] }
-
-        let hash_to_group msg =
-          let%bind input = to_input msg in
-          Tick.make_checked (fun () ->
-              Random_oracle.Checked.hash
-                ~init:Mina_base.Hash_prefix.vrf_message
-                (Random_oracle.Checked.pack_input input)
-              |> Group_map.Checked.to_group )
-      end
-
-      let gen
-          ~(constraint_constants : Genesis_constants.Constraint_constants.t) =
-        let open Quickcheck.Let_syntax in
-        let%map global_slot = Global_slot.gen
-        and seed = Epoch_seed.gen
-        and delegator =
-          Mina_base.Account.Index.gen
-            ~ledger_depth:constraint_constants.ledger_depth
-        in
-        {global_slot; seed; delegator}
-    end
-
-    module Output = struct
-      module Truncated = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t = string [@@deriving sexp, eq, compare, hash]
-
-            let to_yojson t =
-              `String (Base64.encode_exn ~alphabet:Base64.uri_safe_alphabet t)
-
-            let of_yojson = function
-              | `String s ->
-                  Result.map_error
-                      (Base64.decode ~alphabet:Base64.uri_safe_alphabet s)
-                      ~f:(function `Msg err ->
-                      sprintf
-                        "Error decoding vrf output in \
-                         Vrf.Output.Truncated.Stable.V1.of_yojson: %s"
-                        err )
-              | _ ->
-                  Error
-                    "Vrf.Output.Truncated.Stable.V1.of_yojson: Expected a \
-                     string"
-
-            let to_latest = Fn.id
-          end
-        end]
-
-        include Codable.Make_base58_check (struct
-          type t = Stable.Latest.t [@@deriving bin_io_unversioned]
-
-          let version_byte = Base58_check.Version_bytes.vrf_truncated_output
-
-          let description = "Vrf Truncated Output"
-        end)
-
-        open Tick
-
-        let length_in_bits = Int.min 256 (Field.size_in_bits - 2)
-
-        type var = Boolean.var array
-
-        let typ : (var, t) Typ.t =
-          Typ.array ~length:length_in_bits Boolean.typ
-          |> Typ.transport
-               ~there:(fun s ->
-                 Array.sub (Blake2.string_to_bits s) ~pos:0 ~len:length_in_bits
-                 )
-               ~back:Blake2.bits_to_string
-
-        let dummy =
-          String.init
-            (Base.Int.round ~dir:`Up ~to_multiple_of:8 length_in_bits / 8)
-            ~f:(fun _ -> '\000')
-
-        let to_bits t =
-          Fold.(to_list (string_bits t)) |> Fn.flip List.take length_in_bits
-      end
-
-      open Tick
-
-      let typ = Field.typ
-
-      let gen = Field.gen
-
-      let truncate x =
-        Random_oracle.Digest.to_bits ~length:Truncated.length_in_bits x
-        |> Array.of_list |> Blake2.bits_to_string
-
-      let hash ~constraint_constants msg g =
-        let x, y = Non_zero_curve_point.of_inner_curve_exn g in
-        let input =
-          Random_oracle.Input.(
-            append
-              (Message.to_input ~constraint_constants msg)
-              (field_elements [|x; y|]))
-        in
-        let open Random_oracle in
-        hash ~init:Hash_prefix_states.vrf_output (pack_input input)
-
-      module Checked = struct
-        let truncate x =
-          Tick.make_checked (fun () ->
-              Random_oracle.Checked.Digest.to_bits
-                ~length:Truncated.length_in_bits x
-              |> Array.of_list )
-
-        let hash msg (x, y) =
-          let%bind msg = Message.Checked.to_input msg in
-          let input =
-            Random_oracle.Input.(append msg (field_elements [|x; y|]))
-          in
-          make_checked (fun () ->
-              let open Random_oracle.Checked in
-              hash ~init:Hash_prefix_states.vrf_output (pack_input input) )
-      end
-
-      let%test_unit "hash unchecked vs. checked equality" =
-        let constraint_constants =
-          Genesis_constants.Constraint_constants.for_unit_tests
-        in
-        let gen_inner_curve_point =
-          let open Quickcheck.Generator.Let_syntax in
-          let%map compressed = Non_zero_curve_point.gen in
-          Non_zero_curve_point.to_inner_curve compressed
-        in
-        let gen_message_and_curve_point =
-          let open Quickcheck.Generator.Let_syntax in
-          let%map msg = Message.gen ~constraint_constants
-          and g = gen_inner_curve_point in
-          (msg, g)
-        in
-        Quickcheck.test ~trials:10 gen_message_and_curve_point
-          ~f:
-            (Test_util.test_equal ~equal:Field.equal
-               Snark_params.Tick.Typ.(
-                 Message.typ ~constraint_constants
-                 * Snark_params.Tick.Inner_curve.typ)
-               typ
-               (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash ~constraint_constants msg g))
-    end
-
-    module Threshold = struct
-      open Bignum_bigint
-
-      (* c is a constant factor on vrf-win likelihood *)
-      (* c = 2^0 is production behavior *)
-      (* c > 2^0 is a temporary hack for testnets *)
-      let c = `Two_to_the 0
-
-      (* f determines the fraction of slots that will have blocks if c = 2^0 *)
-      let f = Bignum.(of_int 3 / of_int 4)
-
-      let base = Bignum.(of_int 1 - f)
-
-      let c_bias =
-        let (`Two_to_the i) = c in
-        fun xs -> List.drop xs i
-
-      let params =
-        Snarky_taylor.Exp.params ~base
-          ~field_size_in_bits:Snark_params.Tick.Field.size_in_bits
-
-      let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
-
-      (*  Check if
-          vrf_output / 2^256 <= c * (1 - (1 - f)^(amount / total_stake))
-      *)
-      let is_satisfied ~my_stake ~total_stake vrf_output =
-        let input =
-          (* get first params.per_term_precision bits of top / bottom.
-
-             This is equal to
-
-             floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
-          *)
-          let k = params.per_term_precision in
-          let top = bigint_of_uint64 (Balance.to_uint64 my_stake) in
-          let bottom = bigint_of_uint64 (Amount.to_uint64 total_stake) in
-          Bignum.(
-            of_bigint Bignum_bigint.(shift_left top k / bottom)
-            / of_bigint Bignum_bigint.(shift_left one k))
-        in
-        let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
-        let lhs =
-          let n =
-            of_bits_lsb
-              (c_bias (Array.to_list (Blake2.string_to_bits vrf_output)))
-          in
-          Bignum.(
-            of_bigint n
-            / of_bigint
-                Bignum_bigint.(shift_left one Output.Truncated.length_in_bits))
-        in
-        Bignum.(lhs <= rhs)
-
-      module Checked = struct
-        let is_satisfied ~my_stake ~total_stake
-            (vrf_output : Output.Truncated.var) =
-          let open Snarky_integer in
-          let open Snarky_taylor in
-          make_checked (fun () ->
-              let open Run in
-              let rhs =
-                Exp.one_minus_exp ~m params
-                  (Floating_point.of_quotient ~m
-                     ~precision:params.per_term_precision
-                     ~top:(Integer.of_bits ~m (Balance.var_to_bits my_stake))
-                     ~bottom:
-                       (Integer.of_bits ~m (Amount.var_to_bits total_stake))
-                     ~top_is_less_than_bottom:())
-              in
-              let vrf_output =
-                Array.to_list (vrf_output :> Boolean.var array)
-              in
-              let lhs = c_bias vrf_output in
-              Floating_point.(
-                le ~m
-                  (of_bits ~m lhs ~precision:Output.Truncated.length_in_bits)
-                  rhs) )
-      end
-    end
-
-    module T =
-      Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message)
-        (struct
-          type value = Snark_params.Tick.Field.t
-
-          type var = Random_oracle.Checked.Digest.t
-
-          let hash = Output.hash
-
-          module Checked = struct
-            let hash = Output.Checked.hash
-          end
-        end)
+    include Consensus_vrf
+    module T = Integrated
 
     type _ Snarky_backendless.Request.t +=
       | Winner_address : Mina_base.Account.Index.t Snarky_backendless.Request.t
@@ -986,6 +664,22 @@ module Data = struct
       let keypairs = Lazy.force Mina_base.Sample_keypairs.keypairs
 
       let genesis_winner = keypairs.(0)
+
+      let genesis_stake_proof :
+          genesis_epoch_ledger:Mina_base.Ledger.t Lazy.t -> Stake_proof.t =
+       fun ~genesis_epoch_ledger ->
+        let pk, sk = genesis_winner in
+        let dummy_sparse_ledger =
+          Mina_base.Sparse_ledger.of_ledger_subset_exn
+            (Lazy.force genesis_epoch_ledger)
+            [Mina_base.(Account_id.create pk Token_id.default)]
+        in
+        { delegator= 0
+        ; delegator_pk= pk
+        ; coinbase_receiver_pk= pk
+        ; ledger= dummy_sparse_ledger
+        ; producer_private_key= sk
+        ; producer_public_key= Public_key.decompress_exn pk }
 
       let handler :
              constraint_constants:Genesis_constants.Constraint_constants.t
@@ -1265,7 +959,7 @@ module Data = struct
               , Lock_checkpoint.Stable.V1.t
               , Length.Stable.V1.t )
               Poly.Stable.V1.t
-            [@@deriving sexp, compare, eq, hash, yojson]
+            [@@deriving sexp, compare, equal, hash, yojson]
 
             let to_latest = Fn.id
           end
@@ -1289,7 +983,7 @@ module Data = struct
               , Lock_checkpoint.Stable.V1.t
               , Length.Stable.V1.t )
               Poly.Stable.V1.t
-            [@@deriving sexp, compare, eq, hash, yojson]
+            [@@deriving sexp, compare, equal, hash, yojson]
 
             let to_latest = Fn.id
           end
@@ -1315,7 +1009,7 @@ module Data = struct
         else {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
       in
       let staking_data', next_data', epoch_count' =
-        if next_epoch > prev_epoch then
+        if Epoch.(next_epoch > prev_epoch) then
           ( next_to_staking next_data
           , { Poly.seed= next_data.seed
             ; ledger= next_staking_ledger
@@ -1432,8 +1126,11 @@ module Data = struct
               Sub_window.(of_int i < next_relative_sub_window)
             in
             let within_range =
-              if prev_relative_sub_window < next_relative_sub_window then
-                gt_prev_sub_window && lt_next_sub_window
+              if
+                UInt32.compare prev_relative_sub_window
+                  next_relative_sub_window
+                < 0
+              then gt_prev_sub_window && lt_next_sub_window
               else gt_prev_sub_window || lt_next_sub_window
             in
             if same_sub_window then length
@@ -1446,8 +1143,10 @@ module Data = struct
       let min_window_density =
         if
           same_sub_window
-          || Global_slot.slot_number next_global_slot
-             < constants.grace_period_end
+          || UInt32.compare
+               (Global_slot.slot_number next_global_slot)
+               constants.grace_period_end
+             < 0
         then prev_min_window_density
         else Length.min new_window_length prev_min_window_density
       in
@@ -1598,8 +1297,10 @@ module Data = struct
           let min_window_density =
             if
               sub_window_diff = 0
-              || Global_slot.slot_number next_global_slot
-                 < constants.grace_period_end
+              || UInt32.compare
+                   (Global_slot.slot_number next_global_slot)
+                   constants.grace_period_end
+                 < 0
             then prev_min_window_density
             else Length.min new_window_length prev_min_window_density
           in
@@ -1861,7 +1562,7 @@ module Data = struct
             ; block_creator: 'pk
             ; coinbase_receiver: 'pk
             ; supercharge_coinbase: 'bool }
-          [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
+          [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
         end
       end]
     end
@@ -1881,7 +1582,7 @@ module Data = struct
             , bool
             , Public_key.Compressed.Stable.V1.t )
             Poly.Stable.V1.t
-          [@@deriving sexp, eq, compare, hash, yojson]
+          [@@deriving sexp, equal, compare, hash, yojson]
 
           let to_latest = Fn.id
         end
@@ -2050,7 +1751,9 @@ module Data = struct
         / constants.checkpoint_window_size_in_slots)
 
     let same_checkpoint_window_unchecked ~constants slot1 slot2 =
-      checkpoint_window slot1 ~constants = checkpoint_window slot2 ~constants
+      UInt32.equal
+        (checkpoint_window slot1 ~constants)
+        (checkpoint_window slot2 ~constants)
 
     let update ~(constants : Constants.t) ~(previous_consensus_state : Value.t)
         ~(consensus_transition : Consensus_transition.t)
@@ -2597,6 +2300,8 @@ module Data = struct
   module Prover_state = struct
     include Stake_proof
 
+    let genesis_data = Vrf.Precomputed.genesis_stake_proof
+
     let precomputed_handler = Vrf.Precomputed.handler
 
     let handler
@@ -2878,7 +2583,7 @@ module Hooks = struct
     let epoch_is_not_finalized =
       let is_genesis_epoch = Length.equal epoch Length.zero in
       let epoch_is_finalized =
-        consensus_state.next_epoch_data.epoch_length > constants.k
+        Length.(consensus_state.next_epoch_data.epoch_length > constants.k)
       in
       (not epoch_is_finalized) && not is_genesis_epoch
     in
@@ -2961,7 +2666,7 @@ module Hooks = struct
       (* if requested last epoch ledger is equal to the current epoch ledger
          then we don't need make a rpc call to the peers. *)
       if
-        snapshot_id = Staking_epoch_snapshot
+        equal_snapshot_identifier snapshot_id Staking_epoch_snapshot
         && Mina_base.(
              Ledger_hash.equal
                (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
@@ -3059,12 +2764,13 @@ module Hooks = struct
         sync {snapshot_id= Next_epoch_snapshot; expected_root= next}
 
   let received_within_window ~constants (epoch, slot) ~time_received =
-    let open Time in
     let open Int64 in
-    let ( < ) x y = Pervasives.(compare x y < 0) in
-    let ( >= ) x y = Pervasives.(compare x y >= 0) in
+    let ( < ) x y = compare x y < 0 in
+    let ( >= ) x y = compare x y >= 0 in
     let time_received =
-      of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
+      Time.(
+        of_span_since_epoch
+          (Span.of_ms (Unix_timestamp.to_int64 time_received)))
     in
     let slot_diff =
       Epoch.diff_in_slots ~constants
@@ -3099,6 +2805,8 @@ module Hooks = struct
         Mina_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
           c2.staking_epoch_data.lock_checkpoint
       else pred_case c1 c2 || pred_case c2 c1
+
+  type select_status = [`Keep | `Take] [@@deriving equal]
 
   let select ~constants ~existing:existing_with_hash
       ~candidate:candidate_with_hash ~logger =
@@ -3332,7 +3040,8 @@ module Hooks = struct
             ~finish:(fun () -> None)
         in
         let rec find_winning_slot (slot : Slot.t) =
-          if slot >= constants.epoch_size then Deferred.return None
+          if UInt32.compare slot constants.epoch_size >= 0 then
+            Deferred.return None
           else
             match%bind
               Local_state.seen_slot local_state epoch slot |> Deferred.return
@@ -3418,8 +3127,9 @@ module Hooks = struct
 
   let should_bootstrap_len ~(constants : Constants.t) ~existing ~candidate =
     let open UInt32.Infix in
-    candidate - existing
-    > (UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1)
+    UInt32.compare (candidate - existing)
+      ((UInt32.of_int 2 * constants.k) + (constants.delta + UInt32.of_int 1))
+    > 0
 
   let should_bootstrap ~(constants : Constants.t) ~existing ~candidate ~logger
       =
@@ -3790,7 +3500,7 @@ let%test_module "Proof of stake tests" =
             Global_slot.to_epoch_and_slot
               previous_consensus_state.curr_global_slot
           in
-          if next_epoch > prev_epoch then
+          if UInt32.compare next_epoch prev_epoch > 0 then
             previous_consensus_state.next_epoch_data.seed
           else previous_consensus_state.staking_epoch_data.seed
         in
@@ -3988,7 +3698,7 @@ let%test_module "Proof of stake tests" =
       in
       let tolerance = 100. in
       (* 100 is a reasonable choice for samples = 1000 and for very low likelihood of failure; this should be recalculated if sample count was to be adjusted *)
-      let within_tolerance = diff < tolerance in
+      let within_tolerance = Float.(diff < tolerance) in
       if not within_tolerance then
         failwithf "actual vs. expected: %d vs %f" actual expected ()
 
@@ -4103,7 +3813,7 @@ let%test_module "Proof of stake tests" =
     let default_slot_fill_rate_delta = 0.15
 
     (** A root epoch of a block refers the epoch from which we can begin
-     *  simulating information for that block. Because we need to simulate 
+     *  simulating information for that block. Because we need to simulate
      *  both the staking epoch and the next staking epoch, the root epoch
      *  is the staking epoch. The root epoch position this function generates
      *  is the epoch number of the staking epoch and the block height the
@@ -4524,12 +4234,14 @@ let%test_module "Proof of stake tests" =
     let is_selected ?(log = false) (a, b) =
       let logger = if log then Logger.create () else Logger.null () in
       let constants = Lazy.force Constants.for_unit_tests in
-      Hooks.select ~constants ~existing:a ~candidate:b ~logger = `Take
+      Hooks.equal_select_status `Take
+        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
 
     let is_not_selected ?(log = false) (a, b) =
       let logger = if log then Logger.create () else Logger.null () in
       let constants = Lazy.force Constants.for_unit_tests in
-      Hooks.select ~constants ~existing:a ~candidate:b ~logger = `Keep
+      Hooks.equal_select_status `Keep
+        (Hooks.select ~constants ~existing:a ~candidate:b ~logger)
 
     let assert_selected =
       assert_hashed_consensus_state_pair ~assertion:"trigger selection"
@@ -4657,7 +4369,11 @@ let%test_module "Proof of stake tests" =
         ~f:
           (assert_hashed_consensus_state_pair
              ~assertion:"chains do not trigger a selection cycle"
-             ~f:(fun (a, b) -> (select a b, select b a) <> (`Take, `Take)))
+             ~f:(fun (a, b) ->
+               not
+                 ([%equal: Hooks.select_status * Hooks.select_status]
+                    (select a b, select b a)
+                    (`Take, `Take)) ))
 
     (* We define a homogeneous binary relation for consensus states by adapting the binary chain
      * selection rule and extending it to consider equality of chains. From this, we can test

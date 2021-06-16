@@ -115,7 +115,7 @@ module Poly = struct
         ; timing: 'timing
         ; permissions: 'permissions
         ; snapp: 'snapp_opt }
-      [@@deriving sexp, eq, compare, hash, yojson, fields, hlist]
+      [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
     end
   end]
 end
@@ -125,7 +125,7 @@ module Key = struct
   module Stable = struct
     module V1 = struct
       type t = Public_key.Compressed.Stable.V1.t
-      [@@deriving sexp, eq, hash, compare, yojson]
+      [@@deriving sexp, equal, hash, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -134,7 +134,7 @@ end
 
 module Identifier = Account_id
 
-type key = Key.t [@@deriving sexp, eq, hash, compare, yojson]
+type key = Key.t [@@deriving sexp, equal, hash, compare, yojson]
 
 module Timing = Account_timing
 
@@ -156,7 +156,7 @@ module Binable_arg = struct
         , Snapp_account.Stable.V1.t option )
         (* TODO: Cache the digest of this? *)
         Poly.Stable.V1.t
-      [@@deriving sexp, eq, hash, compare, yojson]
+      [@@deriving sexp, equal, hash, compare, yojson]
 
       let to_latest = Fn.id
 
@@ -194,7 +194,7 @@ let check (t : Binable_arg.t) =
 module Stable = struct
   module V1 = struct
     type t = Binable_arg.Stable.V1.t
-    [@@deriving sexp, eq, hash, compare, yojson]
+    [@@deriving sexp, equal, hash, compare, yojson]
 
     include Binable.Of_binable
               (Binable_arg.Stable.V1)

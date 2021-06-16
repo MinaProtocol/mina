@@ -21,7 +21,7 @@ in
             -- Build test executive binary
             OpamInit.andThenRunInDocker [
               "DUNE_PROFILE=${duneProfile}",
-              -- add zexe standardization preprocessing step (see: https://github.com/CodaProtocol/coda/pull/5777)
+              -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
             ] "./buildkite/scripts/build-test-executive.sh"
             

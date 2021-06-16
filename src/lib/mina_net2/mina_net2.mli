@@ -54,7 +54,7 @@ open Network_peer
 type net
 
 module Validation_callback : sig
-  type validation_result = [`Accept | `Reject | `Ignore]
+  type validation_result = [`Accept | `Reject | `Ignore] [@@deriving equal]
 
   type t
 
@@ -212,7 +212,8 @@ end
   * This can fail for a variety of reasons related to spawning the subprocess.
 *)
 val create :
-     on_unexpected_termination:(unit -> unit Deferred.t)
+     all_peers_seen_metric:bool
+  -> on_unexpected_termination:(unit -> unit Deferred.t)
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
   -> conf_dir:string
