@@ -21,7 +21,7 @@ include Codable.S with type t := t
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+    [@@deriving bin_io, sexp, compare, equal, hash, yojson, version]
   end
 
   module Latest = V1
@@ -64,7 +64,8 @@ module Compressed : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, version]
+      type nonrec t = t
+      [@@deriving sexp, bin_io, equal, compare, hash, version]
 
       include Codable.S with type t := t
     end
@@ -124,6 +125,9 @@ val compress : t -> Compressed.t
 val decompress : Compressed.t -> t option
 
 val decompress_exn : Compressed.t -> t
+
+(** Same as [Compressed.of_base58_check_exn] except that [of_base58_check_decompress_exn] fails if [decompress_exn] fails *)
+val of_base58_check_decompress_exn : string -> Compressed.t
 
 [%%ifdef consensus_mechanism]
 

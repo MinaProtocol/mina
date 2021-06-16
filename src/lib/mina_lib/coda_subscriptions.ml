@@ -28,13 +28,17 @@ type t =
 (* idempotent *)
 let add_new_subscription (t : t) ~pk =
   (* add a new subscribed block user for this pk if we're not already tracking it *)
-  Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
-    ~default:(fun () -> [Pipe.create ()])
-  |> ignore ;
+  ignore
+    ( Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
+        ~default:(fun () -> [Pipe.create ()])
+      : (Filtered_external_transition.t, State_hash.t) With_hash.t
+        reader_and_writer
+        list ) ;
   (* add a new payment user if we're not already tracking it *)
-  Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
-    ~default:Pipe.create
-  |> ignore
+  ignore
+    ( Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
+        ~default:Pipe.create
+      : Signed_command.t reader_and_writer )
 
 let create ~logger ~constraint_constants ~wallets ~new_blocks
     ~transition_frontier ~is_storing_all ~time_controller
@@ -107,9 +111,9 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
   in
   Option.iter gcloud_keyfile ~f:(fun path ->
       ignore
-        (Core.Sys.command
-           (sprintf "gcloud auth activate-service-account --key-file=%s" path))
-  ) ;
+        ( Core.Sys.command
+            (sprintf "gcloud auth activate-service-account --key-file=%s" path)
+          : int ) ) ;
   trace_task "subscriptions new block loop" (fun () ->
       Strict_pipe.Reader.iter new_blocks ~f:(fun new_block ->
           let hash =
@@ -188,7 +192,7 @@ let create ~logger ~constraint_constants ~wallets ~new_blocks
                           we have information about which of these different
                           kinds of exception were seen, if any.
                        *)
-                       Deferred.Or_error.try_with_join (fun () ->
+                       Deferred.Or_error.try_with_join ~here:[%here] (fun () ->
                            Or_error.try_with (fun () ->
                                Async.Process.run () ~prog:"bash"
                                  ~args:["-c"; command]

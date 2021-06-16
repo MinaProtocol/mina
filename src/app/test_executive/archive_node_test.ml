@@ -27,8 +27,6 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     ; num_snark_workers= 0
     ; log_precomputed_blocks= true }
 
-  let expected_error_event_reprs = []
-
   (* number of minutes to let the network run, after initialization *)
   let runtime_min = 15.
 

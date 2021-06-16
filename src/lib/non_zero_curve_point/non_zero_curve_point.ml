@@ -55,7 +55,8 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving eq, compare, hash]
+      type t = (Field.t, bool) Poly.Stable.V1.t
+      [@@deriving compare, equal, hash]
 
       (* dummy type for inserting constraint
          adding constraint to t produces "unused rec" error
@@ -174,14 +175,26 @@ module Uncompressed = struct
         let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
         (x, y) )
 
-  let decompress_exn t = Option.value_exn (decompress t)
+  let decompress_exn t =
+    match decompress t with
+    | Some d ->
+        d
+    | None ->
+        failwith
+          (sprintf "Compressed public key %s could not be decompressed"
+             (Yojson.Safe.to_string @@ Compressed.to_yojson t))
+
+  let of_base58_check_decompress_exn pk_str =
+    let pk = Compressed.of_base58_check_exn pk_str in
+    decompress_exn pk |> ignore ;
+    pk
 
   let compress = Compressed.compress
 
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Field.t * Field.t [@@deriving eq, compare, hash]
+      type t = Field.t * Field.t [@@deriving compare, equal, hash]
 
       let to_latest = Fn.id
 

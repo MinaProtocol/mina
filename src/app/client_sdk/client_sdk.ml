@@ -53,7 +53,7 @@ let _ =
        method rawPublicKeyOfPublicKey (pk_base58_check_js : string_js) =
          let pk =
            Js.to_string pk_base58_check_js
-           |> Public_key.Compressed.of_base58_check_exn
+           |> Public_key.of_base58_check_decompress_exn
          in
          Coding.of_public_key_compressed pk |> Js.string
 

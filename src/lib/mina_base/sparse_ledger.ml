@@ -32,6 +32,8 @@ end
 module M =
   Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Token_id) (Account_id) (Account)
 
+type account_state = [`Added | `Existed] [@@deriving equal]
+
 module L = struct
   type t = M.t ref
 
@@ -46,8 +48,8 @@ module L = struct
   let set : t -> location -> Account.t -> unit =
    fun t loc a -> t := M.set_exn !t loc a
 
-  let get_or_create :
-      t -> Account_id.t -> [`Added | `Existed] * Account.t * location =
+  let get_or_create_exn :
+      t -> Account_id.t -> account_state * Account.t * location =
    fun t id ->
     let loc = M.find_index_exn !t id in
     let account = M.get_exn !t loc in
@@ -63,15 +65,18 @@ module L = struct
       (`Added, account', loc) )
     else (`Existed, account, loc)
 
-  let get_or_create_account_exn :
-      t -> Account_id.t -> Account.t -> [`Added | `Existed] * location =
+  let get_or_create t id = Or_error.try_with (fun () -> get_or_create_exn t id)
+
+  let get_or_create_account :
+      t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t =
    fun t id to_set ->
-    let loc = M.find_index_exn !t id in
-    let a = M.get_exn !t loc in
-    if Public_key.Compressed.(equal empty a.public_key) then (
-      set t loc to_set ;
-      (`Added, loc) )
-    else (`Existed, loc)
+    Or_error.try_with (fun () ->
+        let loc = M.find_index_exn !t id in
+        let a = M.get_exn !t loc in
+        if Public_key.Compressed.(equal empty a.public_key) then (
+          set t loc to_set ;
+          (`Added, loc) )
+        else (`Existed, loc) )
 
   let remove_accounts_exn : t -> Account_id.t list -> unit =
    fun _t _xs -> failwith "remove_accounts_exn: not implemented"
@@ -145,7 +150,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
                 ( Ledger.get ledger loc
                 |> Option.value_exn ?here:None ?error:None ?message:None ) )
         | None ->
-            let path, acct = Ledger.create_empty ledger key in
+            let path, acct = Ledger.create_empty_exn ledger key in
             (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in
@@ -207,7 +212,7 @@ let get_or_initialize_exn account_id t idx =
 let sub_account_creation_fee
     ~(constraint_constants : Genesis_constants.Constraint_constants.t) action
     (amount : Currency.Amount.t) =
-  if action = `Added then
+  if equal_account_state action `Added then
     Option.value_exn
       Currency.Amount.(
         sub amount (of_fee constraint_constants.account_creation_fee))
@@ -337,7 +342,7 @@ let apply_user_command_exn
         let receiver_amount =
           if Token_id.(equal default) token then
             sub_account_creation_fee ~constraint_constants action amount
-          else if action = `Added then
+          else if equal_account_state action `Added then
             failwith "Receiver account does not exist, and we cannot create it"
           else amount
         in
@@ -351,7 +356,7 @@ let apply_user_command_exn
         let source_account =
           let account =
             if Account_id.equal source receiver then (
-              assert (action = `Existed) ;
+              assert (equal_account_state action `Existed) ;
               receiver_account )
             else get_exn t source_idx
           in
@@ -383,12 +388,11 @@ let apply_user_command_exn
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        if not (action = `Added) then
+        if not (equal_account_state action `Added) then
           raise
             (Reject
                (Failure
-                  "Token owner account for newly created token already \
-                   exists?!?!")) ;
+                  "Token owner account for newly created token already exists")) ;
         let receiver_account =
           { receiver_account with
             token_permissions=
@@ -411,7 +415,7 @@ let apply_user_command_exn
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        if action = `Existed then
+        if equal_account_state action `Existed then
           failwith "Attempted to create an account that already exists" ;
         let receiver_account =
           { receiver_account with
@@ -466,7 +470,7 @@ let apply_user_command_exn
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        assert (action = `Existed) ;
+        assert (equal_account_state action `Existed) ;
         let receiver_account =
           { receiver_account with
             balance=

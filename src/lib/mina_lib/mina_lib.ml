@@ -197,10 +197,11 @@ module Snark_worker = struct
                ~shutdown_on_disconnect:false )
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger
-      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ;
+      snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
     don't_wait_for
       ( match%bind
-          Monitor.try_with (fun () -> Process.wait snark_worker_process)
+          Monitor.try_with ~here:[%here] (fun () ->
+              Process.wait snark_worker_process )
         with
       | Ok signal_or_error -> (
         match signal_or_error with
@@ -400,10 +401,11 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
                          ())
               | Some _ ->
                   () ) ;
-              if `Empty = first_connection then (
+              let is_empty = function `Empty -> true | _ -> false in
+              if is_empty first_connection then (
                 [%str_log info] Connecting ;
                 `Connecting )
-              else if `Empty = first_message then (
+              else if is_empty first_message then (
                 [%str_log info] Listening ;
                 `Listening )
               else `Offline
@@ -463,7 +465,8 @@ let create_sync_status_observer ~logger ~is_seed ~demo_mode ~net
           ()
     in
     let handle_status_change status =
-      if status = `Offline then start_offline_timeout ()
+      if match status with `Offline -> true | _ -> false then
+        start_offline_timeout ()
       else stop_offline_timeout ()
     in
     Observer.on_update_exn observer ~f:(function
@@ -496,35 +499,121 @@ let best_protocol_state = compose_of_option best_protocol_state_opt
 let best_ledger = compose_of_option best_ledger_opt
 
 let get_ledger t state_hash_opt =
-  let open Deferred.Or_error.Let_syntax in
+  let open Or_error.Let_syntax in
   let%bind state_hash =
-    Option.value_map state_hash_opt ~f:Deferred.Or_error.return
+    Option.value_map state_hash_opt ~f:Or_error.return
       ~default:
         ( match best_tip t with
         | `Active bc ->
-            Deferred.Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
         | `Bootstrapping ->
-            Deferred.Or_error.error_string
+            Or_error.error_string
               "get_ledger: can't get staged ledger hash while bootstrapping" )
   in
-  let%bind frontier =
-    Deferred.return (t.components.transition_frontier |> peek_frontier)
-  in
-  match
-    List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
-        let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
-        if
-          State_hash.equal
-            (Transition_frontier.Breadcrumb.state_hash b)
-            state_hash
-        then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
-        else None )
-  with
-  | Some x ->
-      Deferred.Or_error.return x
+  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  match Transition_frontier.find frontier state_hash with
+  | Some b ->
+      let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
+      Ok (Ledger.to_list (Staged_ledger.ledger staged_ledger))
   | None ->
-      Deferred.Or_error.error_string
+      Or_error.error_string
         "get_ledger: state hash not found in transition frontier"
+
+let get_snarked_ledger t state_hash_opt =
+  let open Or_error.Let_syntax in
+  let%bind state_hash =
+    Option.value_map state_hash_opt ~f:Or_error.return
+      ~default:
+        ( match best_tip t with
+        | `Active bc ->
+            Or_error.return (Frontier_base.Breadcrumb.state_hash bc)
+        | `Bootstrapping ->
+            Or_error.error_string
+              "get_snarked_ledger: can't get snarked ledger hash while \
+               bootstrapping" )
+  in
+  let%bind frontier = t.components.transition_frontier |> peek_frontier in
+  match Transition_frontier.find frontier state_hash with
+  | Some b ->
+      let root_snarked_ledger =
+        Transition_frontier.root_snarked_ledger frontier
+      in
+      let ledger = Ledger.of_database root_snarked_ledger in
+      let path = Transition_frontier.path_map frontier b ~f:Fn.id in
+      let%bind _ =
+        List.fold_until ~init:(Ok ()) path
+          ~f:(fun _acc b ->
+            if Transition_frontier.Breadcrumb.just_emitted_a_proof b then
+              match
+                Staged_ledger.proof_txns_with_state_hashes
+                  (Transition_frontier.Breadcrumb.staged_ledger b)
+              with
+              | None ->
+                  Stop
+                    (Or_error.error_string
+                       (sprintf
+                          "No transactions corresponding to the emitted proof \
+                           for state_hash:%s"
+                          (State_hash.to_string
+                             (Transition_frontier.Breadcrumb.state_hash b))))
+              | Some txns -> (
+                match
+                  List.fold_until ~init:(Ok ())
+                    (Non_empty_list.to_list txns)
+                    ~f:(fun _acc (txn, state_hash) ->
+                      (*Validate transactions against the protocol state associated with the transaction*)
+                      match
+                        Transition_frontier.find_protocol_state frontier
+                          state_hash
+                      with
+                      | Some state -> (
+                          let txn_state_view =
+                            Mina_state.Protocol_state.body state
+                            |> Mina_state.Protocol_state.Body.view
+                          in
+                          match
+                            Ledger.apply_transaction
+                              ~constraint_constants:
+                                t.config.precomputed_values
+                                  .constraint_constants ~txn_state_view ledger
+                              txn.data
+                          with
+                          | Ok _ ->
+                              Continue (Ok ())
+                          | e ->
+                              Stop (Or_error.map e ~f:ignore) )
+                      | None ->
+                          Stop
+                            (Or_error.errorf
+                               !"Coudln't find protocol state with hash %s"
+                               (State_hash.to_string state_hash)) )
+                    ~finish:Fn.id
+                with
+                | Ok _ ->
+                    Continue (Ok ())
+                | e ->
+                    Stop e )
+            else Continue (Ok ()) )
+          ~finish:Fn.id
+      in
+      let snarked_ledger_hash =
+        Transition_frontier.Breadcrumb.blockchain_state b
+        |> Mina_state.Blockchain_state.snarked_ledger_hash
+      in
+      let merkle_root = Ledger.merkle_root ledger in
+      if Frozen_ledger_hash.equal snarked_ledger_hash merkle_root then (
+        let res = Ledger.to_list ledger in
+        ignore @@ Ledger.unregister_mask_exn ~loc:__LOC__ ledger ;
+        Ok res )
+      else
+        Or_error.errorf
+          "Expected snarked ledger hash %s but got %s for state hash %s"
+          (Frozen_ledger_hash.to_string snarked_ledger_hash)
+          (Frozen_ledger_hash.to_string merkle_root)
+          (State_hash.to_string state_hash)
+  | None ->
+      Or_error.error_string
+        "get_snarked_ledger: state hash not found in transition frontier"
 
 let get_account t aid =
   let open Participating_state.Let_syntax in
@@ -735,7 +824,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
      * If not then the work should have already been in the pool with a lower fee or the statement isn't referenced anymore or any other error. In any case remove it from the seen jobs so that it can be picked up if needed *)
     Work_selection_method.remove t.snark_job_state spec
   in
-  let _ = Or_error.try_with (fun () -> update_metrics ()) in
+  ignore (Or_error.try_with (fun () -> update_metrics ()) : unit Or_error.t) ;
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, cb)
   |> Deferred.don't_wait_for
@@ -901,7 +990,7 @@ let perform_compaction t =
             | `Producing ->
                 perform (span slot_duration_ms)
             | `Producing_in_ms ms ->
-                if ms < expected_time_for_compaction then
+                if Float.(ms < expected_time_for_compaction) then
                   (*too close to block production; perform compaction after block production*)
                   perform (span slot_duration_ms ~incr:ms)
                 else (
@@ -1004,13 +1093,14 @@ let create ?wallets (config : Config.t) =
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
           let%bind prover =
-            Monitor.try_with
+            Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
                   (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side prover server: $exn"
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
               (fun () ->
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger
@@ -1020,14 +1110,15 @@ let create ?wallets (config : Config.t) =
             >>| Result.ok_exn
           in
           let%bind verifier =
-            Monitor.try_with
+            Monitor.try_with ~here:[%here]
               ~rest:
                 (`Call
                   (fun exn ->
+                    let err = Error.of_exn ~backtrace:`Get exn in
                     [%log' warn config.logger]
                       "unhandled exception from daemon-side verifier server: \
                        $exn"
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+                      ~metadata:[("exn", Error_json.error_to_yojson err)] ))
               (fun () ->
                 trace "verifier" (fun () ->
                     Verifier.create ~logger:config.logger
@@ -1472,7 +1563,10 @@ let create ?wallets (config : Config.t) =
                               Mina_net2.Validation_callback.await_exn
                                 validation_callback
                             in
-                            if v = `Accept then
+                            if
+                              Mina_net2.Validation_callback
+                              .equal_validation_result v `Accept
+                            then
                               Mina_networking.broadcast_state net
                                 (External_transition.Validation
                                  .forget_validation_with_hash et)) ;
@@ -1493,9 +1587,58 @@ let create ?wallets (config : Config.t) =
             (network_pipe, api_pipe, new_blocks_pipe)
           in
           trace_task "transaction pool broadcast loop" (fun () ->
+              let rl =
+                Network_pool.Rate_limiter.create
+                  ~capacity:
+                    ( Network_pool.Transaction_pool.Resource_pool.Diff
+                      .max_per_15_seconds
+                    , `Per (Time.Span.of_sec 15.) )
+              in
+              (* HACK: Pretend we're a remote peer so that we can rate limit
+                 ourselves.
+              *)
+              let us =
+                { Network_peer.Peer.host= Unix.Inet_addr.of_string "127.0.0.1"
+                ; libp2p_port= 0
+                ; peer_id= "" }
+              in
               Linear_pipe.iter
                 (Network_pool.Transaction_pool.broadcasts transaction_pool)
                 ~f:(fun x ->
+                  let score =
+                    Network_pool.Transaction_pool.Resource_pool.Diff.score x
+                  in
+                  let rec able_to_send_or_wait () =
+                    match
+                      Network_pool.Rate_limiter.add rl (Remote us)
+                        ~now:(Time.now ()) ~score
+                    with
+                    | `Within_capacity ->
+                        Deferred.return ()
+                    | `Capacity_exceeded ->
+                        if
+                          score
+                          > Network_pool.Transaction_pool.Resource_pool.Diff
+                            .max_per_15_seconds
+                        then (
+                          (* This will never pass the rate limiting; pass it on
+                             to progress in the queue. *)
+                          ignore
+                            ( Network_pool.Rate_limiter.add rl (Remote us)
+                                ~now:(Time.now ()) ~score:0
+                              : [`Within_capacity | `Capacity_exceeded] ) ;
+                          Deferred.return () )
+                        else
+                          let%bind () =
+                            after
+                              Time.(
+                                diff (now ())
+                                  (Network_pool.Rate_limiter.next_expires rl
+                                     (Remote us)))
+                          in
+                          able_to_send_or_wait ()
+                  in
+                  let%bind () = able_to_send_or_wait () in
                   Mina_networking.broadcast_transaction_pool_diff net x ;
                   Deferred.unit ) ) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
@@ -1520,7 +1663,11 @@ let create ?wallets (config : Config.t) =
                   with
                   | Ok () ->
                       (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if not (source = `Internal) then
+                      if
+                        not
+                          ([%equal: [`Catchup | `Gossip | `Internal]] source
+                             `Internal)
+                      then
                         [%str_log' info config.logger]
                           ~metadata:
                             [ ( "external_transition"
@@ -1696,3 +1843,6 @@ let create ?wallets (config : Config.t) =
             ; block_production_status= ref `Free } ) )
 
 let net {components= {net; _}; _} = net
+
+let runtime_config {config= {precomputed_values; _}; _} =
+  Genesis_ledger_helper.runtime_config_of_precomputed_values precomputed_values

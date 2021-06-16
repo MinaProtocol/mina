@@ -41,7 +41,27 @@ let fee_lower_bound_exn (t : t) : Currency.Fee.t =
   let x = t.fee_payer.data.body.delta in
   match x.sgn with
   | Neg ->
-      Currency.Amount.to_fee x.magnitude
+      (* See what happens if all the parties that use up balance succeed,
+       and all the non-fee-payer parties that contribute balance fail.
+
+       In the future we could have this function take in the current view of the
+       world to get a more accurate lower bound.
+    *)
+      List.fold_until t.other_parties ~init:x.magnitude ~finish:Fn.id
+        ~f:(fun acc p ->
+          if Token_id.(p.data.body.token_id <> default) then Continue acc
+          else
+            let y = p.data.body.delta in
+            match y.sgn with
+            | Neg ->
+                Continue acc
+            | Pos -> (
+              match Currency.Amount.sub acc y.magnitude with
+              | None ->
+                  Stop Currency.Amount.zero
+              | Some acc' ->
+                  Continue acc' ) )
+      |> Currency.Amount.to_fee
   | Pos ->
       assert false
 

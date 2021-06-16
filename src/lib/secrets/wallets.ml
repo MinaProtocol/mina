@@ -30,7 +30,9 @@ let get_path {path; cache} public_key =
   path ^/ filename
 
 let decode_public_key key file path logger =
-  match Public_key.Compressed.of_base58_check key with
+  match
+    Or_error.try_with (fun () -> Public_key.of_base58_check_decompress_exn key)
+  with
   | Ok pk ->
       Some pk
   | Error e ->
@@ -96,9 +98,10 @@ let import_keypair_helper t keypair write_keypair =
   let privkey_path = get_path t compressed_pk in
   let%bind () = write_keypair privkey_path in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
-  Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-    ~data:(Unlocked (get_privkey_filename compressed_pk, keypair))
-  |> ignore ;
+  ignore
+    ( Public_key.Compressed.Table.add t.cache ~key:compressed_pk
+        ~data:(Unlocked (get_privkey_filename compressed_pk, keypair))
+      : [`Duplicate | `Ok] ) ;
   compressed_pk
 
 let import_keypair t keypair ~password =
@@ -129,15 +132,17 @@ let create_hd_account t ~hd_index :
   let%map () =
     Unix.chmod index_path ~perm:0o600 |> Deferred.map ~f:Result.return
   in
-  Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-    ~data:(Hd_account hd_index)
-  |> ignore ;
+  ignore
+    ( Public_key.Compressed.Table.add t.cache ~key:compressed_pk
+        ~data:(Hd_account hd_index)
+      : [`Duplicate | `Ok] ) ;
   compressed_pk
 
 let delete ({cache; _} as t : t) (pk : Public_key.Compressed.t) :
     (unit, [`Not_found]) Deferred.Result.t =
   Hashtbl.remove cache pk ;
-  Deferred.Or_error.try_with (fun () -> Unix.remove (get_path t pk))
+  Deferred.Or_error.try_with ~here:[%here] (fun () ->
+      Unix.remove (get_path t pk) )
   |> Deferred.Result.map_error ~f:(fun _ -> `Not_found)
 
 let pks ({cache; _} : t) = Public_key.Compressed.Table.keys cache
@@ -180,7 +185,7 @@ let unlock {cache; path} ~needle ~password =
         |> Deferred.Result.map ~f:(fun kp ->
                Public_key.Compressed.Table.set cache ~key:needle
                  ~data:(Unlocked (file, kp)) )
-        |> Deferred.Result.ignore
+        |> Deferred.Result.ignore_m
     | Unlocked _ ->
         Deferred.Result.return ()
     | Hd_account _ ->

@@ -7,7 +7,7 @@ module Proof_level = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Full | Check | None [@@deriving eq]
+      type t = Full | Check | None [@@deriving equal]
 
       let to_latest = Fn.id
     end
@@ -41,7 +41,7 @@ module Fork_constants = struct
         { previous_state_hash: Pickles.Backend.Tick.Field.Stable.V1.t
         ; previous_length: Mina_numbers.Length.Stable.V1.t
         ; previous_global_slot: Mina_numbers.Global_slot.Stable.V1.t }
-      [@@deriving sexp, eq, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -70,7 +70,7 @@ module Constraint_constants = struct
         ; supercharged_coinbase_factor: int
         ; account_creation_fee: Currency.Fee.Stable.V1.t
         ; fork: Fork_constants.Stable.V1.t option }
-      [@@deriving sexp, eq, yojson]
+      [@@deriving sexp, equal, compare, yojson]
 
       let to_latest = Fn.id
     end
@@ -255,6 +255,11 @@ let validate_time time_str =
          %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for \
          UTC-08:00 timezone"
 
+let genesis_timestamp_to_string time =
+  Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
+  |> Core.Time.to_string_iso8601_basic
+       ~zone:(Core.Time.Zone.of_utc_offset ~hours:(-8))
+
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
   module Poly = struct
@@ -267,7 +272,7 @@ module Protocol = struct
           ; slots_per_sub_window: 'length
           ; delta: 'delta
           ; genesis_state_timestamp: 'genesis_state_timestamp }
-        [@@deriving eq, ord, hash, sexp, yojson, hlist, fields]
+        [@@deriving equal, ord, hash, sexp, yojson, hlist, fields]
       end
     end]
   end
@@ -275,7 +280,8 @@ module Protocol = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Int64.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
+      type t = (int, int, Int64.t) Poly.Stable.V1.t
+      [@@deriving equal, ord, hash]
 
       let to_latest = Fn.id
 

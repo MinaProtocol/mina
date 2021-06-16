@@ -14,7 +14,7 @@ module Stable = struct
       | Proof of Pickles.Side_loaded.Proof.Stable.V1.t
       | Signature of Signature.Stable.V1.t
       | None_given
-    [@@deriving sexp, eq, yojson, hash, compare]
+    [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
   end
@@ -25,11 +25,8 @@ end]
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t =
-      | Proof of unit
-      | Signature of Signature.Stable.V1.t
-      | None_given
-    [@@deriving sexp, eq, yojson, hash, compare]
+    type t = Proof of unit | Signature of Signature.Stable.V1.t | None_given
+    [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
   end

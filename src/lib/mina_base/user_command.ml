@@ -12,7 +12,7 @@ module Poly = struct
 
     module V1 = struct
       type ('u, 's) t = Signed_command of 'u | Snapp_command of 's
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest : _ t -> _ V2.t = function
         | Signed_command x ->
@@ -80,7 +80,7 @@ module Valid = struct
         ( Signed_command.With_valid_signature.Stable.V1.t
         , Snapp_command.Valid.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Poly.Stable.V1.to_latest
     end
@@ -101,7 +101,7 @@ module Stable = struct
   module V1 = struct
     type t =
       (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Poly.Stable.V1.to_latest
   end
@@ -116,7 +116,7 @@ include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
     module V1 = struct
       type t =
         (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 
@@ -133,7 +133,7 @@ module Zero_one_or_two = struct
   module Stable = struct
     module V1 = struct
       type 'a t = [`Zero | `One of 'a | `Two of 'a * 'a]
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
 end
@@ -162,7 +162,7 @@ module Verifiable = struct
           Pickles.Side_loaded.Verification_key.Stable.V1.t
           Zero_one_or_two.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Poly.Stable.V1.to_latest
     end
