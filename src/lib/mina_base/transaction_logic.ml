@@ -1277,9 +1277,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let not = not
 
-        let ( || ) = ( || )
+        let ( ||| ) = ( || )
 
-        let ( && ) = ( && )
+        let ( &&& ) = ( && )
       end
 
       module Ledger = struct
@@ -1305,7 +1305,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
         let if_ = Parties.value_if
 
-        module Signed = Signed
+        module Signed = struct
+          include Signed
+
+          let is_pos (t : t) = Sgn.equal t.sgn Pos
+        end
 
         let zero = zero
 
@@ -1403,7 +1407,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         | Full p ->
             Or_error.is_ok (Snapp_predicate.Account.check p account) )
       | Set_account_if (b, l, a, loc) ->
-          if b then set_with_location l loc a ;
+          if b then Or_error.ok_exn (set_with_location l loc a) ;
           l
       | Modify_global_excess (s, f) ->
           {s with fee_excess= f s.fee_excess}
@@ -2130,6 +2134,7 @@ module For_tests = struct
               (Account_id.create
                  (Public_key.compress kp.public_key)
                  Token_id.default)
+            |> Or_error.ok_exn
           in
           L.set l loc {account with balance= Currency.Balance.of_int amount} )
 

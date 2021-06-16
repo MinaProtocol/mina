@@ -5,7 +5,7 @@ module Poly = struct
   module Stable = struct
     module V2 = struct
       type ('u, 's) t = Signed_command of 'u | Parties of 's
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -70,7 +70,7 @@ module Valid = struct
         ( Signed_command.With_valid_signature.Stable.V1.t
         , Parties.Valid.Stable.V1.t )
         Poly.Stable.V2.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -93,7 +93,7 @@ end
 module Stable = struct
   module V2 = struct
     type t = (Signed_command.Stable.V1.t, Parties.Stable.V1.t) Poly.Stable.V2.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
@@ -149,7 +149,7 @@ module Verifiable = struct
             * Pickles.Side_loaded.Verification_key.Stable.V1.t option )
             list )
         Poly.Stable.V2.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end

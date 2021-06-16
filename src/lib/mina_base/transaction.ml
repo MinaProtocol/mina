@@ -29,7 +29,7 @@ module Valid = struct
   module Stable = struct
     module V2 = struct
       type t = User_command.Valid.Stable.V2.t Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -51,7 +51,7 @@ end
 module Stable = struct
   module V2 = struct
     type t = User_command.Stable.V2.t Poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
