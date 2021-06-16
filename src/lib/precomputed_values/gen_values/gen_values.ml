@@ -144,7 +144,7 @@ end
 
 let main () =
   let open Ppxlib.Ast_builder.Default in
-  let target = Sys.argv.(1) in
+  let target = (Sys.get_argv ()).(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
   let (module M) =

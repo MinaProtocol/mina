@@ -3395,7 +3395,7 @@ struct
       ; supply_increase= Transaction_union.supply_increase transaction
       ; pending_coinbase_stack_state }
     in
-    let%map.Async proof =
+    let%map.Async.Deferred proof =
       base []
         ~handler:
           (Base.transaction_union_handler handler transaction state_body
@@ -3520,7 +3520,7 @@ struct
           ; target= t23.pending_coinbase_stack_state.target }
       ; sok_digest }
     in
-    let%map.Async proof =
+    let%map.Async.Deferred proof =
       merge [(x12.statement, x12.proof); (x23.statement, x23.proof)] s
     in
     Ok {statement= s; proof}

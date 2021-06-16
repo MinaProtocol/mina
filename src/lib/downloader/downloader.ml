@@ -14,15 +14,15 @@ module Job = struct
   let result t = Ivar.read t.res
 end
 
-type 'a pred = 'a -> bool
+type 'a pred = 'a -> bool [@@deriving sexp_of]
 
 let pred_to_yojson _f _x = `String "<opaque>"
 
 let sexp_opaque_to_yojson _f _x = `String "<opaque>"
 
 module Claimed_knowledge = struct
-  type 'key t = [`All | `Some of 'key list | `Call of 'key pred sexp_opaque]
-  [@@deriving sexp, to_yojson]
+  type 'key t = [`All | `Some of 'key list | `Call of 'key pred[@sexp.opaque]]
+  [@@deriving sexp_of, to_yojson]
 
   let to_yojson f t =
     match t with
@@ -184,7 +184,7 @@ end = struct
 
     type t =
       {claimed: Key.t Claimed_knowledge.t option; tried_and_failed: Key_set.t}
-    [@@deriving sexp, to_yojson]
+    [@@deriving sexp_of, to_yojson]
 
     let clear t = Hash_set.clear t.tried_and_failed
 
@@ -206,8 +206,8 @@ end = struct
     module Preferred_heap = struct
       (* The preferred peers, sorted by the last time that they were useful to us. *)
       type t =
-        { heap: (Peer.t * Time.t) Heap.t
-        ; table: (Peer.t * Time.t) Heap.Elt.t Peer.Table.t }
+        { heap: (Peer.t * Time.t) Pairing_heap.t
+        ; table: (Peer.t * Time.t) Pairing_heap.Elt.t Peer.Table.t }
 
       let cmp (p1, t1) (p2, t2) =
         (* Later is smaller *)
@@ -218,24 +218,23 @@ end = struct
             c
 
       let clear t =
-        let rec go t = match Heap.pop t with None -> () | Some _ -> go t in
+        let rec go t =
+          match Pairing_heap.pop t with None -> () | Some _ -> go t
+        in
         go t.heap ; Hashtbl.clear t.table
 
-      let create () = {heap= Heap.create ~cmp (); table= Peer.Table.create ()}
+      let create () =
+        {heap= Pairing_heap.create ~cmp (); table= Peer.Table.create ()}
 
       let add t (p, time) =
         Option.iter (Hashtbl.find t.table p) ~f:(fun elt ->
-            Heap.remove t.heap elt ) ;
-        Hashtbl.set t.table ~key:p ~data:(Heap.add_removable t.heap (p, time))
+            Pairing_heap.remove t.heap elt ) ;
+        Hashtbl.set t.table ~key:p
+          ~data:(Pairing_heap.add_removable t.heap (p, time))
 
       let sexp_of_t (t : t) =
-        List.sexp_of_t [%sexp_of: Peer.t * Time.t] (Heap.to_list t.heap)
-
-      let t_of_sexp s =
-        let elts = [%of_sexp: (Peer.t * Time.t) list] s in
-        let t = create () in
-        List.iter elts ~f:(add t) ;
-        t
+        List.sexp_of_t [%sexp_of: Peer.t * Time.t]
+          (Pairing_heap.to_list t.heap)
 
       let of_list xs =
         let now = Time.now () in
@@ -246,26 +245,26 @@ end = struct
       let mem t p = Hashtbl.mem t.table p
 
       let fold t ~init ~f =
-        Heap.fold t.heap ~init ~f:(fun acc (p, _) -> f acc p)
+        Pairing_heap.fold t.heap ~init ~f:(fun acc (p, _) -> f acc p)
 
-      let to_list (t : t) = List.map ~f:fst (Heap.to_list t.heap)
+      let to_list (t : t) = List.map ~f:fst (Pairing_heap.to_list t.heap)
     end
 
     type t =
       { downloading_peers: Peer.Hash_set.t
       ; knowledge_requesting_peers: Peer.Hash_set.t
-      ; temporary_ignores: (unit, unit) Clock.Event.t sexp_opaque Peer.Table.t
+      ; temporary_ignores:
+          ((unit, unit) Clock.Event.t[@sexp.opaque]) Peer.Table.t
       ; mutable all_preferred: Preferred_heap.t
       ; knowledge: Knowledge.t Peer.Table.t
             (* Written to when something changes. *)
-      ; r: unit Strict_pipe.Reader.t sexp_opaque
+      ; r: (unit Strict_pipe.Reader.t[@sexp.opaque])
       ; w:
-          ( unit
-          , Strict_pipe.drop_head Strict_pipe.buffered
-          , unit )
-          Strict_pipe.Writer.t
-          sexp_opaque }
-    [@@deriving sexp]
+          (( unit
+           , Strict_pipe.drop_head Strict_pipe.buffered
+           , unit )
+           Strict_pipe.Writer.t[@sexp.opaque]) }
+    [@@deriving sexp_of]
 
     let reset_knowledge t ~all_peers =
       (* Reset preferred *)

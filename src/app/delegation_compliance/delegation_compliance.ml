@@ -554,7 +554,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
             let payments_from_delegatee =
               List.filter payments_from_delegatee_raw ~f:(fun payment ->
                   Int.Set.mem block_ids payment.block_id
-                  && payment.global_slot >= min_payment_slot )
+                  && Int64.(>=) payment.global_slot min_payment_slot )
               |> List.sort ~compare:compare_by_global_slot
             in
             let payment_amount_and_slot (user_cmd : Sql.User_command.t) =
@@ -633,7 +633,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
                       (* only payments in canonical chain *)
                       List.filter payments_raw ~f:(fun payment ->
                           Int.Set.mem block_ids payment.block_id
-                          && payment.global_slot >= min_payment_slot )
+                          && Int64.(>=) payment.global_slot min_payment_slot )
                       |> List.sort ~compare:compare_by_global_slot
                     in
                     Ok ((cb_receiver_pk, payments) :: accum) )
@@ -685,7 +685,7 @@ let main ~input_file ~csv_file ~preliminary_csv_file_opt ~archive_uri
               *)
               List.filter payments_raw ~f:(fun payment ->
                   Int.Set.mem block_ids payment.block_id
-                  && payment.global_slot >= min_payment_slot
+                  && Int64.(>=) payment.global_slot min_payment_slot
                   && not
                        (List.mem payments_from_known_senders payment
                           ~equal:Sql.User_command.equal) )

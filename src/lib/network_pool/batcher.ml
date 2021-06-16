@@ -8,7 +8,7 @@ type ('init, 'result) elt =
   { id: Id.t
   ; data: 'init
   ; weight: int
-  ; res: ('result, unit) Result.t Or_error.t Ivar.t sexp_opaque }
+  ; res: (('result, unit) Result.t Or_error.t Ivar.t [@sexp.opaque]) }
 [@@deriving sexp]
 
 type ('proof, 'result) state =
@@ -23,7 +23,7 @@ type ('init, 'partially_validated, 'result) t =
   ; how_to_add: [`Insert | `Enqueue_back]
   ; queue: ('init, 'result) elt Q.t
   ; compare_init: ('init -> 'init -> int) option
-  ; logger: Logger.t sexp_opaque
+  ; logger: (Logger.t [@sexp.opaque])
   ; weight: 'init -> int
   ; max_weight_per_call: int option
   ; verifier:
@@ -36,7 +36,7 @@ type ('init, 'partially_validated, 'result) t =
           | `Potentially_invalid of 'partially_validated ]
           list
           Deferred.Or_error.t)
-      sexp_opaque }
+      [@sexp.opaque] }
 [@@deriving sexp]
 
 let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init

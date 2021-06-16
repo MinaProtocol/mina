@@ -32,6 +32,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Node = struct
     type t = Mask.Attached.t
 
+
     type attached =
       {hash: string; uuid: string; total_currency: int; num_accounts: int}
     [@@deriving yojson]

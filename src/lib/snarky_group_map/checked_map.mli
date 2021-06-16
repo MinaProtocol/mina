@@ -12,4 +12,4 @@ module Make
         val params : M.field Group_map.Params.t
     end) : sig
   val to_group : M.Field.t -> M.Field.t * M.Field.t
-end
+end [@@warning "-67"]

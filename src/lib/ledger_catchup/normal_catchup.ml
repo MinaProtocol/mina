@@ -255,12 +255,13 @@ let download_state_hashes ~logger ~trust_system ~network ~frontier ~peers
                 !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof"
                 peer
             in
-            ignore
+            let%bind.Deferred () =
               Trust_system.(
                 record trust_system logger peer
                   Actions.
                     ( Sent_invalid_transition_chain_merkle_proof
-                    , Some (error_msg, []) )) ;
+                    , Some (error_msg, []) ))
+            in
             Deferred.Result.fail
             @@ `Invalid_transition_chain_proof (Error.of_string error_msg)
       in
@@ -373,7 +374,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
   Deferred.Or_error.List.concat_map
     (partition Transition_frontier.max_catchup_chunk_length
        hashes_of_missing_transitions) ~how:`Parallel ~f:(fun hashes ->
-      let%bind.Async peers = Mina_networking.peers network in
+      let%bind.Async.Deferred peers = Mina_networking.peers network in
       let peers =
         Peers_pool.create ~busy ~preferred:[preferred_peer]
           (List.permute peers)
@@ -399,7 +400,7 @@ let download_transitions ~target_hash ~logger ~trust_system ~network
                     "requesting $n blocks from $peer for catchup to \
                      $target_hash" ;
                   let%bind transitions =
-                    match%map.Async
+                    match%map.Async.Deferred
                       Mina_networking.get_transition_chain network peer hashes
                     with
                     | Ok x ->

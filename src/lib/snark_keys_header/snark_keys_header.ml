@@ -239,7 +239,7 @@ let%test_module "Check parsing of header" =
     let valid_header_with_prefix = prefix ^ valid_header_string
 
     module Tests (Lexing : sig
-      val from_string : string -> Lexing.lexbuf
+      val from_string : ?with_positions:bool -> string -> Lexing.lexbuf
     end) =
     struct
       let%test "doesn't parse without prefix" =
@@ -285,7 +285,7 @@ let%test_module "Check parsing of header" =
     let%test_module "Parsing from part-way through a lexbuf" =
       ( module struct
         include Tests (struct
-          let from_string str =
+          let from_string ?with_positions:_ str =
             let prefix = "AAAAAAAAAA" in
             let prefix_len = String.length prefix in
             let lexbuf = Lexing.from_string (prefix ^ str) in
@@ -299,7 +299,7 @@ let%test_module "Check parsing of header" =
     let%test_module "Parsing with refill" =
       ( module struct
         include Tests (struct
-          let from_string str =
+          let from_string ?with_positions:_ str =
             let init = ref true in
             let initial_prefix = "AAAAAAAAAA" in
             let initial_prefix_len = String.length initial_prefix in

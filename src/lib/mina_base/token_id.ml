@@ -61,6 +61,8 @@ module Stable = struct
                 let of_binable = check
               end)
 
+    let equal = T.Stable.V1.equal
+
     let to_latest = Fn.id
   end
 end]

@@ -55,7 +55,7 @@ module Make (Inputs : Inputs_intf) :
 
   type t =
     { uuid: Uuid.Stable.V1.t
-    ; kvdb: Kvdb.t sexp_opaque
+    ; kvdb: Kvdb.t [@sexp.opaque]
     ; depth: int
     ; directory: string
     ; detached_parent_signal: Detached_parent_signal.t }

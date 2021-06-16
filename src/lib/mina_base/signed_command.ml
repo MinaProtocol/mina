@@ -351,6 +351,8 @@ module With_valid_signature = struct
 
       let compare = Stable.V1.compare
 
+      let equal = Stable.V1.equal
+
       module Gen = Gen
     end
   end]

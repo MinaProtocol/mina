@@ -201,7 +201,7 @@ module Make (Engine : Intf.Engine.S) () :
              [%log fatal] "Error occured $error"
                ~metadata:[("error", Logger.Message.to_yojson message)] ;
              on_fatal_error message ) ;
-           Deferred.return `Continue )) ;
+           Deferred.return `Continue ) : 'a Event_router.event_subscription) ;
     log_error_accumulator
 
   let lift_accumulated_log_errors {warn; faulty_peer; error; fatal} =

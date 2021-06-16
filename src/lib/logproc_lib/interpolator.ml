@@ -40,7 +40,7 @@ let parser =
   in
   message <* end_of_input
 
-let parse = Angstrom.parse_string parser
+let parse = Angstrom.parse_string ~consume:All parser
 
 (* map and concat vs. fold: which is better for strings? *)
 let render ~max_interpolation_length ~format_json metadata items =

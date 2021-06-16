@@ -151,8 +151,8 @@ struct
 
       module Config = struct
         type t =
-          { trust_system: Trust_system.t sexp_opaque
-          ; verifier: Verifier.t sexp_opaque
+          { trust_system: (Trust_system.t[@sexp.opaque])
+          ; verifier: (Verifier.t[@sexp.opaque])
           ; disk_location: string }
         [@@deriving sexp, make]
       end
@@ -163,7 +163,7 @@ struct
 
       type t =
         { snark_tables: Snark_tables.t
-        ; best_tip_ledger: (unit -> Base_ledger.t option) sexp_opaque
+        ; best_tip_ledger: (unit -> Base_ledger.t option[@sexp.opaque])
         ; mutable ref_table: int Statement_table.t option
               (** Tracks the number of blocks that have each work statement in
                   their scan state.
@@ -179,7 +179,7 @@ struct
                   irrelevant work is not broadcast.
               *)
         ; config: Config.t
-        ; logger: Logger.t sexp_opaque
+        ; logger: (Logger.t[@sexp.opaque])
         ; mutable removed_counter: int
               (** A counter for transition frontier breadcrumbs removed. When
                   this reaches a certain value, unreferenced snark work is

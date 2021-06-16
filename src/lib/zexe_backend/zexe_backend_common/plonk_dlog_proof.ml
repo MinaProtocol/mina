@@ -315,7 +315,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun {Challenge_polynomial.commitment; _} ->
           G.Affine.to_backend (Finite commitment) )
     in
-    let%map.Async res =
+    let%map.Async.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res

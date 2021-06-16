@@ -87,8 +87,8 @@ let str_decl ~loc (decl : type_declaration) : structure =
           [%e
             pexp_function ~loc
               (List.mapi constrs ~f:(fun i constr ->
-                   match constr with
-                   | Rtag (label, _, has_empty, args) ->
+                   match constr.prf_desc with
+                   | Rtag (label, has_empty, args) ->
                        { pc_lhs=
                            ( match (has_empty, args) with
                            | _, [] ->

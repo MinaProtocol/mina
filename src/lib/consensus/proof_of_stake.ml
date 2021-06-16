@@ -2032,7 +2032,7 @@ module Data = struct
           ~request:As_prover.(return Vrf.Winner_pk)
       in
       let%bind block_creator =
-        let%bind.Checked.Let_syntax bc_compressed =
+        let%bind.Checked bc_compressed =
           exists Public_key.typ
             ~request:As_prover.(return Vrf.Producer_public_key)
         in
