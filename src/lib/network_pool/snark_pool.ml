@@ -281,26 +281,10 @@ struct
         | `New_refcount_table
             { Extensions.Snark_pool_refcount.removed
             ; refcount_table
-            ; inclusion_table
             ; best_tip_table } ->
             t.ref_table <- Some refcount_table ;
             t.best_tip_table <- Some best_tip_table ;
             t.removed_counter <- t.removed_counter + removed ;
-            (* Remove any purchased snark work from the rebroadcast table, to
-               avoid unnecessary messages to the network.
-            *)
-            Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
-              ~f:(fun stmt ->
-                let drop = Hashtbl.mem inclusion_table stmt in
-                if drop then
-                  [%log' debug t.logger]
-                    "No longer rebroadcasting SNARK with statement $stmt, it \
-                     has been seen in a block"
-                    ~metadata:
-                      [ ( "stmt"
-                        , One_or_two.to_yojson
-                            Transaction_snark.Statement.to_yojson stmt ) ] ;
-                not drop ) ;
             if t.removed_counter < removed_breadcrumb_wait then return ()
             else (
               t.removed_counter <- 0 ;
@@ -1075,6 +1059,19 @@ let%test_module "random set test" =
                (Peer.Id.unsafe_of_string "contents should be irrelevant")
              ~libp2p_port:8302)
       in
+      let compare_work (x : Mock_snark_pool.Resource_pool.Diff.t)
+          (y : Mock_snark_pool.Resource_pool.Diff.t) =
+        match (x, y) with
+        | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
+            Transaction_snark_work.Statement.compare stmt1 stmt2
+        | _ ->
+            assert false
+      in
+      let check_work ~expected ~got =
+        let sort = List.sort ~compare:compare_work in
+        [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list] (sort got)
+          (sort expected)
+      in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let network_pool =
@@ -1104,8 +1101,7 @@ let%test_module "random set test" =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
           in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable1 [] ;
+          check_work ~got:rebroadcastable1 ~expected:[] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
           ok_exn res2 |> ignore ;
@@ -1113,9 +1109,8 @@ let%test_module "random set test" =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
           in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable2
-            [Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
+          check_work ~got:rebroadcastable2
+            ~expected:[Add_solved_work (stmt2, {proof= proof2; fee= fee2})] ;
           let%bind res3 = apply_diff resource_pool stmt3 fee3 in
           let proof3 = One_or_two.map ~f:mk_dummy_proof stmt3 in
           ok_exn res3 |> ignore ;
@@ -1123,40 +1118,21 @@ let%test_module "random set test" =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
           in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable3
-            (let open Mock_snark_pool.Resource_pool.Diff in
-            List.sort
-              ~compare:(fun x y ->
-                match (x, y) with
-                | Add_solved_work (stmt1, _), Add_solved_work (stmt2, _) ->
-                    Transaction_snark_work.Statement.compare stmt1 stmt2
-                | _ ->
-                    assert false )
+          check_work ~got:rebroadcastable3
+            ~expected:
               [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
-              ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ]) ;
-          (* Mark work as included in a block. *)
-          let%bind () =
-            Mocks.Transition_frontier.completed_work_statements tf
-              [stmt1; stmt2]
-          in
-          let rebroadcastable4 =
-            Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
-              ~has_timed_out:(Fn.const `Ok)
-          in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable4
-            [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+              ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ] ;
           (* Keep rebroadcasting even after the timeout, as long as the work
              hasn't appeared in a block yet.
           *)
-          let rebroadcastable5 =
+          let rebroadcastable4 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Timed_out)
           in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable5
-            [Add_solved_work (stmt3, {proof= proof3; fee= fee3})] ;
+          check_work ~got:rebroadcastable4
+            ~expected:
+              [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
+              ; Add_solved_work (stmt3, {proof= proof3; fee= fee3}) ] ;
           let%bind res6 = apply_diff resource_pool stmt4 fee4 in
           let proof4 = One_or_two.map ~f:mk_dummy_proof stmt4 in
           ok_exn res6 |> ignore ;
@@ -1164,12 +1140,13 @@ let%test_module "random set test" =
           let%bind () =
             Mocks.Transition_frontier.remove_from_best_tip tf [stmt3]
           in
-          let rebroadcastable6 =
+          let rebroadcastable5 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~has_timed_out:(Fn.const `Ok)
           in
-          [%test_eq: Mock_snark_pool.Resource_pool.Diff.t list]
-            rebroadcastable6
-            [Add_solved_work (stmt4, {proof= proof4; fee= fee4})] ;
+          check_work ~got:rebroadcastable5
+            ~expected:
+              [ Add_solved_work (stmt2, {proof= proof2; fee= fee2})
+              ; Add_solved_work (stmt4, {proof= proof4; fee= fee4}) ] ;
           Deferred.unit )
   end )
