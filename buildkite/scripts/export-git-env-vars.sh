@@ -26,7 +26,7 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
-if [[ -n ${THIS_COMMIT_TAG} ]]; then # If the commit is tagged
+if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export VERSION="${GITTAG}-${GITHASH}"
     export GENERATE_KEYPAIR_VERSION=${VERSION}
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
@@ -44,7 +44,7 @@ export MINA_DEB_CODENAME=stretch
 case $GITBRANCH in
     master)
         RELEASE=stable ;;
-    compatible|master|release/*) # whitelist of branches that can be tagged
+    compatible|master|release*) # whitelist of branches that can be tagged
         case "${THIS_COMMIT_TAG}" in
           *alpha*) # any tag including the string `alpha`
             RELEASE=alpha ;;
