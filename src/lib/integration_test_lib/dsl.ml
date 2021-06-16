@@ -180,28 +180,29 @@ module Make (Engine : Intf.Engine.S) () :
   let watch_log_errors ~logger ~event_router ~on_fatal_error =
     let log_error_accumulator = empty_log_error_accumulator () in
     ignore
-      (Event_router.on event_router Event_type.Log_error
-         ~f:(fun node message ->
-           let open Logger.Message in
-           let acc =
-             match message.level with
-             | Warn ->
-                 log_error_accumulator.warn
-             | Error ->
-                 log_error_accumulator.error
-             | Faulty_peer ->
-                 log_error_accumulator.faulty_peer
-             | Fatal ->
-                 log_error_accumulator.fatal
-             | _ ->
-                 failwith "unexpected log level encountered"
-           in
-           DynArray.add acc (node, message) ;
-           if Logger.Level.equal message.level Fatal then (
-             [%log fatal] "Error occured $error"
-               ~metadata:[("error", Logger.Message.to_yojson message)] ;
-             on_fatal_error message ) ;
-           Deferred.return `Continue ) : 'a Event_router.event_subscription) ;
+      ( Event_router.on event_router Event_type.Log_error
+          ~f:(fun node message ->
+            let open Logger.Message in
+            let acc =
+              match message.level with
+              | Warn ->
+                  log_error_accumulator.warn
+              | Error ->
+                  log_error_accumulator.error
+              | Faulty_peer ->
+                  log_error_accumulator.faulty_peer
+              | Fatal ->
+                  log_error_accumulator.fatal
+              | _ ->
+                  failwith "unexpected log level encountered"
+            in
+            DynArray.add acc (node, message) ;
+            if Logger.Level.equal message.level Fatal then (
+              [%log fatal] "Error occured $error"
+                ~metadata:[("error", Logger.Message.to_yojson message)] ;
+              on_fatal_error message ) ;
+            Deferred.return `Continue )
+        : 'a Event_router.event_subscription ) ;
     log_error_accumulator
 
   let lift_accumulated_log_errors {warn; faulty_peer; error; fatal} =

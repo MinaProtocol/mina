@@ -129,7 +129,7 @@ end
 
 module type Fake_timer_transport_s = functor
   (Message :sig
-
+            
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
@@ -239,30 +239,31 @@ module Trivial_peer : Trivial_peer_intf = struct
 end
 
 [@@@warning "-67"]
+
 module type S = functor
   (State :sig
-
+          
           type t [@@deriving equal, sexp, yojson]
         end)
   (Message :sig
-
+            
             type t
           end)
   (Message_delay : Message_delay_intf with type message := Message.t)
   (Message_label :sig
-
+                  
                   type label [@@deriving enum, sexp]
 
                   include Hashable.S with type t = label
                 end)
   (Timer_label :sig
-
+                
                 type label [@@deriving enum, sexp]
 
                 include Hashable.S with type t = label
               end)
   (Condition_label :sig
-
+                    
                     type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
@@ -304,6 +305,7 @@ module type S = functor
     -> stop:unit Deferred.t
     -> t
 end
+
 [@@@warning "+67"]
 
 module Make (State : sig

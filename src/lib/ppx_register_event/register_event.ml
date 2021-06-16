@@ -71,7 +71,8 @@ let generate_loggers_and_parsers ~loc:_ ~path ty_ext msg_opt =
           failwith
             (sprintf "Expected structure item in payload for %s" deriver)
     in
-    List.find_map_exn ty_ext.ptyext_attributes ~f:(fun ({attr_name={txt; _}; attr_payload=payload;_}) ->
+    List.find_map_exn ty_ext.ptyext_attributes
+      ~f:(fun {attr_name= {txt; _}; attr_payload= payload; _} ->
         if String.equal txt "deriving" then
           match payload with
           | PStr stris ->

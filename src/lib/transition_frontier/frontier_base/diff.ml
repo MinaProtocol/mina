@@ -38,6 +38,7 @@ module Node_list = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = State_hash.Stable.V1.t list
 
@@ -76,6 +77,7 @@ module Root_transition = struct
     [%%versioned
     module Stable = struct
       [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t =
           { new_root: Root_data.Limited.Stable.V1.t
@@ -91,6 +93,7 @@ module Root_transition = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = Lite_binable.Stable.V1.t
 
@@ -176,6 +179,7 @@ module Lite_binable = struct
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
+
     module V1 = struct
       type t =
         | New_node of External_transition.Validated.Stable.V1.t
@@ -195,6 +199,7 @@ module Lite = struct
       [%%versioned
       module Stable = struct
         [@@@no_toplevel_latest_type]
+
         module V1 = struct
           type t = Lite_binable.Stable.V1.t
 
@@ -206,8 +211,10 @@ module Lite = struct
     [%%versioned_binable
     module Stable = struct
       [@@@no_toplevel_latest_type]
+
       module V1 = struct
         type t = E : (lite, 'mutant) diff -> t
+
         module T_nonbinable = struct
           type nonrec t = t
 

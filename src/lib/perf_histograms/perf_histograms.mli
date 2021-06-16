@@ -11,7 +11,7 @@ module Rpc : sig
 
     module Decorate_bin_io (M : Intf.Rpc.S) (Rpc : Intf.Versioned_rpc(M).S) :
       Intf.Versioned_rpc(M).S
-        [@@warning "-67"]
+    [@@warning "-67"]
   end
 end
 

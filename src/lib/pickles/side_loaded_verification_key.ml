@@ -134,7 +134,7 @@ let max_domains_with_x =
   {Ds.h= conv max_domains.h; x}
 
 module Vk = struct
-  type t = Impls.Wrap.Verification_key.t [@sexp.opaque] [@@deriving sexp]
+  type t = (Impls.Wrap.Verification_key.t[@sexp.opaque]) [@@deriving sexp]
 
   let to_yojson _ = `String "opaque"
 

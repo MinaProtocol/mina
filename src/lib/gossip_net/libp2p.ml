@@ -607,7 +607,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
                    ~send_every:(Time_ns.Span.of_sec 10.)
                    ~timeout:
                      (Option.value ~default:(Time_ns.Span.of_sec 120.)
-                        heartbeat_timeout) ())
+                        heartbeat_timeout)
+                   ())
               ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn

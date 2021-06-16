@@ -109,9 +109,7 @@ let export_logs_to_tar ?basename ~conf_dir =
   in
   let%bind.Deferred linux_info =
     if String.equal Sys.os_type "Unix" then
-      match%map.Deferred
-        Process.run ~prog:"uname" ~args:["-a"] ()
-      with
+      match%map.Deferred Process.run ~prog:"uname" ~args:["-a"] () with
       | Ok s when String.is_prefix s ~prefix:"Linux" ->
           Some s
       | _ ->

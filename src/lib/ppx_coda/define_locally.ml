@@ -29,13 +29,12 @@ let expr_to_id loc expr =
 let expand ~loc ~path:_ open_decl defs =
   match defs.pexp_desc with
   | Pexp_tuple exps ->
-    let (module Ast_builder) = Ast_builder.make loc in
-    let open Ast_builder in
-    let names = List.map exps ~f:(expr_to_id loc) in
-    let vars = List.map names ~f:pvar in
-    Str.value ~loc Nonrecursive
-      [ Vb.mk ~loc (Pat.tuple ~loc vars)
-          (Exp.open_ ~loc open_decl defs) ]
+      let (module Ast_builder) = Ast_builder.make loc in
+      let open Ast_builder in
+      let names = List.map exps ~f:(expr_to_id loc) in
+      let vars = List.map names ~f:pvar in
+      Str.value ~loc Nonrecursive
+        [Vb.mk ~loc (Pat.tuple ~loc vars) (Exp.open_ ~loc open_decl defs)]
   | Pexp_ident {txt= Lident id; _} ->
       Str.value ~loc Nonrecursive
         [ Vb.mk ~loc

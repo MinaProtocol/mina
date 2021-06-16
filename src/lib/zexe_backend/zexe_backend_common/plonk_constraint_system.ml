@@ -844,6 +844,7 @@ struct
         ()
     | constr ->
         failwithf "Unhandled constraint %s"
-          Obj.(Extension_constructor.name (Extension_constructor.of_val constr))
+          Obj.(
+            Extension_constructor.name (Extension_constructor.of_val constr))
           ()
 end

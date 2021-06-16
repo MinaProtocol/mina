@@ -441,7 +441,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Mina_numbers.Global_slot.t option [@sexp.option]}
+      ; valid_until: Mina_numbers.Global_slot.t option [@sexp.option] }
     [@@deriving sexp]
   end in
   let payment_path_flag =

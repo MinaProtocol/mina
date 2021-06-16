@@ -7,7 +7,7 @@ let () =
   let is_version_cmd s =
     List.mem ["version"; "-version"] s ~equal:String.equal
   in
-  match (Sys.get_argv ()) with
+  match Sys.get_argv () with
   | [|_generate_keypair_exe; version|] when is_version_cmd version ->
       Mina_version.print_version ()
   | _ ->

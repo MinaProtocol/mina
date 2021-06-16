@@ -540,7 +540,8 @@ module Internal_command = struct
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2::internal_command_type")
+         "SELECT id FROM internal_commands WHERE hash = $1 AND type = \
+          $2::internal_command_type")
       (Transaction_hash.to_base58_check transaction_hash, typ)
 
   let load (module Conn : CONNECTION) ~(id : int) =

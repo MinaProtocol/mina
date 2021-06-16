@@ -129,28 +129,30 @@ let rec core_type ~loc (typ : core_type) : expression =
                elist ~loc
                  (List.rev_map rows ~f:(fun row_field ->
                       match row_field.prf_desc with
-                   | Rtag (name, _, []) ->
-                       [%expr [[%e pexp_variant ~loc name.txt None]]]
-                   | Rtag (name,_, [typ]) ->
-                       [%expr
-                         Stdlib.List.rev_map
-                           (fun e ->
-                             [%e pexp_variant ~loc name.txt (Some [%expr e])]
-                             )
-                           (Stdlib.Lazy.force [%e core_type ~loc typ])]
-                   | Rtag _ ->
-                       Location.raise_errorf ~loc:typ.ptyp_loc
-                         "Cannot derive %s for variant constructors with \
-                          different type arguments for the same constructor"
-                         deriver_name
-                   | Rinherit typ' ->
-                       [%expr
-                         Stdlib.List.rev
-                           (Stdlib.Lazy.force
-                              (* Coerce here, because the inherited type may be a
+                      | Rtag (name, _, []) ->
+                          [%expr [[%e pexp_variant ~loc name.txt None]]]
+                      | Rtag (name, _, [typ]) ->
+                          [%expr
+                            Stdlib.List.rev_map
+                              (fun e ->
+                                [%e
+                                  pexp_variant ~loc name.txt (Some [%expr e])]
+                                )
+                              (Stdlib.Lazy.force [%e core_type ~loc typ])]
+                      | Rtag _ ->
+                          Location.raise_errorf ~loc:typ.ptyp_loc
+                            "Cannot derive %s for variant constructors with \
+                             different type arguments for the same constructor"
+                            deriver_name
+                      | Rinherit typ' ->
+                          [%expr
+                            Stdlib.List.rev
+                              (Stdlib.Lazy.force
+                                 (* Coerce here, because the inherited type may be a
                                  strict subtype.
                               *)
-                              ([%e core_type ~loc typ'] :> [%t typ] list lazy_t))] ))])]
+                                 ( [%e core_type ~loc typ']
+                                   :> [%t typ] list lazy_t ))] ))])]
   | Ptyp_poly (vars, typ) ->
       (* Inject dummy representatives into the environment so that they can
          resolve.

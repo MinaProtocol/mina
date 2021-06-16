@@ -43,9 +43,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     [%log info] "archive node test: running network for %0.1f minutes"
       runtime_min ;
-    let%bind.Async.Deferred () =
-      Async.after (Time.Span.of_min runtime_min)
-    in
+    let%bind.Async.Deferred () = Async.after (Time.Span.of_min runtime_min) in
     [%log info] "archive node test: done running network" ;
     let%bind () =
       Network.Node.dump_archive_data ~logger archive_node

@@ -15,7 +15,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path =
           let%bind stat = Unix.stat dn in
           Deferred.return
           @@
-          if (Unix.File_kind.equal stat.kind `Directory) then Ok true
+          if Unix.File_kind.equal stat.kind `Directory then Ok true
           else
             corrupted_privkey
               (Error.createf

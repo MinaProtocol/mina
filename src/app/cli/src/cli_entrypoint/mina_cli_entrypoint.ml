@@ -932,8 +932,7 @@ let setup_daemon logger =
           Mina_metrics.(
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
           ) ;
-      Stream.iter
-        Async_kernel.Async_kernel_scheduler.long_jobs_with_context
+      Stream.iter Async_kernel.Async_kernel_scheduler.long_jobs_with_context
         ~f:(fun (context, span) ->
           let secs = Time_ns.Span.to_sec span in
           [%log debug]

@@ -29,7 +29,8 @@ end
 module type F = functor
   (Unsigned : Unsigned.S)
   (M :sig
-
+      
       val length : int
     end)
-  -> S with type t = Unsigned.t [@@warning "-67"]
+  -> S with type t = Unsigned.t
+[@@warning "-67"]

@@ -8,7 +8,7 @@ type ('init, 'result) elt =
   { id: Id.t
   ; data: 'init
   ; weight: int
-  ; res: (('result, unit) Result.t Or_error.t Ivar.t [@sexp.opaque]) }
+  ; res: (('result, unit) Result.t Or_error.t Ivar.t[@sexp.opaque]) }
 [@@deriving sexp]
 
 type ('proof, 'result) state =
@@ -23,20 +23,20 @@ type ('init, 'partially_validated, 'result) t =
   ; how_to_add: [`Insert | `Enqueue_back]
   ; queue: ('init, 'result) elt Q.t
   ; compare_init: ('init -> 'init -> int) option
-  ; logger: (Logger.t [@sexp.opaque])
+  ; logger: (Logger.t[@sexp.opaque])
   ; weight: 'init -> int
   ; max_weight_per_call: int option
   ; verifier:
-      (* The batched verifier may make partial progress on its input so that we can
+         (* The batched verifier may make partial progress on its input so that we can
          save time when it is re-verified in a smaller batch in the case that a batch
          fails to verify. *)
-      (   [`Init of 'init | `Partially_validated of 'partially_validated] list
-       -> [ `Valid of 'result
-          | `Invalid
-          | `Potentially_invalid of 'partially_validated ]
-          list
-          Deferred.Or_error.t)
-      [@sexp.opaque] }
+         [`Init of 'init | `Partially_validated of 'partially_validated] list
+      -> [ `Valid of 'result
+         | `Invalid
+         | `Potentially_invalid of 'partially_validated ]
+         list
+         Deferred.Or_error.t
+        [@sexp.opaque] }
 [@@deriving sexp]
 
 let create ?(how_to_add = `Enqueue_back) ?logger ?compare_init

@@ -100,7 +100,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                   Mina_compile_config.rpc_heartbeat_timeout_sec)
              ~send_every:
                (Time_ns.Span.of_sec
-                  Mina_compile_config.rpc_heartbeat_send_every_sec) ())
+                  Mina_compile_config.rpc_heartbeat_send_every_sec)
+             ())
         (Tcp.Where_to_connect.of_host_and_port address)
         (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
