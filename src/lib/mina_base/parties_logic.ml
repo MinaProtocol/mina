@@ -19,9 +19,9 @@ module type Bool_intf = sig
 
   val not : t -> t
 
-  val ( || ) : t -> t -> t
+  val ( ||| ) : t -> t -> t
 
-  val ( && ) : t -> t -> t
+  val ( &&& ) : t -> t -> t
 
   val assert_ : t -> unit
 end
@@ -48,6 +48,8 @@ module type Token_id_intf = sig
   include Iffable
 
   val equal : t -> t -> bool
+
+  val invalid : t
 
   val default : t
 end
@@ -348,14 +350,14 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let party_succeeded =
       Bool.(
-        protocol_state_predicate_satisfied && predicate_satisfied
-        && update_permitted)
+        protocol_state_predicate_satisfied &&& predicate_satisfied
+        &&& update_permitted)
     in
     (* The first party must succeed. *)
-    Bool.(assert_ ((not is_start') || party_succeeded)) ;
+    Bool.(assert_ ((not is_start') ||| party_succeeded)) ;
     let local_state =
       { local_state with
-        success= Bool.( && ) local_state.success party_succeeded }
+        success= Bool.( &&& ) local_state.success party_succeeded }
     in
     let local_delta =
       (* TODO: This is wasteful as it repeats a computation performed inside
@@ -363,6 +365,7 @@ module Make (Inputs : Inputs_intf) = struct
       Amount.(h.perform (Balance a) - h.perform (Balance a'))
     in
     let party_token = h.perform (Party_token_id party) in
+    Bool.(assert_ (not (Token_id.(equal invalid) party_token))) ;
     let fee_excess_change0, new_local_fee_excess =
       let curr_token : Token_id.t = local_state.token_id in
       let same_token = Token_id.equal curr_token party_token in
@@ -370,9 +373,9 @@ module Make (Inputs : Inputs_intf) = struct
       Bool.(
         assert_
           ( (not is_start')
-          || (curr_is_default && same_token && Amount.Signed.is_pos local_delta)
-          )) ;
-      let should_merge = Bool.( && ) (Bool.not same_token) curr_is_default in
+          ||| ( curr_is_default &&& same_token
+              &&& Amount.Signed.is_pos local_delta ) )) ;
+      let should_merge = Bool.( &&& ) (Bool.not same_token) curr_is_default in
       let to_merge_amount =
         Amount.if_ should_merge ~then_:local_state.excess ~else_:Amount.zero
       in
@@ -394,13 +397,13 @@ module Make (Inputs : Inputs_intf) = struct
       the local state excess gets moved into the execution state's fee excess.
 
       If there are more parties to execute after this one, then the local delta gets
-      accumulated in the local state (unless there is a token
+      accumulated in the local state.
 
       If there are no more parties to execute, then we do the same as if we switch tokens.
       The local state excess (plus the local delta) gets moved to the fee excess if it is default token.
     *)
     let new_ledger =
-      let should_apply = Bool.( || ) is_start' local_state.will_succeed in
+      let should_apply = Bool.( ||| ) is_start' local_state.will_succeed in
       h.perform
         (Set_account_if (should_apply, local_state.ledger, a', inclusion_proof))
     in
@@ -417,14 +420,14 @@ module Make (Inputs : Inputs_intf) = struct
     (*
        In the SNARK, this will be
     Bool.(assert_
-            (not is_last_party ||
+            (not is_last_party |||
             equal local_state.will_succeed local_state.success)) ;
        *)
     let global_state, local_state =
       let curr_is_default = Token_id.(equal default) local_state.token_id in
       let should_perform_second_excess_merge =
         (* See: https://github.com/MinaProtocol/mina/issues/8921 *)
-        Bool.(curr_is_default && is_last_party)
+        Bool.(curr_is_default &&& is_last_party)
       in
       ( h.perform
           (Modify_global_excess
