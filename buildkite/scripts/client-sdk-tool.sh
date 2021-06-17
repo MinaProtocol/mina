@@ -2,6 +2,8 @@
 
 set -eo pipefail
 
+echo "ClientSDK Publish Script"
+
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 '<yarn-args>'"
     exit 1
