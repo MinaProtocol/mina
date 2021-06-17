@@ -424,21 +424,18 @@ let signedRosettaTransactionToSignedCommand = (signedRosettaTxn: string) => {
 };
 
 [@bs.send]
-external rawPublicKeyOfPublicKey: (codaSDK, publicKey) => option(string) =
+external rawPublicKeyOfPublicKey: (codaSDK, publicKey) => string =
   "rawPublicKeyOfPublicKey";
 
 /**
-* Return the hex-encoded format of a valid public key. This will return undefined
-* if the public key being passed is invalid or the conversion fails.
-*
-* @param publicKey - A valid public key
-* @returns A string that represents the hex encoding of a public key or undefined otherwise.
-*/
+  * Return the hex-encoded format of a valid public key. This will throw an exception if
+  * the key is invalid or the conversion fails.
+  *
+  * @param publicKey - A valid public key
+  * @returns A string that represents the hex encoding of a public key.
+  */
 
 [@genType]
 let publicKeyToRaw = (publicKey: string) => {
-  switch(rawPublicKeyOfPublicKey(codaSDK, publicKey)) {
-    | rawPublicKey => rawPublicKey
-    | exception _ => None
-  }
+  rawPublicKeyOfPublicKey(codaSDK, publicKey);
 };

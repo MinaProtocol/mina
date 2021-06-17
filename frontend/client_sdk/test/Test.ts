@@ -20,12 +20,6 @@ deepStrictEqual(
   "Conversion to valid raw public key failed"
 );
 
-deepStrictEqual(
-  typeof CodaSDK.publicKeyToRaw(key.publicKey + "_"),
-  "undefined",
-  "Conversion to invalid raw public key returned a non undefined value"
-);
-
 let payment1 = CodaSDK.unsafeSignAny(
   { to: key.publicKey, from: key.publicKey, amount: "1", fee: "1", nonce: "0" },
   key
