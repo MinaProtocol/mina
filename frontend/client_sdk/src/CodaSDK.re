@@ -434,7 +434,6 @@ external rawPublicKeyOfPublicKey: (codaSDK, publicKey) => string =
   * @param publicKey - A valid public key
   * @returns A string that represents the hex encoding of a public key.
   */
-
 [@genType]
 let publicKeyToRaw = (publicKey: string) => {
   rawPublicKeyOfPublicKey(codaSDK, publicKey);
