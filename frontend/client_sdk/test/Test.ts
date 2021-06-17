@@ -6,7 +6,7 @@ let publicKey = CodaSDK.derivePublicKey(key.privateKey);
 let signed = CodaSDK.signMessage("hello", key);
 CodaSDK.verifyMessage(signed);
 
-deepStrictEqual(publicKey, key.publicKey, "Public keys do not match");
+deepStrictEqual(publicKey, key.publicKey, " Public keys do not match");
 
 deepStrictEqual(
   CodaSDK.verifyKeypair(key),
