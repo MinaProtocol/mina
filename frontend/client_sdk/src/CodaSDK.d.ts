@@ -118,8 +118,9 @@ export declare const verifyStakeDelegationSignature: (signedStakeDelegation: sig
    */
 export declare const signedRosettaTransactionToSignedCommand: (signedRosettaTxn: string) => string;
 /**
-* Return the hex-encoded format of a public key. This will raise an exception
-* and return `undefined` if the public key is invalid.
+* Return the hex-encoded format of a valid public key. This will return undefined
+* if the public key being passed is invalid or the conversion fails.
+*
 * @param publicKey - A valid public key
 * @returns A string that represents the hex encoding of a public key or undefined otherwise.
  */
