@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -26,8 +24,7 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    [%%ifdef
-    consensus_mechanism]
+    [%%ifdef consensus_mechanism]
 
     let gen =
       let open Snark_params.Tick.Inner_curve.Scalar in
@@ -46,8 +43,7 @@ module Stable = struct
        but also whether the serializations for the consensus and nonconsensus code are identical
     *)
 
-    [%%if
-    curve_size = 255]
+    [%%if curve_size = 255]
 
     let%test "private key serialization v1" =
       let pk =
@@ -68,11 +64,9 @@ module Stable = struct
   end
 end]
 
-[%%define_locally
-Stable.Latest.(gen)]
+[%%define_locally Stable.Latest.(gen)]
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 let create () =
   (* This calls into libsnark which uses /dev/urandom *)
@@ -117,8 +111,7 @@ let create () : t =
   Snarkette.Pasta.Fq.of_bigint
     (Snarkette.Nat.of_bytes
        (String.init 32 ~f:(fun i ->
-            Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined)
-        )))
+            Char.of_int_exn (Js.Optdef.get (Js.array_get x i) byte_undefined))))
 
 [%%endif]
 
@@ -147,10 +140,10 @@ let to_yojson t = `String (to_base58_check t)
 
 let of_yojson = function
   | `String x -> (
-    try Ok (of_base58_check_exn x) with
-    | Failure str ->
-        Error str
-    | exn ->
-        Error ("Signature_lib.Private_key.of_yojson: " ^ Exn.to_string exn) )
+      try Ok (of_base58_check_exn x) with
+      | Failure str ->
+          Error str
+      | exn ->
+          Error ("Signature_lib.Private_key.of_yojson: " ^ Exn.to_string exn) )
   | _ ->
       Error "Signature_lib.Private_key.of_yojson: Expected a string"

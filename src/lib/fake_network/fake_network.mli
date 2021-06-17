@@ -5,15 +5,20 @@ open Gadt_lib
 type 'n num_peers = 'n Peano.gt_1
 
 type peer_state =
-  { frontier: Transition_frontier.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
+  { frontier : Transition_frontier.t
+  ; consensus_local_state : Consensus.Data.Local_state.t
+  }
 
 type peer_network =
-  {peer: Network_peer.Peer.t; state: peer_state; network: Mina_networking.t}
+  { peer : Network_peer.Peer.t
+  ; state : peer_state
+  ; network : Mina_networking.t
+  }
 
 type nonrec 'n t =
-  { fake_gossip_network: Mina_networking.Gossip_net.Fake.network
-  ; peer_networks: (peer_network, 'n) Vect.t }
+  { fake_gossip_network : Mina_networking.Gossip_net.Fake.network
+  ; peer_networks : (peer_network, 'n) Vect.t
+  }
   constraint 'n = _ num_peers
 
 val setup :

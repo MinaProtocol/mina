@@ -43,8 +43,7 @@ module Make () = struct
     end
   end]
 
-  [%%define_locally
-  T1.(to_raw_string, digest_string, to_hex)]
+  [%%define_locally T1.(to_raw_string, digest_string, to_hex)]
 
   (* do not create bin_io serialization *)
   include Hashable.Make (T1)
@@ -69,7 +68,7 @@ module Make () = struct
       ~f:(fun i ->
         let c = Char.to_int s.[i / 8] in
         let j = i mod 8 in
-        Int.((c lsr j) land 1 = 1) )
+        Int.((c lsr j) land 1 = 1))
 end
 
 include Make ()
@@ -86,9 +85,9 @@ let%test "serialization test V1" =
 
 let%test_unit "bits_to_string" =
   [%test_eq: string]
-    (bits_to_string [|true; false|])
-    (String.of_char_list [Char.of_int_exn 1])
+    (bits_to_string [| true; false |])
+    (String.of_char_list [ Char.of_int_exn 1 ])
 
 let%test_unit "string to bits" =
   Quickcheck.test ~trials:5 String.quickcheck_generator ~f:(fun s ->
-      [%test_eq: string] s (bits_to_string (string_to_bits s)) )
+      [%test_eq: string] s (bits_to_string (string_to_bits s)))

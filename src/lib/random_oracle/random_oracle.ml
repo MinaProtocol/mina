@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Pickles.Impls.Step.Internal_Basic
 
@@ -25,8 +23,7 @@ module Input = Random_oracle_input
 let params : Field.t Sponge.Params.t =
   Sponge.Params.(map pasta_p ~f:Field.of_string)
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Inputs = Pickles.Tick_field_sponge.Inputs
 
@@ -86,8 +83,7 @@ let update ~state = update ~state params
 
 let hash ?init = hash ?init params
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Checked = struct
   module Inputs = Pickles.Step_main_inputs.Sponge.Permutation
@@ -111,7 +107,7 @@ module Checked = struct
 
   let hash ?init xs =
     O1trace.measure "Random_oracle.hash" (fun () ->
-        hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs )
+        hash ?init:(Option.map init ~f:(State.map ~f:constant)) params xs)
 
   let pack_input =
     Input.pack_to_fields ~size_in_bits:Field.size_in_bits ~pack:Field.Var.pack
@@ -129,21 +125,20 @@ let prefix_to_field (s : string) =
   assert (bits_per_character * String.length s < Field.size_in_bits) ;
   Field.project Fold_lib.Fold.(to_list (string_bits (s :> string)))
 
-let salt (s : string) = update ~state:initial_state [|prefix_to_field s|]
+let salt (s : string) = update ~state:initial_state [| prefix_to_field s |]
 
 let%test_unit "iterativeness" =
   let x1 = Field.random () in
   let x2 = Field.random () in
   let x3 = Field.random () in
   let x4 = Field.random () in
-  let s_full = update ~state:initial_state [|x1; x2; x3; x4|] in
+  let s_full = update ~state:initial_state [| x1; x2; x3; x4 |] in
   let s_it =
-    update ~state:(update ~state:initial_state [|x1; x2|]) [|x3; x4|]
+    update ~state:(update ~state:initial_state [| x1; x2 |]) [| x3; x4 |]
   in
   [%test_eq: Field.t array] s_full s_it
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 let%test_unit "sponge checked-unchecked" =
   let open Pickles.Impls.Step in
@@ -153,8 +148,8 @@ let%test_unit "sponge checked-unchecked" =
   T.Test.test_equal ~equal:T.Field.equal ~sexp_of_t:T.Field.sexp_of_t
     T.Typ.(field * field)
     T.Typ.field
-    (fun (x, y) -> make_checked (fun () -> Checked.hash [|x; y|]))
-    (fun (x, y) -> hash [|x; y|])
+    (fun (x, y) -> make_checked (fun () -> Checked.hash [| x; y |]))
+    (fun (x, y) -> hash [| x; y |])
     (x, y)
 
 [%%endif]

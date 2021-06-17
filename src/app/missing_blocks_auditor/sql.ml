@@ -11,6 +11,5 @@ module Unparented_blocks = struct
            WHERE parent_id IS NULL
       |}
 
-  let run (module Conn : Caqti_async.CONNECTION) () =
-    Conn.collect_list query ()
+  let run (module Conn : Caqti_async.CONNECTION) () = Conn.collect_list query ()
 end

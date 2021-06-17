@@ -13,7 +13,7 @@ let m =
        [proof_level <> Full], so this should make no difference. Inline tests
        shouldn't be run with [proof_level = Full].
     *)
-    (module Dummy : Verifier_intf.S with type ledger_proof = Ledger_proof.t )
+    (module Dummy : Verifier_intf.S with type ledger_proof = Ledger_proof.t)
   else (module Prod)
 
 include (val m)

@@ -7,9 +7,9 @@ type location = Location.t [@@deriving sexp]
 type 'a t = 'a Checked_data.t
 
 module Controller = struct
-  type nonrec 'a t = {logger: Logger.t; tc: 'a Binable.m}
+  type nonrec 'a t = { logger : Logger.t; tc : 'a Binable.m }
 
-  let create ~logger tc = {logger; tc}
+  let create ~logger tc = { logger; tc }
 end
 
 let load_with_checksum (type a) (c : a Controller.t) location =
@@ -25,7 +25,7 @@ let load_with_checksum (type a) (c : a Controller.t) location =
           if Checked_data.valid t then
             Ok
               Checked_data.
-                {checksum= t.checksum; data= Binable.of_string c.tc t.data}
+                { checksum = t.checksum; data = Binable.of_string c.tc t.data }
           else Error `Checksum_no_match
       | Error e ->
           Error (`IO_error e) )

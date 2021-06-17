@@ -2,13 +2,11 @@
     for comparison against signatures generated in client SDK
  *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -36,7 +34,7 @@ let keypair =
       "EKFKgDtU3rcuFTVSEpmpXSkukjmX4cKefYREi6Sdsk7E7wsT7KRw"
   in
   let public_key = Public_key.decompress_exn signer_pk in
-  Keypair.{public_key; private_key}
+  Keypair.{ public_key; private_key }
 
 (* payment receiver *)
 let receiver =
@@ -55,7 +53,7 @@ let make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo =
   let valid_until = Mina_numbers.Global_slot.of_int valid_until in
   let memo = Signed_command_memo.create_from_string_exn memo in
   Signed_command_payload.Common.Poly.
-    {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
+    { fee; fee_token; fee_payer_pk; nonce; valid_until; memo }
 
 let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
     ~valid_until memo =
@@ -64,9 +62,9 @@ let make_payment ~amount ~fee ~fee_payer_pk ~source_pk ~receiver_pk ~nonce
   let token_id = Token_id.default in
   let body =
     Signed_command_payload.Body.Payment
-      {source_pk; receiver_pk; token_id; amount}
+      { source_pk; receiver_pk; token_id; amount }
   in
-  Signed_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{ common; body }
 
 let payments =
   let receiver_pk = receiver in
@@ -77,16 +75,17 @@ let payments =
   ; make_payment ~receiver_pk ~source_pk ~fee_payer_pk ~amount:2048 ~fee:15
       ~nonce:212 ~valid_until:305 "this is not a pipe"
   ; make_payment ~receiver_pk ~source_pk ~fee_payer_pk ~amount:109 ~fee:2001
-      ~nonce:3050 ~valid_until:9000 "blessed be the geek" ]
+      ~nonce:3050 ~valid_until:9000 "blessed be the geek"
+  ]
 
 let make_stake_delegation ~delegator ~new_delegate ~fee ~fee_payer_pk ~nonce
     ~valid_until memo =
   let common = make_common ~fee ~fee_payer_pk ~nonce ~valid_until memo in
   let body =
     Signed_command_payload.Body.Stake_delegation
-      (Stake_delegation.Set_delegate {delegator; new_delegate})
+      (Stake_delegation.Set_delegate { delegator; new_delegate })
   in
-  Signed_command_payload.Poly.{common; body}
+  Signed_command_payload.Poly.{ common; body }
 
 let delegations =
   let delegator = signer_pk in
@@ -96,11 +95,12 @@ let delegations =
   ; make_stake_delegation ~fee_payer_pk ~delegator ~new_delegate ~fee:10
       ~nonce:1000 ~valid_until:8192 "enough stake to kill a vampire"
   ; make_stake_delegation ~fee_payer_pk ~delegator ~new_delegate ~fee:8
-      ~nonce:1010 ~valid_until:100000 "another memo" ]
+      ~nonce:1010 ~valid_until:100000 "another memo"
+  ]
 
 let transactions = payments @ delegations
 
-type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
+type jsSignature = { privateKey : Field.t; publicKey : Inner_curve.Scalar.t }
 
 let get_signature payload =
   (Signed_command.sign keypair payload :> Signed_command.With_valid_signature.t)
@@ -120,13 +120,13 @@ let main () =
         eprintf
           !"Signature (%d) failed to verify: %{sexp: Signed_command.t}\n%!"
           i signature ;
-        exit 1 ) ) ;
+        exit 1 )) ;
   printf "[\n" ;
   List.iter signatures ~f:(fun signature ->
-      let Signed_command.Poly.{signature= field, scalar; _} =
+      let Signed_command.Poly.{ signature = field, scalar; _ } =
         (signature :> Signed_command.t)
       in
-      print_signature field scalar ) ;
+      print_signature field scalar) ;
   printf "]\n"
 
 let _ = main ()

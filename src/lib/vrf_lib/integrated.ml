@@ -1,8 +1,8 @@
 module Make
     (Impl : Snarky_backendless.Snark_intf.S) (Scalar : sig
-        type value
+      type value
 
-        type var
+      type var
     end) (Group : sig
       open Impl
 
@@ -16,9 +16,9 @@ module Make
         module Shifted : sig
           module type S =
             Snarky_curves.Shifted_intf
-            with type ('a, 'b) checked := ('a, 'b) Checked.t
-             and type boolean_var := Boolean.var
-             and type curve_var := var
+              with type ('a, 'b) checked := ('a, 'b) Checked.t
+               and type boolean_var := Boolean.var
+               and type curve_var := var
 
           type 'a m = (module S with type t = 'a)
         end
@@ -95,8 +95,8 @@ end = struct
   module Checked = struct
     open Let_syntax
 
-    let eval (type shifted)
-        ((module Shifted) : shifted Group.Checked.Shifted.m) ~private_key m =
+    let eval (type shifted) ((module Shifted) : shifted Group.Checked.Shifted.m)
+        ~private_key m =
       let%bind h = Message.Checked.hash_to_group m in
       let%bind u =
         (* This use of unshift_nonzero is acceptable since if h^private_key = 0 then
