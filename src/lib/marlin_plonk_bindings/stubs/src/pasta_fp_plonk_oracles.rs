@@ -1,4 +1,4 @@
-use algebra::pasta::{
+use mina_curves::pasta::{
     vesta::{Affine as GAffine, VestaParameters},
     fp::Fp,
 };
