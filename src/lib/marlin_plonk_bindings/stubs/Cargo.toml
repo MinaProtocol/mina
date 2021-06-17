@@ -14,7 +14,7 @@ crate-type = ["staticlib"]
 ################################# Dependencies ################################
 
 [dependencies]
-groupmap = { path = "../../marlin/zexe/groupmap" }
+groupmap = { path = "../../marlin/groupmap" }
 libc = { version = "0.2.0" }
 algebra = { path = "../../marlin/zexe/algebra", features = [ "asm", "parallel", "pasta", "ocaml_types" ] }
 ff-fft = { path = "../../marlin/zexe/ff-fft", features = [ "parallel" ] }
