@@ -94,6 +94,10 @@ def check_google_storage_bucket(v1, namespace, recent_google_bucket_blocks):
 
   newest_age = min([ age for age in blob_ages ])
 
+  end = time.time()
+
+  print("Checking google storage bucket took {} seconds".format(end-now))
+
   recent_google_bucket_blocks.set(newest_age)
 
 # ========================================================================
@@ -125,6 +129,7 @@ def get_chain_id(v1, namespace):
 
 def check_seed_list_up(v1, namespace, seeds_reachable):
   print('checking seed list up')
+  start = time.time()
 
   seed_peers_list_url = os.environ.get('SEED_PEERS_URL')
 
@@ -150,6 +155,8 @@ def check_seed_list_up(v1, namespace, seeds_reachable):
     res = json.loads(val)
     #checklibp2p returns whether or not the connection to a peerID errored
     fraction_up = sum(res.values())/len(res.values())
+    end = time.time()
+    print("checking seed connection took {} seconds".format(end-start))
     seeds_reachable.set(fraction_up)
 
 # ========================================================================

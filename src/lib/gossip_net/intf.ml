@@ -4,10 +4,10 @@ open Network_peer
 open Pipe_lib
 open Mina_base.Rpc_intf
 
-type ban_creator = {banned_peer: Peer.t; banned_until: Time.t}
+type ban_creator = { banned_peer : Peer.t; banned_until : Time.t }
 [@@deriving fields]
 
-type ban_notification = {banned_peer: Peer.t; banned_until: Time.t}
+type ban_notification = { banned_peer : Peer.t; banned_until : Time.t }
 
 module type Gossip_net_intf = sig
   type t
