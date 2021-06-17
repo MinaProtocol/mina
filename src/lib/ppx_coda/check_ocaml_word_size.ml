@@ -23,4 +23,4 @@ let ext =
     expand
 
 let () =
-  Driver.register_transformation name ~rules:[Context_free.Rule.extension ext]
+  Driver.register_transformation name ~rules:[ Context_free.Rule.extension ext ]

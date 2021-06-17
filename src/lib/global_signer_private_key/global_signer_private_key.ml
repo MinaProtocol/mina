@@ -3,4 +3,4 @@
 
 let t = Snark_params.Tock.Field.one
 
-let mode : [`Dev | `Prod] = `Prod
+let mode : [ `Dev | `Prod ] = `Prod

@@ -18,18 +18,19 @@ type event_kind =
   | Trace_end
 
 type event =
-  { name: string
-  ; categories: string list
-  ; phase: event_kind
-  ; timestamp: int
-  ; pid: int
-  ; tid: int }
+  { name : string
+  ; categories : string list
+  ; phase : event_kind
+  ; timestamp : int
+  ; pid : int
+  ; tid : int
+  }
 
 type events = event list
 
-let create_event ?(categories = []) ?(pid = 0) ?(tid = 0) ~phase ~timestamp
-    name =
-  {name; categories; phase; timestamp; pid; tid}
+let create_event ?(categories = []) ?(pid = 0) ?(tid = 0) ~phase ~timestamp name
+    =
+  { name; categories; phase; timestamp; pid; tid }
 
 module Output = struct
   module Binary = struct
@@ -73,8 +74,7 @@ module Output = struct
     let emits ~buf (s : string) (pos : int) =
       let sl = String.length s in
       let pos = emiti ~buf sl pos in
-      Bigstring.From_string.blit ~src:s ~src_pos:0 ~len:sl ~dst:buf
-        ~dst_pos:pos ;
+      Bigstring.From_string.blit ~src:s ~src_pos:0 ~len:sl ~dst:buf ~dst_pos:pos ;
       pos + sl
 
     let finish wr ~buf final_len =
@@ -91,8 +91,7 @@ module Output = struct
       | Cycle_start ->
           ()
       | Cycle_end ->
-          emitk ~buf Cycle_end 0 |> emiti ~buf event.timestamp
-          |> finish ~buf wr
+          emitk ~buf Cycle_end 0 |> emiti ~buf event.timestamp |> finish ~buf wr
       | Pid_is ->
           emitk ~buf Pid_is 0 |> emiti ~buf event.pid |> finish ~buf wr
       | Event ->
@@ -105,8 +104,7 @@ module Output = struct
           emitk ~buf Measure_end 0 |> emiti ~buf event.timestamp
           |> finish ~buf wr
       | Trace_end ->
-          emitk ~buf Trace_end 0 |> emiti ~buf event.timestamp
-          |> finish ~buf wr
+          emitk ~buf Trace_end 0 |> emiti ~buf event.timestamp |> finish ~buf wr
   end
 
   module JSON = struct
@@ -133,7 +131,7 @@ module Output = struct
       | Trace_end ->
           `String "e"
 
-    let json_of_event {name; categories; phase; timestamp; pid; tid} =
+    let json_of_event { name; categories; phase; timestamp; pid; tid } =
       let categories = String.concat ~sep:"," categories in
       match phase with
       | New_thread | Pid_is ->
@@ -143,7 +141,8 @@ module Output = struct
             ; ("ph", phase_of_kind phase)
             ; ("pid", `Int pid)
             ; ("tid", `Int tid)
-            ; ("args", `Assoc [("name", `String name)]) ]
+            ; ("args", `Assoc [ ("name", `String name) ])
+            ]
       | Thread_switch ->
           `Assoc
             [ ("name", `String name)
@@ -152,7 +151,8 @@ module Output = struct
             ; ("dur", `Int 0) (* Placeholder value *)
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
-            ; ("tid", `Int tid) ]
+            ; ("tid", `Int tid)
+            ]
       | Cycle_start | Cycle_end | Trace_end ->
           `Assoc
             [ ("name", `String name)
@@ -161,7 +161,8 @@ module Output = struct
             ; ("id", `Int 0) (* Placeholder value *)
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
-            ; ("tid", `Int tid) ]
+            ; ("tid", `Int tid)
+            ]
       | Event | Measure_start | Measure_end ->
           `Assoc
             [ ("name", `String name)
@@ -169,7 +170,8 @@ module Output = struct
             ; ("ph", phase_of_kind phase)
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
-            ; ("tid", `Int tid) ]
+            ; ("tid", `Int tid)
+            ]
 
     let json_of_events (events : events) =
       `List (List.map ~f:json_of_event events)

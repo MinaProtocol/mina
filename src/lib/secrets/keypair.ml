@@ -12,7 +12,7 @@ module T = struct
   let which = "coda keypair"
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
-  let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
+  let write_exn { Keypair.private_key; public_key } ~(privkey_path : string)
       ~(password : Secret_file.password) : unit Deferred.t =
     let privkey_bytes =
       Private_key.to_bigstring private_key |> Bigstring.to_bytes
@@ -26,9 +26,9 @@ module T = struct
     with
     | Ok () ->
         (* The hope is that if [Secret_file.write] succeeded then this ought to
-       as well, letting [handle_open] stay inside [Secret_file]. It might not
-       if the environment changes underneath us, and we won't have nice errors
-       in that case. *)
+           as well, letting [handle_open] stay inside [Secret_file]. It might not
+           if the environment changes underneath us, and we won't have nice errors
+           in that case. *)
         let%bind pubkey_f = Writer.open_file (privkey_path ^ ".pub") in
         Writer.write_line pubkey_f pubkey_string ;
         Writer.close pubkey_f
@@ -70,8 +70,7 @@ module T = struct
 
   let read_exn' path =
     read_exn ~privkey_path:path
-      ~password:
-        (lazy (Password.hidden_line_or_env "Secret key password: " ~env))
+      ~password:(lazy (Password.hidden_line_or_env "Secret key password: " ~env))
 end
 
 include T
