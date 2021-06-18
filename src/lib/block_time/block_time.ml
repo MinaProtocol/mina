@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Snark_params
@@ -32,8 +31,7 @@ module Time = struct
   let zero = UInt64.zero
 
   module Controller = struct
-    [%%if
-    time_offsets]
+    [%%if time_offsets]
 
     type t = unit -> Time.Span.t [@@deriving sexp]
 
@@ -194,8 +192,7 @@ module Time = struct
     Time.of_span_since_epoch
       (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
 
-  [%%if
-  time_offsets]
+  [%%if time_offsets]
 
   let now offset = of_time (Time.sub (Time.now ()) (offset ()))
 
@@ -236,8 +233,7 @@ module Time = struct
 
   let to_string = Fn.compose Int64.to_string to_int64
 
-  [%%if
-  time_offsets]
+  [%%if time_offsets]
 
   let to_string_system_time (offset : Controller.t) (t : t) : string =
     let t2 : t =

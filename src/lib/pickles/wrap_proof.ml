@@ -3,9 +3,7 @@ open Import
 open Backend
 
 type dlog_opening =
-  ( Tock.Curve.Affine.t
-  , Tock.Field.t )
-  Types.Pairing_based.Openings.Bulletproof.t
+  (Tock.Curve.Affine.t, Tock.Field.t) Types.Pairing_based.Openings.Bulletproof.t
 
 type t =
   dlog_opening
@@ -35,11 +33,9 @@ let typ : (var, t) Typ.t =
              (* When storing, make it a shifted value *)
              match Shifted_value.of_field (module Tock.Field) ~shift x with
              | Shifted_value x ->
-                 x )
+                 x)
            ~back:(fun x ->
-             Shifted_value.to_field
-               (module Tock.Field)
-               ~shift (Shifted_value x) )
+             Shifted_value.to_field (module Tock.Field) ~shift (Shifted_value x))
        (* When reading, unshift *)
        |> Typ.transport_var
           (* For the var, we just wrap the now shifted underlying value. *)
@@ -50,7 +46,7 @@ let typ : (var, t) Typ.t =
        ~dummy:Inner_curve.Params.one
        ~commitment_lengths:
          (Dlog_plonk_types.Evals.map
-            ~f:(fun x -> Vector.[x])
+            ~f:(fun x -> Vector.[ x ])
             (Commitment_lengths.of_domains ~max_degree:Common.Max_degree.wrap
                Common.wrap_domains))
        Inner_curve.typ)

@@ -47,15 +47,16 @@ module Fee : sig
   module Checked : sig
     include
       Checked_arithmetic_intf
-      with type var := var
-       and type signed_var := Signed.var
-       and type value := t
+        with type var := var
+         and type signed_var := Signed.var
+         and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
 
   [%%endif]
-end [@@warning "-32"]
+end
+[@@warning "-32"]
 
 module Amount : sig
   [%%versioned:
@@ -98,9 +99,9 @@ module Amount : sig
   module Checked : sig
     include
       Checked_arithmetic_intf
-      with type var := var
-       and type signed_var := Signed.var
-       and type value := t
+        with type var := var
+         and type signed_var := Signed.var
+         and type value := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
@@ -112,7 +113,8 @@ module Amount : sig
   end
 
   [%%endif]
-end [@@warning "-32"]
+end
+[@@warning "-32"]
 
 module Balance : sig
   [%%versioned:
@@ -149,15 +151,15 @@ module Balance : sig
     val sub_amount : var -> Amount.var -> (var, _) Checked.t
 
     val sub_amount_flagged :
-      var -> Amount.var -> (var * [`Underflow of Boolean.var], _) Checked.t
+      var -> Amount.var -> (var * [ `Underflow of Boolean.var ], _) Checked.t
 
     val add_amount_flagged :
-      var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
+      var -> Amount.var -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
     val add_signed_amount_flagged :
          var
       -> Amount.Signed.var
-      -> (var * [`Overflow of Boolean.var], _) Checked.t
+      -> (var * [ `Overflow of Boolean.var ], _) Checked.t
 
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
@@ -179,4 +181,5 @@ module Balance : sig
   end
 
   [%%endif]
-end [@@warning "-32"]
+end
+[@@warning "-32"]

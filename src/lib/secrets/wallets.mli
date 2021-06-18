@@ -31,7 +31,7 @@ val find_unlocked : t -> needle:Public_key.Compressed.t -> Keypair.t option
 val find_identity :
      t
   -> needle:Public_key.Compressed.t
-  -> [`Keypair of Keypair.t | `Hd_index of Mina_numbers.Hd_index.t] option
+  -> [ `Keypair of Keypair.t | `Hd_index of Mina_numbers.Hd_index.t ] option
 
 val check_locked : t -> needle:Public_key.Compressed.t -> bool option
 
@@ -39,11 +39,11 @@ val unlock :
      t
   -> needle:Public_key.Compressed.t
   -> password:Secret_file.password
-  -> (unit, [`Not_found | `Bad_password]) Deferred.Result.t
+  -> (unit, [ `Not_found | `Bad_password ]) Deferred.Result.t
 
 val lock : t -> needle:Public_key.Compressed.t -> unit
 
 val get_path : t -> Public_key.Compressed.t -> string
 
 val delete :
-  t -> Public_key.Compressed.t -> (unit, [`Not_found]) Deferred.Result.t
+  t -> Public_key.Compressed.t -> (unit, [ `Not_found ]) Deferred.Result.t

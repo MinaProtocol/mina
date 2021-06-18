@@ -10,8 +10,7 @@ module Stable : sig
 
     val to_latest : ('a -> 'b) -> 'a t -> 'b t
 
-    val of_latest :
-      ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
+    val of_latest : ('a -> ('b, 'err) Result.t) -> 'a t -> ('b t, 'err) Result.t
   end
 
   module Latest = V1

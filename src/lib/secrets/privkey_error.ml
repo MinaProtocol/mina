@@ -26,5 +26,4 @@ let raise ~which t =
   let where = sprintf "loading %s" which in
   Mina_user_error.raise ~where (to_string t)
 
-let corrupted_privkey error : (_, t) Result.t =
-  Error (`Corrupted_privkey error)
+let corrupted_privkey error : (_, t) Result.t = Error (`Corrupted_privkey error)

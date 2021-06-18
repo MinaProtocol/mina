@@ -30,12 +30,12 @@ module Checked = struct
           in
           Tick.Run.Boolean.Assert.is_true
             (Integer.equal ~m r (Integer.constant ~m Bignum_bigint.zero)) ;
-          q )
+          q)
     in
     let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
     let%bind ck_times_2 = integer_mul third_epoch two in
     make_checked (fun () ->
-        Integer.lt ~m (T.Checked.to_integer slot) ck_times_2 )
+        Integer.lt ~m (T.Checked.to_integer slot) ck_times_2)
 end
 
 let gen (constants : Constants.t) =
@@ -58,6 +58,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
     UInt32.div constants.slots_per_epoch (UInt32.of_int 3) |> UInt32.to_int
   in
   let examples =
-    List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
+    List.map ~f:UInt32.of_int
+      [ x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1 ]
   in
   Quickcheck.test ~trials:100 ~examples (gen constants) ~f:test

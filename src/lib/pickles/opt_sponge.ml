@@ -13,14 +13,16 @@ let rate = m - capacity
 
 type 'f sponge_state =
   | Absorbing of
-      { next_index: 'f Snarky_backendless.Boolean.t
-      ; xs: ('f Snarky_backendless.Boolean.t * 'f) list }
+      { next_index : 'f Snarky_backendless.Boolean.t
+      ; xs : ('f Snarky_backendless.Boolean.t * 'f) list
+      }
   | Squeezed of int
 
 type 'f t =
-  { mutable state: 'f array
-  ; params: 'f Sponge.Params.t
-  ; mutable sponge_state: 'f sponge_state }
+  { mutable state : 'f array
+  ; params : 'f Sponge.Params.t
+  ; mutable sponge_state : 'f sponge_state
+  }
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run with type prover_state = unit)
@@ -31,14 +33,14 @@ struct
 
   type nonrec t = Field.t t
 
-  let state {state; _} = Array.copy state
+  let state { state; _ } = Array.copy state
 
-  let copy {state; params; sponge_state} =
-    {state= Array.copy state; params; sponge_state}
+  let copy { state; params; sponge_state } =
+    { state = Array.copy state; params; sponge_state }
 
   let initial_state = Array.init m ~f:(fun _ -> Field.zero)
 
-  let of_sponge {Sponge.state; params; sponge_state} =
+  let of_sponge { Sponge.state; params; sponge_state } =
     let sponge_state =
       match sponge_state with
       | Squeezed n ->
@@ -53,14 +55,15 @@ struct
             | _ ->
                 assert false
           in
-          Absorbing {next_index; xs= []}
+          Absorbing { next_index; xs = [] }
     in
-    {sponge_state; state= Array.copy state; params}
+    { sponge_state; state = Array.copy state; params }
 
   let create ?(init = initial_state) params =
     { params
-    ; state= Array.copy init
-    ; sponge_state= Absorbing {next_index= Boolean.false_; xs= []} }
+    ; state = Array.copy init
+    ; sponge_state = Absorbing { next_index = Boolean.false_; xs = [] }
+    }
 
   let () = assert (rate = 2)
 
@@ -70,7 +73,7 @@ struct
     (*
       a.(0) <- a.(0) + i_equals_0 * x
       a.(1) <- a.(1) + i_equals_1 * x *)
-    List.iteri [i_equals_0; i_equals_1] ~f:(fun j i_equals_j ->
+    List.iteri [ i_equals_0; i_equals_1 ] ~f:(fun j i_equals_j ->
         let a_j' =
           exists Field.typ
             ~compute:
@@ -82,7 +85,7 @@ struct
                   else a_j)
         in
         assert_r1cs x (i_equals_j :> Field.t) Field.(a_j' - a.(j)) ;
-        a.(j) <- a_j' )
+        a.(j) <- a_j')
 
   let consume ~params ~start_pos input state =
     assert (Array.length state = m) ;
@@ -122,41 +125,41 @@ struct
       let y = Field.(y * (b' :> t)) in
       let add_in_y_after_perm =
         (* post
-          add in
-          (1, 1, 1)
+           add in
+           (1, 1, 1)
 
-          do not add in
-          (1, 1, 0)
-          (0, 1, 0)
-          (0, 1, 1)
+           do not add in
+           (1, 1, 0)
+           (0, 1, 0)
+           (0, 1, 1)
 
-          (1, 0, 0)
-          (1, 0, 1)
-          (0, 0, 0)
-          (0, 0, 1)
+           (1, 0, 0)
+           (1, 0, 1)
+           (0, 0, 0)
+           (0, 0, 1)
         *)
         (* Only one case where we add in y after the permutation is applied *)
-        Boolean.all [b; b'; p]
+        Boolean.all [ b; b'; p ]
       in
       let add_in_y_before_perm = Boolean.not add_in_y_after_perm in
       add_in state p Field.(x * (b :> t)) ;
       add_in state p' Field.(y * (add_in_y_before_perm :> t)) ;
       let permute =
         (* (b, b', p)
-           true:
-           (0, 1, 1)
-           (1, 0, 1)
-           (1, 1, 0)
-           (1, 1, 1)
+            true:
+            (0, 1, 1)
+            (1, 0, 1)
+            (1, 1, 0)
+            (1, 1, 1)
 
-          false:
-           (0, 0, 0)
-           (0, 0, 1)
-           (0, 1, 0)
-           (1, 0, 0)
+           false:
+            (0, 0, 0)
+            (0, 0, 1)
+            (0, 1, 0)
+            (1, 0, 0)
         *)
         (* (b && b') || (p && (b || b')) *)
-        Boolean.(any [all [b; b']; all [p; b ||| b']])
+        Boolean.(any [ all [ b; b' ]; all [ p; b ||| b' ] ])
       in
       cond_permute permute ;
       add_in state p' Field.(y * (add_in_y_after_perm :> t))
@@ -173,7 +176,7 @@ struct
           let p = !pos in
           pos := Boolean.( lxor ) p b ;
           add_in state p Field.(x * (b :> t)) ;
-          Boolean.any [p; b; empty_imput]
+          Boolean.any [ p; b; empty_imput ]
       | _ ->
           assert false
     in
@@ -181,10 +184,10 @@ struct
 
   let absorb (t : t) x =
     match t.sponge_state with
-    | Absorbing {next_index; xs} ->
-        t.sponge_state <- Absorbing {next_index; xs= x :: xs}
+    | Absorbing { next_index; xs } ->
+        t.sponge_state <- Absorbing { next_index; xs = x :: xs }
     | Squeezed _ ->
-        t.sponge_state <- Absorbing {next_index= Boolean.false_; xs= [x]}
+        t.sponge_state <- Absorbing { next_index = Boolean.false_; xs = [ x ] }
 
   let squeeze (t : t) =
     match t.sponge_state with
@@ -196,7 +199,7 @@ struct
         else (
           t.sponge_state <- Squeezed (n + 1) ;
           t.state.(n) )
-    | Absorbing {next_index; xs} ->
+    | Absorbing { next_index; xs } ->
         consume ~start_pos:next_index ~params:t.params (Array.of_list_rev xs)
           t.state ;
         t.sponge_state <- Squeezed 1 ;
@@ -222,8 +225,9 @@ struct
               let a () =
                 Array.init 3 ~f:(fun _ -> Field.(constant (Constant.random ())))
               in
-              { mds= Array.init 3 ~f:(fun _ -> a ())
-              ; round_constants= Array.init 40 ~f:(fun _ -> a ()) }
+              { mds = Array.init 3 ~f:(fun _ -> a ())
+              ; round_constants = Array.init 40 ~f:(fun _ -> a ())
+              }
             in
             let filtered_res =
               let n = List.length filtered in
@@ -234,7 +238,7 @@ struct
                   make_checked (fun () ->
                       let s = S.create params in
                       List.iter xs ~f:(S.absorb s) ;
-                      S.squeeze s ) )
+                      S.squeeze s))
                 filtered
             in
             let opt_res =
@@ -246,15 +250,14 @@ struct
                   make_checked (fun () ->
                       let s = create params in
                       List.iter xs ~f:(absorb s) ;
-                      squeeze s ) )
+                      squeeze s))
                 ps
             in
             if not (Field.Constant.equal filtered_res opt_res) then
               failwithf
-                !"hash(%{sexp:Field.Constant.t list}) = \
-                  %{sexp:Field.Constant.t}\n\
+                !"hash(%{sexp:Field.Constant.t list}) = %{sexp:Field.Constant.t}\n\
                   hash(%{sexp:(bool * Field.Constant.t) list}) = \
                   %{sexp:Field.Constant.t}"
-                filtered filtered_res ps opt_res () )
+                filtered filtered_res ps opt_res ())
     end )
 end

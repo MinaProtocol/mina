@@ -61,9 +61,9 @@ module Time : sig
 
   include
     Tick.Snarkable.Bits.Faithful
-    with type Unpacked.value = t
-     and type Packed.value = t
-     and type Packed.var = private Tick.Field.Var.t
+      with type Unpacked.value = t
+       and type Packed.value = t
+       and type Packed.var = private Tick.Field.Var.t
 
   module Checked : sig
     open Snark_params.Tick
@@ -99,8 +99,8 @@ module Time : sig
 
     include
       Tick.Snarkable.Bits.Faithful
-      with type Unpacked.value = t
-       and type Packed.value = t
+        with type Unpacked.value = t
+         and type Packed.value = t
 
     val to_time_ns_span : t -> Core.Time_ns.Span.t
 
@@ -175,29 +175,28 @@ end
 
 include module type of Time with type t = Time.t
 
-module Timeout :
-  sig
-    type 'a t
+module Timeout : sig
+  type 'a t
 
-    type time
+  type time
 
-    val create : Controller.t -> Span.t -> f:(time -> 'a) -> 'a t
+  val create : Controller.t -> Span.t -> f:(time -> 'a) -> 'a t
 
-    val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
+  val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 
-    val peek : 'a t -> 'a option
+  val peek : 'a t -> 'a option
 
-    val cancel : Controller.t -> 'a t -> 'a -> unit
+  val cancel : Controller.t -> 'a t -> 'a -> unit
 
-    val remaining_time : 'a t -> Span.t
+  val remaining_time : 'a t -> Span.t
 
-    val await :
-         timeout_duration:Span.t
-      -> Controller.t
-      -> 'a Deferred.t
-      -> [`Ok of 'a | `Timeout] Deferred.t
+  val await :
+       timeout_duration:Span.t
+    -> Controller.t
+    -> 'a Deferred.t
+    -> [ `Ok of 'a | `Timeout ] Deferred.t
 
-    val await_exn :
-      timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
-  end
-  with type time := t
+  val await_exn :
+    timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
+end
+with type time := t

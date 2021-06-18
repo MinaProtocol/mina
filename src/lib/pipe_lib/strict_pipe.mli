@@ -27,7 +27,7 @@ type _ buffered = Type_buffered
 type (_, _, _) type_ =
   | Synchronous : ('a, synchronous, unit Deferred.t) type_
   | Buffered :
-      [`Capacity of int] * [`Overflow of ('a, 'b, 'r) overflow_behavior]
+      [ `Capacity of int ] * [ `Overflow of ('a, 'b, 'r) overflow_behavior ]
       -> ('a, 'b buffered, 'r) type_
 
 module Reader : sig
@@ -36,9 +36,9 @@ module Reader : sig
   (* Using [`Eof | `Ok of 't] to mirror interface of Jane Street's Pipe read *)
 
   (** Read a single value from the pipe or fail if the pipe is closed *)
-  val read : 't t -> [`Eof | `Ok of 't] Deferred.t
+  val read : 't t -> [ `Eof | `Ok of 't ] Deferred.t
 
-  val read' : 't t -> [`Eof | `Ok of 't Base.Queue.t] Deferred.t
+  val read' : 't t -> [ `Eof | `Ok of 't Base.Queue.t ] Deferred.t
 
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
@@ -58,8 +58,8 @@ module Reader : sig
   val fold_until :
        'a t
     -> init:'b
-    -> f:('b -> 'a -> [`Continue of 'b | `Stop of 'c] Deferred.t)
-    -> [`Eof of 'b | `Terminated of 'c] Deferred.t
+    -> f:('b -> 'a -> [ `Continue of 'b | `Stop of 'c ] Deferred.t)
+    -> [ `Eof of 'b | `Terminated of 'c ] Deferred.t
 
   (** This has similar semantics to [fold reader ~init ~f], but f isn't
    * deferred. This function delegates to [Pipe.fold_without_pushback] *)
@@ -108,7 +108,7 @@ module Reader : sig
    * there will be a deadlock. *)
   val partition_map3 :
        'a t
-    -> f:('a -> [`Fst of 'b | `Snd of 'c | `Trd of 'd])
+    -> f:('a -> [ `Fst of 'b | `Snd of 'c | `Trd of 'd ])
     -> 'b t * 'c t * 'd t
 end
 

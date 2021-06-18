@@ -54,7 +54,7 @@ open Network_peer
 type net
 
 module Validation_callback : sig
-  type validation_result = [`Accept | `Reject | `Ignore] [@@deriving equal]
+  type validation_result = [ `Accept | `Reject | `Ignore ] [@@deriving equal]
 
   type t
 
@@ -130,7 +130,7 @@ module Multiaddr : sig
   val of_file_contents : contents:string -> t list
 end
 
-type discovered_peer = {id: Peer.Id.t; maddrs: Multiaddr.t list}
+type discovered_peer = { id : Peer.Id.t; maddrs : Multiaddr.t list }
 
 module Pubsub : sig
   (** A subscription to a pubsub topic. *)
@@ -176,9 +176,10 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(   string Envelope.Incoming.t
-                               -> Validation_callback.t
-                               -> unit Deferred.t)
+    -> should_forward_message:
+         (   string Envelope.Incoming.t
+          -> Validation_callback.t
+          -> unit Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -195,13 +196,11 @@ module Pubsub : sig
   val subscribe_encode :
        net
     -> string
-    -> should_forward_message:(   'a Envelope.Incoming.t
-                               -> Validation_callback.t
-                               -> unit Deferred.t)
+    -> should_forward_message:
+         ('a Envelope.Incoming.t -> Validation_callback.t -> unit Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
-    -> on_decode_failure:[ `Ignore
-                         | `Call of
-                           string Envelope.Incoming.t -> Error.t -> unit ]
+    -> on_decode_failure:
+         [ `Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit ]
     -> 'a Subscription.t Deferred.Or_error.t
 end
 
@@ -223,7 +222,7 @@ val create :
     or peer IDs in [banned_peers], except for those listed in [trusted_peers]. If
     [isolate] is true, only connections to [trusted_peers] are allowed. *)
 type connection_gating =
-  {banned_peers: Peer.t list; trusted_peers: Peer.t list; isolate: bool}
+  { banned_peers : Peer.t list; trusted_peers : Peer.t list; isolate : bool }
 
 (** Configure the network connection.
   *
@@ -351,7 +350,7 @@ val open_stream :
 *)
 val handle_protocol :
      net
-  -> on_handler_error:[`Raise | `Ignore | `Call of Stream.t -> exn -> unit]
+  -> on_handler_error:[ `Raise | `Ignore | `Call of Stream.t -> exn -> unit ]
   -> protocol:string
   -> (Stream.t -> unit Deferred.t)
   -> Protocol_handler.t Deferred.Or_error.t

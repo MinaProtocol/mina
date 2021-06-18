@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifndef
-consensus_mechanism]
+[%%ifndef consensus_mechanism]
 
 open Import
 
@@ -28,8 +26,7 @@ let next = T.succ
 
 let invalid = T.of_uint64 Unsigned.UInt64.zero
 
-[%%if
-feature_tokens]
+[%%if feature_tokens]
 
 [%%versioned
 module Stable = struct
@@ -73,7 +70,7 @@ let gen_ge minimum =
   Quickcheck.Generator.map
     Int64.(gen_incl (min_value + minimum) max_value)
     ~f:(fun x ->
-      Int64.(x - min_value) |> Unsigned.UInt64.of_int64 |> T.of_uint64 )
+      Int64.(x - min_value) |> Unsigned.UInt64.of_int64 |> T.of_uint64)
 
 let gen = gen_ge 1L
 
@@ -86,8 +83,7 @@ let unpack = T.to_bits
 include Hashable.Make_binable (Stable.Latest)
 include Comparable.Make_binable (Stable.Latest)
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = T.Checked.t
 
@@ -134,6 +130,6 @@ let%test_unit "var_of_t preserves the underlying value" =
       [%test_eq: t] tid
         (Test_util.checked_to_unchecked Typ.unit typ
            (fun () -> Snark_params.Tick.Checked.return (var_of_t tid))
-           ()) )
+           ()))
 
 [%%endif]
