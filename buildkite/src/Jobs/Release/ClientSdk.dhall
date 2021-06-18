@@ -28,7 +28,7 @@ Pipeline.build
     steps = [
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker (["NPM_TOKEN"]) "./buildkite/scripts/client-sdk-tool.sh 'pack'"
+          commands = OpamInit.andThenRunInDocker (["NPM_TOKEN"]) "./buildkite/scripts/client-sdk-tool.sh 'prepublishOnly'"
           , label = "Publish client SDK to npm"
           , key = "publish-client-sdk"
           , target = Size.Medium
