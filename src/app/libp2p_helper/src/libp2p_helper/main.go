@@ -55,6 +55,7 @@ type streamState int
 const (
 	STREAM_DATA_UNEXPECTED streamState = iota
 	STREAM_DATA_EXPECTED
+	STREAM_QUERY_HANDLED
 )
 
 type messageBuffer [MESSAGE_BUFFER_SIZE]byte
@@ -450,8 +451,9 @@ func (m *listeningAddrsMsg) run(app *app) (interface{}, error) {
 }
 
 type publishMsg struct {
-	Topic string `json:"topic"`
-	Data  string `json:"data"`
+	Topic       string `json:"topic"`
+	MessageType byte   `json:"type`
+	Data        string `json:"data"`
 }
 
 func (t *publishMsg) run(app *app) (interface{}, error) {
@@ -466,6 +468,8 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badRPC(err)
 	}
+
+	data = append([]byte{t.MessageType}, data...)
 
 	var topic *pubsub.Topic
 	var has bool
@@ -556,10 +560,13 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			return pubsub.ValidationIgnore
 		}
 
+		msgType := msg.Data[0]
+		_ = msgType
+
 		app.writeMsg(validateUpcall{
 			Sender:     sender,
 			Expiration: deadline.UnixNano(),
-			Data:       codaEncode(msg.Data),
+			Data:       codaEncode(msg.Data[1:]),
 			Seqno:      seqno,
 			Upcall:     "validate",
 			Idx:        s.Subscription,
@@ -771,7 +778,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
-					Reason:    "invalid length prefix byte (cannot be 0)",
+					Reason:    "invalid length prefix (cannot be 0)",
 				})
 				return
 			}
@@ -792,6 +799,16 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			app.StreamsMutex.Unlock()
 
 			app.P2p.MsgStats.UpdateMetrics(length)
+
+			msgType, err := r.ReadByte()
+			if err != nil {
+				app.writeMsg(streamLostUpcall{
+					Upcall:    "streamLost",
+					StreamIdx: idx,
+					Reason:    "failed to read message type prefix",
+				})
+			}
+			_ = msgType // TODO: check and use message type
 
 			bytesToRead := length
 			for bytesToRead > 0 {
@@ -912,8 +929,9 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 }
 
 type sendStreamMsgMsg struct {
-	StreamIdx int    `json:"stream_idx"`
-	Data      string `json:"data"`
+	StreamIdx   int    `json:"stream_idx"`
+	MessageType byte   `json:"type"`
+	Data        string `json:"data"`
 }
 
 func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
@@ -924,6 +942,8 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badRPC(err)
 	}
+
+	data = append([]byte{cs.MessageType}, data...)
 
 	app.StreamsMutex.Lock()
 	defer app.StreamsMutex.Unlock()
