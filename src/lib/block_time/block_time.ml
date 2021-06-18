@@ -74,6 +74,7 @@ module Time = struct
       | None ->
           let offset =
             let env = "MINA_TIME_OFFSET" in
+            (* TODO: remove eventually *)
             let env_deprecated = "CODA_TIME_OFFSET" in
             let env_offset =
               match (Core.Sys.getenv env, Core.Sys.getenv env_deprecated) with
