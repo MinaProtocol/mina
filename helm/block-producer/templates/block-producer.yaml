@@ -132,9 +132,9 @@ spec:
             cpu: 0.1
         image: {{ $.Values.bots.image }}
         env:
-          - name: CODA_GRAPHQL_HOST
+          - name: MINA_GRAPHQL_HOST
             value: "0.0.0.0"
-          - name: CODA_GRAPHQL_PORT
+          - name: MINA_GRAPHQL_PORT
             value: {{ $.Values.bots.ports.graphql | quote }}
           - name: ECHO_PUBLICKEY
             valueFrom:

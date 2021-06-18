@@ -19,8 +19,8 @@
       }
     },
     "environment" : [
-        { "name" : "CODA_GRAPHQL_HOST", "value" : "${coda_graphql_host}" },
-        { "name" : "CODA_GRAPHQL_PORT", "value" : "${coda_graphql_port}" },
+        { "name" : "MINA_GRAPHQL_HOST", "value" : "${coda_graphql_host}" },
+        { "name" : "MINA_GRAPHQL_PORT", "value" : "${coda_graphql_port}" },
         { "name" : "EXTERNAL_PORT", "value" : "${proxy_external_port}" }
     ]
   },
