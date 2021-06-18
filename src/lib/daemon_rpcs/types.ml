@@ -269,7 +269,7 @@ module Status = struct
               (* TODO: We will temporarily have to create a time controller
                   until the inversion relationship between GraphQL and the RPC code inverts *)
               Block_time.now
-              @@ Block_time.Controller.basic ~logger:(Logger.create ())
+              @@ Block_time.Controller.basic ~logger:(Logger.null ())
             in
             let diff = diff time current_time in
             if Block_time.(time > current_time) then
