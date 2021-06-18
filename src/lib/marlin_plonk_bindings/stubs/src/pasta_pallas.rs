@@ -45,7 +45,7 @@ pub fn caml_pasta_pallas_scale(x: ocaml::Pointer<GProjective>, y: Fq) -> GProjec
 
 #[ocaml::func]
 pub fn caml_pasta_pallas_random() -> GProjective {
-    let rng = &mut rand_core::OsRng;
+    let rng = &mut rand::rngs::OsRng;
     UniformRand::rand(rng)
 }
 

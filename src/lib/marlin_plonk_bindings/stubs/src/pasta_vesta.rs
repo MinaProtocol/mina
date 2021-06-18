@@ -1,4 +1,4 @@
-use ark_ec::curves::{AffineCurve, ProjectiveCurve};
+use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{One, UniformRand};
 use mina_curves::pasta::{
     fp::Fp,
@@ -45,7 +45,7 @@ pub fn caml_pasta_vesta_scale(x: ocaml::Pointer<GProjective>, y: Fp) -> GProject
 
 #[ocaml::func]
 pub fn caml_pasta_vesta_random() -> GProjective {
-    let rng = &mut rand_core::OsRng;
+    let rng = &mut rand::rngs::OsRng;
     UniformRand::rand(rng)
 }
 

@@ -15,13 +15,13 @@ crate-type = ["staticlib"]
 
 [dependencies]
 ark-ff = { version = "0.3.0", features = ["parallel"] }
+ark-serialize = "0.3.0"
 ark-ec = { version = "0.3.0", features = ["parallel"] }
 ark-poly = { version = "0.3.0", features = ["parallel"] }
 libc = { version = "0.2.0" }
 rand = { version = "0.8.0" }
-num-bigint = { version = "0.2.3" }
+num-bigint = { version = "0.4.0" }
 sprs = { version = "0.7.1" }
-rand_core = { version = "0.5" }
 rayon = { version = "1" }
 ocaml = { version = "0.18.1" }
 

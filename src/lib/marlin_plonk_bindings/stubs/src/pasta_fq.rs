@@ -1,13 +1,45 @@
-use crate::bigint_256;
-use ark_ff::{
-    biginteger::BigInteger256, FftField, Field, FpParameters, One, PrimeField, SquareRootField,
-    UniformRand, Zero,
-};
+use crate::bigint_256::BigInteger256;
+use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
+use mina_curves::pasta::fq::{Fq as pasta_Fq, FqParameters as Fq_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
+
+//
+// Wrapper struct to implement OCaml bindings
+//
+
+pub struct Fq(pasta_Fq);
+
+unsafe impl ocaml::FromValue for Fq {
+    fn from_value(value: ocaml::Value) -> Self {
+        let x: ocaml::Pointer<pasta_Fq> = ocaml::FromValue::from_value(value);
+        Self(x.as_ref().clone())
+    }
+}
+
+impl Fq {
+    extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
+        let x: ocaml::Pointer<pasta_Fq> = ocaml::FromValue::from_value(x);
+        let y: ocaml::Pointer<pasta_Fq> = ocaml::FromValue::from_value(y);
+        match x.as_ref().cmp(y.as_ref()) {
+            core::cmp::Ordering::Less => -1,
+            core::cmp::Ordering::Equal => 0,
+            core::cmp::Ordering::Greater => 1,
+        }
+    }
+}
+impl ocaml::Custom for Fq {
+    ocaml::custom! {
+        name: "Fq",
+        compare: Fq::ocaml_compare,
+    }
+}
+
+//
+// Helpers
+//
 
 #[ocaml::func]
 pub fn caml_pasta_fq_size_in_bits() -> ocaml::Int {
@@ -72,13 +104,13 @@ pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> Fq {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<Fq>) -> String {
-    bigint_256::to_biguint(&x.as_ref().into_repr()).to_string()
+    x.as_ref().into_repr().to_biguint().to_string()
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<Fq, ocaml::Error> {
     match BigUint::parse_bytes(s, 10) {
-        Some(data) => Ok(Fq::from_repr(bigint_256::of_biguint(&data))),
+        Some(data) => Ok(Fq::from_repr(BigInteger256::of_biguint(&data))),
         None => Err(ocaml::Error::invalid_argument("caml_pasta_fq_of_string")
             .err()
             .unwrap()),
@@ -87,7 +119,7 @@ pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<Fq, ocaml::Error> {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_print(x: ocaml::Pointer<Fq>) {
-    println!("{}", bigint_256::to_biguint(&x.as_ref().into_repr()));
+    println!("{}", x.as_ref().into_repr().to_biguint());
 }
 
 #[ocaml::func]

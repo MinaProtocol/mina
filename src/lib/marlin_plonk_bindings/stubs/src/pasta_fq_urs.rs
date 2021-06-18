@@ -1,5 +1,5 @@
 use ark_ff::{One, Zero};
-use ark_poly::{DensePolynomial, EvaluationDomain, Evaluations};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
 use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine};
 
 use commitment_dlog::{

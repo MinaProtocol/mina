@@ -1,6 +1,7 @@
+use crate::pasta_fp::Fp;
 #[allow(unused_imports)]
 use mina_curves::pasta::{
-    fp::Fp,
+    fp::Fp as mina_Fp,
     pallas::Affine as GAffineOther,
     vesta::{Affine as GAffine, VestaParameters},
 };
@@ -24,7 +25,7 @@ use crate::index_serialization;
 use crate::pasta_fp_urs::CamlPastaFpUrs;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
 
-pub struct CamlPastaFpPlonkGateVector(Vec<Gate<Fp>>);
+pub struct CamlPastaFpPlonkGateVector(Vec<Gate<mina_Fp>>);
 pub type CamlPastaFpPlonkGateVectorPtr = ocaml::Pointer<CamlPastaFpPlonkGateVector>;
 
 extern "C" fn caml_pasta_fp_plonk_gate_vector_finalize(v: ocaml::Value) {
