@@ -9,9 +9,6 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-[%%check_ocaml_word_size
-64]
-
 [%%if
 record_async_backtraces]
 
