@@ -117,11 +117,11 @@ module Fq_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Backend = struct
     include Pasta_fq_urs.Poly_comm
 
-    let shifted ({shifted; _} : t) = shifted
+    let shifted ({ shifted; _ } : t) = shifted
 
-    let unshifted ({unshifted; _} : t) = unshifted
+    let unshifted ({ unshifted; _ } : t) = unshifted
 
-    let make unshifted shifted : t = {shifted; unshifted}
+    let make unshifted shifted : t = { shifted; unshifted }
   end
 end)
 
@@ -132,10 +132,10 @@ module Fp_poly_comm = Zexe_backend_common.Poly_comm.Make (struct
   module Backend = struct
     include Pasta_fp_urs.Poly_comm
 
-    let shifted ({shifted; _} : t) = shifted
+    let shifted ({ shifted; _ } : t) = shifted
 
-    let unshifted ({unshifted; _} : t) = unshifted
+    let unshifted ({ unshifted; _ } : t) = unshifted
 
-    let make unshifted shifted : t = {shifted; unshifted}
+    let make unshifted shifted : t = { shifted; unshifted }
   end
 end)

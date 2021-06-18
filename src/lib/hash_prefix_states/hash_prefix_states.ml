@@ -1,8 +1,6 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 [%%else]
 

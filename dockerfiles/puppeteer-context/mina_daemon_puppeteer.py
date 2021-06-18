@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # This is a temporary hack for the integration test framework to be able to stop
 # and start nodes dyamically in a kubernetes environment. This script takes
 # mina arguments and will start and monitor a mina process with those arguments.
@@ -35,16 +37,17 @@ class MockRequestHandler(BaseHTTPRequestHandler):
     s.end_headers()
     s.wfile.write(b'<html><body>The daemon is currently offline.<br/><i>This broadcast was brought to you by the puppeteer mock server</i></body></html>')
 
-# just nooping on this signal suffices, since merely trapping it will cause
-# `signal.pause()` to resume
 def handle_child_termination(signum, frame):
-  pass
+  print("puppeteer script: SIGCHLD received " )
+  os.waitpid(-1, os.WNOHANG)
 
 def handle_start_request(signum, frame):
+  print("puppeteer script: SIGUSR1 handle_start_request received, setting active_daemon_request to True" )
   global active_daemon_request
   active_daemon_request = True
 
 def handle_stop_request(signum, frame):
+  print("puppeteer script: SIGUSR2 handle_stop_request received, setting inactive_daemon_request to True" )
   global inactive_daemon_request
   inactive_daemon_request = True
 
@@ -68,6 +71,7 @@ def wait_for_pid(pid):
         time.sleep(0.25)
 
 def start_daemon():
+  print("puppeteer script: start_daemon called" )
   global mina_process
   with open('mina.log', 'a') as f:
     mina_process = subprocess.Popen(
@@ -75,16 +79,23 @@ def start_daemon():
         stdout=f,
         stderr=subprocess.STDOUT
     )
+  print("puppeteer script: touching /root/daemon-active" )
   Path('daemon-active').touch()
 
 def stop_daemon():
+  print("puppeteer script: stop_daemon called" )
   global mina_process
   mina_process.send_signal(signal.SIGTERM)
 
   child_pids = get_child_processes(mina_process.pid)
+  print("stop_daemon, child_pids: " )
+  print(*child_pids)
   mina_process.wait()
   for child_pid in child_pids:
+      print("waiting for child_pid: " + str(child_pid) )
       wait_for_pid(child_pid)
+      print("done waiting for: " + str(child_pid) )
+  print("puppeteer script: removing /root/daemon-active" )
   Path('daemon-active').unlink()
   mina_process = None
 
@@ -92,31 +103,41 @@ def stop_daemon():
 # however, you would need to do a lot of starts and stops to hit this condition
 
 def inactive_loop():
+  print("puppeteer script: inactive_loop beginning" )
   global active_daemon_request
-
+  server = None
   try:
     server = HTTPServer(('0.0.0.0', 3085), MockRequestHandler)
     while True:
       server.handle_request()
       signal.sigtimedwait(ALL_SIGNALS, 0)
       if active_daemon_request:
+        print("inactive_loop: active_daemon_request received, starting daemon" )
         start_daemon()
         active_daemon_request = False
         break
+  except Exception as err:
+    print("puppeteer script: inactive_loop experienced an error: ")
+    print(err)
   finally:
-    server.shutdown()
-
+    if server != None:
+      server.server_close()
+    print("puppeteer script: mock server closed. inactive_loop terminating" )
+    
   active_loop()
 
 def active_loop():
+  print("puppeteer script: active_loop beginning" )
   global mina_process, inactive_daemon_request
 
   while True:
     signal.pause()
     status = mina_process.poll()
     if status != None:
+      print("active_loop: status not None, cleaning up and exiting")
       cleanup_and_exit(status)
     elif inactive_daemon_request:
+      print("active_loop: inactive daemon request detected, stopping daemon")
       stop_daemon()
       inactive_daemon_request = False
       break
@@ -130,6 +151,7 @@ def cleanup_and_exit(status):
   sys.exit(status)
 
 if __name__ == '__main__':
+  print("puppeteer script: starting...")
   signal.signal(signal.SIGCHLD, handle_child_termination)
   signal.signal(signal.SIGUSR1, handle_stop_request)
   signal.signal(signal.SIGUSR2, handle_start_request)

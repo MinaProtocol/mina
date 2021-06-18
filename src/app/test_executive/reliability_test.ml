@@ -18,17 +18,19 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let open Test_config in
     let open Test_config.Block_producer in
     { default with
-      requires_graphql= true
-    ; block_producers=
-        [ {balance= "1000"; timing= Untimed}
-        ; {balance= "1000"; timing= Untimed}
-        ; {balance= "1000"; timing= Untimed} ]
-    ; num_snark_workers= 0 }
+      requires_graphql = true
+    ; block_producers =
+        [ { balance = "1000"; timing = Untimed }
+        ; { balance = "1000"; timing = Untimed }
+        ; { balance = "1000"; timing = Untimed }
+        ]
+    ; num_snark_workers = 0
+    }
 
   let check_common_prefixes ~number_of_blocks:n ~logger chains =
     let recent_chains =
       List.map chains ~f:(fun chain ->
-          List.take (List.rev chain) n |> Hash_set.of_list (module String) )
+          List.take (List.rev chain) n |> Hash_set.of_list (module String))
     in
     let common_prefixes =
       List.fold ~f:Hash_set.inter
@@ -41,8 +43,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         Malleable_error.soft_error ~value:()
           (Error.of_string
              (sprintf
-                "Chains don't have any common prefixes among their most \
-                 recent %d blocks"
+                "Chains don't have any common prefixes among their most recent \
+                 %d blocks"
                 n))
       in
       [%log error]
@@ -82,14 +84,14 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         in
         Malleable_error.ok_if_true
           (List.mem connected_peers p ~equal:String.equal)
-          ~error_type:`Hard ~error )
+          ~error_type:`Hard ~error)
 
   let check_peers ~logger nodes =
     let open Malleable_error.Let_syntax in
     let%bind nodes_and_responses =
       Malleable_error.List.map nodes ~f:(fun node ->
           let%map response = Network.Node.must_get_peer_id ~logger node in
-          (node, response) )
+          (node, response))
     in
     let nodes_by_peer_id =
       nodes_and_responses
@@ -98,7 +100,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     Malleable_error.List.iter nodes_and_responses
       ~f:(fun (_, (peer_id, connected_peers)) ->
-        check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers )
+        check_peer_connectivity ~nodes_by_peer_id ~peer_id ~connected_peers)
 
   let run network t =
     let open Network in
@@ -107,12 +109,12 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     (* TEMP: until we fix the seed graphql port, we will only check peers for block producers *)
     (* let all_nodes = Network.all_nodes network in *)
     let all_nodes = Network.block_producers network in
-    let[@warning "-8"] [node_a; node_b; node_c] =
+    let[@warning "-8"] [ node_a; node_b; node_c ] =
       Network.block_producers network
     in
     (* TODO: let%bind () = wait_for t (Wait_condition.nodes_to_initialize [node_a; node_b; node_c]) in *)
     let%bind () =
-      Malleable_error.List.iter [node_a; node_b; node_c]
+      Malleable_error.List.iter [ node_a; node_b; node_c ]
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
     let%bind () =
@@ -130,7 +132,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
          let%bind () = Node.start ~fresh_state:true node_c in
          let%bind () = wait_for t (Wait_condition.node_to_initialize node_c) in
          wait_for t
-           ( Wait_condition.nodes_to_synchronize [node_a; node_b; node_c]
+           ( Wait_condition.nodes_to_synchronize [ node_a; node_b; node_c ]
            |> Wait_condition.with_timeouts
                 ~hard_timeout:
                   (Network_time_span.Literal

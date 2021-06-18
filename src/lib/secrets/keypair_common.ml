@@ -15,10 +15,7 @@ module Make_terminal_stdin (KP : sig
     -> (t, Privkey_error.t) Deferred.Result.t
 
   val write_exn :
-       t
-    -> privkey_path:string
-    -> password:Secret_file.password
-    -> unit Deferred.t
+    t -> privkey_path:string -> password:Secret_file.password -> unit Deferred.t
 end) =
 struct
   open KP

@@ -8,7 +8,7 @@ let%test_unit "Logger.Dumb_logrotate rotates logs when expected" =
   let directory = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
   let log_filename = "mina.log" in
   let exists name =
-    Result.is_ok (Unix.access (Filename.concat directory name) [`Exists])
+    Result.is_ok (Unix.access (Filename.concat directory name) [ `Exists ])
   in
   let get_size name =
     Int64.to_int_exn (Unix.stat (Filename.concat directory name)).st_size

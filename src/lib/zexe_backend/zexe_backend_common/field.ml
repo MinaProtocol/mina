@@ -134,9 +134,9 @@ end
 
 module Make (F : Input_intf) :
   S_with_version
-  with type Stable.V1.t = F.t
-   and module Bigint = F.Bigint
-   and module Vector = F.Vector = struct
+    with type Stable.V1.t = F.t
+     and module Bigint = F.Bigint
+     and module Vector = F.Vector = struct
   include F
 
   let size = size ()
@@ -145,7 +145,7 @@ module Make (F : Input_intf) :
 
   module Stable = struct
     module V1 = struct
-      type t = F.t [@@deriving version {asserted}]
+      type t = F.t [@@deriving version { asserted }]
 
       include Binable.Of_binable
                 (Bigint)
@@ -224,7 +224,7 @@ module Make (F : Input_intf) :
   let of_bits bs =
     List.fold (List.rev bs) ~init:zero ~f:(fun acc b ->
         let acc = add acc acc in
-        if b then add acc one else acc )
+        if b then add acc one else acc)
 
   let%test_unit "sexp round trip" =
     let t = random () in
@@ -274,5 +274,6 @@ module Make (F : Input_intf) :
       (Quickcheck.Generator.list_with_length
          Int.(size_in_bits - 1)
          Bool.quickcheck_generator)
-      ~f:(fun bs -> [%test_eq: bool list] (bs @ [false]) (to_bits (of_bits bs)))
+      ~f:(fun bs ->
+        [%test_eq: bool list] (bs @ [ false ]) (to_bits (of_bits bs)))
 end
