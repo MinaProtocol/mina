@@ -162,12 +162,14 @@ module Eff = struct
         ; party: 'party
         ; account: 'account
         ; transaction_commitment: 'transaction_commitment
+        ; at_party: 'parties
         ; global_state: 'global_state
         ; inclusion_proof: 'ip }
         -> ( 'account * 'bool
            , < inclusion_proof: 'ip
              ; bool: 'bool
              ; party: 'party
+             ; parties: 'parties
              ; transaction_commitment: 'transaction_commitment
              ; account: 'account
              ; global_state: 'global_state
@@ -281,7 +283,7 @@ module Make (Inputs : Inputs_intf) = struct
       | `No ->
           Bool.true_
     in
-    let (party, remaining), local_state =
+    let (party, remaining), at_party, local_state =
       let to_pop =
         match is_start with
         | `Compute start_data ->
@@ -316,7 +318,7 @@ module Make (Inputs : Inputs_intf) = struct
             Token_id.if_ is_start' ~then_:Token_id.default
               ~else_:local_state.token_id }
       in
-      ((party, remaining), local_state)
+      ((party, remaining), to_pop, local_state)
     in
     let local_state =
       { local_state with
@@ -342,6 +344,7 @@ module Make (Inputs : Inputs_intf) = struct
       h.perform
         (Check_auth_and_update_account
            { is_start= is_start'
+           ; at_party
            ; global_state
            ; party
            ; account= a
