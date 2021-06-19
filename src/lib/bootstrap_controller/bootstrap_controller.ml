@@ -209,7 +209,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
   let rec loop previous_cycles =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
-        (Buffered (`Capacity 50, `Overflow Crash))
+        (Buffered (`Capacity 50, `Overflow Drop_head))
     in
     don't_wait_for
       (transfer_while_writer_alive transition_reader sync_ledger_writer

@@ -13,8 +13,8 @@ type Structured_log_events.t += Starting_transition_frontier_controller
 type Structured_log_events.t += Starting_bootstrap_controller
   [@@deriving register_event {msg= "Starting bootstrap controller phase"}]
 
-let create_bufferred_pipe ?(capacity = 50) ?name () =
-  Strict_pipe.create ?name (Buffered (`Capacity capacity, `Overflow Crash))
+let create_bufferred_pipe ?name () =
+  Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Drop_head))
 
 let is_transition_for_bootstrap ~logger
     ~(precomputed_values : Precomputed_values.t) frontier new_transition =
@@ -61,8 +61,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   [%str_log info] Starting_transition_frontier_controller ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
-    create_bufferred_pipe ~name:"transition frontier controller pipe"
-      ~capacity:100 ()
+    create_bufferred_pipe ~name:"transition frontier controller pipe" ()
   in
   transition_reader_ref := transition_frontier_controller_reader ;
   transition_writer_ref := transition_frontier_controller_writer ;
@@ -95,7 +94,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   [%str_log info] Starting_bootstrap_controller ;
   [%log info] "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
-    create_bufferred_pipe ~name:"bootstrap controller pipe" ~capacity:100 ()
+    create_bufferred_pipe ~name:"bootstrap controller pipe" ()
   in
   transition_reader_ref := bootstrap_controller_reader ;
   transition_writer_ref := bootstrap_controller_writer ;
