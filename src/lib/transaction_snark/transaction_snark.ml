@@ -1221,12 +1221,15 @@ module Base = struct
     in
     (`Min_balance curr_min_balance, timing)
 
-  let _side_loaded i =
-    let open Snapp_statement in
-    Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
-      ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
-      ~value_to_field_elements:to_field_elements
-      ~var_to_field_elements:Checked.to_field_elements
+  let side_loaded =
+    Memo.of_comparable
+      (module Int)
+      (fun i ->
+        let open Snapp_statement in
+        Pickles.Side_loaded.create ~typ ~name:(sprintf "snapp_%d" i)
+          ~max_branching:(module Pickles.Side_loaded.Verification_key.Max_width)
+          ~value_to_field_elements:to_field_elements
+          ~var_to_field_elements:Checked.to_field_elements )
 
   let signature_verifies ~shifted ~payload_digest signature pk =
     let%bind pk =
@@ -1267,17 +1270,6 @@ module Base = struct
             list
         ; state_body: Mina_state.Protocol_state.Body.Value.t }
     end
-
-    let _specs : t list =
-      let signed ~is_start =
-        {predicate_type= `Nonce_or_accept; auth_type= Signature; is_start}
-      in
-      let fee_payer = signed ~is_start:`Compute_in_circuit in
-      let unsigned =
-        {predicate_type= `Nonce_or_accept; auth_type= None_given; is_start= `No}
-      in
-      let payment = [fee_payer; unsigned] in
-      [payment]
 
     module Prover_value : sig
       type 'a t
@@ -1490,6 +1482,8 @@ module Base = struct
       val constraint_constants : Genesis_constants.Constraint_constants.t
 
       val spec : single
+
+      val snapp_statement : (int * Snapp_statement.Checked.t) option
     end
 
     type party =
@@ -1601,6 +1595,8 @@ module Base = struct
 
           module Signed = struct
             type t = Amount.Signed.Checked.t
+
+            let is_pos (t : t) = Sgn.Checked.is_pos t.sgn
           end
 
           let if_ b ~then_ ~else_ =
@@ -1628,7 +1624,9 @@ module Base = struct
 
           let equal x y = run_checked (Token_id.Checked.equal x y)
 
-          let default = Token_id.var_of_t Token_id.default
+          let default = Token_id.(var_of_t default)
+
+          let invalid = Token_id.(var_of_t invalid)
         end
       end
 
@@ -1795,11 +1793,23 @@ module Base = struct
             party.data.body.token_id
         | Check_auth_and_update_account
             { is_start= is_actually_start
+            ; at_party= at_party, _
             ; global_state
             ; party= {party; control; _}
             ; account
             ; transaction_commitment
             ; inclusion_proof= _ } ->
+            ( match (auth_type, snapp_statement) with
+            | Proof, Some (i, s) ->
+                Pickles.Side_loaded.in_circuit (side_loaded i)
+                  (Lazy.force account.data.snapp.verification_key.data) ;
+                Snapp_statement.Checked.Assert.equal
+                  {transaction= transaction_commitment; at_party}
+                  s
+            | (Signature | None_given), None ->
+                ()
+            | Proof, None | (Signature | None_given), Some _ ->
+                assert false ) ;
             let transaction_commitment =
               let with_party () =
                 Parties.Transaction_commitment.Checked.with_fee_payer
@@ -1868,7 +1878,7 @@ module Base = struct
     end
 
     let main ?(witness : Witness.t option) spec ~constraint_constants
-        (statement : Statement.With_sok.Checked.t) =
+        snapp_statements (statement : Statement.With_sok.Checked.t) =
       let open Impl in
       let ( ! ) x = Option.value_exn x in
       let state_body =
@@ -1905,12 +1915,26 @@ module Base = struct
       let start_parties =
         As_prover.Ref.create (fun () -> !witness.start_parties)
       in
-      let global, local =
-        List.fold_left spec ~init ~f:(fun ((_, local) as acc) party_spec ->
+      let (global, local), snapp_statements =
+        List.fold_left spec ~init:(init, snapp_statements)
+          ~f:(fun (((_, local) as acc), statements) party_spec ->
+            let snapp_statement, statements =
+              match party_spec.auth_type with
+              | Signature | None_given ->
+                  (None, statements)
+              | Proof -> (
+                match statements with
+                | [] ->
+                    assert false
+                | s :: ss ->
+                    (Some s, ss) )
+            in
             let module S = Step (struct
               let constraint_constants = constraint_constants
 
               let spec = party_spec
+
+              let snapp_statement = snapp_statement
             end) in
             let finish v =
               let open Parties_logic.Start_data in
@@ -1961,40 +1985,44 @@ module Base = struct
                 S.{perform}
                 acc
             in
-            match party_spec.is_start with
-            | `No ->
-                S.apply ~is_start:`No S.{perform} acc
-            | `Compute_in_circuit ->
-                V.create (fun () ->
-                    match As_prover.Ref.get start_parties with
-                    | [] ->
-                        `Skip
-                    | p :: ps ->
-                        let should_pop =
-                          Field.Constant.equal Parties.With_hashes.empty
-                            (As_prover.read_var (fst local.parties))
-                        in
-                        if should_pop then (
+            let acc' =
+              match party_spec.is_start with
+              | `No ->
+                  S.apply ~is_start:`No S.{perform} acc
+              | `Compute_in_circuit ->
+                  V.create (fun () ->
+                      match As_prover.Ref.get start_parties with
+                      | [] ->
+                          `Skip
+                      | p :: ps ->
+                          let should_pop =
+                            Field.Constant.equal Parties.With_hashes.empty
+                              (As_prover.read_var (fst local.parties))
+                          in
+                          if should_pop then (
+                            As_prover.Ref.set start_parties ps ;
+                            `Start p )
+                          else `Skip )
+                  |> finish
+              | `Yes ->
+                  as_prover
+                    As_prover.(
+                      fun () ->
+                        [%test_eq: Impl.Field.Constant.t]
+                          Parties.With_hashes.empty
+                          (read_var (fst local.parties))) ;
+                  V.create (fun () ->
+                      match As_prover.Ref.get start_parties with
+                      | [] ->
+                          assert false
+                      | p :: ps ->
                           As_prover.Ref.set start_parties ps ;
                           `Start p )
-                        else `Skip )
-                |> finish
-            | `Yes ->
-                as_prover
-                  As_prover.(
-                    fun () ->
-                      [%test_eq: Impl.Field.Constant.t]
-                        Parties.With_hashes.empty
-                        (read_var (fst local.parties))) ;
-                V.create (fun () ->
-                    match As_prover.Ref.get start_parties with
-                    | [] ->
-                        assert false
-                    | p :: ps ->
-                        As_prover.Ref.set start_parties ps ;
-                        `Start p )
-                |> finish )
+                  |> finish
+            in
+            (acc', statements) )
       in
+      assert (List.is_empty snapp_statements) ;
       with_label __LOC__ (fun () ->
           Local_state.Checked.assert_equal statement.target.local_state
             {local with parties= fst local.parties; ledger= fst local.ledger}
@@ -2018,6 +2046,109 @@ module Base = struct
                ; fee_excess_r= Fee.Signed.(Checked.constant zero) }) ) ;
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
+
+    let side_loaded i =
+      Pickles.Side_loaded.create ~name:(sprintf "snapp_%d" i)
+        ~max_branching:(module Pickles_types.Nat.N2)
+        ~value_to_field_elements:Snapp_statement.to_field_elements
+        ~var_to_field_elements:Snapp_statement.Checked.to_field_elements
+        ~typ:Snapp_statement.typ
+
+    module Basic = struct
+      module N = Side_loaded_verification_key.Max_branches
+
+      type (_, _, _, _) t =
+        (* Corresponds to payment *)
+        | Opt_signed_unsigned : (unit, unit, unit, unit) t
+        | Opt_signed_opt_signed : (unit, unit, unit, unit) t
+        | Opt_signed : (unit, unit, unit, unit) t
+        | Proved
+            : ( Snapp_statement.Checked.t * unit
+              , Snapp_statement.t * unit
+              , Nat.N2.n * unit
+              , N.n * unit )
+              t
+
+      let opt_signed ~is_start =
+        {predicate_type= `Nonce_or_accept; auth_type= Signature; is_start}
+
+      let unsigned =
+        {predicate_type= `Nonce_or_accept; auth_type= None_given; is_start= `No}
+
+      let opt_signed = opt_signed ~is_start:`Compute_in_circuit
+
+      let spec : type a b c d. (a, b, c, d) t -> single list =
+       fun t ->
+        match t with
+        | Opt_signed_unsigned ->
+            [opt_signed; unsigned]
+        | Opt_signed_opt_signed ->
+            [opt_signed; opt_signed]
+        | Opt_signed ->
+            [opt_signed]
+        | Proved ->
+            [{predicate_type= `Full; auth_type= Proof; is_start= `No}]
+    end
+
+    (* Horrible hack :( *)
+    let witness : Witness.t option ref = ref None
+
+    let rule (type a b c d) ~constraint_constants ~proof_level
+        (t : (a, b, c, d) Basic.t) :
+        ( a
+        , b
+        , c
+        , d
+        , Statement.With_sok.var
+        , Statement.With_sok.t )
+        Pickles.Inductive_rule.t =
+      let open Hlist in
+      let open Basic in
+      let module M = H4.T (Pickles.Tag) in
+      let s = Basic.spec t in
+      let prev_should_verify =
+        match proof_level with
+        | Genesis_constants.Proof_level.Full ->
+            true
+        | _ ->
+            false
+      in
+      let b = Boolean.var_of_value prev_should_verify in
+      match t with
+      | Proved ->
+          { identifier= "proved"
+          ; prevs= M.[side_loaded 0]
+          ; main_value= (fun [_] _ -> [prev_should_verify])
+          ; main=
+              (fun [snapp_statement] stmt ->
+                main ?witness:!witness s ~constraint_constants
+                  (List.mapi [snapp_statement] ~f:(fun i x -> (i, x)))
+                  stmt ;
+                [b] ) }
+      | Opt_signed_unsigned ->
+          { identifier= "opt_signed-unsigned"
+          ; prevs= M.[]
+          ; main_value= (fun [] _ -> [])
+          ; main=
+              (fun [] stmt ->
+                main ?witness:!witness s ~constraint_constants [] stmt ;
+                [] ) }
+      | Opt_signed_opt_signed ->
+          { identifier= "opt_signed-opt_signed"
+          ; prevs= M.[]
+          ; main_value= (fun [] _ -> [])
+          ; main=
+              (fun [] stmt ->
+                main ?witness:!witness s ~constraint_constants [] stmt ;
+                [] ) }
+      | Opt_signed ->
+          { identifier= "opt_signed"
+          ; prevs= M.[]
+          ; main_value= (fun [] _ -> [])
+          ; main=
+              (fun [] stmt ->
+                main ?witness:!witness s ~constraint_constants [] stmt ;
+                [] ) }
   end
 
   type _ Snarky_backendless.Request.t +=
@@ -2995,14 +3126,22 @@ let system ~proof_level ~constraint_constants =
         (module Statement.With_sok.Checked)
         (module Statement.With_sok)
         ~typ:Statement.With_sok.typ
-        ~branches:(module Nat.N2)
+        ~branches:(module Nat.N6)
         ~max_branching:(module Nat.N2)
         ~name:"transaction-snark"
         ~constraint_constants:
           (Genesis_constants.Constraint_constants.to_snark_keys_header
              constraint_constants)
         ~choices:(fun ~self ->
-          [Base.rule ~constraint_constants; Merge.rule ~proof_level self] ) )
+          let parties x =
+            Base.Parties_snark.rule ~constraint_constants ~proof_level x
+          in
+          [ Base.rule ~constraint_constants
+          ; Merge.rule ~proof_level self
+          ; parties Opt_signed_unsigned
+          ; parties Opt_signed_opt_signed
+          ; parties Opt_signed
+          ; parties Proved ] ) )
 
 module Verification = struct
   module type S = sig
@@ -3222,7 +3361,16 @@ end) =
 struct
   open Inputs
 
-  let tag, cache_handle, p, Pickles.Provers.[base; merge] =
+  let ( tag
+      , cache_handle
+      , p
+      , Pickles.Provers.
+          [ base
+          ; merge
+          ; opt_signed_unsigned
+          ; opt_signed_opt_signed
+          ; opt_signed
+          ; proved ] ) =
     system ~proof_level ~constraint_constants
 
   module Proof = (val p)
@@ -3757,7 +3905,7 @@ let%test_module "transaction_snark" =
                     ; { predicate_type= `Nonce_or_accept
                       ; auth_type= None_given
                       ; is_start= `No } ]
-                    s ~witness:w ;
+                    [] s ~witness:w ;
                   fun () -> () )
                 () )
           |> Or_error.ok_exn
