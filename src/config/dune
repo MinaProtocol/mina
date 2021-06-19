@@ -21,6 +21,5 @@ let () =
   @@ "(rule\n\
      \  (targets config.mlh)\n\
      \  (mode fallback)\n\
-     \  (deps %{profile}.mlh " ^ config_deps
-     ^ " (env_var MINA_DUNE_PROFILE))\n
+     \  (deps %{profile}.mlh " ^ config_deps ^ ")\n
      \  (action (copy %{profile}.mlh config.mlh)))"
