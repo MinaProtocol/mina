@@ -1417,6 +1417,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           p.data.body.token_id
       | Check_auth_and_update_account
           { is_start
+          ; at_party= _
           ; global_state= _
           ; party= p
           ; account= a
