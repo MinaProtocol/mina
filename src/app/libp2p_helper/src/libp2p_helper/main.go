@@ -55,7 +55,6 @@ type streamState int
 const (
 	STREAM_DATA_UNEXPECTED streamState = iota
 	STREAM_DATA_EXPECTED
-	STREAM_QUERY_HANDLED
 )
 
 type messageBuffer [MESSAGE_BUFFER_SIZE]byte
@@ -561,7 +560,6 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		}
 
 		msgType := msg.Data[0]
-		_ = msgType
 
 		app.writeMsg(validateUpcall{
 			Sender:     sender,
@@ -570,6 +568,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			Seqno:      seqno,
 			Upcall:     "validate",
 			Idx:        s.Subscription,
+			MessageType:       msgType,
 		})
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
@@ -667,6 +666,7 @@ type validateUpcall struct {
 	Seqno      int           `json:"seqno"`
 	Upcall     string        `json:"upcall"`
 	Idx        int           `json:"subscription_idx"`
+	MessageType       byte          `json:"type"`
 }
 
 type validationCompleteMsg struct {
@@ -738,6 +738,7 @@ type incomingMsgUpcall struct {
 	Upcall    string `json:"upcall"`
 	StreamIdx int    `json:"stream_idx"`
 	Data      string `json:"data"`
+	MessageType      byte   `json:"type"`
 }
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
@@ -808,7 +809,6 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					Reason:    "failed to read message type prefix",
 				})
 			}
-			_ = msgType // TODO: check and use message type
 
 			bytesToRead := length
 			for bytesToRead > 0 {
@@ -829,6 +829,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					Upcall:    "incomingStreamMsg",
 					Data:      codaEncode(buffer[:bufferReadSize]),
 					StreamIdx: idx,
+					MessageType: msgType,
 				})
 			}
 		}
