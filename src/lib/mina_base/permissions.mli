@@ -33,7 +33,7 @@ module Auth_required : sig
     val spec_eval :
          t
       -> signature_verifies:Boolean.var
-      -> Boolean.var * [`proof_must_verify of Boolean.var]
+      -> Boolean.var * [ `proof_must_verify of Boolean.var ]
   end
 
   val typ : (Checked.t, t) Typ.t
@@ -46,13 +46,14 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('bool, 'controller) t =
-        { stake: 'bool
-        ; edit_state: 'controller
-        ; send: 'controller
-        ; receive: 'controller (* TODO: Consider having fee *)
-        ; set_delegate: 'controller
-        ; set_permissions: 'controller
-        ; set_verification_key: 'controller }
+        { stake : 'bool
+        ; edit_state : 'controller
+        ; send : 'controller
+        ; receive : 'controller (* TODO: Consider having fee *)
+        ; set_delegate : 'controller
+        ; set_permissions : 'controller
+        ; set_verification_key : 'controller
+        }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
   end]

@@ -17,8 +17,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   (* Ok to drop on overflow- catchup will be triggered if required*)
   let primary_transition_reader, primary_transition_writer =
     Strict_pipe.create ~name:"primary transitions"
-      (Buffered
-         (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
+      (Buffered (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
   in
   let processed_transition_reader, processed_transition_writer =
     Strict_pipe.create ~name:"processed transitions"
@@ -41,14 +40,14 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
        * are no duplicates in the list *)
       Transition_handler.Unprocessed_transition_cache.register_exn
         unprocessed_transition_cache t
-      |> Strict_pipe.Writer.write primary_transition_writer ) ;
+      |> Strict_pipe.Writer.write primary_transition_writer) ;
   trace_recurring "validator" (fun () ->
       Transition_handler.Validator.run
         ~consensus_constants:
           (Precomputed_values.consensus_constants precomputed_values)
         ~logger ~trust_system ~time_controller ~frontier
         ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~unprocessed_transition_cache ) ;
+        ~unprocessed_transition_cache) ;
   Strict_pipe.Reader.iter_without_pushback valid_transition_reader
     ~f:(Strict_pipe.Writer.write primary_transition_writer)
   |> don't_wait_for ;
@@ -59,11 +58,11 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
         ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-        ~processed_transition_writer ) ;
+        ~processed_transition_writer) ;
   trace_recurring "catchup" (fun () ->
       Ledger_catchup.run ~logger ~precomputed_values ~trust_system ~verifier
         ~network ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer
-        ~unprocessed_transition_cache ) ;
+        ~unprocessed_transition_cache) ;
   Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
       let open Strict_pipe.Writer in
       kill valid_transition_writer ;
@@ -73,6 +72,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       kill catchup_breadcrumbs_writer ;
       if Ivar.is_full clean_up_catchup_scheduler then
         [%log error] "Ivar.fill bug is here!" ;
-      Ivar.fill clean_up_catchup_scheduler () )
+      Ivar.fill clean_up_catchup_scheduler ())
   |> don't_wait_for ;
   processed_transition_reader

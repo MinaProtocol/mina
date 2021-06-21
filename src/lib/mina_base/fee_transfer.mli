@@ -5,9 +5,10 @@ module Single : sig
   module Stable : sig
     module V1 : sig
       type t = private
-        { receiver_pk: Public_key.Compressed.Stable.V1.t
-        ; fee: Currency.Fee.Stable.V1.t
-        ; fee_token: Token_id.Stable.V1.t }
+        { receiver_pk : Public_key.Compressed.Stable.V1.t
+        ; fee : Currency.Fee.Stable.V1.t
+        ; fee_token : Token_id.Stable.V1.t
+        }
       [@@deriving bin_io, sexp, compare, equal, yojson, version, hash]
     end
 
@@ -15,9 +16,10 @@ module Single : sig
   end
 
   type t = Stable.Latest.t = private
-    { receiver_pk: Public_key.Compressed.t
-    ; fee: Currency.Fee.t
-    ; fee_token: Token_id.t }
+    { receiver_pk : Public_key.Compressed.t
+    ; fee : Currency.Fee.t
+    ; fee_token : Token_id.t
+    }
   [@@deriving sexp, compare, yojson, hash]
 
   include Comparable.S with type t := t
@@ -60,9 +62,10 @@ end
 type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
 
 type single = Single.t = private
-  { receiver_pk: Public_key.Compressed.t
-  ; fee: Currency.Fee.t
-  ; fee_token: Token_id.t }
+  { receiver_pk : Public_key.Compressed.t
+  ; fee : Currency.Fee.t
+  ; fee_token : Token_id.t
+  }
 [@@deriving sexp, compare, yojson, hash]
 
 include Comparable.S with type t := t

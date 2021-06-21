@@ -59,7 +59,7 @@ module Weight : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = {base: int; merge: int} [@@deriving sexp]
+      type t = { base : int; merge : int } [@@deriving sexp]
     end
   end]
 end
@@ -71,9 +71,10 @@ module Base : sig
     module Stable : sig
       module V1 : sig
         type 'base t =
-          { job: 'base
-          ; seq_no: Sequence_number.Stable.V1.t
-          ; status: Job_status.Stable.V1.t }
+          { job : 'base
+          ; seq_no : Sequence_number.Stable.V1.t
+          ; status : Job_status.Stable.V1.t
+          }
         [@@deriving sexp]
       end
     end]
@@ -105,10 +106,11 @@ module Merge : sig
     module Stable : sig
       module V1 : sig
         type 'merge t =
-          { left: 'merge
-          ; right: 'merge
-          ; seq_no: Sequence_number.Stable.V1.t
-          ; status: Job_status.Stable.V1.t }
+          { left : 'merge
+          ; right : 'merge
+          ; seq_no : Sequence_number.Stable.V1.t
+          ; status : Job_status.Stable.V1.t
+          }
         [@@deriving sexp]
       end
     end]
@@ -154,7 +156,8 @@ module Space_partition : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
+      type t = { first : int * int; second : (int * int) option }
+      [@@deriving sexp]
     end
   end]
 end
@@ -165,7 +168,9 @@ module Job_view : sig
     module Stable : sig
       module V1 : sig
         type t =
-          {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
+          { seq_no : Sequence_number.Stable.V1.t
+          ; status : Job_status.Stable.V1.t
+          }
         [@@deriving sexp]
       end
     end]
@@ -189,7 +194,8 @@ module Job_view : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type 'a t = {position: int; value: 'a Node.Stable.V1.t} [@@deriving sexp]
+      type 'a t = { position : int; value : 'a Node.Stable.V1.t }
+      [@@deriving sexp]
     end
   end]
 end
@@ -216,12 +222,10 @@ module State : sig
     val fold_chronological_until :
          ('merge, 'base) t
       -> init:'accum
-      -> f_merge:(   'accum
-                  -> 'merge Merge.t
-                  -> ('accum, 'final) Continue_or_stop.t M.t)
-      -> f_base:(   'accum
-                 -> 'base Base.t
-                 -> ('accum, 'final) Continue_or_stop.t M.t)
+      -> f_merge:
+           ('accum -> 'merge Merge.t -> ('accum, 'final) Continue_or_stop.t M.t)
+      -> f_base:
+           ('accum -> 'base Base.t -> ('accum, 'final) Continue_or_stop.t M.t)
       -> finish:('accum -> 'final M.t)
       -> 'final M.t
   end
@@ -264,8 +268,7 @@ val update :
 
 (** The last ['a] we emitted from the top of the tree and the ['d list]
  * responsible for that ['a]. *)
-val last_emitted_value :
-  ('merge, 'base) State.t -> ('merge * 'base list) option
+val last_emitted_value : ('merge, 'base) State.t -> ('merge * 'base list) option
 
 (** If there aren't enough slots for [max_slots] many ['d], then before
  * continuing onto the next virtual tree, split max_slots = (x,y) such that

@@ -12,5 +12,4 @@ val add :
   -> External_transition.Initial_validated.t Envelope.Incoming.t
   -> unit
 
-val data :
-  t -> External_transition.Initial_validated.t Envelope.Incoming.t list
+val data : t -> External_transition.Initial_validated.t Envelope.Incoming.t list

@@ -7,7 +7,7 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('state_hash, 'body) t =
-        {previous_state_hash: 'state_hash; body: 'body}
+        { previous_state_hash : 'state_hash; body : 'body }
       [@@deriving equal, ord, hash, sexp, to_yojson]
     end
   end]
@@ -71,8 +71,7 @@ module Value : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t =
-        (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+      type t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
       [@@deriving sexp, compare, equal, yojson]
     end
   end]

@@ -8,31 +8,31 @@ end
 
 module Make
     (Impl : Snarky_backendless.Snark_intf.Run) (B : sig
-        open Impl
+      open Impl
 
-        val params : field Sponge.Params.t
+      val params : field Sponge.Params.t
 
-        val to_the_alpha : field -> field
+      val to_the_alpha : field -> field
 
-        module Operations : sig
-          val apply_affine_map :
-            field array array * field array -> field array -> field array
-        end
+      module Operations : sig
+        val apply_affine_map :
+          field array array * field array -> field array -> field array
+      end
     end) =
 struct
   include Make_sponge.Rounds
 
   (* TODO: This is wronge. A round should be
-   ark -> sbox -> mds 
+     ark -> sbox -> mds
 
-   instead of 
+     instead of
 
-   sbox -> mds -> ark 
+     sbox -> mds -> ark
 
-   which is what's implemented.
+     which is what's implemented.
   *)
   let round_table start =
-    let ({round_constants; mds} : _ Sponge.Params.t) = B.params in
+    let ({ round_constants; mds } : _ Sponge.Params.t) = B.params in
     (* sbox -> mds -> ark *)
     let apply_round i s =
       let s' = Array.map s ~f:B.to_the_alpha in
@@ -40,7 +40,7 @@ struct
     in
     let res =
       Array.init (rounds_full + 1) ~f:(fun _ ->
-          Array.create ~len:3 Impl.Field.Constant.zero )
+          Array.create ~len:3 Impl.Field.Constant.zero)
     in
     res.(0) <- start ;
     for i = 1 to rounds_full do
@@ -71,9 +71,11 @@ struct
         (let open Zexe_backend_common.Plonk_constraint_system.Plonk_constraint in
         with_label __LOC__ (fun () ->
             Impl.assert_
-              [ { basic= T (Poseidon {state= t})
-                ; annotation= Some "plonk-poseidon" } ] )) ;
-        t.(Int.(Array.length t - 1)) )
+              [ { basic = T (Poseidon { state = t })
+                ; annotation = Some "plonk-poseidon"
+                }
+              ])) ;
+        t.(Int.(Array.length t - 1)))
 
   (* TODO: experiment with sealing version of this *)
   let add_assign ~state i x =

@@ -32,7 +32,7 @@ module For_tests : sig
        account:Account.t
     -> txn_amount:Amount.t
     -> txn_global_slot:Global_slot.t
-    -> (Account.Timing.t * [> `Min_balance of Balance.t]) Or_error.t
+    -> (Account.Timing.t * [> `Min_balance of Balance.t ]) Or_error.t
 
   val validate_timing :
        account:Account.t

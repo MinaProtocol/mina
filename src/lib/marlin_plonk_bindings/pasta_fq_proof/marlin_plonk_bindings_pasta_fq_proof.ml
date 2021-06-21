@@ -13,22 +13,19 @@ external create :
   -> auxiliary_input:Marlin_plonk_bindings_pasta_fq_vector.t
   -> prev_challenges:Marlin_plonk_bindings_pasta_fq.t array
   -> prev_sgs:Marlin_plonk_bindings_pasta_pallas.Affine.t array
-  -> t
-  = "caml_pasta_fq_plonk_proof_create"
+  -> t = "caml_pasta_fq_plonk_proof_create"
 
 external verify :
      Marlin_plonk_bindings_pasta_fq_urs.Poly_comm.t array
   -> Marlin_plonk_bindings_pasta_fq_verifier_index.t
   -> t
-  -> bool
-  = "caml_pasta_fq_plonk_proof_verify"
+  -> bool = "caml_pasta_fq_plonk_proof_verify"
 
 external batch_verify :
      Marlin_plonk_bindings_pasta_fq_urs.Poly_comm.t array array
   -> Marlin_plonk_bindings_pasta_fq_verifier_index.t array
   -> t array
-  -> bool
-  = "caml_pasta_fq_plonk_proof_batch_verify"
+  -> bool = "caml_pasta_fq_plonk_proof_batch_verify"
 
 external dummy : unit -> t = "caml_pasta_fq_plonk_proof_dummy"
 

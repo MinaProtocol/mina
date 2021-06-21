@@ -76,19 +76,19 @@ end
 
 module Make_mock
     (Key : Hashable.S) (Value : sig
-        type t
+      type t
     end) :
   Intf.Mock
-  with type t = Value.t Key.Table.t
-   and type key := Key.t
-   and type value := Value.t
-   and type config := unit = struct
+    with type t = Value.t Key.Table.t
+     and type key := Key.t
+     and type value := Value.t
+     and type config := unit = struct
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =
     Key.Table.to_alist t
     |> List.map ~f:(fun (key, value) ->
-           [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
+           [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value))
     |> [%sexp_of: Sexp.t list]
 
   let create _ = Key.Table.create ()
