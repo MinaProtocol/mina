@@ -273,6 +273,7 @@ let start_custom :
   in
   let%bind process =
     keep_trying
+      (* TODO: remove CODA...PATH and coda-, eventually *)
       (List.filter_opt
          [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
          ; Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
