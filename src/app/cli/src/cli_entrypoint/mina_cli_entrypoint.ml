@@ -885,6 +885,7 @@ let setup_daemon logger =
         >>| Or_error.ok
       in
       let client_trustlist =
+        (* TODO: remove deprecated var, eventually *)
         let mina_client_trustlist = "MINA_CLIENT_TRUSTLIST" in
         let coda_client_trustlist = "CODA_CLIENT_TRUSTLIST" in
         let cidrs_of_env_str env_str env_var =
