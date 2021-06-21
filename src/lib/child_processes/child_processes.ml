@@ -274,7 +274,8 @@ let start_custom :
   let%bind process =
     keep_trying
       (List.filter_opt
-         [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
+         [ Unix.getenv @@ "MINA_" ^ String.uppercase name ^ "_PATH"
+         ; Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
          ; relative_to_root
          ; Some (Filename.dirname mina_binary_path ^/ name)
          ; Some ("mina-" ^ name)
