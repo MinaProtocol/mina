@@ -227,3 +227,9 @@ module Transaction_commitment = struct
         [|fee_payer_hash; t|]
   end
 end
+
+let commitment (t : t) : Transaction_commitment.t =
+  Transaction_commitment.create
+    ~other_parties_hash:(With_hashes.other_parties_hash t)
+    ~protocol_state_predicate_hash:
+      (Snapp_predicate.Protocol_state.digest t.protocol_state)
