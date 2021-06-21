@@ -877,6 +877,61 @@ module Data = struct
       Mina_metrics.Consensus.record_slot_check ~time_elapsed_ms
         ~vrfs_evaluated_in_slot:vrfs_evaluated ~max_vrfs_to_evaluate_in_slot ;
       win
+
+    let%bench_fun "1_000 vrf checks on single staking account" =
+      let logger = Logger.null () in
+      let constraint_constants =
+        Genesis_constants.Constraint_constants.for_unit_tests
+      in
+      (* let constants = Lazy.force Constants.for_unit_tests in *)
+      let seed =
+        Quickcheck.Generator.generate Epoch_seed.gen ~size:1
+          ~random:(Splittable_random.State.of_int 0xDEADBEEF)
+      in
+      let genesis_ledger, staking_account, private_key =
+        let ledger_accounts = Lazy.force Genesis_ledger.Test.accounts in
+        let ledger =
+          Mina_base.Ledger.create_ephemeral
+            ~depth:constraint_constants.ledger_depth ()
+        in
+        List.iter ledger_accounts ~f:(fun (_, account) ->
+            Mina_base.Ledger.create_new_account_exn ledger
+              (Mina_base.Account.identifier account)
+              account) ;
+        let sk_opt, account = List.hd_exn ledger_accounts in
+        (ledger, account, Option.value_exn sk_opt)
+      in
+      let public_key = Public_key.of_private_key_exn private_key in
+      let public_key_compressed = Public_key.compress public_key in
+      let staking_keypairs =
+        let keypair = { Keypair.public_key; private_key } in
+        Keypair.And_compressed_pk.Set.singleton (keypair, public_key_compressed)
+      in
+      let total_stake =
+        Mina_base.Ledger.foldi genesis_ledger ~init:Currency.Amount.zero
+          ~f:(fun _addr amount account ->
+            Option.value_exn
+              (Currency.Amount.add amount
+                 (Currency.Balance.to_amount account.balance)))
+      in
+      let epoch_snapshot =
+        let open Local_state.Snapshot in
+        { ledger = Ledger_snapshot.Genesis_epoch_ledger genesis_ledger
+        ; delegatee_table =
+            Public_key.Compressed.Table.of_alist_exn
+              [ ( public_key_compressed
+                , Mina_base.Account.Index.Table.of_alist_exn
+                    [ (0, staking_account) ] )
+              ]
+        }
+      in
+      let check_vrf n =
+        let global_slot = UInt32.of_int n in
+        check ~constraint_constants ~global_slot
+          ~global_slot_since_genesis:global_slot ~seed ~epoch_snapshot
+          ~staking_keypairs ~coinbase_receiver:`Producer ~total_stake ~logger
+      in
+      fun () -> ignore (List.init 1_000 ~f:check_vrf)
   end
 
   module Optional_state_hash = struct
