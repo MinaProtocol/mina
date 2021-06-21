@@ -324,7 +324,7 @@ type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
   , Nat.N2.n
-  , Nat.N2.n )
+  , Nat.N6.n )
   Pickles.Tag.t
 
 val verify :
@@ -393,6 +393,26 @@ val generate_transaction_witness :
   -> Tick.Handler.t
   -> unit
 
+module Parties_segment : sig
+  module Witness : sig
+    type t
+  end
+
+  module Basic : sig
+    type (_, _, _, _) t =
+      (* Corresponds to payment *)
+      | Opt_signed_unsigned : (unit, unit, unit, unit) t
+      | Opt_signed_opt_signed : (unit, unit, unit, unit) t
+      | Opt_signed : (unit, unit, unit, unit) t
+      | Proved
+          : ( Snapp_statement.Checked.t * unit
+            , Snapp_statement.t * unit
+            , Nat.N2.n * unit
+            , Side_loaded_verification_key.Max_branches.n * unit )
+            t
+  end
+end
+
 module type S = sig
   include Verification.S
 
@@ -434,6 +454,12 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
+    -> t Async.Deferred.t
+
+  val of_parties_segment_exn :
+       (_, _, _, _) Parties_segment.Basic.t
+    -> statement:Statement.With_sok.t
+    -> witness:Parties_segment.Witness.t
     -> t Async.Deferred.t
 
   val merge :

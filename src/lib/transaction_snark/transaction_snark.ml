@@ -642,6 +642,73 @@ let chain if_ b ~then_ ~else_ =
   let%bind then_ = then_ and else_ = else_ in
   if_ b ~then_ ~else_
 
+module Parties_segment = struct
+  module Spec = struct
+    type single =
+      { predicate_type: [`Full | `Nonce_or_accept]
+      ; auth_type: Control.Tag.t
+      ; is_start: [`Yes | `No | `Compute_in_circuit] }
+
+    type t = single list
+  end
+
+  module Basic = struct
+    module N = Side_loaded_verification_key.Max_branches
+
+    type (_, _, _, _) t =
+      (* Corresponds to payment *)
+      | Opt_signed_unsigned : (unit, unit, unit, unit) t
+      | Opt_signed_opt_signed : (unit, unit, unit, unit) t
+      | Opt_signed : (unit, unit, unit, unit) t
+      | Proved
+          : ( Snapp_statement.Checked.t * unit
+            , Snapp_statement.t * unit
+            , Nat.N2.n * unit
+            , N.n * unit )
+            t
+
+    let opt_signed ~is_start : Spec.single =
+      {predicate_type= `Nonce_or_accept; auth_type= Signature; is_start}
+
+    let unsigned : Spec.single =
+      {predicate_type= `Nonce_or_accept; auth_type= None_given; is_start= `No}
+
+    let opt_signed = opt_signed ~is_start:`Compute_in_circuit
+
+    let spec : type a b c d. (a, b, c, d) t -> Spec.single list =
+     fun t ->
+      match t with
+      | Opt_signed_unsigned ->
+          [opt_signed; unsigned]
+      | Opt_signed_opt_signed ->
+          [opt_signed; opt_signed]
+      | Opt_signed ->
+          [opt_signed]
+      | Proved ->
+          [{predicate_type= `Full; auth_type= Proof; is_start= `No}]
+  end
+
+  module Witness = struct
+    type t =
+      { global_ledger: Sparse_ledger.t
+      ; local_state_init:
+          ( Party.t Parties.With_hashes.t
+          , Token_id.t
+          , Amount.t
+          , Sparse_ledger.t
+          , bool
+          , Field.t )
+          Parties_logic.Local_state.t
+      ; start_parties:
+          ( Parties.t
+          , Snapp_predicate.Protocol_state.t
+          , bool )
+          Parties_logic.Start_data.t
+          list
+      ; state_body: Mina_state.Protocol_state.Body.Value.t }
+  end
+end
+
 module Base = struct
   module User_command_failure = struct
     (** The various ways that a user command may fail. These should be computed
@@ -1240,36 +1307,8 @@ module Base = struct
       (Random_oracle.Input.field payload_digest)
 
   module Parties_snark = struct
-    module Spec = struct
-      type single =
-        { predicate_type: [`Full | `Nonce_or_accept]
-        ; auth_type: Control.Tag.t
-        ; is_start: [`Yes | `No | `Compute_in_circuit] }
-
-      type t = single list
-    end
-
+    open Parties_segment
     open Spec
-
-    module Witness = struct
-      type t =
-        { global_ledger: Sparse_ledger.t
-        ; local_state_init:
-            ( Party.t Parties.With_hashes.t
-            , Token_id.t
-            , Amount.t
-            , Sparse_ledger.t
-            , bool
-            , Field.t )
-            Parties_logic.Local_state.t
-        ; start_parties:
-            ( Parties.t
-            , Snapp_predicate.Protocol_state.t
-            , bool )
-            Parties_logic.Start_data.t
-            list
-        ; state_body: Mina_state.Protocol_state.Body.Value.t }
-    end
 
     module Prover_value : sig
       type 'a t
@@ -1478,7 +1517,7 @@ module Base = struct
           finished := true ;
           Impl.Boolean.all r.contents )
 
-    module type Step_inputs = sig
+    module type Single_inputs = sig
       val constraint_constants : Genesis_constants.Constraint_constants.t
 
       val spec : single
@@ -1490,7 +1529,7 @@ module Base = struct
       { party: (Party.Predicated.Checked.t, Impl.Field.t) With_hash.t
       ; control: Control.t Prover_value.t }
 
-    module Step (I : Step_inputs) = struct
+    module Single (I : Single_inputs) = struct
       open I
 
       let {predicate_type; auth_type; is_start} = spec
@@ -1849,7 +1888,10 @@ module Base = struct
                        account.data.public_key)
             in
             let account', `proof_must_verify proof_must_verify =
-              apply_body ~constraint_constants
+              let tag =
+                Option.map snapp_statement ~f:(fun (i, _) -> side_loaded i)
+              in
+              apply_body ~constraint_constants ?tag
                 ~txn_global_slot:global_state.protocol_state.curr_global_slot
                 ~add_check
                 ~check_auth:(fun t ->
@@ -1877,8 +1919,9 @@ module Base = struct
                 ; equal local_state.will_succeed local_state.success ])
     end
 
-    let main ?(witness : Witness.t option) spec ~constraint_constants
-        snapp_statements (statement : Statement.With_sok.Checked.t) =
+    let main ?(witness : Witness.t option) (spec : Spec.t)
+        ~constraint_constants snapp_statements
+        (statement : Statement.With_sok.Checked.t) =
       let open Impl in
       let ( ! ) x = Option.value_exn x in
       let state_body =
@@ -1929,7 +1972,7 @@ module Base = struct
                 | s :: ss ->
                     (Some s, ss) )
             in
-            let module S = Step (struct
+            let module S = Single (struct
               let constraint_constants = constraint_constants
 
               let spec = party_spec
@@ -2046,49 +2089,6 @@ module Base = struct
                ; fee_excess_r= Fee.Signed.(Checked.constant zero) }) ) ;
       (* TODO: Check various consistency equalities between local and global and the statement *)
       ()
-
-    let side_loaded i =
-      Pickles.Side_loaded.create ~name:(sprintf "snapp_%d" i)
-        ~max_branching:(module Pickles_types.Nat.N2)
-        ~value_to_field_elements:Snapp_statement.to_field_elements
-        ~var_to_field_elements:Snapp_statement.Checked.to_field_elements
-        ~typ:Snapp_statement.typ
-
-    module Basic = struct
-      module N = Side_loaded_verification_key.Max_branches
-
-      type (_, _, _, _) t =
-        (* Corresponds to payment *)
-        | Opt_signed_unsigned : (unit, unit, unit, unit) t
-        | Opt_signed_opt_signed : (unit, unit, unit, unit) t
-        | Opt_signed : (unit, unit, unit, unit) t
-        | Proved
-            : ( Snapp_statement.Checked.t * unit
-              , Snapp_statement.t * unit
-              , Nat.N2.n * unit
-              , N.n * unit )
-              t
-
-      let opt_signed ~is_start =
-        {predicate_type= `Nonce_or_accept; auth_type= Signature; is_start}
-
-      let unsigned =
-        {predicate_type= `Nonce_or_accept; auth_type= None_given; is_start= `No}
-
-      let opt_signed = opt_signed ~is_start:`Compute_in_circuit
-
-      let spec : type a b c d. (a, b, c, d) t -> single list =
-       fun t ->
-        match t with
-        | Opt_signed_unsigned ->
-            [opt_signed; unsigned]
-        | Opt_signed_opt_signed ->
-            [opt_signed; opt_signed]
-        | Opt_signed ->
-            [opt_signed]
-        | Proved ->
-            [{predicate_type= `Full; auth_type= Proof; is_start= `No}]
-    end
 
     (* Horrible hack :( *)
     let witness : Witness.t option ref = ref None
@@ -3110,7 +3110,7 @@ type tag =
   ( Statement.With_sok.Checked.t
   , Statement.With_sok.t
   , Nat.N2.n
-  , Nat.N2.n )
+  , Nat.N6.n )
   Pickles.Tag.t
 
 let time lab f =
@@ -3200,6 +3200,12 @@ module type S = sig
     -> next_available_token_after:Token_id.t
     -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
+    -> t Async.Deferred.t
+
+  val of_parties_segment_exn :
+       (_, _, _, _) Parties_segment.Basic.t
+    -> statement:Statement.With_sok.t
+    -> witness:Parties_segment.Witness.t
     -> t Async.Deferred.t
 
   val merge :
@@ -3391,6 +3397,66 @@ struct
       Proof.verify
         (List.map ts ~f:(fun ({statement; proof}, _) -> (statement, proof)))
     else Async.return false
+
+  let of_parties_segment_exn (type a b c d)
+      (type_ : (a, b, c, d) Parties_segment.Basic.t) ~statement ~witness :
+      t Async.Deferred.t =
+    Base.Parties_snark.witness := Some witness ;
+    let res =
+      match type_ with
+      | Opt_signed ->
+          opt_signed [] statement
+      | Opt_signed_unsigned ->
+          opt_signed_unsigned [] statement
+      | Opt_signed_opt_signed ->
+          opt_signed_opt_signed [] statement
+      | Proved ->
+          let proofs =
+            let party_proof (p : Party.t) =
+              match p.authorization with
+              | Proof p ->
+                  Some p
+              | Signature _ | None_given ->
+                  None
+            in
+            let open Option.Let_syntax in
+            List.filter_map witness.local_state_init.parties
+              ~f:(fun (p, at_party) ->
+                let%map pi = party_proof p in
+                ( { Snapp_statement.Poly.transaction=
+                      witness.local_state_init.transaction_commitment
+                  ; at_party }
+                , pi ) )
+            @ List.concat_map witness.start_parties ~f:(fun s ->
+                  (* TODO: This is unnecessary re-computation of the statements which are also computed in
+                 the circuit. It would be better to use the values computed inside the circuit, but it
+                 was involved to change the pickles API to allow it. *)
+                  let other_parties, transaction =
+                    let ps = Parties.With_hashes.create s.parties in
+                    ( ps
+                    , Parties.Transaction_commitment.create
+                        ~other_parties_hash:(Parties.With_hashes.hash ps)
+                        ~protocol_state_predicate_hash:
+                          (Snapp_predicate.Protocol_state.digest
+                             s.protocol_state_predicate) )
+                  in
+                  List.filter_map other_parties ~f:(fun (p, at_party) ->
+                      let%map pi = party_proof p in
+                      ({Snapp_statement.Poly.transaction; at_party}, pi) ) )
+          in
+          proved
+            ( match proofs with
+            | [p] ->
+                (* TODO: We should not have to pass the statement in here. *)
+                [p]
+            | [] | _ :: _ :: _ ->
+                failwith "of_parties_segment: Expected exactly one proof" )
+            statement
+    in
+    Base.Parties_snark.witness := None ;
+    let open Async in
+    let%map proof = res in
+    {proof; statement}
 
   let of_transaction_union sok_digest source target ~init_stack
       ~pending_coinbase_stack_state ~next_available_token_before
@@ -3828,7 +3894,7 @@ let%test_module "transaction_snark" =
           Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
               let parties = party_send (List.hd_exn specs) in
               Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
-              let w : Base.Parties_snark.Witness.t =
+              let w : Parties_segment.Witness.t =
                 { global_ledger=
                     Sparse_ledger.of_ledger_subset_exn ledger
                       (Parties.accounts_accessed parties)
