@@ -451,8 +451,8 @@ func (m *listeningAddrsMsg) run(app *app) (interface{}, error) {
 
 type publishMsg struct {
 	Topic       string `json:"topic"`
-	MessageType byte   `json:"type`
 	Data        string `json:"data"`
+	MessageType byte   `json:"type"`
 }
 
 func (t *publishMsg) run(app *app) (interface{}, error) {
@@ -562,13 +562,13 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		msgType := msg.Data[0]
 
 		app.writeMsg(validateUpcall{
-			Sender:     sender,
-			Expiration: deadline.UnixNano(),
-			Data:       codaEncode(msg.Data[1:]),
-			Seqno:      seqno,
-			Upcall:     "validate",
-			Idx:        s.Subscription,
-			MessageType:       msgType,
+			Sender:       sender,
+			Expiration:   deadline.UnixNano(),
+			Data:         codaEncode(msg.Data[1:]),
+			Seqno:        seqno,
+			Upcall:       "validate",
+			Idx:          s.Subscription,
+			MessageType:  msgType,
 		})
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
@@ -660,13 +660,13 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 }
 
 type validateUpcall struct {
-	Sender     *codaPeerInfo `json:"sender"`
-	Expiration int64         `json:"expiration"`
-	Data       string        `json:"data"`
-	Seqno      int           `json:"seqno"`
-	Upcall     string        `json:"upcall"`
-	Idx        int           `json:"subscription_idx"`
-	MessageType       byte          `json:"type"`
+	Sender      *codaPeerInfo `json:"sender"`
+	Expiration  int64         `json:"expiration"`
+	Data        string        `json:"data"`
+	Seqno       int           `json:"seqno"`
+	Upcall      string        `json:"upcall"`
+	Idx         int           `json:"subscription_idx"`
+	MessageType byte          `json:"type"`
 }
 
 type validationCompleteMsg struct {
@@ -738,7 +738,10 @@ type incomingMsgUpcall struct {
 	Upcall    string `json:"upcall"`
 	StreamIdx int    `json:"stream_idx"`
 	Data      string `json:"data"`
-	MessageType      byte   `json:"type"`
+  // Seems like it is not necessary to send as
+  // OCaml can demarschal the message and determine
+  // it's type automatically
+	// MessageType      byte   `json:"type"`
 }
 
 func handleStreamReads(app *app, stream net.Stream, idx int) {
@@ -829,7 +832,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 					Upcall:    "incomingStreamMsg",
 					Data:      codaEncode(buffer[:bufferReadSize]),
 					StreamIdx: idx,
-					MessageType: msgType,
+					// MessageType: msgType,
 				})
 			}
 		}
