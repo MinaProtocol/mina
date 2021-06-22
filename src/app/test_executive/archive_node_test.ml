@@ -30,7 +30,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     }
 
   (* number of minutes to let the network run, after initialization *)
-  let runtime_min = 15.
+  let runtime_min = 5.
 
   let run network t =
     let open Malleable_error.Let_syntax in
