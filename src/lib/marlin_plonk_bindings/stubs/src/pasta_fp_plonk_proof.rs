@@ -1,10 +1,10 @@
-use algebra::{
-    curves::AffineCurve,
-    pasta::{
+use mina_curves::pasta::{
         vesta::{Affine as GAffine, VestaParameters},
         fp::Fp,
         fq::Fq,
-    },
+};
+use algebra::{
+    curves::AffineCurve,
     One,
 };
 
