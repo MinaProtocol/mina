@@ -805,6 +805,9 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			app.P2p.MsgStats.UpdateMetrics(length)
 
 			msgType, err := r.ReadByte()
+			// Ocaml process is able to determine the message type
+			// by the message itself
+			_ = msgType
 			if err != nil {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
