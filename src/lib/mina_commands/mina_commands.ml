@@ -356,7 +356,7 @@ let get_status ~flag t =
     in
     match Transition_frontier.catchup_tree frontier with
     | Full full ->
-        Some (Hashtbl.to_alist full.states)
+        Some (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, (n, _hashes)) -> (state, n)))
     | _ ->
         None
   in
