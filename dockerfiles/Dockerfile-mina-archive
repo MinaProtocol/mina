@@ -34,7 +34,7 @@ RUN apt-get -y update \
         ca-certificates \
         dnsutils \
         tzdata \
-        postgresql \
+        postgresql-11 \
         postgresql-contrib \
         apt-utils \
         man \

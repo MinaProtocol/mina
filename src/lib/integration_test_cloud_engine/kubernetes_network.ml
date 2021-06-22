@@ -368,7 +368,7 @@ module Node = struct
       run_in_container t
         ~cmd:
           "pg_dump --create --no-owner \
-           postgres://postgres:foobar@archive-1-postgresql-0:5432/archive"
+           postgres://postgres:foobar@archive-1-postgresql:5432/archive"
     in
     let%map data = Deferred.bind ~f:Malleable_error.return dat in
     [%log info] "Dumping archive data to file %s" data_file ;
