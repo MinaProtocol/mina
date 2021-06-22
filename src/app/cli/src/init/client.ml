@@ -1933,10 +1933,16 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           match Sys.getenv "CODA_CONFIG_FILE" with
-           | Some config_file ->
+           (* TODO: eventually, remove CODA_ variable *)
+           let mina_config_file = "MINA_CONFIG_FILE" in
+           let coda_config_file = "CODA_CONFIG_FILE" in
+           match Sys.getenv mina_config_file, Sys.getenv coda_config_file with
+           | Some config_file,_ ->
                config_file
-           | None ->
+           | None, Some config_file ->
+             (* we print a deprecation warning on daemon startup, don't print here *)
+             config_file
+           | None, None ->
                conf_dir ^/ "daemon.json"
          in
          let open Async in
@@ -1987,7 +1993,7 @@ let compile_time_constants =
                    (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
                ) ]
          in
-         Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
+         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
 
 let node_status =
   let open Command.Param in

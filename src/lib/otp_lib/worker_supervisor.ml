@@ -28,7 +28,7 @@ end
 module type Worker_intf = sig
   include Base_intf
 
-  val make_immediate_progress : t -> input -> [`Unprocessed of input]
+  val make_immediate_progress : t -> input -> [ `Unprocessed of input ]
 
   val perform : t -> input -> output Deferred.t
 end
@@ -39,7 +39,7 @@ module type S = sig
 
   val is_working : t -> bool
 
-  val make_immediate_progress : t -> input -> [`Unprocessed of input]
+  val make_immediate_progress : t -> input -> [ `Unprocessed of input ]
 
   val dispatch : t -> input -> output Deferred.t
 end
@@ -47,12 +47,13 @@ end
 (** [Make (Worker)] creates a supervisor which wraps dispatches to [Worker]. *)
 module Make (Worker : Worker_intf) :
   S
-  with type create_args := Worker.create_args
-   and type input := Worker.input
-   and type output := Worker.output = struct
-  type t = {mutable thread: Worker.output Deferred.t option; worker: Worker.t}
+    with type create_args := Worker.create_args
+     and type input := Worker.input
+     and type output := Worker.output = struct
+  type t =
+    { mutable thread : Worker.output Deferred.t option; worker : Worker.t }
 
-  let create args = {thread= None; worker= Worker.create args}
+  let create args = { thread = None; worker = Worker.create args }
 
   let is_working t =
     Option.value_map t.thread ~default:false ~f:Deferred.is_determined

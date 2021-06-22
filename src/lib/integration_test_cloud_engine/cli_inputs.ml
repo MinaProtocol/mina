@@ -1,6 +1,6 @@
 open Cmdliner
 
-type t = {coda_automation_location: string}
+type t = { coda_automation_location : string }
 
 let term =
   let coda_automation_location =
@@ -12,8 +12,8 @@ let term =
     Arg.(
       value & opt string "./automation"
       & info
-          ["coda-automation-location"]
+          [ "coda-automation-location" ]
           ~env ~docv:"CODA_AUTOMATION_LOCATION" ~doc)
   in
-  let cons_inputs coda_automation_location = {coda_automation_location} in
+  let cons_inputs coda_automation_location = { coda_automation_location } in
   Term.(const cons_inputs $ coda_automation_location)

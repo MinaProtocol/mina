@@ -69,6 +69,4 @@ val min_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
 val max_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
 
 val iter_deferred :
-     'a t
-  -> f:('a -> unit Async_kernel.Deferred.t)
-  -> unit Async_kernel.Deferred.t
+  'a t -> f:('a -> unit Async_kernel.Deferred.t) -> unit Async_kernel.Deferred.t

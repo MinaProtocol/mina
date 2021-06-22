@@ -512,10 +512,16 @@ let get_consensus_constants ~logger :
     Filename.concat home ".coda-config"
   in
   let config_file =
-    match Sys.getenv "CODA_CONFIG_FILE" with
-    | Some config_file ->
+    let mina_config_file = "MINA_CONFIG_FILE" in
+    let coda_config_file = "CODA_CONFIG_FILE" in
+    match Sys.getenv mina_config_file,Sys.getenv coda_config_file with
+    | Some config_file,_ ->
         config_file
-    | None ->
+    | None,Some config_file ->
+      [%log warn] "Using deprecated environment variable %s, please use %s instead"
+        coda_config_file mina_config_file;
+      config_file
+    | None,None ->
         Filename.concat conf_dir "config.json"
   in
   let%bind config =

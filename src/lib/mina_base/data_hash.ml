@@ -1,10 +1,8 @@
 (* data_hash.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 include Data_hash_lib.Data_hash
 

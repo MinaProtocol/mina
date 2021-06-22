@@ -11,6 +11,6 @@ now_time=$(date +%s)
 
 export CODA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export CODA_PRIVKEY_PASS=""
-export CODA_CONFIG_FILE=/tmp/config.json
+export MINA_CONFIG_FILE=/tmp/config.json
 
 exec $BIN daemon -seed -demo-mode -block-producer-key /tmp/keys/demo-block-producer -run-snark-worker $SNARK_PK -config-file /tmp/config.json -insecure-rest-server $@
