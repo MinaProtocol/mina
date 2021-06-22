@@ -1,10 +1,10 @@
+use mina_curves::pasta::{
+    pallas::{Affine as GAffine, PallasParameters},
+    fp::Fp,
+    fq::Fq,
+};
 use algebra::{
     curves::AffineCurve,
-    pasta::{
-        pallas::{Affine as GAffine, PallasParameters},
-        fp::Fp,
-        fq::Fq,
-    },
     One,
 };
 
