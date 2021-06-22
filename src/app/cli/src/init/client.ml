@@ -476,7 +476,7 @@ let batch_send_payments =
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
     let%bind keypair =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
         privkey_path
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
@@ -882,7 +882,7 @@ let dump_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
         privkey_path
     in
     printf "Public key: %s\nPrivate key: %s\n"
@@ -1375,7 +1375,7 @@ let import_key =
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon.\n\
-       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
     (let%map_open.Command access_method =
        choose_one
@@ -1511,7 +1511,7 @@ let export_key =
     ~summary:
       "Export a tracked account so that it can be saved or transferred \
        between machines.\n\
-      \ Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+      \ Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be exported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun _ (export_path, pk, conf_dir) ->
