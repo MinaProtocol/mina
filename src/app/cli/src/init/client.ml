@@ -1933,11 +1933,10 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           match Sys.getenv "CODA_CONFIG_FILE" with
+           match Sys.getenv "MINA_CONFIG_FILE" with
            | Some config_file ->
                config_file
-           | None ->
-               conf_dir ^/ "daemon.json"
+           | None -> conf_dir ^/ "daemon.json"
          in
          let open Async in
          let%map ({consensus_constants; _} as precomputed_values), _ =
@@ -1987,7 +1986,7 @@ let compile_time_constants =
                    (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
                ) ]
          in
-         Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
+         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
 
 let node_status =
   let open Command.Param in

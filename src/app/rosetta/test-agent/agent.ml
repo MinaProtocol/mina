@@ -512,11 +512,10 @@ let get_consensus_constants ~logger :
     Filename.concat home ".coda-config"
   in
   let config_file =
-    match Sys.getenv "CODA_CONFIG_FILE" with
+    match Sys.getenv "MINA_CONFIG_FILE" with
     | Some config_file ->
         config_file
-    | None ->
-        Filename.concat conf_dir "config.json"
+    | None -> Filename.concat conf_dir "config.json"
   in
   let%bind config =
     let%map config_json = Genesis_ledger_helper.load_config_json config_file in

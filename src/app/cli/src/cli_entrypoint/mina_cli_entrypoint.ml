@@ -321,7 +321,7 @@ let setup_daemon logger =
   and config_files =
     flag "--config-file" ~aliases:["config-file"]
       ~doc:
-        "PATH path to a configuration file (overrides CODA_CONFIG_FILE, \
+        "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
@@ -609,11 +609,10 @@ let setup_daemon logger =
         (conf_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
-        match Sys.getenv "CODA_CONFIG_FILE" with
+        match Sys.getenv "MINA_CONFIG_FILE" with
         | Some config_file ->
             Some (config_file, `Must_exist)
-        | None ->
-            None
+        | None -> None
       in
       let config_files =
         Option.to_list config_file_installed
