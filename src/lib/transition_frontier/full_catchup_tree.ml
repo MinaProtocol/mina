@@ -116,7 +116,7 @@ end
    ancestor is at most k *)
 type t =
   { nodes: Node.t State_hash.Table.t
-  ; states: int Node.State.Enum.Table.t
+  ; states: (int * State_hash.Set.t) Node.State.Enum.Table.t
   ; logger: Logger.t }
 
 (* mutable root: Node.t ; *)
@@ -137,9 +137,16 @@ let tear_down {nodes; states; _} =
   Hashtbl.clear states
 
 let set_state t (node : Node.t) s =
-  Hashtbl.decr t.states (Node.State.enum node.state) ;
+  Hashtbl.update t.states (Node.State.enum node.state)
+    ~f:(function
+      | None -> (0, State_hash.Set.empty)
+      | Some (n, hashes) -> (n-1, State_hash.Set.remove hashes node.state_hash)) ;
   node.state <- s ;
-  Hashtbl.incr t.states (Node.State.enum s)
+  Hashtbl.update t.states (Node.State.enum node.state)
+    ~f:(function
+      | None -> (1, State_hash.Set.singleton node.state_hash)
+      | Some (n, hashes) -> (n+1, State_hash.Set.add hashes node.state_hash))
+
 
 let finish t (node : Node.t) b =
   let s, r =
@@ -151,9 +158,9 @@ let finish t (node : Node.t) b =
 
 let to_yojson =
   let module T = struct
-    type t = (Node.State.Enum.t * int) list [@@deriving to_yojson]
+    type t = (Node.State.Enum.t * (int * State_hash.t list ))  list [@@deriving to_yojson]
   end in
-  fun (t : t) -> T.to_yojson (Hashtbl.to_alist t.states)
+  fun (t : t) -> T.to_yojson @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, (n, hashes)) -> (state, (n, State_hash.Set.to_list hashes)))
 
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
@@ -195,7 +202,10 @@ let create_node_full t b : unit =
     ; parent= Breadcrumb.parent_hash b
     ; result= Ivar.create_full (Ok `Added_to_frontier) }
   in
-  Hashtbl.incr t.states (Node.State.enum node.state) ;
+  Hashtbl.update t.states (Node.State.enum node.state)
+    ~f:(function
+      | None -> (1, State_hash.Set.singleton h)
+      | Some (n, hashes) -> (n+1, State_hash.Set.add hashes h)) ;
   Hashtbl.add_exn t.nodes ~key:h ~data:node
 
 let breadcrumb_added (t : t) b =
@@ -218,7 +228,11 @@ let breadcrumb_added (t : t) b =
 
 let remove_node' t (node : Node.t) =
   Hashtbl.remove t.nodes node.state_hash ;
-  Hashtbl.decr t.states (Node.State.enum node.state) ;
+
+    Hashtbl.update t.states (Node.State.enum node.state)
+    ~f:(function
+      | None -> (0, State_hash.Set.empty)
+      | Some (n, hashes) -> (n-1, State_hash.Set.remove hashes node.state_hash)) ;
   Ivar.fill_if_empty node.result (Error node.attempts) ;
   match node.state with
   | Root _ | Failed | Finished ->
