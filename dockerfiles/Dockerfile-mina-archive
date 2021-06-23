@@ -22,7 +22,7 @@ RUN mkdir /usr/share/man/man7 /usr/share/man/man1
 RUN apt-get -y update \
     && apt-get -y upgrade \
     && apt install -y wget \
-    && apt-get install gnupg
+    && apt-get install -y gnupg
 
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 # Dependencies
