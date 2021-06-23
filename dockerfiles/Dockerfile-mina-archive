@@ -24,7 +24,10 @@ RUN apt-get -y update \
     && apt install -y wget \
     && apt-get install -y gnupg
 
-RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+  && RELEASE=$(lsb_release -cs) \
+  && echo "deb http://apt.postgresql.org/pub/repos/apt/ ${RELEASE}"-pgdg main | tee /etc/apt/sources.list.d/pgdg.list
+
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
