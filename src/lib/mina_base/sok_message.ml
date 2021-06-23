@@ -5,14 +5,16 @@ open Import
 module Stable = struct
   module V1 = struct
     type t =
-      {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+      { fee : Currency.Fee.Stable.V1.t
+      ; prover : Public_key.Compressed.Stable.V1.t
+      }
     [@@deriving sexp, yojson, equal, compare]
 
     let to_latest = Fn.id
   end
 end]
 
-let create ~fee ~prover = Stable.Latest.{fee; prover}
+let create ~fee ~prover = Stable.Latest.{ fee; prover }
 
 module Digest = struct
   let length_in_bytes = Blake2.digest_size_in_bytes
@@ -55,8 +57,7 @@ module Digest = struct
     let to_input t = Random_oracle.Input.bitstring (Array.to_list t)
   end
 
-  [%%define_locally
-  Stable.Latest.(to_input, typ)]
+  [%%define_locally Stable.Latest.(to_input, typ)]
 
   let default = String.init length_in_bytes ~f:(fun _ -> '\000')
 end

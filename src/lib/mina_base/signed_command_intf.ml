@@ -1,13 +1,11 @@
 (* user_command_intf.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Import
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Mina_numbers
 open Snark_params.Tick
@@ -31,9 +29,9 @@ module type Gen_intf = sig
     * and an amount $\in [1,max_amount]$
     *)
     val payment :
-         ?sign_type:[`Fake | `Real]
-      -> key_gen:(Signature_keypair.t * Signature_keypair.t)
-                 Quickcheck.Generator.t
+         ?sign_type:[ `Fake | `Real ]
+      -> key_gen:
+           (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
       -> ?fee_token:Token_id.t
@@ -49,7 +47,7 @@ module type Gen_intf = sig
     * and an amount $\in [1,max_amount]$
     *)
     val payment_with_random_participants :
-         ?sign_type:[`Fake | `Real]
+         ?sign_type:[ `Fake | `Real ]
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> max_amount:int
@@ -60,8 +58,8 @@ module type Gen_intf = sig
       -> t Quickcheck.Generator.t
 
     val stake_delegation :
-         key_gen:(Signature_keypair.t * Signature_keypair.t)
-                 Quickcheck.Generator.t
+         key_gen:
+           (Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
       -> ?fee_token:Token_id.t
       -> fee_range:int
@@ -81,7 +79,7 @@ module type Gen_intf = sig
     *)
     val sequence :
          ?length:int
-      -> ?sign_type:[`Fake | `Real]
+      -> ?sign_type:[ `Fake | `Real ]
       -> ( Signature_lib.Keypair.t
          * Currency.Amount.t
          * Mina_numbers.Account_nonce.t

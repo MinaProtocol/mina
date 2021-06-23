@@ -5,7 +5,8 @@ open Core
 (* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
 
 module T = struct
-  type t = {uuid: Uuid.Stable.V1.t; db: (Rocks.t [@sexp.opaque])} [@@deriving sexp]
+  type t = { uuid : Uuid.Stable.V1.t; db : (Rocks.t[@sexp.opaque]) }
+  [@@deriving sexp]
 end
 
 include T
@@ -13,7 +14,7 @@ include T
 let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
-  {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
+  { uuid = Uuid_unix.create (); db = Rocks.open_db ~opts directory }
 
 let create_checkpoint t dir =
   Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ;
@@ -35,7 +36,7 @@ let set_batch t ?(remove_keys = [])
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
   List.iter key_data_pairs ~f:(fun (key, data) ->
-      Rocks.WriteBatch.put batch key data ) ;
+      Rocks.WriteBatch.put batch key data) ;
   (* Delete any key pairs *)
   List.iter remove_keys ~f:(fun key -> Rocks.WriteBatch.delete batch key) ;
   (* commit batch *)
@@ -106,7 +107,7 @@ let%test_unit "to_alist (of_alist l) = l" =
               [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted
                 alist ;
               close db ;
-              Async.Deferred.unit ) )
+              Async.Deferred.unit))
 
 let%test_unit "checkpoint read" =
   let open Async in
@@ -128,17 +129,15 @@ let%test_unit "checkpoint read" =
           in
           let db = create db_dir in
           Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
-              set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
+              set db ~key:(to_bigstring key) ~data:(to_bigstring data)) ;
           let cp = create_checkpoint db cp_dir in
           match
             ( Hashtbl.add db_hashtbl ~key:"db_key" ~data:"db_data"
             , Hashtbl.add cp_hashtbl ~key:"cp_key" ~data:"cp_data" )
           with
           | `Ok, `Ok ->
-              set db ~key:(to_bigstring "db_key")
-                ~data:(to_bigstring "db_data") ;
-              set cp ~key:(to_bigstring "cp_key")
-                ~data:(to_bigstring "cp_data") ;
+              set db ~key:(to_bigstring "db_key") ~data:(to_bigstring "db_data") ;
+              set cp ~key:(to_bigstring "cp_key") ~data:(to_bigstring "cp_data") ;
               let db_sorted =
                 List.sort
                   (Hashtbl.to_alist db_hashtbl)
@@ -159,12 +158,12 @@ let%test_unit "checkpoint read" =
                 List.sort (to_alist cp)
                   ~compare:[%compare: Bigstring.t * Bigstring.t]
               in
-              [%test_result: (Bigstring.t * Bigstring.t) list]
-                ~expect:db_sorted db_alist ;
-              [%test_result: (Bigstring.t * Bigstring.t) list]
-                ~expect:cp_sorted cp_alist ;
+              [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:db_sorted
+                db_alist ;
+              [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:cp_sorted
+                cp_alist ;
               close db ;
               close cp ;
               Deferred.unit
           | _ ->
-              Deferred.unit ) )
+              Deferred.unit ))

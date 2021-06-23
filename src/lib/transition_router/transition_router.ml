@@ -8,10 +8,10 @@ open Mina_numbers
 
 type Structured_log_events.t += Starting_transition_frontier_controller
   [@@deriving
-    register_event {msg= "Starting transition frontier controller phase"}]
+    register_event { msg = "Starting transition frontier controller phase" }]
 
 type Structured_log_events.t += Starting_bootstrap_controller
-  [@@deriving register_event {msg= "Starting bootstrap controller phase"}]
+  [@@deriving register_event { msg = "Starting bootstrap controller phase" }]
 
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
@@ -51,7 +51,8 @@ let is_transition_for_bootstrap ~logger
           ~logger:
             (Logger.extend logger
                [ ( "selection_context"
-                 , `String "Transition_router.is_transition_for_bootstrap" ) ])
+                 , `String "Transition_router.is_transition_for_bootstrap" )
+               ])
 
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~producer_transition_reader_ref
@@ -77,7 +78,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Transition_frontier_controller.run ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
-          ~producer_transition_reader ~clear_reader ~precomputed_values )
+          ~producer_transition_reader ~clear_reader ~precomputed_values)
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -105,8 +106,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   producer_transition_reader_ref := producer_transition_reader ;
   producer_transition_writer_ref := producer_transition_writer ;
   Option.iter best_seen_transition ~f:(fun best_seen_transition ->
-      Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition
-  ) ;
+      Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   trace_recurring "bootstrap controller" (fun () ->
       upon
@@ -120,8 +120,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~network ~time_controller ~producer_transition_reader_ref
             ~producer_transition_writer_ref ~verified_transition_writer
             ~clear_reader ~collected_transitions ~transition_reader_ref
-            ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier
-      ) )
+            ~transition_writer_ref ~frontier_w ~precomputed_values new_frontier))
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer ~genesis_constants ~precomputed_values =
@@ -140,7 +139,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             [%log debug]
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", Error_json.error_to_yojson e) ]
+                ; ("error", Error_json.error_to_yojson e)
+                ]
               "Couldn't get best tip from peer: $error" ;
             return None
         | Ok peer_best_tip -> (
@@ -150,7 +150,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 ; ( "length"
                   , Length.to_yojson
                       (External_transition.blockchain_length peer_best_tip.data)
-                  ) ]
+                  )
+                ]
               "Successfully downloaded best tip with $length from $peer" ;
             (* TODO: Use batch verification instead *)
             match%bind
@@ -161,7 +162,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 [%log warn]
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
-                    ; ("error", Error_json.error_to_yojson e) ]
+                    ; ("error", Error_json.error_to_yojson e)
+                    ]
                   "Peer sent us bad proof for their best tip" ;
                 let%map () =
                   Trust_system.(
@@ -174,17 +176,17 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                 None
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 [%log debug]
-                  ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
+                  ~metadata:[ ("peer", Network_peer.Peer.to_yojson peer) ]
                   "Successfully verified best tip from $peer" ;
                 return
                   (Some
                      (Envelope.Incoming.wrap_peer
-                        ~data:{peer_best_tip with data= candidate_best_tip}
-                        ~sender:peer)) ) )
+                        ~data:{ peer_best_tip with data = candidate_best_tip }
+                        ~sender:peer)) ))
   in
   [%log debug]
     ~metadata:
-      [("actual", `Int (List.length tips)); ("expected", `Int num_peers)]
+      [ ("actual", `Int (List.length tips)); ("expected", `Int num_peers) ]
     "Finished requesting tips. Got $actual / $expected" ;
   let res =
     List.fold tips ~init:None ~f:(fun acc enveloped_candidate_best_tip ->
@@ -205,7 +207,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             | `Keep ->
                 enveloped_existing_best_tip
             | `Take ->
-                enveloped_candidate_best_tip ) )
+                enveloped_candidate_best_tip))
   in
   Option.iter res ~f:(fun best ->
       let best_tip_length =
@@ -216,19 +218,18 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
         best_tip_length ;
       don't_wait_for
       @@ Broadcast_pipe.Writer.write most_recent_valid_block_writer
-           best.data.data ) ;
+           best.data.data) ;
   Option.map res
     ~f:
       (Envelope.Incoming.map ~f:(fun (x : _ Proof_carrying_data.t) ->
            Ledger_catchup.Best_tip_lru.add x ;
-           x.data ))
+           x.data))
 
 let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
     ~consensus_local_state ~precomputed_values ~catchup_mode =
   match%map
     Transition_frontier.load ~logger ~verifier ~consensus_local_state
-      ~persistent_root ~persistent_frontier ~precomputed_values ~catchup_mode
-      ()
+      ~persistent_root ~persistent_frontier ~precomputed_values ~catchup_mode ()
   with
   | Ok frontier ->
       [%log info] "Successfully loaded frontier" ;
@@ -263,7 +264,8 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             [%log info]
               ~metadata:
                 [ ( "max seconds to wait for high connectivity"
-                  , `Float connectivity_time_upperbound ) ]
+                  , `Float connectivity_time_upperbound )
+                ]
               "Will start initialization without connecting with too any peers"
           else (
             [%log error]
@@ -275,9 +277,11 @@ let wait_for_high_connectivity ~logger ~network ~is_seed =
             ~metadata:
               [ ("num peers", `Int (List.length peers))
               ; ( "max seconds to wait for high connectivity"
-                , `Float connectivity_time_upperbound ) ]
+                , `Float connectivity_time_upperbound )
+              ]
             "Will start initialization without connecting with too many peers"
-      ) ]
+      )
+    ]
 
 let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
     ~time_controller ~frontier_w ~producer_transition_reader_ref
@@ -310,89 +314,94 @@ let initialize ~logger ~network ~is_seed ~is_demo_mode ~verifier ~trust_system
         ~time_controller ~producer_transition_reader_ref
         ~producer_transition_writer_ref ~verified_transition_writer
         ~clear_reader ~transition_reader_ref ~consensus_local_state
-        ~transition_writer_ref ~frontier_w ~persistent_root
-        ~persistent_frontier ~initial_root_transition ~catchup_mode
-        ~best_seen_transition:best_tip ~precomputed_values
+        ~transition_writer_ref ~frontier_w ~persistent_root ~persistent_frontier
+        ~initial_root_transition ~catchup_mode ~best_seen_transition:best_tip
+        ~precomputed_values
   | best_tip, Some frontier -> (
-    match best_tip with
-    | Some best_tip
-      when is_transition_for_bootstrap ~logger frontier
-             (best_tip |> Envelope.Incoming.data)
-             ~precomputed_values ->
-        [%log info]
-          ~metadata:
-            [ ( "length"
-              , `Int
-                  (Unsigned.UInt32.to_int
-                     (External_transition.Initial_validated.blockchain_length
-                        best_tip.data)) ) ]
-          "Network best tip is too new to catchup to (best_tip with $length); \
-           starting bootstrap" ;
-        let initial_root_transition =
-          Transition_frontier.(Breadcrumb.validated_transition (root frontier))
-        in
-        let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
-        start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-          ~time_controller ~producer_transition_reader_ref
-          ~producer_transition_writer_ref ~verified_transition_writer
-          ~clear_reader ~transition_reader_ref ~consensus_local_state
-          ~transition_writer_ref ~frontier_w ~persistent_root
-          ~persistent_frontier ~initial_root_transition ~catchup_mode
-          ~best_seen_transition:(Some best_tip) ~precomputed_values
-    | _ ->
-        if Option.is_some best_tip then
+      match best_tip with
+      | Some best_tip
+        when is_transition_for_bootstrap ~logger frontier
+               (best_tip |> Envelope.Incoming.data)
+               ~precomputed_values ->
           [%log info]
             ~metadata:
               [ ( "length"
                 , `Int
                     (Unsigned.UInt32.to_int
                        (External_transition.Initial_validated.blockchain_length
-                          (Option.value_exn best_tip).data)) ) ]
-            "Network best tip is recent enough to catchup to (best_tip with \
-             $length); syncing local state and starting participation"
-        else
-          [%log info]
-            "Successfully loaded frontier, but failed downloaded best tip \
-             from network" ;
-        let curr_best_tip = Transition_frontier.best_tip frontier in
-        let%map () =
-          match
-            Consensus.Hooks.required_local_state_sync
-              ~constants:precomputed_values.consensus_constants
-              ~consensus_state:
-                (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
-              ~local_state:consensus_local_state
-          with
-          | None ->
-              [%log info] "Local state already in sync" ;
-              Deferred.unit
-          | Some sync_jobs -> (
-              [%log info] "Local state is out of sync; " ;
-              match%map
-                Consensus.Hooks.sync_local_state
-                  ~local_state:consensus_local_state ~logger ~trust_system
-                  ~random_peers:(Mina_networking.random_peers network)
-                  ~query_peer:
-                    { Consensus.Hooks.Rpcs.query=
-                        (fun peer rpc query ->
-                          Mina_networking.(
-                            query_peer network peer.peer_id
-                              (Rpcs.Consensus_rpc rpc) query) ) }
-                  ~ledger_depth:
-                    precomputed_values.constraint_constants.ledger_depth
-                  sync_jobs
-              with
-              | Error e ->
-                  Error.tag e ~tag:"Local state sync failed" |> Error.raise
-              | Ok () ->
-                  () )
-        in
-        let collected_transitions = Option.to_list best_tip in
-        start_transition_frontier_controller ~logger ~trust_system ~verifier
-          ~network ~time_controller ~producer_transition_reader_ref
-          ~producer_transition_writer_ref ~verified_transition_writer
-          ~clear_reader ~collected_transitions ~transition_reader_ref
-          ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
+                          best_tip.data)) )
+              ]
+            "Network best tip is too new to catchup to (best_tip with \
+             $length); starting bootstrap" ;
+          let initial_root_transition =
+            Transition_frontier.(
+              Breadcrumb.validated_transition (root frontier))
+          in
+          let%map () = Transition_frontier.close ~loc:__LOC__ frontier in
+          start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+            ~time_controller ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~transition_reader_ref ~consensus_local_state
+            ~transition_writer_ref ~frontier_w ~persistent_root
+            ~persistent_frontier ~initial_root_transition ~catchup_mode
+            ~best_seen_transition:(Some best_tip) ~precomputed_values
+      | _ ->
+          if Option.is_some best_tip then
+            [%log info]
+              ~metadata:
+                [ ( "length"
+                  , `Int
+                      (Unsigned.UInt32.to_int
+                         (External_transition.Initial_validated
+                          .blockchain_length (Option.value_exn best_tip).data))
+                  )
+                ]
+              "Network best tip is recent enough to catchup to (best_tip with \
+               $length); syncing local state and starting participation"
+          else
+            [%log info]
+              "Successfully loaded frontier, but failed downloaded best tip \
+               from network" ;
+          let curr_best_tip = Transition_frontier.best_tip frontier in
+          let%map () =
+            match
+              Consensus.Hooks.required_local_state_sync
+                ~constants:precomputed_values.consensus_constants
+                ~consensus_state:
+                  (Transition_frontier.Breadcrumb.consensus_state curr_best_tip)
+                ~local_state:consensus_local_state
+            with
+            | None ->
+                [%log info] "Local state already in sync" ;
+                Deferred.unit
+            | Some sync_jobs -> (
+                [%log info] "Local state is out of sync; " ;
+                match%map
+                  Consensus.Hooks.sync_local_state
+                    ~local_state:consensus_local_state ~logger ~trust_system
+                    ~random_peers:(Mina_networking.random_peers network)
+                    ~query_peer:
+                      { Consensus.Hooks.Rpcs.query =
+                          (fun peer rpc query ->
+                            Mina_networking.(
+                              query_peer network peer.peer_id
+                                (Rpcs.Consensus_rpc rpc) query))
+                      }
+                    ~ledger_depth:
+                      precomputed_values.constraint_constants.ledger_depth
+                    sync_jobs
+                with
+                | Error e ->
+                    Error.tag e ~tag:"Local state sync failed" |> Error.raise
+                | Ok () ->
+                    () )
+          in
+          let collected_transitions = Option.to_list best_tip in
+          start_transition_frontier_controller ~logger ~trust_system ~verifier
+            ~network ~time_controller ~producer_transition_reader_ref
+            ~producer_transition_writer_ref ~verified_transition_writer
+            ~clear_reader ~collected_transitions ~transition_reader_ref
+            ~transition_writer_ref ~frontier_w ~precomputed_values frontier )
 
 let wait_till_genesis ~logger ~time_controller
     ~(precomputed_values : Precomputed_values.t) =
@@ -408,7 +417,8 @@ let wait_till_genesis ~logger ~time_controller
     [%log warn]
       ~metadata:
         [ ( "time_till_genesis"
-          , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) ) ]
+          , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+        ]
       "Node started before the chain start time: waiting $time_till_genesis \
        milliseconds before starting participation" ;
     let rec logger_loop () =
@@ -424,7 +434,8 @@ let wait_till_genesis ~logger ~time_controller
            milliseconds before starting participation"
           ~metadata:
             [ ( "tm_remaining"
-              , `Int (Int64.to_int_exn @@ Time.Span.to_ms tm_remaining) ) ] ;
+              , `Int (Int64.to_int_exn @@ Time.Span.to_ms tm_remaining) )
+            ] ;
         logger_loop ()
     in
     Time.Timeout.await ~timeout_duration:time_till_genesis time_controller
@@ -434,10 +445,10 @@ let wait_till_genesis ~logger ~time_controller
 let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
     ~time_controller ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
-    ~frontier_broadcast_pipe:(frontier_r, frontier_w)
-    ~network_transition_reader ~producer_transition_reader
-    ~most_recent_valid_block:( most_recent_valid_block_reader
-                             , most_recent_valid_block_writer )
+    ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~network_transition_reader
+    ~producer_transition_reader
+    ~most_recent_valid_block:
+      (most_recent_valid_block_reader, most_recent_valid_block_writer)
     ~precomputed_values ~catchup_mode =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
@@ -459,7 +470,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
   in
   don't_wait_for
   @@ Strict_pipe.Reader.iter producer_transition_reader ~f:(fun x ->
-         Strict_pipe.Writer.write !producer_transition_writer_ref x ) ;
+         Strict_pipe.Writer.write !producer_transition_writer_ref x) ;
   upon (wait_till_genesis ~logger ~time_controller ~precomputed_values)
     (fun () ->
       let valid_transition_reader, valid_transition_writer =
@@ -516,7 +527,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                  then
                    Broadcast_pipe.Writer.write most_recent_valid_block_writer
                      incoming_transition
-                 else Deferred.unit ) ;
+                 else Deferred.unit) ;
           don't_wait_for
           @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
                ~f:(fun enveloped_transition ->
@@ -560,5 +571,5 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~is_demo_mode
                           Deferred.unit
                     in
                     Strict_pipe.Writer.write !transition_writer_ref
-                      enveloped_transition ) ) ) ;
+                      enveloped_transition))) ;
   (verified_transition_reader, initialization_finish_signal)

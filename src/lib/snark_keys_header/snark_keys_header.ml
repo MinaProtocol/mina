@@ -22,7 +22,7 @@ module UInt64 = struct
                sprintf
                  "Snark_keys_header.UInt64.of_yojson: Could not parse string \
                   as UInt64: %s"
-                 (Error.to_string_hum err) )
+                 (Error.to_string_hum err))
     | _ ->
         Error "Snark_keys_header.UInt64.of_yojson: Expected a string"
 
@@ -44,9 +44,9 @@ module Kind = struct
 |}
   *)
   type t =
-    { type_: string [@key "type"]
+    { type_ : string [@key "type"]
           (** Identifies the type of data that the file contains *)
-    ; identifier: string
+    ; identifier : string
           (** Identifies the specific purpose of the file's data, in a
             human-readable format
         *)
@@ -63,15 +63,15 @@ module Constraint_constants = struct
     let to_yojson t : Yojson.Safe.t =
       match t with
       | Log_2 i ->
-          `Assoc [("two_to_the", `Int i)]
+          `Assoc [ ("two_to_the", `Int i) ]
       | Txns_per_second_x10 i ->
-          `Assoc [("txns_per_second_x10", `Int i)]
+          `Assoc [ ("txns_per_second_x10", `Int i) ]
 
     let of_yojson (json : Yojson.Safe.t) =
       match json with
-      | `Assoc [("two_to_the", `Int i)] ->
+      | `Assoc [ ("two_to_the", `Int i) ] ->
           Ok (Log_2 i)
-      | `Assoc [("txns_per_second_x10", `Int i)] ->
+      | `Assoc [ ("txns_per_second_x10", `Int i) ] ->
           Ok (Txns_per_second_x10 i)
       | `Assoc _ ->
           Error
@@ -87,9 +87,10 @@ module Constraint_constants = struct
   module Fork_config = struct
     (** Fork data *)
     type t =
-      { previous_state_hash: string
-      ; previous_length: int
-      ; previous_global_slot: int }
+      { previous_state_hash : string
+      ; previous_length : int
+      ; previous_global_slot : int
+      }
     [@@deriving yojson, sexp, ord, equal]
 
     let opt_to_yojson t : Yojson.Safe.t =
@@ -105,38 +106,42 @@ module Constraint_constants = struct
 
   (** The constants used in the constraint system.  *)
   type t =
-    { sub_windows_per_window: int
-    ; ledger_depth: int
-    ; work_delay: int
-    ; block_window_duration_ms: int
-    ; transaction_capacity: Transaction_capacity.t
-    ; pending_coinbase_depth: int
-    ; coinbase_amount: UInt64.t
-    ; supercharged_coinbase_factor: int
-    ; account_creation_fee: UInt64.t
-    ; fork:
-        (Fork_config.t option[@to_yojson Fork_config.opt_to_yojson]
-                             [@of_yojson Fork_config.opt_of_yojson]) }
+    { sub_windows_per_window : int
+    ; ledger_depth : int
+    ; work_delay : int
+    ; block_window_duration_ms : int
+    ; transaction_capacity : Transaction_capacity.t
+    ; pending_coinbase_depth : int
+    ; coinbase_amount : UInt64.t
+    ; supercharged_coinbase_factor : int
+    ; account_creation_fee : UInt64.t
+    ; fork :
+        (Fork_config.t option
+        [@to_yojson Fork_config.opt_to_yojson]
+        [@of_yojson Fork_config.opt_of_yojson])
+    }
   [@@deriving yojson, sexp, ord, equal]
 end
 
 module Commits = struct
   (** Commit identifiers *)
-  type t = {mina: string; marlin: string} [@@deriving yojson, sexp, ord, equal]
+  type t = { mina : string; marlin : string }
+  [@@deriving yojson, sexp, ord, equal]
 end
 
 let header_version = 1
 
 (** Header contents *)
 type t =
-  { header_version: int
-  ; kind: Kind.t
-  ; constraint_constants: Constraint_constants.t
-  ; commits: Commits.t
-  ; length: int
-  ; commit_date: string
-  ; constraint_system_hash: string
-  ; identifying_hash: string }
+  { header_version : int
+  ; kind : Kind.t
+  ; constraint_constants : Constraint_constants.t
+  ; commits : Commits.t
+  ; length : int
+  ; commit_date : string
+  ; constraint_system_hash : string
+  ; identifying_hash : string
+  }
 [@@deriving yojson, sexp, ord, equal]
 
 let prefix = "MINA_SNARK_KEYS\n"
@@ -147,7 +152,7 @@ let parse_prefix (lexbuf : Lexing.lexbuf) =
   let open Or_error.Let_syntax in
   Result.map_error ~f:(fun err ->
       Error.tag_arg err "Could not read prefix" ("prefix", prefix)
-        [%sexp_of: string * string] )
+        [%sexp_of: string * string])
   @@ Or_error.try_with_join (fun () ->
          (* This roughly mirrors the behavior of [Yojson.Safe.read_ident],
             except that we have a known fixed length to parse, and that it is a
@@ -191,12 +196,13 @@ let parse_prefix (lexbuf : Lexing.lexbuf) =
          (* Update the positions to match our end state *)
          lexbuf.lex_curr_pos <- lexbuf.lex_curr_pos + prefix_len ;
          lexbuf.lex_last_pos <- lexbuf.lex_last_pos ;
-         lexbuf.lex_curr_p
-         <- { lexbuf.lex_curr_p with
-              pos_bol= lexbuf.lex_curr_p.pos_bol + prefix_len
-            ; pos_cnum= lexbuf.lex_curr_p.pos_cnum + prefix_len } ;
+         lexbuf.lex_curr_p <-
+           { lexbuf.lex_curr_p with
+             pos_bol = lexbuf.lex_curr_p.pos_bol + prefix_len
+           ; pos_cnum = lexbuf.lex_curr_p.pos_cnum + prefix_len
+           } ;
          (* This matches the action given by [Yojson.Safe.read_ident]. *)
-         lexbuf.lex_last_action <- 1 )
+         lexbuf.lex_last_action <- 1)
 
 let parse_lexbuf (lexbuf : Lexing.lexbuf) =
   let open Or_error.Let_syntax in
@@ -208,31 +214,34 @@ let parse_lexbuf (lexbuf : Lexing.lexbuf) =
             'greedy' parsing that will attempt to continue and read the file's
             contents beyond the header.
          *)
-         Yojson.Safe.read_t yojson_parsebuffer lexbuf )
+         Yojson.Safe.read_t yojson_parsebuffer lexbuf)
 
 let%test_module "Check parsing of header" =
   ( module struct
     let valid_header =
-      { header_version= 1
-      ; kind= {type_= "type"; identifier= "identifier"}
-      ; constraint_constants=
-          { sub_windows_per_window= 4
-          ; ledger_depth= 8
-          ; work_delay= 1000
-          ; block_window_duration_ms= 1000
-          ; transaction_capacity= Log_2 3
-          ; pending_coinbase_depth= 12
-          ; coinbase_amount= Unsigned.UInt64.of_int 1
-          ; supercharged_coinbase_factor= 1
-          ; account_creation_fee= Unsigned.UInt64.of_int 1
-          ; fork= None }
-      ; commits=
-          { mina= "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
-          ; marlin= "75836c41fc4947acce9c938da1b2f506843e90ed" }
-      ; length= 4096
-      ; commit_date= "2020-01-01 00:00:00.000000Z"
-      ; constraint_system_hash= "ABCDEF1234567890"
-      ; identifying_hash= "ABCDEF1234567890" }
+      { header_version = 1
+      ; kind = { type_ = "type"; identifier = "identifier" }
+      ; constraint_constants =
+          { sub_windows_per_window = 4
+          ; ledger_depth = 8
+          ; work_delay = 1000
+          ; block_window_duration_ms = 1000
+          ; transaction_capacity = Log_2 3
+          ; pending_coinbase_depth = 12
+          ; coinbase_amount = Unsigned.UInt64.of_int 1
+          ; supercharged_coinbase_factor = 1
+          ; account_creation_fee = Unsigned.UInt64.of_int 1
+          ; fork = None
+          }
+      ; commits =
+          { mina = "7e1fb2cd9138af1d0f24e78477efd40a2a0fcd07"
+          ; marlin = "75836c41fc4947acce9c938da1b2f506843e90ed"
+          }
+      ; length = 4096
+      ; commit_date = "2020-01-01 00:00:00.000000Z"
+      ; constraint_system_hash = "ABCDEF1234567890"
+      ; identifying_hash = "ABCDEF1234567890"
+      }
 
     let valid_header_string = Yojson.Safe.to_string (to_yojson valid_header)
 
@@ -259,8 +268,7 @@ let%test_module "Check parsing of header" =
         let partial_prefix =
           String.sub prefix ~pos:0 ~len:(prefix_len - 1) ^ " "
         in
-        parse_lexbuf
-          (Lexing.from_string (partial_prefix ^ valid_header_string))
+        parse_lexbuf (Lexing.from_string (partial_prefix ^ valid_header_string))
         |> Or_error.is_error
 
       let%test "doesn't parse with short file" =
@@ -326,7 +334,7 @@ let%test_module "Check parsing of header" =
                         Bytes.From_string.blit ~src:str ~src_pos:!offset
                           ~dst:buffer ~dst_pos:0 ~len ;
                         offset := !offset + len ;
-                        len ) )
+                        len ))
             in
             (* Load the initial content into the buffer *)
             lexbuf.refill_buff lexbuf ;
@@ -357,7 +365,9 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
     failwith
       "Snark_keys_header.write_header: expected_max_size_log2 is too large, \
        the resulting length underflows" ;
-  let header_string = Yojson.Safe.to_string (to_yojson {header with length}) in
+  let header_string =
+    Yojson.Safe.to_string (to_yojson { header with length })
+  in
   (* We look for the "length" field first, to ensure that we find our length
      and not some other data that happens to match it. Due to the
      JSON-encoding, we will only find the first field named "length", which is
@@ -381,13 +391,13 @@ let write_with_header ~expected_max_size_log2 ~append_data header filename =
       (* Newline, to allow [head -n 2 path/to/file | tail -n 1] to easily
          extract the header.
       *)
-      Out_channel.output_char out_channel '\n' ) ;
+      Out_channel.output_char out_channel '\n') ;
   append_data filename ;
   (* Core doesn't let us open a file without appending or truncating, so we use
      stdlib instead.
   *)
   let out_channel =
-    Stdlib.open_out_gen [Open_wronly; Open_binary] 0 filename
+    Stdlib.open_out_gen [ Open_wronly; Open_binary ] 0 filename
   in
   let true_length = Out_channel.length out_channel |> Int.of_int64_exn in
   if true_length > length then
@@ -444,7 +454,5 @@ let read_with_header ~read_data filename =
             (("header length", header.length), ("file length", file_length))
             [%sexp_of: (string * int) * (string * int)]
       in
-      let%map data =
-        Or_error.try_with (fun () -> read_data ~offset filename)
-      in
-      (header, data) )
+      let%map data = Or_error.try_with (fun () -> read_data ~offset filename) in
+      (header, data))

@@ -36,8 +36,7 @@ end]
 let typ f =
   let there (Shifted_value x) = x in
   let back x = Shifted_value x in
-  Snarky_backendless.Typ.(
-    transport_var (transport f ~there ~back) ~there ~back)
+  Snarky_backendless.Typ.(transport_var (transport f ~there ~back) ~there ~back)
 
 let map (Shifted_value x) ~f = Shifted_value (f x)
 

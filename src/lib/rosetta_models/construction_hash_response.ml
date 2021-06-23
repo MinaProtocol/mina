@@ -6,7 +6,8 @@
  * Schema Construction_hash_response.t : ConstructionHashResponse is the output of the `/construction/hash` endpoint.
  *)
 
-type t = {transaction_hash: string} [@@deriving yojson {strict= false}, show]
+type t = { transaction_hash : string }
+[@@deriving yojson { strict = false }, show]
 
 (** ConstructionHashResponse is the output of the `/construction/hash` endpoint. *)
-let create (transaction_hash : string) : t = {transaction_hash}
+let create (transaction_hash : string) : t = { transaction_hash }

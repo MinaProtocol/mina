@@ -34,12 +34,12 @@ module type S = sig
 
   include
     Syncable_intf.S
-    with type root_hash := root_hash
-     and type hash := hash
-     and type account := account
-     and type addr := Addr.t
-     and type path = Path.t
-     and type t := t
+      with type root_hash := root_hash
+       and type hash := hash
+       and type account := account
+       and type addr := Addr.t
+       and type path = Path.t
+       and type t := t
 
   (** list of accounts in the ledger *)
   val to_list : t -> account list
@@ -97,7 +97,10 @@ module type S = sig
 
   (** This may return an error if the ledger is full. *)
   val get_or_create_account :
-    t -> account_id -> account -> ([`Added | `Existed] * Location.t) Or_error.t
+       t
+    -> account_id
+    -> account
+    -> ([ `Added | `Existed ] * Location.t) Or_error.t
 
   (** the ledger should not be used after calling [close] *)
   val close : t -> unit

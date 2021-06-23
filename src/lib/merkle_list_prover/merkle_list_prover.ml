@@ -14,8 +14,7 @@ module type Inputs_intf = sig
   val get_previous : context:context -> value -> value option M.t
 end
 
-module Make_intf (M : Monad.S) (Input : Inputs_intf with module M := M) =
-struct
+module Make_intf (M : Monad.S) (Input : Inputs_intf with module M := M) = struct
   module type S = sig
     val prove :
          ?length:int

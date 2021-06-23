@@ -9,7 +9,9 @@ open Import
 module Stable : sig
   module V1 : sig
     type t =
-      {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+      { fee : Currency.Fee.Stable.V1.t
+      ; prover : Public_key.Compressed.Stable.V1.t
+      }
     [@@deriving sexp, yojson, equal, compare]
   end
 end]
@@ -17,7 +19,7 @@ end]
 [@@@warning "+32"]
 
 type t = Stable.Latest.t =
-  {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+  { fee : Currency.Fee.Stable.V1.t; prover : Public_key.Compressed.Stable.V1.t }
 [@@deriving sexp, yojson, equal, compare]
 
 val create : fee:Currency.Fee.t -> prover:Public_key.Compressed.t -> t
