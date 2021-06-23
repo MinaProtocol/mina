@@ -141,7 +141,11 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       ~consensus_constants ~unprocessed_transition_cache
       enveloped_initially_validated_transition
   in
-  let state_hash = External_transition.Validation.forget_validation_with_hash transition_with_hash |> With_hash.hash |> State_hash.to_yojson in
+  let state_hash =
+    External_transition.Validation.forget_validation_with_hash
+      transition_with_hash
+    |> With_hash.hash |> State_hash.to_yojson
+  in
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
   | Ok x ->
@@ -152,29 +156,33 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
   | Error (`In_frontier hash) ->
       [%log trace]
         ~metadata:[("state_hash", state_hash)]
-        "initial_validate: transition queried during ledger catchup has already been seen" ;
+        "initial_validate: transition queried during ledger catchup has \
+         already been seen" ;
       Deferred.return @@ Ok (`In_frontier hash)
   | Error (`In_process consumed_state) -> (
       [%log trace]
         ~metadata:[("state_hash", state_hash)]
-        "initial_validate: transition queried during ledger catchup is still in process in one \
-         of the components in transition_frontier" ;
+        "initial_validate: transition queried during ledger catchup is still \
+         in process in one of the components in transition_frontier" ;
       match%map Ivar.read consumed_state with
       | `Failed ->
-          [%log trace] ~metadata:[("state_hash", state_hash)]
-           "initial_validate: transition queried during ledger catchup failed" ;
+          [%log trace]
+            ~metadata:[("state_hash", state_hash)]
+            "initial_validate: transition queried during ledger catchup failed" ;
           Error (Error.of_string "Previous transition failed")
       | `Success hash ->
-          [%log trace] ~metadata:[("state_hash", state_hash)]
-            "initial_validate: transition queried during ledger catchup is added to frontier" ;
+          [%log trace]
+            ~metadata:[("state_hash", state_hash)]
+            "initial_validate: transition queried during ledger catchup is \
+             added to frontier" ;
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
       [%log warn]
-        ~metadata:[("error", Error_json.error_to_yojson error)
-        
-        ; ("state_hash", state_hash)]
-        "initial_validate: verifier threw an error while verifying transiton queried during \
-         ledger catchup: $error" ;
+        ~metadata:
+          [ ("error", Error_json.error_to_yojson error)
+          ; ("state_hash", state_hash) ]
+        "initial_validate: verifier threw an error while verifying transiton \
+         queried during ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->
       let%map () =
@@ -231,7 +239,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "invalid protocol version")
   | Error `Mismatched_protocol_version ->
-        [%log warn]
+      [%log warn]
         ~metadata:[("state_hash", state_hash)]
         "initial_validate: mismatch protocol version" ;
       let transition =
@@ -253,7 +261,7 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
-        [%log warn]
+      [%log warn]
         ~metadata:[("state_hash", state_hash)]
         "initial_validate: disconnected chain" ;
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
@@ -547,7 +555,8 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
   let state_hash =
     Envelope.Incoming.data transition |> With_hash.hash |> State_hash.to_yojson
   in
-  [%log debug] ~metadata:[("state_hash", state_hash)]
+  [%log debug]
+    ~metadata:[("state_hash", state_hash)]
     "initial_validate: start processing $state_hash" ;
   let%bind tv =
     let open Deferred.Let_syntax in
@@ -556,8 +565,7 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
         return (Ok {transition with data= tv})
     | Ok (Error ()) ->
         let s = "initial_validate: proof failed to verify" in
-        [%log warn] ~metadata:[("state_hash", state_hash)]
-          "%s" s ;
+        [%log warn] ~metadata:[("state_hash", state_hash)] "%s" s ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -570,9 +578,11 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
         Error (`Error (Error.of_string s))
     | Error e ->
         [%log warn]
-          ~metadata:[("error", Error_json.error_to_yojson e)
-                    ; ("staet_hash", state_hash)]
-          "initial_validate: verification of blockchain snark failed but it was our fault" ;
+          ~metadata:
+            [ ("error", Error_json.error_to_yojson e)
+            ; ("state_hash", state_hash) ]
+          "initial_validate: verification of blockchain snark failed but it \
+           was our fault" ;
         return (Error `Couldn't_reach_verifier)
   in
   let verification_end_time = Core.Time.now () in
@@ -581,8 +591,9 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
       [ ( "time_elapsed"
         , `Float
             Core.Time.(
-              Span.to_sec @@ diff verification_end_time verification_start_time) )
-      ; ("state_hash", state_hash)  ]
+              Span.to_sec @@ diff verification_end_time verification_start_time)
+        )
+      ; ("state_hash", state_hash) ]
     "initial_validate: verification of proofs complete" ;
   verify_transition ~logger
     ~consensus_constants:precomputed_values.consensus_constants ~trust_system
@@ -636,10 +647,11 @@ let create_node ~downloader t x =
   in
   upon (Ivar.read node.result) (fun _ ->
       Downloader.cancel downloader (h, blockchain_length) ) ;
-  Hashtbl.update t.states (Node.State.enum node.state)
-    ~f:(function
-      | None -> State_hash.Set.singleton node.state_hash
-      | Some hashes -> State_hash.Set.add hashes node.state_hash) ;
+  Hashtbl.update t.states (Node.State.enum node.state) ~f:(function
+    | None ->
+        State_hash.Set.singleton node.state_hash
+    | Some hashes ->
+        State_hash.Set.add hashes node.state_hash ) ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
     with e ->

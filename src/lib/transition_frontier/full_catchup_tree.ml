@@ -137,16 +137,17 @@ let tear_down {nodes; states; _} =
   Hashtbl.clear states
 
 let set_state t (node : Node.t) s =
-  Hashtbl.update t.states (Node.State.enum node.state)
-    ~f:(function
-      | None -> State_hash.Set.empty
-      | Some hashes -> State_hash.Set.remove hashes node.state_hash) ;
+  Hashtbl.update t.states (Node.State.enum node.state) ~f:(function
+    | None ->
+        State_hash.Set.empty
+    | Some hashes ->
+        State_hash.Set.remove hashes node.state_hash ) ;
   node.state <- s ;
-  Hashtbl.update t.states (Node.State.enum node.state)
-    ~f:(function
-      | None -> State_hash.Set.singleton node.state_hash
-      | Some hashes -> State_hash.Set.add hashes node.state_hash)
-
+  Hashtbl.update t.states (Node.State.enum node.state) ~f:(function
+    | None ->
+        State_hash.Set.singleton node.state_hash
+    | Some hashes ->
+        State_hash.Set.add hashes node.state_hash )
 
 let finish t (node : Node.t) b =
   let s, r =
@@ -158,9 +159,14 @@ let finish t (node : Node.t) b =
 
 let to_yojson =
   let module T = struct
-    type t = (Node.State.Enum.t * (int * State_hash.t list) )  list [@@deriving to_yojson]
+    type t = (Node.State.Enum.t * (int * State_hash.t list)) list
+    [@@deriving to_yojson]
   end in
-  fun (t : t) -> T.to_yojson @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) -> (state, (State_hash.Set.length hashes, State_hash.Set.to_list hashes)))
+  fun (t : t) ->
+    T.to_yojson
+    @@ List.map (Hashtbl.to_alist t.states) ~f:(fun (state, hashes) ->
+           ( state
+           , (State_hash.Set.length hashes, State_hash.Set.to_list hashes) ) )
 
 let max_catchup_chain_length (t : t) =
   (* Find the longest directed path *)
@@ -202,10 +208,11 @@ let create_node_full t b : unit =
     ; parent= Breadcrumb.parent_hash b
     ; result= Ivar.create_full (Ok `Added_to_frontier) }
   in
-  Hashtbl.update t.states (Node.State.enum node.state)
-    ~f:(function
-      | None -> State_hash.Set.singleton h
-      | Some hashes -> State_hash.Set.add hashes h) ;
+  Hashtbl.update t.states (Node.State.enum node.state) ~f:(function
+    | None ->
+        State_hash.Set.singleton h
+    | Some hashes ->
+        State_hash.Set.add hashes h ) ;
   Hashtbl.add_exn t.nodes ~key:h ~data:node
 
 let breadcrumb_added (t : t) b =
@@ -228,11 +235,11 @@ let breadcrumb_added (t : t) b =
 
 let remove_node' t (node : Node.t) =
   Hashtbl.remove t.nodes node.state_hash ;
-
-    Hashtbl.update t.states (Node.State.enum node.state)
-    ~f:(function
-      | None -> State_hash.Set.empty
-      | Some hashes -> State_hash.Set.remove hashes node.state_hash) ;
+  Hashtbl.update t.states (Node.State.enum node.state) ~f:(function
+    | None ->
+        State_hash.Set.empty
+    | Some hashes ->
+        State_hash.Set.remove hashes node.state_hash ) ;
   Ivar.fill_if_empty node.result (Error node.attempts) ;
   match node.state with
   | Root _ | Failed | Finished ->
