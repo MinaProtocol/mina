@@ -56,7 +56,7 @@ variable "seed_count" {
 locals {
   testnet_name = "mainnet"
   mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.1.2-0975867-mainnet-6a9354a"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
+  mina_archive_image = "gcr.io/o1labs-192920/coda-archive:1.1.2-0975867"
   seed_region = "us-east1"
   seed_zone = "us-east1-b"
 
@@ -84,7 +84,7 @@ module "mainnet" {
   testnet_name   = local.testnet_name
 
   mina_image         = local.mina_image
-  coda_archive_image = local.coda_archive_image
+  mina_archive_image = local.mina_archive_image
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.5"
 
   block_producer_key_pass = "naughty blue worm"

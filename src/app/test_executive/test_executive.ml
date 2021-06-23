@@ -356,7 +356,7 @@ let test_arg =
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
 
 let mina_image_arg =
-  let doc = "Identifier of the coda docker image to test." in
+  let doc = "Identifier of the Mina docker image to test." in
   let env = Arg.env_var "MINA_IMAGE" ~doc in
   Arg.(
     required

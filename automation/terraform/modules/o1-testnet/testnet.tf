@@ -30,10 +30,10 @@ module "kubernetes_testnet" {
 
   use_local_charts   = false
   mina_image         = var.mina_image
-  coda_archive_image = var.coda_archive_image
-  coda_agent_image   = var.coda_agent_image
-  coda_bots_image    = var.coda_bots_image
-  coda_points_image  = var.coda_points_image
+  mina_archive_image = var.mina_archive_image
+  mina_agent_image   = var.mina_agent_image
+  mina_bots_image    = var.mina_bots_image
+  mina_points_image  = var.mina_points_image
   watchdog_image     = var.watchdog_image
 
   coda_faucet_amount = var.coda_faucet_amount

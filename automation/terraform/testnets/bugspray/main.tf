@@ -16,8 +16,8 @@ provider "aws" {
 locals {
   testnet_name = "bugspray"
   mina_image   = var.mina_image
-  coda_agent_image = var.coda_agent_image
-  coda_bots_image = var.coda_bots_image
+  mina_agent_image = var.mina_agent_image
+  mina_bots_image = var.mina_bots_image
   coda_faucet_amount = var.coda_faucet_amount
   coda_faucet_fee = var.coda_faucet_fee
 }
@@ -27,12 +27,12 @@ variable "mina_image" {
   default = "codaprotocol/coda-daemon:0.0.12-beta-feature-bump-genesis-timestamp-16200a0"
 }
 
-variable "coda_agent_image" {
+variable "mina_agent_image" {
   type = string
   default = "codaprotocol/coda-user-agent:0.1.5"
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type = string
   default = "codaprotocol/coda-bots:0.0.13-beta-1"
 }

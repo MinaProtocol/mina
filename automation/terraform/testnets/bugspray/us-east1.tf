@@ -15,8 +15,8 @@ module "testnet_east" {
   cluster_region        = "us-east1"
   testnet_name          = local.testnet_name
   mina_image            = local.mina_image
-  coda_agent_image      = local.coda_agent_image
-  coda_bots_image       = local.coda_bots_image
+  mina_agent_image      = local.mina_agent_image
+  mina_bots_image       = local.mina_bots_image
   coda_faucet_amount    = local.coda_faucet_amount
   coda_faucet_fee       = local.coda_faucet_fee
 

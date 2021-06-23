@@ -81,7 +81,7 @@ locals {
     healthcheck = local.healthcheck_vars
 
     userAgent = {
-      image         = var.coda_agent_image
+      image         = var.mina_agent_image
       minFee        = var.agent_min_fee
       maxFee        = var.agent_max_fee
       minTx         = var.agent_min_tx
@@ -92,7 +92,7 @@ locals {
     }
 
     bots = {
-      image = var.coda_bots_image
+      image = var.mina_bots_image
       faucet = {
         amount = var.coda_faucet_amount
         fee    = var.coda_faucet_fee
