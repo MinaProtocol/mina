@@ -55,7 +55,7 @@ variable "seed_count" {
 
 locals {
   testnet_name = "finalfinal2"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.0-fd39808-finalfinal2-fd39808"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:1.0.0-fd39808-finalfinal2-fd39808"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:1.0.0-fix-archive-build-profile-e344c96"
 
   # replace with `make_report_discord_webhook_url = ""` if not in use (will fail if file not present)
@@ -81,7 +81,7 @@ module "finalfinal2" {
   k8s_context    = "gke_o1labs-192920_us-east1_coda-infra-east"
   testnet_name   = local.testnet_name
 
-  coda_image         = local.coda_image
+  mina_image         = local.mina_image
   coda_archive_image = local.coda_archive_image
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.4.1"
 

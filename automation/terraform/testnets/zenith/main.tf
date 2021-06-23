@@ -55,7 +55,7 @@ variable "seed_count" {
 
 locals {
   testnet_name = "zenith"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-zenith-7a89538"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-zenith-7a89538"
   coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
@@ -83,7 +83,7 @@ module "testnet_east" {
   k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
-  coda_image         = local.coda_image
+  mina_image         = local.mina_image
   coda_archive_image = local.coda_archive_image
   coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
   coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"

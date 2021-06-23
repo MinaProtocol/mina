@@ -26,7 +26,7 @@ variable "testnet_name" {
   type = string
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
 }
 

@@ -29,7 +29,7 @@ module "kubernetes_testnet" {
   testnet_name   = var.testnet_name
 
   use_local_charts   = false
-  coda_image         = var.coda_image
+  mina_image         = var.mina_image
   coda_archive_image = var.coda_archive_image
   coda_agent_image   = var.coda_agent_image
   coda_bots_image    = var.coda_bots_image

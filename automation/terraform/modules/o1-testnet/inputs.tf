@@ -30,7 +30,7 @@ variable "artifact_path" {
   default = "/tmp"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
 }
