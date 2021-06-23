@@ -638,8 +638,8 @@ let create_node ~downloader t x =
       Downloader.cancel downloader (h, blockchain_length) ) ;
   Hashtbl.update t.states (Node.State.enum node.state)
     ~f:(function
-      | None -> (1, State_hash.Set.singleton node.state_hash)
-      | Some (n, hashes) -> (n+1, State_hash.Set.add hashes node.state_hash)) ;
+      | None -> State_hash.Set.singleton node.state_hash
+      | Some hashes -> State_hash.Set.add hashes node.state_hash) ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
     with e ->
