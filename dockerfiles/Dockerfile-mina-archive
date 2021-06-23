@@ -19,6 +19,12 @@ RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 # Workaround terrible postgresql package requirements with man
 RUN mkdir /usr/share/man/man7 /usr/share/man/man1
 
+RUN apt-get -y update \
+    && apt-get -y upgrade \
+    && apt install -y wget \
+    && apt-get install gnupg
+
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
