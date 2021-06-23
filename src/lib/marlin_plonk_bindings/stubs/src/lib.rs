@@ -1,12 +1,9 @@
 extern crate libc;
 
+/* Arkworks types */
+pub mod types;
 /* Caml pointers */
 pub mod caml_pointer;
-/* Bigints */
-pub mod bigint_256;
-/* Fields */
-pub mod pasta_fp;
-pub mod pasta_fq;
 /* Field vectors */
 pub mod pasta_fp_vector;
 pub mod pasta_fq_vector;
@@ -32,7 +29,3 @@ pub mod pasta_fq_plonk_proof;
 /* Oracles */
 pub mod pasta_fp_plonk_oracles;
 pub mod pasta_fq_plonk_oracles;
-pub mod random_oracles;
-
-/* Polynomial commitments */
-pub mod polycomm;

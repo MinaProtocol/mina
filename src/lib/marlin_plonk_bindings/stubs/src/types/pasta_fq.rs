@@ -1,4 +1,4 @@
-use crate::bigint_256::BigInteger256;
+use crate::types::CamlBigInteger256;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
@@ -54,7 +54,7 @@ pub fn caml_pasta_fq_size_in_bits() -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_size() -> BigInteger256 {
+pub fn caml_pasta_fq_size() -> CamlBigInteger256 {
     Fq_params::MODULUS.into()
 }
 
@@ -115,7 +115,7 @@ pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> CamlFq {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<CamlFq>) -> String {
-    BigInteger256(x.as_ref().0.into_repr())
+    CamlBigInteger256(x.as_ref().0.into_repr())
         .to_biguint()
         .to_string()
 }
@@ -124,7 +124,7 @@ pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<CamlFq>) -> String {
 pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
     BigUint::parse_bytes(s, 10)
         // TODO: implement from_repr on CamlFq
-        .map(|data| BigInteger256::of_biguint(&data).0)
+        .map(|data| CamlBigInteger256::of_biguint(&data).0)
         .map(Fq::from_repr)
         .flatten()
         .map(CamlFq)
@@ -137,7 +137,10 @@ pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_print(x: ocaml::Pointer<CamlFq>) {
-    println!("{}", BigInteger256(x.as_ref().0.into_repr()).to_biguint());
+    println!(
+        "{}",
+        CamlBigInteger256(x.as_ref().0.into_repr()).to_biguint()
+    );
 }
 
 #[ocaml::func]
@@ -195,14 +198,14 @@ pub fn caml_pasta_fq_rng(i: ocaml::Int) -> CamlFq {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> BigInteger256 {
-    BigInteger256(x.as_ref().0.into_repr())
+pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> CamlBigInteger256 {
+    CamlBigInteger256(x.as_ref().0.into_repr())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_of_bigint(x: BigInteger256) -> Result<CamlFq, ocaml::Error> {
+pub fn caml_pasta_fq_of_bigint(x: CamlBigInteger256) -> Result<CamlFq, ocaml::Error> {
     Fq::from_repr(x.0).map(CamlFq).ok_or(ocaml::Error::Message(
-        "caml_pasta_fq_of_bigint was given an invalid BigInteger256",
+        "caml_pasta_fq_of_bigint was given an invalid CamlBigInteger256",
     ))
 }
 

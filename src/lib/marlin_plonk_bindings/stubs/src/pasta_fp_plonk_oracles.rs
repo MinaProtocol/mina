@@ -39,7 +39,7 @@ pub fn caml_pasta_fp_plonk_oracles_create(
         &lgr_comm
             .iter()
             .take(proof.public.len())
-            .map(|x| x.0) // isn't this useless?
+            .map(|x| &x.0) // isn't this useless?
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );

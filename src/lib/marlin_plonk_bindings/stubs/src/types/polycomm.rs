@@ -9,6 +9,7 @@ type PolyComVesta = PolyComm<vesta::Affine>;
 
 // the first type of commitment
 
+#[derive(Clone)]
 pub struct CamlPolyComPallas(pub PolyComPallas);
 
 unsafe impl ocaml::FromValue for CamlPolyComPallas {
@@ -41,6 +42,7 @@ impl Deref for CamlPolyComPallas {
 
 // the second type of commitment
 
+#[derive(Clone)]
 pub struct CamlPolyComVesta(pub PolyComVesta);
 
 unsafe impl ocaml::FromValue for CamlPolyComVesta {

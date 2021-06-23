@@ -1,9 +1,8 @@
-use crate::bigint_256::BigInteger256;
+use crate::types::CamlBigInteger256;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
 use num_bigint::BigUint;
-use ocaml::ToValue;
 use rand::rngs::StdRng;
 use std::{
     cmp::Ordering::{Equal, Greater, Less},
@@ -78,7 +77,7 @@ pub fn caml_pasta_fp_size_in_bits() -> ocaml::Int {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_size() -> BigInteger256 {
+pub fn caml_pasta_fp_size() -> CamlBigInteger256 {
     Fp_params::MODULUS.into()
 }
 
@@ -143,7 +142,7 @@ pub fn caml_pasta_fp_of_int(i: ocaml::Int) -> CamlFp {
 
 #[ocaml::func]
 pub fn caml_pasta_fp_to_string(x: ocaml::Pointer<CamlFp>) -> String {
-    BigInteger256(x.as_ref().0.into_repr())
+    CamlBigInteger256(x.as_ref().0.into_repr())
         .to_biguint()
         .to_string()
 }
@@ -152,7 +151,7 @@ pub fn caml_pasta_fp_to_string(x: ocaml::Pointer<CamlFp>) -> String {
 pub fn caml_pasta_fp_of_string(s: &[u8]) -> Result<CamlFp, ocaml::Error> {
     BigUint::parse_bytes(s, 10)
         // TODO: implement from_repr on CamlFp
-        .map(|data| BigInteger256::of_biguint(&data).0)
+        .map(|data| CamlBigInteger256::of_biguint(&data).0)
         .map(Fp::from_repr)
         .flatten()
         .map(CamlFp)
@@ -165,7 +164,10 @@ pub fn caml_pasta_fp_of_string(s: &[u8]) -> Result<CamlFp, ocaml::Error> {
 
 #[ocaml::func]
 pub fn caml_pasta_fp_print(x: ocaml::Pointer<CamlFp>) {
-    println!("{}", BigInteger256(x.as_ref().0.into_repr()).to_biguint());
+    println!(
+        "{}",
+        CamlBigInteger256(x.as_ref().0.into_repr()).to_biguint()
+    );
 }
 
 #[ocaml::func]
@@ -223,14 +225,14 @@ pub fn caml_pasta_fp_rng(i: ocaml::Int) -> CamlFp {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_to_bigint(x: ocaml::Pointer<CamlFp>) -> BigInteger256 {
-    BigInteger256(x.as_ref().0.into_repr())
+pub fn caml_pasta_fp_to_bigint(x: ocaml::Pointer<CamlFp>) -> CamlBigInteger256 {
+    CamlBigInteger256(x.as_ref().0.into_repr())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_of_bigint(x: BigInteger256) -> Result<CamlFp, ocaml::Error> {
+pub fn caml_pasta_fp_of_bigint(x: CamlBigInteger256) -> Result<CamlFp, ocaml::Error> {
     Fp::from_repr(x.0).map(CamlFp).ok_or(ocaml::Error::Message(
-        "caml_pasta_fp_of_bigint was given an invalid BigInteger256",
+        "caml_pasta_fp_of_bigint was given an invalid CamlBigInteger256",
     ))
 }
 
