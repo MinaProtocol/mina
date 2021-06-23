@@ -9,6 +9,7 @@ use std::ops::Deref;
 // Wrapper struct to implement OCaml bindings
 //
 
+#[derive(Clone, Copy)]
 pub struct BigInteger256(pub ark_BigInteger256);
 
 impl From<ark_BigInteger256> for BigInteger256 {
@@ -19,16 +20,16 @@ impl From<ark_BigInteger256> for BigInteger256 {
 
 unsafe impl ocaml::FromValue for BigInteger256 {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<ark_BigInteger256> = ocaml::FromValue::from_value(value);
-        Self(x.as_ref().clone())
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+        x.as_ref().clone()
     }
 }
 
 impl BigInteger256 {
     extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
-        let x: ocaml::Pointer<ark_BigInteger256> = ocaml::FromValue::from_value(x);
-        let y: ocaml::Pointer<ark_BigInteger256> = ocaml::FromValue::from_value(y);
-        match x.as_ref().cmp(y.as_ref()) {
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(x);
+        let y: ocaml::Pointer<Self> = ocaml::FromValue::from_value(y);
+        match x.as_ref().0.cmp(&y.as_ref().0) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
             core::cmp::Ordering::Greater => 1,

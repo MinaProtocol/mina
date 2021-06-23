@@ -1,19 +1,19 @@
+use crate::{
+    caml_pointer::{self, CamlPointer},
+    pasta_fp::CamlFp,
+};
 use ark_ff::{One, Zero};
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
-use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
-
 use commitment_dlog::{
     commitment::{b_poly_coefficients, PolyComm},
     srs::SRS,
 };
-
+use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
-
-use crate::caml_pointer::{self, CamlPointer};
 
 pub type CamlPastaFpUrs = CamlPointer<Rc<SRS<GAffine>>>;
 
@@ -111,7 +111,7 @@ pub fn caml_pasta_fp_urs_commit_evaluations(
 #[ocaml::func]
 pub fn caml_pasta_fp_urs_b_poly_commitment(
     urs: CamlPastaFpUrs,
-    chals: Vec<Fp>,
+    chals: Vec<CamlFp>,
 ) -> Result<PolyComm<GAffine>, ocaml::Error> {
     let chals: Vec<Fp> = chals.into_iter().map(From::from).collect();
     let coeffs = b_poly_coefficients(&chals);
@@ -123,7 +123,7 @@ pub fn caml_pasta_fp_urs_b_poly_commitment(
 pub fn caml_pasta_fp_urs_batch_accumulator_check(
     urs: CamlPastaFpUrs,
     comms: Vec<GAffine>,
-    chals: Vec<Fp>,
+    chals: Vec<CamlFp>,
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
         &*urs,

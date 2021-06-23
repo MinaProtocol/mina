@@ -9,23 +9,19 @@ use crate::plonk_verifier_index::{
 use crate::{pasta_fq::CamlFq, polycomm::CamlPolyComPallas};
 use ark_ec::AffineCurve;
 use ark_ff::One;
-use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
-
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-
 use commitment_dlog::{
     commitment::PolyComm,
     srs::{SRSValue, SRS},
 };
+use mina_curves::pasta::{fq::Fq, pallas::Affine as GAffine, vesta::Affine as GAffineOther};
 use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
 use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
-
+use std::rc::Rc;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
-
-use std::rc::Rc;
 
 pub type CamlPastaFqPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyComPallas>;

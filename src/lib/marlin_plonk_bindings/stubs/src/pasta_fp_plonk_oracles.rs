@@ -1,23 +1,20 @@
+use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use crate::{pasta_fp::CamlFp, polycomm::CamlPolyComVesta, random_oracles::CamlRandomOracles};
+use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use mina_curves::pasta::{
     fp::Fp,
     vesta::{Affine as GAffine, VestaParameters},
 };
-
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
-
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use plonk_circuits::scalars::RandomOracles;
 use plonk_protocol_dlog::{
     index::VerifierIndex as DlogVerifierIndex, prover::ProverProof as DlogProof,
 };
-
-use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 
 /// The state of the verifier during verification
 #[derive(ocaml::ToValue, ocaml::FromValue)]
@@ -36,15 +33,13 @@ pub fn caml_pasta_fp_plonk_oracles_create(
     proof: DlogProof<GAffine>,       // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
-    let proof: DlogProof<GAffine> = proof.into(); // isn't this useless?
-    let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm.into_iter().map(From::from).collect(); // isn't this useless?
 
     // get commitments to the public elements
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
         &lgr_comm
             .iter()
             .take(proof.public.len())
-            .map(|x| x) // isn't this useless?
+            .map(|x| x.0) // isn't this useless?
             .collect(),
         &proof.public.iter().map(|s| -*s).collect(),
     );

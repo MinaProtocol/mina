@@ -13,8 +13,8 @@ pub struct CamlPolyComPallas(pub PolyComPallas);
 
 unsafe impl ocaml::FromValue for CamlPolyComPallas {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<PolyComm> = ocaml::FromValue::from_value(value);
-        Self(x.as_ref().clone())
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+        x.as_ref().clone()
     }
 }
 
@@ -45,8 +45,8 @@ pub struct CamlPolyComVesta(pub PolyComVesta);
 
 unsafe impl ocaml::FromValue for CamlPolyComVesta {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<PolyComm> = ocaml::FromValue::from_value(value);
-        Self(x.as_ref().clone())
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+        x.as_ref().clone()
     }
 }
 

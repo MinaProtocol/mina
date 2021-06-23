@@ -1,36 +1,30 @@
-use crate::pasta_fq::Fq;
-
+use crate::index_serialization;
+use crate::pasta_fq::CamlFq;
+use crate::pasta_fq_urs::CamlPastaFqUrs;
+use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
+use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use commitment_dlog::srs::{SRSSpec, SRS};
 #[allow(unused_imports)]
 use mina_curves::pasta::{
-    fq::Fq as mina_Fq,
+    fq::Fq,
     pallas::{Affine as GAffine, PallasParameters},
     vesta::Affine as GAffineOther,
 };
-
 use plonk_circuits::constraints::ConstraintSystem;
 use plonk_circuits::gate::{CircuitGate, Gate};
 use plonk_circuits::wires::{Col::*, GateWires, Wire};
-
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-
-use commitment_dlog::srs::{SRSSpec, SRS};
 use plonk_protocol_dlog::index::Index as DlogIndex;
-
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
 
-use crate::index_serialization;
-use crate::pasta_fq_urs::CamlPastaFqUrs;
-use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
-
 //
 // CamlPastaFqPlonkGateVector
 //
 
-pub struct CamlPastaFqPlonkGateVector(Vec<Gate<mina_Fq>>);
+pub struct CamlPastaFqPlonkGateVector(Vec<Gate<Fq>>);
 pub type CamlPastaFqPlonkGateVectorPtr = ocaml::Pointer<CamlPastaFqPlonkGateVector>;
 
 extern "C" fn caml_pasta_fq_plonk_gate_vector_finalize(v: ocaml::Value) {
@@ -50,12 +44,12 @@ pub fn caml_pasta_fq_plonk_gate_vector_create() -> CamlPastaFqPlonkGateVector {
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_gate_vector_add(
     mut v: CamlPastaFqPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<Fq>>,
+    gate: CamlPlonkGate<Vec<CamlFq>>,
 ) {
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c: Fq(gate.c),
+        c: CamlFq(gate.c),
     });
 }
 
@@ -63,7 +57,7 @@ pub fn caml_pasta_fq_plonk_gate_vector_add(
 pub fn caml_pasta_fq_plonk_gate_vector_get(
     v: CamlPastaFqPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<Fq>> {
+) -> CamlPlonkGate<Vec<CamlFq>> {
     let gate = &(v.as_ref().0)[i as usize];
     let c = gate.c.iter().map(|x| *x).collect();
     CamlPlonkGate {

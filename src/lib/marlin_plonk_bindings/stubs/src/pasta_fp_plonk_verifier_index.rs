@@ -8,26 +8,30 @@ use crate::plonk_verifier_index::{
 use crate::{caml_pointer, pasta_fp::CamlFp, polycomm::CamlPolyComVesta};
 use ark_ec::AffineCurve;
 use ark_ff::One;
-use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
-
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-
 use commitment_dlog::{
     commitment::PolyComm,
     srs::{SRSValue, SRS},
 };
+use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
 use plonk_circuits::constraints::{zk_polynomial, zk_w, ConstraintSystem};
 use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
-
+use std::rc::Rc;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
 };
 
-use std::rc::Rc;
+//
+// CamlPastaFpPlonkVerifierIndex
+//
 
 pub type CamlPastaFpPlonkVerifierIndex =
     CamlPlonkVerifierIndex<CamlFp, CamlPastaFpUrs, CamlPolyComVesta>;
+
+//
+// (Rc<SRS<GAffine>>, DlogVerifierIndex<'a, GAffine>) -> CamlPastaFpPlonkVerifierIndex
+//
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -104,6 +108,10 @@ pub fn to_ocaml_copy<'a>(
         shifts: CamlPlonkVerificationShifts { r: vi.r, o: vi.o },
     }
 }
+
+//
+// ... -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>)
+//
 
 pub fn of_ocaml<'a>(
     max_poly_size: ocaml::Int,

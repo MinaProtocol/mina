@@ -1,7 +1,7 @@
 use crate::bigint_256::BigInteger256;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fq::{Fq as CACA, FqParameters as Fq_params};
+use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -11,12 +11,12 @@ use std::cmp::Ordering::{Equal, Greater, Less};
 //
 
 #[derive(Clone, Copy)]
-pub struct CamlFq(pub CACA);
+pub struct CamlFq(pub Fq);
 
 unsafe impl ocaml::FromValue for CamlFq {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<CACA> = ocaml::FromValue::from_value(value);
-        Self(x.as_ref().clone())
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+        x.as_ref().clone()
     }
 }
 
@@ -29,9 +29,9 @@ impl CamlFq {
     }
 
     extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
-        let x: ocaml::Pointer<CACA> = ocaml::FromValue::from_value(x);
-        let y: ocaml::Pointer<CACA> = ocaml::FromValue::from_value(y);
-        match x.as_ref().cmp(y.as_ref()) {
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(x);
+        let y: ocaml::Pointer<Self> = ocaml::FromValue::from_value(y);
+        match x.as_ref().0.cmp(&y.as_ref().0) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
             core::cmp::Ordering::Greater => 1,
@@ -106,7 +106,7 @@ pub fn caml_pasta_fq_sqrt(x: ocaml::Pointer<CamlFq>) -> Option<CamlFq> {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> CamlFq {
-    CamlFq(CACA::from(i as u64))
+    CamlFq(Fq::from(i as u64))
 }
 
 //
@@ -125,7 +125,7 @@ pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
     BigUint::parse_bytes(s, 10)
         // TODO: implement from_repr on CamlFq
         .map(|data| BigInteger256::of_biguint(&data).0)
-        .map(CACA::from_repr)
+        .map(Fq::from_repr)
         .flatten()
         .map(CamlFq)
         .ok_or(ocaml::Error::Message("caml_pasta_fp_of_string"))
@@ -181,7 +181,7 @@ pub fn caml_pasta_fq_equal(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>)
 
 #[ocaml::func]
 pub fn caml_pasta_fq_random() -> CamlFq {
-    let fq: CACA = UniformRand::rand(&mut rand::thread_rng());
+    let fq: Fq = UniformRand::rand(&mut rand::thread_rng());
     CamlFq(fq)
 }
 
@@ -190,7 +190,7 @@ pub fn caml_pasta_fq_rng(i: ocaml::Int) -> CamlFq {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
-    let fq: CACA = UniformRand::rand(&mut rng);
+    let fq: Fq = UniformRand::rand(&mut rng);
     CamlFq(fq)
 }
 
@@ -201,16 +201,14 @@ pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> BigInteger256 {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_of_bigint(x: BigInteger256) -> Result<CamlFq, ocaml::Error> {
-    CACA::from_repr(x.0)
-        .map(CamlFq)
-        .ok_or(ocaml::Error::Message(
-            "caml_pasta_fq_of_bigint was given an invalid BigInteger256",
-        ))
+    Fq::from_repr(x.0).map(CamlFq).ok_or(ocaml::Error::Message(
+        "caml_pasta_fq_of_bigint was given an invalid BigInteger256",
+    ))
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fq_two_adic_root_of_unity() -> CamlFq {
-    let res: CACA = FftField::two_adic_root_of_unity();
+    let res: Fq = FftField::two_adic_root_of_unity();
     CamlFq(res)
 }
 

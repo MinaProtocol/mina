@@ -1,6 +1,5 @@
 use ark_ec::AffineCurve;
 use ark_ff::{Field, FromBytes, PrimeField, ToBytes};
-
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain,
 };

@@ -1,3 +1,4 @@
 target
 release
 .merlin
+Cargo.lock

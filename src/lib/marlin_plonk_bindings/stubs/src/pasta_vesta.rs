@@ -1,5 +1,3 @@
-use std::ops::{Add, Deref, Neg, Sub};
-
 use crate::pasta_fp::CamlFp;
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{One, UniformRand};
@@ -9,6 +7,7 @@ use mina_curves::pasta::{
     vesta::{Affine as GAffine, Projective},
 };
 use rand::rngs::StdRng;
+use std::ops::{Add, Deref, Neg, Sub};
 
 //
 // Wrapper struct to implement OCaml bindings

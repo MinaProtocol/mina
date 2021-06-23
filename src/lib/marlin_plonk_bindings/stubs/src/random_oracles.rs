@@ -2,6 +2,7 @@ use ark_ff::Field;
 use plonk_circuits::scalars::RandomOracles;
 use std::ops::Deref;
 
+#[derive(Clone)]
 pub struct CamlRandomOracles<F>(pub RandomOracles<F>)
 where
     F: Field;
@@ -11,8 +12,8 @@ where
     F: Field,
 {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<RandomOracles<F>> = ocaml::FromValue::from_value(value);
-        Self(x.as_ref().clone())
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+        x.as_ref().clone()
     }
 }
 

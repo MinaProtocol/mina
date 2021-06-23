@@ -1,29 +1,24 @@
+use crate::index_serialization;
 use crate::pasta_fp::CamlFp;
+use crate::pasta_fp_urs::CamlPastaFpUrs;
+use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
+use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use commitment_dlog::srs::{SRSSpec, SRS};
 #[allow(unused_imports)]
 use mina_curves::pasta::{
     fp::Fp,
     pallas::Affine as GAffineOther,
     vesta::{Affine as GAffine, VestaParameters},
 };
-
 use plonk_circuits::constraints::ConstraintSystem;
 use plonk_circuits::gate::{CircuitGate, Gate};
 use plonk_circuits::wires::{Col::*, GateWires, Wire};
-
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-
-use commitment_dlog::srs::{SRSSpec, SRS};
 use plonk_protocol_dlog::index::Index as DlogIndex;
-
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
-
-use crate::index_serialization;
-use crate::pasta_fp_urs::CamlPastaFpUrs;
-use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
 
 pub struct CamlPastaFpPlonkGateVector(Vec<Gate<Fp>>);
 pub type CamlPastaFpPlonkGateVectorPtr = ocaml::Pointer<CamlPastaFpPlonkGateVector>;

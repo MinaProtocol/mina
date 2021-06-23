@@ -21,8 +21,8 @@ pub struct CamlFp(pub Fp);
 
 unsafe impl ocaml::FromValue for CamlFp {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<Fp> = ocaml::FromValue::from_value(value);
-        Self(x.as_ref().clone())
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
+        x.as_ref().clone()
     }
 }
 
@@ -35,9 +35,9 @@ impl CamlFp {
     }
 
     extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
-        let x: ocaml::Pointer<Fp> = ocaml::FromValue::from_value(x);
-        let y: ocaml::Pointer<Fp> = ocaml::FromValue::from_value(y);
-        match x.as_ref().cmp(y.as_ref()) {
+        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(x);
+        let y: ocaml::Pointer<Self> = ocaml::FromValue::from_value(y);
+        match x.as_ref().0.cmp(&y.as_ref().0) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
             core::cmp::Ordering::Greater => 1,
