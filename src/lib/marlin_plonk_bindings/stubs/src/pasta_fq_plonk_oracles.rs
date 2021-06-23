@@ -61,13 +61,3 @@ pub fn caml_pasta_fq_plonk_oracles_create(
         digest_before_evaluations: digest_before_evaluations,
     }
 }
-
-#[ocaml::func]
-pub fn caml_pasta_fq_plonk_oracles_dummy() -> RandomOracles<Fq> {
-    RandomOracles::zero().into()
-}
-
-#[ocaml::func]
-pub fn caml_pasta_fq_plonk_oracles_deep_copy(x: RandomOracles<Fq>) -> RandomOracles<Fq> {
-    x
-}

@@ -11,8 +11,8 @@ pub mod pasta_fq;
 pub mod pasta_fp_vector;
 pub mod pasta_fq_vector;
 /* Groups */
-pub mod pasta_vesta;
 pub mod pasta_pallas;
+pub mod pasta_vesta;
 /* URS */
 pub mod pasta_fp_urs;
 pub mod pasta_fq_urs;
@@ -21,14 +21,18 @@ pub mod urs_utils;
 pub mod plonk_gate;
 /* Indices */
 pub mod index_serialization;
-pub mod plonk_verifier_index;
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fp_plonk_verifier_index;
 pub mod pasta_fq_plonk_index;
 pub mod pasta_fq_plonk_verifier_index;
+pub mod plonk_verifier_index;
 /* Proofs */
 pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
 /* Oracles */
 pub mod pasta_fp_plonk_oracles;
 pub mod pasta_fq_plonk_oracles;
+pub mod random_oracles;
+
+/* Polynomial commitments */
+pub mod polycomm;

@@ -9,7 +9,13 @@ use std::ops::Deref;
 // Wrapper struct to implement OCaml bindings
 //
 
-pub struct BigInteger256(ark_BigInteger256);
+pub struct BigInteger256(pub ark_BigInteger256);
+
+impl From<ark_BigInteger256> for BigInteger256 {
+    fn from(big: ark_BigInteger256) -> Self {
+        Self(big)
+    }
+}
 
 unsafe impl ocaml::FromValue for BigInteger256 {
     fn from_value(value: ocaml::Value) -> Self {

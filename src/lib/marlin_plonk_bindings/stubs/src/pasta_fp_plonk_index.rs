@@ -1,7 +1,7 @@
-use crate::pasta_fp::Fp;
+use crate::pasta_fp::CamlFp;
 #[allow(unused_imports)]
 use mina_curves::pasta::{
-    fp::Fp as mina_Fp,
+    fp::Fp,
     pallas::Affine as GAffineOther,
     vesta::{Affine as GAffine, VestaParameters},
 };
@@ -25,7 +25,7 @@ use crate::index_serialization;
 use crate::pasta_fp_urs::CamlPastaFpUrs;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
 
-pub struct CamlPastaFpPlonkGateVector(Vec<Gate<mina_Fp>>);
+pub struct CamlPastaFpPlonkGateVector(Vec<Gate<Fp>>);
 pub type CamlPastaFpPlonkGateVectorPtr = ocaml::Pointer<CamlPastaFpPlonkGateVector>;
 
 extern "C" fn caml_pasta_fp_plonk_gate_vector_finalize(v: ocaml::Value) {
@@ -45,12 +45,12 @@ pub fn caml_pasta_fp_plonk_gate_vector_create() -> CamlPastaFpPlonkGateVector {
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_gate_vector_add(
     mut v: CamlPastaFpPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<Fp>>,
+    gate: CamlPlonkGate<Vec<CamlFp>>,
 ) {
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c: gate.c,
+        c: gate.c.iter().map(|x| x.0).collect(),
     });
 }
 
@@ -58,9 +58,9 @@ pub fn caml_pasta_fp_plonk_gate_vector_add(
 pub fn caml_pasta_fp_plonk_gate_vector_get(
     v: CamlPastaFpPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<Fp>> {
+) -> CamlPlonkGate<Vec<CamlFp>> {
     let gate = &(v.as_ref().0)[i as usize];
-    let c = gate.c.iter().map(|x| *x).collect();
+    let c = gate.c.iter().map(|x| CamlFp(x.clone())).collect();
     CamlPlonkGate {
         typ: (&gate.typ).into(),
         wires: (&gate.wires).into(),

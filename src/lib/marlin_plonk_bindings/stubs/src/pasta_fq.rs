@@ -1,7 +1,7 @@
 use crate::bigint_256::BigInteger256;
 use ark_ff::{FftField, Field, FpParameters, One, PrimeField, SquareRootField, UniformRand, Zero};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
-use mina_curves::pasta::fq::{Fq as pasta_Fq, FqParameters as Fq_params};
+use mina_curves::pasta::fq::{Fq as CACA, FqParameters as Fq_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -10,19 +10,27 @@ use std::cmp::Ordering::{Equal, Greater, Less};
 // Wrapper struct to implement OCaml bindings
 //
 
-pub struct Fq(pasta_Fq);
+#[derive(Clone, Copy)]
+pub struct CamlFq(pub CACA);
 
-unsafe impl ocaml::FromValue for Fq {
+unsafe impl ocaml::FromValue for CamlFq {
     fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<pasta_Fq> = ocaml::FromValue::from_value(value);
+        let x: ocaml::Pointer<CACA> = ocaml::FromValue::from_value(value);
         Self(x.as_ref().clone())
     }
 }
 
-impl Fq {
+impl CamlFq {
+    extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
+        let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
+        unsafe {
+            v.drop_in_place();
+        }
+    }
+
     extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
-        let x: ocaml::Pointer<pasta_Fq> = ocaml::FromValue::from_value(x);
-        let y: ocaml::Pointer<pasta_Fq> = ocaml::FromValue::from_value(y);
+        let x: ocaml::Pointer<CACA> = ocaml::FromValue::from_value(x);
+        let y: ocaml::Pointer<CACA> = ocaml::FromValue::from_value(y);
         match x.as_ref().cmp(y.as_ref()) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
@@ -30,12 +38,11 @@ impl Fq {
         }
     }
 }
-impl ocaml::Custom for Fq {
-    ocaml::custom! {
-        name: "Fq",
-        compare: Fq::ocaml_compare,
-    }
-}
+
+ocaml::custom!(CamlFq {
+    finalize: CamlFq::caml_pointer_finalize,
+    compare: CamlFq::ocaml_compare,
+});
 
 //
 // Helpers
@@ -48,108 +55,119 @@ pub fn caml_pasta_fq_size_in_bits() -> ocaml::Int {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_size() -> BigInteger256 {
-    Fq_params::MODULUS
+    Fq_params::MODULUS.into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_add(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> Fq {
-    *x.as_ref() + *y.as_ref()
+pub fn caml_pasta_fq_add(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> CamlFq {
+    CamlFq(x.as_ref().0 + y.as_ref().0)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_sub(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> Fq {
-    *x.as_ref() - *y.as_ref()
+pub fn caml_pasta_fq_sub(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> CamlFq {
+    CamlFq(x.as_ref().0 - y.as_ref().0)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_negate(x: ocaml::Pointer<Fq>) -> Fq {
-    -(*x.as_ref())
+pub fn caml_pasta_fq_negate(x: ocaml::Pointer<CamlFq>) -> CamlFq {
+    CamlFq(-x.as_ref().0)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_mul(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> Fq {
-    *x.as_ref() * *y.as_ref()
+pub fn caml_pasta_fq_mul(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> CamlFq {
+    CamlFq(x.as_ref().0 * y.as_ref().0)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_div(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> Fq {
-    *x.as_ref() / *y.as_ref()
+pub fn caml_pasta_fq_div(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> CamlFq {
+    CamlFq(x.as_ref().0 / y.as_ref().0)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_inv(x: ocaml::Pointer<Fq>) -> Option<Fq> {
-    x.as_ref().inverse()
+pub fn caml_pasta_fq_inv(x: ocaml::Pointer<CamlFq>) -> Option<CamlFq> {
+    x.as_ref().0.inverse().map(CamlFq)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_square(x: ocaml::Pointer<Fq>) -> Fq {
-    x.as_ref().square()
+pub fn caml_pasta_fq_square(x: ocaml::Pointer<CamlFq>) -> CamlFq {
+    CamlFq(x.as_ref().0.square())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_is_square(x: ocaml::Pointer<Fq>) -> bool {
-    let s = x.as_ref().pow(Fq_params::MODULUS_MINUS_ONE_DIV_TWO);
+pub fn caml_pasta_fq_is_square(x: ocaml::Pointer<CamlFq>) -> bool {
+    let s = x.as_ref().0.pow(Fq_params::MODULUS_MINUS_ONE_DIV_TWO);
     s.is_zero() || s.is_one()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_sqrt(x: ocaml::Pointer<Fq>) -> Option<Fq> {
-    x.as_ref().sqrt()
+pub fn caml_pasta_fq_sqrt(x: ocaml::Pointer<CamlFq>) -> Option<CamlFq> {
+    x.as_ref().0.sqrt().map(CamlFq)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> Fq {
-    Fq::from(i as u64)
+pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> CamlFq {
+    CamlFq(CACA::from(i as u64))
+}
+
+//
+// Conversion methods
+//
+
+#[ocaml::func]
+pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<CamlFq>) -> String {
+    BigInteger256(x.as_ref().0.into_repr())
+        .to_biguint()
+        .to_string()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<Fq>) -> String {
-    x.as_ref().into_repr().to_biguint().to_string()
+pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
+    BigUint::parse_bytes(s, 10)
+        // TODO: implement from_repr on CamlFq
+        .map(|data| BigInteger256::of_biguint(&data).0)
+        .map(CACA::from_repr)
+        .flatten()
+        .map(CamlFq)
+        .ok_or(ocaml::Error::Message("caml_pasta_fp_of_string"))
+}
+
+//
+// Data methods
+//
+
+#[ocaml::func]
+pub fn caml_pasta_fq_print(x: ocaml::Pointer<CamlFq>) {
+    println!("{}", BigInteger256(x.as_ref().0.into_repr()).to_biguint());
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<Fq, ocaml::Error> {
-    match BigUint::parse_bytes(s, 10) {
-        Some(data) => Ok(Fq::from_repr(BigInteger256::of_biguint(&data))),
-        None => Err(ocaml::Error::invalid_argument("caml_pasta_fq_of_string")
-            .err()
-            .unwrap()),
-    }
+pub fn caml_pasta_fq_copy(mut x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) {
+    *x.as_mut() = y.as_ref().clone()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_print(x: ocaml::Pointer<Fq>) {
-    println!("{}", x.as_ref().into_repr().to_biguint());
+pub fn caml_pasta_fq_mut_add(mut x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) {
+    x.as_mut().0 += y.as_ref().0;
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_copy(mut x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) {
-    *x.as_mut() = *y.as_ref()
+pub fn caml_pasta_fq_mut_sub(mut x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) {
+    x.as_mut().0 -= y.as_ref().0;
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_mut_add(mut x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) {
-    *x.as_mut() += *y.as_ref();
+pub fn caml_pasta_fq_mut_mul(mut x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) {
+    x.as_mut().0 *= y.as_ref().0;
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_mut_sub(mut x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) {
-    *x.as_mut() -= *y.as_ref();
+pub fn caml_pasta_fq_mut_square(mut x: ocaml::Pointer<CamlFq>) {
+    x.as_mut().0.square_in_place();
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_mut_mul(mut x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) {
-    *x.as_mut() *= *y.as_ref();
-}
-
-#[ocaml::func]
-pub fn caml_pasta_fq_mut_square(mut x: ocaml::Pointer<Fq>) {
-    x.as_mut().square_in_place();
-}
-
-#[ocaml::func]
-pub fn caml_pasta_fq_compare(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> ocaml::Int {
-    match x.as_ref().cmp(&y.as_ref()) {
+pub fn caml_pasta_fq_compare(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> ocaml::Int {
+    match x.as_ref().0.cmp(&y.as_ref().0) {
         Less => -1,
         Equal => 0,
         Greater => 1,
@@ -157,53 +175,55 @@ pub fn caml_pasta_fq_compare(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> oc
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_equal(x: ocaml::Pointer<Fq>, y: ocaml::Pointer<Fq>) -> bool {
-    *x.as_ref() == *y.as_ref()
+pub fn caml_pasta_fq_equal(x: ocaml::Pointer<CamlFq>, y: ocaml::Pointer<CamlFq>) -> bool {
+    x.as_ref().0 == y.as_ref().0
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_random() -> Fq {
-    UniformRand::rand(&mut rand::thread_rng())
+pub fn caml_pasta_fq_random() -> CamlFq {
+    let fq: CACA = UniformRand::rand(&mut rand::thread_rng());
+    CamlFq(fq)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_rng(i: ocaml::Int) -> Fq {
+pub fn caml_pasta_fq_rng(i: ocaml::Int) -> CamlFq {
     // We only care about entropy here, so we force a conversion i32 -> u32.
     let i: u64 = (i as u32).into();
     let mut rng: StdRng = rand::SeedableRng::seed_from_u64(i);
-    UniformRand::rand(&mut rng)
+    let fq: CACA = UniformRand::rand(&mut rng);
+    CamlFq(fq)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<Fq>) -> BigInteger256 {
-    x.as_ref().into_repr()
+pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> BigInteger256 {
+    BigInteger256(x.as_ref().0.into_repr())
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_of_bigint(x: BigInteger256) -> Fq {
-    Fq::from_repr(x)
+pub fn caml_pasta_fq_of_bigint(x: BigInteger256) -> Result<CamlFq, ocaml::Error> {
+    CACA::from_repr(x.0)
+        .map(CamlFq)
+        .ok_or(ocaml::Error::Message(
+            "caml_pasta_fq_of_bigint was given an invalid BigInteger256",
+        ))
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_two_adic_root_of_unity() -> Fq {
-    FftField::two_adic_root_of_unity()
+pub fn caml_pasta_fq_two_adic_root_of_unity() -> CamlFq {
+    let res: CACA = FftField::two_adic_root_of_unity();
+    CamlFq(res)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_domain_generator(log2_size: ocaml::Int) -> Result<Fq, ocaml::Error> {
-    match Domain::new(1 << log2_size) {
-        Some(x) => Ok(x.group_gen),
-        None => Err(
-            ocaml::Error::invalid_argument("caml_pasta_fq_domain_generator")
-                .err()
-                .unwrap(),
-        ),
-    }
+pub fn caml_pasta_fq_domain_generator(log2_size: ocaml::Int) -> Result<CamlFq, ocaml::Error> {
+    Domain::new(1 << log2_size)
+        .map(|x| CamlFq(x.group_gen))
+        .ok_or(ocaml::Error::Message("caml_pasta_fq_domain_generator"))
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<Fq>) -> ocaml::Value {
-    let len = std::mem::size_of::<Fq>();
+pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<CamlFq>) -> ocaml::Value {
+    let len = std::mem::size_of::<CamlFq>();
     let str = unsafe { ocaml::sys::caml_alloc_string(len) };
     unsafe {
         core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
@@ -212,16 +232,16 @@ pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<Fq>) -> ocaml::Value {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_of_bytes(x: &[u8]) -> Result<Fq, ocaml::Error> {
-    let len = std::mem::size_of::<Fq>();
+pub fn caml_pasta_fq_of_bytes(x: &[u8]) -> Result<CamlFq, ocaml::Error> {
+    let len = std::mem::size_of::<CamlFq>();
     if x.len() != len {
         ocaml::Error::failwith("caml_pasta_fq_of_bytes")?;
     };
-    let x = unsafe { *(x.as_ptr() as *const Fq) };
+    let x = unsafe { *(x.as_ptr() as *const CamlFq) };
     Ok(x)
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_deep_copy(x: Fq) -> Fq {
+pub fn caml_pasta_fq_deep_copy(x: CamlFq) -> CamlFq {
     x
 }

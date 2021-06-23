@@ -1,6 +1,6 @@
-use crate::pasta_fp::Fp;
+use crate::{pasta_fp::CamlFp, polycomm::CamlPolyComVesta, random_oracles::CamlRandomOracles};
 use mina_curves::pasta::{
-    fp::Fp as mina_Fp,
+    fp::Fp,
     vesta::{Affine as GAffine, VestaParameters},
 };
 
@@ -22,18 +22,18 @@ use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 /// The state of the verifier during verification
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPastaFpPlonkOracles {
-    pub o: RandomOracles<mina_Fp>, // all the challenges produced during the protocol
-    pub p_eval: (Fp, Fp),          // two evaluation of some poly?
-    pub opening_prechallenges: Vec<Fp>, // challenges before some opening?
-    pub digest_before_evaluations: Fp, // digest of poseidon before evaluating?
+    pub o: CamlRandomOracles<Fp>, // all the challenges produced during the protocol
+    pub p_eval: (CamlFp, CamlFp), // two evaluation of some poly?
+    pub opening_prechallenges: Vec<CamlFp>, // challenges before some opening?
+    pub digest_before_evaluations: CamlFp, // digest of poseidon before evaluating?
 }
 
 /// Creates a [CamlPastaFpPlonkOracles] state which will initialize a verifier
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_create(
-    lgr_comm: Vec<PolyComm<GAffine>>, // the bases to commit polynomials
+    lgr_comm: Vec<CamlPolyComVesta>, // the bases to commit polynomials
     index: CamlPastaFpPlonkVerifierIndex, // parameters
-    proof: DlogProof<GAffine>,        // the final proof (contains public elements at the beginning)
+    proof: DlogProof<GAffine>,       // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
     let proof: DlogProof<GAffine> = proof.into(); // isn't this useless?
@@ -51,7 +51,7 @@ pub fn caml_pasta_fp_plonk_oracles_create(
 
     // runs the entire protocol
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<Fp, PlonkSpongeConstants>>(&index, &p_comm);
+        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<CamlFp, PlonkSpongeConstants>>(&index, &p_comm);
 
     // absorb the combined inner product into the sponge, as an Fr (why?)
     // shift_scalar = x - 2^(modulus_bits), why??
@@ -69,14 +69,4 @@ pub fn caml_pasta_fp_plonk_oracles_create(
             .collect(),
         digest_before_evaluations: digest_before_evaluations,
     }
-}
-
-#[ocaml::func]
-pub fn caml_pasta_fp_plonk_oracles_dummy() -> RandomOracles<Fp> {
-    RandomOracles::zero().into()
-}
-
-#[ocaml::func]
-pub fn caml_pasta_fp_plonk_oracles_deep_copy(x: RandomOracles<Fp>) -> RandomOracles<Fp> {
-    x
 }

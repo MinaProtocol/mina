@@ -1,4 +1,3 @@
-use crate::caml_pointer;
 use crate::index_serialization;
 use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::pasta_fp_urs::CamlPastaFpUrs;
@@ -6,6 +5,7 @@ use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
     CamlPlonkVerifierIndex,
 };
+use crate::{caml_pointer, pasta_fp::CamlFp, polycomm::CamlPolyComVesta};
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use mina_curves::pasta::{fp::Fp, pallas::Affine as GAffineOther, vesta::Affine as GAffine};
@@ -27,7 +27,7 @@ use std::{
 use std::rc::Rc;
 
 pub type CamlPastaFpPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<Fp, CamlPastaFpUrs, PolyComm<GAffine>>;
+    CamlPlonkVerifierIndex<CamlFp, CamlPastaFpUrs, CamlPolyComVesta>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -110,8 +110,8 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlPastaFpUrs,
-    evals: CamlPlonkVerificationEvals<PolyComm<GAffine>>,
-    shifts: CamlPlonkVerificationShifts<Fp>,
+    evals: CamlPlonkVerificationEvals<CamlPolyComVesta>,
+    shifts: CamlPlonkVerificationShifts<CamlFp>,
 ) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&*urs);
     let urs_copy_outer = Rc::clone(&*urs);
@@ -251,7 +251,7 @@ pub fn caml_pasta_fp_plonk_verifier_index_create(
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_verifier_index_shifts(
     log2_size: ocaml::Int,
-) -> CamlPlonkVerificationShifts<Fp> {
+) -> CamlPlonkVerificationShifts<CamlFp> {
     let (a, b) = ConstraintSystem::sample_shifts(&Domain::new(1 << log2_size).unwrap());
     CamlPlonkVerificationShifts { r: a, o: b }
 }
