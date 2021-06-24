@@ -1104,8 +1104,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                       $reason" ;
                    Mina_metrics.(
                      Counter.inc Rejected_blocks.no_common_ancestor
-                       (Float.of_int @@ (1 + List.length children_transitions)))
-               )
+                       (Float.of_int @@ (1 + List.length children_transitions))) ;
+                   List.iter forest ~f:(fun tree ->
+                       Rose_tree.iter subtree ~f:Cached.invalidate_with_failure
+                   ) )
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
@@ -1135,9 +1137,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              List.iter forest
                ~f:
                  (Rose_tree.iter ~f:(fun c ->
-                      let node =
-                        create_node ~downloader t (`Initial_validated c)
-                      in
+                      let node = create_node ~downloader t (`Verify c) in
                       run_node node |> ignore )) ;
              List.fold state_hashes
                ~init:(root.state_hash, root.blockchain_length)
