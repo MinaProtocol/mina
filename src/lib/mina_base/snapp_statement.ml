@@ -14,13 +14,14 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'comm t = {transaction: 'comm; at_party: 'comm} [@@deriving hlist]
+      type 'comm t = {transaction: 'comm; at_party: 'comm; event_list: 'comm}
+      [@@deriving hlist]
     end
   end]
 
   let to_field_elements (t : 'c t) : 'c array =
-    let [x0; x1] = to_hlist t in
-    [|x0; x1|]
+    let [x0; x1; x2] = to_hlist t in
+    [|x0; x1; x2|]
 end
 
 [%%versioned
@@ -54,7 +55,7 @@ end
 let typ =
   let open Poly in
   Typ.of_hlistable
-    Parties.Transaction_commitment.[typ; typ]
+    Parties.Transaction_commitment.[typ; typ; typ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 

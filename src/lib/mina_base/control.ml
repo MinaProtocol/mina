@@ -7,11 +7,14 @@ open Core_kernel
 [%%ifdef
 consensus_mechanism]
 
+open Zexe_backend
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t =
-      | Proof of Pickles.Side_loaded.Proof.Stable.V1.t
+      | Proof of
+          Pickles.Side_loaded.Proof.Stable.V1.t * Pasta.Fp.Stable.V1.t list
       | Signature of Signature.Stable.V1.t
       | None_given
     [@@deriving sexp, equal, yojson, hash, compare]
