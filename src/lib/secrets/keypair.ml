@@ -69,8 +69,21 @@ module T = struct
         Privkey_error.raise ~which priv_key_error
 
   let read_exn' path =
-    read_exn ~privkey_path:path
-      ~password:(lazy (Password.hidden_line_or_env "Secret key password: " ~env))
+    let password =
+      let env_value = Sys.getenv env in
+      let env_deprecated_value = Sys.getenv env_deprecated in
+      match (env_value, env_deprecated_value) with
+      | Some v, _ | None, Some v ->
+          lazy (return @@ Bytes.of_string v)
+      | None, None ->
+          let error_help_message =
+            sprintf "Set the %s environment variable to the password" env
+          in
+          lazy
+            (Password.read_hidden_line ~error_help_message
+               "Secret key password: ")
+    in
+    read_exn ~privkey_path:path ~password
 end
 
 include T
