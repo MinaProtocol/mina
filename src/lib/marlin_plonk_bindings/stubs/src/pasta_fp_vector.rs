@@ -1,5 +1,5 @@
 use crate::caml_pointer::{self, CamlPointer};
-use algebra::pasta::fp::Fp;
+use mina_curves::pasta::fp::Fp;
 
 pub type CamlPastaFpVector = CamlPointer<Vec<Fp>>;
 
