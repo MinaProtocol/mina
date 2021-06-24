@@ -4,22 +4,22 @@ use std::ops::Deref;
 
 // there are two curves we commit with
 
-type PolyComPallas = PolyComm<pallas::Affine>;
-type PolyComVesta = PolyComm<vesta::Affine>;
+type PolyCommPallas = PolyComm<pallas::Affine>;
+type PolyCommVesta = PolyComm<vesta::Affine>;
 
 // the first type of commitment
 
 #[derive(Clone)]
-pub struct CamlPolyComPallas(pub PolyComPallas);
+pub struct CamlPolyCommPallas(pub PolyCommPallas);
 
-unsafe impl ocaml::FromValue for CamlPolyComPallas {
+unsafe impl ocaml::FromValue for CamlPolyCommPallas {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
         x.as_ref().clone()
     }
 }
 
-impl CamlPolyComPallas {
+impl CamlPolyCommPallas {
     extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
         let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
         unsafe {
@@ -28,12 +28,12 @@ impl CamlPolyComPallas {
     }
 }
 
-ocaml::custom!(CamlPolyComPallas {
-    finalize: CamlPolyComPallas::caml_pointer_finalize,
+ocaml::custom!(CamlPolyCommPallas {
+    finalize: CamlPolyCommPallas::caml_pointer_finalize,
 });
 
-impl Deref for CamlPolyComPallas {
-    type Target = PolyComPallas;
+impl Deref for CamlPolyCommPallas {
+    type Target = PolyCommPallas;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -42,26 +42,26 @@ impl Deref for CamlPolyComPallas {
 
 // handy converter
 
-impl From<PolyComPallas> for CamlPolyComPallas {
-    fn from(x: PolyComPallas) -> Self {
+impl From<PolyCommPallas> for CamlPolyCommPallas {
+    fn from(x: PolyCommPallas) -> Self {
         Self(x)
     }
 }
 
-impl From<&PolyComPallas> for CamlPolyComPallas {
-    fn from(x: &PolyComPallas) -> Self {
+impl From<&PolyCommPallas> for CamlPolyCommPallas {
+    fn from(x: &PolyCommPallas) -> Self {
         Self(x.clone())
     }
 }
 
-impl Into<PolyComPallas> for CamlPolyComPallas {
-    fn into(self) -> PolyComPallas {
+impl Into<PolyCommPallas> for CamlPolyCommPallas {
+    fn into(self) -> PolyCommPallas {
         self.0
     }
 }
 
-impl Into<PolyComPallas> for &CamlPolyComPallas {
-    fn into(self) -> PolyComPallas {
+impl Into<PolyCommPallas> for &CamlPolyCommPallas {
+    fn into(self) -> PolyCommPallas {
         self.0.clone()
     }
 }
@@ -69,16 +69,16 @@ impl Into<PolyComPallas> for &CamlPolyComPallas {
 // the second type of commitment
 
 #[derive(Clone)]
-pub struct CamlPolyComVesta(pub PolyComVesta);
+pub struct CamlPolyCommVesta(pub PolyCommVesta);
 
-unsafe impl ocaml::FromValue for CamlPolyComVesta {
+unsafe impl ocaml::FromValue for CamlPolyCommVesta {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
         x.as_ref().clone()
     }
 }
 
-impl CamlPolyComVesta {
+impl CamlPolyCommVesta {
     extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
         let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
         unsafe {
@@ -87,12 +87,12 @@ impl CamlPolyComVesta {
     }
 }
 
-ocaml::custom!(CamlPolyComVesta {
-    finalize: CamlPolyComVesta::caml_pointer_finalize,
+ocaml::custom!(CamlPolyCommVesta {
+    finalize: CamlPolyCommVesta::caml_pointer_finalize,
 });
 
-impl Deref for CamlPolyComVesta {
-    type Target = PolyComVesta;
+impl Deref for CamlPolyCommVesta {
+    type Target = PolyCommVesta;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -101,26 +101,26 @@ impl Deref for CamlPolyComVesta {
 
 // handy converter
 
-impl From<PolyComVesta> for CamlPolyComVesta {
-    fn from(x: PolyComVesta) -> Self {
+impl From<PolyCommVesta> for CamlPolyCommVesta {
+    fn from(x: PolyCommVesta) -> Self {
         Self(x)
     }
 }
 
-impl From<&PolyComVesta> for CamlPolyComVesta {
-    fn from(x: &PolyComVesta) -> Self {
+impl From<&PolyCommVesta> for CamlPolyCommVesta {
+    fn from(x: &PolyCommVesta) -> Self {
         Self(x.clone())
     }
 }
 
-impl Into<PolyComVesta> for CamlPolyComVesta {
-    fn into(self) -> PolyComVesta {
+impl Into<PolyCommVesta> for CamlPolyCommVesta {
+    fn into(self) -> PolyCommVesta {
         self.0
     }
 }
 
-impl Into<PolyComVesta> for &CamlPolyComVesta {
-    fn into(self) -> PolyComVesta {
+impl Into<PolyCommVesta> for &CamlPolyCommVesta {
+    fn into(self) -> PolyCommVesta {
         self.0.clone()
     }
 }

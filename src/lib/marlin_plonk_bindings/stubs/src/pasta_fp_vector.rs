@@ -1,6 +1,6 @@
 use crate::{
+    arkworks::CamlFp,
     caml_pointer::{self, CamlPointer},
-    pasta_fp::CamlFp,
 };
 use mina_curves::pasta::fp::Fp;
 

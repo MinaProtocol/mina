@@ -13,8 +13,6 @@ use std::{
 // Wrapper struct to implement OCaml bindings
 //
 
-// TODO: implement both Fp and Fq with a macro
-// TODO: implement ops::Add, ops::Neg, etc.
 #[derive(Clone, Copy)]
 pub struct CamlFp(pub Fp);
 

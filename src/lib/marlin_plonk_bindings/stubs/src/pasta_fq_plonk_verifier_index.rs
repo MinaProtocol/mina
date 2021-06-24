@@ -6,7 +6,7 @@ use crate::plonk_verifier_index::{
     CamlPlonkDomain, CamlPlonkVerificationEvals, CamlPlonkVerificationShifts,
     CamlPlonkVerifierIndex,
 };
-use crate::{pasta_fq::CamlFq, polycomm::CamlPolyComPallas};
+use crate::{pasta_fq::CamlFq, polycomm::CamlPolyCommPallas};
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -24,7 +24,7 @@ use std::{
 };
 
 pub type CamlPastaFqPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyComPallas>;
+    CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyCommPallas>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -107,7 +107,7 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlPastaFqUrs,
-    evals: CamlPlonkVerificationEvals<CamlPolyComPallas>,
+    evals: CamlPlonkVerificationEvals<CamlPolyCommPallas>,
     shifts: CamlPlonkVerificationShifts<CamlFq>,
 ) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&*urs);

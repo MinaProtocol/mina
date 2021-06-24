@@ -1,7 +1,7 @@
 extern crate libc;
 
 /* Arkworks types */
-pub mod types;
+pub mod arkworks;
 /* Caml pointers */
 pub mod caml_pointer;
 /* Field vectors */

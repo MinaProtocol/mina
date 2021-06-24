@@ -1,5 +1,5 @@
+use crate::arkworks::{CamlDlogProofVesta, CamlFp, CamlPolyCommVesta, CamlRandomOraclesFp};
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
-use crate::{pasta_fp::CamlFp, polycomm::CamlPolyComVesta, random_oracles::CamlRandomOracles};
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use mina_curves::pasta::{
     fp::Fp,
@@ -19,7 +19,7 @@ use plonk_protocol_dlog::{
 /// The state of the verifier during verification
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPastaFpPlonkOracles {
-    pub o: CamlRandomOracles<Fp>, // all the challenges produced during the protocol
+    pub o: CamlRandomOraclesFp, // all the challenges produced during the protocol
     pub p_eval: (CamlFp, CamlFp), // two evaluation of some poly?
     pub opening_prechallenges: Vec<CamlFp>, // challenges before some opening?
     pub digest_before_evaluations: CamlFp, // digest of poseidon before evaluating?
@@ -28,9 +28,9 @@ pub struct CamlPastaFpPlonkOracles {
 /// Creates a [CamlPastaFpPlonkOracles] state which will initialize a verifier
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_create(
-    lgr_comm: Vec<CamlPolyComVesta>, // the bases to commit polynomials
+    lgr_comm: Vec<CamlPolyCommVesta>, // the bases to commit polynomials
     index: CamlPastaFpPlonkVerifierIndex, // parameters
-    proof: DlogProof<GAffine>,       // the final proof (contains public elements at the beginning)
+    proof: CamlDlogProofVesta,        // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
 
@@ -46,22 +46,23 @@ pub fn caml_pasta_fp_plonk_oracles_create(
 
     // runs the entire protocol
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
-        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<CamlFp, PlonkSpongeConstants>>(&index, &p_comm);
+        proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<Fp, PlonkSpongeConstants>>(&index, &p_comm);
 
     // absorb the combined inner product into the sponge, as an Fr (why?)
     // shift_scalar = x - 2^(modulus_bits), why??
     sponge.absorb_fr(&[shift_scalar(combined_inner_product)]);
 
     // return the state at that point on.
+    let opening_prechallenges = proof
+        .proof
+        .prechallenges(&mut sponge)
+        .into_iter()
+        .map(|x| x.0.into())
+        .collect();
     CamlPastaFpPlonkOracles {
-        o: o,
-        p_eval: (p_eval[0][0], p_eval[1][0]),
-        opening_prechallenges: proof
-            .proof
-            .prechallenges(&mut sponge)
-            .into_iter()
-            .map(|x| x.0)
-            .collect(),
-        digest_before_evaluations: digest_before_evaluations,
+        o: o.into(),
+        p_eval: (p_eval[0][0].into(), p_eval[1][0].into()),
+        opening_prechallenges,
+        digest_before_evaluations: digest_before_evaluations.into(),
     }
 }

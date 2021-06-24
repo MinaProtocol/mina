@@ -1,5 +1,5 @@
+use crate::arkworks::CamlFq;
 use crate::index_serialization;
-use crate::pasta_fq::CamlFq;
 use crate::pasta_fq_urs::CamlPastaFqUrs;
 use crate::plonk_gate::{CamlPlonkCol, CamlPlonkGate, CamlPlonkWire};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};

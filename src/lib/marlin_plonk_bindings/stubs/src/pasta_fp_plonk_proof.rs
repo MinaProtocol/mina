@@ -1,3 +1,4 @@
+use crate::arkworks::{CamlDlogProofVesta, CamlFp, CamlGroupAffineVesta, CamlPolyCommVesta};
 use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use crate::pasta_fp_vector::CamlPastaFpVector;
@@ -23,9 +24,9 @@ pub fn caml_pasta_fp_plonk_proof_create(
     index: CamlPastaFpPlonkIndexPtr<'static>,
     primary_input: CamlPastaFpVector,
     auxiliary_input: CamlPastaFpVector,
-    prev_challenges: Vec<Fp>,
-    prev_sgs: Vec<GAffine>,
-) -> DlogProof<GAffine> {
+    prev_challenges: Vec<CamlFp>,
+    prev_sgs: Vec<CamlGroupAffineVesta>,
+) -> CamlDlogProofVesta {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
@@ -36,12 +37,13 @@ pub fn caml_pasta_fp_plonk_proof_create(
             let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
             prev_sgs
                 .into_iter()
+                .map(Into::<GAffine>::into)
                 .enumerate()
                 .map(|(i, sg)| {
                     (
                         prev_challenges[(i * challenges_per_sg)..(i + 1) * challenges_per_sg]
                             .iter()
-                            .map(|x| *x)
+                            .map(Into::<Fp>::into)
                             .collect(),
                         PolyComm::<GAffine> {
                             unshifted: vec![sg.into()],
@@ -67,7 +69,7 @@ pub fn caml_pasta_fp_plonk_proof_create(
 
     ocaml::runtime::acquire_lock();
 
-    proof
+    proof.into()
 }
 
 pub fn proof_verify(
@@ -94,24 +96,25 @@ pub fn proof_verify(
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
-    lgr_comm: Vec<PolyComm<GAffine>>,
+    lgr_comm: Vec<CamlPolyCommVesta>,
     index: CamlPastaFpPlonkVerifierIndex,
-    proof: DlogProof<GAffine>,
+    proof: CamlDlogProofVesta,
 ) -> bool {
-    proof_verify(lgr_comm, &index.into(), proof)
+    let lgr_comm = lgr_comm.iter().map(|x| x.into()).collect();
+    proof_verify(lgr_comm, &index.into(), proof.into())
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<PolyComm<GAffine>>>,
+    lgr_comms: Vec<Vec<CamlPolyCommVesta>>,
     indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
-    proofs: Vec<DlogProof<GAffine>>,
+    proofs: Vec<CamlDlogProofVesta>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
         .zip(lgr_comms.into_iter())
         .zip(proofs.into_iter())
-        .map(|((i, l), p)| (i.into(), l.into_iter().map(From::from).collect(), p.into()))
+        .map(|((i, l), p)| (i.into(), l.into_iter().map(Into::into).collect(), p.into()))
         .collect();
     let ts: Vec<_> = ts.iter().map(|(i, l, p)| (i, l, p)).collect();
     let group_map = GroupMap::<Fq>::setup();
@@ -124,13 +127,13 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_dummy() -> DlogProof<GAffine> {
+pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlDlogProofVesta {
     let g = || GAffine::prime_subgroup_generator();
     let comm = || PolyComm {
         shifted: Some(g()),
         unshifted: vec![g(), g(), g()],
     };
-    DlogProof {
+    let dlogproof = DlogProof {
         prev_challenges: vec![
             (vec![Fp::one(), Fp::one()], comm()),
             (vec![Fp::one(), Fp::one()], comm()),
@@ -165,10 +168,11 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> DlogProof<GAffine> {
             };
             [evals(), evals()]
         },
-    }
+    };
+    dlogproof.into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_deep_copy(x: DlogProof<GAffine>) -> DlogProof<GAffine> {
+pub fn caml_pasta_fp_plonk_proof_deep_copy(x: CamlDlogProofVesta) -> CamlDlogProofVesta {
     x
 }

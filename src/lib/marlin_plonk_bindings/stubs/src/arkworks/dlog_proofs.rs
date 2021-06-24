@@ -7,7 +7,7 @@ use std::ops::Deref;
 type DlogProofPallas = DlogProof<pallas::Affine>;
 type DlogProofVesta = DlogProof<vesta::Affine>;
 
-// the first type
+// Pallas
 
 #[derive(Clone)]
 pub struct CamlDlogProofPallas(pub DlogProofPallas);
@@ -32,6 +32,31 @@ ocaml::custom!(CamlDlogProofPallas {
     finalize: CamlDlogProofPallas::caml_pointer_finalize,
 });
 
+// handy implementations
+
+impl From<DlogProofPallas> for CamlDlogProofPallas {
+    fn from(x: DlogProofPallas) -> Self {
+        CamlDlogProofPallas(x)
+    }
+}
+
+impl From<&DlogProofPallas> for CamlDlogProofPallas {
+    fn from(x: &DlogProofPallas) -> Self {
+        CamlDlogProofPallas(*x)
+    }
+}
+
+impl Into<DlogProofPallas> for CamlDlogProofPallas {
+    fn into(self) -> DlogProofPallas {
+        self.0
+    }
+}
+
+impl Into<DlogProofPallas> for &CamlDlogProofPallas {
+    fn into(self) -> DlogProofPallas {
+        self.0
+    }
+}
 impl Deref for CamlDlogProofPallas {
     type Target = DlogProofPallas;
 
@@ -40,7 +65,7 @@ impl Deref for CamlDlogProofPallas {
     }
 }
 
-// the second type
+// Vesta
 
 #[derive(Clone)]
 pub struct CamlDlogProofVesta(pub DlogProofVesta);
@@ -64,6 +89,32 @@ impl CamlDlogProofVesta {
 ocaml::custom!(CamlDlogProofVesta {
     finalize: CamlDlogProofVesta::caml_pointer_finalize,
 });
+
+// handy implementation
+
+impl From<DlogProofVesta> for CamlDlogProofVesta {
+    fn from(x: DlogProofVesta) -> Self {
+        CamlDlogProofVesta(x)
+    }
+}
+
+impl From<&DlogProofVesta> for CamlDlogProofVesta {
+    fn from(x: &DlogProofVesta) -> Self {
+        CamlDlogProofVesta(*x)
+    }
+}
+
+impl Into<DlogProofVesta> for CamlDlogProofVesta {
+    fn into(self) -> DlogProofVesta {
+        self.0
+    }
+}
+
+impl Into<DlogProofVesta> for &CamlDlogProofVesta {
+    fn into(self) -> DlogProofVesta {
+        self.0
+    }
+}
 
 impl Deref for CamlDlogProofVesta {
     type Target = DlogProofVesta;
