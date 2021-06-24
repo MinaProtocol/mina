@@ -647,11 +647,7 @@ let create_node ~downloader t x =
   in
   upon (Ivar.read node.result) (fun _ ->
       Downloader.cancel downloader (h, blockchain_length) ) ;
-  Hashtbl.update t.states (Node.State.enum node.state) ~f:(function
-    | None ->
-        State_hash.Set.singleton node.state_hash
-    | Some hashes ->
-        State_hash.Set.add hashes node.state_hash ) ;
+  Full_catchup_tree.add_state t.states node ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
     with e ->
