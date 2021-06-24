@@ -141,6 +141,8 @@ module Side_loaded : sig
 
     val typ : (Checked.t, t) Impls.Step.Typ.t
 
+    val of_compiled : _ Tag.t -> t
+
     module Max_branches : Nat.Add.Intf
 
     module Max_width = Nat.N2
