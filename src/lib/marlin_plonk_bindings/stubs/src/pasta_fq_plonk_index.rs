@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use algebra::pasta::{
+use mina_curves::pasta::{
     vesta::Affine as GAffineOther,
     pallas::{Affine as GAffine, PallasParameters},
     fq::Fq,
