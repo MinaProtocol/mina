@@ -3977,6 +3977,164 @@ let%test_module "transaction_snark" =
           |> Or_error.ok_exn
           |> fun ((), ()) -> () )
 
+    let%test_unit "snapps-based proved transaction" =
+      let open Transaction_logic.For_tests in
+      let tag, _, (module P), Pickles.Provers.[multisig] =
+        let multisig_rule : _ Pickles.Inductive_rule.t =
+          let multisig_main = failwith "TODO" in
+          { identifier= "multisig-rule"
+          ; prevs= []
+          ; main= (fun [] x -> multisig_main x ; [])
+          ; main_value= (fun [] _ -> []) }
+        in
+        Pickles.compile ~cache:Cache_dir.cache
+          (module Snapp_statement.Checked)
+          (module Snapp_statement)
+          ~typ:Snapp_statement.typ
+          ~branches:(module Nat.N1)
+          ~max_branching:(module Nat.N2) (* You have to put 2 here... *)
+          ~name:"multisig"
+          ~constraint_constants:
+            (Genesis_constants.Constraint_constants.to_snark_keys_header
+               constraint_constants)
+          ~choices:(fun ~self:_ -> [multisig_rule])
+      in
+      let vk = Pickles.Side_loaded.Verification_key.of_compiled tag in
+      Quickcheck.test ~trials:15 Test_spec.gen ~f:(fun {init_ledger; specs} ->
+          Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
+              Init_ledger.init (module Ledger.Ledger_inner) init_ledger ledger ;
+              let spec = List.hd_exn specs in
+              let { Transaction_logic.For_tests.Transaction_spec.fee
+                  ; sender= sender, sender_nonce
+                  ; receiver= multisig_account_pk
+                  ; amount } =
+                spec
+              in
+              let vk =
+                With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
+              in
+              (let _is_new, loc =
+                 let id =
+                   Account_id.create multisig_account_pk Token_id.default
+                 in
+                 Ledger.get_or_create_account ledger id
+                   (Account.create id Balance.(of_int 234234234234))
+                 |> Or_error.ok_exn
+               in
+               let a = Ledger.get ledger loc |> Option.value_exn in
+               Ledger.set ledger loc
+                 { a with
+                   snapp=
+                     Some
+                       { (Option.value ~default:Snapp_account.default a.snapp) with
+                         verification_key= Some vk } }) ;
+              let pi : Pickles.Side_loaded.Proof.t = failwith "TODO" in
+              let parties : Parties.t =
+                let total = Option.value_exn (Amount.add fee amount) in
+                { fee_payer=
+                    { Party.Signed.data=
+                        { body=
+                            { pk= sender.public_key |> Public_key.compress
+                            ; update= Party.Update.noop
+                            ; token_id= Token_id.default
+                            ; delta= Amount.Signed.(negate (of_unsigned total))
+                            }
+                        ; predicate= sender_nonce }
+                        (* Real signature added in below *)
+                    ; authorization= Signature.dummy }
+                ; other_parties=
+                    [ { data=
+                          { body=
+                              { pk= multisig_account_pk
+                              ; update= Party.Update.noop
+                              ; token_id= Token_id.default
+                              ; delta= Amount.Signed.(of_unsigned amount) }
+                          ; predicate= Accept }
+                      ; authorization= Proof pi } ]
+                ; protocol_state= Snapp_predicate.Protocol_state.accept }
+              in
+              let w : Parties_segment.Witness.t =
+                { global_ledger=
+                    Sparse_ledger.of_ledger_subset_exn ledger
+                      (Parties.accounts_accessed parties)
+                ; local_state_init=
+                    { Local_state.dummy with
+                      parties= []
+                    ; ledger=
+                        Sparse_ledger.of_root ~depth:ledger_depth
+                          ~next_available_token:Token_id.(next default)
+                          Local_state.dummy.ledger }
+                ; start_parties=
+                    [ { will_succeed= true
+                      ; protocol_state_predicate=
+                          Snapp_predicate.Protocol_state.accept
+                      ; parties } ]
+                ; state_body }
+              in
+              let _, (local_state_post, excess) =
+                Ledger.apply_parties_unchecked ledger ~constraint_constants
+                  ~state_view:(Mina_state.Protocol_state.Body.view state_body)
+                  parties
+                |> Or_error.ok_exn
+              in
+              let statement : Statement.With_sok.t =
+                { source=
+                    { ledger= Sparse_ledger.merkle_root w.global_ledger
+                    ; next_available_token=
+                        Sparse_ledger.next_available_token w.global_ledger
+                    ; pending_coinbase_stack= Pending_coinbase.Stack.empty
+                    ; local_state=
+                        { w.local_state_init with
+                          parties=
+                            Parties.With_hashes.digest
+                              w.local_state_init.parties
+                        ; ledger=
+                            Sparse_ledger.merkle_root w.local_state_init.ledger
+                        } }
+                ; target=
+                    { ledger= Ledger.merkle_root ledger
+                    ; next_available_token= Ledger.next_available_token ledger
+                    ; pending_coinbase_stack= Pending_coinbase.Stack.empty
+                    ; local_state=
+                        { local_state_post with
+                          parties=
+                            List.fold (List.rev local_state_post.parties)
+                              ~init:Parties.With_hashes.empty ~f:(fun acc p ->
+                                Parties.With_hashes.cons_hash
+                                  (Party.Predicated.digest p.data)
+                                  acc )
+                        ; ledger=
+                            (* TODO: This won't quite work when the transaction fails. *)
+                            Ledger.merkle_root local_state_post.ledger
+                        ; transaction_commitment=
+                            w.local_state_init.transaction_commitment } }
+                ; supply_increase= Amount.zero
+                ; fee_excess=
+                    { fee_token_l= Token_id.default
+                    ; fee_excess_l=
+                        Fee.Signed.of_unsigned (Amount.to_fee excess)
+                    ; fee_token_r= Token_id.default
+                    ; fee_excess_r= Fee.Signed.zero }
+                ; sok_digest= Sok_message.Digest.default }
+              in
+              let open Impl in
+              run_and_check
+                (fun () ->
+                  let s =
+                    exists Statement.With_sok.typ ~compute:(fun () -> statement)
+                  in
+                  Base.Parties_snark.main ~constraint_constants
+                    [ { predicate_type= `Nonce_or_accept
+                      ; auth_type= Signature
+                      ; is_start= `Yes }
+                    ; {predicate_type= `Full; auth_type= Proof; is_start= `No}
+                    ]
+                    [] s ~witness:w ;
+                  fun () -> () )
+                () )
+          |> Or_error.ok_exn
+          |> fun ((), ()) -> () )
+
     (* Disabling until new-style snapp transactions are fully implemented. 
 
     let%test_unit "signed_signed" =
