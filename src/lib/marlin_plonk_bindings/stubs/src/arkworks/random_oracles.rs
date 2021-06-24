@@ -32,14 +32,14 @@ ocaml::custom!(CamlRandomOraclesFq {
 // Handy implementations
 
 impl From<RandomOracles<Fq>> for CamlRandomOraclesFq {
-    fn from(fp: RandomOracles<Fq>) -> Self {
-        CamlRandomOraclesFq(fp)
+    fn from(x: RandomOracles<Fq>) -> Self {
+        CamlRandomOraclesFq(x)
     }
 }
 
 impl From<&RandomOracles<Fq>> for CamlRandomOraclesFq {
-    fn from(fp: &RandomOracles<Fq>) -> Self {
-        CamlRandomOraclesFq(*fp)
+    fn from(x: &RandomOracles<Fq>) -> Self {
+        CamlRandomOraclesFq(x.clone())
     }
 }
 
@@ -51,7 +51,7 @@ impl Into<RandomOracles<Fq>> for CamlRandomOraclesFq {
 
 impl Into<RandomOracles<Fq>> for &CamlRandomOraclesFq {
     fn into(self) -> RandomOracles<Fq> {
-        self.0
+        self.0.clone()
     }
 }
 
@@ -91,14 +91,14 @@ ocaml::custom!(CamlRandomOraclesFp {
 // Handy implementations
 
 impl From<RandomOracles<Fp>> for CamlRandomOraclesFp {
-    fn from(fp: RandomOracles<Fp>) -> Self {
-        CamlRandomOraclesFp(fp)
+    fn from(x: RandomOracles<Fp>) -> Self {
+        CamlRandomOraclesFp(x)
     }
 }
 
 impl From<&RandomOracles<Fp>> for CamlRandomOraclesFp {
-    fn from(fp: &RandomOracles<Fp>) -> Self {
-        CamlRandomOraclesFp(*fp)
+    fn from(x: &RandomOracles<Fp>) -> Self {
+        CamlRandomOraclesFp(x.clone())
     }
 }
 
@@ -110,7 +110,7 @@ impl Into<RandomOracles<Fp>> for CamlRandomOraclesFp {
 
 impl Into<RandomOracles<Fp>> for &CamlRandomOraclesFp {
     fn into(self) -> RandomOracles<Fp> {
-        self.0
+        self.0.clone()
     }
 }
 

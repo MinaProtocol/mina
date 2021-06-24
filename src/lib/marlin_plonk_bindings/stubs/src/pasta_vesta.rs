@@ -40,16 +40,16 @@ pub fn caml_pasta_vesta_negate(
 pub fn caml_pasta_vesta_double(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
 ) -> CamlGroupProjectiveVesta {
-    CamlGroupProjectiveVesta(x.as_ref().0.double())
+    x.as_ref().double().into()
 }
 
 #[ocaml::func]
 pub fn caml_pasta_vesta_scale(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
-    y: ocaml::Pointer<Fp>,
+    y: ocaml::Pointer<CamlFp>,
 ) -> CamlGroupProjectiveVesta {
-    let res = x.as_ref().0.mul(&y.as_ref().0);
-    CamlGroupProjectiveVesta(res)
+    let y: &Fp = &y.as_ref().0;
+    x.as_ref().mul(&y.0).into()
 }
 
 #[ocaml::func]

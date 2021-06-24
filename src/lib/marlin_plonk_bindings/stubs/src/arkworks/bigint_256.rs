@@ -76,8 +76,8 @@ impl CamlBigInteger256 {
     /// This converts a [BigUint] into a [CamlBigInteger256].
     /// The function can panic if `x` is larger than [CamlBigInteger256].
     pub fn of_biguint(x: &BigUint) -> Self {
-        let result = [0u64; BIGINT256_NUM_LIMBS as usize];
-        let mut serialized = x.to_u64_digits();
+        let mut result = [0u64; BIGINT256_NUM_LIMBS as usize];
+        let serialized = x.to_u64_digits();
         assert!(serialized.len() <= BIGINT256_NUM_LIMBS as usize);
         result.copy_from_slice(&serialized);
         Self(BigInteger256(result))

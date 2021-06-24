@@ -42,7 +42,7 @@ impl From<DlogProofPallas> for CamlDlogProofPallas {
 
 impl From<&DlogProofPallas> for CamlDlogProofPallas {
     fn from(x: &DlogProofPallas) -> Self {
-        CamlDlogProofPallas(*x)
+        CamlDlogProofPallas(x.clone())
     }
 }
 
@@ -54,7 +54,7 @@ impl Into<DlogProofPallas> for CamlDlogProofPallas {
 
 impl Into<DlogProofPallas> for &CamlDlogProofPallas {
     fn into(self) -> DlogProofPallas {
-        self.0
+        self.0.clone()
     }
 }
 impl Deref for CamlDlogProofPallas {
@@ -100,7 +100,7 @@ impl From<DlogProofVesta> for CamlDlogProofVesta {
 
 impl From<&DlogProofVesta> for CamlDlogProofVesta {
     fn from(x: &DlogProofVesta) -> Self {
-        CamlDlogProofVesta(*x)
+        CamlDlogProofVesta(x.clone())
     }
 }
 
@@ -112,7 +112,7 @@ impl Into<DlogProofVesta> for CamlDlogProofVesta {
 
 impl Into<DlogProofVesta> for &CamlDlogProofVesta {
     fn into(self) -> DlogProofVesta {
-        self.0
+        self.0.clone()
     }
 }
 

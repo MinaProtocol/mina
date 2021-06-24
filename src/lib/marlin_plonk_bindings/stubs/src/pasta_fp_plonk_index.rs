@@ -45,7 +45,7 @@ pub fn caml_pasta_fp_plonk_gate_vector_add(
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c: gate.c.iter().map(|x| x.0).collect(),
+        c: gate.c.iter().map(Into::into).collect(),
     });
 }
 
@@ -55,7 +55,7 @@ pub fn caml_pasta_fp_plonk_gate_vector_get(
     i: ocaml::Int,
 ) -> CamlPlonkGate<Vec<CamlFp>> {
     let gate = &(v.as_ref().0)[i as usize];
-    let c = gate.c.iter().map(|x| CamlFp(x.clone())).collect();
+    let c = gate.c.iter().map(Into::into).collect();
     CamlPlonkGate {
         typ: (&gate.typ).into(),
         wires: (&gate.wires).into(),

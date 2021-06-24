@@ -18,7 +18,7 @@ pub fn caml_pasta_fp_vector_length(v: CamlPastaFpVector) -> ocaml::Int {
 
 #[ocaml::func]
 pub fn caml_pasta_fp_vector_emplace_back(mut v: CamlPastaFpVector, x: CamlFp) {
-    (*v).push(x.0);
+    (*v).push(x.into());
 }
 
 #[ocaml::func]
