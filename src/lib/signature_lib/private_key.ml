@@ -17,7 +17,7 @@ open Snark_params_nonconsensus
 [%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    type t = Inner_curve.Scalar.t
+    type t = Inner_curve.Scalar.t [@@deriving hash]
 
     let to_latest = Fn.id
 
