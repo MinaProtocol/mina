@@ -112,14 +112,14 @@ module Node = struct
     ; result: ([`Added_to_frontier], Attempt_history.t) Result.t Ivar.t }
 end
 
-let add_state states (node : Node.t) =
+let add_state states node =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
     | None ->
         State_hash.Set.empty
     | Some hashes ->
         State_hash.Set.remove hashes node.state_hash )
 
-let remove_state states (node : Node.t) =
+let remove_state states node =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
     | None ->
         State_hash.Set.empty
