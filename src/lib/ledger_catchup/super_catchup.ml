@@ -1133,9 +1133,7 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
              List.iter forest
                ~f:
                  (Rose_tree.iter ~f:(fun c ->
-                      let node =
-                        create_node ~downloader t (`Initial_validated c)
-                      in
+                      let node = create_node ~downloader t (`Verify c) in
                       run_node node |> ignore )) ;
              List.fold state_hashes
                ~init:(root.state_hash, root.blockchain_length)
