@@ -474,6 +474,7 @@ module Slots_won = struct
         retry ~logger
           ~error_message:"Error fetching slots from the VRF evaluator" f
       in
+      [%log info] "Polling VRF evaluator process" ;
       let%bind vrf_result = poll_vrf_evaluator () in
       Queue.enqueue_all q vrf_result.slots_won ;
       let wait_time = consensus_constants.block_window_duration_ms in

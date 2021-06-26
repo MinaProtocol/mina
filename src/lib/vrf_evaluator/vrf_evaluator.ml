@@ -255,7 +255,7 @@ module Functions = struct
             ~metadata:[("epoch", Epoch.to_yojson e.epoch)] ;
           Strict_pipe.Writer.write w.reset_writer e
         in
-        if Epoch.(e.epoch > w.current_epoch) then (
+        if Epoch.(succ e.epoch > w.current_epoch) then (
           [%log info] "Updating epoch data" ;
           update () )
         else (
@@ -266,6 +266,9 @@ module Functions = struct
   let slots_won_so_far =
     create Unit.bin_t Vrf_evaluation_result.Stable.Latest.bin_t (fun w () ->
         let slots_won = Queue.to_list w.slots_won in
+        [%log' info w.config.logger]
+          !"Slots won evaluator: %{sexp: Consensus.Data.Slot_won.t list}"
+          slots_won ;
         Queue.clear w.slots_won ;
         let evaluator_status =
           match w.current_slot with

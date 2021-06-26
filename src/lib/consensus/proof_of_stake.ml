@@ -223,6 +223,7 @@ module Data = struct
           ; global_slot: Mina_numbers.Global_slot.Stable.V1.t
           ; global_slot_since_genesis: Mina_numbers.Global_slot.Stable.V1.t
           ; vrf_result: Consensus_vrf.Output_hash.Stable.V1.t }
+        [@@deriving sexp]
 
         let to_latest = Fn.id
       end
