@@ -2933,6 +2933,8 @@ module Hooks = struct
     | `Produce_now of Block_data.t * Public_key.Compressed.t
     | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t ]
 
+  let epoch_end_time = Epoch.end_time
+
   let get_epoch_data_for_vrf ~(constants : Constants.t) now
       (state : Consensus_state.Value.t) ~local_state ~logger :
       Epoch_data_for_vrf.t * Local_state.Snapshot.Ledger_snapshot.t =

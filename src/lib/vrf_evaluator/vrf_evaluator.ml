@@ -36,13 +36,14 @@ module Evaluator_status = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = At of Global_slot.Stable.V1.t | Stopped
+      type t = At of Global_slot.Stable.V1.t | Completed
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = At of Global_slot.t | Stopped [@@deriving sexp]
+  type t = Stable.Latest.t = At of Global_slot.t | Completed
+  [@@deriving sexp]
 end
 
 module Vrf_evaluation_result = struct
@@ -275,7 +276,7 @@ module Functions = struct
           | Some slot ->
               Evaluator_status.At slot
           | None ->
-              Stopped
+              Completed
         in
         return Vrf_evaluation_result.{slots_won; evaluator_status} )
 

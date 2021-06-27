@@ -727,6 +727,9 @@ module type S = sig
       -> local_state:Local_state.t
       -> Data.Local_state.Snapshot.Ledger_snapshot.t
 
+    val epoch_end_time :
+      constants:Constants.t -> Mina_numbers.Length.t -> Block_time.t
+
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]
 
