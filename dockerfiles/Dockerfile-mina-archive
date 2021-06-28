@@ -19,11 +19,13 @@ RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 # Workaround terrible postgresql package requirements with man
 RUN mkdir /usr/share/man/man7 /usr/share/man/man1
 
+#these are necessary to install BEFORE attempting to install psql-11
 RUN apt-get -y update \
     && apt-get -y upgrade \
-    && apt-get install -y wget \
-    && apt-get install -y lsb-release \
-    && apt-get install -y gnupg
+    && apt-get -y install \
+      wget \
+      lsb-release \
+      gnupg
 
 RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
   && RELEASE=$(lsb_release -cs) \
@@ -33,6 +35,7 @@ RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-k
 RUN apt-get -y update \
     && apt-get -y upgrade \
     && apt-get -y install \
+        procps \
         curl \
         jq \
         dumb-init \
