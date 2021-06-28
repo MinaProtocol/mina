@@ -647,7 +647,7 @@ let create_node ~downloader t x =
   in
   upon (Ivar.read node.result) (fun _ ->
       Downloader.cancel downloader (h, blockchain_length) ) ;
-  Full_catchup_tree.add_state t.states node ;
+  Transition_frontier.Full_catchup_tree.add_state t.states node ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
     with e ->
@@ -1100,10 +1100,11 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                       $reason" ;
                    Mina_metrics.(
                      Counter.inc Rejected_blocks.no_common_ancestor
-                       (Float.of_int @@ (1 + List.length children_transitions))) ;
-                   List.iter forest ~f:(fun tree ->
-                       Rose_tree.iter subtree ~f:Cached.invalidate_with_failure
-                   ) )
+                       (Float.of_int @@ (1 + List.length children_transitions)))
+               ) ;
+             List.iter forest ~f:(fun subtree ->
+                 Rose_tree.iter subtree ~f:(fun cached ->
+                     Cached.invalidate_with_failure cached |> ignore ) )
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
