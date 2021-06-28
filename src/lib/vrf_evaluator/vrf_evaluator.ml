@@ -147,8 +147,8 @@ module Worker_state = struct
       (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
       let slot = Consensus_time.slot consensus_time in
       let global_slot = Consensus_time.to_global_slot consensus_time in
-      List.fold_until keypairs ~init:()
-        ~f:(fun () (keypair, public_key_compressed) ->
+      Deferred.List.find_map keypairs
+        ~f:(fun ((keypair : Keypair.t), public_key_compressed) ->
           let global_slot_since_genesis =
             let slot_diff =
               match Global_slot.sub global_slot start_global_slot with
@@ -166,7 +166,7 @@ module Worker_state = struct
             ~metadata:
               [ ("epoch", `Int (Epoch.to_int epoch))
               ; ("slot", `Int (Slot.to_int slot)) ] ;
-          match
+          match%map
             Consensus.Data.Vrf.check
               ~constraint_constants:config.constraint_constants ~global_slot
               ~seed:epoch_data.epoch_seed
@@ -176,7 +176,7 @@ module Worker_state = struct
               ~producer_public_key:public_key_compressed ~total_stake ~logger
           with
           | None ->
-              Continue_or_stop.Continue ()
+              None
           | Some (`Vrf_output vrf_result, `Delegator delegator) ->
               [%log info] "Won slot %d in epoch %d" (Slot.to_int slot)
                 (Epoch.to_int epoch) ;
@@ -188,8 +188,7 @@ module Worker_state = struct
                   ; global_slot_since_genesis
                   ; vrf_result }
               in
-              Continue_or_stop.Stop (Some slot_won) )
-        ~finish:(fun () -> None)
+              Some slot_won )
     in
     let rec find_winning_slot (consensus_time : Consensus_time.t) =
       let slot = Consensus_time.slot consensus_time in
@@ -200,10 +199,17 @@ module Worker_state = struct
         ~metadata:[("slot", Slot.to_yojson slot)] ;
       if Epoch.(epoch' > epoch) then Deferred.unit
       else
-        match%bind evaluate_vrf ~consensus_time |> Deferred.return with
+        let start = Time.now () in
+        match%bind evaluate_vrf ~consensus_time with
         | None ->
+            [%log info] "Did not win a slot, took $time ms"
+              ~metadata:
+                [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
             find_winning_slot (Consensus_time.succ consensus_time)
         | Some slot_won ->
+            [%log info] "Won a slot, took $time ms"
+              ~metadata:
+                [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
             Queue.enqueue slots_won slot_won ;
             find_winning_slot (Consensus_time.succ consensus_time)
     in
@@ -228,13 +234,14 @@ module Worker_state = struct
       ; reset_writer }
     in
     don't_wait_for
-      (Strict_pipe.Reader.fold ~init:() reset_reader ~f:(fun () epoch_data ->
+      (Strict_pipe.Reader.iter_without_pushback reset_reader
+         ~f:(fun epoch_data ->
            [%log' info config.logger] "Resetting epoch data for epoch %d"
              (Epoch.to_int epoch_data.epoch) ;
            Queue.clear t.slots_won ;
            t.current_slot <- None ;
            t.current_epoch <- epoch_data.epoch ;
-           evaluate epoch_data t )) ;
+           don't_wait_for (evaluate epoch_data t) )) ;
     return t
 end
 

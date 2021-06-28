@@ -799,43 +799,41 @@ module Data = struct
               Public_key.Compressed.t
            -> Mina_base.Account.t Mina_base.Account.Index.Table.t option) =
       let open Message in
-      with_return (fun {return} ->
-          Hashtbl.iteri
-            ( get_delegators producer_public_key
-            |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
-            ~f:(fun ~key:delegator ~data:account ->
-              let vrf_result =
-                T.eval ~constraint_constants ~private_key:producer_private_key
-                  {global_slot; seed; delegator}
-              in
-              let truncated_vrf_result = Output.truncate vrf_result in
-              [%log debug]
-                "VRF result for delegator: $delegator, balance: $balance, \
-                 amount: $amount, result: $result"
-                ~metadata:
-                  [ ( "delegator"
-                    , `Int (Mina_base.Account.Index.to_int delegator) )
-                  ; ( "delegator_pk"
-                    , Public_key.Compressed.to_yojson account.public_key )
-                  ; ("balance", `Int (Balance.to_int account.balance))
-                  ; ("amount", `Int (Amount.to_int total_stake))
-                  ; ( "result"
-                    , `String
-                        (* use sexp representation; int might be too small *)
-                        ( Fold.string_bits truncated_vrf_result
-                        |> Bignum_bigint.of_bit_fold_lsb
-                        |> Bignum_bigint.sexp_of_t |> Sexp.to_string ) ) ] ;
-              Mina_metrics.Counter.inc_one
-                Mina_metrics.Consensus.vrf_evaluations ;
-              if
-                Threshold.is_satisfied ~my_stake:account.balance ~total_stake
-                  truncated_vrf_result
-              then
-                return
-                  (Some
-                     ( `Vrf_output vrf_result
-                     , `Delegator (account.public_key, delegator) )) ) ;
-          None )
+      let delegators =
+        get_delegators producer_public_key
+        |> Option.value_map ~f:Hashtbl.to_alist ~default:[]
+      in
+      Deferred.List.find_map delegators ~f:(fun (delegator, account) ->
+          let%map () = Deferred.return () in
+          let vrf_result =
+            T.eval ~constraint_constants ~private_key:producer_private_key
+              {global_slot; seed; delegator}
+          in
+          let truncated_vrf_result = Output.truncate vrf_result in
+          [%log debug]
+            "VRF result for delegator: $delegator, balance: $balance, amount: \
+             $amount, result: $result"
+            ~metadata:
+              [ ("delegator", `Int (Mina_base.Account.Index.to_int delegator))
+              ; ( "delegator_pk"
+                , Public_key.Compressed.to_yojson account.public_key )
+              ; ("balance", `Int (Balance.to_int account.balance))
+              ; ("amount", `Int (Amount.to_int total_stake))
+              ; ( "result"
+                , `String
+                    (* use sexp representation; int might be too small *)
+                    ( Fold.string_bits truncated_vrf_result
+                    |> Bignum_bigint.of_bit_fold_lsb |> Bignum_bigint.sexp_of_t
+                    |> Sexp.to_string ) ) ] ;
+          Mina_metrics.Counter.inc_one Mina_metrics.Consensus.vrf_evaluations ;
+          if
+            Threshold.is_satisfied ~my_stake:account.balance ~total_stake
+              truncated_vrf_result
+          then
+            Some
+              ( `Vrf_output vrf_result
+              , `Delegator (account.public_key, delegator) )
+          else None )
   end
 
   module Optional_state_hash = struct
@@ -2928,11 +2926,6 @@ module Hooks = struct
     log_choice ~precondition_msg ~choice_msg choice ;
     choice
 
-  type block_producer_timing =
-    [ `Check_again of Unix_timestamp.t
-    | `Produce_now of Block_data.t * Public_key.Compressed.t
-    | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t ]
-
   let epoch_end_time = Epoch.end_time
 
   let get_epoch_data_for_vrf ~(constants : Constants.t) now
@@ -3654,7 +3647,7 @@ let%test_module "Proof of stake tests" =
       let samples = 1000 in
       let check i =
         let global_slot = UInt32.of_int i in
-        let result =
+        let%map result =
           Vrf.check ~constraint_constants ~global_slot ~seed
             ~producer_private_key:private_key
             ~producer_public_key:public_key_compressed ~total_stake ~logger
@@ -3662,10 +3655,15 @@ let%test_module "Proof of stake tests" =
         in
         match result with Some _ -> 1 | None -> 0
       in
-      let rec loop i =
-        match i < samples with true -> check i + loop (i + 1) | false -> 0
+      let rec loop acc_count i =
+        match i < samples with
+        | true ->
+            let%bind count = check i in
+            loop (acc_count + count) (i + 1)
+        | false ->
+            return acc_count
       in
-      let actual = loop 0 in
+      let actual = Async.Thread_safe.block_on_async_exn (fun () -> loop 0 0) in
       let diff =
         Float.abs (float_of_int actual -. (expected *. float_of_int samples))
       in

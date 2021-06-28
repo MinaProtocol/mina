@@ -382,6 +382,7 @@ module type S = sig
                 Signature_lib.Public_key.Compressed.t
                 * Mina_base.Account.Index.t ] )
            option
+           Deferred.t
     end
 
     module Prover_state : sig
@@ -678,12 +679,6 @@ module type S = sig
       -> candidate:(Consensus_state.Value.t, State_hash.t) With_hash.t
       -> logger:Logger.t
       -> [`Keep | `Take]
-
-    type block_producer_timing =
-      [ `Check_again of Unix_timestamp.t
-      | `Produce_now of Block_data.t * Public_key.Compressed.t
-      | `Produce of Unix_timestamp.t * Block_data.t * Public_key.Compressed.t
-      ]
 
     (*Data required to evaluate VRFs for an epoch*)
     val get_epoch_data_for_vrf :

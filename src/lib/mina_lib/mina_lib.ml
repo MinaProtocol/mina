@@ -1019,11 +1019,10 @@ let start t =
       in
       let status, timing =
         match timing with
-        | `Check_again time ->
+        | `Check_again block_time ->
             ( `Free
             , Daemon_rpcs.Types.Status.Next_producer_timing.Check_again
-                ( time |> Block_time.Span.of_ms
-                |> Block_time.of_span_since_epoch ) )
+                block_time )
         | `Produce_now (block_data, _) ->
             let info :
                 Daemon_rpcs.Types.Status.Next_producer_timing.producing_time =

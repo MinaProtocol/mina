@@ -474,7 +474,7 @@ module Vrf_evaluation_state = struct
 
   let create () = {queue= Core.Queue.create (); vrf_evaluator_status= Start}
 
-  let not_finished t =
+  let finished t =
     match t.vrf_evaluator_status with Completed -> true | _ -> false
 
   let update_status t (vrf_status : Vrf_evaluator.Evaluator_status.t) =
@@ -915,8 +915,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                      (*Poll once every slot if the evaluation for the epoch is not completed or the evaluation is completed*)
                      if
                        Mina_numbers.Global_slot.(new_global_slot > slot)
-                       && Vrf_evaluation_state.not_finished
-                            vrf_evaluation_state
+                       && not
+                            (Vrf_evaluation_state.finished vrf_evaluation_state)
                      then
                        Vrf_evaluation_state.poll ~vrf_evaluator ~logger
                          vrf_evaluation_state
@@ -926,7 +926,8 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                    | None ->
                        (*Keep trying until we get some slots*)
                        if
-                         Vrf_evaluation_state.not_finished vrf_evaluation_state
+                         not
+                           (Vrf_evaluation_state.finished vrf_evaluation_state)
                        then
                          let%bind () =
                            Async.after (Core.Time.Span.of_ms 5000.)
@@ -944,6 +945,9 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                            Consensus.Hooks.epoch_end_time
                              ~constants:consensus_constants epoch
                          in
+                         set_next_producer_timing (`Check_again epoch_end_time)
+                           consensus_state ;
+                         [%log info] "No more slots won in this epoch" ;
                          return
                            (Singleton_scheduler.schedule scheduler
                               epoch_end_time
