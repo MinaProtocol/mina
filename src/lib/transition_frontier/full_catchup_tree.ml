@@ -115,9 +115,9 @@ end
 let add_state states (node : Node.t) =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
     | None ->
-        State_hash.Set.empty
+        State_hash.Set.singleton node.state_hash
     | Some hashes ->
-        State_hash.Set.remove hashes node.state_hash )
+        State_hash.Set.add hashes node.state_hash )
 
 let remove_state states (node : Node.t) =
   Hashtbl.update states (Node.State.enum node.state) ~f:(function
