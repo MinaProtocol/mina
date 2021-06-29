@@ -151,9 +151,9 @@ let tear_down {nodes; states; _} =
   Hashtbl.clear states
 
 let set_state t (node : Node.t) s =
-  add_state t.states node ;
+  remove_state t.states node ;
   node.state <- s ;
-  remove_state t.states node
+  add_state t.states node
 
 let finish t (node : Node.t) b =
   let s, r =
