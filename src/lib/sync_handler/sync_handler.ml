@@ -149,12 +149,19 @@ module Make (Inputs : Inputs_intf) :
           Transition_frontier.max_catchup_chunk_length ;
         None )
     in
-    let get hash =
+    let get state_hash =
+      let%bind () =
+        (* Genesis breadcrumb has a dummy proof, don't gossip it to peers *)
+        Option.some_if
+          State_hash.(
+            not (state_hash = Transition_frontier.genesis_state_hash frontier))
+          ()
+      in
       let%map validated_transition =
         Option.merge
           Transition_frontier.(
-            find frontier hash >>| Breadcrumb.validated_transition)
-          ( find_in_root_history frontier hash
+            find frontier state_hash >>| Breadcrumb.validated_transition)
+          ( find_in_root_history frontier state_hash
           >>| fun x -> Root_data.Historical.transition x )
           ~f:Fn.const
       in

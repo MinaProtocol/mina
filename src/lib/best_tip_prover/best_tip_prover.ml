@@ -87,7 +87,7 @@ module Make (Inputs : Inputs_intf) :
           (merkle_list, root |> External_transition.Validation.forget_validation)
       }
 
-  let validate_proof ~verifier transition_with_hash =
+  let validate_proof ~verifier ~genesis_state_hash transition_with_hash =
     let open Deferred.Result.Monad_infix in
     External_transition.(
       Validation.wrap transition_with_hash
@@ -97,7 +97,17 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> (fun x -> validate_proofs ~verifier [ x ] >>| List.hd_exn)
+      |> (fun (({ With_hash.hash = state_hash; _ }, _) as x) ->
+           if State_hash.(state_hash = genesis_state_hash) then
+             (* We store the genesis block with an dummy proof, rather than
+                generating one at startup. Since the genesis proof is already
+                known good, and the proof here for it may be a dummy one, we
+                ignore it instead.
+             *)
+             Deferred.Result.return
+               (skip_proof_validation `This_transition_was_generated_internally
+                  x)
+           else validate_proofs ~verifier [ x ] >>| List.hd_exn)
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation
                `This_transition_was_not_received_via_gossip)
@@ -143,8 +153,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%map root, best_tip =
       Deferred.Or_error.both
-        (validate_proof ~verifier root_transition_with_hash)
-        (validate_proof ~verifier best_tip_with_hash)
+        (validate_proof ~verifier ~genesis_state_hash root_transition_with_hash)
+        (validate_proof ~verifier ~genesis_state_hash best_tip_with_hash)
     in
     (`Root root, `Best_tip best_tip)
 end
