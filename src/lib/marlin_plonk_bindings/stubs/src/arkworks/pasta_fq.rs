@@ -4,7 +4,11 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
 use num_bigint::BigUint;
 use rand::rngs::StdRng;
-use std::cmp::Ordering::{Equal, Greater, Less};
+use std::{
+    cmp::Ordering::{Equal, Greater, Less},
+    convert::{TryFrom, TryInto},
+    ops::Deref,
+};
 
 //
 // Wrapper struct to implement OCaml bindings
@@ -48,15 +52,23 @@ ocaml::custom!(CamlFq {
 // Handy implementations
 //
 
+impl Deref for CamlFq {
+    type Target = Fq;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl From<Fq> for CamlFq {
-    fn from(fp: Fq) -> Self {
-        CamlFq(fp)
+    fn from(x: Fq) -> Self {
+        CamlFq(x)
     }
 }
 
 impl From<&Fq> for CamlFq {
-    fn from(fp: &Fq) -> Self {
-        CamlFq(*fp)
+    fn from(x: &Fq) -> Self {
+        CamlFq(*x)
     }
 }
 
@@ -69,6 +81,17 @@ impl Into<Fq> for CamlFq {
 impl Into<Fq> for &CamlFq {
     fn into(self) -> Fq {
         self.0
+    }
+}
+
+impl TryFrom<CamlBigInteger256> for CamlFq {
+    type Error = ocaml::Error;
+    fn try_from(x: CamlBigInteger256) -> Result<Self, Self::Error> {
+        Fq::from_repr(x.0)
+            .map(Into::into)
+            .ok_or(ocaml::Error::Message(
+                "TryFrom<CamlBigInteger256>: integer is larger than order",
+            ))
     }
 }
 
@@ -143,20 +166,18 @@ pub fn caml_pasta_fq_of_int(i: ocaml::Int) -> CamlFq {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_to_string(x: ocaml::Pointer<CamlFq>) -> String {
-    CamlBigInteger256(x.as_ref().0.into_repr())
-        .to_biguint()
-        .to_string()
+    CamlBigInteger256(x.as_ref().into_repr()).to_string()
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
-    BigUint::parse_bytes(s, 10)
-        // TODO: implement from_repr on CamlFq
-        .map(|data| CamlBigInteger256::of_biguint(&data).0)
-        .map(Fq::from_repr)
-        .flatten()
-        .map(CamlFq)
-        .ok_or(ocaml::Error::Message("caml_pasta_fp_of_string"))
+    let biguint = BigUint::parse_bytes(s, 10).ok_or(ocaml::Error::Message(
+        "caml_pasta_fq_of_string: couldn't parse input",
+    ))?;
+    let camlbigint: CamlBigInteger256 = biguint
+        .try_into()
+        .map_err(|_| ocaml::Error::Message("caml_pasta_fq_of_string: Biguint is too large"))?;
+    CamlFq::try_from(camlbigint).map_err(|_| ocaml::Error::Message("caml_pasta_fq_of_string"))
 }
 
 //
@@ -167,7 +188,7 @@ pub fn caml_pasta_fq_of_string(s: &[u8]) -> Result<CamlFq, ocaml::Error> {
 pub fn caml_pasta_fq_print(x: ocaml::Pointer<CamlFq>) {
     println!(
         "{}",
-        CamlBigInteger256(x.as_ref().0.into_repr()).to_biguint()
+        CamlBigInteger256(x.as_ref().0.into_repr()).to_string()
     );
 }
 
@@ -232,6 +253,8 @@ pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> CamlBigInteger256 {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_of_bigint(x: CamlBigInteger256) -> Result<CamlFq, ocaml::Error> {
+    println!("debug: {:?}", x.to_string());
+    println!("debug2: {:?}", x.0);
     Fq::from_repr(x.0).map(CamlFq).ok_or(ocaml::Error::Message(
         "caml_pasta_fq_of_bigint was given an invalid CamlBigInteger256",
     ))

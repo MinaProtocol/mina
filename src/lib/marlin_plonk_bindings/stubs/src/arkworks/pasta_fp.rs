@@ -6,6 +6,7 @@ use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::{
     cmp::Ordering::{Equal, Greater, Less},
+    convert::{TryFrom, TryInto},
     ops::Deref,
 };
 
@@ -80,6 +81,17 @@ impl Into<Fp> for CamlFp {
 impl Into<Fp> for &CamlFp {
     fn into(self) -> Fp {
         self.0
+    }
+}
+
+impl TryFrom<CamlBigInteger256> for CamlFp {
+    type Error = ocaml::Error;
+    fn try_from(x: CamlBigInteger256) -> Result<Self, Self::Error> {
+        Fp::from_repr(x.0)
+            .map(Into::into)
+            .ok_or(ocaml::Error::Message(
+                "TryFrom<CamlBigInteger256>: integer is larger than order",
+            ))
     }
 }
 
@@ -158,20 +170,18 @@ pub fn caml_pasta_fp_of_int(i: ocaml::Int) -> CamlFp {
 
 #[ocaml::func]
 pub fn caml_pasta_fp_to_string(x: ocaml::Pointer<CamlFp>) -> String {
-    CamlBigInteger256(x.as_ref().0.into_repr())
-        .to_biguint()
-        .to_string()
+    CamlBigInteger256(x.as_ref().into_repr()).to_string()
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fp_of_string(s: &[u8]) -> Result<CamlFp, ocaml::Error> {
-    BigUint::parse_bytes(s, 10)
-        // TODO: implement from_repr on CamlFp
-        .map(|data| CamlBigInteger256::of_biguint(&data).0)
-        .map(Fp::from_repr)
-        .flatten()
-        .map(CamlFp)
-        .ok_or(ocaml::Error::Message("caml_pasta_fp_of_string"))
+    let biguint = BigUint::parse_bytes(s, 10).ok_or(ocaml::Error::Message(
+        "caml_pasta_fp_of_string: couldn't parse input",
+    ))?;
+    let camlbigint: CamlBigInteger256 = biguint
+        .try_into()
+        .map_err(|_| ocaml::Error::Message("caml_pasta_fp_of_string: Biguint is too large"))?;
+    CamlFp::try_from(camlbigint).map_err(|_| ocaml::Error::Message("caml_pasta_fp_of_string"))
 }
 
 //
@@ -182,7 +192,7 @@ pub fn caml_pasta_fp_of_string(s: &[u8]) -> Result<CamlFp, ocaml::Error> {
 pub fn caml_pasta_fp_print(x: ocaml::Pointer<CamlFp>) {
     println!(
         "{}",
-        CamlBigInteger256(x.as_ref().0.into_repr()).to_biguint()
+        CamlBigInteger256(x.as_ref().0.into_repr()).to_string()
     );
 }
 

@@ -11,6 +11,7 @@ use oracle::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
+use plonk_circuits::scalars::RandomOracles;
 use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
 
 /// The state of the verifier during verification
@@ -62,4 +63,14 @@ pub fn caml_pasta_fp_plonk_oracles_create(
         opening_prechallenges,
         digest_before_evaluations: digest_before_evaluations.into(),
     }
+}
+
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_oracles_dummy() -> CamlRandomOraclesFp {
+    RandomOracles::<Fp>::zero().into()
+}
+
+#[ocaml::func]
+pub fn caml_pasta_fp_plonk_oracles_deep_copy(x: CamlRandomOraclesFp) -> CamlRandomOraclesFp {
+    x
 }
