@@ -141,29 +141,48 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       ~consensus_constants ~unprocessed_transition_cache
       enveloped_initially_validated_transition
   in
+  let state_hash =
+    External_transition.Validation.forget_validation_with_hash
+      transition_with_hash
+    |> With_hash.hash |> State_hash.to_yojson
+  in
   let open Deferred.Let_syntax in
   match cached_initially_validated_transition_result with
   | Ok x ->
+      [%log trace]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: validation is successful" ;
       Deferred.return @@ Ok (`Building_path x)
   | Error (`In_frontier hash) ->
       [%log trace]
-        "transition queried during ledger catchup has already been seen" ;
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: transition queried during ledger catchup has \
+         already been seen" ;
       Deferred.return @@ Ok (`In_frontier hash)
   | Error (`In_process consumed_state) -> (
       [%log trace]
-        "transition queried during ledger catchup is still in process in one \
-         of the components in transition_frontier" ;
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: transition queried during ledger catchup is still \
+         in process in one of the components in transition_frontier" ;
       match%map Ivar.read consumed_state with
       | `Failed ->
-          [%log trace] "transition queried during ledger catchup failed" ;
+          [%log trace]
+            ~metadata:[("state_hash", state_hash)]
+            "initial_validate: transition queried during ledger catchup failed" ;
           Error (Error.of_string "Previous transition failed")
       | `Success hash ->
+          [%log trace]
+            ~metadata:[("state_hash", state_hash)]
+            "initial_validate: transition queried during ledger catchup is \
+             added to frontier" ;
           Ok (`In_frontier hash) )
   | Error (`Verifier_error error) ->
       [%log warn]
-        ~metadata:[("error", Error_json.error_to_yojson error)]
-        "verifier threw an error while verifying transiton queried during \
-         ledger catchup: $error" ;
+        ~metadata:
+          [ ("error", Error_json.error_to_yojson error)
+          ; ("state_hash", state_hash) ]
+        "initial_validate: verifier threw an error while verifying transiton \
+         queried during ledger catchup: $error" ;
       Deferred.Or_error.fail (Error.tag ~tag:"verifier threw an error" error)
   | Error `Invalid_proof ->
       let%map () =
@@ -171,6 +190,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           ( Trust_system.Actions.Gossiped_invalid_transition
           , Some ("invalid proof", []) )
       in
+      [%log warn]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: invalid proof" ;
       Error (Error.of_string "invalid proof")
   | Error `Invalid_genesis_protocol_state ->
       let%map () =
@@ -178,8 +200,14 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
           ( Trust_system.Actions.Gossiped_invalid_transition
           , Some ("invalid genesis protocol state", []) )
       in
+      [%log warn]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: invalid genesis protocol state" ;
       Error (Error.of_string "invalid genesis protocol state")
   | Error `Invalid_delta_transition_chain_proof ->
+      [%log warn]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: invalid delta transition chain proof" ;
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Gossiped_invalid_transition
@@ -187,6 +215,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "invalid delta transition chain witness")
   | Error `Invalid_protocol_version ->
+      [%log warn]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: invalid protocol version" ;
       let transition =
         External_transition.Validation.forget_validation transition_with_hash
       in
@@ -208,6 +239,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "invalid protocol version")
   | Error `Mismatched_protocol_version ->
+      [%log warn]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: mismatch protocol version" ;
       let transition =
         External_transition.Validation.forget_validation transition_with_hash
       in
@@ -227,6 +261,9 @@ let verify_transition ~logger ~consensus_constants ~trust_system ~frontier
       in
       Error (Error.of_string "mismatched protocol version")
   | Error `Disconnected ->
+      [%log warn]
+        ~metadata:[("state_hash", state_hash)]
+        "initial_validate: disconnected chain" ;
       Deferred.Or_error.fail @@ Error.of_string "disconnected chain"
 
 let find_map_ok ?how xs ~f =
@@ -515,14 +552,20 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
     ~unprocessed_transition_cache transition =
   let verification_start_time = Core.Time.now () in
   let open Deferred.Result.Let_syntax in
+  let state_hash =
+    Envelope.Incoming.data transition |> With_hash.hash |> State_hash.to_yojson
+  in
+  [%log debug]
+    ~metadata:[("state_hash", state_hash)]
+    "initial_validate: start processing $state_hash" ;
   let%bind tv =
     let open Deferred.Let_syntax in
     match%bind Initial_validate_batcher.verify batcher transition with
     | Ok (Ok tv) ->
         return (Ok {transition with data= tv})
     | Ok (Error ()) ->
-        let s = "proof failed to verify" in
-        [%log warn] "%s" s ;
+        let s = "initial_validate: proof failed to verify" in
+        [%log warn] ~metadata:[("state_hash", state_hash)] "%s" s ;
         let%map () =
           match transition.sender with
           | Local ->
@@ -535,8 +578,11 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
         Error (`Error (Error.of_string s))
     | Error e ->
         [%log warn]
-          ~metadata:[("error", Error_json.error_to_yojson e)]
-          "verification of blockchain snark failed but it was our fault" ;
+          ~metadata:
+            [ ("error", Error_json.error_to_yojson e)
+            ; ("state_hash", state_hash) ]
+          "initial_validate: verification of blockchain snark failed but it \
+           was our fault" ;
         return (Error `Couldn't_reach_verifier)
   in
   let verification_end_time = Core.Time.now () in
@@ -546,8 +592,9 @@ let initial_validate ~(precomputed_values : Precomputed_values.t) ~logger
         , `Float
             Core.Time.(
               Span.to_sec @@ diff verification_end_time verification_start_time)
-        ) ]
-    "verification of proofs complete" ;
+        )
+      ; ("state_hash", state_hash) ]
+    "initial_validate: verification of proofs complete" ;
   verify_transition ~logger
     ~consensus_constants:precomputed_values.consensus_constants ~trust_system
     ~frontier ~unprocessed_transition_cache tv
@@ -600,7 +647,7 @@ let create_node ~downloader t x =
   in
   upon (Ivar.read node.result) (fun _ ->
       Downloader.cancel downloader (h, blockchain_length) ) ;
-  Hashtbl.incr t.states (Node.State.enum node.state) ;
+  Transition_frontier.Full_catchup_tree.add_state t.states node ;
   Hashtbl.set t.nodes ~key:h ~data:node ;
   ( try check_invariant ~downloader t
     with e ->
@@ -1054,7 +1101,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                    Mina_metrics.(
                      Counter.inc Rejected_blocks.no_common_ancestor
                        (Float.of_int @@ (1 + List.length children_transitions)))
-               )
+               ) ;
+             List.iter forest ~f:(fun subtree ->
+                 Rose_tree.iter subtree ~f:(fun cached ->
+                     Cached.invalidate_with_failure cached |> ignore ) )
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
