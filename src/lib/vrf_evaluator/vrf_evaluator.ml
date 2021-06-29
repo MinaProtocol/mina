@@ -1,7 +1,6 @@
 open Core
 open Async
 open Signature_lib
-open Pipe_lib
 module Epoch = Mina_numbers.Length
 module Global_slot = Mina_numbers.Global_slot
 
@@ -11,23 +10,20 @@ module Slot = Mina_numbers.Global_slot
 (* Can extract both slot numbers and epoch number*)
 module Consensus_time = Consensus.Data.Consensus_time
 
-module State = struct
+module Block_producer_keys = struct
   [%%versioned
   module Stable = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t =
-        { block_producer_keys:
-            (Keypair.Stable.V1.t * Public_key.Compressed.Stable.V1.t) list }
+      type t = (Keypair.Stable.V1.t * Public_key.Compressed.Stable.V1.t) list
+      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t =
-    {block_producer_keys: (Keypair.t * Public_key.Compressed.t) list}
-  [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 module Evaluator_status = struct
@@ -81,13 +77,9 @@ module Worker_state = struct
     ; slots_won: Consensus.Data.Slot_won.t Queue.t
           (*possibly multiple producers per slot*)
     ; mutable current_slot: Global_slot.t option
-    ; mutable current_epoch: Epoch.t
-    ; mutable epoch_state: State.t
-    ; reset_writer:
-        ( Consensus.Data.Epoch_data_for_vrf.t
-        , Strict_pipe.synchronous
-        , unit Deferred.t )
-        Strict_pipe.Writer.t }
+    ; mutable epoch_data:
+        unit Ivar.t * Consensus.Data.Epoch_data_for_vrf.t option
+    ; mutable block_producer_keys: Block_producer_keys.t }
 
   let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
     let module Set = Public_key.Compressed.Set in
@@ -121,128 +113,129 @@ module Worker_state = struct
     | nel ->
         `Unseen (Public_key.Compressed.Set.of_list nel)
 
-  let evaluate (epoch_data : Consensus.Data.Epoch_data_for_vrf.t)
-      ({config; slots_won; epoch_state; _} as t) : unit Deferred.t =
-    let module Slot = Mina_numbers.Global_slot in
-    let logger = config.logger in
-    let epoch = epoch_data.epoch in
-    [%log info] "Starting VRF evaluation for epoch: $epoch"
-      ~metadata:[("epoch", Epoch.to_yojson epoch)] ;
-    let keypairs = epoch_state.block_producer_keys in
-    let logger = config.logger in
-    let start_global_slot = epoch_data.global_slot in
-    let start_global_slot_since_genesis =
-      epoch_data.global_slot_since_genesis
-    in
-    let constants = config.consensus_constants in
-    let delegatee_table = epoch_data.delegatee_table in
-    (*slot in the epoch*)
-    let start_consensus_time =
-      Consensus.Data.Consensus_time.(
-        of_global_slot ~constants start_global_slot)
-    in
-    let total_stake = epoch_data.epoch_ledger.total_currency in
-    let evaluate_vrf ~consensus_time =
-      (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
-      (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
-      let slot = Consensus_time.slot consensus_time in
-      let global_slot = Consensus_time.to_global_slot consensus_time in
-      Deferred.List.find_map keypairs
-        ~f:(fun ((keypair : Keypair.t), public_key_compressed) ->
-          let global_slot_since_genesis =
-            let slot_diff =
-              match Global_slot.sub global_slot start_global_slot with
-              | None ->
-                  failwith
-                    "Checking slot-winner for a slot which is older than the \
-                     slot in the latest consensus state. System time might be \
-                     out-of-sync"
-              | Some diff ->
-                  diff
-            in
-            Global_slot.add start_global_slot_since_genesis slot_diff
+  let evaluate
+      ( { config
+        ; slots_won
+        ; block_producer_keys
+        ; epoch_data= interrupt_ivar, epoch_data
+        ; _ } as t ) : (unit, unit) Interruptible.t =
+    match epoch_data with
+    | None ->
+        Interruptible.return ()
+    | Some epoch_data ->
+        let open Interruptible.Let_syntax in
+        let%bind () =
+          Interruptible.lift Deferred.unit (Ivar.read interrupt_ivar)
+        in
+        let module Slot = Mina_numbers.Global_slot in
+        let logger = config.logger in
+        let epoch = epoch_data.epoch in
+        [%log info] "Starting VRF evaluation for epoch: $epoch"
+          ~metadata:[("epoch", Epoch.to_yojson epoch)] ;
+        let keypairs = block_producer_keys in
+        let logger = config.logger in
+        let start_global_slot = epoch_data.global_slot in
+        let start_global_slot_since_genesis =
+          epoch_data.global_slot_since_genesis
+        in
+        let constants = config.consensus_constants in
+        let delegatee_table = epoch_data.delegatee_table in
+        (*slot in the epoch*)
+        let start_consensus_time =
+          Consensus.Data.Consensus_time.(
+            of_global_slot ~constants start_global_slot)
+        in
+        let total_stake = epoch_data.epoch_ledger.total_currency in
+        let evaluate_vrf ~consensus_time =
+          (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
+          (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
+          let slot = Consensus_time.slot consensus_time in
+          let global_slot = Consensus_time.to_global_slot consensus_time in
+          let rec go = function
+            | [] ->
+                Interruptible.return None
+            | ((keypair : Keypair.t), public_key_compressed) :: keypairs -> (
+                let global_slot_since_genesis =
+                  let slot_diff =
+                    match Global_slot.sub global_slot start_global_slot with
+                    | None ->
+                        failwith
+                          "Checking slot-winner for a slot which is older \
+                           than the slot in the latest consensus state. \
+                           System time might be out-of-sync"
+                    | Some diff ->
+                        diff
+                  in
+                  Global_slot.add start_global_slot_since_genesis slot_diff
+                in
+                [%log info]
+                  "Checking VRF evaluations at epoch: $epoch, slot: $slot"
+                  ~metadata:
+                    [ ("epoch", `Int (Epoch.to_int epoch))
+                    ; ("slot", `Int (Slot.to_int slot)) ] ;
+                match%bind
+                  Consensus.Data.Vrf.check
+                    ~constraint_constants:config.constraint_constants
+                    ~global_slot ~seed:epoch_data.epoch_seed
+                    ~get_delegators:
+                      (Public_key.Compressed.Table.find delegatee_table)
+                    ~producer_private_key:keypair.private_key
+                    ~producer_public_key:public_key_compressed ~total_stake
+                    ~logger
+                with
+                | None ->
+                    go keypairs
+                | Some (`Vrf_output vrf_result, `Delegator delegator) ->
+                    [%log info] "Won slot %d in epoch %d" (Slot.to_int slot)
+                      (Epoch.to_int epoch) ;
+                    let slot_won =
+                      Consensus.Data.Slot_won.
+                        { delegator
+                        ; producer= keypair
+                        ; global_slot
+                        ; global_slot_since_genesis
+                        ; vrf_result }
+                    in
+                    Interruptible.return (Some slot_won) )
           in
-          [%log info] "Checking VRF evaluations at epoch: $epoch, slot: $slot"
-            ~metadata:
-              [ ("epoch", `Int (Epoch.to_int epoch))
-              ; ("slot", `Int (Slot.to_int slot)) ] ;
-          match%map
-            Consensus.Data.Vrf.check
-              ~constraint_constants:config.constraint_constants ~global_slot
-              ~seed:epoch_data.epoch_seed
-              ~get_delegators:
-                (Public_key.Compressed.Table.find delegatee_table)
-              ~producer_private_key:keypair.private_key
-              ~producer_public_key:public_key_compressed ~total_stake ~logger
-          with
-          | None ->
-              None
-          | Some (`Vrf_output vrf_result, `Delegator delegator) ->
-              [%log info] "Won slot %d in epoch %d" (Slot.to_int slot)
-                (Epoch.to_int epoch) ;
-              let slot_won =
-                Consensus.Data.Slot_won.
-                  { delegator
-                  ; producer= keypair
-                  ; global_slot
-                  ; global_slot_since_genesis
-                  ; vrf_result }
-              in
-              Some slot_won )
-    in
-    let rec find_winning_slot (consensus_time : Consensus_time.t) =
-      let slot = Consensus_time.slot consensus_time in
-      let global_slot = Consensus_time.to_global_slot consensus_time in
-      t.current_slot <- Some global_slot ;
-      let epoch' = Consensus_time.epoch consensus_time in
-      [%log info] "Slot in an epoch: $slot"
-        ~metadata:[("slot", Slot.to_yojson slot)] ;
-      if Epoch.(epoch' > epoch) then Deferred.unit
-      else
-        let start = Time.now () in
-        match%bind evaluate_vrf ~consensus_time with
-        | None ->
-            [%log info] "Did not win a slot, took $time ms"
-              ~metadata:
-                [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
-            find_winning_slot (Consensus_time.succ consensus_time)
-        | Some slot_won ->
-            [%log info] "Won a slot, took $time ms"
-              ~metadata:
-                [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
-            Queue.enqueue slots_won slot_won ;
-            find_winning_slot (Consensus_time.succ consensus_time)
-    in
-    find_winning_slot start_consensus_time
+          go keypairs
+        in
+        let rec find_winning_slot (consensus_time : Consensus_time.t) =
+          let slot = Consensus_time.slot consensus_time in
+          let global_slot = Consensus_time.to_global_slot consensus_time in
+          t.current_slot <- Some global_slot ;
+          let epoch' = Consensus_time.epoch consensus_time in
+          [%log info] "Slot in an epoch: $slot"
+            ~metadata:[("slot", Slot.to_yojson slot)] ;
+          if Epoch.(epoch' > epoch) then Interruptible.return ()
+          else
+            let start = Time.now () in
+            match%bind evaluate_vrf ~consensus_time with
+            | None ->
+                [%log info] "Did not win a slot, took $time ms"
+                  ~metadata:
+                    [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
+                find_winning_slot (Consensus_time.succ consensus_time)
+            | Some slot_won ->
+                [%log info] "Won a slot, took $time ms"
+                  ~metadata:
+                    [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
+                Queue.enqueue slots_won slot_won ;
+                find_winning_slot (Consensus_time.succ consensus_time)
+        in
+        find_winning_slot start_consensus_time
 
   let create config =
-    let reset_reader, reset_writer =
-      Pipe_lib.Strict_pipe.create ~name:"Vrf-evaluator reset"
-        Pipe_lib.Strict_pipe.Synchronous
-    in
-    let t =
-      { config
-      ; last_checked_slot_and_epoch= Public_key.Compressed.Table.create ()
-      ; slots_won=
-          Queue.create
-            ~capacity:
-              (Global_slot.to_int config.consensus_constants.slots_per_epoch)
-            ()
-      ; current_slot= None
-      ; current_epoch= Epoch.zero
-      ; epoch_state= {block_producer_keys= []}
-      ; reset_writer }
-    in
-    don't_wait_for
-      (Strict_pipe.Reader.iter_without_pushback reset_reader
-         ~f:(fun epoch_data ->
-           [%log' info config.logger] "Resetting epoch data for epoch %d"
-             (Epoch.to_int epoch_data.epoch) ;
-           Queue.clear t.slots_won ;
-           t.current_slot <- None ;
-           t.current_epoch <- epoch_data.epoch ;
-           don't_wait_for (evaluate epoch_data t) )) ;
-    return t
+    { config
+    ; last_checked_slot_and_epoch= Public_key.Compressed.Table.create ()
+    ; slots_won=
+        Queue.create
+          ~capacity:
+            (Global_slot.to_int config.consensus_constants.slots_per_epoch)
+          ()
+    ; current_slot= None
+    ; epoch_data= (Ivar.create (), None)
+    ; block_producer_keys= [] }
 end
 
 module Functions = struct
@@ -261,15 +254,24 @@ module Functions = struct
           [%log info]
             "Updating epoch data for the VRF evaluation for epoch $epoch"
             ~metadata:[("epoch", Epoch.to_yojson e.epoch)] ;
-          Strict_pipe.Writer.write w.reset_writer e
+          let interrupt_ivar, _ = w.epoch_data in
+          Ivar.fill_if_empty interrupt_ivar () ;
+          Queue.clear w.slots_won ;
+          w.current_slot <- None ;
+          w.epoch_data <- (Ivar.create (), Some e) ;
+          Interruptible.don't_wait_for (Worker_state.evaluate w) ;
+          Deferred.unit
         in
-        if Epoch.(succ e.epoch > w.current_epoch) then (
-          [%log info] "Updating epoch data" ;
-          update () )
-        else (
-          [%log info] "Received epoch data for current epoch $epoch. Skipping "
-            ~metadata:[("epoch", Epoch.to_yojson e.epoch)] ;
-          Deferred.unit ) )
+        match w.epoch_data with
+        | _, None ->
+            update ()
+        | _, Some current ->
+            if Epoch.(succ e.epoch > current.epoch) then update ()
+            else (
+              [%log info]
+                "Received epoch data for current epoch $epoch. Skipping "
+                ~metadata:[("epoch", Epoch.to_yojson e.epoch)] ;
+              Deferred.unit ) )
 
   let slots_won_so_far =
     create Unit.bin_t Vrf_evaluation_result.Stable.Latest.bin_t (fun w () ->
@@ -288,10 +290,11 @@ module Functions = struct
         return Vrf_evaluation_result.{slots_won; evaluator_status} )
 
   let update_block_producer_keys =
-    create State.Stable.Latest.bin_t Unit.bin_t (fun w e ->
+    create Block_producer_keys.Stable.Latest.bin_t Unit.bin_t (fun w e ->
         let logger = w.config.logger in
         [%log info] "Updating block producer keys" ;
-        w.epoch_state <- e ;
+        w.block_producer_keys <- e ;
+        (*TODO: Interrupt the evaluation here when we handle key updated*)
         Deferred.unit )
 end
 
@@ -306,7 +309,7 @@ module Worker = struct
       ; slots_won_so_far:
           ('worker, unit, Vrf_evaluation_result.t) Rpc_parallel.Function.t
       ; update_block_producer_keys:
-          ('worker, State.t, unit) Rpc_parallel.Function.t }
+          ('worker, Block_producer_keys.t, unit) Rpc_parallel.Function.t }
 
     module Worker_state = Worker_state
 
@@ -343,7 +346,7 @@ module Worker = struct
                ~directory:init_arg.conf_dir
                ~log_filename:"mina-vrf-evaluator.log" ~max_size ~num_rotate) ;
         [%log info] "Vrf_evaluator started" ;
-        Worker_state.create init_arg
+        return (Worker_state.create init_arg)
 
       let init_connection_state ~connection:_ ~worker_state:_ = return
     end
@@ -357,9 +360,7 @@ type t = {connection: Worker.Connection.t; process: Process.t}
 let update_block_producer_keys {connection; process= _} ~keypairs =
   Worker.Connection.run connection
     ~f:Worker.functions.update_block_producer_keys
-    ~arg:
-      State.
-        {block_producer_keys= Keypair.And_compressed_pk.Set.to_list keypairs}
+    ~arg:(Keypair.And_compressed_pk.Set.to_list keypairs)
 
 let create ~constraint_constants ~pids ~consensus_constants ~conf_dir ~logger
     ~keypairs =
