@@ -151,6 +151,10 @@ module Worker_state = struct
           (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
           let slot = Consensus_time.slot consensus_time in
           let global_slot = Consensus_time.to_global_slot consensus_time in
+          [%log info] "Checking VRF evaluations for epoch: $epoch, slot: $slot"
+            ~metadata:
+              [ ("epoch", `Int (Epoch.to_int epoch))
+              ; ("slot", `Int (Slot.to_int slot)) ] ;
           let rec go = function
             | [] ->
                 Interruptible.return None
@@ -205,21 +209,21 @@ module Worker_state = struct
           let global_slot = Consensus_time.to_global_slot consensus_time in
           t.current_slot <- Some global_slot ;
           let epoch' = Consensus_time.epoch consensus_time in
-          [%log info] "Slot in an epoch: $slot"
-            ~metadata:[("slot", Slot.to_yojson slot)] ;
           if Epoch.(epoch' > epoch) then Interruptible.return ()
           else
             let start = Time.now () in
             match%bind evaluate_vrf ~consensus_time with
             | None ->
-                [%log info] "Did not win a slot, took $time ms"
+                [%log info] "Did not win slot $slot, took $time ms"
                   ~metadata:
-                    [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
+                    [ ("time", `Float Time.(Span.to_ms (diff (now ()) start)))
+                    ; ("slot", Slot.to_yojson slot) ] ;
                 find_winning_slot (Consensus_time.succ consensus_time)
             | Some slot_won ->
-                [%log info] "Won a slot, took $time ms"
+                [%log info] "Won a slot $slot, took $time ms"
                   ~metadata:
-                    [("time", `Float Time.(Span.to_ms (diff (now ()) start)))] ;
+                    [ ("time", `Float Time.(Span.to_ms (diff (now ()) start)))
+                    ; ("slot", Slot.to_yojson slot) ] ;
                 Queue.enqueue slots_won slot_won ;
                 find_winning_slot (Consensus_time.succ consensus_time)
         in
