@@ -1002,9 +1002,10 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                              curr_global_slot
                          with
                          | None ->
-                             [%log debug]
-                               "Skipping global slot $slot_won because it has \
-                                passed. Current global slot is $curr_slot"
+                             [%log warn]
+                               "Skipping block production for global slot \
+                                $slot_won because it has passed. Current \
+                                global slot is $curr_slot"
                                ~metadata:
                                  [ ( "slot_won"
                                    , Mina_numbers.Global_slot.to_yojson
