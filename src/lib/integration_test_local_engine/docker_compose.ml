@@ -9,8 +9,7 @@ module Compose = struct
         { type_ : string [@key "type"]; source : string; target : string }
       [@@deriving to_yojson]
 
-      let create name =
-        { type_ = "bind"; source = "." ^/ name; target = "/root" ^/ name }
+      let create source target = { type_ = "bind"; source; target }
     end
 
     module Environment = struct

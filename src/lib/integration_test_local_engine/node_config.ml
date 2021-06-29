@@ -15,6 +15,23 @@ module Envs = struct
     ; ("WORK_SELECTION", "seq")
     ]
     @ base_node_envs
+
+  let postgres_envs ~username ~password ~database ~port =
+    [ ("BITNAMI_DEBUG", "false")
+    ; ("POSTGRES_USER", username)
+    ; ("POSTGRES_PASSWORD", password)
+    ; ("POSTGRES_DB", database)
+    ; ("POSTGRESQL_PORT_NUMBER", port)
+    ; ("POSTGRESQL_ENABLE_LDAP", "no")
+    ; ("POSTGRESQL_ENABLE_TLS", "no")
+    ; ("POSTGRESQL_LOG_HOSTNAME", "false")
+    ; ("POSTGRESQL_LOG_CONNECTIONS", "false")
+    ; ("POSTGRESQL_LOG_DISCONNECTIONS", "false")
+    ; ("POSTGRESQL_PGAUDIT_LOG_CATALOG", "off")
+    ; ("POSTGRESQL_CLIENT_MIN_MESSAGES", "error")
+    ; ("POSTGRESQL_SHARED_PRELOAD_LIBRARIES", "pgaudit")
+    ; ("POSTGRES_HOST_AUTH_METHOD", "trust")
+    ]
 end
 
 module Cli_args = struct
@@ -29,6 +46,37 @@ module Cli_args = struct
 
     let default =
       "/dns4/seed/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"
+  end
+
+  module Postgres_uri = struct
+    type t =
+      { username : string
+      ; password : string
+      ; host : string
+      ; port : string
+      ; db : string
+      }
+
+    let create ~host =
+      { username = "postgres"
+      ; password = "password"
+      ; host
+      ; port = "5432"
+      ; db = "archive"
+      }
+
+    (* Hostname should be dynamic based on the container ID in runtime. Ignore this field for default binding *)
+    let default =
+      { username = "postgres"
+      ; password = "password"
+      ; host = ""
+      ; port = "5432"
+      ; db = "archive"
+      }
+
+    let to_string t =
+      Printf.sprintf "postgres://%s:%s@%s:%s/%s" t.username t.password t.host
+        t.port t.db
   end
 
   module Proof_level = struct
@@ -164,11 +212,34 @@ module Cmd = struct
       @ Base_command.default_cmd ~config_file
   end
 
+  module Archive_node_command = struct
+    type t = { postgres_uri : string; server_port : string }
+
+    let default =
+      { postgres_uri = Postgres_uri.(default |> to_string)
+      ; server_port = "3086"
+      }
+
+    let create postgres_uri = { postgres_uri; server_port = "3086" }
+
+    let cmd t ~config_file =
+      [ "coda-archive"
+      ; "run"
+      ; "-postgres-uri"
+      ; t.postgres_uri
+      ; "-server-port"
+      ; t.server_port
+      ; "-config-file"
+      ; config_file
+      ]
+  end
+
   type t =
     | Seed_command
     | Block_producer_command of Block_producer_command.t
     | Snark_coordinator_command of Snark_coordinator_command.t
     | Snark_worker_command of Snark_worker_command.t
+    | Archive_node_command of Archive_node_command.t
 
   let create_cmd t ~config_file =
     match t with
@@ -180,4 +251,6 @@ module Cmd = struct
         Snark_coordinator_command.cmd args ~config_file
     | Snark_worker_command args ->
         Snark_worker_command.cmd args ~config_file
+    | Archive_node_command args ->
+        Archive_node_command.cmd args ~config_file
 end

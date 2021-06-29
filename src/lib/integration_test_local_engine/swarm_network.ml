@@ -196,15 +196,22 @@ let initialize ~logger network =
   Deferred.bind (poll 0) ~f:(fun res ->
       if Malleable_error.is_ok res then
         let seed_nodes = seeds network in
-        let seed_pod_ids =
+        let seed_service_ids =
           seed_nodes
           |> List.map ~f:(fun { Node.service_id; _ } -> service_id)
           |> String.Set.of_list
         in
-        let non_seed_nodes =
+        let archive_nodes = archive_nodes network in
+        let archive_service_ids =
+          archive_nodes
+          |> List.map ~f:(fun { Node.service_id; _ } -> service_id)
+          |> String.Set.of_list
+        in
+        let non_seed_archive_nodes =
           network |> all_nodes
           |> List.filter ~f:(fun { Node.service_id; _ } ->
-                 not (String.Set.mem seed_pod_ids service_id))
+                 (not (String.Set.mem seed_service_ids service_id))
+                 && not (String.Set.mem archive_service_ids service_id))
         in
         (* TODO: parallelize (requires accumlative hard errors) *)
         let%bind () =
@@ -216,6 +223,6 @@ let initialize ~logger network =
           after (Time.Span.of_sec 30.0)
           |> Deferred.bind ~f:Malleable_error.return
         in
-        Malleable_error.List.iter non_seed_nodes
+        Malleable_error.List.iter non_seed_archive_nodes
           ~f:(Node.start ~fresh_state:false)
       else Deferred.return res)

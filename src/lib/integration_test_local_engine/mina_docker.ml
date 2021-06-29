@@ -7,6 +7,13 @@ open Integration_test_lib
 
 let docker_swarm_version = "3.9"
 
+let postgres_image = "docker.io/bitnami/postgresql"
+
+let mina_archive_schema =
+  "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
+
+let mina_create_schema = "create_schema.sql"
+
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
@@ -32,13 +39,18 @@ module Network_config = struct
     }
   [@@deriving to_yojson]
 
+  type archive_node_configs = { name : string; id : string; schema : string }
+  [@@deriving to_yojson]
+
   type docker_config =
     { docker_swarm_version : string
     ; stack_name : string
-    ; coda_image : string
+    ; mina_image : string
+    ; mina_archive_image : string
     ; docker_volume_configs : docker_volume_configs list
     ; block_producer_configs : block_producer_config list
     ; snark_coordinator_configs : snark_coordinator_configs list
+    ; archive_node_configs : archive_node_configs list
     ; log_precomputed_blocks : bool
     ; archive_node_count : int
     ; mina_archive_schema : string
@@ -202,6 +214,7 @@ module Network_config = struct
     let block_producer_configs =
       List.mapi block_producer_keypairs ~f:block_producer_config
     in
+    (* SNARK COORDINATOR CONFIG *)
     let snark_coordinator_configs =
       if num_snark_workers > 0 then
         List.mapi
@@ -222,7 +235,21 @@ module Network_config = struct
              ]
       else []
     in
-    (* Combine configs for block producer configs and runtime config to be a docker bind volume *)
+    (* ARCHIVE CONFIG *)
+    let archive_node_configs =
+      if num_archive_nodes > 0 then
+        List.mapi
+          (List.init num_archive_nodes ~f:(const 0))
+          ~f:(fun index _ ->
+            { name = "archive-" ^ Int.to_string (index + 1)
+            ; id = Int.to_string index
+            ; schema = mina_archive_schema
+            })
+      else []
+    in
+    (* DOCKER VOLUME CONFIG:
+     * Create a docker volume structure for the runtime_config and all block producer keys
+     *)
     let docker_volume_configs =
       List.map block_producer_configs ~f:(fun config ->
           { name = "sk_" ^ config.name; data = config.private_key })
@@ -232,34 +259,38 @@ module Network_config = struct
           }
         ]
     in
-    let mina_archive_schema =
-      "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
-    in
     { debug_arg = debug
     ; keypairs = block_producer_keypairs
     ; constants
     ; docker =
         { docker_swarm_version
         ; stack_name
-        ; coda_image = images.coda
+        ; mina_image = images.coda
+        ; mina_archive_image = images.archive_node
         ; docker_volume_configs
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs
         ; snark_coordinator_configs
+        ; archive_node_configs
         ; log_precomputed_blocks
         ; archive_node_count = num_archive_nodes
         ; mina_archive_schema
         }
     }
 
+  (* Creates a mapping of the network_config services to a docker-compose file. *)
   let to_docker network_config =
     let open Docker_compose.Compose in
     let open Node_config in
-    let runtime_config = Service.Volume.create "runtime_config" in
-    let blocks_seed_map =
+    let runtime_config =
+      Service.Volume.create "runtime_config" "/root/runtime_config"
+    in
+    let block_producer_map =
       List.map network_config.docker.block_producer_configs ~f:(fun config ->
+          let private_key_config_name = "sk_" ^ config.name in
           let private_key_config =
-            Service.Volume.create ("sk_" ^ config.name)
+            Service.Volume.create private_key_config_name
+              ("/root/" ^ private_key_config_name)
           in
           let cmd =
             Cmd.(
@@ -268,20 +299,11 @@ module Network_config = struct
                    ~private_key_config:private_key_config.target))
           in
           ( config.name
-          , { Service.image = network_config.docker.coda_image
+          , { Service.image = network_config.docker.mina_image
             ; volumes = [ private_key_config; runtime_config ]
             ; command = Cmd.create_cmd cmd ~config_file:runtime_config.target
             ; environment = Service.Environment.create Envs.base_node_envs
             } ))
-      @ [ (* Add a seed node to the map as well *)
-          ( "seed"
-          , { Service.image = network_config.docker.coda_image
-            ; volumes = [ runtime_config ]
-            ; command =
-                Cmd.create_cmd Seed_command ~config_file:runtime_config.target
-            ; environment = Service.Environment.create Envs.base_node_envs
-            } )
-        ]
       |> StringMap.of_alist_exn
     in
     let snark_worker_map =
@@ -321,14 +343,75 @@ module Network_config = struct
                 (worker_command, worker_environment)
           in
           ( config.name
-          , { Service.image = network_config.docker.coda_image
+          , { Service.image = network_config.docker.mina_image
             ; volumes = [ runtime_config ]
             ; command
             ; environment
             } ))
       |> StringMap.of_alist_exn
     in
-    let services = merge blocks_seed_map snark_worker_map in
+    let archive_node_configs =
+      List.mapi network_config.docker.archive_node_configs
+        ~f:(fun index config ->
+          let postgres_uri =
+            Cli_args.Postgres_uri.create
+              ~host:
+                ( network_config.docker.stack_name ^ "_postgres-"
+                ^ Int.to_string (index + 1) )
+            |> Cli_args.Postgres_uri.to_string
+          in
+          let cmd =
+            Cmd.(
+              Archive_node_command
+                { Archive_node_command.postgres_uri; server_port = "3086" })
+          in
+          ( config.name
+          , { Service.image = network_config.docker.mina_archive_image
+            ; volumes = [ runtime_config ]
+            ; command = Cmd.create_cmd cmd ~config_file:runtime_config.target
+            ; environment = Service.Environment.create Envs.base_node_envs
+            } ))
+      (* Add an equal number of postgres containers as archive nodes *)
+      @ List.mapi network_config.docker.archive_node_configs ~f:(fun index _ ->
+            let pg_config = Cli_args.Postgres_uri.default in
+            (* Mount the archive schema on the /docker-entrypoint-initdb.d postgres entrypoint*)
+            let archive_config =
+              Service.Volume.create mina_create_schema
+                ("/docker-entrypoint-initdb.d/" ^ mina_create_schema)
+            in
+            ( "postgres-" ^ Int.to_string (index + 1)
+            , { Service.image = postgres_image
+              ; volumes = [ archive_config ]
+              ; command = []
+              ; environment =
+                  Service.Environment.create
+                    (Envs.postgres_envs ~username:pg_config.username
+                       ~password:pg_config.password ~database:pg_config.db
+                       ~port:pg_config.port)
+              } ))
+      |> StringMap.of_alist_exn
+    in
+    let seed_map =
+      [ (let command =
+           if List.length network_config.docker.archive_node_configs > 0 then
+             (* If an archive node is specified in the test plan, use the seed node to connect to the coda-archive process *)
+             Cmd.create_cmd Seed_command ~config_file:runtime_config.target
+             @ [ "-archive-address"; "archive-1:3086" ]
+           else Cmd.create_cmd Seed_command ~config_file:runtime_config.target
+         in
+         ( "seed"
+         , { Service.image = network_config.docker.mina_image
+           ; volumes = [ runtime_config ]
+           ; command
+           ; environment = Service.Environment.create Envs.base_node_envs
+           } ))
+      ]
+      |> StringMap.of_alist_exn
+    in
+    let services =
+      seed_map |> merge block_producer_map |> merge snark_worker_map
+      |> merge archive_node_configs
+    in
     { version = docker_swarm_version; services }
 end
 
@@ -343,6 +426,7 @@ module Network_manager = struct
     ; nodes_by_app_id : Swarm_network.Node.t String.Map.t
     ; block_producer_nodes : Swarm_network.Node.t list
     ; snark_coordinator_nodes : Swarm_network.Node.t list
+    ; archive_node_nodes : Swarm_network.Node.t list
     ; mutable deployed : bool
     ; keypairs : Keypair.t list
     }
@@ -404,7 +488,7 @@ module Network_manager = struct
     in
     let seed_nodes =
       [ cons_node network_config.docker.stack_name
-          (network_config.docker.stack_name ^ "_" ^ "seed")
+          (network_config.docker.stack_name ^ "_seed")
           None
       ]
     in
@@ -421,9 +505,27 @@ module Network_manager = struct
             (network_config.docker.stack_name ^ "_" ^ snark_config.name)
             None)
     in
+    let%bind _ =
+      if List.length network_config.docker.archive_node_configs > 0 then
+        let cmd =
+          Printf.sprintf "curl -Ls %s > create_schema.sql"
+            network_config.docker.mina_archive_schema
+        in
+        (* Write the archive schema to the working directory to use as an entrypoint for postgres*)
+        Util.run_cmd_exn testnet_dir "bash" [ "-c"; cmd ]
+      else return ""
+    in
+    let archive_node_nodes =
+      List.map network_config.docker.archive_node_configs
+        ~f:(fun archive_node ->
+          cons_node network_config.docker.stack_name
+            (network_config.docker.stack_name ^ "_" ^ archive_node.name)
+            None)
+    in
     let nodes_by_app_id =
       let all_nodes =
         seed_nodes @ block_producer_nodes @ snark_coordinator_nodes
+        @ archive_node_nodes
       in
       all_nodes
       |> List.map ~f:(fun node -> (node.service_id, node))
@@ -437,6 +539,7 @@ module Network_manager = struct
       ; seed_nodes
       ; block_producer_nodes
       ; snark_coordinator_nodes
+      ; archive_node_nodes
       ; nodes_by_app_id
       ; deployed = false
       ; testnet_log_filter = ""
@@ -461,7 +564,7 @@ module Network_manager = struct
       ; seeds = t.seed_nodes
       ; block_producers = t.block_producer_nodes
       ; snark_coordinators = t.snark_coordinator_nodes
-      ; archive_nodes = []
+      ; archive_nodes = t.archive_node_nodes
       ; nodes_by_app_id = t.nodes_by_app_id
       ; testnet_log_filter = t.testnet_log_filter
       ; keypairs = t.keypairs
