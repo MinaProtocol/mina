@@ -1,6 +1,6 @@
 module Container_images = struct
   type t =
-    { coda : string
+    { mina : string
     ; archive_node : string
     ; user_agent : string
     ; bots : string
