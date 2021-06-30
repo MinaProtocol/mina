@@ -14,9 +14,7 @@ use oracle::{
     FqSponge,
 };
 use plonk_circuits::scalars::RandomOracles;
-use plonk_protocol_dlog::{
-    index::VerifierIndex as DlogVerifierIndex, prover::ProverProof as DlogProof,
-};
+use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPastaFqPlonkOracles {
@@ -32,16 +30,17 @@ pub fn caml_pasta_fq_plonk_oracles_create(
     index: CamlPastaFqPlonkVerifierIndex,
     proof: CamlDlogProofPallas,
 ) -> CamlPastaFqPlonkOracles {
+    // conversions
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
-    let proof: DlogProof<GAffine> = proof.into();
-    let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm.into_iter().map(Into::into).collect();
+    let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
+        .iter()
+        .take(proof.public.len())
+        .map(Into::into)
+        .collect();
+    let lgr_comm_refs = lgr_comm.iter().collect();
 
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
-        &lgr_comm
-            .iter()
-            .take(proof.public.len())
-            .map(|x| x)
-            .collect(),
+        &lgr_comm_refs,
         &proof.public.iter().map(|s| -*s).collect(),
     );
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =

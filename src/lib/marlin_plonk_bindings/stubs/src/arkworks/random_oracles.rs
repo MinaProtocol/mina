@@ -1,123 +1,179 @@
+use crate::arkworks::{CamlFp, CamlFq, CamlScalarChallengeFp, CamlScalarChallengeFq};
 use mina_curves::pasta::{Fp, Fq};
 use plonk_circuits::scalars::RandomOracles;
-use std::ops::Deref;
 
-// This is defined on two fields
-
+//
 // Fq
+//
 
-#[derive(Clone)]
-pub struct CamlRandomOraclesFq(pub RandomOracles<Fq>);
-
-unsafe impl ocaml::FromValue for CamlRandomOraclesFq {
-    fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
-        x.as_ref().clone()
-    }
+#[derive(Clone, ocaml::ToValue, ocaml::FromValue)]
+pub struct CamlRandomOraclesFq {
+    pub beta: CamlFq,
+    pub gamma: CamlFq,
+    pub alpha_chal: CamlScalarChallengeFq,
+    pub alpha: CamlFq,
+    pub zeta: CamlFq,
+    pub v: CamlFq,
+    pub u: CamlFq,
+    pub zeta_chal: CamlScalarChallengeFq,
+    pub v_chal: CamlScalarChallengeFq,
+    pub u_chal: CamlScalarChallengeFq,
 }
-
-impl CamlRandomOraclesFq {
-    extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
-        let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
-        unsafe {
-            v.drop_in_place();
-        }
-    }
-}
-
-ocaml::custom!(CamlRandomOraclesFq {
-    finalize: CamlRandomOraclesFq::caml_pointer_finalize,
-});
 
 // Handy implementations
 
 impl From<RandomOracles<Fq>> for CamlRandomOraclesFq {
     fn from(x: RandomOracles<Fq>) -> Self {
-        CamlRandomOraclesFq(x)
+        CamlRandomOraclesFq {
+            beta: x.beta.into(),
+            gamma: x.gamma.into(),
+            alpha_chal: x.alpha_chal.into(),
+            alpha: x.alpha.into(),
+            zeta: x.zeta.into(),
+            v: x.v.into(),
+            u: x.u.into(),
+            zeta_chal: x.zeta_chal.into(),
+            v_chal: x.v_chal.into(),
+            u_chal: x.u_chal.into(),
+        }
     }
 }
 
 impl From<&RandomOracles<Fq>> for CamlRandomOraclesFq {
     fn from(x: &RandomOracles<Fq>) -> Self {
-        CamlRandomOraclesFq(x.clone())
+        CamlRandomOraclesFq {
+            beta: x.beta.into(),
+            gamma: x.gamma.into(),
+            alpha_chal: x.alpha_chal.into(),
+            alpha: x.alpha.into(),
+            zeta: x.zeta.into(),
+            v: x.v.into(),
+            u: x.u.into(),
+            zeta_chal: x.zeta_chal.into(),
+            v_chal: x.v_chal.into(),
+            u_chal: x.u_chal.into(),
+        }
     }
 }
 
 impl Into<RandomOracles<Fq>> for CamlRandomOraclesFq {
     fn into(self) -> RandomOracles<Fq> {
-        self.0
+        RandomOracles {
+            beta: self.beta.into(),
+            gamma: self.gamma.into(),
+            alpha_chal: self.alpha_chal.into(),
+            alpha: self.alpha.into(),
+            zeta: self.zeta.into(),
+            v: self.v.into(),
+            u: self.u.into(),
+            zeta_chal: self.zeta_chal.into(),
+            v_chal: self.v_chal.into(),
+            u_chal: self.u_chal.into(),
+        }
     }
 }
 
 impl Into<RandomOracles<Fq>> for &CamlRandomOraclesFq {
     fn into(self) -> RandomOracles<Fq> {
-        self.0.clone()
-    }
-}
-
-impl Deref for CamlRandomOraclesFq {
-    type Target = RandomOracles<Fq>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-// Fp
-
-#[derive(Clone)]
-pub struct CamlRandomOraclesFp(pub RandomOracles<Fp>);
-
-unsafe impl ocaml::FromValue for CamlRandomOraclesFp {
-    fn from_value(value: ocaml::Value) -> Self {
-        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
-        x.as_ref().clone()
-    }
-}
-
-impl CamlRandomOraclesFp {
-    extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
-        let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
-        unsafe {
-            v.drop_in_place();
+        RandomOracles {
+            beta: self.beta.into(),
+            gamma: self.gamma.into(),
+            alpha_chal: self.alpha_chal.into(),
+            alpha: self.alpha.into(),
+            zeta: self.zeta.into(),
+            v: self.v.into(),
+            u: self.u.into(),
+            zeta_chal: self.zeta_chal.into(),
+            v_chal: self.v_chal.into(),
+            u_chal: self.u_chal.into(),
         }
     }
 }
 
-ocaml::custom!(CamlRandomOraclesFp {
-    finalize: CamlRandomOraclesFp::caml_pointer_finalize,
-});
+//
+// Fp
+//
+
+#[derive(ocaml::ToValue, ocaml::FromValue)]
+pub struct CamlRandomOraclesFp {
+    pub beta: CamlFp,
+    pub gamma: CamlFp,
+    pub alpha_chal: CamlScalarChallengeFp,
+    pub alpha: CamlFp,
+    pub zeta: CamlFp,
+    pub v: CamlFp,
+    pub u: CamlFp,
+    pub zeta_chal: CamlScalarChallengeFp,
+    pub v_chal: CamlScalarChallengeFp,
+    pub u_chal: CamlScalarChallengeFp,
+}
 
 // Handy implementations
 
 impl From<RandomOracles<Fp>> for CamlRandomOraclesFp {
     fn from(x: RandomOracles<Fp>) -> Self {
-        CamlRandomOraclesFp(x)
+        CamlRandomOraclesFp {
+            beta: x.beta.into(),
+            gamma: x.gamma.into(),
+            alpha_chal: x.alpha_chal.into(),
+            alpha: x.alpha.into(),
+            zeta: x.zeta.into(),
+            v: x.v.into(),
+            u: x.u.into(),
+            zeta_chal: x.zeta_chal.into(),
+            v_chal: x.v_chal.into(),
+            u_chal: x.u_chal.into(),
+        }
     }
 }
 
 impl From<&RandomOracles<Fp>> for CamlRandomOraclesFp {
     fn from(x: &RandomOracles<Fp>) -> Self {
-        CamlRandomOraclesFp(x.clone())
+        CamlRandomOraclesFp {
+            beta: x.beta.into(),
+            gamma: x.gamma.into(),
+            alpha_chal: x.alpha_chal.into(),
+            alpha: x.alpha.into(),
+            zeta: x.zeta.into(),
+            v: x.v.into(),
+            u: x.u.into(),
+            zeta_chal: x.zeta_chal.into(),
+            v_chal: x.v_chal.into(),
+            u_chal: x.u_chal.into(),
+        }
     }
 }
 
 impl Into<RandomOracles<Fp>> for CamlRandomOraclesFp {
     fn into(self) -> RandomOracles<Fp> {
-        self.0
+        RandomOracles {
+            beta: self.beta.into(),
+            gamma: self.gamma.into(),
+            alpha_chal: self.alpha_chal.into(),
+            alpha: self.alpha.into(),
+            zeta: self.zeta.into(),
+            v: self.v.into(),
+            u: self.u.into(),
+            zeta_chal: self.zeta_chal.into(),
+            v_chal: self.v_chal.into(),
+            u_chal: self.u_chal.into(),
+        }
     }
 }
 
 impl Into<RandomOracles<Fp>> for &CamlRandomOraclesFp {
     fn into(self) -> RandomOracles<Fp> {
-        self.0.clone()
-    }
-}
-
-impl Deref for CamlRandomOraclesFp {
-    type Target = RandomOracles<Fp>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+        RandomOracles {
+            beta: self.beta.into(),
+            gamma: self.gamma.into(),
+            alpha_chal: self.alpha_chal.into(),
+            alpha: self.alpha.into(),
+            zeta: self.zeta.into(),
+            v: self.v.into(),
+            u: self.u.into(),
+            zeta_chal: self.zeta_chal.into(),
+            v_chal: self.v_chal.into(),
+            u_chal: self.u_chal.into(),
+        }
     }
 }

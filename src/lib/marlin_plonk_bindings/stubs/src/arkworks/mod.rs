@@ -6,6 +6,7 @@ pub mod pasta_fp;
 pub mod pasta_fq;
 pub mod polycomm;
 pub mod random_oracles;
+pub mod scalar_challenge;
 
 pub use bigint_256::CamlBigInteger256;
 pub use dlog_proofs::{CamlDlogProofPallas, CamlDlogProofVesta};
@@ -15,3 +16,4 @@ pub use pasta_fp::CamlFp;
 pub use pasta_fq::CamlFq;
 pub use polycomm::{CamlPolyCommPallas, CamlPolyCommVesta};
 pub use random_oracles::{CamlRandomOraclesFp, CamlRandomOraclesFq};
+pub use scalar_challenge::{CamlScalarChallengeFp, CamlScalarChallengeFq};

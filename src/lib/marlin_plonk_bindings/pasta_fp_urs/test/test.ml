@@ -10,7 +10,7 @@ let () =
   Format.printf "batch_accumulator_check=%b@."
     (batch_accumulator_check urs [||] [||]) ;
   ( match h urs with
-  | Infinite ->
+  | Infinity ->
       Format.printf "h= Infinite@."
   | Finite (x, y) ->
       Format.printf "h= (%s, %s)@."
@@ -28,7 +28,7 @@ let () =
   Format.printf "batch_accumulator_check=%b@."
     (batch_accumulator_check urs2 [||] [||]) ;
   match h urs with
-  | Infinite ->
+  | Infinity ->
       Format.printf "h= Infinite@."
   | Finite (x, y) ->
       Format.printf "h= (%s, %s)@."

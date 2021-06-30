@@ -14,7 +14,7 @@ use std::{
 // Wrapper struct to implement OCaml bindings
 //
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct CamlFp(pub Fp);
 
 unsafe impl ocaml::FromValue for CamlFp {

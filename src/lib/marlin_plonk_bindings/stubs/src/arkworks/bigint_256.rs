@@ -19,7 +19,7 @@ const BIGINT256_NUM_LIMBS: i32 =
 // Wrapper struct to implement OCaml bindings
 //
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct CamlBigInteger256(pub BigInteger256);
 
 impl From<BigInteger256> for CamlBigInteger256 {
@@ -105,12 +105,8 @@ impl ToString for CamlBigInteger256 {
 //
 
 #[ocaml::func]
-pub fn caml_bigint_256_of_numeral(
-    s: &[u8],
-    _len: u32,
-    base: u32,
-) -> Result<CamlBigInteger256, ocaml::Error> {
-    match BigUint::parse_bytes(s, base) {
+pub fn caml_bigint_256_of_numeral(s: &[u8], base: u16) -> Result<CamlBigInteger256, ocaml::Error> {
+    match BigUint::parse_bytes(s, base as u32) {
         Some(data) => CamlBigInteger256::try_from(data)
             .map_err(|_| ocaml::Error::Message("caml_bigint_256_of_numeral")),
         None => Err(ocaml::Error::Message("caml_bigint_256_of_numeral")),

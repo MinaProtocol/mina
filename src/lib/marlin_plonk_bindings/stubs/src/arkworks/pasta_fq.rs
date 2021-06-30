@@ -253,8 +253,7 @@ pub fn caml_pasta_fq_to_bigint(x: ocaml::Pointer<CamlFq>) -> CamlBigInteger256 {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_of_bigint(x: CamlBigInteger256) -> Result<CamlFq, ocaml::Error> {
-    println!("debug: {:?}", x.to_string());
-    println!("debug2: {:?}", x.0);
+    println!("invalid?: {:?}", CamlBigInteger256::to_string(&x));
     Fq::from_repr(x.0).map(CamlFq).ok_or(ocaml::Error::Message(
         "caml_pasta_fq_of_bigint was given an invalid CamlBigInteger256",
     ))

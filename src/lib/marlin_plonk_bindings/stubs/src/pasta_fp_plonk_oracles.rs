@@ -30,15 +30,18 @@ pub fn caml_pasta_fp_plonk_oracles_create(
     index: CamlPastaFpPlonkVerifierIndex, // parameters
     proof: CamlDlogProofVesta,        // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
+    // conversions
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
+    let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
+        .iter()
+        .take(proof.public.len())
+        .map(Into::into)
+        .collect();
+    let lgr_comm_refs = lgr_comm.iter().collect();
 
     // get commitments to the public elements
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
-        &lgr_comm
-            .iter()
-            .take(proof.public.len())
-            .map(|x| &x.0) // isn't this useless?
-            .collect(),
+        &lgr_comm_refs,
         &proof.public.iter().map(|s| -*s).collect(),
     );
 

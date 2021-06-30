@@ -1,13 +1,116 @@
 use commitment_dlog::commitment::PolyComm;
 use mina_curves::pasta::{pallas, vesta};
-use std::ops::Deref;
 
 // there are two curves we commit with
 
 type PolyCommPallas = PolyComm<pallas::Affine>;
 type PolyCommVesta = PolyComm<vesta::Affine>;
 
-// the first type of commitment
+//
+// Pallas
+//
+
+use crate::arkworks::CamlGroupAffinePallas;
+
+#[derive(ocaml::ToValue, ocaml::FromValue)]
+pub struct CamlPolyCommPallas {
+    pub unshifted: Vec<CamlGroupAffinePallas>,
+    pub shifted: Option<CamlGroupAffinePallas>,
+}
+
+// handy converter
+
+impl From<PolyCommPallas> for CamlPolyCommPallas {
+    fn from(x: PolyCommPallas) -> Self {
+        Self {
+            unshifted: x.unshifted.iter().map(Into::into).collect(),
+            shifted: x.shifted.map(Into::into),
+        }
+    }
+}
+
+impl From<&PolyCommPallas> for CamlPolyCommPallas {
+    fn from(x: &PolyCommPallas) -> Self {
+        Self {
+            unshifted: x.unshifted.iter().map(Into::into).collect(),
+            shifted: x.shifted.map(Into::into),
+        }
+    }
+}
+
+impl Into<PolyCommPallas> for CamlPolyCommPallas {
+    fn into(self) -> PolyCommPallas {
+        PolyCommPallas {
+            unshifted: self.unshifted.iter().map(Into::into).collect(),
+            shifted: self.shifted.map(Into::into),
+        }
+    }
+}
+
+impl Into<PolyCommPallas> for &CamlPolyCommPallas {
+    fn into(self) -> PolyCommPallas {
+        PolyCommPallas {
+            unshifted: self.unshifted.iter().map(Into::into).collect(),
+            shifted: self.shifted.map(Into::into),
+        }
+    }
+}
+
+//
+// Vesta
+//
+
+use crate::arkworks::CamlGroupAffineVesta;
+
+#[derive(ocaml::ToValue, ocaml::FromValue)]
+pub struct CamlPolyCommVesta {
+    pub unshifted: Vec<CamlGroupAffineVesta>,
+    pub shifted: Option<CamlGroupAffineVesta>,
+}
+
+// handy converter
+
+impl From<PolyCommVesta> for CamlPolyCommVesta {
+    fn from(x: PolyCommVesta) -> Self {
+        Self {
+            unshifted: x.unshifted.iter().map(Into::into).collect(),
+            shifted: x.shifted.map(Into::into),
+        }
+    }
+}
+
+impl From<&PolyCommVesta> for CamlPolyCommVesta {
+    fn from(x: &PolyCommVesta) -> Self {
+        Self {
+            unshifted: x.unshifted.iter().map(Into::into).collect(),
+            shifted: x.shifted.map(Into::into),
+        }
+    }
+}
+
+impl Into<PolyCommVesta> for CamlPolyCommVesta {
+    fn into(self) -> PolyCommVesta {
+        PolyCommVesta {
+            unshifted: self.unshifted.iter().map(Into::into).collect(),
+            shifted: self.shifted.map(Into::into),
+        }
+    }
+}
+
+impl Into<PolyCommVesta> for &CamlPolyCommVesta {
+    fn into(self) -> PolyCommVesta {
+        PolyCommVesta {
+            unshifted: self.unshifted.iter().map(Into::into).collect(),
+            shifted: self.shifted.map(Into::into),
+        }
+    }
+}
+
+/*
+
+//
+// Pallas
+//
 
 #[derive(Clone)]
 pub struct CamlPolyCommPallas(pub PolyCommPallas);
@@ -66,7 +169,9 @@ impl Into<PolyCommPallas> for &CamlPolyCommPallas {
     }
 }
 
-// the second type of commitment
+//
+// Vesta
+//
 
 #[derive(Clone)]
 pub struct CamlPolyCommVesta(pub PolyCommVesta);
@@ -124,3 +229,5 @@ impl Into<PolyCommVesta> for &CamlPolyCommVesta {
         self.0.clone()
     }
 }
+
+*/
