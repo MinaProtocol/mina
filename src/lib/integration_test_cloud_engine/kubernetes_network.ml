@@ -540,7 +540,7 @@ let initialize ~logger network =
     |> String.Set.of_list
   in
   let kube_get_pods () =
-    Util.run_cmd_exn_timeout ~timeout_seconds:60 "/" "kubectl"
+    Util.run_cmd_or_error_timeout ~timeout_seconds:60 "/" "kubectl"
       [ "-n"
       ; network.namespace
       ; "get"
@@ -564,7 +564,7 @@ let initialize ~logger network =
     in
     let bad_pod_statuses_opt =
       match run_result with
-      | `Ok str ->
+      | Ok str ->
           let pod_statuses = process_pod_statuses str in
           (* TODO: detect "bad statuses" (eg CrashLoopBackoff) and terminate early *)
           let filtered =
@@ -572,7 +572,7 @@ let initialize ~logger network =
                 not (String.equal status "Running"))
           in
           Some filtered
-      | `Timeout ->
+      | Error _ ->
           None
     in
     match bad_pod_statuses_opt with
@@ -588,8 +588,17 @@ let initialize ~logger network =
               [%log info] "`kubectl get pods` timed out, polling again"
           in
           let () =
-            if Option.is_some bad_pod_statuses_opt then
-              [%log info] "Got bad pod statuses, polling again"
+            if Option.is_some bad_pod_statuses_opt then (
+              let rec print_tuples = function
+                | [] ->
+                    ()
+                | (a, b) :: rest ->
+                    [%log info] "(pod: %s, status: %s) " a b ;
+                    print_tuples rest
+              in
+              let statuses = Option.value_exn bad_pod_statuses_opt in
+              [%log info] "Got bad pod statuses, polling again" ;
+              print_tuples statuses )
           in
           poll (n + 1)
         else if Option.is_some bad_pod_statuses_opt then (
@@ -607,15 +616,19 @@ let initialize ~logger network =
              $bad_pod_statuses"
             ~metadata:[ ("bad_pod_statuses", bad_pod_statuses_json) ] ;
           Malleable_error.hard_error_format
-            "Some pods either were not assigned to nodes or did deploy \
+            "Some pods either were not assigned to nodes or did not deploy \
              properly (errors: %s)"
             (Yojson.Safe.to_string bad_pod_statuses_json) )
         else
           let%bind () = Malleable_error.return () in
-          [%log fatal] "Not all pods were assigned to nodes and ready in time" ;
+          [%log fatal]
+            "`kubectl get pods` timed out (at least on the latest poll).  This \
+             probably means that not all pods were assigned to nodes and ready \
+             in time" ;
           Malleable_error.hard_error_string
-            "Some pods either were not assigned to nodes or did deploy \
-             properly "
+            "`kubectl get pods` timed out (at least on the latest poll).  This \
+             probably means that not all pods were assigned to nodes and ready \
+             in time"
   in
   [%log info] "Waiting for pods to be assigned nodes and become ready" ;
   let res = poll 0 in
@@ -627,6 +640,12 @@ let initialize ~logger network =
   | Ok _ ->
       [%log info] "Starting the daemons within the pods" ;
       let seed_nodes = seeds network in
+      let start_print node =
+        let open Malleable_error.Let_syntax in
+        let%bind res = Node.start ~fresh_state:false node in
+        [%log info] "%s started" node.pod_id ;
+        Malleable_error.return res
+      in
       let seed_pod_ids =
         seed_nodes
         |> List.map ~f:(fun { Node.pod_id; _ } -> pod_id)
@@ -638,12 +657,9 @@ let initialize ~logger network =
                not (String.Set.mem seed_pod_ids pod_id))
       in
       (* TODO: parallelize (requires accumlative hard errors) *)
-      let%bind () =
-        Malleable_error.List.iter seed_nodes ~f:(Node.start ~fresh_state:false)
-      in
+      let%bind () = Malleable_error.List.iter seed_nodes ~f:start_print in
       (* put a short delay before starting other nodes, to help avoid artifact generation races *)
       let%bind () =
         after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
       in
-      Malleable_error.List.iter non_seed_nodes
-        ~f:(Node.start ~fresh_state:false)
+      Malleable_error.List.iter non_seed_nodes ~f:start_print
