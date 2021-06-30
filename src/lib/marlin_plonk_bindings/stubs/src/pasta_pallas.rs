@@ -7,7 +7,7 @@ use mina_curves::pasta::{
 };
 use rand::rngs::StdRng;
 
-use crate::arkworks::{CamlFp, CamlFq, CamlGroupAffinePallas, CamlGroupProjectivePallas};
+use crate::arkworks::{CamlFp, CamlFq, CamlGroupAffine, CamlGroupProjectivePallas};
 
 #[ocaml::func]
 pub fn caml_pasta_pallas_one() -> CamlGroupProjectivePallas {
@@ -84,12 +84,12 @@ pub extern "C" fn caml_pasta_pallas_endo_scalar() -> CamlFq {
 #[ocaml::func]
 pub fn caml_pasta_pallas_to_affine(
     x: ocaml::Pointer<CamlGroupProjectivePallas>,
-) -> CamlGroupAffinePallas {
+) -> CamlGroupAffine<CamlFp> {
     x.as_ref().into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_pallas_of_affine(x: CamlGroupAffinePallas) -> CamlGroupProjectivePallas {
+pub fn caml_pasta_pallas_of_affine(x: CamlGroupAffine<CamlFp>) -> CamlGroupProjectivePallas {
     Into::<GAffine>::into(x).into_projective().into()
 }
 
@@ -100,6 +100,6 @@ pub fn caml_pasta_pallas_of_affine_coordinates(x: CamlFp, y: CamlFp) -> CamlGrou
 }
 
 #[ocaml::func]
-pub fn caml_pasta_pallas_affine_deep_copy(x: CamlGroupAffinePallas) -> CamlGroupAffinePallas {
+pub fn caml_pasta_pallas_affine_deep_copy(x: CamlGroupAffine<CamlFp>) -> CamlGroupAffine<CamlFp> {
     x
 }

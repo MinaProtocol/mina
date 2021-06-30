@@ -10,7 +10,7 @@ pub mod scalar_challenge;
 
 pub use bigint_256::CamlBigInteger256;
 pub use dlog_proofs::{CamlDlogProofPallas, CamlDlogProofVesta};
-pub use group_affine::{CamlGroupAffinePallas, CamlGroupAffineVesta};
+pub use group_affine::CamlGroupAffine;
 pub use group_projective::{CamlGroupProjectivePallas, CamlGroupProjectiveVesta};
 pub use pasta_fp::CamlFp;
 pub use pasta_fq::CamlFq;

@@ -54,8 +54,9 @@ external read :
 external write : ?append:bool -> t -> string -> unit
   = "caml_pasta_fp_plonk_index_write"
 
+(*
 let%test "pasta_fp" =
   let gates = Gate_vector.create () in
   let public = 5 in
   let urs = Marlin_plonk_bindings_pasta_fp_urs.create 10 in
-  let x = create gates public urs in
+  let x = create gates public urs in*)

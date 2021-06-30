@@ -14,7 +14,7 @@ external print : t -> unit = "caml_bigint_256_print"
 
 external to_string : t -> string = "caml_bigint_256_to_string"
 
-external of_numeral : string -> int -> t = "caml_bigint_256_of_numeral"
+external of_numeral : string -> int -> int -> t = "caml_bigint_256_of_numeral"
 
 external of_decimal_string : string -> t = "caml_bigint_256_of_decimal_string"
 
@@ -36,7 +36,7 @@ let%test "serialization and deserialization" =
 
 let%test "div and compare" =
   let x = of_decimal_string "3" in
-  let y = of_numeral "3" 10 in
+  let y = of_numeral "3" 1 10 in
   compare x y = 0
 
 let%test "test_bit" =

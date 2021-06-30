@@ -1,5 +1,5 @@
 use crate::{
-    arkworks::{CamlFq, CamlGroupAffinePallas, CamlPolyCommPallas},
+    arkworks::{CamlFp, CamlFq, CamlGroupAffine, CamlPolyCommPallas},
     caml_pointer::{self, CamlPointer},
 };
 use ark_ff::{One, Zero};
@@ -119,7 +119,7 @@ pub fn caml_pasta_fq_urs_b_poly_commitment(
 #[ocaml::func]
 pub fn caml_pasta_fq_urs_batch_accumulator_check(
     urs: CamlPastaFqUrs,
-    comms: Vec<CamlGroupAffinePallas>,
+    comms: Vec<CamlGroupAffine<CamlFp>>,
     chals: Vec<CamlFq>,
 ) -> bool {
     crate::urs_utils::batch_dlog_accumulator_check(
@@ -130,6 +130,6 @@ pub fn caml_pasta_fq_urs_batch_accumulator_check(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_urs_h(urs: CamlPastaFqUrs) -> CamlGroupAffinePallas {
+pub fn caml_pasta_fq_urs_h(urs: CamlPastaFqUrs) -> CamlGroupAffine<CamlFp> {
     (*urs).h.into()
 }

@@ -1,4 +1,4 @@
-use crate::arkworks::{CamlDlogProofPallas, CamlFq, CamlGroupAffinePallas, CamlPolyCommPallas};
+use crate::arkworks::{CamlDlogProofPallas, CamlFp, CamlFq, CamlGroupAffine, CamlPolyCommPallas};
 use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
 use crate::pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex;
 use crate::pasta_fq_vector::CamlPastaFqVector;
@@ -25,7 +25,7 @@ pub fn caml_pasta_fq_plonk_proof_create(
     primary_input: CamlPastaFqVector,
     auxiliary_input: CamlPastaFqVector,
     prev_challenges: Vec<CamlFq>,
-    prev_sgs: Vec<CamlGroupAffinePallas>,
+    prev_sgs: Vec<CamlGroupAffine<CamlFp>>,
 ) -> CamlDlogProofPallas {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;

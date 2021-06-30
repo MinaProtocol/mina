@@ -1,4 +1,4 @@
-use crate::arkworks::{CamlFp, CamlFq, CamlGroupAffineVesta, CamlGroupProjectiveVesta};
+use crate::arkworks::{CamlFp, CamlFq, CamlGroupAffine, CamlGroupProjectiveVesta};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{One, UniformRand};
 use mina_curves::pasta::{
@@ -83,12 +83,12 @@ pub extern "C" fn caml_pasta_vesta_endo_scalar() -> CamlFp {
 #[ocaml::func]
 pub fn caml_pasta_vesta_to_affine(
     x: ocaml::Pointer<CamlGroupProjectiveVesta>,
-) -> CamlGroupAffineVesta {
+) -> CamlGroupAffine<CamlFq> {
     x.as_ref().into_affine().into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_of_affine(x: CamlGroupAffineVesta) -> CamlGroupProjectiveVesta {
+pub fn caml_pasta_vesta_of_affine(x: CamlGroupAffine<CamlFq>) -> CamlGroupProjectiveVesta {
     Into::<GAffine>::into(x).into_projective().into()
 }
 
@@ -99,6 +99,6 @@ pub fn caml_pasta_vesta_of_affine_coordinates(x: CamlFq, y: CamlFq) -> CamlGroup
 }
 
 #[ocaml::func]
-pub fn caml_pasta_vesta_affine_deep_copy(x: CamlGroupAffineVesta) -> CamlGroupAffineVesta {
+pub fn caml_pasta_vesta_affine_deep_copy(x: CamlGroupAffine<CamlFq>) -> CamlGroupAffine<CamlFq> {
     x
 }

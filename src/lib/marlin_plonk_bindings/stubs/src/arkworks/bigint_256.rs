@@ -105,7 +105,11 @@ impl ToString for CamlBigInteger256 {
 //
 
 #[ocaml::func]
-pub fn caml_bigint_256_of_numeral(s: &[u8], base: u16) -> Result<CamlBigInteger256, ocaml::Error> {
+pub fn caml_bigint_256_of_numeral(
+    s: &[u8],
+    _len: u16,
+    base: u16,
+) -> Result<CamlBigInteger256, ocaml::Error> {
     match BigUint::parse_bytes(s, base as u32) {
         Some(data) => CamlBigInteger256::try_from(data)
             .map_err(|_| ocaml::Error::Message("caml_bigint_256_of_numeral")),

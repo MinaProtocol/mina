@@ -1,3 +1,5 @@
+use crate::arkworks::CamlGroupAffine;
+use crate::arkworks::{CamlFp, CamlFq};
 use commitment_dlog::commitment::PolyComm;
 use mina_curves::pasta::{pallas, vesta};
 
@@ -10,12 +12,10 @@ type PolyCommVesta = PolyComm<vesta::Affine>;
 // Pallas
 //
 
-use crate::arkworks::CamlGroupAffinePallas;
-
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPolyCommPallas {
-    pub unshifted: Vec<CamlGroupAffinePallas>,
-    pub shifted: Option<CamlGroupAffinePallas>,
+    pub unshifted: Vec<CamlGroupAffine<CamlFp>>,
+    pub shifted: Option<CamlGroupAffine<CamlFp>>,
 }
 
 // handy converter
@@ -60,12 +60,10 @@ impl Into<PolyCommPallas> for &CamlPolyCommPallas {
 // Vesta
 //
 
-use crate::arkworks::CamlGroupAffineVesta;
-
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPolyCommVesta {
-    pub unshifted: Vec<CamlGroupAffineVesta>,
-    pub shifted: Option<CamlGroupAffineVesta>,
+    pub unshifted: Vec<CamlGroupAffine<CamlFq>>,
+    pub shifted: Option<CamlGroupAffine<CamlFq>>,
 }
 
 // handy converter
