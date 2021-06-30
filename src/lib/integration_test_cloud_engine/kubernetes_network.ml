@@ -619,33 +619,31 @@ let initialize ~logger network =
   in
   [%log info] "Waiting for pods to be assigned nodes and become ready" ;
   let res = poll 0 in
-  let%map.Deferred result = res in
-  if Result.is_ok result then (
-    let seed_nodes = seeds network in
-    [%log info] "Starting the daemons within the pods" ;
-    let seed_pod_ids =
-      seed_nodes
-      |> List.map ~f:(fun { Node.pod_id; _ } -> pod_id)
-      |> String.Set.of_list
-    in
-    let non_seed_nodes =
-      network |> all_nodes
-      |> List.filter ~f:(fun { Node.pod_id; _ } ->
-             not (String.Set.mem seed_pod_ids pod_id))
-    in
-    (* TODO: parallelize (requires accumlative hard errors) *)
-    let%bind () =
-      Malleable_error.List.iter seed_nodes ~f:(Node.start ~fresh_state:false)
-    in
-    (* put a short delay before starting other nodes, to help avoid artifact generation races *)
-    let%bind () =
-      after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
-    in
-    Malleable_error.List.iter non_seed_nodes ~f:(Node.start ~fresh_state:false)
-    )
-  else
-    let%bind () = Malleable_error.return () in
-    [%log error]
-      "Since not all pods were assigned to nodes and ready in time, daemons \
-       will not be started" ;
-    res
+  match%bind.Deferred res with
+  | Error _ ->
+      [%log error]
+        "Since not all pods were assigned nodes, daemons will not be started" ;
+      res
+  | Ok _ ->
+      [%log info] "Starting the daemons within the pods" ;
+      let seed_nodes = seeds network in
+      let seed_pod_ids =
+        seed_nodes
+        |> List.map ~f:(fun { Node.pod_id; _ } -> pod_id)
+        |> String.Set.of_list
+      in
+      let non_seed_nodes =
+        network |> all_nodes
+        |> List.filter ~f:(fun { Node.pod_id; _ } ->
+               not (String.Set.mem seed_pod_ids pod_id))
+      in
+      (* TODO: parallelize (requires accumlative hard errors) *)
+      let%bind () =
+        Malleable_error.List.iter seed_nodes ~f:(Node.start ~fresh_state:false)
+      in
+      (* put a short delay before starting other nodes, to help avoid artifact generation races *)
+      let%bind () =
+        after (Time.Span.of_sec 30.0) |> Deferred.bind ~f:Malleable_error.return
+      in
+      Malleable_error.List.iter non_seed_nodes
+        ~f:(Node.start ~fresh_state:false)
