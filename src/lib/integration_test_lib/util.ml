@@ -1,5 +1,6 @@
 open Core
 open Async
+module Timeout = Timeout_lib.Core_time
 
 (* module util with  *)
 
@@ -48,6 +49,11 @@ let run_cmd_exn dir prog args =
       output
   | Error error ->
       Error.raise error
+
+let run_cmd_exn_timeout ~timeout_seconds dir prog args =
+  Timeout.await ()
+    ~timeout_duration:(Time.Span.create ~sec:timeout_seconds ())
+    (run_cmd_exn dir prog args)
 
 let rec prompt_continue prompt_string =
   print_string prompt_string ;
