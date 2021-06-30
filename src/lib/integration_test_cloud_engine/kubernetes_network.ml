@@ -78,8 +78,8 @@ module Node = struct
       Malleable_error.map m ~f:(function s -> acc ^ s)
     in
     let container_list : string list =
-      List.append [ node.mina_container_id ]
-        (Option.to_list node.mina_archive_container_id)
+      List.append [ node.mina_container_id ] []
+      (* (Option.to_list node.mina_archive_container_id) *)
     in
     let result_list = List.map container_list ~f:call_run in
     List.fold result_list ~init:(Malleable_error.return "") ~f:foldh
