@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 open Signature_lib
@@ -35,10 +33,11 @@ module Update = struct
     module Stable = struct
       module V1 = struct
         type ('state_element, 'pk, 'vk, 'perms) t =
-          { app_state: 'state_element Snapp_state.V.Stable.V1.t
-          ; delegate: 'pk
-          ; verification_key: 'vk
-          ; permissions: 'perms }
+          { app_state : 'state_element Snapp_state.V.Stable.V1.t
+          ; delegate : 'pk
+          ; verification_key : 'vk
+          ; permissions : 'perms
+          }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
     end]
@@ -74,7 +73,7 @@ module Update = struct
       , Permissions.Checked.t Set_or_keep.Checked.t )
       Poly.t
 
-    let to_input ({app_state; delegate; verification_key; permissions} : t) =
+    let to_input ({ app_state; delegate; verification_key; permissions } : t) =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
@@ -83,17 +82,19 @@ module Update = struct
             ~f:Public_key.Compressed.Checked.to_input
         ; Set_or_keep.Checked.to_input verification_key ~f:field
         ; Set_or_keep.Checked.to_input permissions
-            ~f:Permissions.Checked.to_input ]
+            ~f:Permissions.Checked.to_input
+        ]
   end
 
   let dummy : t =
-    { app_state=
+    { app_state =
         Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> Set_or_keep.Keep)
-    ; delegate= Keep
-    ; verification_key= Keep
-    ; permissions= Keep }
+    ; delegate = Keep
+    ; verification_key = Keep
+    ; permissions = Keep
+    }
 
-  let to_input ({app_state; delegate; verification_key; permissions} : t) =
+  let to_input ({ app_state; delegate; verification_key; permissions } : t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
@@ -105,7 +106,8 @@ module Update = struct
           (Set_or_keep.map verification_key ~f:With_hash.hash)
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
-          ~f:Permissions.to_input ]
+          ~f:Permissions.to_input
+      ]
 
   let typ () : (Checked.t, t) Typ.t =
     let open Poly in
@@ -118,7 +120,8 @@ module Update = struct
         |> Typ.transport
              ~there:(Set_or_keep.map ~f:With_hash.hash)
              ~back:(Set_or_keep.map ~f:(fun _ -> failwith "vk typ"))
-      ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ ]
+      ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -129,7 +132,11 @@ module Body = struct
     module Stable = struct
       module V1 = struct
         type ('pk, 'update, 'token_id, 'signed_amount) t =
-          {pk: 'pk; update: 'update; token_id: 'token_id; delta: 'signed_amount}
+          { pk : 'pk
+          ; update : 'update
+          ; token_id : 'token_id
+          ; delta : 'signed_amount
+          }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
@@ -158,12 +165,13 @@ module Body = struct
       , Amount.Signed.var )
       Poly.t
 
-    let to_input ({pk; update; token_id; delta} : t) =
+    let to_input ({ pk; update; token_id; delta } : t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
-        ; Amount.Signed.Checked.to_input delta ]
+        ; Amount.Signed.Checked.to_input delta
+        ]
 
     let digest (t : t) =
       Random_oracle.Checked.(
@@ -176,22 +184,25 @@ module Body = struct
       [ Public_key.Compressed.typ
       ; Update.typ ()
       ; Token_id.typ
-      ; Amount.Signed.typ ]
+      ; Amount.Signed.typ
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   let dummy : t =
-    { pk= Public_key.Compressed.empty
-    ; update= Update.dummy
-    ; token_id= Token_id.default
-    ; delta= Amount.Signed.zero }
+    { pk = Public_key.Compressed.empty
+    ; update = Update.dummy
+    ; token_id = Token_id.default
+    ; delta = Amount.Signed.zero
+    }
 
-  let to_input ({pk; update; token_id; delta} : t) =
+  let to_input ({ pk; update; token_id; delta } : t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
-      ; Amount.Signed.to_input delta ]
+      ; Amount.Signed.to_input delta
+      ]
 
   let digest (t : t) =
     Random_oracle.(hash ~init:Hash_prefix.snapp_body (pack_input (to_input t)))
@@ -225,7 +236,7 @@ module Predicated = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('body, 'predicate) t = {body: 'body; predicate: 'predicate}
+        type ('body, 'predicate) t = { body : 'body; predicate : 'predicate }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
@@ -289,9 +300,9 @@ module Predicated = struct
       type t = (Body.Checked.t, Account_nonce.Checked.t) Poly.t
     end
 
-    let typ : (Checked.t, t) Typ.t = Poly.typ [Body.typ (); Account_nonce.typ]
+    let typ : (Checked.t, t) Typ.t = Poly.typ [ Body.typ (); Account_nonce.typ ]
 
-    let dummy : t = {body= Body.dummy; predicate= Account_nonce.zero}
+    let dummy : t = { body = Body.dummy; predicate = Account_nonce.zero }
   end
 
   module Empty = struct
@@ -305,14 +316,14 @@ module Predicated = struct
       end
     end]
 
-    let dummy : t = {body= Body.dummy; predicate= ()}
+    let dummy : t = { body = Body.dummy; predicate = () }
 
-    let create body : t = {body; predicate= ()}
+    let create body : t = { body; predicate = () }
   end
 end
 
 module Poly (Data : Type) (Auth : Type) = struct
-  type t = {data: Data.t; authorization: Auth.t}
+  type t = { data : Data.t; authorization : Auth.t }
 end
 
 module Proved = struct
@@ -323,8 +334,9 @@ module Proved = struct
             Poly(Predicated.Proved.Stable.V1)
               (Pickles.Side_loaded.Proof.Stable.V1)
             .t =
-        { data: Predicated.Proved.Stable.V1.t
-        ; authorization: Pickles.Side_loaded.Proof.Stable.V1.t }
+        { data : Predicated.Proved.Stable.V1.t
+        ; authorization : Pickles.Side_loaded.Proof.Stable.V1.t
+        }
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -337,8 +349,9 @@ module Signed = struct
   module Stable = struct
     module V1 = struct
       type t = Poly(Predicated.Signed.Stable.V1)(Signature.Stable.V1).t =
-        { data: Predicated.Signed.Stable.V1.t
-        ; authorization: Signature.Stable.V1.t }
+        { data : Predicated.Signed.Stable.V1.t
+        ; authorization : Signature.Stable.V1.t
+        }
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -351,7 +364,7 @@ module Empty = struct
   module Stable = struct
     module V1 = struct
       type t = Poly(Predicated.Empty.Stable.V1)(Unit.Stable.V1).t =
-        {data: Predicated.Empty.Stable.V1.t; authorization: unit}
+        { data : Predicated.Empty.Stable.V1.t; authorization : unit }
       [@@deriving sexp, equal, yojson, hash, compare]
 
       let to_latest = Fn.id
@@ -363,7 +376,7 @@ end
 module Stable = struct
   module V1 = struct
     type t = Poly(Predicated.Stable.V1)(Control.Stable.V1).t =
-      {data: Predicated.Stable.V1.t; authorization: Control.Stable.V1.t}
+      { data : Predicated.Stable.V1.t; authorization : Control.Stable.V1.t }
     [@@deriving sexp, equal, yojson, hash, compare]
 
     let to_latest = Fn.id
