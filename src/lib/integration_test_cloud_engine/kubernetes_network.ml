@@ -533,7 +533,8 @@ let lookup_node_by_app_id t = Map.find t.nodes_by_app_id
 let initialize ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  let max_polls = 60 (* 15 mins *) in
+  (*let max_polls = 60 (* 15 mins *) in *)
+  let max_polls = 120 (* 30 mins *) in
   let all_pods =
     all_nodes network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)
