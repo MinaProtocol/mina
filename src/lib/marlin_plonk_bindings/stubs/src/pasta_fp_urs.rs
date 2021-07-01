@@ -1,19 +1,17 @@
-use mina_curves::pasta::{vesta::Affine as GAffine, fp::Fp};
-use algebra::{One, Zero};
-use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
-
-use commitment_dlog::{
-    commitment::{b_poly_coefficients, PolyComm},
-    srs::SRS,
+use crate::{
+    arkworks::{CamlFp, CamlFq, CamlGroupAffine, CamlPolyCommVesta},
+    caml_pointer::{self, CamlPointer},
 };
-
+use ark_ff::{One, Zero};
+use ark_poly::UVPolynomial;
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Evaluations};
+use commitment_dlog::{commitment::b_poly_coefficients, srs::SRS};
+use mina_curves::pasta::{fp::Fp, vesta::Affine as GAffine};
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, BufWriter, Seek, SeekFrom::Start},
     rc::Rc,
 };
-
-use crate::caml_pointer::{self, CamlPointer};
 
 pub type CamlPastaFpUrs = CamlPointer<Rc<SRS<GAffine>>>;
 

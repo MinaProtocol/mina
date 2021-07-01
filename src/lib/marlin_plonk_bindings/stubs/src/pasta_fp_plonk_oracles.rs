@@ -1,22 +1,18 @@
+use crate::arkworks::{CamlDlogProofVesta, CamlFp, CamlPolyCommVesta, CamlRandomOraclesFp};
+use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use mina_curves::pasta::{
-    vesta::{Affine as GAffine, VestaParameters},
     fp::Fp,
+    vesta::{Affine as GAffine, VestaParameters},
 };
-
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
-
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use plonk_circuits::scalars::RandomOracles;
-use plonk_protocol_dlog::{
-    index::VerifierIndex as DlogVerifierIndex, prover::ProverProof as DlogProof,
-};
-
-use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPastaFpPlonkOracles {
