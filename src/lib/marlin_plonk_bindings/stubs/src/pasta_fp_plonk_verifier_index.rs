@@ -6,9 +6,9 @@ use crate::plonk_verifier_index::{
 };
 use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::pasta_fp_urs::CamlPastaFpUrs;
+use mina_curves::pasta::{vesta::Affine as GAffine, pallas::Affine as GAffineOther, fp::Fp};
 use algebra::{
     curves::AffineCurve,
-    pasta::{vesta::Affine as GAffine, pallas::Affine as GAffineOther, fp::Fp},
     One,
 };
 

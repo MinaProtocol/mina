@@ -104,7 +104,7 @@ module Zero_one_or_two = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = [`Zero | `One of 'a | `Two of 'a * 'a]
+      type 'a t = [ `Zero | `One of 'a | `Two of 'a * 'a ]
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -138,9 +138,9 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
   let of_list = function
     | [] ->
         `Zero
-    | [x] ->
+    | [ x ] ->
         `One x
-    | [x; y] ->
+    | [ x; y ] ->
         `Two (x, y)
     | _ ->
         failwith "of_list"
@@ -152,11 +152,11 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
       let pks =
         match c with
         | Proved_proved r ->
-            [r.one.data.body.pk; r.two.data.body.pk]
+            [ r.one.data.body.pk; r.two.data.body.pk ]
         | Proved_empty r ->
-            [r.one.data.body.pk]
+            [ r.one.data.body.pk ]
         | Proved_signed r ->
-            [r.one.data.body.pk]
+            [ r.one.data.body.pk ]
         | Signed_signed _ | Signed_empty _ ->
             []
       in
@@ -164,7 +164,7 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
 
 let to_verifiable t ~ledger ~get ~location_of_account =
   Option.try_with (fun () ->
-      to_verifiable_exn t ~ledger ~get ~location_of_account )
+      to_verifiable_exn t ~ledger ~get ~location_of_account)
 
 let fee_exn : t -> Currency.Fee.t = function
   | Signed_command x ->
@@ -254,4 +254,4 @@ let filter_by_participant (commands : t list) public_key =
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
-             Account_id.public_key) )
+             Account_id.public_key))

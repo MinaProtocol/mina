@@ -233,8 +233,8 @@ let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) : State_hash.t
       go ancestors1 ancestors2 (parent_unless_root b1) (parent_unless_root b2)
   in
   go
-    (Hash_set.create (module State_hash) ())
-    (Hash_set.create (module State_hash) ())
+    (Hash_set.create (module State_hash))
+    (Hash_set.create (module State_hash))
     bc1 bc2
 
 (* TODO: separate visualizer? *)

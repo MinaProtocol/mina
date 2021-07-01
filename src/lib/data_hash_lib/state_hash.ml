@@ -1,12 +1,10 @@
 (* state_hash.ml -- defines the type for the protocol state hash *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifndef
-consensus_mechanism]
+[%%ifndef consensus_mechanism]
 
 module Outside_hash_image = Outside_hash_image_nonconsensus.Outside_hash_image
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
@@ -26,8 +24,7 @@ end)
 
 let dummy = of_hash Outside_hash_image.t
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 let zero = dummy
 
@@ -54,15 +51,14 @@ module Stable = struct
 
   module V1 = struct
     module T = struct
-      type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      type t = Field.t [@@deriving sexp, compare, hash, version { asserted }]
     end
 
     include T
 
     let to_latest = Fn.id
 
-    [%%define_from_scope
-    to_yojson, of_yojson]
+    [%%define_from_scope to_yojson, of_yojson]
 
     include Comparable.Make (T)
     include Hashable.Make_binable (T)

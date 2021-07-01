@@ -12,8 +12,8 @@ let dispatch ?(max_tries = 5)
         (Error
            (Error.tag_arg e
               (sprintf
-                 "Could not send archive diff data to archive process after \
-                  %d tries. The process may not be running, please check the \
+                 "Could not send archive diff data to archive process after %d \
+                  tries. The process may not be running, please check the \
                   daemon-argument"
                  max_tries)
               ( ("host_and_port", archive_location.value)
@@ -40,8 +40,8 @@ let make_dispatch_block rpc ?(max_tries = 5)
         (Error
            (Error.tag_arg e
               (sprintf
-                 "Could not send block data to archive process after %d \
-                  tries. The process may not be running, please check the \
+                 "Could not send block data to archive process after %d tries. \
+                  The process may not be running, please check the \
                   daemon-argument"
                  max_tries)
               ( ("host_and_port", archive_location.value)
@@ -79,8 +79,9 @@ let transfer ~logger ~archive_location
                 ~metadata:
                   [ ("error", Error_json.error_to_yojson e)
                   ; ( "breadcrumb"
-                    , Transition_frontier.Breadcrumb.to_yojson breadcrumb ) ]
-                "Could not send breadcrumb to archive: $error" ) )
+                    , Transition_frontier.Breadcrumb.to_yojson breadcrumb )
+                  ]
+                "Could not send breadcrumb to archive: $error"))
 
 let run ~logger
     ~(frontier_broadcast_pipe :
@@ -97,4 +98,4 @@ let run ~logger
                  Transition_frontier.Extensions.get_view_pipe extensions
                    Transition_frontier.Extensions.New_breadcrumbs
                in
-               transfer ~logger ~archive_location breadcrumb_reader )) )
+               transfer ~logger ~archive_location breadcrumb_reader)))

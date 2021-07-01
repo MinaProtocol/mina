@@ -9,9 +9,6 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-[%%check_ocaml_word_size
-64]
-
 [%%if
 record_async_backtraces]
 
@@ -78,7 +75,7 @@ let setup_daemon logger =
       ~aliases:["block-producer-password"]
       ~doc:
         "PASSWORD Password associated with the block-producer key. Setting \
-         this is equivalent to setting the CODA_PRIVKEY_PASS environment \
+         this is equivalent to setting the MINA_PRIVKEY_PASS environment \
          variable. Be careful when setting it in the commandline as it will \
          likely get tracked in your history. Mainly to be used from the \
          daemon.json config file"
@@ -321,7 +318,7 @@ let setup_daemon logger =
   and config_files =
     flag "--config-file" ~aliases:["config-file"]
       ~doc:
-        "PATH path to a configuration file (overrides CODA_CONFIG_FILE, \
+        "PATH path to a configuration file (overrides MINA_CONFIG_FILE, \
          default: <config_dir>/daemon.json). Pass multiple times to override \
          fields from earlier config files"
       (listed string)
@@ -609,10 +606,17 @@ let setup_daemon logger =
         (conf_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
-        match Sys.getenv "CODA_CONFIG_FILE" with
-        | Some config_file ->
+        (* TODO: remove deprecated variable, eventually *)
+        let mina_config_file = "MINA_CONFIG_FILE" in
+        let coda_config_file = "CODA_CONFIG_FILE" in
+        match Sys.getenv mina_config_file,Sys.getenv coda_config_file with
+        | Some config_file, _ ->
             Some (config_file, `Must_exist)
-        | None ->
+        | None, Some config_file ->
+          [%log warn] "Using deprecated environment variable %s, please use %s instead"
+            coda_config_file mina_config_file;
+          Some (config_file, `Must_exist)
+        | None, None ->
             None
       in
       let config_files =
@@ -907,7 +911,7 @@ let setup_daemon logger =
             client_trustlist
       in
       Stream.iter
-        (Async_kernel.Async_kernel_scheduler.(long_cycles_with_context @@ t ())
+        (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
         ~f:(fun (span, context) ->
           let secs = Time_ns.Span.to_sec span in
@@ -933,7 +937,7 @@ let setup_daemon logger =
             Runtime.Long_async_histogram.observe Runtime.long_async_cycle secs)
           ) ;
       Stream.iter
-        Async_kernel.Async_kernel_scheduler.(long_jobs_with_context @@ t ())
+        Async_kernel.Async_kernel_scheduler.long_jobs_with_context
         ~f:(fun (context, span) ->
           let secs = Time_ns.Span.to_sec span in
           [%log debug]
@@ -1582,7 +1586,7 @@ let () =
   (let make_list_mem ss s = List.mem ss s ~equal:String.equal in
    let is_version_cmd = make_list_mem ["version"; "-version"] in
    let is_help_flag = make_list_mem ["-help"; "-?"] in
-   match Sys.argv with
+   match Sys.get_argv () with
    | [|_coda_exe; version|] when is_version_cmd version ->
        Mina_version.print_version ()
    | [|coda_exe; version; help|]
