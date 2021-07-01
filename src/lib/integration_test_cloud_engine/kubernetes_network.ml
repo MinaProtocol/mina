@@ -533,8 +533,7 @@ let lookup_node_by_app_id t = Map.find t.nodes_by_app_id
 let initialize ~logger network =
   let open Malleable_error.Let_syntax in
   let poll_interval = Time.Span.of_sec 15.0 in
-  (*let max_polls = 60 (* 15 mins *) in *)
-  let max_polls = 120 (* 30 mins *) in
+  let max_polls = 60 (* 15 mins *) in
   let all_pods =
     all_nodes network
     |> List.map ~f:(fun { pod_id; _ } -> pod_id)
@@ -559,7 +558,7 @@ let initialize ~logger network =
     |> List.filter ~f:(fun (pod_name, _) -> String.Set.mem all_pods pod_name)
   in
   let rec poll n =
-    [%log info] "Checking kubernetes pod statuses, n=%d" n ;
+    [%log debug] "Checking kubernetes pod statuses, n=%d" n ;
     let%bind run_result =
       Deferred.bind ~f:Malleable_error.return (kube_get_pods ())
     in
@@ -586,7 +585,7 @@ let initialize ~logger network =
           in
           let () =
             if Option.is_none bad_pod_statuses_opt then
-              [%log info] "`kubectl get pods` timed out, polling again"
+              [%log debug] "`kubectl get pods` timed out, polling again"
           in
           let () =
             if Option.is_some bad_pod_statuses_opt then (
@@ -594,11 +593,11 @@ let initialize ~logger network =
                 | [] ->
                     ()
                 | (a, b) :: rest ->
-                    [%log info] "(pod: %s, status: %s) " a b ;
+                    [%log debug] "(pod: %s, status: %s) " a b ;
                     print_tuples rest
               in
               let statuses = Option.value_exn bad_pod_statuses_opt in
-              [%log info] "Got bad pod statuses, polling again" ;
+              [%log debug] "Got bad pod statuses, polling again" ;
               print_tuples statuses )
           in
           poll (n + 1)
@@ -641,8 +640,9 @@ let initialize ~logger network =
   | Ok _ ->
       [%log info] "Starting the daemons within the pods" ;
       let seed_nodes = seeds network in
-      let start_print node =
+      let start_print (node : Node.t) =
         let open Malleable_error.Let_syntax in
+        [%log info] "starting %s ..." node.pod_id ;
         let%bind res = Node.start ~fresh_state:false node in
         [%log info] "%s started" node.pod_id ;
         Malleable_error.return res
