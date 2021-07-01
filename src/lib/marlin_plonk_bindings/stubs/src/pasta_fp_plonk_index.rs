@@ -20,7 +20,6 @@ use std::{
     rc::Rc,
 };
 
-
 pub struct CamlPastaFpPlonkGateVector(Vec<Gate<Fp>>);
 pub type CamlPastaFpPlonkGateVectorPtr = ocaml::Pointer<CamlPastaFpPlonkGateVector>;
 
@@ -41,12 +40,12 @@ pub fn caml_pasta_fp_plonk_gate_vector_create() -> CamlPastaFpPlonkGateVector {
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_gate_vector_add(
     mut v: CamlPastaFpPlonkGateVectorPtr,
-    gate: CamlPlonkGate<Vec<Fp>>,
+    gate: CamlPlonkGate<Vec<CamlFp>>,
 ) {
     v.as_mut().0.push(Gate {
         typ: gate.typ.into(),
         wires: gate.wires.into(),
-        c: gate.c,
+        c: gate.c.iter().map(Into::into).collect(),
     });
 }
 
@@ -54,9 +53,9 @@ pub fn caml_pasta_fp_plonk_gate_vector_add(
 pub fn caml_pasta_fp_plonk_gate_vector_get(
     v: CamlPastaFpPlonkGateVectorPtr,
     i: ocaml::Int,
-) -> CamlPlonkGate<Vec<Fp>> {
+) -> CamlPlonkGate<Vec<CamlFp>> {
     let gate = &(v.as_ref().0)[i as usize];
-    let c = gate.c.iter().map(|x| *x).collect();
+    let c = gate.c.iter().map(Into::into).collect();
     CamlPlonkGate {
         typ: (&gate.typ).into(),
         wires: (&gate.wires).into(),
@@ -147,8 +146,7 @@ pub fn caml_pasta_fp_plonk_index_create(
 
     let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffineOther>();
     let cs =
-        match ConstraintSystem::<Fp>::create(gates, oracle::pasta::fp::params(), public as usize)
-        {
+        match ConstraintSystem::<Fp>::create(gates, oracle::pasta::fp::params(), public as usize) {
             None => Err(ocaml::Error::failwith(
                 "caml_pasta_fp_plonk_index_create: could not create constraint system",
             )

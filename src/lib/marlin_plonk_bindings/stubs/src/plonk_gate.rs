@@ -1,6 +1,10 @@
 use plonk_circuits::gate::{GateType, GateType::*};
 use plonk_circuits::wires::{Col, Col::*, Wire, Wires};
 
+//
+// CamlPlonkGateType
+//
+
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub enum CamlPlonkGateType {
     Zero,    // zero gate
@@ -69,6 +73,10 @@ impl From<CamlPlonkGateType> for GateType {
     }
 }
 
+//
+// CamlPlonkCol
+//
+
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub enum CamlPlonkCol {
     L,
@@ -108,6 +116,10 @@ impl From<CamlPlonkCol> for Col {
     }
 }
 
+//
+// CamlPlonkWire
+//
+
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPlonkWire {
     pub row: ocaml::Int,   // wire row
@@ -141,6 +153,10 @@ impl From<CamlPlonkWire> for Wire {
         Self::from(&wire)
     }
 }
+
+//
+// CamlPlonkWires
+//
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPlonkWires {
@@ -182,8 +198,15 @@ impl From<CamlPlonkWires> for Wires {
     }
 }
 
+//
+// CamlPlonkGate
+//
+
 #[derive(ocaml::ToValue, ocaml::FromValue)]
-pub struct CamlPlonkGate<T> {
+pub struct CamlPlonkGate<T>
+where
+    T: ocaml::ToValue + ocaml::FromValue,
+{
     pub typ: CamlPlonkGateType, // type of the gate
     pub wires: CamlPlonkWires,  // gate wires
     pub c: T,                   // constraints vector
