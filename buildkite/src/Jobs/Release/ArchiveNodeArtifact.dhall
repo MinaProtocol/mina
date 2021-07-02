@@ -66,25 +66,25 @@ Pipeline.build
           ]
         },
 
-        let devnetSpec = DockerImage.ReleaseSpec::{
-          deps=dependsOn,
-          deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
-          step_key="archive-devnet-docker-image"
-        }
+      let devnetSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+        step_key="archive-devnet-docker-image"
+      }
 
-        in
+      in
 
-        DockerImage.generateStep devnetSpec
+      DockerImage.generateStep devnetSpec,
 
-        let mainnetSpec = DockerImage.ReleaseSpec::{
-          deps=dependsOn,
-          deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
-          network=mainnet,
-          step_key="archive-mainnet-docker-image"
-        }
+      let mainnetSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+        network=mainnet,
+        step_key="archive-mainnet-docker-image"
+      }
 
-        in
+      in
 
-        DockerImage.generateStep mainnetSpec
+      DockerImage.generateStep mainnetSpec
     ]
   }
