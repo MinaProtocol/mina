@@ -1670,21 +1670,24 @@ let create ?wallets (config : Config.t) =
                       ~constants:consensus_constants ~time_received:now
                       consensus_state
                   with
-                  | Ok () ->
-                      (*Don't log rebroadcast message if it is internally generated; There is a broadcast log for it*)
-                      if
-                        not
-                          ([%equal: [ `Catchup | `Gossip | `Internal ]] source
-                             `Internal)
-                      then
-                        [%str_log' info config.logger]
-                          ~metadata:
-                            [ ( "external_transition"
-                              , External_transition.Validated.to_yojson
-                                  transition )
-                            ]
-                          (Rebroadcast_transition { state_hash = hash }) ;
-                      External_transition.Validated.broadcast transition
+                  | Ok () -> (
+                      match source with
+                      | `Gossip ->
+                          [%str_log' info config.logger]
+                            ~metadata:
+                              [ ( "external_transition"
+                                , External_transition.Validated.to_yojson
+                                    transition )
+                              ]
+                            (Rebroadcast_transition { state_hash = hash }) ;
+                          (*send callback to libp2p to forward the gossiped transition*)
+                          External_transition.Validated.accept transition
+                      | `Internal ->
+                          (*Send callback to publish the new block. Don't log rebroadcast message if it is internally generated; There is a broadcast log*)
+                          External_transition.Validated.accept transition
+                      | `Catchup ->
+                          (*Noop for directly downloaded transitions*)
+                          External_transition.Validated.accept transition )
                   | Error reason -> (
                       let timing_error_json =
                         match reason with
@@ -1701,7 +1704,7 @@ let create ?wallets (config : Config.t) =
                         ; ("timing", timing_error_json)
                         ]
                       in
-                      External_transition.Validated.don't_broadcast transition ;
+                      External_transition.Validated.reject transition ;
                       match source with
                       | `Catchup ->
                           ()

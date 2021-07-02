@@ -73,14 +73,22 @@ module Time = struct
           offset
       | None ->
           let offset =
+            let env = "MINA_TIME_OFFSET" in
+            (* TODO: remove eventually *)
+            let env_deprecated = "CODA_TIME_OFFSET" in
             let env_offset =
-              match Core.Sys.getenv "CODA_TIME_OFFSET" with
-              | Some tm ->
+              match (Core.Sys.getenv env, Core.Sys.getenv env_deprecated) with
+              | Some tm, _ ->
                   Int.of_string tm
-              | None ->
+              | _, Some tm ->
+                  [%log warn]
+                    "Using deprecated environment variable %s, please use %s \
+                     instead"
+                    env_deprecated env ;
+                  Int.of_string tm
+              | None, None ->
                   [%log debug]
-                    "Environment variable CODA_TIME_OFFSET not found, using \
-                     default of 0" ;
+                    "Environment variable %s not found, using default of 0" env ;
                   0
             in
             Core_kernel.Time.Span.of_int_sec env_offset

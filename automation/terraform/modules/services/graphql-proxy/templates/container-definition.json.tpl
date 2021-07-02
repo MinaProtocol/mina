@@ -54,7 +54,7 @@
         { "name" : "DAEMON_DISCOVERY_PORT", "value" : "${coda_discovery_port}" },
         { "name" : "DAEMON_METRICS_PORT", "value" : "${coda_metrics_port}" },
         { "name" : "DAEMON_CLIENT_PORT", "value" : "${coda_client_port}" },
-        { "name" : "CODA_PRIVKEY_PASS", "value" : "${coda_privkey_pass}" },
+        { "name" : "MINA_PRIVKEY_PASS", "value" : "${coda_privkey_pass}" },
         { "name" : "CODA_TESTNET", "value" : "${coda_testnet}" },
         { "name" : "CODA_ARCHIVE_NODE", "value" : "${coda_archive_node}" }
     ]

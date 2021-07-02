@@ -52,7 +52,7 @@ let medium_curves = false
 time_offsets = true]
 
 let setup_time_offsets consensus_constants =
-  Unix.putenv ~key:"CODA_TIME_OFFSET"
+  Unix.putenv ~key:"MINA_TIME_OFFSET"
     ~data:
       ( Time.Span.to_int63_seconds_round_down_exn
           (Coda_processes.offset consensus_constants)
@@ -95,7 +95,7 @@ let run_test () : unit Deferred.t =
     ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
-        match Unix.getenv "CODA_TRACING" with
+        match Unix.getenv "MINA_TRACING" with
         | Some trace_dir ->
             let%bind () = Async.Unix.mkdir ~p:() trace_dir in
             Coda_tracing.start trace_dir
