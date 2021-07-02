@@ -70,7 +70,7 @@ Pipeline.build
 
       let devnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file=${deployEnvFile},
+        deploy_env_file=deployEnvFile,
         step_key="archive-devnet-docker-image"
       }
 
@@ -80,8 +80,8 @@ Pipeline.build
 
       let mainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file=${deployEnvFile},
-        network=mainnet,
+        deploy_env_file=deployEnvFile,
+        network="mainnet",
         step_key="archive-mainnet-docker-image"
       }
 
