@@ -59,8 +59,8 @@ Pipeline.build
           retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
         },
 
-      -- devnet image
-      let devnetSpec = DockerImage.ReleaseSpec::{
+      -- daemon devnet image
+      let daemonDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-daemon",
         network="devnet",
@@ -69,10 +69,10 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep devnetSpec,
+      DockerImage.generateStep daemonDevnetSpec,
 
-      -- mainnet image
-      let mainnetSpec = DockerImage.ReleaseSpec::{
+      -- daemon mainnet image
+      let daemonMainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-daemon",
         network="mainnet",
@@ -81,8 +81,30 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep mainnetSpec,
+      DockerImage.generateStep daemonMainnetSpec,
 
+      -- archive devnet image
+      let archiveDevnetSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        deploy_env_file=deployEnvFile,
+        step_key="archive-devnet-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep archiveDevnetSpec,
+
+      -- archive mainnet image
+      let archiveMainnetSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        deploy_env_file=deployEnvFile,
+        network="mainnet",
+        step_key="archive-mainnet-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep archiveMainnetSpec
 
       -- rosetta image
       let rosettaSpec = DockerImage.ReleaseSpec::{

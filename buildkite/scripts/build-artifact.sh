@@ -39,6 +39,9 @@ dune build --profile=${DUNE_PROFILE} \
 echo "--- Build deb package without pvkeys"
 make deb
 
+echo "--- Build Archive Node debs"
+./scripts/archive/build-release-archives.sh
+
 echo "--- Upload deb to repo"
 make publish_debs
 
