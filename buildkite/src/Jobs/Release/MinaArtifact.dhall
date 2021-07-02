@@ -63,7 +63,7 @@ Pipeline.build
       let devnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-daemon",
-        network="devnet"
+        network="devnet",
         step_key="devnet-docker-image"
       }
 
@@ -75,7 +75,7 @@ Pipeline.build
       let mainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-daemon",
-        network="mainnet"
+        network="mainnet",
         step_key="mainnet-docker-image"
       }
 
