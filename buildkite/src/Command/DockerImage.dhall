@@ -39,7 +39,7 @@ let ReleaseSpec = {
     deb_version = "\\\${MINA_DEB_VERSION}",
     build_rosetta_override = False,
     extra_args = "",
-    step_key = "devnet-docker-image"
+    step_key = "daemon-devnet-docker-image"
   }
 }
 

@@ -7,8 +7,8 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifact", key = "devnet-docker-image" },
-    { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
+    { name = "MinaArtifact", key = "daemon-devnet-docker-image" },
+    { name = "ArchiveNodeArtifact", key = "archive-devnet-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{
