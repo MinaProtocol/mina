@@ -7,9 +7,11 @@ set -euo pipefail
 
 # Set up variables for build
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../../_build"
+cd "${SCRIPTPATH}/../.."
 
 source "buildkite/scripts/export-git-env-vars.sh"
+
+cd _build
 
 PROJECT="mina-archive"
 BUILD_DIR="deb_build"
