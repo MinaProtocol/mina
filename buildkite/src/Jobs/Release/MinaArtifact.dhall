@@ -104,7 +104,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep archiveMainnetSpec
+      DockerImage.generateStep archiveMainnetSpec,
 
       -- rosetta image
       let rosettaSpec = DockerImage.ReleaseSpec::{
