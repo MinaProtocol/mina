@@ -86,7 +86,7 @@ Pipeline.build
       -- archive devnet image
       let archiveDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file=deployEnvFile,
+        service="mina-archive",
         step_key="archive-devnet-docker-image"
       }
 
@@ -97,8 +97,8 @@ Pipeline.build
       -- archive mainnet image
       let archiveMainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file=deployEnvFile,
         network="mainnet",
+        service="mina-archive",
         step_key="archive-mainnet-docker-image"
       }
 
