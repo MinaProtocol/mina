@@ -20,6 +20,10 @@ function usage() {
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
   echo "  -c, --commit              The commit hash to be appended to the docker image tag"
+  echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
+  echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
+  echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
+  echo "      --deb-version         The version string for the debian package to install"
   echo ""
   echo "Example: $0 --service faucet --version v0.1.0 --commit abf678"
   echo "Valid Services: ${VALID_SERVICES[*]}"
@@ -32,6 +36,10 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
+  -n|--network) NETWORK="--build-arg network=$2"; shift;;
+  --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
+  --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
+  --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
   *) echo "Unknown parameter passed: $1"; exit 1;;
 esac; shift; done
@@ -82,9 +90,9 @@ esac
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')
 if [ -z "$DOCKER_CONTEXT" ]; then
-  cat $DOCKERFILE_PATH | docker build $extra_build_args -t codaprotocol/$SERVICE:$VERSION -
+  cat $DOCKERFILE_PATH | docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t codaprotocol/$SERVICE:$VERSION -
 else
-  docker build $extra_build_args $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
+  docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
 
 tag-and-push() {

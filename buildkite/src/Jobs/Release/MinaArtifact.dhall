@@ -59,23 +59,22 @@ Pipeline.build
           retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
         },
 
-      -- daemon image
-      let daemonSpec = DockerImage.ReleaseSpec::{
+      -- devnet image
+      let devnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        service="mina-daemon"
+        service="mina-daemon",
+        network="devnet"
       }
 
       in
 
-      DockerImage.generateStep daemonSpec,
+      DockerImage.generateStep devnetSpec,
 
       -- mainnet image
       let mainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-daemon",
-        version = "\\\${MINA_VERSION}-mainnet",
-        step_key="mainnet-docker-image",
-        extra_args = "--build-arg deb_version=\\\${MINA_DEB_VERSION} --build-arg deb_release=\\\${MINA_DEB_RELEASE} --build-arg deb_codename=\\\${MINA_DEB_CODENAME} --build-arg network=mainnet --build-arg MINA_VERSION=\\\${MINA_VERSION} --build-arg MINA_BRANCH=\\\${MINA_GIT_BRANCH}"
+        network="mainnet"
       }
 
       in

@@ -14,14 +14,6 @@ let DockerImage = ../../Command/DockerImage.dhall
 
 let dependsOn = [ { name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" } ]
 
-let spec = DockerImage.ReleaseSpec::{
-    deps=dependsOn,
-    deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
-    step_key="archive-docker-image"
-}
-
-in
-
 Pipeline.build
   Pipeline.Config::{
     spec =
@@ -71,6 +63,26 @@ Pipeline.build
             { name = "ArchiveRedundancyTools", key = "archive-redundancy-swap_bad_balances" }
           ]
         },
-      DockerImage.generateStep spec
+
+        let devnetSpec = DockerImage.ReleaseSpec::{
+          deps=dependsOn,
+          deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+          step_key="archive-devnet-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep devnetSpec
+
+        let mainnetSpec = DockerImage.ReleaseSpec::{
+          deps=dependsOn,
+          deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+          network=mainnet,
+          step_key="archive-mainnet-docker-image"
+        }
+
+        in
+
+        DockerImage.generateStep mainnetSpec
     ]
   }
