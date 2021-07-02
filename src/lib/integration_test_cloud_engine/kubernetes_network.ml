@@ -25,16 +25,6 @@ module Node = struct
 
   let base_kube_args t = [ "--cluster"; t.cluster; "--namespace"; t.namespace ]
 
-  (* let run_in_postgresql_container node ~cmd =
-     let base_args = base_kube_args node in
-     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
-     let kubectl_cmd =
-       Printf.sprintf "%s -c %s exec -i %s -- %s" base_kube_cmd
-         node.container_id node.pod_id cmd
-     in
-     let%bind cwd = Unix.getcwd () in
-     Util.run_cmd_exn cwd "sh" [ "-c"; kubectl_cmd ] *)
-
   let get_logs_in_container ?container node =
     let container_id : string =
       match container with None -> node.mina_container_id | Some id -> id
@@ -52,7 +42,7 @@ module Node = struct
     in
     Util.run_cmd_exn cwd "sh" [ "-c"; kubectl_cmd ]
 
-  let run_in_container node container_id ~cmd =
+  let run_in_container node ~container_id ~cmd =
     let base_args = base_kube_args node in
     let base_kube_cmd = "kubectl " ^ String.concat ~sep:" " base_args in
     let kubectl_cmd =
@@ -63,41 +53,63 @@ module Node = struct
     let%bind.Deferred cwd = Unix.getcwd () in
     Util.run_cmd_exn cwd "sh" [ "-c"; kubectl_cmd ]
 
-  let run_in_pod node ~cmd =
-    (* run the cmd in every single container in a pod *)
-    let call_run s =
-      (* (run_in_container node s ~cmd) Malleable_error.(>>=) Malleable_error.return Malleable_error.(>>|) Deferred.bind *)
-      let%map res = run_in_container node s ~cmd in
-      res
-    in
-    let foldh accum m =
-      let open Deferred.Let_syntax in
-      let%bind acc = accum in
-      Deferred.map m ~f:(function s -> acc ^ s)
-    in
-    let container_list : string list =
-      List.append [ node.mina_container_id ] []
-      (* (Option.to_list node.mina_archive_container_id) *)
-    in
-    let result_list = List.map container_list ~f:call_run in
-    List.fold result_list ~init:(Deferred.return "") ~f:foldh
+  (* we dont use this functionality atm but if we need logic that runs commands in all containers a whole pod at a time, here it is *)
+  (* let run_in_pod node ~cmd =
+     (* run the cmd in every single container in a pod *)
+     let call_run container_id =
+       let%map res = run_in_container node ~container_id ~cmd in
+       res
+     in
+     let foldh accum m =
+       let open Deferred.Let_syntax in
+       let%bind acc = accum in
+       Deferred.map m ~f:(function s -> acc ^ s)
+     in
+     let container_list : string list =
+       List.append [ node.mina_container_id ]
+       (Option.to_list node.mina_archive_container_id)
+     in
+     let result_list = List.map container_list ~f:call_run in
+     List.fold result_list ~init:(Deferred.return "") ~f:foldh *)
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
-    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"ps aux") in
+    let%bind _ =
+      Malleable_error.return
+        (run_in_container node ~container_id:node.mina_container_id
+           ~cmd:"ps aux")
+    in
     let%bind _ =
       if fresh_state then
-        Malleable_error.return (run_in_pod node ~cmd:"rm -rf .mina-config/*")
+        Malleable_error.return
+          (run_in_container node ~container_id:node.mina_container_id
+             ~cmd:"rm -rf .mina-config/*")
       else Malleable_error.return (Deferred.return "")
     in
-    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"/start.sh") in
+    let%bind _ =
+      Malleable_error.return
+        (run_in_container node ~container_id:node.mina_container_id
+           ~cmd:"/start.sh")
+    in
     Malleable_error.return ()
 
   let stop node =
     let open Malleable_error.Let_syntax in
-    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"ps aux") in
-    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"/stop.sh") in
-    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"ps aux") in
+    let%bind _ =
+      Malleable_error.return
+        (run_in_container node ~container_id:node.mina_container_id
+           ~cmd:"ps aux")
+    in
+    let%bind _ =
+      Malleable_error.return
+        (run_in_container node ~container_id:node.mina_container_id
+           ~cmd:"/stop.sh")
+    in
+    let%bind _ =
+      Malleable_error.return
+        (run_in_container node ~container_id:node.mina_container_id
+           ~cmd:"ps aux")
+    in
     return ()
 
   let get_pod_name t : string Malleable_error.t =
@@ -393,7 +405,7 @@ module Node = struct
       archive_container_id ;
     let%map data =
       Deferred.bind ~f:Malleable_error.return
-        (run_in_container t archive_container_id
+        (run_in_container t ~container_id:archive_container_id
            ~cmd:
              "pg_dump --create --no-owner \
               postgres://postgres:foobar@archive-1-postgresql:5432/archive")
