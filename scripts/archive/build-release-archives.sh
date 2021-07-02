@@ -62,7 +62,7 @@ ls -lh mina*.deb
 
 ###### archiver deb with testnet signatures
 
-rm -r "${BUILD_DIR}"
+rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PROJECT}-devnet
@@ -109,7 +109,7 @@ ls -lh mina*.deb
 
 ###### archiver deb with mainnet signatures
 
-rm -r "${BUILD_DIR}"
+rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PROJECT}-mainnet
