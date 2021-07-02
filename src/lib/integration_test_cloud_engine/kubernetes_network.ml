@@ -61,44 +61,43 @@ module Node = struct
         base_kube_cmd container_id base_kube_cmd node.pod_id cmd
     in
     let%bind.Deferred cwd = Unix.getcwd () in
-    Malleable_error.return (Util.run_cmd_exn cwd "sh" [ "-c"; kubectl_cmd ])
+    Util.run_cmd_exn cwd "sh" [ "-c"; kubectl_cmd ]
 
   let run_in_pod node ~cmd =
     (* run the cmd in every single container in a pod *)
     let call_run s =
       (* (run_in_container node s ~cmd) Malleable_error.(>>=) Malleable_error.return Malleable_error.(>>|) Deferred.bind *)
-      let open Malleable_error.Let_syntax in
-      let%bind deferred_a = run_in_container node s ~cmd in
-      let%map a = Deferred.bind ~f:Malleable_error.return deferred_a in
-      a
+      let%map res = run_in_container node s ~cmd in
+      res
     in
     let foldh accum m =
-      let open Malleable_error.Let_syntax in
+      let open Deferred.Let_syntax in
       let%bind acc = accum in
-      Malleable_error.map m ~f:(function s -> acc ^ s)
+      Deferred.map m ~f:(function s -> acc ^ s)
     in
     let container_list : string list =
       List.append [ node.mina_container_id ] []
       (* (Option.to_list node.mina_archive_container_id) *)
     in
     let result_list = List.map container_list ~f:call_run in
-    List.fold result_list ~init:(Malleable_error.return "") ~f:foldh
+    List.fold result_list ~init:(Deferred.return "") ~f:foldh
 
   let start ~fresh_state node : unit Malleable_error.t =
     let open Malleable_error.Let_syntax in
-    let%bind _ = run_in_pod node ~cmd:"ps aux" in
+    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"ps aux") in
     let%bind _ =
-      if fresh_state then run_in_pod node ~cmd:"rm -rf .mina-config/*"
-      else Malleable_error.return ""
+      if fresh_state then
+        Malleable_error.return (run_in_pod node ~cmd:"rm -rf .mina-config/*")
+      else Malleable_error.return (Deferred.return "")
     in
-    let%bind _ = run_in_pod node ~cmd:"/start.sh" in
+    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"/start.sh") in
     Malleable_error.return ()
 
   let stop node =
     let open Malleable_error.Let_syntax in
-    let%bind _ = run_in_pod node ~cmd:"ps aux" in
-    let%bind _ = run_in_pod node ~cmd:"/stop.sh" in
-    let%bind _ = run_in_pod node ~cmd:"ps aux" in
+    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"ps aux") in
+    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"/stop.sh") in
+    let%bind _ = Malleable_error.return (run_in_pod node ~cmd:"ps aux") in
     return ()
 
   let get_pod_name t : string Malleable_error.t =
@@ -382,7 +381,7 @@ module Node = struct
 
   let dump_archive_data ~logger (t : t) ~data_file =
     (* this function won't work if t doesn't happen to be an archive node *)
-    let container_id =
+    let archive_container_id =
       if Option.is_none t.mina_archive_container_id then
         failwith
           "Trying to dump logs of archive node but there is no archive \
@@ -391,15 +390,14 @@ module Node = struct
     in
     let open Malleable_error.Let_syntax in
     [%log info] "Dumping archive data from (node: %s, container: %s)" t.pod_id
-      container_id ;
-    let%bind dat =
-      (* (Deferred.bind ~f:Malleable_error.return *)
-      run_in_container t container_id
-        ~cmd:
-          "pg_dump --create --no-owner \
-           postgres://postgres:foobar@archive-1-postgresql:5432/archive"
+      archive_container_id ;
+    let%map data =
+      Deferred.bind ~f:Malleable_error.return
+        (run_in_container t archive_container_id
+           ~cmd:
+             "pg_dump --create --no-owner \
+              postgres://postgres:foobar@archive-1-postgresql:5432/archive")
     in
-    let%map data = Deferred.bind ~f:Malleable_error.return dat in
     [%log info] "Dumping archive data to file %s" data_file ;
     Out_channel.with_file data_file ~f:(fun out_ch ->
         Out_channel.output_string out_ch data)
