@@ -27,15 +27,15 @@ let ReleaseSpec = {
     deps = [] : List Command.TaggedKey.Type,
     deploy_env_file = "DOCKER_DEPLOY_ENV",
     network = "devnet",
+    version = "\\\${MINA_VERSION}",
     service = "\\\${MINA_SERVICE}",
-    version = "\\\${MINA_VERSION}-${spec.network}",
     commit = "\\\${MINA_GIT_HASH}",
     deb_codename = "\\\${MINA_DEB_CODENAME}",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
     build_rosetta_override = False,
     extra_args = "",
-    step_key = "${spec.network}-docker-image"
+    step_key = "devnet-docker-image"
   }
 }
 
@@ -52,7 +52,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
         ),
         Cmd.run (
           "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
-              "--service ${spec.service} --version ${spec.version} --commit ${spec.commit} --network ${spec.network} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version}-${spec.network} --commit ${spec.commit} --network ${spec.network} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
 

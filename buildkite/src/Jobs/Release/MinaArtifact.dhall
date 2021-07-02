@@ -64,6 +64,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-daemon",
         network="devnet"
+        step_key="devnet-docker-image"
       }
 
       in
@@ -75,6 +76,7 @@ Pipeline.build
         deps=dependsOn,
         service="mina-daemon",
         network="mainnet"
+        step_key="mainnet-docker-image"
       }
 
       in
