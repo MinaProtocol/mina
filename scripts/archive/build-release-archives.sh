@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Set up variables for build
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../.."
+cd "${SCRIPTPATH}/../../_build"
 
 source "buildkite/scripts/export-git-env-vars.sh"
 
