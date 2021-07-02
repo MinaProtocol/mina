@@ -14,6 +14,8 @@ let DockerImage = ../../Command/DockerImage.dhall
 
 let dependsOn = [ { name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" } ]
 
+let deployEnvFile = "ARCHIVE_DOCKER_DEPLOY"
+
 in
 
 Pipeline.build
@@ -50,7 +52,7 @@ Pipeline.build
             #
 
             [
-              Cmd.run "artifact-cache-helper.sh ./ARCHIVE_DOCKER_DEPLOY --upload"
+              Cmd.run "artifact-cache-helper.sh ./${deployEnvFile} --upload"
             ],
           label = "Build Archive node debian package",
           key = "build-archive-deb-pkg",
@@ -68,7 +70,7 @@ Pipeline.build
 
       let devnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+        deploy_env_file=deployEnvFile,
         step_key="archive-devnet-docker-image"
       }
 
@@ -78,7 +80,7 @@ Pipeline.build
 
       let mainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="ARCHIVE_DOCKER_DEPLOY",
+        deploy_env_file=deployEnvFile,
         network="mainnet",
         step_key="archive-mainnet-docker-image"
       }
