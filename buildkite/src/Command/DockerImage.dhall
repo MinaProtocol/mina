@@ -65,7 +65,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     Command.build
       Command.Config::{
         commands  = commands,
-        label = "Build and release Docker images: ${spec.step_key}",
+        label = "Release Docker Image: ${Text/replace "-docker-image" "" spec.step_key}",
         key = spec.step_key,
         target = Size.XLarge,
         docker_login = Some DockerLogin::{=},
