@@ -14,6 +14,8 @@ let DockerImage = ../../Command/DockerImage.dhall
 
 let dependsOn = [ { name = "ArchiveNodeArtifact", key = "build-archive-deb-pkg" } ]
 
+in
+
 Pipeline.build
   Pipeline.Config::{
     spec =
