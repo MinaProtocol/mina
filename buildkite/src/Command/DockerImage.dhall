@@ -16,9 +16,13 @@ let ReleaseSpec = {
   Type = {
     deps : List Command.TaggedKey.Type,
     deploy_env_file : Text,
+    network: Text,
     service: Text,
     version: Text,
     commit: Text,
+    deb_codename: Text,
+    deb_release: Text,
+    deb_version: Text,
     build_rosetta_override: Bool,
     extra_args: Text,
     step_key: Text
