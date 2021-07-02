@@ -26,10 +26,7 @@ apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 rm ~/.mina-config/.mina-lock ||:
 
 # Restart in the background
-mina daemon \
-  --peer-list-url https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt \
-  --config-file ./automation/terraform/testnets/$TESTNET_NAME/genesis_ledger.json \
-  & # -background
+mina daemon & # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
 num_status_retries=24
