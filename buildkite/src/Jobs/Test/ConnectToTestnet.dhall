@@ -6,7 +6,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 
 let dependsOn = [
-    { name = "MinaArtifact", key = "mainnet-docker-image" }
+    { name = "MinaArtifact", key = "daemon-mainnet-docker-image" }
 ]
 
 in Pipeline.build Pipeline.Config::{
