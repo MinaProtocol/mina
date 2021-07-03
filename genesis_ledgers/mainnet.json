@@ -1,7 +1,4 @@
 {
-  "daemon": {
-    "peer-list-url": "https://storage.googleapis.com/mina-seed-lists/mainnet_seeds.txt"
-  },
   "genesis": {
     "genesis_state_timestamp": "2021-03-17T00:00:00Z"
   },

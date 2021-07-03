@@ -1,7 +1,4 @@
 {
-  "daemon": {
-    "peer-list-url": "https://storage.googleapis.com/seed-lists/devnet_seeds.txt"
-  },
   "genesis": {
     "genesis_state_timestamp": "2021-03-09T05:09:07Z"
   },

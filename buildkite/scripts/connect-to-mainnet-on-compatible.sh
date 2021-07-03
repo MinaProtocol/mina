@@ -26,7 +26,9 @@ apt-get install --allow-downgrades -y "mina-${TESTNET_NAME}=${MINA_DEB_VERSION}"
 rm ~/.mina-config/.mina-lock ||:
 
 # Restart in the background
-mina daemon & # -background
+mina daemon \
+  --peer-list-url "https://storage.googleapis.com/seed-lists/${TESTNET_NAME}_seeds.txt" \
+& # -background
 
 # Attempt to connect to the GraphQL client every 10s for up to 4 minutes
 num_status_retries=24
