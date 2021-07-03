@@ -28,12 +28,10 @@ export BUILD_URL=${BUILDKITE_BUILD_URL}
 
 if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export VERSION="${GITTAG}-${GITHASH}"
-    export GENERATE_KEYPAIR_VERSION=${VERSION}
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
 else
     export VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
     export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
-    export GENERATE_KEYPAIR_VERSION=${GITTAG}-${GITHASH}
 fi
 
 export MINA_DOCKER_TAG=${DOCKER_TAG}

@@ -47,7 +47,7 @@ mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
 Package: mina-generate-keypair
-Version: ${GENERATE_KEYPAIR_VERSION}
+Version: ${VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
@@ -78,7 +78,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${GENERATE_KEYPAIR_VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${VERSION}.deb
 ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
