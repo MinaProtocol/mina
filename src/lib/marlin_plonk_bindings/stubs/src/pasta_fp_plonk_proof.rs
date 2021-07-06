@@ -1,29 +1,26 @@
+use crate::arkworks::{CamlFp, CamlGVesta};
+use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
+use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use crate::pasta_fp_vector::CamlPastaFpVector;
+use ark_ec::AffineCurve;
+use ark_ff::One;
+use commitment_dlog::commitment::caml::CamlPolyComm;
+use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
+use groupmap::GroupMap;
 use mina_curves::pasta::{
-        vesta::{Affine as GAffine, VestaParameters},
-        fp::Fp,
-        fq::Fq,
+    fp::Fp,
+    fq::Fq,
+    vesta::{Affine as GAffine, VestaParameters},
 };
-use algebra::{
-    curves::AffineCurve,
-    One,
-};
-
-use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
-
 use oracle::{
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge},
 };
-
-use groupmap::GroupMap;
-
-use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
+use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
 use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
+use plonk_protocol_dlog::prover::caml::CamlProverProof;
 use plonk_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
 
-use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
-use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
-use crate::pasta_fp_vector::CamlPastaFpVector;
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_create(

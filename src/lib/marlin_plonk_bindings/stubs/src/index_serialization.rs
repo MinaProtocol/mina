@@ -1,14 +1,12 @@
-use algebra::{
-    curves::AffineCurve,
-    fields::{Field, PrimeField},
-    FromBytes, ToBytes,
+use ark_ec::AffineCurve;
+use ark_ff::{Field, FromBytes, PrimeField, ToBytes};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain,
 };
-
 use commitment_dlog::{
     commitment::{CommitmentCurve, CommitmentField, PolyComm},
-    srs::{SRS, SRSValue as PlonkSRSValue},
+    srs::{SRSValue as PlonkSRSValue, SRS},
 };
-use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations, Radix2EvaluationDomain as Domain};
 use oracle::poseidon::ArithmeticSpongeParams;
 use plonk_circuits::{
     constraints::{zk_polynomial, zk_w, ConstraintSystem as PlonkConstraintSystem},

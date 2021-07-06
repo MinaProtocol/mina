@@ -1,11 +1,10 @@
+use crate::arkworks::{CamlFp, CamlFq, CamlGVesta, CamlGroupProjectiveVesta};
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ff::{One, UniformRand};
 use mina_curves::pasta::{
-    vesta::{Affine as GAffine, Projective as GProjective},
     fp::Fp,
     fq::Fq,
-};
-use algebra::{
-    curves::{AffineCurve, ProjectiveCurve},
-    One, UniformRand,
+    vesta::{Affine as GAffine, Projective},
 };
 use rand::rngs::StdRng;
 
