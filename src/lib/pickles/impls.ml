@@ -38,7 +38,8 @@ module Step = struct
     let forbidden_shifted_values =
       forbidden_shifted_values ~size_in_bits:Constant.size_in_bits
         ~max_size:B.(Field.size * of_int 2)
-        ~modulus:(Wrap_impl.Bigint.to_bignum_bigint Constant.size) ~f:(fun x ->
+        ~modulus:(Wrap_impl.Bigint.to_bignum_bigint Constant.size)
+        ~f:(fun x ->
           let hi = test_bit x (Field.size_in_bits - 1) in
           let lo = B.shift_right x 1 in
           (Impl.Bigint.(to_field (of_bignum_bigint lo)), hi))
