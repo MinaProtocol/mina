@@ -30,7 +30,7 @@
   "devDependencies": {
     "bs-platform": "^7.0.2-dev.2",
     "gentype": "^3.11.0",
-    "typescript": "^3.7.5"
+    "typescript": "^3.8.2"
   },
   "dependencies": {
     "@types/node": "^13.7.0"

@@ -9,16 +9,15 @@ module Make_terminal_stdin (KP : sig
 
   val env : string
 
+  val env_deprecated : string
+
   val read :
        privkey_path:string
     -> password:Secret_file.password
     -> (t, Privkey_error.t) Deferred.Result.t
 
   val write_exn :
-       t
-    -> privkey_path:string
-    -> password:Secret_file.password
-    -> unit Deferred.t
+    t -> privkey_path:string -> password:Secret_file.password -> unit Deferred.t
 end) =
 struct
   open KP
@@ -35,15 +34,25 @@ struct
   let read_exn ?(should_reask = true) ~which path =
     let read_privkey password = read ~privkey_path:path ~password in
     let%bind result =
-      match Sys.getenv env with
-      | Some password ->
+      match (Sys.getenv env, Sys.getenv env_deprecated) with
+      | Some password, _ ->
           (* this function is only called from client commands that can prompt for
              a password, so printing a message, rather than a formatted log, is OK
           *)
           printf "Using %s private-key password from environment variable %s\n"
             which env ;
           read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
-      | None ->
+      | None, Some password ->
+          (* this function is only called from client commands that can prompt for
+             a password, so printing a message, rather than a formatted log, is OK
+          *)
+          printf
+            "Using %s private-key password from deprecated environment \
+             variable %s\n"
+            which env_deprecated ;
+          printf "Please use environment variable %s instead\n" env ;
+          read_privkey (lazy (Deferred.return @@ Bytes.of_string password))
+      | None, None ->
           let read_file () =
             read_privkey
               ( lazy

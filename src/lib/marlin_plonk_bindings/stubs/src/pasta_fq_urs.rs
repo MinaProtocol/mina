@@ -1,7 +1,5 @@
-use algebra::{
-    pasta::{pallas::Affine as GAffine, fq::Fq},
-    One, Zero,
-};
+use mina_curves::pasta::{pallas::Affine as GAffine, fq::Fq};
+use algebra::{One, Zero};
 use ff_fft::{DensePolynomial, EvaluationDomain, Evaluations};
 
 use commitment_dlog::{

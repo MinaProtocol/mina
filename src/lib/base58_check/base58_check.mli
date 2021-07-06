@@ -29,5 +29,6 @@ end) : sig
   (** decode Base58Check result into payload *)
   val decode : string -> string Or_error.t
 end
+[@@warning "-67"]
 
 module Version_bytes : module type of Version_bytes

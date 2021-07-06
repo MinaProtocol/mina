@@ -19,11 +19,13 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let n = 3 in
     let open Test_config in
     { default with
-      requires_graphql= true
-    ; block_producers=
+      requires_graphql = true
+    ; block_producers =
         List.init n ~f:(fun _ ->
-            {Block_producer.balance= block_producer_balance; timing= Untimed}
-        ) }
+            { Block_producer.balance = block_producer_balance
+            ; timing = Untimed
+            })
+    }
 
   let wait_for_all_to_initialize ~logger network t =
     let open Malleable_error.Let_syntax in
@@ -34,11 +36,11 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         [%log info]
           "gossip_consistency test: Block producer %d (of %d) initialized"
           (i + 1) n ;
-        () )
+        ())
     |> Malleable_error.all_unit
 
-  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee
-      ~node n =
+  let send_payments ~logger ~sender_pub_key ~receiver_pub_key ~amount ~fee ~node
+      n =
     let open Malleable_error.Let_syntax in
     let rec go n =
       if n = 0 then return ()
@@ -55,8 +57,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     in
     go n
 
-  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount
-      n =
+  let wait_for_payments ~logger ~dsl ~sender_pub_key ~receiver_pub_key ~amount n
+      =
     let open Malleable_error.Let_syntax in
     let rec go n =
       if n = 0 then return ()
@@ -65,8 +67,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         let%bind () =
           let%map () =
             wait_for dsl
-              (Wait_condition.payment_to_be_included_in_frontier
-                 ~sender_pub_key ~receiver_pub_key ~amount)
+              (Wait_condition.payment_to_be_included_in_frontier ~sender_pub_key
+                 ~receiver_pub_key ~amount)
           in
           [%log info]
             "gossip_consistency test: payment #%d successfully included in \
@@ -103,8 +105,8 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       "gossip_consistency test: sending payments done. will now wait for \
        payments" ;
     let%bind () =
-      wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key
-        ~amount num_payments
+      wait_for_payments ~logger ~dsl:t ~sender_pub_key ~receiver_pub_key ~amount
+        num_payments
     in
     [%log info] "gossip_consistency test: finished waiting for payments" ;
     let gossip_states = (network_state t).gossip_received in
@@ -140,23 +142,23 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     let `Seen_by_all inter, `Seen_by_some union =
       Gossip_state.stats Transactions_gossip
         (Map.data (network_state t).gossip_received)
-        ~exclusion_list:[Network.Node.id sender_bp]
+        ~exclusion_list:[ Network.Node.id sender_bp ]
     in
     [%log info] "gossip_consistency test: inter = %d; union = %d " inter union ;
     let ratio =
       if union = 0 then 1. else Float.of_int inter /. Float.of_int union
       (* Gossip_state.consistency_ratio Transactions_gossip
-        (Map.data (network_state t).gossip_received) *)
+         (Map.data (network_state t).gossip_received) *)
     in
     [%log info] "gossip_consistency test: consistency ratio = %f" ratio ;
     let threshold = 0.95 in
     let%map () =
-      if ratio < threshold then (
+      if Float.(ratio < threshold) then (
         let result =
           Malleable_error.soft_error_string ~value:()
             (Printf.sprintf
-               "consistency ratio = %f, which is less than threshold = %f"
-               ratio threshold)
+               "consistency ratio = %f, which is less than threshold = %f" ratio
+               threshold)
         in
         [%log error]
           "gossip_consistency test: TEST FAILURE. consistency ratio = %f, \

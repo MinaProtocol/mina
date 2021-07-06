@@ -88,7 +88,7 @@ let command_prune =
            Caqti_async.connect postgres.value
          in
          let%bind () = Conn.start () in
-         match%bind.Async
+         match%bind.Async.Deferred
            let%bind () =
              Archive_lib.Processor.Block.delete_if_older_than ?height
                ?num_blocks ?timestamp conn
@@ -98,7 +98,7 @@ let command_prune =
          | Ok () ->
              return ()
          | Error err ->
-             let%bind.Async _ = Conn.rollback () in
+             let%bind.Async.Deferred _ = Conn.rollback () in
              Deferred.Result.fail err
        in
        let logger = Logger.create () in
@@ -109,7 +109,7 @@ let command_prune =
            ; Option.map timestamp ~f:(fun v ->
                  ("timestamp", `String (Int64.to_string v)) ) ]
        in
-       match%map.Async go () with
+       match%map.Async.Deferred go () with
        | Ok () ->
            [%log info] "Successfully purged blocks." ~metadata:cmd_metadata
        | Error err ->

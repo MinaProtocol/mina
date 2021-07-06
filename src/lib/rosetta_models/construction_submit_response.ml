@@ -7,10 +7,11 @@
  *)
 
 type t =
-  { transaction_identifier: Transaction_identifier.t
-  ; metadata: Yojson.Safe.t option [@default None] }
-[@@deriving yojson {strict= false}, show]
+  { transaction_identifier : Transaction_identifier.t
+  ; metadata : Yojson.Safe.t option [@default None]
+  }
+[@@deriving yojson { strict = false }, show]
 
 (** A TransactionSubmitResponse contains the transaction_identifier of a submitted transaction that was accepted into the mempool. *)
 let create (transaction_identifier : Transaction_identifier.t) : t =
-  {transaction_identifier; metadata= None}
+  { transaction_identifier; metadata = None }

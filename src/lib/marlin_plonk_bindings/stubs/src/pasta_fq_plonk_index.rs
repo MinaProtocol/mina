@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use algebra::pasta::{
+use mina_curves::pasta::{
     vesta::Affine as GAffineOther,
     pallas::{Affine as GAffine, PallasParameters},
     fq::Fq,
@@ -11,8 +11,8 @@ use plonk_circuits::wires::{Col::*, GateWires, Wire};
 
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
 
-use commitment_dlog::srs::SRS;
-use plonk_protocol_dlog::index::{Index as DlogIndex, SRSSpec};
+use commitment_dlog::srs::{SRS, SRSSpec};
+use plonk_protocol_dlog::index::Index as DlogIndex;
 
 use std::{
     fs::{File, OpenOptions},

@@ -4,7 +4,7 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, equal, hash]
   end
 end]
 
@@ -42,8 +42,7 @@ module C = Container.Make (struct
   let length = `Define_using_fold
 end)
 
-[%%define_locally
-C.(find, find_map, iter, length)]
+[%%define_locally C.(find, find_map, iter, length)]
 
 let fold (x, xs) ~init ~f = List.fold xs ~init:(init x) ~f
 
@@ -61,11 +60,11 @@ let take (x, xs) = function
 
 let min_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun mininum ->
-      if compare x mininum < 0 then x else mininum )
+      if compare x mininum < 0 then x else mininum)
 
 let max_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.max_elt ~compare xs) ~f:(fun maximum ->
-      if compare x maximum > 0 then x else maximum )
+      if compare x maximum > 0 then x else maximum)
 
 let rec iter_deferred (x, xs) ~f =
   let open Async_kernel in

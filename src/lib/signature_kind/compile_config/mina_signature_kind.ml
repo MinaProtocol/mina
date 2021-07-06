@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 type t = Testnet | Mainnet
 
-[%%if
-mainnet]
+[%%if mainnet]
 
 let t = Mainnet
 

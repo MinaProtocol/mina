@@ -1,12 +1,10 @@
 (* user_command_memo.ml *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Crypto_params
 
@@ -15,7 +13,7 @@ open Crypto_params
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = string [@@deriving sexp, eq, compare, hash]
+    type t = string [@@deriving sexp, equal, compare, hash]
 
     let to_latest = Fn.id
 
@@ -41,8 +39,7 @@ module Stable = struct
   end
 end]
 
-[%%define_locally
-Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
+[%%define_locally Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
 
 exception Too_long_user_memo_input
 
@@ -99,7 +96,7 @@ let create_by_digesting_string_exn s =
   String.init memo_length ~f:(fun ndx ->
       if Int.(ndx = tag_index) then digest_tag
       else if Int.(ndx = length_index) then digest_length_byte
-      else digest.[ndx - 2] )
+      else digest.[ndx - 2])
 
 let create_by_digesting_string (s : string) =
   try Ok (create_by_digesting_string_exn s)
@@ -122,7 +119,7 @@ let create_from_value_exn (type t) (module M : Memoable with type t = t)
       if Int.(ndx = tag_index) then bytes_tag
       else if Int.(ndx = length_index) then Char.of_int_exn len
       else if Int.(ndx < len + 2) then M.get value (ndx - 2)
-      else '\x00' )
+      else '\x00')
 
 let create_from_bytes_exn bytes = create_from_value_exn (module Bytes) bytes
 
@@ -145,7 +142,7 @@ let dummy = (create_by_digesting_string_exn "" :> t)
 let empty = create_from_string_exn ""
 
 let fold_bits t =
-  { Fold_lib.Fold.fold=
+  { Fold_lib.Fold.fold =
       (fun ~init ~f ->
         let n = 8 * String.length t in
         let rec go acc i =
@@ -154,12 +151,12 @@ let fold_bits t =
             let b = (Char.to_int t.[i / 8] lsr (i mod 8)) land 1 = 1 in
             go (f acc b) (i + 1)
         in
-        go init 0 ) }
+        go init 0)
+  }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Boolean = Tick.Boolean
 module Typ = Tick.Typ
@@ -204,7 +201,7 @@ let%test_module "user_command_memo" =
         String.init (max_digestible_string_length + 1) ~f:(fun _ -> '\xFF')
       in
       try
-        let _ = create_by_digesting_string_exn s in
+        let (_ : t) = create_by_digesting_string_exn s in
         false
       with Too_long_digestible_string -> true
 
@@ -216,12 +213,11 @@ let%test_module "user_command_memo" =
     let%test "memo from too-long string" =
       let s = String.init (max_input_length + 1) ~f:(fun _ -> '\xFF') in
       try
-        let _ = create_from_string_exn s in
+        let (_ : t) = create_from_string_exn s in
         false
       with Too_long_user_memo_input -> true
 
-    [%%ifdef
-    consensus_mechanism]
+    [%%ifdef consensus_mechanism]
 
     let%test_unit "typ is identity" =
       let s = "this is a string" in
@@ -234,11 +230,10 @@ let%test_module "user_command_memo" =
       in
       let memo_var =
         Snarky_backendless.Typ_monads.Store.run (typ.store memo) (fun x ->
-            Snarky_backendless.Cvar.Constant x )
+            Snarky_backendless.Cvar.Constant x)
       in
       let memo_read =
-        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var)
-          read_constant
+        Snarky_backendless.Typ_monads.Read.run (typ.read memo_var) read_constant
       in
       [%test_eq: string] memo memo_read
 

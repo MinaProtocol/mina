@@ -22,19 +22,25 @@ let brew_install_path =
       "/usr/local/var/coda"
 
 let cache =
-  let dir d w = Key_cache.Spec.On_disk {directory= d; should_write= w} in
+  let dir d w = Key_cache.Spec.On_disk { directory = d; should_write = w } in
   [ dir manual_install_path false
   ; dir brew_install_path false
   ; dir s3_install_path false
   ; dir autogen_path true
   ; Key_cache.Spec.S3
-      {bucket_prefix= s3_keys_bucket_prefix; install_path= s3_install_path} ]
+      { bucket_prefix = s3_keys_bucket_prefix; install_path = s3_install_path }
+  ]
 
 let env_path =
-  match Sys.getenv "CODA_KEYS_PATH" with
-  | Some path ->
+  (* TODO: remove deprecated variable, eventually *)
+  let mina_keys_path = "MINA_KEYS_PATH" in
+  let coda_keys_path = "CODA_KEYS_PATH" in
+  match (Sys.getenv mina_keys_path, Sys.getenv coda_keys_path) with
+  | Some path, _ ->
       path
-  | None ->
+  | None, Some path ->
+      path
+  | None, None ->
       manual_install_path
 
 let possible_paths base =
@@ -43,7 +49,8 @@ let possible_paths base =
     ; brew_install_path
     ; s3_install_path
     ; autogen_path
-    ; manual_install_path ] ~f:(fun d -> d ^/ base)
+    ; manual_install_path
+    ] ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   Deferred.map ~f:Result.join
@@ -53,7 +60,8 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
            [%log trace] "Downloading file from S3"
              ~metadata:
                [ ("url", `String uri_string)
-               ; ("local_file_path", `String file_path) ] ;
+               ; ("local_file_path", `String file_path)
+               ] ;
            let%map _result =
              Process.run_exn ~prog:"curl"
                ~args:
@@ -62,16 +70,18 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
                  ; "--show-error"
                  ; "-o"
                  ; file_path
-                 ; uri_string ]
+                 ; uri_string
+                 ]
                ()
            in
            [%log trace] "Download finished"
              ~metadata:
                [ ("url", `String uri_string)
-               ; ("local_file_path", `String file_path) ] ;
+               ; ("local_file_path", `String file_path)
+               ] ;
            Result.return ()
          in
          Deferred.List.map ~f:each_uri
            (List.zip_exn s3_bucket_prefix s3_install_path)
-         |> Deferred.map ~f:Result.all_unit )
+         |> Deferred.map ~f:Result.all_unit)
   |> Deferred.Result.map_error ~f:Error.of_exn
