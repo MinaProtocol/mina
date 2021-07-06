@@ -155,6 +155,71 @@ let _ =
     end)
 
 let _ =
+  let open Pasta_fq in
+  Js.export "pasta_fq"
+    (object%js (_self)
+       method sizeInBits = size_in_bits ()
+
+       method size = size ()
+
+       method add x y = add x y
+
+       method sub x y = sub x y
+
+       method negate x = negate x
+
+       method mul x y = mul x y
+
+       method div x y = div x y
+
+       method inv x = inv x
+
+       method square x = square x
+
+       method sqrt x = sqrt x
+
+       method ofInt x = of_int x
+
+       method toString x = to_string x
+
+       method ofString x = of_string x
+
+       method print x = print x
+
+       method copy x y = copy ~over:x y
+
+       method mutAdd x y = mut_add x ~other:y
+
+       method mutSub x y = mut_sub x ~other:y
+
+       method mutMul x y = mut_sub x ~other:y
+
+       method mutSquare x = mut_square x
+
+       method compare x y = compare x y
+
+       method equal x y = equal x y
+
+       method random = random ()
+
+       method rng i = rng i
+
+       method toBigint x = to_bigint x
+
+       method ofBigint x = of_bigint x
+
+       method twoAdicRootOfUnity = two_adic_root_of_unity ()
+
+       method domainGenerator i = domain_generator i
+
+       method toBytes x = to_bytes x
+
+       method ofBytes x = of_bytes x
+
+       method deepCopy x = deep_copy x
+    end)
+
+let _ =
   let open Bigint_256 in
   Js.export "bigint_256_test"
     (object%js (_self)
@@ -194,6 +259,65 @@ let _ =
            String.equal
              (Bigint_256.to_string size)
              "28948022309329048855892746252171976963363056481941560715954676764349967630337"
+         ) ;
+         let one = of_int 1 in
+         let two = of_string "2" in
+         let rand1 = random () in
+         let rand2 = rng 15 in
+         let ten = of_bigint (Bigint_256.of_decimal_string "10") in
+         let eleven = of_bigint (Bigint_256.of_decimal_string "11") in
+         let twenty_one = add ten eleven in
+         let one_again = sub eleven ten in
+         let twenty = mul two ten in
+         let five = div ten two in
+         assert (String.equal (to_string twenty_one) "21") ;
+         assert (String.equal (to_string one_again) "1") ;
+         assert (String.equal (to_string twenty) "20") ;
+         assert (String.equal (to_string five) "5") ;
+         assert (equal (of_string "5") five) ;
+         assert (equal (of_string (to_string five)) five) ;
+         assert (
+           equal twenty_one
+             ( match sqrt (square twenty_one) with
+             | Some x ->
+                 x
+             | None ->
+                 assert false ) ) ;
+         print twenty_one ;
+         copy ~over:eleven twenty_one ;
+         assert (equal eleven twenty_one) ;
+         assert (String.equal (to_string eleven) "21") ;
+         mut_add one_again ~other:ten ;
+         assert (String.equal (to_string one_again) "11") ;
+         mut_sub one_again ~other:one ;
+         assert (String.equal (to_string one_again) "10") ;
+         mut_mul one_again ~other:ten ;
+         assert (String.equal (to_string one_again) "100") ;
+         mut_square one_again ;
+         assert (String.equal (to_string one_again) "10000") ;
+         assert (equal (of_bigint (to_bigint rand1)) rand1) ;
+         assert (compare (of_bigint (to_bigint rand1)) rand1 = 0) ;
+         assert (compare one ten < 0) ;
+         assert (compare ten one > 0) ;
+         let root_of_unity = two_adic_root_of_unity () in
+         assert (equal (of_bytes (to_bytes root_of_unity)) root_of_unity) ;
+         let gen = domain_generator 2 in
+         assert (equal (of_bytes (to_bytes gen)) gen) ;
+         assert (equal (deep_copy rand2) rand2)
+    end)
+
+let _ =
+  let open Pasta_fq in
+  Js.export "pasta_fq_test"
+    (object%js (_self)
+       method run =
+         let size_in_bits = size_in_bits () in
+         assert (size_in_bits = 255) ;
+         let size = size () in
+         assert (
+           String.equal
+             (Bigint_256.to_string size)
+             "28948022309329048855892746252171976963363056481941647379679742748393362948097"
          ) ;
          let one = of_int 1 in
          let two = of_string "2" in
