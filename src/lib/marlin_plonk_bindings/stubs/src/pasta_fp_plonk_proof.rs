@@ -1,9 +1,10 @@
-use crate::arkworks::{CamlDlogProofVesta, CamlFp, CamlFq, CamlGroupAffine, CamlPolyCommVesta};
+use crate::arkworks::{CamlFp, CamlGVesta};
 use crate::pasta_fp_plonk_index::CamlPastaFpPlonkIndexPtr;
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
 use crate::pasta_fp_vector::CamlPastaFpVector;
 use ark_ec::AffineCurve;
 use ark_ff::One;
+use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
 use mina_curves::pasta::{
@@ -17,6 +18,7 @@ use oracle::{
 };
 use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
 use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
+use plonk_protocol_dlog::prover::caml::CamlProverProof;
 use plonk_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
 
 #[ocaml::func]
@@ -25,8 +27,8 @@ pub fn caml_pasta_fp_plonk_proof_create(
     primary_input: CamlPastaFpVector,
     auxiliary_input: CamlPastaFpVector,
     prev_challenges: Vec<CamlFp>,
-    prev_sgs: Vec<CamlGroupAffine<CamlFq>>,
-) -> CamlDlogProofVesta {
+    prev_sgs: Vec<CamlGVesta>,
+) -> CamlProverProof<CamlGVesta, CamlFp> {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
@@ -96,19 +98,19 @@ pub fn proof_verify(
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_verify(
-    lgr_comm: Vec<CamlPolyCommVesta>,
+    lgr_comm: Vec<CamlPolyComm<CamlGVesta>>,
     index: CamlPastaFpPlonkVerifierIndex,
-    proof: CamlDlogProofVesta,
+    proof: CamlProverProof<CamlGVesta, CamlFp>,
 ) -> bool {
-    let lgr_comm = lgr_comm.iter().map(|x| x.into()).collect();
+    let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
     proof_verify(lgr_comm, &index.into(), proof.into())
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<CamlPolyCommVesta>>,
+    lgr_comms: Vec<Vec<CamlPolyComm<CamlGVesta>>>,
     indexes: Vec<CamlPastaFpPlonkVerifierIndex>,
-    proofs: Vec<CamlDlogProofVesta>,
+    proofs: Vec<CamlProverProof<CamlGVesta, CamlFp>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -127,7 +129,7 @@ pub fn caml_pasta_fp_plonk_proof_batch_verify(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlDlogProofVesta {
+pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlProverProof<CamlGVesta, CamlFp> {
     let g = || GAffine::prime_subgroup_generator();
     let comm = || PolyComm {
         shifted: Some(g()),
@@ -173,6 +175,8 @@ pub fn caml_pasta_fp_plonk_proof_dummy() -> CamlDlogProofVesta {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_proof_deep_copy(x: CamlDlogProofVesta) -> CamlDlogProofVesta {
+pub fn caml_pasta_fp_plonk_proof_deep_copy(
+    x: CamlProverProof<CamlGVesta, CamlFp>,
+) -> CamlProverProof<CamlGVesta, CamlFp> {
     x
 }

@@ -1,4 +1,4 @@
-use crate::arkworks::{CamlFq, CamlPolyCommPallas};
+use crate::arkworks::{CamlFq, CamlGPallas};
 use crate::caml_pointer;
 use crate::index_serialization;
 use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
@@ -10,6 +10,7 @@ use crate::plonk_verifier_index::{
 use ark_ec::AffineCurve;
 use ark_ff::One;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain as Domain};
+use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::{
     commitment::PolyComm,
     srs::{SRSValue, SRS},
@@ -24,7 +25,7 @@ use std::{
 };
 
 pub type CamlPastaFqPlonkVerifierIndex =
-    CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyCommPallas>;
+    CamlPlonkVerifierIndex<CamlFq, CamlPastaFqUrs, CamlPolyComm<CamlGPallas>>;
 
 pub fn to_ocaml<'a>(
     urs: &Rc<SRS<GAffine>>,
@@ -82,17 +83,17 @@ pub fn to_ocaml_copy<'a>(
         max_quot_size: vi.max_quot_size as isize,
         urs: caml_pointer::create(Rc::clone(urs)),
         evals: CamlPlonkVerificationEvals {
-            sigma_comm0: sigma_comm0.into(),
-            sigma_comm1: sigma_comm1.into(),
-            sigma_comm2: sigma_comm2.into(),
+            sigma_comm0: sigma_comm0.clone().into(),
+            sigma_comm1: sigma_comm1.clone().into(),
+            sigma_comm2: sigma_comm2.clone().into(),
             ql_comm: vi.ql_comm.clone().into(),
             qr_comm: vi.qr_comm.clone().into(),
             qo_comm: vi.qo_comm.clone().into(),
             qm_comm: vi.qm_comm.clone().into(),
             qc_comm: vi.qc_comm.clone().into(),
-            rcm_comm0: rcm_comm0.into(),
-            rcm_comm1: rcm_comm1.into(),
-            rcm_comm2: rcm_comm2.into(),
+            rcm_comm0: rcm_comm0.clone().into(),
+            rcm_comm1: rcm_comm1.clone().into(),
+            rcm_comm2: rcm_comm2.clone().into(),
             psm_comm: vi.psm_comm.clone().into(),
             add_comm: vi.add_comm.clone().into(),
             mul1_comm: vi.mul1_comm.clone().into(),
@@ -113,7 +114,7 @@ pub fn of_ocaml<'a>(
     max_quot_size: ocaml::Int,
     log_size_of_group: ocaml::Int,
     urs: CamlPastaFqUrs,
-    evals: CamlPlonkVerificationEvals<CamlPolyCommPallas>,
+    evals: CamlPlonkVerificationEvals<CamlPolyComm<CamlGPallas>>,
     shifts: CamlPlonkVerificationShifts<CamlFq>,
 ) -> (DlogVerifierIndex<'a, GAffine>, Rc<SRS<GAffine>>) {
     let urs_copy = Rc::clone(&*urs);

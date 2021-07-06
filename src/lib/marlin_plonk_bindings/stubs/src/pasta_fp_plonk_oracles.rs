@@ -1,5 +1,6 @@
-use crate::arkworks::{CamlDlogProofVesta, CamlFp, CamlPolyCommVesta, CamlRandomOraclesFp};
+use crate::arkworks::{CamlFp, CamlGVesta};
 use crate::pasta_fp_plonk_verifier_index::CamlPastaFpPlonkVerifierIndex;
+use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::commitment::{shift_scalar, PolyComm};
 use mina_curves::pasta::{
     fp::Fp,
@@ -11,29 +12,32 @@ use oracle::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
-use plonk_circuits::scalars::RandomOracles;
-use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
+use plonk_circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
+use plonk_protocol_dlog::prover::ProverProof;
+use plonk_protocol_dlog::{
+    index::VerifierIndex as DlogVerifierIndex, prover::caml::CamlProverProof,
+};
 
 /// The state of the verifier during verification
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPastaFpPlonkOracles {
-    pub o: CamlRandomOraclesFp, // all the challenges produced during the protocol
-    pub p_eval: (CamlFp, CamlFp), // two evaluation of some poly?
-    pub opening_prechallenges: Vec<CamlFp>, // challenges before some opening?
-    pub digest_before_evaluations: CamlFp, // digest of poseidon before evaluating?
+    pub o: CamlRandomOracles<CamlFp>,
+    pub p_eval: (CamlFp, CamlFp),
+    pub opening_prechallenges: Vec<CamlFp>,
+    pub digest_before_evaluations: CamlFp,
 }
 
 /// Creates a [CamlPastaFpPlonkOracles] state which will initialize a verifier
 #[ocaml::func]
 pub fn caml_pasta_fp_plonk_oracles_create(
-    lgr_comm: Vec<CamlPolyCommVesta>, // the bases to commit polynomials
-    index: CamlPastaFpPlonkVerifierIndex, // parameters
-    proof: CamlDlogProofVesta,        // the final proof (contains public elements at the beginning)
+    lgr_comm: Vec<CamlPolyComm<CamlGVesta>>, // the bases to commit polynomials
+    index: CamlPastaFpPlonkVerifierIndex,    // parameters
+    proof: CamlProverProof<CamlGVesta, CamlFp>, // the final proof (contains public elements at the beginning)
 ) -> CamlPastaFpPlonkOracles {
     // conversions
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
-        .iter()
+        .into_iter()
         .take(proof.public.len())
         .map(Into::into)
         .collect();
@@ -42,10 +46,16 @@ pub fn caml_pasta_fp_plonk_oracles_create(
     // get commitments to the public elements
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
         &lgr_comm_refs,
-        &proof.public.iter().map(|s| -*s).collect(),
+        &proof
+            .public
+            .iter()
+            .map(Into::<Fp>::into)
+            .map(|s| -s)
+            .collect(),
     );
 
     // runs the entire protocol
+    let proof: ProverProof<GAffine> = proof.into();
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<VestaParameters, PlonkSpongeConstants>, DefaultFrSponge<Fp, PlonkSpongeConstants>>(&index, &p_comm);
 
@@ -67,11 +77,13 @@ pub fn caml_pasta_fp_plonk_oracles_create(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_oracles_dummy() -> CamlRandomOraclesFp {
+pub fn caml_pasta_fp_plonk_oracles_dummy() -> CamlRandomOracles<CamlFp> {
     RandomOracles::<Fp>::zero().into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fp_plonk_oracles_deep_copy(x: CamlRandomOraclesFp) -> CamlRandomOraclesFp {
+pub fn caml_pasta_fp_plonk_oracles_deep_copy(
+    x: CamlRandomOracles<CamlFp>,
+) -> CamlRandomOracles<CamlFp> {
     x
 }

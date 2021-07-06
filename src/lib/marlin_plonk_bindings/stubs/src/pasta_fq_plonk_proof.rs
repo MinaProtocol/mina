@@ -1,9 +1,10 @@
-use crate::arkworks::{CamlDlogProofPallas, CamlFp, CamlFq, CamlGroupAffine, CamlPolyCommPallas};
+use crate::arkworks::{CamlFq, CamlGPallas};
 use crate::pasta_fq_plonk_index::CamlPastaFqPlonkIndexPtr;
 use crate::pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex;
 use crate::pasta_fq_vector::CamlPastaFqVector;
 use ark_ec::AffineCurve;
 use ark_ff::One;
+use commitment_dlog::commitment::caml::CamlPolyComm;
 use commitment_dlog::commitment::{CommitmentCurve, OpeningProof, PolyComm};
 use groupmap::GroupMap;
 use mina_curves::pasta::{
@@ -17,6 +18,7 @@ use oracle::{
 };
 use plonk_circuits::scalars::ProofEvaluations as DlogProofEvaluations;
 use plonk_protocol_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex};
+use plonk_protocol_dlog::prover::caml::CamlProverProof;
 use plonk_protocol_dlog::prover::{ProverCommitments as DlogCommitments, ProverProof as DlogProof};
 
 #[ocaml::func]
@@ -25,8 +27,8 @@ pub fn caml_pasta_fq_plonk_proof_create(
     primary_input: CamlPastaFqVector,
     auxiliary_input: CamlPastaFqVector,
     prev_challenges: Vec<CamlFq>,
-    prev_sgs: Vec<CamlGroupAffine<CamlFp>>,
-) -> CamlDlogProofPallas {
+    prev_sgs: Vec<CamlGPallas>,
+) -> CamlProverProof<CamlGPallas, CamlFq> {
     // TODO: Should we be ignoring this?!
     let _primary_input = primary_input;
 
@@ -95,19 +97,19 @@ pub fn proof_verify(
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_verify(
-    lgr_comm: Vec<CamlPolyCommPallas>,
+    lgr_comm: Vec<CamlPolyComm<CamlGPallas>>,
     index: CamlPastaFqPlonkVerifierIndex,
-    proof: CamlDlogProofPallas,
+    proof: CamlProverProof<CamlGPallas, CamlFq>,
 ) -> bool {
-    let lgr_comm = lgr_comm.iter().map(|x| x.into()).collect();
+    let lgr_comm = lgr_comm.into_iter().map(|x| x.into()).collect();
     proof_verify(lgr_comm, &index.into(), proof.into())
 }
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_proof_batch_verify(
-    lgr_comms: Vec<Vec<CamlPolyCommPallas>>,
+    lgr_comms: Vec<Vec<CamlPolyComm<CamlGPallas>>>,
     indexes: Vec<CamlPastaFqPlonkVerifierIndex>,
-    proofs: Vec<CamlDlogProofPallas>,
+    proofs: Vec<CamlProverProof<CamlGPallas, CamlFq>>,
 ) -> bool {
     let ts: Vec<_> = indexes
         .into_iter()
@@ -126,7 +128,7 @@ pub fn caml_pasta_fq_plonk_proof_batch_verify(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlDlogProofPallas {
+pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlProverProof<CamlGPallas, CamlFq> {
     let g = || GAffine::prime_subgroup_generator();
     let comm = || PolyComm {
         shifted: Some(g()),
@@ -172,6 +174,8 @@ pub fn caml_pasta_fq_plonk_proof_dummy() -> CamlDlogProofPallas {
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_proof_deep_copy(x: CamlDlogProofPallas) -> CamlDlogProofPallas {
+pub fn caml_pasta_fq_plonk_proof_deep_copy(
+    x: CamlProverProof<CamlGPallas, CamlFq>,
+) -> CamlProverProof<CamlGPallas, CamlFq> {
     x
 }

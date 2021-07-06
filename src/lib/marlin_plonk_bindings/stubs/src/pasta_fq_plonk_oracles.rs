@@ -1,8 +1,8 @@
 use crate::{
-    arkworks::{CamlDlogProofPallas, CamlFq, CamlPolyCommPallas, CamlRandomOraclesFq},
+    arkworks::{CamlFq, CamlGPallas},
     pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
 };
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
+use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
 use mina_curves::pasta::{
     fq::Fq,
     pallas::{Affine as GAffine, PallasParameters},
@@ -13,12 +13,15 @@ use oracle::{
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
-use plonk_circuits::scalars::RandomOracles;
-use plonk_protocol_dlog::index::VerifierIndex as DlogVerifierIndex;
+use plonk_circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
+use plonk_protocol_dlog::{
+    index::VerifierIndex as DlogVerifierIndex,
+    prover::{caml::CamlProverProof, ProverProof},
+};
 
 #[derive(ocaml::ToValue, ocaml::FromValue)]
 pub struct CamlPastaFqPlonkOracles {
-    pub o: CamlRandomOraclesFq,
+    pub o: CamlRandomOracles<CamlFq>,
     pub p_eval: (CamlFq, CamlFq),
     pub opening_prechallenges: Vec<CamlFq>,
     pub digest_before_evaluations: CamlFq,
@@ -26,14 +29,14 @@ pub struct CamlPastaFqPlonkOracles {
 
 #[ocaml::func]
 pub fn caml_pasta_fq_plonk_oracles_create(
-    lgr_comm: Vec<CamlPolyCommPallas>,
+    lgr_comm: Vec<CamlPolyComm<CamlGPallas>>,
     index: CamlPastaFqPlonkVerifierIndex,
-    proof: CamlDlogProofPallas,
+    proof: CamlProverProof<CamlGPallas, CamlFq>,
 ) -> CamlPastaFqPlonkOracles {
     // conversions
     let index: DlogVerifierIndex<'_, GAffine> = index.into();
     let lgr_comm: Vec<PolyComm<GAffine>> = lgr_comm
-        .iter()
+        .into_iter()
         .take(proof.public.len())
         .map(Into::into)
         .collect();
@@ -41,8 +44,15 @@ pub fn caml_pasta_fq_plonk_oracles_create(
 
     let p_comm = PolyComm::<GAffine>::multi_scalar_mul(
         &lgr_comm_refs,
-        &proof.public.iter().map(|s| -*s).collect(),
+        &proof
+            .public
+            .iter()
+            .map(Into::<Fq>::into)
+            .map(|s| -s)
+            .collect(),
     );
+
+    let proof: ProverProof<GAffine> = proof.into();
     let (mut sponge, digest_before_evaluations, o, _, p_eval, _, _, _, combined_inner_product) =
         proof.oracles::<DefaultFqSponge<PallasParameters, PlonkSpongeConstants>, DefaultFrSponge<Fq, PlonkSpongeConstants>>(&index, &p_comm);
 
@@ -63,11 +73,13 @@ pub fn caml_pasta_fq_plonk_oracles_create(
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_oracles_dummy() -> CamlRandomOraclesFq {
+pub fn caml_pasta_fq_plonk_oracles_dummy() -> CamlRandomOracles<CamlFq> {
     RandomOracles::<Fq>::zero().into()
 }
 
 #[ocaml::func]
-pub fn caml_pasta_fq_plonk_oracles_deep_copy(x: CamlRandomOraclesFq) -> CamlRandomOraclesFq {
+pub fn caml_pasta_fq_plonk_oracles_deep_copy(
+    x: CamlRandomOracles<CamlFq>,
+) -> CamlRandomOracles<CamlFq> {
     x
 }

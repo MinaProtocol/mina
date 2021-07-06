@@ -2,20 +2,26 @@ use crate::arkworks::{CamlFp, CamlFq};
 use ark_ff::Zero;
 use mina_curves::pasta::{pallas::Affine as AffinePallas, vesta::Affine as AffineVesta};
 
-// OCaml type
+//
+// handy types
+//
+
+pub type CamlGVesta = CamlGroupAffine<CamlFq>;
+pub type CamlGPallas = CamlGroupAffine<CamlFp>;
+
+//
+// GroupAffine<G> <-> CamlGroupAffine<F>
+//
 
 #[derive(Clone, Copy, ocaml::ToValue, ocaml::FromValue)]
-pub enum CamlGroupAffine<T>
-where
-    T: ocaml::ToValue + ocaml::FromValue,
-{
+pub enum CamlGroupAffine<F> {
     Infinity,
-    Finite((T, T)),
+    Finite((F, F)),
 }
 
 // Conversions from/to AffineVesta
 
-impl From<AffineVesta> for CamlGroupAffine<CamlFq> {
+impl From<AffineVesta> for CamlGVesta {
     fn from(point: AffineVesta) -> Self {
         if point.infinity {
             Self::Infinity
@@ -25,7 +31,7 @@ impl From<AffineVesta> for CamlGroupAffine<CamlFq> {
     }
 }
 
-impl From<&AffineVesta> for CamlGroupAffine<CamlFq> {
+impl From<&AffineVesta> for CamlGVesta {
     fn from(point: &AffineVesta) -> Self {
         if point.infinity {
             Self::Infinity
@@ -35,7 +41,7 @@ impl From<&AffineVesta> for CamlGroupAffine<CamlFq> {
     }
 }
 
-impl Into<AffineVesta> for CamlGroupAffine<CamlFq> {
+impl Into<AffineVesta> for CamlGVesta {
     fn into(self) -> AffineVesta {
         match self {
             Self::Infinity => AffineVesta::zero(),
@@ -44,7 +50,7 @@ impl Into<AffineVesta> for CamlGroupAffine<CamlFq> {
     }
 }
 
-impl Into<AffineVesta> for &CamlGroupAffine<CamlFq> {
+impl Into<AffineVesta> for &CamlGVesta {
     fn into(self) -> AffineVesta {
         match self {
             CamlGroupAffine::Infinity => AffineVesta::zero(),
@@ -55,7 +61,7 @@ impl Into<AffineVesta> for &CamlGroupAffine<CamlFq> {
 
 // Conversion from/to AffinePallas
 
-impl From<AffinePallas> for CamlGroupAffine<CamlFp> {
+impl From<AffinePallas> for CamlGPallas {
     fn from(point: AffinePallas) -> Self {
         if point.infinity {
             Self::Infinity
@@ -65,7 +71,7 @@ impl From<AffinePallas> for CamlGroupAffine<CamlFp> {
     }
 }
 
-impl From<&AffinePallas> for CamlGroupAffine<CamlFp> {
+impl From<&AffinePallas> for CamlGPallas {
     fn from(point: &AffinePallas) -> Self {
         if point.infinity {
             Self::Infinity
@@ -75,7 +81,7 @@ impl From<&AffinePallas> for CamlGroupAffine<CamlFp> {
     }
 }
 
-impl Into<AffinePallas> for CamlGroupAffine<CamlFp> {
+impl Into<AffinePallas> for CamlGPallas {
     fn into(self) -> AffinePallas {
         match self {
             Self::Infinity => AffinePallas::zero(),
@@ -84,7 +90,7 @@ impl Into<AffinePallas> for CamlGroupAffine<CamlFp> {
     }
 }
 
-impl Into<AffinePallas> for &CamlGroupAffine<CamlFp> {
+impl Into<AffinePallas> for &CamlGPallas {
     fn into(self) -> AffinePallas {
         match self {
             CamlGroupAffine::Infinity => AffinePallas::zero(),
