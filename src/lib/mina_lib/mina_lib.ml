@@ -144,8 +144,9 @@ let client_port t =
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
-  let public_keys, _ = Agent.get t.block_production_keypairs in
-  Public_key.Compressed.Set.map public_keys ~f:snd
+  let keypair_and_compressed_pks, _ = Agent.get t.block_production_keypairs in
+  Public_key.Compressed.Set.map keypair_and_compressed_pks
+    ~f:(fun (_keypair, pk_compressed) -> pk_compressed)
 
 let coinbase_receiver t = !(t.coinbase_receiver)
 

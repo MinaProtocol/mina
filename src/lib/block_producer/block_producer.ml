@@ -12,6 +12,12 @@ module Time = Block_time
 type Structured_log_events.t += Block_produced
   [@@deriving register_event {msg= "Successfully produced a new block"}]
 
+let last_block_produced_opt, set_last_block_produced =
+  let last_ref : State_hash.t option ref = ref None in
+  let last_block_produced_opt () = !last_ref in
+  let set_last_block_produced state_hash = last_ref := Some state_hash in
+  (last_block_produced_opt, set_last_block_produced)
+
 module Singleton_supervisor : sig
   type ('data, 'a) t
 
@@ -686,6 +692,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     let metadata =
                       [("state_hash", State_hash.to_yojson protocol_state_hash)]
                     in
+                    set_last_block_produced protocol_state_hash ;
                     Mina_metrics.(
                       Counter.inc_one Block_producer.blocks_produced) ;
                     let%bind.Async () =
