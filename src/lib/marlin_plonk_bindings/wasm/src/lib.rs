@@ -30,5 +30,3 @@ pub mod testing_proof;
 pub mod bigint_256;
 pub mod pasta_fp;
 pub mod pasta_fq;
-
-/*pub use wasm_bindgen_rayon::init_thread_pool;*/
