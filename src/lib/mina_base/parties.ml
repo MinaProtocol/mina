@@ -4,9 +4,10 @@ open Core
 module Stable = struct
   module V1 = struct
     type t =
-      { fee_payer: Party.Signed.Stable.V1.t
-      ; other_parties: Party.Stable.V1.t list
-      ; protocol_state: Snapp_predicate.Protocol_state.Stable.V1.t }
+      { fee_payer : Party.Signed.Stable.V1.t
+      ; other_parties : Party.Stable.V1.t list
+      ; protocol_state : Snapp_predicate.Protocol_state.Stable.V1.t
+      }
     [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
@@ -32,8 +33,9 @@ let check (t : t) =
 
 let parties (t : t) : Party.t list =
   let p = t.fee_payer in
-  { authorization= Control.Signature p.authorization
-  ; data= {p.data with predicate= Party.Predicate.Nonce p.data.predicate} }
+  { authorization = Control.Signature p.authorization
+  ; data = { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
+  }
   :: t.other_parties
 
 (** [fee_lower_bound_exn t] may raise if [check t = false] *)
@@ -42,11 +44,11 @@ let fee_lower_bound_exn (t : t) : Currency.Fee.t =
   match x.sgn with
   | Neg ->
       (* See what happens if all the parties that use up balance succeed,
-       and all the non-fee-payer parties that contribute balance fail.
+         and all the non-fee-payer parties that contribute balance fail.
 
-       In the future we could have this function take in the current view of the
-       world to get a more accurate lower bound.
-    *)
+         In the future we could have this function take in the current view of the
+         world to get a more accurate lower bound.
+      *)
       List.fold_until t.other_parties ~init:x.magnitude ~finish:Fn.id
         ~f:(fun acc p ->
           if Token_id.(p.data.body.token_id <> default) then Continue acc
@@ -56,16 +58,16 @@ let fee_lower_bound_exn (t : t) : Currency.Fee.t =
             | Neg ->
                 Continue acc
             | Pos -> (
-              match Currency.Amount.sub acc y.magnitude with
-              | None ->
-                  Stop Currency.Amount.zero
-              | Some acc' ->
-                  Continue acc' ) )
+                match Currency.Amount.sub acc y.magnitude with
+                | None ->
+                    Stop Currency.Amount.zero
+                | Some acc' ->
+                    Continue acc' ))
       |> Currency.Amount.to_fee
   | Pos ->
       assert false
 
-let fee_payer_party ({fee_payer; _} : t) = fee_payer
+let fee_payer_party ({ fee_payer; _ } : t) = fee_payer
 
 let fee_payer (t : t) = Party.Signed.account_id (fee_payer_party t)
 
@@ -75,7 +77,7 @@ let fee_token (t : t) = (fee_payer_party t).data.body.token_id
 
 let accounts_accessed (t : t) =
   List.map (parties t) ~f:(fun p ->
-      Account_id.create p.data.body.pk p.data.body.token_id )
+      Account_id.create p.data.body.pk p.data.body.token_id)
   |> List.dedup_and_sort ~compare:Account_id.compare
 
 let fee_payer_pk (t : t) = t.fee_payer.data.body.pk
@@ -160,31 +162,32 @@ module With_hashes = struct
   let empty = Outside_hash_image.t
 
   let cons_hash hash h_tl =
-    Random_oracle.hash ~init:Hash_prefix_states.party_cons [|hash; h_tl|]
+    Random_oracle.hash ~init:Hash_prefix_states.party_cons [| hash; h_tl |]
 
-  let cons ({hash; data} : ('a, 'h) With_hash.t) (t : 'a t) : 'a t =
+  let cons ({ hash; data } : ('a, 'h) With_hash.t) (t : 'a t) : 'a t =
     let h_tl = match t with [] -> empty | (_, h_tl) :: _ -> h_tl in
     (data, cons_hash hash h_tl) :: t
 
   let hash (t : _ t) : Random_oracle.Digest.t =
     match t with [] -> empty | (_, h) :: _ -> h
 
-  let create {other_parties; fee_payer; protocol_state= _} : Party.t t =
+  let create { other_parties; fee_payer; protocol_state = _ } : Party.t t =
     let parties =
       let p = fee_payer in
-      { Party.authorization= Control.Signature p.authorization
-      ; data= {p.data with predicate= Party.Predicate.Nonce p.data.predicate}
+      { Party.authorization = Control.Signature p.authorization
+      ; data =
+          { p.data with predicate = Party.Predicate.Nonce p.data.predicate }
       }
       :: other_parties
     in
     List.fold (List.rev parties) ~init:[] ~f:(fun acc p ->
         let hash = Party.Predicated.digest p.data in
-        cons {hash; data= p} acc )
+        cons { hash; data = p } acc)
 
   let other_parties_hash t =
     List.fold (List.rev t.other_parties) ~init:empty ~f:(fun acc p ->
         let hash = Party.Predicated.digest p.data in
-        cons_hash hash acc )
+        cons_hash hash acc)
 
   let digest (t : _ t) : Random_oracle.Digest.t =
     match t with [] -> empty | (_, h) :: _ -> h
@@ -194,7 +197,7 @@ let valid_interval (t : t) =
   let open Snapp_predicate.Closed_interval in
   match t.protocol_state.curr_global_slot with
   | Ignore ->
-      Mina_numbers.Global_slot.{lower= zero; upper= max_value}
+      Mina_numbers.Global_slot.{ lower = zero; upper = max_value }
   | Check i ->
       i
 
@@ -207,10 +210,10 @@ module Transaction_commitment = struct
 
   let create ~other_parties_hash ~protocol_state_predicate_hash : t =
     Random_oracle.hash ~init:Hash_prefix.party_with_protocol_state_predicate
-      [|protocol_state_predicate_hash; other_parties_hash|]
+      [| protocol_state_predicate_hash; other_parties_hash |]
 
   let with_fee_payer (t : t) ~fee_payer_hash =
-    Random_oracle.hash ~init:Hash_prefix.party_cons [|fee_payer_hash; t|]
+    Random_oracle.hash ~init:Hash_prefix.party_cons [| fee_payer_hash; t |]
 
   module Checked = struct
     type t = Pickles.Impls.Step.Field.t
@@ -218,10 +221,10 @@ module Transaction_commitment = struct
     let create ~other_parties_hash ~protocol_state_predicate_hash =
       Random_oracle.Checked.hash
         ~init:Hash_prefix.party_with_protocol_state_predicate
-        [|protocol_state_predicate_hash; other_parties_hash|]
+        [| protocol_state_predicate_hash; other_parties_hash |]
 
     let with_fee_payer (t : t) ~fee_payer_hash =
       Random_oracle.Checked.hash ~init:Hash_prefix.party_cons
-        [|fee_payer_hash; t|]
+        [| fee_payer_hash; t |]
   end
 end

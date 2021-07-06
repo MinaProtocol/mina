@@ -132,7 +132,7 @@ module Zero_one_or_two = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = [`Zero | `One of 'a | `Two of 'a * 'a]
+      type 'a t = [ `Zero | `One of 'a | `Two of 'a * 'a ]
       [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
@@ -183,11 +183,11 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
       Parties
         ( ps.protocol_state
         , List.map (Parties.parties ps) ~f:(fun p ->
-              (p, Option.try_with (fun () -> find_vk p)) ) )
+              (p, Option.try_with (fun () -> find_vk p))) )
 
 let to_verifiable t ~ledger ~get ~location_of_account =
   Option.try_with (fun () ->
-      to_verifiable_exn t ~ledger ~get ~location_of_account )
+      to_verifiable_exn t ~ledger ~get ~location_of_account)
 
 let fee_exn : t -> Currency.Fee.t = function
   | Signed_command x ->
@@ -277,4 +277,4 @@ let filter_by_participant (commands : t list) public_key =
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
-             Account_id.public_key) )
+             Account_id.public_key))

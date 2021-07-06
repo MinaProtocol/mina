@@ -23,12 +23,11 @@ val next_available_token : t -> Token_id.t
 val get_exn : t -> int -> Account.t
 
 val path_exn :
-  t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
+  t -> int -> [ `Left of Ledger_hash.t | `Right of Ledger_hash.t ] list
 
 val find_index_exn : t -> Account_id.t -> int
 
-val of_root :
-  depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
+val of_root : depth:int -> next_available_token:Token_id.t -> Ledger_hash.t -> t
 
 val apply_user_command_exn :
      constraint_constants:Genesis_constants.Constraint_constants.t
@@ -55,7 +54,4 @@ val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 val handler : t -> Handler.t Staged.t
 
 val has_locked_tokens_exn :
-     global_slot:Mina_numbers.Global_slot.t
-  -> account_id:Account_id.t
-  -> t
-  -> bool
+  global_slot:Mina_numbers.Global_slot.t -> account_id:Account_id.t -> t -> bool

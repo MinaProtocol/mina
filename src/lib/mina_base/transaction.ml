@@ -95,7 +95,8 @@ let public_keys : t -> _ = function
   | Command (Signed_command cmd) ->
       [ Signed_command.fee_payer_pk cmd
       ; Signed_command.source_pk cmd
-      ; Signed_command.receiver_pk cmd ]
+      ; Signed_command.receiver_pk cmd
+      ]
   | Command (Parties t) ->
       Parties.accounts_accessed t |> List.map ~f:Account_id.public_key
   | Fee_transfer ft ->

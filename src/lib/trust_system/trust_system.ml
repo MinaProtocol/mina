@@ -34,8 +34,7 @@ module Actions = struct
         (**Peer gossiped a transition that has a different genesis protocol state from that of mine*)
     | Sent_invalid_transition_chain_merkle_proof
         (** Peer sent us a transition chain witness that does not verify *)
-    | Violated_protocol
-        (** Peer violated the specification of the protocol. *)
+    | Violated_protocol  (** Peer violated the specification of the protocol. *)
     | Made_request
         (** Peer made a valid request. This causes a small decrease to mitigate
             DoS. *)

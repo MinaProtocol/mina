@@ -26,23 +26,27 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
         ~vesting_increment : Mina_base.Account_timing.t =
       let open Currency in
       Timed
-        { initial_minimum_balance= Balance.of_int min_balance
-        ; cliff_time= Mina_numbers.Global_slot.of_int cliff_time
-        ; cliff_amount= Amount.of_int cliff_amount
-        ; vesting_period= Mina_numbers.Global_slot.of_int vesting_period
-        ; vesting_increment= Amount.of_int vesting_increment }
+        { initial_minimum_balance = Balance.of_int min_balance
+        ; cliff_time = Mina_numbers.Global_slot.of_int cliff_time
+        ; cliff_amount = Amount.of_int cliff_amount
+        ; vesting_period = Mina_numbers.Global_slot.of_int vesting_period
+        ; vesting_increment = Amount.of_int vesting_increment
+        }
     in
     { default with
-      requires_graphql= true
-    ; block_producers=
-        [ {balance= "4000"; timing= Untimed}
-        ; {balance= "3000"; timing= Untimed}
-        ; { balance= "1000"
-          ; timing=
+      requires_graphql = true
+    ; block_producers =
+        [ { balance = "4000"; timing = Untimed }
+        ; { balance = "3000"; timing = Untimed }
+        ; { balance = "1000"
+          ; timing =
               make_timing ~min_balance:100_000_000_000 ~cliff_time:4
                 ~cliff_amount:0 ~vesting_period:2
-                ~vesting_increment:50_000_000_000 } ]
-    ; num_snark_workers= 0 }
+                ~vesting_increment:50_000_000_000
+          }
+        ]
+    ; num_snark_workers = 0
+    }
 
   let run network t =
     let open Network in
@@ -55,7 +59,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
       Malleable_error.List.iter block_producer_nodes
         ~f:(Fn.compose (wait_for t) Wait_condition.node_to_initialize)
     in
-    let[@warning "-8"] [untimed_node_a; untimed_node_b; timed_node_a] =
+    let[@warning "-8"] [ untimed_node_a; untimed_node_b; timed_node_a ] =
       block_producer_nodes
     in
     let%bind () =

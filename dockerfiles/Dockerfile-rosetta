@@ -1,14 +1,14 @@
 #################################################################################################
 # The "build-deps" stage
-# - Installs all compilers/interpreters, tools, and OS packages on debian buster-slim
+# - Installs all compilers/interpreters, tools, and OS packages on debian stretch-slim
 #################################################################################################
 FROM debian:stretch-slim AS build-deps
 
 # Ocaml Version
-ARG OCAML_VERSION=4.07
-ARG OCAML_REVISION=.1
-ARG OCAML_VARIANT=+logoom
-ARG OCAML_PACKAGE=ocaml-variants
+ARG OCAML_VERSION=4.11
+ARG OCAML_REVISION=.2
+ARG OCAML_VARIANT=
+ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
@@ -129,7 +129,7 @@ RUN git clone \
   /home/opam/opam-repository \
   && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
   && opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git \
-  && opam switch create "${OCAML_VERSION}" "${OCAML_PACKAGE}.${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
+  && opam switch create "${OCAML_VERSION}" "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}"
 
 # Alternate variants for 4.07 that are included in the official opam image
@@ -150,11 +150,11 @@ FROM build-deps AS opam-deps
 
 # location of repo used for pins and external package commits
 ARG MINA_DIR=mina
-# branch to checkout on first clone (this will be the only availible branch in the container)
+# branch to checkout on first clone (this will be the only available branch in the container)
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the mina codebase in the next stage
-ARG OPAM_BRANCH=develop
+ARG OPAM_BRANCH=compatible
 
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$MINA_DIR/src/external
@@ -205,6 +205,7 @@ RUN eval $(opam config env) \
   && opam pin add src/external/async_kernel \
   && opam pin add src/external/coda_base58 \
   && opam pin add src/external/graphql_ppx \
+  && opam pin add src/external/ppx_deriving_yojson \
   && opam clean --logs -cs
 
 
@@ -222,7 +223,7 @@ ARG DUNE_PROFILE=testnet_postake_medium_curves
 # can also be a tagged release
 # TODO: change this to two distinct variables, one for opam/dependency clone
 #       and a distinct one for the mina codebase in the next stage
-ARG MINA_BRANCH=develop
+ARG MINA_BRANCH=compatible
 
 # repo to checkout the branch from
 ARG MINA_REPO=https://github.com/MinaProtocol/mina
@@ -293,7 +294,6 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN mkdir /usr/share/man/man7 /usr/share/man/man1
 
 # Dependencies
-# buster-slim configures apt to not store any cache, so no need to rm it
 # TODO: make sure this is the minimum runtime deps
 RUN apt-get -y update \
   && apt -y install \

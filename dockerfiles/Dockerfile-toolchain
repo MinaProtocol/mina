@@ -1,8 +1,7 @@
-#FROM ocaml/opam2:debian-10-ocaml-4.08
-FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256:3cc21ddf546350407f5a5f63bb59c4aec9bbaf680b2ac89bb834e23c5a0ae07d
+FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256:eb4d3ad2c15127e00c68b7b2c07dd8f887ed20c499d1302e963cbf02740b9eaa
 
 # if updated, also change in Dockerfile
-ARG OCAML_VERSION=4.07.1
+ARG OCAML_VERSION=4.11.2
 ARG DOCKER_VERSION=19.03.4
 ARG TERRAFORM_VERSION=0.12.29
 

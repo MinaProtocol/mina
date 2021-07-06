@@ -16,8 +16,7 @@ external negate : t -> t = "caml_pasta_vesta_negate"
 
 external double : t -> t = "caml_pasta_vesta_double"
 
-external scale :
-  t -> Marlin_plonk_bindings_pasta_fp.t -> t
+external scale : t -> Marlin_plonk_bindings_pasta_fp.t -> t
   = "caml_pasta_vesta_scale"
 
 external random : unit -> t = "caml_pasta_vesta_random"
@@ -32,16 +31,13 @@ external of_affine_coordinates :
   Marlin_plonk_bindings_pasta_fq.t -> Marlin_plonk_bindings_pasta_fq.t -> t
   = "caml_pasta_vesta_of_affine_coordinates"
 
-external endo_base :
-  unit -> Marlin_plonk_bindings_pasta_fq.t
+external endo_base : unit -> Marlin_plonk_bindings_pasta_fq.t
   = "caml_pasta_vesta_endo_base"
 
-external endo_scalar :
-  unit -> Marlin_plonk_bindings_pasta_fp.t
+external endo_scalar : unit -> Marlin_plonk_bindings_pasta_fp.t
   = "caml_pasta_vesta_endo_scalar"
 
-external affine_deep_copy :
-  Affine.t -> Affine.t
+external affine_deep_copy : Affine.t -> Affine.t
   = "caml_pasta_vesta_affine_deep_copy"
 
 let%test "affine deep_copy" =

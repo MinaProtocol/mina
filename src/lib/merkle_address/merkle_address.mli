@@ -55,7 +55,7 @@ module Range : sig
   type nonrec t = t * t
 
   val fold :
-       ?stop:[`Inclusive | `Exclusive]
+       ?stop:[ `Inclusive | `Exclusive ]
     -> t
     -> init:'a
     -> f:(Stable.Latest.t -> 'a -> 'a)
