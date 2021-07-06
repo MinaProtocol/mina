@@ -1980,6 +1980,8 @@ let%test_module "coda network tests" =
           handle_protocol b ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Stream.pipes stream in
+              (* Prime the pipe by writing to it, in lieu of an RPC menu. *)
+              let () = Pipe.write_without_pushback w "1" in
               let%map () = Pipe.transfer r w ~f:Fn.id in
               Pipe.close w ;
               handler_finished := true)
@@ -1989,6 +1991,7 @@ let%test_module "coda network tests" =
           open_stream c ~protocol:"echo" b_peerid >>| Or_error.ok_exn
         in
         let r, w = Stream.pipes stream in
+        let%bind _fake_rpc_menu = Pipe.read r in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
         (* HACK: let our messages send before we reset.
@@ -1996,10 +1999,11 @@ let%test_module "coda network tests" =
            the stream interface. *)
         let%bind () = after (Time.Span.of_sec 1.) in
         let%bind _ = Stream.reset stream in
-        let%bind msg = Pipe.read_all r in
+        let%bind msg =
+          match%map Pipe.read r with `Ok x -> x | `Eof -> failwith "eof"
+        in
         (* give time for [a] to notice the reset finish. *)
         let%bind () = after (Time.Span.of_sec 1.) in
-        let msg = Queue.to_list msg |> String.concat in
         assert (String.equal msg testmsg) ;
         assert !handler_finished ;
         let%bind () = Protocol_handler.close echo_handler in
