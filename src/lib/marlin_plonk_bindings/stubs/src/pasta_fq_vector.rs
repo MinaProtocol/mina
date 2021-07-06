@@ -1,4 +1,7 @@
-use crate::caml_pointer::{self, CamlPointer};
+use crate::{
+    arkworks::CamlFq,
+    caml_pointer::{self, CamlPointer},
+};
 use mina_curves::pasta::fq::Fq;
 
 pub type CamlPastaFqVector = CamlPointer<Vec<Fq>>;

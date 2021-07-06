@@ -1,22 +1,24 @@
-use mina_curves::pasta::{
-    pallas::{Affine as GAffine, PallasParameters},
-    fq::Fq,
+use crate::{
+    arkworks::{CamlFq, CamlGPallas},
+    pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex,
 };
-
+use commitment_dlog::commitment::{caml::CamlPolyComm, shift_scalar, PolyComm};
+use mina_curves::pasta::{
+    fq::Fq,
+    pallas::{Affine as GAffine, PallasParameters},
+};
 use oracle::{
     self,
     poseidon::PlonkSpongeConstants,
     sponge::{DefaultFqSponge, DefaultFrSponge},
     FqSponge,
 };
-
-use commitment_dlog::commitment::{shift_scalar, PolyComm};
-use plonk_circuits::scalars::RandomOracles;
+use plonk_circuits::scalars::{caml::CamlRandomOracles, RandomOracles};
 use plonk_protocol_dlog::{
-    index::VerifierIndex as DlogVerifierIndex, prover::ProverProof as DlogProof,
+    index::VerifierIndex as DlogVerifierIndex,
+    prover::{caml::CamlProverProof, ProverProof},
 };
 
-use crate::pasta_fq_plonk_verifier_index::CamlPastaFqPlonkVerifierIndex;
 
 #[derive(ocaml::IntoValue, ocaml::FromValue)]
 pub struct CamlPastaFqPlonkOracles {

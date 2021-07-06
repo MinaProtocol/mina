@@ -1,14 +1,13 @@
+use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ff::{One, UniformRand};
 use mina_curves::pasta::{
-    pallas::{Affine as GAffine, Projective as GProjective},
     fp::Fp,
     fq::Fq,
-};
-use algebra::{
-    curves::{AffineCurve, ProjectiveCurve},
-    One, UniformRand,
+    pallas::{Affine as GAffine, Projective},
 };
 use rand::rngs::StdRng;
 
+use crate::arkworks::{CamlFp, CamlFq, CamlGPallas, CamlGroupProjectivePallas};
 #[ocaml::func]
 pub fn caml_pasta_pallas_one() -> GProjective {
     GProjective::prime_subgroup_generator()
