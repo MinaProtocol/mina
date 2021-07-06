@@ -41,7 +41,8 @@ let _ =
 
        method returnString = "String"
 
-       method returnString2 = String.concat "" [ "String1"; "String2"; "String3" ]
+       method returnString2 =
+         String.concat "" [ "String1"; "String2"; "String3" ]
 
        method returnBytes = Bytes.of_string "Bytes"
 
