@@ -5,16 +5,13 @@ module Gate_vector = struct
 
   external create : unit -> t = "caml_pasta_fq_plonk_gate_vector_create"
 
-  external add :
-    t -> Marlin_plonk_bindings_pasta_fq.t Plonk_gate.t -> unit
+  external add : t -> Marlin_plonk_bindings_pasta_fq.t Plonk_gate.t -> unit
     = "caml_pasta_fq_plonk_gate_vector_add"
 
-  external get :
-    t -> int -> Marlin_plonk_bindings_pasta_fq.t Plonk_gate.t
+  external get : t -> int -> Marlin_plonk_bindings_pasta_fq.t Plonk_gate.t
     = "caml_pasta_fq_plonk_gate_vector_get"
 
-  external wrap :
-    t -> Plonk_gate.Wire.t -> Plonk_gate.Wire.t -> unit
+  external wrap : t -> Plonk_gate.Wire.t -> Plonk_gate.Wire.t -> unit
     = "caml_pasta_fq_plonk_gate_vector_wrap"
 end
 
@@ -38,6 +35,5 @@ external read :
   ?offset:int -> Marlin_plonk_bindings_pasta_fq_urs.t -> string -> t
   = "caml_pasta_fq_plonk_index_read"
 
-external write :
-  ?append:bool -> t -> string -> unit
+external write : ?append:bool -> t -> string -> unit
   = "caml_pasta_fq_plonk_index_write"

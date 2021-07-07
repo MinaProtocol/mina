@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -14,13 +12,14 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'comm t = {transaction: 'comm; at_party: 'comm} [@@deriving hlist]
+      type 'comm t = { transaction : 'comm; at_party : 'comm }
+      [@@deriving hlist]
     end
   end]
 
   let to_field_elements (t : 'c t) : 'c array =
-    let [x0; x1] = to_hlist t in
-    [|x0; x1|]
+    let [ x0; x1 ] = to_hlist t in
+    [| x0; x1 |]
 end
 
 [%%versioned
@@ -34,8 +33,7 @@ end]
 
 let to_field_elements : t -> _ = Poly.to_field_elements
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Checked = struct
   type t = Parties.Transaction_commitment.Checked.t Poly.t
@@ -54,7 +52,7 @@ end
 let typ =
   let open Poly in
   Typ.of_hlistable
-    Parties.Transaction_commitment.[typ; typ]
+    Parties.Transaction_commitment.[ typ; typ ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 

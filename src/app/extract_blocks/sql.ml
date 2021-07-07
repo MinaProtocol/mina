@@ -36,8 +36,8 @@ module Subchain = struct
       Archive_lib.Processor.Block.typ
       (make_sql
          ~join_condition:
-           "b.id = chain.parent_id AND (chain.state_hash <> $2 OR \
-            b.state_hash = $2)")
+           "b.id = chain.parent_id AND (chain.state_hash <> $2 OR b.state_hash \
+            = $2)")
 
   let start_from_unparented (module Conn : Caqti_async.CONNECTION)
       ~end_state_hash =
@@ -100,15 +100,16 @@ end
 
 module Blocks_and_internal_commands = struct
   type t =
-    { internal_command_id: int
-    ; sequence_no: int
-    ; secondary_sequence_no: int
-    ; receiver_balance_id: int }
+    { internal_command_id : int
+    ; sequence_no : int
+    ; secondary_sequence_no : int
+    ; receiver_balance_id : int
+    }
   [@@deriving hlist]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
-    let spec = Caqti_type.[int; int; int; int] in
+    let spec = Caqti_type.[ int; int; int; int ] in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)

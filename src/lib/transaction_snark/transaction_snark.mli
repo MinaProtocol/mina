@@ -21,7 +21,7 @@ module Pending_coinbase_stack_state : sig
     module Stable : sig
       module V1 : sig
         type 'pending_coinbase t =
-          {source: 'pending_coinbase; target: 'pending_coinbase}
+          { source : 'pending_coinbase; target : 'pending_coinbase }
         [@@deriving compare, equal, fields, hash, sexp, yojson]
 
         val to_latest :
@@ -37,7 +37,7 @@ module Pending_coinbase_stack_state : sig
   end
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
-    {source: 'pending_coinbase; target: 'pending_coinbase}
+    { source : 'pending_coinbase; target : 'pending_coinbase }
   [@@deriving sexp, hash, compare, equal, fields, yojson]
 
   [%%versioned:
@@ -64,10 +64,11 @@ module Registers : sig
   module Stable : sig
     module V1 : sig
       type ('ledger, 'pending_coinbase_stack, 'token_id, 'local_state) t =
-        { ledger: 'ledger
-        ; pending_coinbase_stack: 'pending_coinbase_stack
-        ; next_available_token: 'token_id
-        ; local_state: 'local_state }
+        { ledger : 'ledger
+        ; pending_coinbase_stack : 'pending_coinbase_stack
+        ; next_available_token : 'token_id
+        ; local_state : 'local_state
+        }
       [@@deriving compare, equal, hash, sexp, yojson, hlist, fields]
     end
   end]
@@ -116,21 +117,22 @@ module Statement : sig
              , 'sok_digest
              , 'local_state )
              t =
-          { source:
+          { source :
               ( 'ledger_hash
               , 'pending_coinbase
               , 'token_id
               , 'local_state )
               Registers.Stable.V1.t
-          ; target:
+          ; target :
               ( 'ledger_hash
               , 'pending_coinbase
               , 'token_id
               , 'local_state )
               Registers.Stable.V1.t
-          ; supply_increase: 'amount
-          ; fee_excess: 'fee_excess
-          ; sok_digest: 'sok_digest }
+          ; supply_increase : 'amount
+          ; fee_excess : 'fee_excess
+          ; sok_digest : 'sok_digest
+          }
         [@@deriving compare, equal, hash, sexp, yojson, hlist]
       end
 
@@ -144,37 +146,37 @@ module Statement : sig
              t
 
         (* =
-          { source: 'ledger_hash
-          ; target: 'ledger_hash
-          ; supply_increase: 'amount
-          ; pending_coinbase_stack_state: 'pending_coinbase
-          ; fee_excess: 'fee_excess
-          ; next_available_token_before: 'token_id
-          ; next_available_token_after: 'token_id
-          ; sok_digest: 'sok_digest }
-        [@@deriving compare, equal, hash, sexp, yojson]
+             { source: 'ledger_hash
+             ; target: 'ledger_hash
+             ; supply_increase: 'amount
+             ; pending_coinbase_stack_state: 'pending_coinbase
+             ; fee_excess: 'fee_excess
+             ; next_available_token_before: 'token_id
+             ; next_available_token_after: 'token_id
+             ; sok_digest: 'sok_digest }
+           [@@deriving compare, equal, hash, sexp, yojson]
 
-        val to_latest :
-             ('ledger_hash -> 'ledger_hash')
-          -> ('amount -> 'amount')
-          -> ('pending_coinbase -> 'pending_coinbase')
-          -> ('fee_excess -> 'fee_excess')
-          -> ('token_id -> 'token_id')
-          -> ('sok_digest -> 'sok_digest')
-          -> ( 'ledger_hash
-             , 'amount
-             , 'pending_coinbase
-             , 'fee_excess
-             , 'token_id
-             , 'sok_digest )
-             t
-          -> ( 'ledger_hash'
-             , 'amount'
-             , 'pending_coinbase'
-             , 'fee_excess'
-             , 'token_id'
-             , 'sok_digest' )
-             t *)
+           val to_latest :
+                ('ledger_hash -> 'ledger_hash')
+             -> ('amount -> 'amount')
+             -> ('pending_coinbase -> 'pending_coinbase')
+             -> ('fee_excess -> 'fee_excess')
+             -> ('token_id -> 'token_id')
+             -> ('sok_digest -> 'sok_digest')
+             -> ( 'ledger_hash
+                , 'amount
+                , 'pending_coinbase
+                , 'fee_excess
+                , 'token_id
+                , 'sok_digest )
+                t
+             -> ( 'ledger_hash'
+                , 'amount'
+                , 'pending_coinbase'
+                , 'fee_excess'
+                , 'token_id'
+                , 'sok_digest' )
+                t *)
       end
     end]
   end
@@ -195,13 +197,14 @@ module Statement : sig
         , 'sok_digest
         , 'local_state )
         Poly.t =
-    { source:
+    { source :
         ('ledger_hash, 'pending_coinbase, 'token_id, 'local_state) Registers.t
-    ; target:
+    ; target :
         ('ledger_hash, 'pending_coinbase, 'token_id, 'local_state) Registers.t
-    ; supply_increase: 'amount
-    ; fee_excess: 'fee_excess
-    ; sok_digest: 'sok_digest }
+    ; supply_increase : 'amount
+    ; fee_excess : 'fee_excess
+    ; sok_digest : 'sok_digest
+    }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   [%%versioned:
@@ -471,6 +474,7 @@ module Make (Inputs : sig
 
   val proof_level : Genesis_constants.Proof_level.t
 end) : S
+[@@warning "-67"]
 
 val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t

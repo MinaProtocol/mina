@@ -53,10 +53,11 @@ module Info = struct
 
     module V1 = struct
       type t =
-        { statements: Statement.Stable.V1.t
-        ; work_ids: int One_or_two.Stable.V1.t
-        ; fee: Fee.Stable.V1.t
-        ; prover: Public_key.Compressed.Stable.V1.t }
+        { statements : Statement.Stable.V1.t
+        ; work_ids : int One_or_two.Stable.V1.t
+        ; fee : Fee.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
       [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
@@ -64,10 +65,11 @@ module Info = struct
   end]
 
   type t = Stable.Latest.t =
-    { statements: Statement.t
-    ; work_ids: int One_or_two.t
-    ; fee: Fee.t
-    ; prover: Public_key.Compressed.t }
+    { statements : Statement.t
+    ; work_ids : int One_or_two.t
+    ; fee : Fee.t
+    ; prover : Public_key.Compressed.t
+    }
   [@@deriving to_yojson, sexp, compare]
 end
 
@@ -78,9 +80,10 @@ module T = struct
 
     module V1 = struct
       type t =
-        { fee: Fee.Stable.V1.t
-        ; proofs: Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-        ; prover: Public_key.Compressed.Stable.V1.t }
+        { fee : Fee.Stable.V1.t
+        ; proofs : Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+        ; prover : Public_key.Compressed.Stable.V1.t
+        }
       [@@deriving compare, sexp, yojson]
 
       let to_latest = Fn.id
@@ -88,9 +91,10 @@ module T = struct
   end]
 
   type t = Stable.Latest.t =
-    { fee: Fee.t
-    ; proofs: Ledger_proof.t One_or_two.t
-    ; prover: Public_key.Compressed.t }
+    { fee : Fee.t
+    ; proofs : Ledger_proof.t One_or_two.t
+    ; prover : Public_key.Compressed.t
+    }
   [@@deriving compare, yojson, sexp]
 
   let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
@@ -98,9 +102,10 @@ module T = struct
   let info t =
     let statements = One_or_two.map t.proofs ~f:Ledger_proof.statement in
     { Info.statements
-    ; work_ids= One_or_two.map statements ~f:Transaction_snark.Statement.hash
-    ; fee= t.fee
-    ; prover= t.prover }
+    ; work_ids = One_or_two.map statements ~f:Transaction_snark.Statement.hash
+    ; fee = t.fee
+    ; prover = t.prover
+    }
 end
 
 include T
@@ -115,4 +120,4 @@ end
 
 let forget = Fn.id
 
-let fee {fee; _} = fee
+let fee { fee; _ } = fee

@@ -14,10 +14,7 @@ module type S = sig
     | Find_index : Account_id.t -> Account.Index.t Request.t
 
   val get :
-       depth:int
-    -> var
-    -> Account.Index.Unpacked.var
-    -> (Account.var, _) Checked.t
+    depth:int -> var -> Account.Index.Unpacked.var -> (Account.var, _) Checked.t
 
   val merge : height:int -> t -> t -> t
 
@@ -43,7 +40,8 @@ module type S = sig
     -> var
     -> Account_id.var
     -> is_writeable:Boolean.var
-    -> f:(   is_empty_and_writeable:Boolean.var
+    -> f:
+         (   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t
@@ -52,7 +50,8 @@ module type S = sig
        depth:int
     -> var
     -> Account_id.var
-    -> f:(   is_empty_and_writeable:Boolean.var
+    -> f:
+         (   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t

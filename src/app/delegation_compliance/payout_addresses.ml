@@ -243,7 +243,8 @@ let foundation_addresses =
   ; "B62qndvr7iZsJeFdeYVGYXP6oJY64T5BHjPBTSrfdHrwkxuEYCfa1LF"
   ; "B62qovdiupo2b2UxNhASffHV4CKE5abZD4TmSdSJZzf623fkrgLvouR"
   ; "B62qoFmrHvDzz1H7qztEkvkaqNUbGUCaZJJJjXb8xMmxVotSaWDmyMw"
-  ; "B62qnkYYpjAHWvWkYsy7ANo9omZSQ53bwhKgHXUk8g2XANkjEq4AfNS" ]
+  ; "B62qnkYYpjAHWvWkYsy7ANo9omZSQ53bwhKgHXUk8g2XANkjEq4AfNS"
+  ]
 
 let o1_addresses =
   [ "B62qjMbmoXjUXSjqiR3z9zn8uSF62kExrbQ1mQq51w2ztVbSgEZGUmH"
@@ -485,4 +486,5 @@ let o1_addresses =
   ; "B62qrFTdexNZeedkMCGSEUDtc14atEyevSj6Bzix1UUacaXmiKLsggw"
   ; "B62qpFjUdtZSGzXa6pYJuSv1R5vxJPorZLPgui8Gfg4YPrYEeL5pyz3"
   ; "B62qiydA5hjPMZ8wm7WkmZvcJWGio1A3X91Cu7PDP6WqqipQXEZu1gH"
-  ; "B62qqNHRcLYT3HvUHyQ972BeaZi9Nm4GCRWj4uUbB9iAHhc7ZXiBmFC" ]
+  ; "B62qqNHRcLYT3HvUHyQ972BeaZi9Nm4GCRWj4uUbB9iAHhc7ZXiBmFC"
+  ]

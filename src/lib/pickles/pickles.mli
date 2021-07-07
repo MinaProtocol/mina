@@ -46,7 +46,7 @@ module Verification_key : sig
   val load :
        cache:Key_cache.Spec.t list
     -> Id.t
-    -> (t * [`Cache_hit | `Locally_generated]) Async.Deferred.Or_error.t
+    -> (t * [ `Cache_hit | `Locally_generated ]) Async.Deferred.Or_error.t
 end
 
 module type Proof_intf = sig
@@ -94,8 +94,9 @@ val verify :
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ?handler:(   Snarky_backendless.Request.request
-                 -> Snarky_backendless.Request.response)
+       ?handler:
+         (   Snarky_backendless.Request.request
+          -> Snarky_backendless.Request.response)
     -> ( 'prev_values
        , 'local_widths
        , 'local_heights )
@@ -107,7 +108,7 @@ end
 module Provers : module type of H3_2.T (Prover)
 
 module Dirty : sig
-  type t = [`Cache_hit | `Generated_something | `Locally_generated]
+  type t = [ `Cache_hit | `Generated_something | `Locally_generated ]
 
   val ( + ) : t -> t -> t
 end
@@ -172,12 +173,12 @@ module Side_loaded : sig
     -> bool Async.Deferred.t
 
   (* Must be called in the inductive rule snarky function defining a
-   rule for which this tag is used as a predecessor. *)
+     rule for which this tag is used as a predecessor. *)
   val in_circuit :
     ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.Checked.t -> unit
 
   (* Must be called immediately before calling the prover for the inductive rule
-    for which this tag is used as a predecessor. *)
+     for which this tag is used as a predecessor. *)
   val in_prover : ('var, 'value, 'n1, 'n2) Tag.t -> Verification_key.t -> unit
 end
 
@@ -187,8 +188,9 @@ end
 val compile :
      ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
   -> ?cache:Key_cache.Spec.t list
-  -> ?disk_keys:(Cache.Step.Key.Verification.t, 'branches) Vector.t
-                * Cache.Wrap.Key.Verification.t
+  -> ?disk_keys:
+       (Cache.Step.Key.Verification.t, 'branches) Vector.t
+       * Cache.Wrap.Key.Verification.t
   -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Step.Typ.t
@@ -196,14 +198,15 @@ val compile :
   -> max_branching:(module Nat.Add.Intf with type n = 'max_branching)
   -> name:string
   -> constraint_constants:Snark_keys_header.Constraint_constants.t
-  -> choices:(   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
-              -> ( 'prev_varss
-                 , 'prev_valuess
-                 , 'widthss
-                 , 'heightss
-                 , 'a_var
-                 , 'a_value )
-                 H4_2.T(Inductive_rule).t)
+  -> choices:
+       (   self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+        -> ( 'prev_varss
+           , 'prev_valuess
+           , 'widthss
+           , 'heightss
+           , 'a_var
+           , 'a_value )
+           H4_2.T(Inductive_rule).t)
   -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
      * Cache_handle.t
      * (module Proof_intf

@@ -1,11 +1,9 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
 (* TODO: temporary hack *)
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 [%%versioned
 module Stable = struct
