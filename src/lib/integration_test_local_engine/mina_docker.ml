@@ -200,9 +200,10 @@ module Network_config = struct
     let constants : Test_config.constants =
       { constraints = constraint_constants; genesis = genesis_constants }
     in
+    let open Docker_node_config.Services in
     (* BLOCK PRODUCER CONFIG *)
     let block_producer_config index keypair =
-      { name = "test-block-producer-" ^ Int.to_string (index + 1)
+      { name = Block_producer.name ^ "-" ^ Int.to_string (index + 1)
       ; id = Int.to_string index
       ; keypair
       ; keypair_secret = keypair.secret_name
@@ -220,14 +221,14 @@ module Network_config = struct
         List.mapi
           (List.init num_snark_workers ~f:(const 0))
           ~f:(fun index _ ->
-            { name = "test-snark-worker-" ^ Int.to_string (index + 1)
+            { name = Snark_worker.name ^ "-" ^ Int.to_string (index + 1)
             ; id = Int.to_string index
             ; snark_worker_fee
             ; public_key = snark_worker_public_key
             })
         (* Add one snark coordinator for all workers *)
         |> List.append
-             [ { name = "test-snark-coordinator"
+             [ { name = Snark_coordinator.name
                ; id = "1"
                ; snark_worker_fee
                ; public_key = snark_worker_public_key
@@ -241,19 +242,20 @@ module Network_config = struct
         List.mapi
           (List.init num_archive_nodes ~f:(const 0))
           ~f:(fun index _ ->
-            { name = "archive-" ^ Int.to_string (index + 1)
+            { name = Archive_node.name ^ "-" ^ Int.to_string (index + 1)
             ; id = Int.to_string index
             ; schema = mina_archive_schema
             })
       else []
     in
     (* DOCKER VOLUME CONFIG:
-     * Create a docker volume structure for the runtime_config and all block producer keys
-     *)
+       Create a docker volume structure for the runtime_config and all block producer keys
+       to mount in the specified docker services
+    *)
     let docker_volume_configs =
       List.map block_producer_configs ~f:(fun config ->
-          { name = "sk_" ^ config.name; data = config.private_key })
-      @ [ { name = "runtime_config"
+          { name = "sk-" ^ config.name; data = config.private_key })
+      @ [ { name = Docker_node_config.Volumes.Runtime_config.name
           ; data =
               Yojson.Safe.to_string (Runtime_config.to_yojson runtime_config)
           }
@@ -278,24 +280,36 @@ module Network_config = struct
         }
     }
 
-  (* Creates a mapping of the network_config services to a docker-compose file. *)
+  (*
+     Composes a docker_compose.json file from the network_config specification and writes to disk. This docker_compose
+     file contains docker service definitions for each node in the local network. Each node service has different
+     configurations which are specified as commands, environment variables, and docker bind volumes.
+     We start by creating a runtime config volume to mount to each node service as a bind volume and then continue to create each
+     node service. As we create each definition for a service, we specify the docker command, volume, and environment varibles to 
+     be used (which are mostly defaults).
+  *)
   let to_docker network_config =
     let open Docker_compose.Compose in
-    let open Node_config in
+    let open Docker_node_config in
+    let open Docker_node_config.Services in
+    (* RUNTIME CONFIG DOCKER BIND VOLUME *)
     let runtime_config =
-      Service.Volume.create "runtime_config" "/root/runtime_config"
+      Service.Volume.create Volumes.Runtime_config.name
+        Volumes.Runtime_config.container_mount_target
     in
+    (* BLOCK PRODUCER DOCKER SERVICE *)
     let block_producer_map =
       List.map network_config.docker.block_producer_configs ~f:(fun config ->
-          let private_key_config_name = "sk_" ^ config.name in
+          (* BP KEYPAIR CONFIG DOCKER BIND VOLUME *)
+          let private_key_config_name = "sk-" ^ config.name in
           let private_key_config =
             Service.Volume.create private_key_config_name
               ("/root/" ^ private_key_config_name)
           in
           let cmd =
             Cmd.(
-              Block_producer_command
-                (Block_producer_command.default
+              Block_producer
+                (Block_producer.default
                    ~private_key_config:private_key_config.target))
           in
           ( config.name
@@ -306,15 +320,19 @@ module Network_config = struct
             } ))
       |> StringMap.of_alist_exn
     in
+    (* SNARK COORD/WORKER DOCKER SERVICE *)
     let snark_worker_map =
       List.map network_config.docker.snark_coordinator_configs ~f:(fun config ->
+          (* Assign different command and environment configs depending on coordinator or worker *)
           let command, environment =
-            match String.substr_index config.name ~pattern:"coordinator" with
+            match
+              String.substr_index config.name ~pattern:Snark_coordinator.name
+            with
             | Some _ ->
                 let cmd =
                   Cmd.(
-                    Snark_coordinator_command
-                      (Snark_coordinator_command.default
+                    Snark_coordinator
+                      (Snark_coordinator.default
                          ~snark_coordinator_key:config.public_key
                          ~snark_worker_fee:config.snark_worker_fee))
                 in
@@ -329,12 +347,12 @@ module Network_config = struct
                 in
                 (coordinator_command, coordinator_environment)
             | None ->
+                let daemon_address = Snark_coordinator.name in
+                let daemon_port = Snark_coordinator.default_port in
                 let cmd =
                   Cmd.(
-                    Snark_worker_command
-                      (Snark_worker_command.default
-                         ~daemon_address:"test-snark-coordinator"
-                         ~daemon_port:"8301"))
+                    Snark_worker
+                      (Snark_worker.default ~daemon_address ~daemon_port))
                 in
                 let worker_command =
                   Cmd.create_cmd cmd ~config_file:runtime_config.target
@@ -350,20 +368,21 @@ module Network_config = struct
             } ))
       |> StringMap.of_alist_exn
     in
+    (* ARCHIVE_NODE SERVICE *)
     let archive_node_configs =
       List.mapi network_config.docker.archive_node_configs
         ~f:(fun index config ->
           let postgres_uri =
-            Cli_args.Postgres_uri.create
+            Cmd.Cli_args.Postgres_uri.create
               ~host:
-                ( network_config.docker.stack_name ^ "_postgres-"
+                ( network_config.docker.stack_name ^ "_"
+                ^ Archive_node.postgres_name ^ "-"
                 ^ Int.to_string (index + 1) )
-            |> Cli_args.Postgres_uri.to_string
+            |> Cmd.Cli_args.Postgres_uri.to_string
           in
           let cmd =
-            Cmd.(
-              Archive_node_command
-                { Archive_node_command.postgres_uri; server_port = "3086" })
+            let server_port = Archive_node.server_port in
+            Cmd.(Archive_node { Archive_node.postgres_uri; server_port })
           in
           ( config.name
           , { Service.image = network_config.docker.mina_archive_image
@@ -373,13 +392,13 @@ module Network_config = struct
             } ))
       (* Add an equal number of postgres containers as archive nodes *)
       @ List.mapi network_config.docker.archive_node_configs ~f:(fun index _ ->
-            let pg_config = Cli_args.Postgres_uri.default in
-            (* Mount the archive schema on the /docker-entrypoint-initdb.d postgres entrypoint*)
+            let pg_config = Cmd.Cli_args.Postgres_uri.default in
+            (* Mount the archive schema on the /docker-entrypoint-initdb.d postgres entrypoint *)
             let archive_config =
               Service.Volume.create mina_create_schema
-                ("/docker-entrypoint-initdb.d/" ^ mina_create_schema)
+                (Archive_node.entrypoint_target ^/ mina_create_schema)
             in
-            ( "postgres-" ^ Int.to_string (index + 1)
+            ( Archive_node.postgres_name ^ "-" ^ Int.to_string (index + 1)
             , { Service.image = postgres_image
               ; volumes = [ archive_config ]
               ; command = []
@@ -391,15 +410,17 @@ module Network_config = struct
               } ))
       |> StringMap.of_alist_exn
     in
+    (* SEED DOCKER SERVICE *)
     let seed_map =
       [ (let command =
            if List.length network_config.docker.archive_node_configs > 0 then
-             (* If an archive node is specified in the test plan, use the seed node to connect to the coda-archive process *)
-             Cmd.create_cmd Seed_command ~config_file:runtime_config.target
-             @ [ "-archive-address"; "archive-1:3086" ]
-           else Cmd.create_cmd Seed_command ~config_file:runtime_config.target
+             (* If an archive node is specified in the test plan, use the seed node to connect to the first mina-archive process *)
+             Cmd.create_cmd Seed ~config_file:runtime_config.target
+             @ Cmd.Seed.connect_to_archive
+                 ~archive_node:("archive-1:" ^ Services.Archive_node.server_port)
+           else Cmd.create_cmd Seed ~config_file:runtime_config.target
          in
-         ( "seed"
+         ( Seed.name
          , { Service.image = network_config.docker.mina_image
            ; volumes = [ runtime_config ]
            ; command
@@ -435,6 +456,14 @@ module Network_manager = struct
 
   let run_cmd_exn t prog args = Util.run_cmd_exn t.testnet_dir prog args
 
+  (*
+      Creates a docker swarm network by creating a local working directory and writing a
+      docker_compose.json file to disk with all related resources (e.g. runtime_config and secret keys).
+
+      First, check if there is a running swarm network and let the user remove it. Continue by creating a
+      working directory and writing out all resources to be used as docker volumes. Additionally for each resource, specify
+      file permissions of 600 so that the daemon can run properly.
+  *)
   let create ~logger (network_config : Network_config.t) =
     let%bind all_stacks_str =
       Util.run_cmd_exn "/" "docker" [ "stack"; "ls"; "--format"; "{{.Name}}" ]
@@ -488,7 +517,8 @@ module Network_manager = struct
     in
     let seed_nodes =
       [ cons_node network_config.docker.stack_name
-          (network_config.docker.stack_name ^ "_seed")
+          ( network_config.docker.stack_name ^ "_"
+          ^ Docker_node_config.Services.Seed.name )
           None
       ]
     in
@@ -506,12 +536,12 @@ module Network_manager = struct
             None)
     in
     let%bind _ =
+      (* If any archive nodes are specified, write the archive schema to the working directory to use as an entrypoint for postgres *)
       if List.length network_config.docker.archive_node_configs > 0 then
         let cmd =
-          Printf.sprintf "curl -Ls %s > create_schema.sql"
-            network_config.docker.mina_archive_schema
+          Printf.sprintf "curl -Ls %s > %s"
+            network_config.docker.mina_archive_schema mina_create_schema
         in
-        (* Write the archive schema to the working directory to use as an entrypoint for postgres*)
         Util.run_cmd_exn testnet_dir "bash" [ "-c"; cmd ]
       else return ""
     in

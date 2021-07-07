@@ -34,62 +34,70 @@ module Envs = struct
     ]
 end
 
-module Cli_args = struct
-  module Log_level = struct
-    type t = Debug
+module Volumes = struct
+  module Runtime_config = struct
+    let name = "runtime_config"
 
-    let to_string t = match t with Debug -> "Debug"
-  end
-
-  module Peer = struct
-    type t = string
-
-    let default =
-      "/dns4/seed/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"
-  end
-
-  module Postgres_uri = struct
-    type t =
-      { username : string
-      ; password : string
-      ; host : string
-      ; port : string
-      ; db : string
-      }
-
-    let create ~host =
-      { username = "postgres"
-      ; password = "password"
-      ; host
-      ; port = "5432"
-      ; db = "archive"
-      }
-
-    (* Hostname should be dynamic based on the container ID in runtime. Ignore this field for default binding *)
-    let default =
-      { username = "postgres"
-      ; password = "password"
-      ; host = ""
-      ; port = "5432"
-      ; db = "archive"
-      }
-
-    let to_string t =
-      Printf.sprintf "postgres://%s:%s@%s:%s/%s" t.username t.password t.host
-        t.port t.db
-  end
-
-  module Proof_level = struct
-    type t = Full
-
-    let to_string t = match t with Full -> "Full"
+    let container_mount_target = "/root/" ^ name
   end
 end
 
 module Cmd = struct
+  module Cli_args = struct
+    module Log_level = struct
+      type t = Debug
+
+      let to_string t = match t with Debug -> "Debug"
+    end
+
+    module Peer = struct
+      type t = string
+
+      let default =
+        "/dns4/seed/tcp/10401/p2p/12D3KooWCoGWacXE4FRwAX8VqhnWVKhz5TTEecWEuGmiNrDt2XLf"
+    end
+
+    module Postgres_uri = struct
+      type t =
+        { username : string
+        ; password : string
+        ; host : string
+        ; port : string
+        ; db : string
+        }
+
+      let create ~host =
+        { username = "postgres"
+        ; password = "password"
+        ; host
+        ; port = "5432"
+        ; db = "archive"
+        }
+
+      (* Hostname should be dynamic based on the container ID in runtime. Ignore this field for default binding *)
+      let default =
+        { username = "postgres"
+        ; password = "password"
+        ; host = ""
+        ; port = "5432"
+        ; db = "archive"
+        }
+
+      let to_string t =
+        Printf.sprintf "postgres://%s:%s@%s:%s/%s" t.username t.password t.host
+          t.port t.db
+    end
+
+    module Proof_level = struct
+      type t = Full
+
+      let to_string t = match t with Full -> "Full"
+    end
+  end
+
   open Cli_args
 
-  module Base_command = struct
+  module Base = struct
     type t =
       { peer : Peer.t
       ; log_level : Log_level.t
@@ -139,12 +147,13 @@ module Cmd = struct
     let default_cmd ~config_file = default ~config_file |> to_string
   end
 
-  module Seed_command = struct
-    let cmd ~config_file =
-      [ "daemon"; "-seed" ] @ Base_command.default_cmd ~config_file
+  module Seed = struct
+    let cmd ~config_file = [ "daemon"; "-seed" ] @ Base.default_cmd ~config_file
+
+    let connect_to_archive ~archive_node = [ "-archive-address"; archive_node ]
   end
 
-  module Block_producer_command = struct
+  module Block_producer = struct
     type t =
       { block_producer_key : string
       ; enable_flooding : bool
@@ -166,10 +175,10 @@ module Cmd = struct
       ; "-enable-peer-exchange"
       ; Bool.to_string t.enable_peer_exchange
       ]
-      @ Base_command.default_cmd ~config_file
+      @ Base.default_cmd ~config_file
   end
 
-  module Snark_coordinator_command = struct
+  module Snark_coordinator = struct
     type t =
       { snark_coordinator_key : string
       ; snark_worker_fee : string
@@ -188,10 +197,12 @@ module Cmd = struct
       ; "-work-selection"
       ; t.work_selection
       ]
-      @ Base_command.default_cmd ~config_file
+      @ Base.default_cmd ~config_file
   end
 
-  module Snark_worker_command = struct
+  module Snark_worker = struct
+    let name = "snark-worker"
+
     type t =
       { daemon_address : string
       ; daemon_port : string
@@ -209,10 +220,10 @@ module Cmd = struct
       ; "-daemon-address"
       ; t.daemon_address ^ ":" ^ t.daemon_port
       ]
-      @ Base_command.default_cmd ~config_file
+      @ Base.default_cmd ~config_file
   end
 
-  module Archive_node_command = struct
+  module Archive_node = struct
     type t = { postgres_uri : string; server_port : string }
 
     let default =
@@ -235,22 +246,74 @@ module Cmd = struct
   end
 
   type t =
-    | Seed_command
-    | Block_producer_command of Block_producer_command.t
-    | Snark_coordinator_command of Snark_coordinator_command.t
-    | Snark_worker_command of Snark_worker_command.t
-    | Archive_node_command of Archive_node_command.t
+    | Seed
+    | Block_producer of Block_producer.t
+    | Snark_coordinator of Snark_coordinator.t
+    | Snark_worker of Snark_worker.t
+    | Archive_node of Archive_node.t
 
   let create_cmd t ~config_file =
     match t with
-    | Seed_command ->
-        Seed_command.cmd ~config_file
-    | Block_producer_command args ->
-        Block_producer_command.cmd args ~config_file
-    | Snark_coordinator_command args ->
-        Snark_coordinator_command.cmd args ~config_file
-    | Snark_worker_command args ->
-        Snark_worker_command.cmd args ~config_file
-    | Archive_node_command args ->
-        Archive_node_command.cmd args ~config_file
+    | Seed ->
+        Seed.cmd ~config_file
+    | Block_producer args ->
+        Block_producer.cmd args ~config_file
+    | Snark_coordinator args ->
+        Snark_coordinator.cmd args ~config_file
+    | Snark_worker args ->
+        Snark_worker.cmd args ~config_file
+    | Archive_node args ->
+        Archive_node.cmd args ~config_file
+end
+
+module Services = struct
+  module Seed = struct
+    let name = "seed"
+
+    let env = Envs.base_node_envs
+
+    let cmd = Cmd.Seed
+  end
+
+  module Block_producer = struct
+    let name = "block-producer"
+
+    let secret_name = "keypair"
+
+    let env = Envs.base_node_envs
+
+    let cmd args = Cmd.Block_producer args
+  end
+
+  module Snark_coordinator = struct
+    let name = "snark-coordinator"
+
+    let default_port = "8301"
+
+    let env = Envs.snark_coord_envs
+
+    let cmd args = Cmd.Snark_coordinator args
+  end
+
+  module Snark_worker = struct
+    let name = "snark-worker"
+
+    let env = []
+
+    let cmd args = Cmd.Snark_worker args
+  end
+
+  module Archive_node = struct
+    let name = "archive"
+
+    let postgres_name = "postgres"
+
+    let server_port = "3086"
+
+    let envs = Envs.base_node_envs
+
+    let cmd args = Cmd.Archive_node args
+
+    let entrypoint_target = "/docker-entrypoint-initdb.d"
+  end
 end
