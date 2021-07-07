@@ -102,7 +102,7 @@ let%test_module "TLS Notary test" =
         Array.iteri [|0;0;0;1|] ~f:(fun i x -> ec0.(i+12) <- Field.of_int x);
         let ec0 = Block.encryptBlock ec0 ks in
         let ptdl1 = 2 in
-        let ec = Array.init ptdl1 ~f:(fun i -> 
+        let ec = Array.init ptdl1 ~f:(fun i ->
         (
           let cnt = Array.copy iv in
           let i = i + bloks - ptdl1 + 2 in
@@ -114,14 +114,14 @@ let%test_module "TLS Notary test" =
         (* decrypt score ciphertext into plaintext and decode *)
         let score = let offset = ctl-9-(bloks-ptdl1)*16 in Array.mapi (Array.sub ct (ctl-9) 3)
           ~f:(fun i x -> Bytes.asciiDigit (Bytes.xor ec.((offset+i)/16).((offset+i)%16) x)) in
-        
+
         (* check the score *)
         Bytes.assertScore Field.(score.(0) * (of_int 100) + score.(1) * (of_int 10) + score.(2));
 
         (* pad ciphertext to the block boundary *)
         let ctp = Array.append ct (Array.init (bloks*16-ctl) ~f:(fun _ -> Field.zero)) in
         let ctp = Array.init bloks ~f:(fun i -> Array.sub ctp (i*16) 16) in
-        
+
         (* compute GCM ciphertext authentication tag *)
         let len = Array.init 16 ~f:(fun _ -> Field.zero)  in
         Array.iteri ~f:(fun i x -> len.(i + 12) <- Field.of_int x)
@@ -134,7 +134,7 @@ let%test_module "TLS Notary test" =
             if i <= bloks then htn
             else ht
           ) in
-        
+
         let at = Block.xor ec0 at in
 
 (*      just vrifying the hash-tag correctness
@@ -146,7 +146,7 @@ let%test_module "TLS Notary test" =
         (* hash the data to be signed *)
         let hb = Array.map ~f:(fun x -> Bytes.b16tof x) [|key; iv; at|] in
         Array.iter ~f:(fun x -> Sponge.absorb x) (Array.append hb [|fst rc; snd rc;|]);
-        let e = Sponge.squeeze in
+        let e = Sponge.squeeze () in
 
         (* verify TlsNotary signature *)
         let lpt = Ecc.add (Ecc.mul q e) rc in
@@ -157,7 +157,7 @@ let%test_module "TLS Notary test" =
 
       module Public_input = Test.Public_input (Impl)
       open Public_input
-      let input () = 
+      let input () =
         let open Typ in
         Impl.Data_spec.
         [
@@ -191,6 +191,6 @@ let%test_module "TLS Notary test" =
 
     module Impl = Snarky.Snark.Run.Make(Zexe_backend.Pasta.Vesta_based_plonk_plookup) (Core.Unit)
     module Params = struct let params = Sponge.Params.(map pasta_p5 ~f:Impl.Field.Constant.of_string) end
-    include TlsNotarySignature (Impl) (Params) 
+    include TlsNotarySignature (Impl) (Params)
   end
 )

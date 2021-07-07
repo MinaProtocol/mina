@@ -14,15 +14,15 @@ module ArithmeticSponge
   type 'f t =
     { mutable state: 'f Array.t
     ; mutable sponge_state: sponge_state }
-    
+
   let st: Field.t t = {state = Array.init 5 ~f:(fun _ -> Field.zero); sponge_state= Absorbed 0;}
 
   let add_assign ~state i x = Field.(state.(i) <- (state.(i) + x))
 
   let permute (start : Field.t array) rounds : Field.t array =
     let length = Array.length start in
-    let state = exists 
-        (Snarky.Typ.array ~length:Int.(rounds + 1) (Snarky.Typ.array length Field.typ)) 
+    let state = exists
+        (Snarky.Typ.array ~length:Int.(rounds + 1) (Snarky.Typ.array length Field.typ))
         ~compute:As_prover.(fun () ->
             (
               let state = Array.create Int.(rounds + 1) (Array.create length zero) in
@@ -64,7 +64,7 @@ module ArithmeticSponge
         add_assign ~state:st.state 0 x ;
         st.sponge_state <- Absorbed 1
 
-  let squeeze =
+  let squeeze () =
     match st.sponge_state with
     | Squeezed n ->
         if n = rate then (
