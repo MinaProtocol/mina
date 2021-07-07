@@ -233,7 +233,6 @@ struct
           let open Quickcheck.Generator.Let_syntax in
           let%bind n = Quickcheck.Generator.small_positive_int
           and n_pre = Quickcheck.Generator.small_positive_int in
-          let n_pre = 2 in
           let%map xs = List.gen_with_length n Field.Constant.gen
           and bs = List.gen_with_length n Bool.quickcheck_generator
           and pre = List.gen_with_length n_pre Field.Constant.gen in
