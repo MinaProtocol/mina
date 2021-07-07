@@ -15,7 +15,18 @@ spec:
           - command:
             - /bin/bash
             - -c
-            - 'pg_dump --no-owner --create postgres://postgres:foobar@archive-3:5432/archive > mainnet_archive.sql
+            - '
+            DATE="$(date +%F_%H%M)"
+            FILENAME=archive-dump-"$DATE".sql
+
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive > $FILENAME
+
+            echo "archive database dumped"
+
+            gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $FILENAME gs://mina-archive-dumps
+
+            echo "archive database uploaded to bucket"
+
             '
             env:
             - name: GCLOUD_KEYFILE
