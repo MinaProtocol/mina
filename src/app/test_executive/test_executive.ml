@@ -27,14 +27,14 @@ type test_inputs_with_cli_inputs =
 type inputs =
   { test_inputs : test_inputs_with_cli_inputs
   ; test : test
-  ; coda_image : string
+  ; mina_image : string
   ; archive_image : string
   ; debug : bool
   }
 
-let validate_inputs { coda_image; _ } =
-  if String.is_empty coda_image then
-    failwith "Coda image cannot be an empt string"
+let validate_inputs { mina_image; _ } =
+  if String.is_empty mina_image then
+    failwith "Mina image cannot be an empty string"
 
 let engines : engine list =
   [ ("cloud", (module Integration_test_cloud_engine : Intf.Engine.S)) ]
@@ -240,7 +240,7 @@ let main inputs =
    *)
   let logger = Logger.create () in
   let images =
-    { Test_config.Container_images.coda = inputs.coda_image
+    { Test_config.Container_images.mina = inputs.mina_image
     ; archive_node = inputs.archive_image
     ; user_agent = "codaprotocol/coda-user-agent:0.1.5"
     ; bots = "codaprotocol/coda-bots:0.0.13-beta-1"
@@ -356,13 +356,13 @@ let test_arg =
   let doc = "The name of the test to execute." in
   Arg.(required & pos 0 (some (enum indexed_tests)) None & info [] ~doc)
 
-let coda_image_arg =
-  let doc = "Identifier of the coda docker image to test." in
-  let env = Arg.env_var "CODA_IMAGE" ~doc in
+let mina_image_arg =
+  let doc = "Identifier of the Mina docker image to test." in
+  let env = Arg.env_var "MINA_IMAGE" ~doc in
   Arg.(
     required
     & opt (some string) None
-    & info [ "coda-image" ] ~env ~docv:"CODA_IMAGE" ~doc)
+    & info [ "mina-image" ] ~env ~docv:"MINA_IMAGE" ~doc)
 
 let archive_image_arg =
   let doc = "Identifier of the archive node docker image to test." in
@@ -394,12 +394,12 @@ let engine_cmd ((engine_name, (module Engine)) : engine) =
     Term.(const wrap_cli_inputs $ Engine.Network_config.Cli_inputs.term)
   in
   let inputs_term =
-    let cons_inputs test_inputs test coda_image archive_image debug =
-      { test_inputs; test; coda_image; archive_image; debug }
+    let cons_inputs test_inputs test mina_image archive_image debug =
+      { test_inputs; test; mina_image; archive_image; debug }
     in
     Term.(
       const cons_inputs $ test_inputs_with_cli_inputs_arg $ test_arg
-      $ coda_image_arg $ archive_image_arg $ debug_arg)
+      $ mina_image_arg $ archive_image_arg $ debug_arg)
   in
   let term = Term.(const start $ inputs_term) in
   (term, info)

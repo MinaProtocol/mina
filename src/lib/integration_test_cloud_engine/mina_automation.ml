@@ -40,11 +40,11 @@ module Network_config = struct
     ; aws_route53_zone_id : string
     ; testnet_name : string
     ; deploy_graphql_ingress : bool
-    ; coda_image : string
-    ; coda_agent_image : string
-    ; coda_bots_image : string
-    ; coda_points_image : string
-    ; coda_archive_image : string
+    ; mina_image : string
+    ; mina_agent_image : string
+    ; mina_bots_image : string
+    ; mina_points_image : string
+    ; mina_archive_image : string
           (* this field needs to be sent as a string to terraform, even though it's a json encoded value *)
     ; runtime_config : Yojson.Safe.t
           [@to_yojson fun j -> `String (Yojson.Safe.to_string j)]
@@ -59,7 +59,7 @@ module Network_config = struct
   [@@deriving to_yojson]
 
   type t =
-    { coda_automation_location : string
+    { mina_automation_location : string
     ; debug_arg : bool
     ; keypairs : Network_keypair.t list
     ; constants : Test_config.constants
@@ -221,7 +221,7 @@ module Network_config = struct
       "https://raw.githubusercontent.com/MinaProtocol/mina/develop/src/app/archive/create_schema.sql"
     in
     (* NETWORK CONFIG *)
-    { coda_automation_location = cli_inputs.coda_automation_location
+    { mina_automation_location = cli_inputs.mina_automation_location
     ; debug_arg = debug
     ; keypairs = block_producer_keypairs
     ; constants
@@ -231,11 +231,11 @@ module Network_config = struct
         ; k8s_context = cluster_id
         ; testnet_name
         ; deploy_graphql_ingress = requires_graphql
-        ; coda_image = images.coda
-        ; coda_agent_image = images.user_agent
-        ; coda_bots_image = images.bots
-        ; coda_points_image = images.points
-        ; coda_archive_image = images.archive_node
+        ; mina_image = images.mina
+        ; mina_agent_image = images.user_agent
+        ; mina_bots_image = images.bots
+        ; mina_points_image = images.points
+        ; mina_archive_image = images.archive_node
         ; runtime_config = Runtime_config.to_yojson runtime_config
         ; block_producer_configs =
             List.mapi block_producer_keypairs ~f:block_producer_config
@@ -326,7 +326,7 @@ module Network_manager = struct
     in
     let all_namespaces = String.split ~on:' ' all_namespaces_str in
     let testnet_dir =
-      network_config.coda_automation_location ^/ "terraform/testnets"
+      network_config.mina_automation_location ^/ "terraform/testnets"
       ^/ network_config.terraform.testnet_name
     in
     let%bind () =
@@ -366,7 +366,7 @@ module Network_manager = struct
         ~constraint_constants ~genesis_constants
     in
     let%bind (_, genesis_proof_filename) =
-      Genesis_ledger_helper.Genesis_proof.load_or_generate ~logger ~genesis_dir 
+      Genesis_ledger_helper.Genesis_proof.load_or_generate ~logger ~genesis_dir
         inputs
     in
     *)

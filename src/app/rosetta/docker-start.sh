@@ -26,7 +26,7 @@ pg_ctlcluster 11 main start
 # wait for it to settle
 sleep 3
 
-export CODA_PRIVKEY_PASS=""
+export MINA_PRIVKEY_PASS=""
 export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
 export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/data/config.json}

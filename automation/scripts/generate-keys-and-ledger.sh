@@ -10,7 +10,7 @@ FISH_COUNT=1
 SEED_COUNT=1
 EXTRA_COUNT=1 # Extra community keys to be handed out manually
 
-CODA_DAEMON_IMAGE="codaprotocol/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-a46b9ef"
+MINA_DAEMON_IMAGE="codaprotocol/mina-daemon:1.1.6alpha4-feature-mina-passwd-envvars-devnet-4a86bc8"
 
 WHALE_AMOUNT=2250000
 FISH_AMOUNT=20000
@@ -88,18 +88,18 @@ function generate_key_files {
   for k in $(seq 1 $COUNT); do
     docker run \
       -v "${output_dir}:/keys:z" \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
+      --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
+      -c "MINA_PRIVKEY_PASS='${privkey_pass}' mina advanced generate-keypair -privkey-path /keys/${name_prefix}_account_${k}"
     docker run \
       --mount type=bind,source=${output_dir},target=/keys \
-      --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
-      -c "CODA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
+      --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
+      -c "MINA_LIBP2P_PASS='${privkey_pass}' mina advanced generate-libp2p-keypair -privkey-path /keys/${name_prefix}_libp2p_${k}"
   done
 
   # ensure proper r+w permissions for access to keys external to container
   docker run \
     -v "${output_dir}:/keys:z" \
-    --entrypoint /bin/bash $CODA_DAEMON_IMAGE \
+    --entrypoint /bin/bash $MINA_DAEMON_IMAGE \
     -c "chmod -R +rw /keys"
 }
 
@@ -293,7 +293,7 @@ if [[ -s "terraform/testnets/${TESTNET}/genesis_ledger.json" ]] ; then
   exit
 fi
 
-#if $COMMUNITY_ENABLED ; then 
+#if $COMMUNITY_ENABLED ; then
 #    echo "-- Creating genesis ledger with 'coda-network genesis' --"
 #else
 #  echo "-- Creating genesis ledger with 'coda-network genesis' without community keys --"
