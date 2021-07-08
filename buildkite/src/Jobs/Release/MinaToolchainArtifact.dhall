@@ -34,7 +34,6 @@ Pipeline.build
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-toolchain",
-        network="devnet",
         deb_codename="buster",
         step_key="mina-toolchain-buster-docker-image"
       }
