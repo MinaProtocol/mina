@@ -13,11 +13,10 @@ let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
-let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
 let dependsOn = [ { name = "MinaArtifactBuster", key = "build-deb-pkg" } ]
-let rosettaDependsOn = [ { name = "MinaArtifactBuster", key = "upload-git-env" } ]
+let rosettaDependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
 in
 
@@ -25,7 +24,7 @@ Pipeline.build
   Pipeline.Config::{
     spec =
       JobSpec::{
-        dirtyWhen = OpamInit.dirtyWhen # [
+        dirtyWhen = Cmd.run # [
           S.strictlyStart (S.contains "src"),
           S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
@@ -40,7 +39,6 @@ Pipeline.build
       },
     steps = [
       Libp2p.step,
-      UploadGitEnv.step,
       Command.build
         Command.Config::{
           commands = OpamInit.andThenRunInDocker [
@@ -51,7 +49,7 @@ Pipeline.build
             "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
             -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
-          ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
+          ] "./buildkite/scripts/build-artifact.sh",
           label = "Build Mina daemon package for Debian Buster",
           key = "build-deb-pkg",
           target = Size.XLarge,
@@ -62,6 +60,7 @@ Pipeline.build
       -- daemon devnet image
       let daemonDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
+        deploy_env_file="export-git-env-vars.sh",
         service="mina-daemon",
         network="devnet",
         deb_codename="buster",
@@ -75,6 +74,7 @@ Pipeline.build
       -- daemon mainnet image
       let daemonMainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
+        deploy_env_file="export-git-env-vars.sh",
         service="mina-daemon",
         network="mainnet",
         deb_codename="buster",
@@ -88,6 +88,7 @@ Pipeline.build
       -- archive devnet image
       let archiveDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
+        deploy_env_file="export-git-env-vars.sh",
         service="mina-archive",
         deb_codename="buster",
         step_key="archive-devnet-buster-docker-image"
@@ -100,6 +101,7 @@ Pipeline.build
       -- archive mainnet image
       let archiveMainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
+        deploy_env_file="export-git-env-vars.sh",
         network="mainnet",
         service="mina-archive",
         deb_codename="buster",

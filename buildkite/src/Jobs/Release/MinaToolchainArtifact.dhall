@@ -8,12 +8,11 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
 let Size = ../../Command/Size.dhall
-let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 let DockerLogin = ../../Command/DockerLogin/Type.dhall
 
 
-let dependsOn = { name = "MinaToolchainArtifact", key = "upload-git-env" }
+let dependsOn = { name = "GitEnvUpload", key = "upload-git-env" }
 let deployEnv = "export-git-env-vars.sh"
 
 let commands : List Cmd.Type =
@@ -50,7 +49,6 @@ Pipeline.build
         name = "MinaToolchainArtifact"
       },
     steps = [
-      UploadGitEnv.step,
       Command.build
         Command.Config::{
             commands  = commands,
