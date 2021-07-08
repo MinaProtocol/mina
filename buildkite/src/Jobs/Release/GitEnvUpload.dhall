@@ -13,7 +13,7 @@ let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 
 let deployEnv = "export-git-env-vars.sh"
 
-Pipeline.build
+in Pipeline.build
   Pipeline.Config::{
     spec =
       JobSpec::{
@@ -28,3 +28,4 @@ Pipeline.build
       UploadGitEnv.step
     ]
   }
+}
