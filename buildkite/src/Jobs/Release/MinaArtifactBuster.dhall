@@ -24,7 +24,7 @@ Pipeline.build
   Pipeline.Config::{
     spec =
       JobSpec::{
-        dirtyWhen = Cmd.run # [
+        dirtyWhen = OpamInit.dirtyWhen # [
           S.strictlyStart (S.contains "src"),
           S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
