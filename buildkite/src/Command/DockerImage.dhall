@@ -45,7 +45,7 @@ let ReleaseSpec = {
 
 let generateStep = \(spec : ReleaseSpec.Type) ->
     -- assume head or first dependency specified by spec represents the primary artifact dependency step
-    let artifactUploadScope = Prelude.Optional.default Command.TaggedKey.Type defaultArtifactStep (List/head Command.TaggedKey.Type spec.deps) 
+    let artifactUploadScope = Command.TaggedKey.Type defaultArtifactStep
 
     let commands : List Cmd.Type =
     [
