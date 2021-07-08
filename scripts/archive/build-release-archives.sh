@@ -35,7 +35,7 @@ BUILD_DIR="deb_build"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PROJECT}
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
@@ -45,7 +45,7 @@ Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Archive Process
  Compatible with Mina Daemon
- Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
+ Built from ${GITHASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
 echo "------------------------------------------------------------"
@@ -73,7 +73,7 @@ find "${BUILD_DIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${VERSION}.deb
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ###### archiver deb with testnet signatures
@@ -82,7 +82,7 @@ rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PROJECT}-devnet
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
@@ -92,7 +92,7 @@ Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Archive Process
  Compatible with Mina Daemon
- Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
+ Built from ${GITHASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
 echo "------------------------------------------------------------"
@@ -120,7 +120,7 @@ find "${BUILD_DIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-devnet_${VERSION}.deb
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ###### archiver deb with mainnet signatures
@@ -129,7 +129,7 @@ rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/DEBIAN"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: ${PROJECT}-mainnet
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
@@ -139,7 +139,7 @@ Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Mina Archive Process
  Compatible with Mina Daemon
- Built from ${GIT_HASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
+ Built from ${GITHASH} by ${BUILDKITE_BUILD_URL:-"Mina CI"}
 EOF
 
 echo "------------------------------------------------------------"
@@ -167,5 +167,5 @@ find "${BUILD_DIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-mainnet_${VERSION}.deb
+dpkg-deb --build "${BUILD_DIR}" ${PROJECT}-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
