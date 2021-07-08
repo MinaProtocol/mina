@@ -299,12 +299,6 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
-deb_optimized:
-	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
-	$(WRAP) ./scripts/archive/build-release-archives.sh "optimized"
-	@mkdir -p /tmp/artifacts
-	@cp _build/mina*.deb /tmp/artifacts/.
-
 build_pv_keys: ocaml_checks
 	$(info Building keys)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only

@@ -27,17 +27,7 @@ BUILD_URL=${BUILDKITE_BUILD_URL}
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
-VERSION="${MINA_DEB_VERSION}"
-
 cd "${SCRIPTPATH}/../_build"
-
-if [[ "$1" == "optimized" ]] ; then
-    echo "Optimized deb"
-    VERSION=${VERSION}_optimized
-else
-    echo "Standard deb"
-    VERSION=${VERSION}
-fi
 
 # Set dependencies based on debian release
 SHARED_DEPS="libssl1.1, libgmp10, libgomp1, "
@@ -67,7 +57,7 @@ mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 
 Package: mina-generate-keypair
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 License: Apache-2.0
 Vendor: none
 Architecture: amd64
@@ -98,7 +88,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-generate-keypair_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ##################################### END GENERATE KEYPAIR PACKAGE #######################################
@@ -111,7 +101,7 @@ rm -rf "${BUILDDIR}"
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: mina-mainnet
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
@@ -185,7 +175,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-mainnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 ###### deb with testnet signatures
@@ -194,7 +184,7 @@ echo "Building testnet signatures deb without keys:"
 
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
 Package: mina-devnet
-Version: ${VERSION}
+Version: ${MINA_DEB_VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
@@ -229,7 +219,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" mina-devnet_${MINA_DEB_VERSION}.deb
 ls -lh mina*.deb
 
 # TODO: Find a way to package keys properly without blocking/locking in CI
