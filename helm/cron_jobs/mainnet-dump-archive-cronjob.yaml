@@ -16,16 +16,24 @@ spec:
             - /bin/bash
             - -c
             - '
-            DATE="$(date +%F_%H%M)"
-            FILENAME=archive-dump-"$DATE".sql
+            apk add curl;
+            apk add python3;
+            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
+            tar -xzf google-cloud-sdk-347.0.0-linux-x86_64.tar.gz;
+            echo "installed gsutil";
 
-            pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive > $FILENAME
+            DATE="$(date +%F_%H%M)";
+            FILENAME=archive-dump-"$DATE".sql;
 
-            echo "archive database dumped"
+            pg_dump --no-owner --create postgres://postgres:foobar@archive-3-postgresql:5432/archive > $FILENAME;
 
-            gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $FILENAME gs://mina-archive-dumps
+            tar -czvf $FILENAME.tar.gz $FILENAME;
 
-            echo "archive database uploaded to bucket"
+            echo "archive database dumped";
+
+            ./google-cloud-sdk/bin/gsutil -o Credentials:gs_service_key_file=/gcloud/keyfile.json cp $FILENAME.tar.gz gs://mina-archive-dumps;
+
+            echo "archive database uploaded to bucket";
 
             '
             env:
