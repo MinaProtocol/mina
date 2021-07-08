@@ -34,6 +34,7 @@ else
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
 fi
 
+export MINA_VERSION=${VERSION}
 export MINA_DOCKER_TAG=${DOCKER_TAG}
 export MINA_DEB_VERSION=${VERSION}
 export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=stretch}
