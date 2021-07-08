@@ -16,8 +16,8 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let UploadGitEnv = ../../Command/UploadGitEnv.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
-let dependsOn = [ { name = "MinaArtifact", key = "build-deb-pkg" } ]
-let rosettaDependsOn = [ { name = "MinaArtifact", key = "upload-git-env" } ]
+let dependsOn = [ { name = "MinaArtifactBuster", key = "build-deb-pkg" } ]
+let rosettaDependsOn = [ { name = "MinaArtifactBuster", key = "upload-git-env" } ]
 
 in
 
@@ -29,14 +29,14 @@ Pipeline.build
           S.strictlyStart (S.contains "src"),
           S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
-          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifact"),
+          S.strictlyStart (S.contains "buildkite/src/Jobs/Release/MinaArtifactBuster"),
           S.exactly "buildkite/scripts/build-artifact" "sh",
-          S.exactly "buildkite/scripts/connect-to-testnet-on-develop" "sh",
+          S.exactly "buildkite/scripts/connect-to-mainnet-on-compatible" "sh",
           S.strictlyStart (S.contains "dockerfiles"),
           S.strictlyStart (S.contains "scripts")
         ],
         path = "Release",
-        name = "MinaArtifact"
+        name = "MinaArtifactBuster"
       },
     steps = [
       Libp2p.step,
@@ -52,7 +52,7 @@ Pipeline.build
             -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh" # [ Cmd.run "buildkite/scripts/buildkite-artifact-helper.sh ./DOCKER_DEPLOY_ENV" ],
-          label = "Build Mina daemon debian package",
+          label = "Build Mina daemon package for Debian Buster",
           key = "build-deb-pkg",
           target = Size.XLarge,
           artifact_paths = [ S.contains "_build/*.deb" ],
@@ -64,7 +64,8 @@ Pipeline.build
         deps=dependsOn,
         service="mina-daemon",
         network="devnet",
-        step_key="daemon-devnet-docker-image"
+        deb_codename="buster",
+        step_key="daemon-devnet-buster-docker-image"
       }
 
       in
@@ -76,7 +77,8 @@ Pipeline.build
         deps=dependsOn,
         service="mina-daemon",
         network="mainnet",
-        step_key="daemon-mainnet-docker-image"
+        deb_codename="buster",
+        step_key="daemon-mainnet-buster-docker-image"
       }
 
       in
@@ -87,7 +89,8 @@ Pipeline.build
       let archiveDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-archive",
-        step_key="archive-devnet-docker-image"
+        deb_codename="buster",
+        step_key="archive-devnet-buster-docker-image"
       }
 
       in
@@ -99,7 +102,8 @@ Pipeline.build
         deps=dependsOn,
         network="mainnet",
         service="mina-archive",
-        step_key="archive-mainnet-docker-image"
+        deb_codename="buster",
+        step_key="archive-mainnet-buster-docker-image"
       }
 
       in
@@ -114,7 +118,8 @@ Pipeline.build
         version="\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
-        step_key="rosetta-mainnet-docker-image"
+        deb_codename="buster",
+        step_key="rosetta-mainnet-buster-docker-image"
       }
 
       in
@@ -129,7 +134,8 @@ Pipeline.build
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
-        step_key="rosetta-dev-docker-image"
+        deb_codename="buster",
+        step_key="rosetta-dev-buster-docker-image"
       }
 
       in

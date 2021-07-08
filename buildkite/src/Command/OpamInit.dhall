@@ -16,7 +16,7 @@ let commands : List Text -> List Cmd.Type = \(environment : List Text) ->
           "> opam_ci_cache.sig"),
     Cmd.cacheThrough
       Cmd.Docker::{
-        image = (../Constants/ContainerImages.dhall).minaToolchain,
+        image = (../Constants/ContainerImages.dhall).minaToolchainStretch,
         extraEnv = environment
       }
       file
@@ -31,7 +31,7 @@ let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
   \(innerScript : Text) ->
     [ Mina.fixPermissionsCommand ] # (commands environment) # [
       Cmd.runInDocker
-        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchain, extraEnv = environment })
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainStretch, extraEnv = environment })
         (unpackageScript ++ " && " ++ innerScript)
     ]
 

@@ -39,6 +39,22 @@ else
     VERSION=${VERSION}
 fi
 
+# Set dependencies based on debian release
+case "${MINA_DEB_CODENAME}" in
+  buster)
+    DEPS=
+    ARCHIVE_DEPS=
+    ;;
+  stretch)
+    DEPS=
+    ARCHIVE_DEPS=
+    ;;
+  *)
+    echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
+    ;;
+esac
+
+
 BUILDDIR="deb_build"
 
 ##################################### GENERATE KEYPAIR PACKAGE #######################################

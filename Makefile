@@ -295,6 +295,7 @@ publish-macos:
 
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
+	$(WRAP) ./scripts/archive/build-release-archives.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
