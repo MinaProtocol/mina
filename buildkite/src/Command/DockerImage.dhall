@@ -49,7 +49,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
           "fi"
         ),
         Cmd.run (
-          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ${defaultArtifactStep.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
+          "export MINA_DEB_CODENAME=${spec.deb_codename} && source ${defaultArtifactStep.deploy_env_file} && ./scripts/release-docker.sh " ++
               "--service ${spec.service} --version ${spec.version}-${spec.network} --network ${spec.network} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
