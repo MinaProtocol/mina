@@ -22,7 +22,7 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     ConnectToTestnetStretch.step dependsOnStretch
   ]
-}
+},
 
 let dependsOnBuster = [
   { name = "MinaArtifactBuster", key = "daemon-mainnet-buster-docker-image" }
