@@ -30,9 +30,8 @@ Pipeline.build
       },
     steps = [
 
-      -- toolchainBuster image
+      -- mina-toolchain Debian Buster image
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
-        label = "Build and release Mina toolchain Docker image",
         deps=dependsOn,
         deploy_env_file="export-git-env-vars.sh",
         service="mina-toolchain",
