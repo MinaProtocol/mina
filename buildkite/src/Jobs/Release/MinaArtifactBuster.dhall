@@ -53,7 +53,6 @@ Pipeline.build
           label = "Build Mina daemon package for Debian Buster",
           key = "build-deb-pkg",
           target = Size.XLarge,
-          artifact_paths = [ S.contains "_build/*.deb" ],
           retries = [ Command.Retry::{ exit_status = +2, limit = Some 2 } ] -- libp2p error
         },
 
