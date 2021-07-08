@@ -31,7 +31,7 @@ if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
 else
     export VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-    export DOCKER_TAG="$(echo "${GITTAG}-${GITBRANCH}" | sed 's!/!-!g; s!_!-!g')"
+    export DOCKER_TAG="$(echo "${VERSION}" | sed 's!/!-!g; s!_!-!g')"
 fi
 
 export MINA_DOCKER_TAG=${DOCKER_TAG}
