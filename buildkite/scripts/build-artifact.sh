@@ -35,7 +35,7 @@ dune build "--profile=${DUNE_PROFILE}" \
   src/app/rosetta/rosetta_mainnet_signatures.exe \
   src/app/rosetta/rosetta_testnet_signatures.exe # 2>&1 | tee /tmp/buildocaml.log
 
-echo "--- Build all packages for Debian ${MINA_DEB_CODENAME}"
+echo "--- Bundle all packages for Debian ${MINA_DEB_CODENAME}"
 echo " Includes mina daemon, archive-node, rosetta, generate keypair for mainnet and devnet"
 make deb
 

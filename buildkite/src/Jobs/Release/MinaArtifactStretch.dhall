@@ -50,6 +50,7 @@ Pipeline.build
             "AWS_SECRET_ACCESS_KEY",
             "MINA_BRANCH=$BUILDKITE_BRANCH",
             "MINA_COMMIT_SHA1=$BUILDKITE_COMMIT",
+            "MINA_DEB_CODENAME=stretch",
             -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
             "PREPROCESSOR=./scripts/zexe-standardize.sh"
           ] "./buildkite/scripts/build-artifact.sh",

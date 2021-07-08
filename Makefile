@@ -301,6 +301,7 @@ deb:
 
 deb_optimized:
 	$(WRAP) ./scripts/rebuild-deb.sh "optimized"
+	$(WRAP) ./scripts/archive/build-release-archives.sh "optimized"
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
