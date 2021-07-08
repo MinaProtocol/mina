@@ -39,7 +39,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-              Cmd.run "echo export CODA_VERSION=$(cat frontend/leaderboard/package.json | jq '.version') > LEADERBOARD_DEPLOY_ENV && buildkite/scripts/buildkite-artifact-helper.sh LEADERBOARD_DEPLOY_ENV"
+              Cmd.run "echo export MINA_VERSION=$(cat frontend/leaderboard/package.json | jq '.version') > LEADERBOARD_DEPLOY_ENV && buildkite/scripts/buildkite-artifact-helper.sh LEADERBOARD_DEPLOY_ENV"
           ],
           label = "Setup Leaderboard docker image deploy environment",
           key = "setup-deploy-env",

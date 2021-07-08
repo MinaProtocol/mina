@@ -31,7 +31,7 @@ The short version:
 
 - Invoke `make macos-setup`
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Invoke `rustup default 1.52.1`
+- Invoke `rustup toolchain install 1.52.1`
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#dev-env)
 
