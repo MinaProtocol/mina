@@ -126,6 +126,22 @@ let get_nat0_consequents ~bin_io =
   in
   (nat0_len, nat0_value, bin_io)
 
+let get_summand_tag_len_bin_io
+    ~(summands : Ppx_version_runtime.Bin_prot_rule.summand list) ~bin_io =
+  let num_tags = List.length summands in
+  let tag_len = if num_tags <= 256 then 1 else 2 in
+  (* which summand? *)
+  let tag_value =
+    if tag_len = 1 then int_of_hex8 (bin_io_sub ~bin_io ~pos:0 ~len:tag_len)
+    else int_of_hex16 (bin_io_sub ~bin_io ~pos:0 ~len:tag_len)
+  in
+  let bin_io =
+    bin_io_sub ~bin_io ~pos:tag_len ~len:(bin_io_len ~bin_io - tag_len)
+  in
+  let summand = List.nth_exn summands tag_value in
+  assert (summand.index = tag_value) ;
+  (summand, tag_len, bin_io)
+
 let rec expected_len ~bin_io ~(rule : Ppx_version_runtime.Bin_prot_rule.t) =
   match rule with
   | Nat0 ->
@@ -173,19 +189,11 @@ let rec expected_len ~bin_io ~(rule : Ppx_version_runtime.Bin_prot_rule.t) =
           in
           expected_len ~bin_io ~rule )
   | Sum summands ->
-      let num_tags = List.length summands in
-      let tag_len = if num_tags <= 256 then 1 else 2 in
-      (* which summand? *)
-      let tag_value =
-        if tag_len = 1 then
-          int_of_hex8 (bin_io_sub ~bin_io ~pos:0 ~len:tag_len)
-        else int_of_hex16 (bin_io_sub ~bin_io ~pos:0 ~len:tag_len)
+      let ( (summand : Ppx_version_runtime.Bin_prot_rule.summand)
+          , tag_len
+          , bin_io ) =
+        get_summand_tag_len_bin_io ~bin_io ~summands
       in
-      let bin_io =
-        bin_io_sub ~bin_io ~pos:tag_len ~len:(bin_io_len ~bin_io - tag_len)
-      in
-      let summand = List.nth_exn summands tag_value in
-      assert (summand.index = tag_value) ;
       let args_len =
         List.fold_left summand.ctor_args ~init:0 ~f:(fun sum rule ->
             let bin_io =
@@ -255,6 +263,7 @@ let rec expected_len ~bin_io ~(rule : Ppx_version_runtime.Bin_prot_rule.t) =
 
 let rec slice_from_rule ~directory ~bin_io
     ~(rule : Ppx_version_runtime.Bin_prot_rule.t) =
+  assert (String.length bin_io = expected_len ~bin_io ~rule) ;
   Out_channel.with_file (directory ^/ "data.hex") ~f:(fun out_ch ->
       Out_channel.output_string out_ch bin_io ) ;
   match rule with
@@ -280,14 +289,65 @@ let rec slice_from_rule ~directory ~bin_io
         slice_from_rule ~directory ~bin_io ~rule:rule'
     | s ->
         failwithf "Unexpected leading hex pair for Option: %s" s () )
-  | Record _
-  | Tuple _
-  | Sum _
-  | Polyvar _
-  | List _
-  | Hashtable _
-  | Vec
-  | Bigstring ->
+  | Record fields ->
+      let%bind _total =
+        Deferred.List.fold fields ~init:0
+          ~f:(fun sum {field_rule; field_name; _} ->
+            let bin_io0 =
+              bin_io_sub ~bin_io ~pos:sum ~len:(bin_io_len ~bin_io - sum)
+            in
+            let len = expected_len ~bin_io:bin_io0 ~rule:field_rule in
+            let bin_io = bin_io_sub ~bin_io:bin_io0 ~pos:0 ~len in
+            let%map () =
+              slice_from_rule ~directory:(directory ^/ field_name) ~bin_io
+                ~rule:field_rule
+            in
+            sum + len )
+      in
+      return ()
+  | Tuple rules ->
+      let%bind _total =
+        Deferred.List.foldi rules ~init:0 ~f:(fun ndx sum rule ->
+            let bin_io0 =
+              bin_io_sub ~bin_io ~pos:sum ~len:(bin_io_len ~bin_io - sum)
+            in
+            let len = expected_len ~bin_io:bin_io0 ~rule in
+            let bin_io = bin_io_sub ~bin_io:bin_io0 ~pos:0 ~len in
+            let%map () =
+              slice_from_rule
+                ~directory:(directory ^/ Int.to_string ndx)
+                ~bin_io ~rule
+            in
+            sum + len )
+      in
+      return ()
+  | Sum summands ->
+      let ( (summand : Ppx_version_runtime.Bin_prot_rule.summand)
+          , tag_len
+          , bin_io ) =
+        get_summand_tag_len_bin_io ~bin_io ~summands
+      in
+      let bin_io =
+        bin_io_sub ~bin_io ~pos:tag_len ~len:(bin_io_len ~bin_io - tag_len)
+      in
+      let directory = directory ^/ summand.ctor_name in
+      let%bind () = Unix.mkdir directory in
+      let%bind _total =
+        Deferred.List.foldi summand.ctor_args ~init:0 ~f:(fun ndx sum rule ->
+            let bin_io0 =
+              bin_io_sub ~bin_io ~pos:sum ~len:(bin_io_len ~bin_io - sum)
+            in
+            let len = expected_len ~bin_io:bin_io0 ~rule in
+            let bin_io = bin_io_sub ~bin_io:bin_io0 ~pos:0 ~len in
+            let%map () =
+              slice_from_rule
+                ~directory:(directory ^/ Int.to_string ndx)
+                ~bin_io ~rule
+            in
+            sum + len )
+      in
+      return ()
+  | Polyvar _ | List _ | Hashtable _ | Vec | Bigstring ->
       return ()
   | Reference (Resolved {ref_rule; _}) ->
       slice_from_rule ~directory ~bin_io ~rule:ref_rule
