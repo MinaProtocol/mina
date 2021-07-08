@@ -16,16 +16,15 @@ function usage() {
   if [ -n "$1" ]; then
     echo -e "${RED}☞  $1${CLEAR}\n";
   fi
-  echo "Usage: $0 [-s service-to-release] [-v service-version] [-c commit-hash]"
+  echo "Usage: $0 [-s service-to-release] [-v service-version] [-n network]"
   echo "  -s, --service             The Service being released to Dockerhub"
   echo "  -v, --version             The version to be used in the docker image tag"
-  echo "  -c, --commit              The commit hash to be appended to the docker image tag"
   echo "  -n, --network             The network configuration to use (devnet or mainnet). Default=devnet"
   echo "      --deb-codename        The debian codename (stretch or buster) to build the docker image from. Default=stretch"
   echo "      --deb-release         The debian package release channel to pull from (unstable,alpha,beta,stable). Default=unstable"
   echo "      --deb-version         The version string for the debian package to install"
   echo ""
-  echo "Example: $0 --service faucet --version v0.1.0 --commit abf678"
+  echo "Example: $0 --service faucet --version v0.1.0"
   echo "Valid Services: ${VALID_SERVICES[*]}"
   exit 1
 }
@@ -35,7 +34,6 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   --build-rosetta) BUILD_ROSETTA=true;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
-  -c|--commit) COMMIT="$2"; shift;;
   -n|--network) NETWORK="--build-arg network=$2"; shift;;
   --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
@@ -45,13 +43,12 @@ while [[ "$#" -gt 0 ]]; do case $1 in
 esac; shift; done
 
 # Debug prints for visability
-echo 'service="'$SERVICE'" version="'$VERSION'" commit="'$COMMIT'"'
+echo 'service="'$SERVICE'" version="'$VERSION'" deb_version="'${DEB_VERSION}'" deb_release="'${DEB_RELEASE}' "deb_codename="'${DEB_CODENAME}'" '
 echo $EXTRA
 
 # Verify Required Parameters are Present
 if [ -z "$SERVICE" ]; then usage "Service is not set!"; fi;
 if [ -z "$VERSION" ]; then usage "Version is not set!"; fi;
-if [ -z "$COMMIT" ]; then usage "Commit is not set!"; fi;
 if [ -z "$EXTRA" ]; then EXTRA=""; fi;
 if [ $(echo ${VALID_SERVICES[@]} | grep -o "$SERVICE" - | wc -w) -eq 0 ]; then usage "Invalid service!"; fi
 

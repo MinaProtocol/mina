@@ -18,7 +18,6 @@ let ReleaseSpec = {
     network: Text,
     service: Text,
     version: Text,
-    commit: Text,
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
@@ -31,7 +30,6 @@ let ReleaseSpec = {
     network = "devnet",
     version = "\\\${MINA_DOCKER_TAG}",
     service = "\\\${MINA_SERVICE}",
-    commit = "\\\${MINA_GIT_HASH}",
     deb_codename = "stretch",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
@@ -52,7 +50,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
         ),
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ${defaultArtifactStep.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
-              "--service ${spec.service} --version ${spec.version}-${spec.network} --commit ${spec.commit} --network ${spec.network} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
+              "--service ${spec.service} --version ${spec.version}-${spec.network} --network ${spec.network} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]
 
