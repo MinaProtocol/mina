@@ -21,18 +21,16 @@ source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 cd "${SCRIPTPATH}/../_build"
 
 # Set dependencies based on debian release
-SHARED_DEPS="libssl1.1, libgmp10, libgomp1, "
+SHARED_DEPS="libssl1.1, libgmp10, libgomp1, libffi6"
 case "${MINA_DEB_CODENAME}" in
   buster)
-    DAEMON_DEPS="libffi7, libjemalloc2, libpq-dev, libprocps7"
+    DAEMON_DEPS=", libjemalloc2, libpq-dev, libprocps7"
     # buster deps that should only affect the toolchain container:
     # python3-sexpdata \
     # python-sexpdata \
-    GENKEY_DEPS="libffi7"
     ;;
   stretch)
-    DAEMON_DEPS="libffi6, libjemalloc1, libpq-dev, libprocps6"
-    GENKEY_DEPS="libffi6"
+    DAEMON_DEPS=", libjemalloc1, libpq-dev, libprocps6"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -54,7 +52,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: ${SHARED_DEPS}${GENKEY_DEPS}
+Depends: ${SHARED_DEPS}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
