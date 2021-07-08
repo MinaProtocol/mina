@@ -17,7 +17,6 @@ let spec = DockerImage.ReleaseSpec::{
     deps=dependsOn,
     service="leaderboard",
     commit="\\\${BUILDKITE_COMMIT}",
-    deploy_env_file="LEADERBOARD_DEPLOY_ENV",
     extra_args="",
     step_key="leaderboard-docker-image"
 }

@@ -10,12 +10,11 @@ let Cmd = ../Lib/Cmds.dhall
 let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 
-let defaultArtifactStep = { name = "GitEnvUpload", key = "upload-git-env" }
+let defaultArtifactStep = { name = "GitEnvUpload", key = "upload-git-env", deploy_env_file = "export-git-env-vars.sh" }
 
 let ReleaseSpec = {
   Type = {
     deps : List Command.TaggedKey.Type,
-    deploy_env_file : Text,
     network: Text,
     service: Text,
     version: Text,
@@ -29,7 +28,6 @@ let ReleaseSpec = {
   },
   default = {
     deps = [] : List Command.TaggedKey.Type,
-    deploy_env_file = "DOCKER_DEPLOY_ENV",
     network = "devnet",
     version = "\\\${MINA_VERSION}",
     service = "\\\${MINA_SERVICE}",
@@ -44,18 +42,16 @@ let ReleaseSpec = {
 }
 
 let generateStep = \(spec : ReleaseSpec.Type) ->
-    -- assume head or first dependency specified by spec represents the primary artifact dependency step
-    let artifactUploadScope = Command.TaggedKey.Type defaultArtifactStep
 
     let commands : List Cmd.Type =
     [
         Cmd.run (
-          "if [ ! -f ${spec.deploy_env_file} ]; then " ++
-              "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${artifactUploadScope.name}-${artifactUploadScope.key} ${spec.deploy_env_file} .; " ++
+          "if [ ! -f ${defaultArtifactStep.deploy_env_file} ]; then " ++
+              "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} .; " ++
           "fi"
         ),
         Cmd.run (
-          "source ${spec.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
+          "source ${defaultArtifactStep.deploy_env_file} && ./scripts/release-docker.sh ${if spec.build_rosetta_override then "--build-rosetta " else ""} " ++
               "--service ${spec.service} --version ${spec.version}-${spec.network} --commit ${spec.commit} --network ${spec.network} --deb-codename ${spec.deb_codename} --deb-release ${spec.deb_release} --deb-version ${spec.deb_version} --extra-args \\\"${spec.extra_args}\\\""
         )
     ]

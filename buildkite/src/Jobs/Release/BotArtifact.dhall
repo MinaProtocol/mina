@@ -17,7 +17,6 @@ let spec = DockerImage.ReleaseSpec::{
     deps=dependsOn,
     service="bot",
     commit="\\\${BUILDKITE_COMMIT}",
-    deploy_env_file="BOT_DEPLOY_ENV",
     extra_args="",
     step_key="bot-docker-image"
 }

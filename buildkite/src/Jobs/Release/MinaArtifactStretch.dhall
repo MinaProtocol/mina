@@ -63,7 +63,6 @@ Pipeline.build
       -- daemon devnet image
       let daemonDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         service="mina-daemon",
         network="devnet",
         step_key="daemon-devnet-stretch-docker-image"
@@ -76,7 +75,6 @@ Pipeline.build
       -- daemon mainnet image
       let daemonMainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         service="mina-daemon",
         network="mainnet",
         step_key="daemon-mainnet-stretch-docker-image"
@@ -89,7 +87,6 @@ Pipeline.build
       -- archive devnet image
       let archiveDevnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         service="mina-archive",
         step_key="archive-devnet-stretch-docker-image"
       }
@@ -101,7 +98,6 @@ Pipeline.build
       -- archive mainnet image
       let archiveMainnetSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         network="mainnet",
         service="mina-archive",
         step_key="archive-mainnet-stretch-docker-image"
@@ -114,7 +110,6 @@ Pipeline.build
       -- rosetta image
       let rosettaSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         service="mina-rosetta",
         version="\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",
@@ -129,7 +124,6 @@ Pipeline.build
       -- rosetta image w/ DUNE_PROFILE=dev
       let rosettaDuneSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         service="mina-rosetta",
         version="dev-\\\${DOCKER_TAG}",
         commit = "\\\${GITHASH}",

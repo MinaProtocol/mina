@@ -33,7 +33,6 @@ Pipeline.build
       -- mina-toolchain Debian Buster image
       let toolchainBusterSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
-        deploy_env_file="export-git-env-vars.sh",
         service="mina-toolchain",
         network="devnet",
         deb_codename="buster",
