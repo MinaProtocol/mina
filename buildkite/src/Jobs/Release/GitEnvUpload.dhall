@@ -28,4 +28,3 @@ in Pipeline.build
       UploadGitEnv.step
     ]
   }
-}
