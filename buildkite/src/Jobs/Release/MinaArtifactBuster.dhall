@@ -18,7 +18,8 @@ let DockerImage = ../../Command/DockerImage.dhall
 let dependsOn = [
   { name = "GitEnvUpload", key = "upload-git-env" },
   { name = "MinaArtifactBuster", key = "build-deb-pkg" }
- ]
+]
+
 let rosettaDependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
 in
@@ -115,7 +116,7 @@ Pipeline.build
       let rosettaSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         service="mina-rosetta",
-        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO},
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
         deb_codename="buster",
         step_key="rosetta-mainnet-buster-docker-image"
       }
