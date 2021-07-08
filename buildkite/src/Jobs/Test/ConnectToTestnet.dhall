@@ -24,7 +24,7 @@ in Pipeline.build Pipeline.Config::{
     name = "ConnectToTestnet"
   },
   steps = [
-    ConnectToTestnetStretch.step dependsOnStretch,
-    ConnectToTestnetBuster.step dependsOnBuster
+    ConnectToTestnet.step dependsOnStretch,
+    ConnectToTestnet.step dependsOnBuster
   ]
 }
