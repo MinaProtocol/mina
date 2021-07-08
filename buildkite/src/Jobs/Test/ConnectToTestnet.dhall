@@ -9,10 +9,6 @@ let dependsOnStretch = [
   { name = "MinaArtifactStretch", key = "daemon-mainnet-stretch-docker-image" }
 ]
 
-let dependsOnBuster = [
-  { name = "MinaArtifactBuster", key = "daemon-mainnet-buster-docker-image" }
-]
-
 in Pipeline.build Pipeline.Config::{
   spec =
     JobSpec::{
@@ -24,7 +20,6 @@ in Pipeline.build Pipeline.Config::{
     name = "ConnectToTestnet"
   },
   steps = [
-    ConnectToTestnet.step dependsOnStretch,
-    ConnectToTestnet.step dependsOnBuster
+    ConnectToTestnet.step dependsOnStretch
   ]
 }
