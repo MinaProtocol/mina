@@ -549,6 +549,65 @@ let send_payment_graphql =
          printf "Dispatched payment with ID %s\n"
            ((response#sendPayment)#payment |> unwrap_user_command)#id ))
 
+let sign_payment =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "--receiver" ~aliases:["receiver"]
+      ~doc:"PUBLICKEY Public key to which you want to send money"
+      (required public_key_compressed)
+  in
+  let amount_flag =
+    flag "--amount" ~aliases:["amount"]
+      ~doc:"VALUE Payment amount you want to send" (required txn_amount)
+  in
+  let token_flag =
+    flag "--token" ~aliases:["token"]
+      ~doc:"TOKEN_ID The ID of the token to transfer" (optional token_id)
+  in
+  let args =
+    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
+      token_flag
+  in
+  Command.async ~summary:"generate a signed payment to an address"
+    (Command.Param.map args
+       ~f:(fun (common, receiver_pk, amount, token_id) () ->
+            let {Cli_lib.Flag.sender; fee; nonce; memo} = common in
+            let fee_token = Token_id.default in
+            let fee_payer_pk = sender in
+            let valid_until = Unsigned.UInt32.max_int in
+            let nonce = Option.value ~default:Unsigned.UInt32.zero nonce in
+            let memo = Option.map ~f:Signed_command_memo.of_string memo
+                        |> Option.value ~default:Signed_command_memo.empty in
+            let common: Signed_command_payload.Common.t =
+              { fee; fee_token; fee_payer_pk; nonce; valid_until; memo } in
+            let body: Signed_command_payload.Body.t =
+              let token_id = Option.value ~default:Token_id.default token_id in
+              Signed_command_payload.Body.Payment
+              Payment_payload.Poly.
+              { source_pk=sender; receiver_pk; token_id; amount } in
+            let payload = Signed_command_payload.Poly.{ common; body } in
+            let logger = Logger.create () in
+            let%bind wallets =
+              let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+              let wallets_disk_location = conf_dir ^/ "wallets" in
+              Secrets.Wallets.load ~logger
+                ~disk_location:wallets_disk_location
+            in
+            let sk_file = Secrets.Wallets.get_path wallets sender in
+            let%bind kp =
+              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
+                ~which:"block producer keypair" sk_file
+            in
+            let sk = kp.private_key in
+            let signature = Signed_command.sign_payload sk payload in
+            let signer: Public_key.t = Public_key.decompress_exn sender in
+            let signed: Signed_command.t = Signed_command.Poly.{ payload; signer; signature } in
+            Signed_command.to_string signed
+            |> print_endline
+            |> Deferred.return
+         ))
+
 let delegate_stake_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
@@ -2406,6 +2465,7 @@ let client =
     [ ("get-balance", get_balance_graphql)
     ; ("get-tokens", get_tokens_graphql)
     ; ("send-payment", send_payment_graphql)
+    ; ("sign-payment", sign_payment)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("create-token", create_new_token_graphql)
     ; ("create-token-account", create_new_account_graphql)
