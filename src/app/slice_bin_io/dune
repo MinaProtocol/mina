@@ -1,0 +1,15 @@
+(executable
+ (package slice_bin_io)
+ (name slice_bin_io)
+ (public_name slice_bin_io)
+ (libraries
+   async_kernel
+   core
+   mina_base
+   mina_state
+   ppx_version.runtime
+   yojson
+ )
+ (preprocessor_deps ../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_let ppx_deriving_yojson)))
