@@ -31,7 +31,6 @@ function usage() {
 
 while [[ "$#" -gt 0 ]]; do case $1 in
   --no-upload) NOUPLOAD=1;;
-  --build-rosetta) BUILD_ROSETTA=true;;
   -s|--service) SERVICE="$2"; shift;;
   -v|--version) VERSION="$2"; shift;;
   -n|--network) NETWORK="--build-arg network=$2"; shift;;
@@ -73,10 +72,6 @@ mina-daemon-puppeteered)
   DOCKER_CONTEXT="dockerfiles/puppeteer-context"
   ;;
 mina-rosetta)
-  if [[ "$BUILD_ROSETTA" != "true" ]]; then
-    echo "BUILD_ROSETTA env var not set, short-circuiting to avoid slow builds."
-    exit 0
-  fi
   DOCKERFILE_PATH="dockerfiles/Dockerfile-rosetta"
   ;;
 leaderboard)

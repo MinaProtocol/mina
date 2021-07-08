@@ -21,7 +21,6 @@ let ReleaseSpec = {
     deb_codename: Text,
     deb_release: Text,
     deb_version: Text,
-    build_rosetta_override: Bool,
     extra_args: Text,
     step_key: Text
   },
@@ -33,7 +32,6 @@ let ReleaseSpec = {
     deb_codename = "stretch",
     deb_release = "\\\${MINA_DEB_RELEASE}",
     deb_version = "\\\${MINA_DEB_VERSION}",
-    build_rosetta_override = False,
     extra_args = "",
     step_key = "daemon-devnet-docker-image"
   }

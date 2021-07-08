@@ -1,4 +1,4 @@
-#!/bin/bash
+\#!/bin/bash
 set -eo pipefail
 
 set +x
@@ -62,9 +62,5 @@ esac
 echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH}\" and tag \"${THIS_COMMIT_TAG}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 export MINA_DEB_RELEASE="${RELEASE}"
-
-case $GITBRANCH in master|compatible|develop|rosetta*)
-  export BUILD_ROSETTA=true
-esac
 
 set -x
