@@ -15,7 +15,10 @@ let Libp2p = ../../Command/Libp2pHelperBuild.dhall
 let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
-let dependsOn = [ { name = "MinaArtifactBuster", key = "build-deb-pkg" } ]
+let dependsOn = [
+  { name = "MinaArtifactBuster", key = "build-deb-pkg" },
+  { name = "GitEnvUpload", key = "upload-git-env" }
+ ]
 let rosettaDependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
 in

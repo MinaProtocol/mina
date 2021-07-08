@@ -63,7 +63,7 @@ RUN sudo apt-get update -y \
     zlib1g-dev
 
 # buster-only packages
-RUN [[ "$MINA_DEB_CODENAME" -eq "buster" ]] \
+RUN test "$MINA_DEB_CODENAME" -eq "buster" \
     && sudo apt-get update -y \
     && sudo apt-get install -y \
         python3-sexpdata \
