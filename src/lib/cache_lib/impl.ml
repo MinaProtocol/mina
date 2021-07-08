@@ -196,7 +196,9 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
            ; final_state= final_state t })
 
     let invalidate_with_failure (type a b) (t : (a, b) t) : a =
-      assert_not_finalized t "Cached item has already been finalized" ;
+      ( if was_finalized t && not (is_pure t) then
+        let logger = Cache.logger (cache t) in
+        [%log error] "Cached item has already been finalized" ) ;
       mark_failed t ;
       Cache.remove (cache t) `Failure (original t) ;
       value t

@@ -16,15 +16,14 @@ type block_data =
   ; snark_work: string option [@default None] }
 [@@deriving to_yojson]
 
-type proof_data =
-  (Ledger_proof.Stable.Latest.t * Core_kernel.Time.Span.t)
-  One_or_two.Stable.Latest.t
+type proof_data = Ledger_proof.Stable.Latest.t * Core_kernel.Time.Span.t
 [@@deriving bin_io_unversioned]
 
 (* TODO: what's the max size of a serialized block? *)
 let block_buf = Bin_prot.Common.create_buf 12_000_000
 
 (* TODO: what the size of a serialized proof? *)
+
 let proof_buf = Bin_prot.Common.create_buf 500_000
 
 let external_transition_of_breadcrumb breadcrumb =
@@ -120,7 +119,7 @@ let block_base64_of_breadcrumb ~logger breadcrumb =
 let send_produced_block_at ~logger ~url ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) tm =
   (* give block production some time *)
-  let%bind () = at (Time.add tm Time.Span.minute) in
+  let%bind () = at (Time.add tm @@ Time.Span.of_min 2.0) in
   match Block_producer.last_block_produced_opt () with
   | None ->
       [%log error] "State hash of last block produced unavailable"
@@ -159,7 +158,7 @@ let send_produced_block_at ~logger ~url ~transition_frontier ~peer_id
             return () ) ) )
 
 let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
-    ~(submitter_keypair : Keypair.t) =
+    ~(submitter_keypair : Keypair.t) ~snark_resource_pool ~snark_work_fee =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log error]
@@ -170,11 +169,11 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
       match block_base64_of_breadcrumb ~logger breadcrumb with
       | None ->
           [%log info]
-            "Could not Base64-encode block, not performing SNARK work" ;
+            "Could not Base64-encode block, not sending block or SNARK work" ;
           return ()
       | Some block_base64 -> (
           let message =
-            Sok_message.create ~fee:Currency.Fee.zero
+            Sok_message.create ~fee:snark_work_fee
               ~prover:(Public_key.compress submitter_keypair.public_key)
           in
           (* mimicking code from standalone snark worker *)
@@ -187,69 +186,169 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
           in
           let (module M : Transaction_snark.S) = Option.value_exn m in
           let best_tip = Transition_frontier.best_tip tf in
-          let best_tip_staged_ledger =
-            Transition_frontier.Breadcrumb.staged_ledger best_tip
+          let external_transition =
+            Transition_frontier.Breadcrumb.validated_transition best_tip
+            |> External_transition.Validation.forget_validation
           in
-          match
-            Staged_ledger.all_work_pairs best_tip_staged_ledger
-              ~get_state:(fun state_hash ->
-                match Transition_frontier.find tf state_hash with
+          if
+            List.is_empty
+              (External_transition.transactions
+                 ~constraint_constants:
+                   Genesis_constants.Constraint_constants.compiled
+                 external_transition)
+          then (
+            [%log info]
+              "No transactions in block, sending block without SNARK work" ;
+            let state_hash =
+              Transition_frontier.Breadcrumb.state_hash best_tip
+            in
+            let block_data =
+              { block= block_base64
+              ; created_at= get_rfc3339_time ()
+              ; peer_id
+              ; snark_work= None }
+            in
+            send_uptime_data ~logger ~submitter_keypair ~url ~state_hash
+              block_data )
+          else
+            let best_tip_staged_ledger =
+              Transition_frontier.Breadcrumb.staged_ledger best_tip
+            in
+            match
+              Staged_ledger.all_work_pairs best_tip_staged_ledger
+                ~get_state:(fun state_hash ->
+                  match
+                    Transition_frontier.find_protocol_state tf state_hash
+                  with
+                  | None ->
+                      Error
+                        (Error.createf
+                           "Could not find state_hash %s in transition \
+                            frontier for uptime service"
+                           (State_hash.to_base58_check state_hash))
+                  | Some protocol_state ->
+                      Ok protocol_state )
+            with
+            | Error e ->
+                [%log error]
+                  "Could not get SNARK work from best tip staged ledger for \
+                   uptime service"
+                  ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                return ()
+            | Ok [] ->
+                [%log info]
+                  "No SNARK jobs available for uptime service, sending just \
+                   the block" ;
+                let state_hash =
+                  Transition_frontier.Breadcrumb.state_hash best_tip
+                in
+                let block_data =
+                  { block= block_base64
+                  ; created_at= get_rfc3339_time ()
+                  ; peer_id
+                  ; snark_work= None }
+                in
+                send_uptime_data ~logger ~submitter_keypair ~url ~state_hash
+                  block_data
+            | Ok job_one_or_twos -> (
+                let transitions =
+                  List.concat_map job_one_or_twos ~f:One_or_two.to_list
+                  |> List.filter ~f:(function
+                       | Snark_work_lib.Work.Single.Spec.Transition _ ->
+                           true
+                       | Merge _ ->
+                           false )
+                in
+                let staged_ledger_hash =
+                  Transition_frontier.Breadcrumb.blockchain_state best_tip
+                  |> Mina_state.Blockchain_state.staged_ledger_hash
+                in
+                match
+                  List.find transitions ~f:(fun transition ->
+                      match transition with
+                      | Snark_work_lib.Work.Single.Spec.Transition
+                          ({target; _}, _, _) ->
+                          Marlin_plonk_bindings_pasta_fp.equal target
+                            (Staged_ledger_hash.ledger_hash staged_ledger_hash)
+                      | Merge _ ->
+                          (* unreachable *)
+                          failwith "Expected Transition work, not Merge" )
+                with
                 | None ->
-                    Error
-                      (Error.createf
-                         "Could not find state_hash %s in transition frontier \
-                          for uptime service"
-                         (State_hash.to_base58_check state_hash))
-                | Some breadcrumb ->
-                    Ok
-                      (Transition_frontier.Breadcrumb.protocol_state breadcrumb)
-            )
-          with
-          | Error e ->
-              [%log error]
-                "Could not get SNARK work from best tip staged ledger for \
-                 uptime service"
-                ~metadata:[("error", Error_json.error_to_yojson e)] ;
-              return ()
-          | Ok [] ->
-              [%log info] "No SNARK jobs available for uptime service" ;
-              return ()
-          | Ok jobs -> (
-              let last_job = List.last_exn jobs in
-              match%bind
-                One_or_two.Deferred_result.map last_job ~f:(fun single_spec ->
-                    Prod.perform_single worker_state ~message single_spec )
-              with
-              | Error e ->
-                  [%log error]
-                    "Error when computing SNARK work for uptime service"
-                    ~metadata:[("error", Error_json.error_to_yojson e)] ;
-                  return ()
-              | Ok proofs -> (
-                  let proof_len =
-                    bin_write_proof_data proof_buf ~pos:0 proofs
-                  in
-                  let proof_string =
-                    String.init proof_len ~f:(fun ndx -> proof_buf.{ndx})
-                  in
-                  match Base64.encode proof_string with
-                  | Error (`Msg err) ->
-                      [%log error]
-                        "Could not Base64-encode SNARK work for uptime service"
-                        ~metadata:[("error", `String err)] ;
-                      return ()
-                  | Ok snark_work_base64 ->
-                      let state_hash =
-                        Transition_frontier.Breadcrumb.state_hash best_tip
-                      in
-                      let block_data =
-                        { block= block_base64
-                        ; created_at= get_rfc3339_time ()
-                        ; peer_id
-                        ; snark_work= Some snark_work_base64 }
-                      in
-                      send_uptime_data ~logger ~submitter_keypair ~url
-                        ~state_hash block_data ) ) ) )
+                    [%log info]
+                      "No transactions in block match staged ledger hash, \
+                       sending block without SNARK work" ;
+                    let state_hash =
+                      Transition_frontier.Breadcrumb.state_hash best_tip
+                    in
+                    let block_data =
+                      { block= block_base64
+                      ; created_at= get_rfc3339_time ()
+                      ; peer_id
+                      ; snark_work= None }
+                    in
+                    send_uptime_data ~logger ~submitter_keypair ~url
+                      ~state_hash block_data
+                | Some single_spec -> (
+                    match%bind
+                      Prod.perform_single worker_state ~message single_spec
+                    with
+                    | Error e ->
+                        [%log error]
+                          "Error when computing SNARK work for uptime service"
+                          ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                        return ()
+                    | Ok ((proof, _span) as proof_data) -> (
+                        let work =
+                          `One
+                            (Snark_work_lib.Work.Single.Spec.statement
+                               single_spec)
+                        in
+                        let fee =
+                          { Fee_with_prover.fee= snark_work_fee
+                          ; prover=
+                              submitter_keypair.public_key
+                              |> Public_key.compress }
+                        in
+                        ( match
+                            Network_pool.Snark_pool.Resource_pool.add_snark
+                              snark_resource_pool ~is_local:true ~work
+                              ~proof:(`One proof) ~fee
+                          with
+                        | `Added ->
+                            [%log info]
+                              "Added work created for uptime service to SNARK \
+                               pool"
+                        | `Statement_not_referenced ->
+                            [%log error]
+                              "Statement not referenced error when trying to \
+                               add SNARK for uptime service to pool" ) ;
+                        let proof_len =
+                          bin_write_proof_data proof_buf ~pos:0 proof_data
+                        in
+                        let proof_string =
+                          String.init proof_len ~f:(fun ndx -> proof_buf.{ndx})
+                        in
+                        match Base64.encode proof_string with
+                        | Error (`Msg err) ->
+                            [%log error]
+                              "Could not Base64-encode SNARK work for uptime \
+                               service"
+                              ~metadata:[("error", `String err)] ;
+                            return ()
+                        | Ok snark_work_base64 ->
+                            let state_hash =
+                              Transition_frontier.Breadcrumb.state_hash
+                                best_tip
+                            in
+                            let block_data =
+                              { block= block_base64
+                              ; created_at= get_rfc3339_time ()
+                              ; peer_id
+                              ; snark_work= Some snark_work_base64 }
+                            in
+                            send_uptime_data ~logger ~submitter_keypair ~url
+                              ~state_hash block_data ) ) ) ) )
 
 let start (mina : Mina_lib.t) =
   let config = Mina_lib.config mina in
@@ -314,8 +413,14 @@ let start (mina : Mina_lib.t) =
               let send_block_and_snark_work () =
                 [%log' info config.logger]
                   "Uptime service will attempt to send a block and SNARK work" ;
+                let snark_resource_pool =
+                  Mina_lib.snark_pool mina
+                  |> Network_pool.Snark_pool.resource_pool
+                in
+                let snark_work_fee = Mina_lib.snark_work_fee mina in
                 send_block_and_transaction_snark ~logger:config.logger ~url
                   ~transition_frontier ~peer_id ~submitter_keypair
+                  ~snark_resource_pool ~snark_work_fee
               in
               match%bind get_next_producer_time_opt () with
               | None ->

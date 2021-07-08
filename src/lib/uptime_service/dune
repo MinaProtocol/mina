@@ -2,7 +2,8 @@
  (name uptime_service)
  (public_name uptime_service)
  (inline_tests)
- (libraries core_kernel async block_producer mina_lib mina_transition otp_lib ptime snark_worker string_sign)
+ (libraries core_kernel async block_producer mina_lib mina_transition otp_lib ptime
+            snark_work_lib snark_worker string_sign)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_jane ppx_coda ppx_version ppx_inline_test ppx_deriving.std))
  (synopsis "Uptime service library for delegation program"))
