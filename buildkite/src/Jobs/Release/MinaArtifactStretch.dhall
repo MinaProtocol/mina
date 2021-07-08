@@ -111,9 +111,7 @@ Pipeline.build
       let rosettaSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         service="mina-rosetta",
-        version="\\\${DOCKER_TAG}",
-        commit = "\\\${GITHASH}",
-        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
         step_key="rosetta-mainnet-stretch-docker-image"
       }
 
@@ -125,9 +123,8 @@ Pipeline.build
       let rosettaDuneSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         service="mina-rosetta",
-        version="dev-\\\${DOCKER_TAG}",
-        commit = "\\\${GITHASH}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO} --cache-from gcr.io/o1labs-192920/mina-rosetta-opam-deps:develop",
+        version="dev-\\\${MINA_DOCKER_TAG}",
+        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
         step_key="rosetta-dev-stretch-docker-image"
       }
 

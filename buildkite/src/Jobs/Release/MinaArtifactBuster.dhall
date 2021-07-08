@@ -115,8 +115,6 @@ Pipeline.build
       let rosettaSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         service="mina-rosetta",
-        version="\\\${DOCKER_TAG}",
-        commit = "\\\${GITHASH}",
         extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO},
         deb_codename="buster",
         step_key="rosetta-mainnet-buster-docker-image"
@@ -130,8 +128,7 @@ Pipeline.build
       let rosettaDuneSpec = DockerImage.ReleaseSpec::{
         deps=rosettaDependsOn,
         service="mina-rosetta",
-        version="dev-\\\${DOCKER_TAG}",
-        commit = "\\\${GITHASH}",
+        version="dev-\\\${MINA_DOCKER_TAG}",
         extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
         deb_codename="buster",
         step_key="rosetta-dev-buster-docker-image"
