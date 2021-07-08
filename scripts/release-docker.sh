@@ -90,7 +90,7 @@ esac
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')
 if [ -z "$DOCKER_CONTEXT" ]; then
-  cat $DOCKERFILE_PATH | docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t codaprotocol/$SERVICE:$VERSION} -
+  cat $DOCKERFILE_PATH | docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args -t codaprotocol/$SERVICE:$VERSION -
 else
   docker build $NETWORK $DEB_CODENAME $DEB_RELEASE $DEB_VERSION $extra_build_args $DOCKER_CONTEXT -t codaprotocol/$SERVICE:$VERSION -f $DOCKERFILE_PATH
 fi
