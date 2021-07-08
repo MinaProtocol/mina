@@ -37,7 +37,7 @@ while [[ "$#" -gt 0 ]]; do case $1 in
   -v|--version) VERSION="$2"; shift;;
   -c|--commit) COMMIT="$2"; shift;;
   -n|--network) NETWORK="--build-arg network=$2"; shift;;
-  --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; RAW_CODENAME="-${2}"; shift;;
+  --deb-codename) DEB_CODENAME="--build-arg deb_codename=$2"; shift;;
   --deb-release) DEB_RELEASE="--build-arg deb_release=$2"; shift;;
   --deb-version) DEB_VERSION="--build-arg deb_version=$2"; shift;;
   --extra-args) EXTRA=${@:2}; shift $((${#}-1));;
@@ -89,8 +89,6 @@ leaderboard)
 *)
 esac
 
-# Append CODENAME to VERSION string
-VERSION=${VERSION}${RAW_CODENAME}
 
 # If DOCKER_CONTEXT is not specified, assume none and just pipe the dockerfile into docker build
 extra_build_args=$(echo $EXTRA | tr -d '"')

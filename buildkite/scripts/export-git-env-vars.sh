@@ -24,14 +24,16 @@ export PROJECT="mina"
 export BUILD_NUM=${BUILDKITE_BUILD_NUM}
 export BUILD_URL=${BUILDKITE_BUILD_URL}
 
+export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=stretch}
+
 [[ -n "$BUILDKITE_BRANCH" ]] && export GITBRANCH=$(echo "$BUILDKITE_BRANCH" | sed 's!/!-!g; s!_!-!g')
 
 if [[ -n "${THIS_COMMIT_TAG}" ]]; then # If the commit is tagged
     export MINA_DEB_VERSION="${GITTAG}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}" | sed 's!/!-!g; s!_!-!g')"
+    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}" | sed 's!/!-!g; s!_!-!g')-${MINA_DEB_CODENAME}"
 else
     export MINA_DEB_VERSION="${GITTAG}-${GITBRANCH}-${GITHASH}"
-    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}" | sed 's!/!-!g; s!_!-!g')"
+    export MINA_DOCKER_TAG="$(echo "${MINA_DEB_VERSION}" | sed 's!/!-!g; s!_!-!g')-${MINA_DEB_CODENAME}"
 fi
 
 # Determine deb repo to use
@@ -60,8 +62,6 @@ esac
 echo "Publishing on release channel \"${RELEASE}\" based on branch \"${GITBRANCH}\" and tag \"${THIS_COMMIT_TAG}\""
 [[ -n ${THIS_COMMIT_TAG} ]] && export MINA_COMMIT_TAG="${THIS_COMMIT_TAG}"
 export MINA_DEB_RELEASE="${RELEASE}"
-
-export MINA_DEB_CODENAME=${MINA_DEB_CODENAME:=stretch}
 
 case $GITBRANCH in master|compatible|develop|rosetta*)
   export BUILD_ROSETTA=true

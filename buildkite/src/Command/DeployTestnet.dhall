@@ -45,7 +45,7 @@ in
           Cmd.run "source ${spec.deployEnvFile}",
           Cmd.run (
             "terraform apply -auto-approve" ++
-              " -var mina_image=gcr.io/o1labs-192920/mina-daemon:\\\$MINA_DOCKER_TAG-\\\$MINA_DEB_CODENAME" ++
+              " -var mina_image=gcr.io/o1labs-192920/mina-daemon:\\\$MINA_DOCKER_TAG" ++
               " -var ci_artifact_path=${spec.artifactPath}" ++
               " || (terraform destroy -auto-approve && exit 1)"
           ),
