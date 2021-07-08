@@ -108,7 +108,7 @@ RUN curl https://baltocdn.com/helm/signing.asc | sudo apt-key add - \
 # RUN /tmp/rust_install.sh -y
 # RUN export PATH="$PATH:$HOME/.cargo/bin"
 # RUN echo 'export PATH="$PATH:$HOME/.cargo/bin"' >> /home/opam/.bashrc
-# RUN bash -c "source $HOME/.cargo/env && rustup toolchain install 1.45.2 && rustup default 1.45.2"
+# RUN bash -c "source $HOME/.cargo/env && rustup toolchain install 1.52.1 && rustup default 1.52.1"
 
 # Get yarn + nodejs
 RUN curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
