@@ -18,7 +18,7 @@ BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
 # Load in env vars for githash/branch/etc.
-#source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
 cd "${SCRIPTPATH}/../_build"
 
