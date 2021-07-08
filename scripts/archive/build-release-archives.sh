@@ -13,6 +13,20 @@ source "buildkite/scripts/export-git-env-vars.sh"
 
 cd _build
 
+# Set dependencies based on debian release
+SHARED_DEPS="libssl1.1, libgomp1, libpq-dev, "
+case "${MINA_DEB_CODENAME}" in
+  buster)
+    ARCHIVE_DEPS="libjemalloc2"
+    ;;
+  stretch)
+    ARCHIVE_DEPS="libjemalloc1"
+    ;;
+  *)
+    echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
+    ;;
+esac
+
 PROJECT="mina-archive"
 BUILD_DIR="deb_build"
 
@@ -25,7 +39,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libjemalloc1, libgomp1, libssl1.1, libpq-dev
+Depends: "${SHARED_DEPS}${ARCHIVE_DEPS}"
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -72,7 +86,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libjemalloc1, libgomp1, libssl1.1, libpq-dev
+Depends: "${SHARED_DEPS}${ARCHIVE_DEPS}"
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -119,7 +133,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libjemalloc1, libgomp1, libssl1.1, libpq-dev
+Depends: "${SHARED_DEPS}${ARCHIVE_DEPS}"
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>

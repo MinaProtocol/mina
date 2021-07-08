@@ -19,6 +19,14 @@ RUN chmod +x /mina_daemon_puppeteer.py /find_puppeteer.sh /start.sh /stop.sh
 # Workaround terrible postgresql package requirements with man
 RUN mkdir /usr/share/man/man7 /usr/share/man/man1
 
+# We do not install the below platform-specific dependencies,
+# and instead assume that apt will install the proper deps based on the package definition.
+# The packages are noted here just for clarity/documentation.
+# Buster-only Deps:
+#    libjemalloc2 \
+# Stretch-only Deps:
+#    libjemalloc1 \
+
 # Dependencies
 RUN apt-get -y update \
     && apt-get -y upgrade \
@@ -28,7 +36,6 @@ RUN apt-get -y update \
         dumb-init \
         libssl1.1 \
         libgomp1 \
-        libjemalloc1 \
         libpq-dev \
         apt-transport-https \
         ca-certificates \

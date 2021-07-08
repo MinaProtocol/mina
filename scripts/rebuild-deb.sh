@@ -40,14 +40,18 @@ else
 fi
 
 # Set dependencies based on debian release
+SHARED_DEPS="libssl1.1, libgmp10, libgomp1, "
 case "${MINA_DEB_CODENAME}" in
   buster)
-    DEPS=
-    ARCHIVE_DEPS=
+    DAEMON_DEPS="libffi7, libjemalloc2, libpq-dev, libprocps7"
+    # buster deps that should only affect the toolchain container:
+    # python3-sexpdata \
+    # python-sexpdata \
+    GENKEY_DEPS="libffi7"
     ;;
   stretch)
-    DEPS=
-    ARCHIVE_DEPS=
+    DAEMON_DEPS="libffi6, libjemalloc1, libpq-dev, libprocps6"
+    GENKEY_DEPS="libffi6"
     ;;
   *)
     echo "Unknown Debian codename provided: ${MINA_DEB_CODENAME}"; exit 1
@@ -69,7 +73,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: libffi6, libssl1.1, libgmp10, libgomp1
+Depends: "${SHARED_DEPS}${GENKEY_DEPS}"
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -111,7 +115,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libjemalloc1, libssl1.1, libgmp10, libgomp1, libpq-dev
+Depends: "${SHARED_DEPS}${DAEMON_DEPS}"
 Suggests: postgresql
 Conflicts: mina-devnet
 License: Apache-2.0
@@ -194,7 +198,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libjemalloc1, libssl1.1, libgmp10, libgomp1, libpq-dev
+Depends: "${SHARED_DEPS}${DAEMON_DEPS}"
 Suggests: postgresql
 Conflicts: mina-mainnet
 License: Apache-2.0

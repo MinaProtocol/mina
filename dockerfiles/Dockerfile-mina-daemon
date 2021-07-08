@@ -8,6 +8,18 @@ ARG network=mainnet
 
 ENV DEBIAN_FRONTEND noninteractive
 
+# We do not install the below platform-specific dependencies,
+# and instead assume that apt will install the proper deps based on the package definition.
+# The packages are noted here just for clarity/documentation.
+# Buster-only Deps:
+#    libffi7 \
+#    libprocps7 \
+#    libjemalloc2 \
+# Stretch-only Deps:
+#    libffi6 \
+#    libprocps6 \
+#    libjemalloc1 \
+
 # Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
@@ -20,13 +32,10 @@ RUN apt-get -y update && \
     gettext \
     gnupg2 \
     jq \
-    libffi6 \
     libgmp10 \
     libgomp1 \
     libssl1.1 \
     libpq-dev \
-    libprocps6 \
-    libjemalloc1 \
     procps \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
