@@ -2,7 +2,8 @@
 # The "build-deps" stage
 # - Installs all compilers/interpreters, tools, and OS packages on debian stretch-slim
 #################################################################################################
-FROM debian:stretch-slim AS build-deps
+ARG deb_codename=stretch
+FROM debian:${deb_codename}-slim AS build-deps
 
 # Ocaml Version
 ARG OCAML_VERSION=4.11
