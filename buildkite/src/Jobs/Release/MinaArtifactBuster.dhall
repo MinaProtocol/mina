@@ -123,20 +123,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep rosettaSpec,
+      DockerImage.generateStep rosettaSpec
 
-      -- rosetta image w/ DUNE_PROFILE=dev
-      let rosettaDuneSpec = DockerImage.ReleaseSpec::{
-        deps=rosettaDependsOn,
-        service="mina-rosetta",
-        version="dev-\\\${MINA_DOCKER_TAG}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
-        deb_codename="buster",
-        step_key="rosetta-dev-buster-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep rosettaDuneSpec
     ]
   }

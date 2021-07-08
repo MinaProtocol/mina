@@ -105,31 +105,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep archiveMainnetSpec,
+      DockerImage.generateStep archiveMainnetSpec
 
-      -- rosetta image
-      let rosettaSpec = DockerImage.ReleaseSpec::{
-        deps=rosettaDependsOn,
-        service="mina-rosetta",
-        extra_args="--build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
-        step_key="rosetta-mainnet-stretch-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep rosettaSpec,
-
-      -- rosetta image w/ DUNE_PROFILE=dev
-      let rosettaDuneSpec = DockerImage.ReleaseSpec::{
-        deps=rosettaDependsOn,
-        service="mina-rosetta",
-        version="dev-\\\${MINA_DOCKER_TAG}",
-        extra_args="--build-arg DUNE_PROFILE=dev --build-arg MINA_BRANCH=\\\${BUILDKITE_BRANCH} --build-arg MINA_REPO=\\\${BUILDKITE_PULL_REQUEST_REPO}",
-        step_key="rosetta-dev-stretch-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep rosettaDuneSpec
     ]
   }
