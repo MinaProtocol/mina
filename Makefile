@@ -10,7 +10,6 @@ ifeq ($(USEDOCKER),TRUE)
  WRAP = docker exec -it $(DOCKERNAME)
  WRAPAPP = docker exec --workdir /home/opam/app -t $(DOCKERNAME)
 else
- $(info INFO Not using Docker)
  WRAP =
 endif
 
@@ -296,8 +295,6 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	$(WRAP) ./scripts/archive/build-release-archives.sh
-	@mkdir -p /tmp/artifacts
-	@cp _build/mina*.deb /tmp/artifacts/.
 
 build_pv_keys: ocaml_checks
 	$(info Building keys)
