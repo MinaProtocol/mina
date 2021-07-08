@@ -16,8 +16,8 @@ let ConnectToTestnet = ../../Command/ConnectToTestnet.dhall
 let DockerImage = ../../Command/DockerImage.dhall
 
 let dependsOn = [ 
-  { name = "MinaArtifactStretch", key = "build-deb-pkg" },
-  { name = "GitEnvUpload", key = "upload-git-env" }
+  { name = "GitEnvUpload", key = "upload-git-env" },
+  { name = "MinaArtifactStretch", key = "build-deb-pkg" }
 ]
 let rosettaDependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 

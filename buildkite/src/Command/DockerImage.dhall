@@ -10,7 +10,7 @@ let Cmd = ../Lib/Cmds.dhall
 let DockerLogin = ../Command/DockerLogin/Type.dhall
 
 
-let defaultArtifactStep = { name = "Artifact", key = "build-artifact" }
+let defaultArtifactStep = { name = "GitEnvUpload", key = "upload-git-env" }
 
 let ReleaseSpec = {
   Type = {
