@@ -215,16 +215,22 @@ module Async : S with module M := Async.Deferred.Or_error = struct
         ~metadata:
           [("url", `String uri_string); ("local_file_path", `String file_path)] ;
       let%bind result =
-        Process.run ~prog:"curl"
-          ~args:
-            ["--fail"; "--silent"; "--show-error"; "-o"; file_path; uri_string]
-          ()
-        |> Deferred.Result.map_error ~f:(fun err ->
-               [%log debug] "Could not download key to key cache"
-                 ~metadata:
-                   [ ("url", `String uri_string)
-                   ; ("local_file_path", `String file_path) ] ;
-               err )
+        Monitor.try_with_join_or_error ~here:[%here] (fun () ->
+            Process.run ~prog:"curl"
+              ~args:
+                [ "--fail"
+                ; "--silent"
+                ; "--show-error"
+                ; "-o"
+                ; file_path
+                ; uri_string ]
+              ()
+            |> Deferred.Result.map_error ~f:(fun err ->
+                   [%log debug] "Could not download key to key cache"
+                     ~metadata:
+                       [ ("url", `String uri_string)
+                       ; ("local_file_path", `String file_path) ] ;
+                   err ) )
       in
       [%log trace] "Downloaded key to key cache"
         ~metadata:
