@@ -8,24 +8,17 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
-GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
-GITTAG=$(git describe --always --abbrev=0)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
 
 
-# TODO: be smarter about this when we introduce a devnet package
-#if [[ "$GITBRANCH" == "master" ]] ; then
-DUNE_PROFILE="mainnet"
-#fi
-
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
 
 # Load in env vars for githash/branch/etc.
-source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
+#source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
 
 cd "${SCRIPTPATH}/../_build"
 
@@ -142,7 +135,7 @@ cp ../scripts/mina.service "${BUILDDIR}/usr/lib/systemd/user/"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+cp ../src/config/mainnet.mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
 rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Copy the genesis ledgers and proofs as these are fairly small and very valueable to have l
