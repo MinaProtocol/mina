@@ -10,12 +10,10 @@ cd "${SCRIPTPATH}/../_build"
 GITHASH=$(git rev-parse --short=7 HEAD)
 GITHASH_CONFIG=$(git rev-parse --short=8 --verify HEAD)
 
-# Identify All Artifacts by Branch and Git Hash
 set +u
-
-
 BUILD_NUM=${BUILDKITE_BUILD_NUM}
 BUILD_URL=${BUILDKITE_BUILD_URL}
+set -u
 
 # Load in env vars for githash/branch/etc.
 source "${SCRIPTPATH}/../buildkite/scripts/export-git-env-vars.sh"
@@ -262,5 +260,5 @@ done
 rm -rf "${BUILDDIR}"
 
 # Build mina block producer sidecar 
-source ../automation/services/mina-bp-stats/sidecar/build.sh
+../automation/services/mina-bp-stats/sidecar/build.sh
 ls -lh mina*.deb
