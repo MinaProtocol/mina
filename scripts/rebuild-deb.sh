@@ -73,7 +73,7 @@ Vendor: none
 Architecture: amd64
 Maintainer: o(1)Labs <build@o1labs.org>
 Installed-Size:
-Depends: "${SHARED_DEPS}${GENKEY_DEPS}"
+Depends: ${SHARED_DEPS}${GENKEY_DEPS}
 Section: base
 Priority: optional
 Homepage: https://minaprotocol.com/
@@ -115,7 +115,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: "${SHARED_DEPS}${DAEMON_DEPS}"
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
 Suggests: postgresql
 Conflicts: mina-devnet
 License: Apache-2.0
@@ -198,7 +198,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: "${SHARED_DEPS}${DAEMON_DEPS}"
+Depends: ${SHARED_DEPS}${DAEMON_DEPS}
 Suggests: postgresql
 Conflicts: mina-mainnet
 License: Apache-2.0

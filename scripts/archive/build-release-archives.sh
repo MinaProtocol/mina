@@ -39,7 +39,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: "${SHARED_DEPS}${ARCHIVE_DEPS}"
+Depends: ${SHARED_DEPS}${ARCHIVE_DEPS}
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -86,7 +86,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: "${SHARED_DEPS}${ARCHIVE_DEPS}"
+Depends: ${SHARED_DEPS}${ARCHIVE_DEPS}
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
@@ -133,7 +133,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: "${SHARED_DEPS}${ARCHIVE_DEPS}"
+Depends: ${SHARED_DEPS}${ARCHIVE_DEPS}
 License: Apache-2.0
 Homepage: https://minaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
