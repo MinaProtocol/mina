@@ -83,7 +83,7 @@ module Instance = struct
 
   let load_potential_snarked_ledgers_from_disk factory =
     let location = Locations.potential_snarked_ledgers factory.directory in
-    if Sys.file_exists location = `Yes then
+    if phys_equal (Sys.file_exists location) `Yes then
       Yojson.Safe.from_file location |> potential_snarked_ledgers_of_yojson
     else []
 
@@ -258,7 +258,7 @@ let create_instance_exn t =
 
 let load_from_disk_exn t ~snarked_ledger_hash =
   let open Result.Let_syntax in
-  assert (t.instance = None) ;
+  assert (Option.is_none t.instance) ;
   let%map instance = Instance.load_from_disk t ~snarked_ledger_hash in
   t.instance <- Some instance ;
   instance

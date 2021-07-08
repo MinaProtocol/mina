@@ -358,7 +358,7 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
       Database.initialize instance.db ~root_data ;
       (* sanity check database after initialization on debug builds *)
       Debug_assert.debug_assert (fun () ->
-          Database.check instance.db ~genesis_state_hash
+          ignore (Database.check instance.db ~genesis_state_hash
           |> Result.map_error ~f:(function
                | `Invalid_version ->
                    "invalid version"
@@ -368,4 +368,4 @@ let reset_database_exn t ~root_data ~genesis_state_hash =
                    "genesis state mismatch"
                | `Corrupt err ->
                    Database.Error.message err )
-          |> Result.ok_or_failwith |> ignore ) )
+          |> Result.ok_or_failwith : Frozen_ledger_hash.t) ) )
