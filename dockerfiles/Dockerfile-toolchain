@@ -1,5 +1,5 @@
-ARG MINA_TOOLCHAIN_SHA=7e555eb05e25b4858a97d62740473ef7f26ffcb4faa05572a9c5e2abaa2c940e
-FROM gcr.io/o1labs-192920/mina-rosetta-build-deps@sha256:${MINA_TOOLCHAIN_SHA}
+ARG MINA_TOOLCHAIN_SHA=0b44b84398e6f37c34ba643d77fe38cb364eafa190ea7a6829d834e9302e08c7
+FROM gcr.io/o1labs-192920/mina-rosetta-opam-deps@sha256:${MINA_TOOLCHAIN_SHA}
 
 ARG deb_codename=stretch
 
