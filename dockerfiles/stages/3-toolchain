@@ -73,7 +73,7 @@ RUN if test "$deb_codename" = "buster" ; then \
       && sudo apt-get install -y \
         python3-sexpdata \
         python-sexpdata \
-    else \
+    else ; \
       sudo pip install readchar sexpdata \
       && sudo pip3 install readchar sexpdata ; fi
 
