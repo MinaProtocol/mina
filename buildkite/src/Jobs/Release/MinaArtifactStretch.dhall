@@ -93,7 +93,7 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep archiveMainnetSpec
+      DockerImage.generateStep archiveSpec
 
     ]
   }
