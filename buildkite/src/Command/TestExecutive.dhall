@@ -18,11 +18,6 @@ in
     Command.build
       Command.Config::{
         commands =
-            Cmd.run (
-                "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID" ++ \
-                    "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
-            ),
-
             -- Build test executive binary
             OpamInit.andThenRunInDocker [
               "DUNE_PROFILE=${duneProfile}",
@@ -49,7 +44,10 @@ in
             [
               -- Download test dependencies
               Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
-              Cmd.run "artifact-cache-helper.sh ${defaultArtifactStep.deploy_env_file}",
+              Cmd.run (
+                  "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID" ++
+                      "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
+              ),
 
               -- Execute test based on BUILD image
               Cmd.run "source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"

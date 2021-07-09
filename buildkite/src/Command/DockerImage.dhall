@@ -42,7 +42,7 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     let commands : List Cmd.Type =
     [
         Cmd.run (
-          "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID" ++ \
+          "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID" ++
               "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
         ),
         Cmd.run (
