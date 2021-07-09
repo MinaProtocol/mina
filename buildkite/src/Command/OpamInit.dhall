@@ -38,7 +38,7 @@ let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
 let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
-    [
+    [ Mina.fixPermissionsCommand ] # [
       Cmd.runInDocker
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBuster, extraEnv = environment })
         ("make setup-opam &&" ++ innerScript)
@@ -47,7 +47,7 @@ let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
 let runInToolchainStretch : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
-    [
+    [ Mina.fixPermissionsCommand ] # [
       Cmd.runInDocker
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainStretch, extraEnv = environment })
         ("make setup-opam &&" ++ innerScript)
