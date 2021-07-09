@@ -117,5 +117,5 @@ RUN git clone \
   /home/opam/opam-repository \
   && opam init --disable-sandboxing -k git -a ~/opam-repository --bare \
   && opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git \
-  && opam switch create "${OCAML_VERSION}" "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
-  && opam switch "${OCAML_VERSION}"
+  && opam switch create "${OCAML_VERSION}${OCAML_REVISION}" "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
+  && opam switch "${OCAML_VERSION}${OCAML_REVISION}"

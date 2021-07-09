@@ -38,7 +38,6 @@ RUN opam switch import src/opam.export
 # TODO: Get pins from a script that can be easily updated if more pins are needed
 # Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
 RUN eval $(opam config env) \
-  && opam uninstall extlib \
   && opam pin add src/external/ocaml-extlib \
   && opam pin add src/external/ocaml-sodium \
   && opam pin add src/external/rpc_parallel \
