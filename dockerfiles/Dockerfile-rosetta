@@ -343,10 +343,17 @@ RUN mkdir -p --mode=700 ${MINA_CONFIG_DIR}/wallets/store/ \
   > ${MINA_CONFIG_DIR}/wallets/store/${PK} \
   && chmod go-rwx ${MINA_CONFIG_DIR}/wallets/store/${PK}
 
+# Copy the demo daemon.json.template
+COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json.template
+
+COPY --from=builder /home/opam/app/* /mina-bin/
+COPY --from=builder /home/opam/mina/src/app /app
+COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.json
+
 USER postgres
 
 # TODO: derive this value from the installed package version
-ARG POSTGRES_VERSION=9.6
+ARG POSTGRES_VERSION=11
 
 # TODO: use POSTGRES_DATA_DIR variable more consistently and ensure proper escaping
 # TODO: move this to a more useful and easy to maintain script in the rosetta directory for this purpose
@@ -367,12 +374,5 @@ WORKDIR /app/rosetta
 
 EXPOSE 3087
 EXPOSE $MINA_DAEMON_PORT
-
-# Copy the demo daemon.json.template
-COPY --from=builder /home/opam/mina/src/app/rosetta/demo-config.json ${MINA_CONFIG_DIR}/daemon.json.template
-
-COPY --from=builder /home/opam/app/* /mina-bin/
-COPY --from=builder /home/opam/mina/src/app /app
-COPY --from=builder /home/opam/mina/src/app/rosetta/config.json /data/config.json
 
 ENTRYPOINT ["bash", "./docker-start.sh"]
