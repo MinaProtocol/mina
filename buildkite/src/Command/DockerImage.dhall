@@ -42,9 +42,8 @@ let generateStep = \(spec : ReleaseSpec.Type) ->
     let commands : List Cmd.Type =
     [
         Cmd.run (
-          "if [ ! -f ${defaultArtifactStep.deploy_env_file} ]; then " ++
-              "buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID --include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} .; " ++
-          "fi"
+          "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID" ++ \
+              "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
         ),
         Cmd.run (
           "export MINA_DEB_CODENAME=${spec.deb_codename} && source ${defaultArtifactStep.deploy_env_file} && ./scripts/release-docker.sh " ++

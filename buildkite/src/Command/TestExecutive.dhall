@@ -9,7 +9,7 @@ let OpamInit = ../Command/OpamInit.dhall
 let Cmd = ../Lib/Cmds.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
 
-let deployEnv = "DOCKER_DEPLOY_ENV"
+let defaultArtifactStep = { name = "GitEnvUpload", key = "upload-git-env", deploy_env_file = "export-git-env-vars.sh" }
 
 in
 
@@ -18,6 +18,11 @@ in
     Command.build
       Command.Config::{
         commands =
+            Cmd.run (
+                "[ ! -f ${defaultArtifactStep.deploy_env_file} ] && buildkite-agent artifact download --build \\\$BUILDKITE_BUILD_ID" ++ \
+                    "--include-retried-jobs --step _${defaultArtifactStep.name}-${defaultArtifactStep.key} ${defaultArtifactStep.deploy_env_file} ."
+            ),
+
             -- Build test executive binary
             OpamInit.andThenRunInDocker [
               "DUNE_PROFILE=${duneProfile}",
@@ -44,11 +49,10 @@ in
             [
               -- Download test dependencies
               Cmd.run "artifact-cache-helper.sh test_executive.exe && chmod +x test_executive.exe",
-              Cmd.run "artifact-cache-helper.sh ${deployEnv}",
-              Cmd.run "cat ${deployEnv}",
+              Cmd.run "artifact-cache-helper.sh ${defaultArtifactStep.deploy_env_file}",
 
               -- Execute test based on BUILD image
-              Cmd.run "source ${deployEnv} && ./buildkite/scripts/run-test-executive.sh ${testName}"
+              Cmd.run "source ${defaultArtifactStep.deploy_env_file} && ./buildkite/scripts/run-test-executive.sh ${testName}"
             ],
         artifact_paths = [SelectFiles.exactly "." "${testName}.test.log"],
         label = "${testName} integration test",
