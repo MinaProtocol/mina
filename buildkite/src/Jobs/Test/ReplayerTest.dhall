@@ -7,7 +7,7 @@ let JobSpec = ../../Pipeline/JobSpec.dhall
 let ReplayerTest = ../../Command/ReplayerTest.dhall
 
 let dependsOn =
-      [ { name = "MinaArtifact", key = "archive-devnet-docker-image" } ]
+      [ { name = "MinaArtifactStretch", key = "archive-docker-image" } ]
 
 in  Pipeline.build
       Pipeline.Config::{
