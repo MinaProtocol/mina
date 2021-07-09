@@ -40,7 +40,19 @@ Pipeline.build
 
       in
 
-      DockerImage.generateStep toolchainBusterSpec
+      DockerImage.generateStep toolchainBusterSpec,
+
+      -- mina-toolchain Debian Stretch image
+      let toolchainStretchSpec = DockerImage.ReleaseSpec::{
+        deps=dependsOn,
+        service="mina-toolchain",
+        deb_codename="stretch",
+        step_key="mina-toolchain-stretch-docker-image"
+      }
+
+      in
+
+      DockerImage.generateStep toolchainStretchSpec
 
     ]
   }
