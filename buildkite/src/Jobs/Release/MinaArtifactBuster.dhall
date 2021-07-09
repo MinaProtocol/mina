@@ -87,30 +87,17 @@ Pipeline.build
 
       DockerImage.generateStep daemonMainnetSpec,
 
-      -- archive devnet image
-      let archiveDevnetSpec = DockerImage.ReleaseSpec::{
+      -- archive image
+      let archiveSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-archive",
         deb_codename="buster",
-        step_key="archive-devnet-buster-docker-image"
+        step_key="archive-buster-docker-image"
       }
 
       in
 
-      DockerImage.generateStep archiveDevnetSpec,
-
-      -- archive mainnet image
-      let archiveMainnetSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
-        network="mainnet",
-        service="mina-archive",
-        deb_codename="buster",
-        step_key="archive-mainnet-buster-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep archiveMainnetSpec,
+      DockerImage.generateStep archiveSpec,
 
       -- rosetta image
       let rosettaSpec = DockerImage.ReleaseSpec::{

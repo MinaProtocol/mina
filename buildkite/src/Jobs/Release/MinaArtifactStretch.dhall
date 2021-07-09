@@ -84,23 +84,11 @@ Pipeline.build
 
       DockerImage.generateStep daemonMainnetSpec,
 
-      -- archive devnet image
-      let archiveDevnetSpec = DockerImage.ReleaseSpec::{
+      -- archive image
+      let archiveSpec = DockerImage.ReleaseSpec::{
         deps=dependsOn,
         service="mina-archive",
-        step_key="archive-devnet-stretch-docker-image"
-      }
-
-      in
-
-      DockerImage.generateStep archiveDevnetSpec,
-
-      -- archive mainnet image
-      let archiveMainnetSpec = DockerImage.ReleaseSpec::{
-        deps=dependsOn,
-        network="mainnet",
-        service="mina-archive",
-        step_key="archive-mainnet-stretch-docker-image"
+        step_key="archive-stretch-docker-image"
       }
 
       in
