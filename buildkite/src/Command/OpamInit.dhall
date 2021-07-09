@@ -35,18 +35,6 @@ let andThenRunInDocker : List Text -> Text -> List Cmd.Type =
         (unpackageScript ++ " && " ++ innerScript)
     ]
 
-in
-
-{ andThenRunInDocker = andThenRunInDocker
-, dirtyWhen =
-    [ S.exactly "src/opam" "export"
-    , S.exactly "scripts/setup-opam" "sh"
-    , S.strictly (S.contains "Makefile")
-    , S.exactly "buildkite/src/Command/OpamInit" "dhall"
-    , S.exactly "buildkite/scripts/cache-through" "sh"
-    ]
-}
-
 let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
   \(innerScript : Text) ->
@@ -55,18 +43,6 @@ let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
         (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBuster, extraEnv = environment })
         (innerScript)
     ]
-
-in
-
-{ runInToolchainBuster = runInToolchainBuster
-, dirtyWhen =
-    [ S.exactly "src/opam" "export"
-    , S.exactly "scripts/setup-opam" "sh"
-    , S.strictly (S.contains "Makefile")
-    , S.exactly "buildkite/src/Command/OpamInit" "dhall"
-    , S.exactly "buildkite/scripts/cache-through" "sh"
-    ]
-}
 
 let runInToolchainStretch : List Text -> Text -> List Cmd.Type =
   \(environment : List Text) ->
@@ -79,13 +55,13 @@ let runInToolchainStretch : List Text -> Text -> List Cmd.Type =
 
 in
 
-{ runInToolchainStretch = runInToolchainStretch
-, dirtyWhen =
-    [ S.exactly "src/opam" "export"
+{ andThenRunInDocker = andThenRunInDocker
+, runInToolchainBuster = runInToolchainBuster
+, runInToolchainStretch = runInToolchainStretch
+, dirtyWhen = [ S.exactly "src/opam" "export"
     , S.exactly "scripts/setup-opam" "sh"
     , S.strictly (S.contains "Makefile")
     , S.exactly "buildkite/src/Command/OpamInit" "dhall"
     , S.exactly "buildkite/scripts/cache-through" "sh"
-    ]
+  ]
 }
-
