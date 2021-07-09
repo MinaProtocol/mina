@@ -13,7 +13,7 @@ ARG OCAML_PACKAGE=
 ARG OPAM_VERSION=2.0.7
 
 # Golang version number used to detemine tarball name
-ARG GO_VERSION=1.14.15
+ARG GO_VERSION=1.16.5
 
 # Rust Version passed into rustup-init, can also be "stable", "nightly" or similar
 ARG RUST_VERSION=1.52.1
@@ -132,13 +132,6 @@ RUN git clone \
   && opam repository add --yes --all --set-default o1-labs https://github.com/o1-labs/opam-repository.git \
   && opam switch create "${OCAML_VERSION}" "${OCAML_PACKAGE}${OCAML_VERSION}${OCAML_REVISION}${OCAML_VARIANT}" \
   && opam switch "${OCAML_VERSION}"
-
-# Alternate variants for 4.07 that are included in the official opam image
-#  opam switch create 4.07+afl ocaml-variants.4.07.1+afl && \
-#  opam switch create 4.07+flambda ocaml-variants.4.07.1+flambda && \
-#  opam switch create 4.07+default-unsafe-string ocaml-variants.4.07.1+default-unsafe-string && \
-#  opam switch create 4.07+force-safe-string ocaml-variants.4.07.1+force-safe-string && \
-
 
 #################################################################################################
 # The "opam-deps" Stage
@@ -282,7 +275,7 @@ RUN eval $(opam config env) \
 # The "production" Stage
 # - sets up the final container with built binaries and a running postgresql archive node setup
 #################################################################################################
-FROM debian:stretch-slim AS production
+FROM debian:${deb_codename}-slim AS production
 
 ARG POSTGRES_DATA_DIR=/data/postgresql
 ARG MINA_DAEMON_PORT=10101
@@ -308,12 +301,27 @@ RUN apt-get -y update \
     libffi6 \
     libgmp10 \
     libgomp1 \
-    libjemalloc1 \
     libssl1.1 \
     postgresql \
     postgresql-contrib \
     man \
     tzdata
+
+RUN if test "$deb_codename" = "buster" ; then \
+     sudo apt-get update -y \
+     && sudo apt-get install -y \
+         python3-sexpdata \
+         python-sexpdata \
+         libjemalloc2 \
+         libprocps8 \
+      else ; exit 0 ; fi
+
+RUN if test "$deb_codename" = "stretch" ; then \
+     sudo apt-get update -y \
+     && sudo apt-get install -y \
+         libjemalloc1 \
+         libprocps6 \
+      else ; exit 0 ; fi
 
 # Make all directories for configuration and empty s3 cache dirs
 RUN mkdir -p /tmp/s3_cache_dir \
