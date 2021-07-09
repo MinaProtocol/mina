@@ -252,12 +252,10 @@ RUN eval $(opam config env) \
     src/app/rosetta/rosetta.exe \
     src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
     src/app/generate_keypair/generate_keypair.exe \
+    src/app/rosetta/test-agent/agent.exe \
+    src/app/rosetta/ocaml-signer/signer.exe \
   && mv _build/default/src/app $HOME/app \
   && rm -rf _build
-
-# Rosetta testing tools
-#    src/app/rosetta/test-agent/agent.exe \
-#    src/app/rosetta/ocaml-signer/signer.exe \
 
 # TODO: consider making a mina-rosetta package with the minimum mina binaries/configs for rosetta.
 # Right now make deb is overkill
