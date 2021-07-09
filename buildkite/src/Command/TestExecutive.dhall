@@ -4,7 +4,7 @@ let Command = ./Base.dhall
 let Docker = ./Docker/Type.dhall
 let Size = ./Size.dhall
 
-let OpamInit = ../Command/OpamInit.dhall
+let RunInToolchain = ../Command/RunInToolchain.dhall
 
 let Cmd = ../Lib/Cmds.dhall
 let SelectFiles = ../Lib/SelectFiles.dhall
@@ -19,7 +19,7 @@ in
       Command.Config::{
         commands =
             -- Build test executive binary
-            OpamInit.andThenRunInDocker [
+            RunInToolchain.runInToolchainBuster [
               "DUNE_PROFILE=${duneProfile}",
               -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"

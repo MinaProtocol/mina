@@ -8,7 +8,7 @@ let Pipeline = ../../Pipeline/Dsl.dhall
 let JobSpec = ../../Pipeline/JobSpec.dhall
 
 let Command = ../../Command/Base.dhall
-let OpamInit = ../../Command/OpamInit.dhall
+let RunInToolchain = ../../Command/RunInToolchain.dhall
 let Summon = ../../Command/Summon/Type.dhall
 let Size = ../../Command/Size.dhall
 let Libp2p = ../../Command/Libp2pHelperBuild.dhall
@@ -28,7 +28,7 @@ Pipeline.build
   Pipeline.Config::{
     spec =
       JobSpec::{
-        dirtyWhen = OpamInit.dirtyWhen # [
+        dirtyWhen = [
           S.strictlyStart (S.contains "src"),
           S.strictlyStart (S.contains "automation"),
           S.strictly (S.contains "Makefile"),
@@ -45,7 +45,7 @@ Pipeline.build
       Libp2p.step,
       Command.build
         Command.Config::{
-          commands = OpamInit.runInToolchainBuster [
+          commands = RunInToolchain.runInToolchainBuster [
             "DUNE_PROFILE=devnet",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",
