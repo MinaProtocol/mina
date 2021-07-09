@@ -178,30 +178,12 @@ WORKDIR $HOME/$MINA_DIR
 
 ENV OPAMYES 1
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
-# TODO: handle uri's build failure in a more flexible manner
-# Installs uri.2.2.1 and its dependencies so that build succeeds, then installs the rest of the deps
 RUN opam switch import src/opam.export
-#RUN opam install \
-#  $(scripts/select-opam-deps.sh \
-#  uri \
-#  base \
-#  stdio \
-#  ppx_sexp_conv \
-#  ppxlib \
-#  ocaml-compiler-libs \
-#  ocaml-migrate-parsetree \
-#  dune \
-#  ocamlfind \
-#  base-bytes \
-#  ppx_derivers \
-#  re \
-#  result \
-#  stringext) \
-#  && opam switch import src/opam.export
 
 # TODO: Get pins from a script that can be easily updated if more pins are needed
 # Would be really nice to pull this script, the git submodules, and src/opam.export exclusively in this stage
 RUN eval $(opam config env) \
+  && opam uninstall extlib \
   && opam pin add src/external/ocaml-extlib \
   && opam pin add src/external/ocaml-sodium \
   && opam pin add src/external/rpc_parallel \
@@ -270,10 +252,12 @@ RUN eval $(opam config env) \
     src/app/rosetta/rosetta.exe \
     src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe \
     src/app/generate_keypair/generate_keypair.exe \
-    src/app/rosetta/test-agent/agent.exe \
-    src/app/rosetta/ocaml-signer/signer.exe \
   && mv _build/default/src/app $HOME/app \
   && rm -rf _build
+
+# Rosetta testing tools
+#    src/app/rosetta/test-agent/agent.exe \
+#    src/app/rosetta/ocaml-signer/signer.exe \
 
 # TODO: consider making a mina-rosetta package with the minimum mina binaries/configs for rosetta.
 # Right now make deb is overkill

@@ -45,7 +45,7 @@ Pipeline.build
       Libp2p.step,
       Command.build
         Command.Config::{
-          commands = OpamInit.andThenRunInDocker [
+          commands = OpamInit.runInToolchainBuster [
             "DUNE_PROFILE=devnet",
             "AWS_ACCESS_KEY_ID",
             "AWS_SECRET_ACCESS_KEY",

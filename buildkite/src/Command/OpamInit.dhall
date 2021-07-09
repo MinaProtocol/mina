@@ -47,3 +47,45 @@ in
     ]
 }
 
+let runInToolchainBuster : List Text -> Text -> List Cmd.Type =
+  \(environment : List Text) ->
+  \(innerScript : Text) ->
+    [ Mina.fixPermissionsCommand ] # [
+      Cmd.runInDocker
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainBuster, extraEnv = environment })
+        (innerScript)
+    ]
+
+in
+
+{ runInToolchainBuster = runInToolchainBuster
+, dirtyWhen =
+    [ S.exactly "src/opam" "export"
+    , S.exactly "scripts/setup-opam" "sh"
+    , S.strictly (S.contains "Makefile")
+    , S.exactly "buildkite/src/Command/OpamInit" "dhall"
+    , S.exactly "buildkite/scripts/cache-through" "sh"
+    ]
+}
+
+let runInToolchainStretch : List Text -> Text -> List Cmd.Type =
+  \(environment : List Text) ->
+  \(innerScript : Text) ->
+    [ Mina.fixPermissionsCommand ] # [
+      Cmd.runInDocker
+        (Cmd.Docker::{ image = (../Constants/ContainerImages.dhall).minaToolchainStretch, extraEnv = environment })
+        (innerScript)
+    ]
+
+in
+
+{ runInToolchainStretch = runInToolchainStretch
+, dirtyWhen =
+    [ S.exactly "src/opam" "export"
+    , S.exactly "scripts/setup-opam" "sh"
+    , S.strictly (S.contains "Makefile")
+    , S.exactly "buildkite/src/Command/OpamInit" "dhall"
+    , S.exactly "buildkite/scripts/cache-through" "sh"
+    ]
+}
+
