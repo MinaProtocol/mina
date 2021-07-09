@@ -19,7 +19,6 @@ let dependsOn = [
   { name = "GitEnvUpload", key = "upload-git-env" },
   { name = "MinaArtifactStretch", key = "build-deb-pkg" }
 ]
-let rosettaDependsOn = [ { name = "GitEnvUpload", key = "upload-git-env" } ]
 
 in
 
