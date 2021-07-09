@@ -5,6 +5,7 @@
  (targets libmarlin_plonk_stubs.a target)
  (deps
    Cargo.toml
+   rust_toolchain.toml
    (source_tree src)
    (source_tree ../../marlin))
  (action
