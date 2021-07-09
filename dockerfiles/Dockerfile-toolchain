@@ -38,6 +38,8 @@ RUN sudo apt-get update -y \
     libffi-dev \
     libgmp-dev \
     libgmp3-dev \
+    libgmp10 \
+    libgomp1 \
     libjemalloc-dev \
     libpq-dev \
     libprocps-dev \
@@ -61,19 +63,6 @@ RUN sudo apt-get update -y \
     python3-pip \
     rubygems \
     zlib1g-dev
-
-# buster-only packages
-RUN if test "$deb_codename" = "buster" ; then \
-    sudo apt-get update -y \
-    && sudo apt-get install -y \
-        python3-sexpdata \
-        python-sexpdata \
-        libjemalloc2 \
-        libprocps8 \
-        libffi7 \
-        libgmp10 \
-        libgomp1 \
-     else ; exit 0 ; fi
 
 # -- python dependencies (largely installed above from apt)
 RUN sudo pip install readchar sexpdata \
