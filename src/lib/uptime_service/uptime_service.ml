@@ -16,14 +16,19 @@ type block_data =
   ; snark_work: string option [@default None] }
 [@@deriving to_yojson]
 
-type proof_data = Ledger_proof.Stable.Latest.t * Core_kernel.Time.Span.t
+(* NB: this type is unversioned, so the verifier on the backend
+   will need to be using the same code
+*)
+type proof_data =
+  { proof: Ledger_proof.Stable.Latest.t
+  ; proof_time: Core_kernel.Time.Span.t
+  ; snark_work_fee: Currency.Fee.Stable.Latest.t }
 [@@deriving bin_io_unversioned]
 
 (* TODO: what's the max size of a serialized block? *)
 let block_buf = Bin_prot.Common.create_buf 12_000_000
 
 (* TODO: what the size of a serialized proof? *)
-
 let proof_buf = Bin_prot.Common.create_buf 500_000
 
 let external_transition_of_breadcrumb breadcrumb =
@@ -64,10 +69,10 @@ let send_uptime_data ~logger ~(submitter_keypair : Keypair.t) ~url ~state_hash
             ~body:(Yojson.Safe.to_string json |> Cohttp_async.Body.of_string)
             url
         with
-        | {status; _}, _body ->
+        | {status; _}, body ->
             if Cohttp.Code.code_of_status status = 200 then
               [%log info]
-                "Sent block with state hash $state_hash to uptime server at \
+                "Sent block with state hash $state_hash to uptime service at \
                  URL $url"
                 ~metadata:
                   [ ("state_hash", State_hash.to_yojson state_hash)
@@ -75,25 +80,38 @@ let send_uptime_data ~logger ~(submitter_keypair : Keypair.t) ~url ~state_hash
                     , `Bool (Option.is_some block_data.snark_work) )
                   ; ("url", `String (Uri.to_string url)) ]
             else
+              let base_metadata =
+                [ ("state_hash", State_hash.to_yojson state_hash)
+                ; ("url", `String (Uri.to_string url))
+                ; ("http_code", `Int (Cohttp.Code.code_of_status status))
+                ; ("http_error", `String (Cohttp.Code.string_of_status status))
+                ; ("payload", json) ]
+              in
+              let extra_metadata =
+                match body with
+                | `String s ->
+                    [("error", `String s)]
+                | `Strings ss ->
+                    [("error", `List (List.map ss ~f:(fun s -> `String s)))]
+                | `Empty | `Pipe _ ->
+                    []
+              in
+              let metadata = base_metadata @ extra_metadata in
               [%log error]
                 "Failure when sending block with state hash $state_hash to \
-                 uptime server at URL $url"
-                ~metadata:
-                  [ ("state_hash", State_hash.to_yojson state_hash)
-                  ; ("url", `String (Uri.to_string url))
-                  ; ("http_code", `Int (Cohttp.Code.code_of_status status))
-                  ; ( "http_error"
-                    , `String (Cohttp.Code.string_of_status status) ) ] )
+                 uptime service at URL $url"
+                ~metadata )
   with
   | Ok () ->
       ()
   | Error exn ->
       [%log error]
         "Error when sending block with state hash $state_hash to uptime \
-         server at URL $url"
+         service at URL $url"
         ~metadata:
           [ ("state_hash", State_hash.to_yojson state_hash)
           ; ("url", `String (Uri.to_string url))
+          ; ("payload", json)
           ; ("error", `String (Exn.to_string exn)) ]
 
 let block_base64_of_breadcrumb ~logger breadcrumb =
@@ -108,7 +126,9 @@ let block_base64_of_breadcrumb ~logger breadcrumb =
   | Ok block_base64 ->
       Some block_base64
   | Error (`Msg err) ->
-      [%log error] "Could not Base64-encode block with state hash $state_hash"
+      [%log error]
+        "Could not Base64-encode block with state hash $state_hash for uptime \
+         service"
         ~metadata:
           [ ( "state_hash"
             , State_hash.to_yojson
@@ -119,10 +139,11 @@ let block_base64_of_breadcrumb ~logger breadcrumb =
 let send_produced_block_at ~logger ~url ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) tm =
   (* give block production some time *)
-  let%bind () = at (Time.add tm @@ Time.Span.of_min 2.0) in
+  let%bind () = at (Time.add tm @@ Time.Span.of_min 3.0) in
   match Block_producer.last_block_produced_opt () with
   | None ->
-      [%log error] "State hash of last block produced unavailable"
+      [%log error]
+        "State hash of last block produced unavailable for uptime service"
         ~metadata:
           [ ( "expected_block_production_time"
             , `String (Time.to_string_abs ~zone:Time.Zone.utc tm) ) ] ;
@@ -132,7 +153,7 @@ let send_produced_block_at ~logger ~url ~transition_frontier ~peer_id
     | None ->
         [%log error]
           "Transition frontier not available to obtain produced block with \
-           state hash $state_hash"
+           state hash $state_hash for uptime service"
           ~metadata:[("state_hash", State_hash.to_yojson state_hash)] ;
         return ()
     | Some tf -> (
@@ -140,7 +161,7 @@ let send_produced_block_at ~logger ~url ~transition_frontier ~peer_id
       | None ->
           [%log error]
             "Produced block with state hash $state_hash not found in \
-             transition frontier"
+             transition frontier for uptime service"
             ~metadata:[("state_hash", State_hash.to_yojson state_hash)] ;
           return ()
       | Some breadcrumb -> (
@@ -169,7 +190,8 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
       match block_base64_of_breadcrumb ~logger breadcrumb with
       | None ->
           [%log info]
-            "Could not Base64-encode block, not sending block or SNARK work" ;
+            "Could not Base64-encode block, not sending block or SNARK work \
+             to uptime service" ;
           return ()
       | Some block_base64 -> (
           let message =
@@ -178,13 +200,12 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
           in
           (* mimicking code from standalone snark worker *)
           let module Prod = Snark_worker__Prod.Inputs in
-          let%bind ({m; _} as worker_state : Prod.Worker_state.t) =
+          let%bind (worker_state : Prod.Worker_state.t) =
             Prod.Worker_state.create
               ~constraint_constants:
                 Genesis_constants.Constraint_constants.compiled
               ~proof_level:Full ()
           in
-          let (module M : Transaction_snark.S) = Option.value_exn m in
           let best_tip = Transition_frontier.best_tip tf in
           let external_transition =
             Transition_frontier.Breadcrumb.validated_transition best_tip
@@ -198,7 +219,8 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
                  external_transition)
           then (
             [%log info]
-              "No transactions in block, sending block without SNARK work" ;
+              "No transactions in block, sending block without SNARK work to \
+               uptime service" ;
             let state_hash =
               Transition_frontier.Breadcrumb.state_hash best_tip
             in
@@ -298,7 +320,7 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
                           "Error when computing SNARK work for uptime service"
                           ~metadata:[("error", Error_json.error_to_yojson e)] ;
                         return ()
-                    | Ok ((proof, _span) as proof_data) -> (
+                    | Ok (proof, proof_time) -> (
                         let work =
                           `One
                             (Snark_work_lib.Work.Single.Spec.statement
@@ -323,6 +345,7 @@ let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
                             [%log error]
                               "Statement not referenced error when trying to \
                                add SNARK for uptime service to pool" ) ;
+                        let proof_data = {proof; proof_time; snark_work_fee} in
                         let proof_len =
                           bin_write_proof_data proof_buf ~pos:0 proof_data
                         in
@@ -401,7 +424,8 @@ let start (mina : Mina_lib.t) =
           | Some _, None ->
               (* should be unreachable *)
               failwith
-                "No uptime submitter keypair, though a submitter URL was given"
+                "No uptime service submitter keypair, though a submitter URL \
+                 was given"
           | Some {peer_id; _}, Some submitter_keypair -> (
               let send_just_block next_producer_time =
                 [%log' info config.logger]
