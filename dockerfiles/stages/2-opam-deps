@@ -31,6 +31,7 @@ RUN git clone \
 WORKDIR $HOME/$MINA_DIR
 
 ENV OPAMYES 1
+
 # TODO: handle this opam work without cloning the full repository (directly pull src/opam.export)
 RUN opam switch import src/opam.export
 
