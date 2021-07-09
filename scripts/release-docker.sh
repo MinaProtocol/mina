@@ -65,7 +65,7 @@ mina-daemon)
   DOCKER_CONTEXT="dockerfiles/"
   ;;
 mina-toolchain)
-  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-opam-deps dockerfiles/stages/3-toolchain"
+  DOCKERFILE_PATH="dockerfiles/stages/1-build-deps dockerfiles/stages/2-toolchain dockerfiles/stages/3-opam-deps"
   ;;
 mina-rosetta)
   DOCKERFILE_PATH="dockerfiles/stages/*"
