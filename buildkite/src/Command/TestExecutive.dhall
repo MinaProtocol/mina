@@ -19,7 +19,7 @@ in
       Command.Config::{
         commands =
             -- Build test executive binary
-            RunInToolchain.runInToolchainBuster [
+            RunInToolchain.runInToolchainStretch [
               "DUNE_PROFILE=${duneProfile}",
               -- add zexe standardization preprocessing step (see: https://github.com/MinaProtocol/mina/pull/5777)
               "PREPROCESSOR=./scripts/zexe-standardize.sh"
