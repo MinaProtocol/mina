@@ -370,6 +370,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
         ]
     in
     upon finished (fun e ->
+        don't_wait_for (Process.stdin process |> Writer.close) ;
         let pid = Process.pid process in
         let create_worker_trigger = Ivar.create () in
         don't_wait_for

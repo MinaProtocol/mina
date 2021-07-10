@@ -204,12 +204,16 @@ module Snark_worker = struct
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger
       snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
+    let close_stdin () =
+      Process.stdin snark_worker_process |> Async.Writer.close
+    in
     don't_wait_for
       ( match%bind
           Monitor.try_with ~here:[%here] (fun () ->
               Process.wait snark_worker_process)
         with
       | Ok signal_or_error -> (
+          let%bind () = close_stdin () in
           match signal_or_error with
           | Ok () ->
               [%log info] "Snark worker process died" ;
@@ -229,6 +233,7 @@ module Snark_worker = struct
                 signal ;
               raise (Snark_worker_signal_interrupt signal) )
       | Error exn ->
+          let%bind () = close_stdin () in
           [%log info]
             !"Exception when waiting for snark worker process to terminate: \
               $exn"
