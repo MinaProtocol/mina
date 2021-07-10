@@ -18,7 +18,10 @@ type t =
       [ `Always_raise
       | `Raise_on_failure
       | `Handler of
-        killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
+           killed:bool
+        -> Process.t
+        -> Unix.Exit_or_signal.t Or_error.t
+        -> unit Deferred.t
       | `Ignore ]
   }
 
@@ -241,7 +244,10 @@ let start_custom :
          [ `Always_raise
          | `Raise_on_failure
          | `Handler of
-           killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
+              killed:bool
+           -> Process.t
+           -> Unix.Exit_or_signal.t Or_error.t
+           -> unit Deferred.t
          | `Ignore ]
     -> t Deferred.Or_error.t =
  fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
@@ -355,7 +361,7 @@ let start_custom :
     | `Raise_on_failure, Ok (Ok ()) ->
         Deferred.unit
     | `Handler f, _ ->
-        f ~killed:t.killing termination_status) ;
+        f ~killed:t.killing process termination_status) ;
   Deferred.Or_error.return t
 
 let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
@@ -384,10 +390,8 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
   | Some _ ->
       Deferred.Or_error.error_string "already terminated"
 
-let register_process ?termination_expected (termination : Termination.t)
-    (process : t) kind =
-  Termination.register_process ?termination_expected termination process.process
-    kind
+let register_process (termination : Termination.t) (process : t) kind =
+  Termination.register_process termination process.process kind
 
 let%test_module _ =
   ( module struct

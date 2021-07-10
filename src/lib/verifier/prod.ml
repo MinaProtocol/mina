@@ -336,8 +336,6 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)
-    let pid = Process.pid process in
-    Child_processes.Termination.mark_termination_as_expected pids pid ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stdout process |> Reader.pipe)
@@ -372,6 +370,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     upon finished (fun e ->
         don't_wait_for (Process.stdin process |> Writer.close) ;
         let pid = Process.pid process in
+        Child_processes.Termination.remove pids pid ;
         let create_worker_trigger = Ivar.create () in
         don't_wait_for
           (* If we don't hear back that the process has died after 10 seconds,

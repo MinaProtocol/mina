@@ -9,20 +9,12 @@ include Hashable.Make_binable (Pid)
 type process_kind = Prover | Verifier | Libp2p_helper
 [@@deriving show { with_path = false }, yojson]
 
-type data = { kind : process_kind; termination_expected : bool }
-[@@deriving yojson]
-
-type t = data Pid.Table.t
+type t = process_kind Pid.Table.t
 
 let create_pid_table () : t = Pid.Table.create ()
 
-let register_process ?(termination_expected = false) (t : t) process kind =
-  let data = { kind; termination_expected } in
-  Pid.Table.add_exn t ~key:(Process.pid process) ~data
-
-let mark_termination_as_expected t child_pid =
-  Pid.Table.change t child_pid
-    ~f:(Option.map ~f:(fun r -> { r with termination_expected = true }))
+let register_process (t : t) process kind =
+  Pid.Table.add_exn t ~key:(Process.pid process) ~data:kind
 
 let remove : t -> Pid.t -> unit = Pid.Table.remove
 
@@ -36,26 +28,6 @@ let get_signal_cause_opt =
     ] ~f:(fun (signal, msg) ->
       Base.ignore (Table.add signal_causes_tbl ~key:signal ~data:msg)) ;
   fun signal -> Signal.Table.find signal_causes_tbl signal
-
-let get_child_data (t : t) child_pid = Pid.Table.find t child_pid
-
-let check_terminated_child (t : t) child_pid logger =
-  match get_child_data t child_pid with
-  | None ->
-      (* not a process of interest *)
-      ()
-  | Some data ->
-      if not data.termination_expected then (
-        let kind = show_process_kind data.kind in
-        [%log error]
-          "Child process of kind $process_kind with pid $child_pid has \
-           unexpectedly terminated"
-          ~metadata:
-            [ ("child_pid", `Int (Pid.to_int child_pid))
-            ; ("process_kind", `String kind)
-            ] ;
-        failwithf "Child process of kind %s has unexpectedly terminated" kind ()
-        )
 
 (** wait for a [process], which may resolve immediately or in a Deferred.t,
     log any errors, attributing the source to the provided [module] and [location]
