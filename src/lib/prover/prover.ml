@@ -323,24 +323,25 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
       ~location:__LOC__ ~here:[%here]
   in
   don't_wait_for
-    ( match%map exit_or_signal with
+    ( match%bind exit_or_signal with
     | Ok (Ok ()) ->
-        [%log fatal] "Unexpected prover termination" ;
-        failwith "Unexpected prover termination"
+        [%log fatal] "Unexpected prover termination, terminating daemon" ;
+        Async.exit 1
     | Ok (Error (`Exit_non_zero n)) ->
-        [%log fatal] "Prover terminated with nonzero exit code"
+        [%log fatal]
+          "Prover terminated with nonzero exit code, terminating daemon"
           ~metadata:[ ("exit_code", `Int n) ] ;
-        failwithf "Prover terminated with exit code %d" n ()
+        Async.exit 1
     | Ok (Error (`Signal signal)) ->
         let signal_str = Signal.to_string signal in
-        [%log fatal] "Prover terminated due to signal"
+        [%log fatal] "Prover terminated due to signal, terminating daemon"
           ~metadata:[ ("signal", `String signal_str) ] ;
-        failwithf "Prover terminated due to signal %s" signal_str ()
+        Async.exit 1
     | Error err ->
         let err_str = Error.to_string_hum err in
-        [%log fatal] "Error waiting on prover process"
+        [%log fatal] "Error waiting on prover process, terminating daemon"
           ~metadata:[ ("error", `String err_str) ] ;
-        failwithf "Error waiting on prover process: %s" err_str () ) ;
+        Async.exit 1 ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)
