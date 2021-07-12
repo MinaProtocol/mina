@@ -1112,7 +1112,10 @@ let run ~logger ~trust_system ~verifier ~network ~frontier
                        (Float.of_int @@ (1 + List.length children_transitions)))) ;
              List.iter forest ~f:(fun subtree ->
                  Rose_tree.iter subtree ~f:(fun cached ->
-                     Cached.invalidate_with_failure cached |> ignore))
+                     ( Cached.invalidate_with_failure cached
+                       : External_transition.Initial_validated.t
+                         Envelope.Incoming.t )
+                     |> ignore))
          | Ok (root, state_hashes) ->
              [%log' debug t.logger]
                ~metadata:
