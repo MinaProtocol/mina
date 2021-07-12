@@ -28,7 +28,7 @@ impl From<BigInteger256> for CamlBigInteger256 {
     }
 }
 
-unsafe impl ocaml::FromValue for CamlBigInteger256 {
+unsafe impl<'a> ocaml::FromValue<'a> for CamlBigInteger256 {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
         x.as_ref().clone()
@@ -36,9 +36,14 @@ unsafe impl ocaml::FromValue for CamlBigInteger256 {
 }
 
 impl CamlBigInteger256 {
-    extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
-        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(x);
-        let y: ocaml::Pointer<Self> = ocaml::FromValue::from_value(y);
+    unsafe extern "C" fn caml_pointer_finalize(v: ocaml::Raw) {
+        let ptr = v.as_pointer::<Self>();
+        ptr.drop_in_place()
+    }
+
+    unsafe extern "C" fn ocaml_compare(x: ocaml::Raw, y: ocaml::Raw) -> i32 {
+        let x = x.as_pointer::<Self>();
+        let y = y.as_pointer::<Self>();
         match x.as_ref().0.cmp(&y.as_ref().0) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
@@ -47,12 +52,10 @@ impl CamlBigInteger256 {
     }
 }
 
-impl ocaml::Custom for CamlBigInteger256 {
-    ocaml::custom! {
-        name: "CamlBigInteger256",
-        compare: CamlBigInteger256::ocaml_compare,
-    }
-}
+ocaml::custom!(CamlBigInteger256 {
+    finalize: CamlBigInteger256::caml_pointer_finalize,
+    compare: CamlBigInteger256::ocaml_compare,
+});
 
 impl Deref for CamlBigInteger256 {
     type Target = BigInteger256;
@@ -107,10 +110,14 @@ impl ToString for CamlBigInteger256 {
 #[ocaml::func]
 pub fn caml_bigint_256_of_numeral(
     s: &[u8],
-    _len: u16,
-    base: u16,
+    _len: ocaml::Int,
+    base: ocaml::Int,
 ) -> Result<CamlBigInteger256, ocaml::Error> {
-    match BigUint::parse_bytes(s, base as u32) {
+    match BigUint::parse_bytes(
+        s,
+        base.try_into()
+            .map_err(|_| ocaml::Error::Message("caml_bigint_256_of_numeral"))?,
+    ) {
         Some(data) => CamlBigInteger256::try_from(data)
             .map_err(|_| ocaml::Error::Message("caml_bigint_256_of_numeral")),
         None => Err(ocaml::Error::Message("caml_bigint_256_of_numeral")),
@@ -196,8 +203,8 @@ pub fn caml_bigint_256_to_bytes(x: ocaml::Pointer<CamlBigInteger256>) -> ocaml::
             ocaml::sys::string_val(str),
             input_bytes.len(),
         );
+        ocaml::Value::new(str)
     }
-    ocaml::Value(str)
 }
 
 #[ocaml::func]
