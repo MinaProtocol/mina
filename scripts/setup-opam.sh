@@ -40,6 +40,24 @@ eval $(opam config env)
 O1LABS_REPO='https://github.com/o1-labs/opam-repository.git'
 opam repository add --yes --this-switch o1-labs "$O1LABS_REPO"
 
+# Extlib gets automatically installed, but we want our pin, so we should
+# uninstall here
+opam uninstall extlib
+
+# init submodules
+git submodule sync && git submodule update --init --recursive
+
+# workaround a permissions problem in rpc_parallel .git
+sudo chmod -R u+rw _opam
+
+# update and pin packages, used by CI
+opam pin -y -k path add src/external/rpc_parallel
+opam pin -y -k path add src/external/ocaml-sodium
+opam pin -y -k path add src/external/ocaml-extlib
+opam pin -y -k path add src/external/async_kernel
+opam pin -y -k path add src/external/coda_base58
+opam pin -y -k path add src/external/ppx_deriving_yojson
+
 # update ocaml packages
 opam update
 eval $(opam config env)
