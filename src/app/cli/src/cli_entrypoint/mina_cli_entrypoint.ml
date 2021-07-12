@@ -55,14 +55,6 @@ let plugin_flag = Command.Param.return []
 
 [%%endif]
 
-let get_tracked_keypair ~logger ~read_from_env_exn ~which conf_dir pk =
-  let%bind wallets =
-    Secrets.Wallets.load ~logger ~disk_location:(conf_dir ^/ "wallets")
-  in
-  let sk_file = Secrets.Wallets.get_path wallets pk in
-  let%map kp = read_from_env_exn ~logger ~which sk_file in
-  Some kp
-
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -886,10 +878,14 @@ let setup_daemon logger =
             in
             Some kp
         | _, Some tracked_pubkey ->
-            get_tracked_keypair ~logger
-              ~read_from_env_exn:
-                Secrets.Keypair.Terminal_stdin.read_from_env_exn
-              ~which:"block producer keypair" conf_dir tracked_pubkey
+            let%map kp =
+              Secrets.Wallets.get_tracked_keypair ~logger
+                ~which:"block producer keypair"
+                ~read_from_env_exn:
+                  Secrets.Keypair.Terminal_stdin.read_from_env_exn ~conf_dir
+                tracked_pubkey
+            in
+            Some kp
       in
       let%bind client_trustlist =
         Reader.load_sexp
@@ -1142,10 +1138,14 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         | None ->
             return None
         | Some pk ->
-            get_tracked_keypair ~logger
-              ~read_from_env_exn:
-                Secrets.Uptime_keypair.Terminal_stdin.read_from_env_exn
-              ~which:"uptime submitter keypair" conf_dir pk
+            let%map kp =
+              Secrets.Wallets.get_tracked_keypair ~logger
+                ~which:"uptime submitter keypair"
+                ~read_from_env_exn:
+                  Secrets.Uptime_keypair.Terminal_stdin.read_from_env_exn
+                ~conf_dir pk
+            in
+            Some kp
       in
       let start_time = Time.now () in
       let%map coda =
