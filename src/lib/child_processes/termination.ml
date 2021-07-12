@@ -69,3 +69,44 @@ let wait_for_process_log_errors ~logger process ~module_ ~location ~here =
       Logger.error logger ~module_ ~location
         "Saw an immediate exception $exn while waiting for process"
         ~metadata:[ ("exn", Error_json.error_to_yojson err) ]
+
+(** Call this as early as possible after the process is known, and store the
+    resulting [Deferred.t] somewhere to be used later.
+*)
+let wait_safe ~logger process ~module_ ~location ~here =
+  (* This is a little more nuanced than it may initially seem.
+     - The initial call to [Process.wait] runs a wait syscall -- with the
+       NOHANG flag -- synchronously.
+       * This may raise an error (WNOHANG or otherwise) that we have to handle
+         synchronously at call time.
+     - The [Process.wait] then returns a [Deferred.t] that resolves when a
+       second syscall returns.
+       * This may throw its own errors, so we need to ensure that this is also
+         wrapped to catch them.
+     - Once the child process has died and one or more wait syscalls have
+       resolved, the operating system will drop the process metadata. This
+       means that our wait may hang forever if 1) the process has already died
+       and 2) there was a wait call issued by some other code before we have a
+       chance.
+       * Thus, we should make this initial call while the child process is
+         still alive, preferably on startup, to avoid this hang.
+  *)
+  match
+    Or_error.try_with (fun () ->
+        let deferred_wait =
+          Monitor.try_with ~here ~run:`Now
+            ~rest:
+              (`Call
+                (fun exn ->
+                  Logger.warn logger ~module_ ~location
+                    "Saw an error from Process.wait in wait_safe: $err"
+                    ~metadata:
+                      [ ("err", Error_json.error_to_yojson (Error.of_exn exn)) ]))
+            (fun () -> Process.wait process)
+        in
+        Deferred.Result.map_error ~f:Error.of_exn deferred_wait)
+  with
+  | Ok x ->
+      x
+  | Error err ->
+      Deferred.Or_error.fail err

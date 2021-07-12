@@ -318,6 +318,29 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
       ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Prover ;
+  let exit_or_signal =
+    Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
+      ~location:__LOC__ ~here:[%here]
+  in
+  don't_wait_for
+    ( match%map exit_or_signal with
+    | Ok (Ok ()) ->
+        [%log fatal] "Unexpected prover termination" ;
+        failwith "Unexpected prover termination"
+    | Ok (Error (`Exit_non_zero n)) ->
+        [%log fatal] "Prover terminated with nonzero exit code"
+          ~metadata:[ ("exit_code", `Int n) ] ;
+        failwithf "Prover terminated with exit code %d" n ()
+    | Ok (Error (`Signal signal)) ->
+        let signal_str = Signal.to_string signal in
+        [%log fatal] "Prover terminated due to signal"
+          ~metadata:[ ("signal", `String signal_str) ] ;
+        failwithf "Prover terminated due to signal %s" signal_str ()
+    | Error err ->
+        let err_str = Error.to_string_hum err in
+        [%log fatal] "Error waiting on prover process"
+          ~metadata:[ ("error", `String err_str) ] ;
+        failwithf "Error waiting on prover process: %s" err_str () ) ;
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)
