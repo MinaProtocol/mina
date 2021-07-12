@@ -552,26 +552,30 @@ let send_payment_graphql =
 let sign_payment =
   let open Command.Param in
   let open Cli_lib.Arg_type in
-  let receiver_flag =
+  let receiver_arg =
     flag "--receiver" ~aliases:["receiver"]
       ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
   in
-  let amount_flag =
+  let amount_arg =
     flag "--amount" ~aliases:["amount"]
       ~doc:"VALUE Payment amount you want to send" (required txn_amount)
   in
-  let token_flag =
+  let token_arg =
     flag "--token" ~aliases:["token"]
       ~doc:"TOKEN_ID The ID of the token to transfer" (optional token_id)
   in
+  let wallet_path_arg =
+    flag "--wallet-file" ~doc:"wallet filepath" (optional string) in
+  let secret_key_path_arg =
+    flag "--secret-key-file" ~doc:"secret key filepath" (optional string) in
   let args =
-    Args.zip4 Cli_lib.Flag.signed_command_common receiver_flag amount_flag
-      token_flag
+    Args.zip6 Cli_lib.Flag.signed_command_common receiver_arg amount_arg
+      token_arg wallet_path_arg secret_key_path_arg
   in
-  Command.async ~summary:"generate a signed payment to an address"
+  Command.async ~summary:"generate a signature for a payment"
     (Command.Param.map args
-       ~f:(fun (common, receiver_pk, amount, token_id) () ->
+       ~f:(fun (common, receiver_pk, amount, token_id, wallet_path, secret_key_path_arg) () ->
             let {Cli_lib.Flag.sender; fee; nonce; memo} = common in
             let fee_token = Token_id.default in
             let fee_payer_pk = sender in
@@ -588,22 +592,33 @@ let sign_payment =
               { source_pk=sender; receiver_pk; token_id; amount } in
             let payload = Signed_command_payload.Poly.{ common; body } in
             let logger = Logger.create () in
-            let%bind wallets =
-              let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
-              let wallets_disk_location = conf_dir ^/ "wallets" in
-              Secrets.Wallets.load ~logger
-                ~disk_location:wallets_disk_location
+            let%bind sk_file =
+              match secret_key_path_arg with
+              | Some secret_key_path -> Deferred.return secret_key_path
+              | None -> 
+                  let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+                  let wallet_path = Option.value wallet_path
+                      ~default:(conf_dir ^/ "wallets") in
+                  let%map wallets = 
+                    Secrets.Wallets.load ~logger ~disk_location:wallet_path
+                  in
+                  Secrets.Wallets.get_path wallets sender
             in
-            let sk_file = Secrets.Wallets.get_path wallets sender in
             let%bind kp =
-              Secrets.Keypair.Terminal_stdin.read_from_env_exn ~logger
+              Secrets.Keypair.Terminal_stdin.read_exn
                 ~which:"block producer keypair" sk_file
             in
             let sk = kp.private_key in
             let signature = Signed_command.sign_payload sk payload in
-            let signer: Public_key.t = Public_key.decompress_exn sender in
-            let signed: Signed_command.t = Signed_command.Poly.{ payload; signer; signature } in
-            Signed_command.to_string signed
+            let (field, scalar) = signature in
+            let field_js : Yojson.Safe.t =
+              `String(Marlin_plonk_bindings.Pasta_fp.to_string field) in
+            let scalar_js : Yojson.Safe.t =
+              `String(Marlin_plonk_bindings_pasta_fq.to_string scalar) in
+            let signature_js : Yojson.Safe.t =
+              `Assoc [("field", field_js); ("scalar", scalar_js)] in
+            signature_js
+            |> Yojson.Safe.pretty_to_string
             |> print_endline
             |> Deferred.return
          ))
