@@ -1,7 +1,6 @@
 (* date in the far future *)
 
-[%%expires_after
-"25250101"]
+[%%expires_after "25250101"]
 
 (* ppx used inside internal module *)
 

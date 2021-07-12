@@ -14,8 +14,7 @@ module type Inputs_intf = sig
   val get_previous : context:context -> value -> value option M.t
 end
 
-module Make_intf (M : Monad.S) (Input : Inputs_intf with module M := M) =
-struct
+module Make_intf (M : Monad.S) (Input : Inputs_intf with module M := M) = struct
   module type S = sig
     val prove :
          ?length:int
@@ -32,7 +31,7 @@ module Make (M : Monad.S) (Input : Inputs_intf with module M := M) :
   let prove ?length ~context last =
     let open M.Let_syntax in
     let rec find_path ~length value =
-      if length = Some 0 then M.return (value, [])
+      if [%equal: int option] length (Some 0) then M.return (value, [])
       else
         match%bind get_previous ~context value with
         | None ->

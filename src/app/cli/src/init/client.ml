@@ -122,9 +122,9 @@ let get_time_offset_graphql =
            "Current time offset:\n\
             %i\n\n\
             Start other daemons with this offset by setting the \
-            CODA_TIME_OFFSET environment variable in the shell before \
+            MINA_TIME_OFFSET environment variable in the shell before \
             executing them:\n\
-            export CODA_TIME_OFFSET=%i\n"
+            export MINA_TIME_OFFSET=%i\n"
            time_offset time_offset ))
 
 let print_trust_statuses statuses json =
@@ -441,7 +441,7 @@ let batch_send_payments =
       { receiver: string
       ; amount: Currency.Amount.t
       ; fee: Currency.Fee.t
-      ; valid_until: Mina_numbers.Global_slot.t sexp_option }
+      ; valid_until: Mina_numbers.Global_slot.t option [@sexp.option]}
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -476,7 +476,7 @@ let batch_send_payments =
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
     let%bind keypair =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
         privkey_path
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
@@ -882,7 +882,7 @@ let dump_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
-      Secrets.Keypair.Terminal_stdin.read_exn ~which:"coda keypair"
+      Secrets.Keypair.Terminal_stdin.read_exn ~which:"Mina keypair"
         privkey_path
     in
     printf "Public key: %s\nPrivate key: %s\n"
@@ -1022,7 +1022,7 @@ let hash_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             ignore (exit 1))
+             ignore (exit 1 : 'a Deferred.t))
 
 let currency_in_ledger =
   let open Command.Let_syntax in
@@ -1090,7 +1090,7 @@ let currency_in_ledger =
          | Error err ->
              Format.eprintf "Could not parse JSON in file %s: %s@" ledger_file
                err ;
-             ignore (exit 1))
+             ignore (exit 1 : 'a Deferred.t))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -1287,7 +1287,7 @@ let set_coinbase_receiver_graphql =
   let open Cli_lib.Arg_type in
   let open Graphql_lib in
   let pk_flag =
-    choose_one ~if_nothing_chosen:`Raise
+    choose_one ~if_nothing_chosen:Raise
       [ flag "--public-key" ~aliases:["public-key"]
           ~doc:"PUBLICKEY Public key of account to send coinbase rewards to"
           (optional public_key_compressed)
@@ -1375,11 +1375,11 @@ let import_key =
   Command.async
     ~summary:
       "Import a password protected private key to be tracked by the daemon.\n\
-       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be imported using the same password)."
-    (let%map_open.Command.Let_syntax access_method =
+    (let%map_open.Command access_method =
        choose_one
-         ~if_nothing_chosen:(`Default_to `None)
+         ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1511,7 +1511,7 @@ let export_key =
     ~summary:
       "Export a tracked account so that it can be saved or transferred \
        between machines.\n\
-      \ Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+      \ Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be exported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun _ (export_path, pk, conf_dir) ->
@@ -1579,9 +1579,9 @@ let export_key =
 
 let list_accounts =
   Command.async ~summary:"List all owned accounts"
-    (let%map_open.Command.Let_syntax access_method =
+    (let%map_open.Command access_method =
        choose_one
-         ~if_nothing_chosen:(`Default_to `None)
+         ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
          ; Cli_lib.Flag.conf_dir
@@ -1767,7 +1767,7 @@ let generate_libp2p_keypair =
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
-    Deferred.ignore
+    Deferred.ignore_m
       (let open Deferred.Let_syntax in
       (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
       let logger = Logger.null () in
@@ -1933,10 +1933,16 @@ let compile_time_constants =
            home ^/ Cli_lib.Default.conf_dir_name
          in
          let config_file =
-           match Sys.getenv "CODA_CONFIG_FILE" with
-           | Some config_file ->
+           (* TODO: eventually, remove CODA_ variable *)
+           let mina_config_file = "MINA_CONFIG_FILE" in
+           let coda_config_file = "CODA_CONFIG_FILE" in
+           match Sys.getenv mina_config_file, Sys.getenv coda_config_file with
+           | Some config_file,_ ->
                config_file
-           | None ->
+           | None, Some config_file ->
+             (* we print a deprecation warning on daemon startup, don't print here *)
+             config_file
+           | None, None ->
                conf_dir ^/ "daemon.json"
          in
          let open Async in
@@ -1987,7 +1993,7 @@ let compile_time_constants =
                    (Unsigned.UInt32.to_int consensus_constants.slots_per_epoch)
                ) ]
          in
-         Core.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
+         Core_kernel.printf "%s\n%!" (Yojson.Safe.to_string all_constants) ))
 
 let node_status =
   let open Command.Param in
@@ -2133,7 +2139,7 @@ let archive_blocks =
            | None ->
                (* Send the requests over GraphQL. *)
                let block = block_to_yojson block |> Yojson.Safe.to_basic in
-               let%map.Deferred.Or_error.Let_syntax _res =
+               let%map.Deferred.Or_error _res =
                  (* Don't catch this error: [query_exn] already handles
                     printing etc.
                  *)
@@ -2184,7 +2190,7 @@ let archive_blocks =
          in
          Deferred.List.iter files ~f:(fun path ->
              match%map
-               let%bind.Deferred.Or_error.Let_syntax block_json =
+               let%bind.Deferred.Or_error block_json =
                  Or_error.try_with (fun () ->
                      In_channel.with_file path ~f:(fun in_channel ->
                          Yojson.Safe.from_channel in_channel ) )
@@ -2307,6 +2313,39 @@ let hash_transaction =
        in
        printf "%s\n" (Transaction_hash.to_base58_check hash))
 
+let runtime_config =
+  Command.async
+    ~summary:"Compute the runtime configuration used by a running daemon"
+    (Cli_lib.Background_daemon.graphql_init (Command.Param.return ())
+       ~f:(fun graphql_endpoint () ->
+         let%bind runtime_config =
+           Graphql_client.query
+             (Graphql_queries.Runtime_config.make ())
+             graphql_endpoint
+           |> Deferred.Result.map_error ~f:(function
+                | `Failed_request e ->
+                    Error.create "Unable to connect to Mina daemon" ()
+                      (fun () ->
+                        Sexp.List
+                          [ List
+                              [ Atom "uri"
+                              ; Atom (Uri.to_string graphql_endpoint.value) ]
+                          ; List [Atom "uri_flag"; Atom graphql_endpoint.name]
+                          ; List [Atom "error_message"; Atom e] ] )
+                | `Graphql_error e ->
+                    Error.createf "GraphQL error: %s" e )
+         in
+         match runtime_config with
+         | Ok runtime_config ->
+             Format.printf "%s@."
+               (Yojson.Basic.pretty_to_string runtime_config#runtimeConfig) ;
+             return ()
+         | Error err ->
+             Format.eprintf
+               "Failed to retrieve runtime configuration. Error:@.%s@."
+               (Error.to_string_hum err) ;
+             exit 1 ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -2425,6 +2464,7 @@ let advanced =
     ; ("hash-transaction", hash_transaction)
     ; ("set-coinbase-receiver", set_coinbase_receiver_graphql)
     ; ("chain-id-inputs", chain_id_inputs)
+    ; ("runtime-config", runtime_config)
     ; ("vrf", Cli_lib.Commands.Vrf.command_group) ]
 
 let ledger =

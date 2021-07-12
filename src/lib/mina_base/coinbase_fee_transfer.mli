@@ -5,9 +5,10 @@ open Import
 module Stable : sig
   module V1 : sig
     type t = private
-      { receiver_pk: Public_key.Compressed.Stable.V1.t
-      ; fee: Currency.Fee.Stable.V1.t }
-    [@@deriving sexp, compare, eq, yojson, hash]
+      { receiver_pk : Public_key.Compressed.Stable.V1.t
+      ; fee : Currency.Fee.Stable.V1.t
+      }
+    [@@deriving sexp, compare, equal, yojson, hash]
   end
 end]
 

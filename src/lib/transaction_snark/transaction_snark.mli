@@ -11,7 +11,7 @@ module Pending_coinbase_stack_state : sig
     module Stable : sig
       module V1 : sig
         type t = Base of Pending_coinbase.Stack_versioned.Stable.V1.t | Merge
-        [@@deriving sexp, hash, compare, eq, yojson]
+        [@@deriving sexp, hash, compare, equal, yojson]
       end
     end]
   end
@@ -21,8 +21,8 @@ module Pending_coinbase_stack_state : sig
     module Stable : sig
       module V1 : sig
         type 'pending_coinbase t =
-          {source: 'pending_coinbase; target: 'pending_coinbase}
-        [@@deriving compare, eq, fields, hash, sexp, yojson]
+          { source : 'pending_coinbase; target : 'pending_coinbase }
+        [@@deriving compare, equal, fields, hash, sexp, yojson]
 
         val to_latest :
              ('pending_coinbase -> 'pending_coinbase')
@@ -37,14 +37,14 @@ module Pending_coinbase_stack_state : sig
   end
 
   type 'pending_coinbase poly = 'pending_coinbase Poly.t =
-    {source: 'pending_coinbase; target: 'pending_coinbase}
-  [@@deriving sexp, hash, compare, eq, fields, yojson]
+    { source : 'pending_coinbase; target : 'pending_coinbase }
+  [@@deriving sexp, hash, compare, equal, fields, yojson]
 
   [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = Pending_coinbase.Stack_versioned.Stable.V1.t Poly.Stable.V1.t
-      [@@deriving compare, eq, hash, sexp, yojson]
+      [@@deriving compare, equal, hash, sexp, yojson]
     end
   end]
 
@@ -71,14 +71,15 @@ module Statement : sig
              , 'token_id
              , 'sok_digest )
              t =
-          { source: 'ledger_hash
-          ; target: 'ledger_hash
-          ; supply_increase: 'amount
-          ; pending_coinbase_stack_state: 'pending_coinbase
-          ; fee_excess: 'fee_excess
-          ; next_available_token_before: 'token_id
-          ; next_available_token_after: 'token_id
-          ; sok_digest: 'sok_digest }
+          { source : 'ledger_hash
+          ; target : 'ledger_hash
+          ; supply_increase : 'amount
+          ; pending_coinbase_stack_state : 'pending_coinbase
+          ; fee_excess : 'fee_excess
+          ; next_available_token_before : 'token_id
+          ; next_available_token_after : 'token_id
+          ; sok_digest : 'sok_digest
+          }
         [@@deriving compare, equal, hash, sexp, yojson]
 
         val to_latest :
@@ -120,14 +121,15 @@ module Statement : sig
         , 'token_id
         , 'sok_digest )
         Poly.t =
-    { source: 'ledger_hash
-    ; target: 'ledger_hash
-    ; supply_increase: 'amount
-    ; pending_coinbase_stack_state: 'pending_coinbase
-    ; fee_excess: 'fee_excess
-    ; next_available_token_before: 'token_id
-    ; next_available_token_after: 'token_id
-    ; sok_digest: 'sok_digest }
+    { source : 'ledger_hash
+    ; target : 'ledger_hash
+    ; supply_increase : 'amount
+    ; pending_coinbase_stack_state : 'pending_coinbase
+    ; fee_excess : 'fee_excess
+    ; next_available_token_before : 'token_id
+    ; next_available_token_after : 'token_id
+    ; sok_digest : 'sok_digest
+    }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   [%%versioned:
@@ -201,7 +203,7 @@ end
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving compare, sexp, yojson, hash]
+    type t [@@deriving compare, equal, sexp, yojson, hash]
   end
 end]
 
@@ -350,6 +352,7 @@ module Make (Inputs : sig
 
   val proof_level : Genesis_constants.Proof_level.t
 end) : S
+[@@warning "-67"]
 
 val constraint_system_digests :
      constraint_constants:Genesis_constants.Constraint_constants.t

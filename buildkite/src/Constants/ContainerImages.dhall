@@ -2,7 +2,7 @@
 
 {
   toolchainBase = "codaprotocol/ci-toolchain-base:v3",
-  minaToolchain = "codaprotocol/mina-toolchain@sha256:03958744ae145185132fe6d5f681a3dc992811ab2c036e1825daeda0d71ce0f9",
+  minaToolchain = "codaprotocol/mina-toolchain@sha256:61701a8c0382384f862888b7a0947f1209b5561af46dcca9d3ccd2aec04dea70",
   elixirToolchain = "elixir:1.10-alpine",
   rustToolchain = "codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3",
   nodeToolchain = "node:14.13.1-stretch-slim",

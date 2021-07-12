@@ -24,8 +24,8 @@ let faucetPassword = getEnvOrFail("FAUCET_PASSWORD");
 
 let discordApiKey = getEnvOrFail("DISCORD_API_KEY");
 
-let graphqlPort = getEnv(~default=string_of_int(0xc0d), "CODA_GRAPHQL_PORT");
-let graphqlHost = getEnv(~default="localhost", "CODA_GRAPHQL_HOST");
+let graphqlPort = getEnv(~default=string_of_int(0xc0d), "MINA_GRAPHQL_PORT");
+let graphqlHost = getEnv(~default="localhost", "MINA_GRAPHQL_HOST");
 
 let listeningChannels = ["faucet"];
 let faucetApproveRole = "faucet-approvers";

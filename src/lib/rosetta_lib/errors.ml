@@ -12,7 +12,7 @@ module Partial_reason = struct
     | Amount_inc_dec_mismatch
     | Status_not_pending
     | Can't_find_kind of string
-  [@@deriving yojson, sexp, show, eq]
+  [@@deriving yojson, sexp, show, equal]
 end
 
 module Variant = struct
@@ -38,11 +38,11 @@ module Variant = struct
     | `Signature_invalid
     | `Memo_invalid
     | `Graphql_uri_not_set ]
-  [@@deriving yojson, show, eq, to_enum, to_representatives]
+  [@@deriving yojson, show, equal, to_enum, to_representatives]
 end
 
 module T : sig
-  type t [@@deriving yojson, show, eq]
+  type t [@@deriving yojson, show, equal]
 
   val create : ?context:string -> Variant.t -> t
 
@@ -56,15 +56,15 @@ module T : sig
 
     val sql :
          ?context:string
-      -> ('a, [< Caqti_error.t]) Deferred.Result.t
+      -> ('a, [< Caqti_error.t ]) Deferred.Result.t
       -> ('a, t) Deferred.Result.t
 
     val wrap :
-      ('a, t) Deferred.Result.t -> ('a, [> `App of t]) Deferred.Result.t
+      ('a, t) Deferred.Result.t -> ('a, [> `App of t ]) Deferred.Result.t
   end
 end = struct
-  type t = {extra_context: string option; kind: Variant.t}
-  [@@deriving yojson, show, eq]
+  type t = { extra_context : string option; kind : Variant.t }
+  [@@deriving yojson, show, equal]
 
   let code = Fn.compose (fun x -> x + 1) Variant.to_enum
 
@@ -124,9 +124,9 @@ end = struct
     | `Chain_info_missing ->
         Some
           "Could not get chain information. This probably means you are \
-           bootstrapping -- bootstrapping is the process of synchronizing \
-           with peers that are way ahead of you on the chain. Try again in a \
-           few seconds."
+           bootstrapping -- bootstrapping is the process of synchronizing with \
+           peers that are way ahead of you on the chain. Try again in a few \
+           seconds."
     | `Account_not_found addr ->
         Some
           (sprintf
@@ -145,8 +145,8 @@ end = struct
              hash)
     | `Block_missing ->
         Some
-          "We couldn't find the block you specified in the archive node. Ask \
-           a friend for the missing data."
+          "We couldn't find the block you specified in the archive node. Ask a \
+           friend for the missing data."
     | `Malformed_public_key ->
         None
     | `Operations_not_valid reasons ->
@@ -257,27 +257,31 @@ end = struct
         "We encountered an internal exception while processing your request. \
          (That means you found a bug!)"
 
-  let create ?context kind = {extra_context= context; kind}
+  let create ?context kind = { extra_context = context; kind }
 
   let erase (t : t) =
-    { Rosetta_models.Error.code= Int32.of_int_exn (code t.kind)
-    ; message= message t.kind
-    ; retriable= retriable t.kind
-    ; details=
+    { Rosetta_models.Error.code = Int32.of_int_exn (code t.kind)
+    ; message = message t.kind
+    ; retriable = retriable t.kind
+    ; details =
         ( match (context t.kind, t.extra_context) with
         | None, None ->
-            Some (`Assoc [("body", Variant.to_yojson t.kind)])
+            Some (`Assoc [ ("body", Variant.to_yojson t.kind) ])
         | None, Some context | Some context, None ->
             Some
               (`Assoc
-                [("body", Variant.to_yojson t.kind); ("error", `String context)])
+                [ ("body", Variant.to_yojson t.kind)
+                ; ("error", `String context)
+                ])
         | Some context1, Some context2 ->
             Some
               (`Assoc
                 [ ("body", Variant.to_yojson t.kind)
                 ; ("error", `String context1)
-                ; ("extra", `String context2) ]) )
-    ; description= Some (description t.kind) }
+                ; ("extra", `String context2)
+                ]) )
+    ; description = Some (description t.kind)
+    }
 
   (* The most recent rosetta-cli denies errors that have details in them. When
    * future versions of the spec allow for more detailed descriptions we can
@@ -295,9 +299,11 @@ end = struct
     Variant.to_representatives
     |> Lazy.map ~f:(fun vs -> List.map vs ~f:(Fn.compose erase create))
     |> Lazy.map ~f:(fun es ->
-           List.map es ~f:(fun e -> {e with Rosetta_models.Error.details= None})
-           |> uniq ~eq:(fun {Rosetta_models.Error.code; _} {code= code2; _} ->
-                  Int32.equal code code2 ) )
+           List.map es ~f:(fun e ->
+               { e with Rosetta_models.Error.details = None })
+           |> uniq
+                ~eq:(fun { Rosetta_models.Error.code; _ } { code = code2; _ } ->
+                  Int32.equal code code2))
 
   module Lift = struct
     let parse ?context res =

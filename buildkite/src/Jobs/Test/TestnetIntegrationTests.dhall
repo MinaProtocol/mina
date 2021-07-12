@@ -7,7 +7,7 @@ let TestExecutive = ../../Command/TestExecutive.dhall
 
 let dependsOn = [
     { name = "TestnetIntegrationTests", key = "build-test-executive" },
-    { name = "MinaArtifact", key = "puppeteered-docker-image" },
+    { name = "MinaArtifact", key = "devnet-docker-image" },
     { name = "ArchiveNodeArtifact", key = "archive-docker-image" }
 ]
 
@@ -16,6 +16,7 @@ in Pipeline.build Pipeline.Config::{
     JobSpec::{
     dirtyWhen = [
         S.strictlyStart (S.contains "src"),
+        S.strictlyStart (S.contains "dockerfiles"),
         S.strictlyStart (S.contains "buildkite/src/Jobs/Test/TestnetIntegrationTest")
     ],
     path = "Test",
@@ -24,6 +25,7 @@ in Pipeline.build Pipeline.Config::{
   steps = [
     TestExecutive.build "integration_tests",
     TestExecutive.execute "reliability" dependsOn,
+    TestExecutive.execute "short-boot" dependsOn,
     TestExecutive.execute "payment" dependsOn,
     TestExecutive.execute "gossip-consis" dependsOn
   ]

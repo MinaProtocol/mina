@@ -46,6 +46,9 @@ spec:
             memory: 32.0Gi
             cpu: 12.0
         image: {{ $.Values.coda.image }}
+        {{ if $.Values.coda.useCustomEntrypoint -}}
+        command: [{{ $.Values.coda.customEntrypoint }}]
+        {{- end }}
         args: [ "daemon",
           "-log-level", "Debug",
           "-log-json",
@@ -108,7 +111,7 @@ spec:
         - name: DAEMON_EXTERNAL_PORT
           value: {{ default $.Values.coda.ports.p2p $config.externalPort | quote }}
         {{- if $config.libp2pSecret }}
-        - name: CODA_LIBP2P_PASS
+        - name: MINA_LIBP2P_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- end }}
         ports:

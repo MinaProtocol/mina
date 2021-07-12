@@ -4,15 +4,15 @@ module Make (Account : sig
   type t
 end)
 (Hash : Merkle_ledger.Intf.Hash with type account := Account.t) (Depth : sig
-    val depth : int
+  val depth : int
 end) =
 struct
-  type t = Node of {hash: Hash.t; left: t; right: t} | Leaf of Hash.t
+  type t = Node of { hash : Hash.t; left : t; right : t } | Leaf of Hash.t
   [@@deriving sexp]
 
   let max_depth = Depth.depth
 
-  let get_hash = function Leaf hash -> hash | Node {hash; _} -> hash
+  let get_hash = function Leaf hash -> hash | Node { hash; _ } -> hash
 
   let set_accounts (list : Account.t list) =
     let rec go (list : Hash.t list) num_nodes =
@@ -32,7 +32,7 @@ struct
           Hash.merge ~height:left_height (get_hash left_tree)
             (get_hash right_tree)
         in
-        ( Node {hash; left= left_tree; right= right_tree}
+        ( Node { hash; left = left_tree; right = right_tree }
         , remaining_nodes
         , left_height + 1 )
     in
@@ -44,14 +44,14 @@ struct
     let tree, remaining_nodes, _ =
       go (List.map ~f:Hash.hash_account list @ empty_hashes) max_num_accts
     in
-    assert (remaining_nodes = []) ;
+    assert (List.is_empty remaining_nodes) ;
     tree
 
   let rec get_inner_hash_at_addr_exn = function
     | Leaf hash -> (
         function
         | [] -> hash | _ :: _ -> failwith "Could not traverse beyond a leaf" )
-    | Node {hash; left; right} -> (
+    | Node { hash; left; right } -> (
         function
         | [] ->
             hash

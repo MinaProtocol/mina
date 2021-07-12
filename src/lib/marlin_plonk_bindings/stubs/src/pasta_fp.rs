@@ -1,8 +1,8 @@
 use crate::bigint_256;
 use algebra::biginteger::BigInteger256;
+use mina_curves::pasta::fp::{Fp, FpParameters as Fp_params};
 use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
-    pasta::fp::{Fp, FpParameters as Fp_params},
     FftField, One, UniformRand, Zero,
 };
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};

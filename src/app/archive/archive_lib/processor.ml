@@ -395,7 +395,7 @@ module User_command = struct
                {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
                       receiver_id, fee_token, token, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id |sql})
             { typ=
                 ( match via with
@@ -489,7 +489,7 @@ module User_command = struct
          {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
                       receiver_id, fee_token, token, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id
          |sql})
       { typ= user_cmd.typ
@@ -540,7 +540,7 @@ module Internal_command = struct
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2")
+         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2::internal_command_type")
       (Transaction_hash.to_base58_check transaction_hash, typ)
 
   let load (module Conn : CONNECTION) ~(id : int) =
@@ -570,7 +570,7 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token,hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { typ= internal_cmd.typ
@@ -640,7 +640,7 @@ module Fee_transfer = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token, hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { kind
@@ -688,7 +688,7 @@ module Coinbase = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token, hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { receiver_id
@@ -881,7 +881,7 @@ module Block_and_signed_command = struct
                  fee_payer_balance,
                  source_balance,
                  receiver_balance)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?::user_command_status, ?, ?, ?, ?, ?, ?, ?)
          |sql})
       { block_id
       ; user_command_id
@@ -1842,7 +1842,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
           | Ok () ->
               () )
       |> don't_wait_for ;
-      Deferred.ignore
+      Deferred.ignore_m
       @@ Tcp.Server.create
            ~on_handler_error:
              (`Call

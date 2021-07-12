@@ -5,7 +5,7 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('u, 's) t = Signed_command of 'u | Snapp_command of 's
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -59,7 +59,7 @@ module Valid = struct
         ( Signed_command.With_valid_signature.Stable.V1.t
         , Snapp_command.Valid.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -73,7 +73,7 @@ module Stable = struct
   module V1 = struct
     type t =
       (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving sexp, compare, eq, hash, yojson]
+    [@@deriving sexp, compare, equal, hash, yojson]
 
     let to_latest = Fn.id
   end
@@ -88,7 +88,7 @@ include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
     module V1 = struct
       type t =
         (Signed_command.Stable.V1.t, Snapp_command.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
 
@@ -104,8 +104,8 @@ module Zero_one_or_two = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = [`Zero | `One of 'a | `Two of 'a * 'a]
-      [@@deriving sexp, compare, eq, hash, yojson]
+      type 'a t = [ `Zero | `One of 'a | `Two of 'a * 'a ]
+      [@@deriving sexp, compare, equal, hash, yojson]
     end
   end]
 end
@@ -121,7 +121,7 @@ module Verifiable = struct
           Pickles.Side_loaded.Verification_key.Stable.V1.t
           Zero_one_or_two.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving sexp, compare, eq, hash, yojson]
+      [@@deriving sexp, compare, equal, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -138,9 +138,9 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
   let of_list = function
     | [] ->
         `Zero
-    | [x] ->
+    | [ x ] ->
         `One x
-    | [x; y] ->
+    | [ x; y ] ->
         `Two (x, y)
     | _ ->
         failwith "of_list"
@@ -152,11 +152,11 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
       let pks =
         match c with
         | Proved_proved r ->
-            [r.one.data.body.pk; r.two.data.body.pk]
+            [ r.one.data.body.pk; r.two.data.body.pk ]
         | Proved_empty r ->
-            [r.one.data.body.pk]
+            [ r.one.data.body.pk ]
         | Proved_signed r ->
-            [r.one.data.body.pk]
+            [ r.one.data.body.pk ]
         | Signed_signed _ | Signed_empty _ ->
             []
       in
@@ -164,7 +164,7 @@ let to_verifiable_exn (t : t) ~ledger ~get ~location_of_account =
 
 let to_verifiable t ~ledger ~get ~location_of_account =
   Option.try_with (fun () ->
-      to_verifiable_exn t ~ledger ~get ~location_of_account )
+      to_verifiable_exn t ~ledger ~get ~location_of_account)
 
 let fee_exn : t -> Currency.Fee.t = function
   | Signed_command x ->
@@ -254,4 +254,4 @@ let filter_by_participant (commands : t list) public_key =
         ~f:
           (Fn.compose
              (Signature_lib.Public_key.Compressed.equal public_key)
-             Account_id.public_key) )
+             Account_id.public_key))

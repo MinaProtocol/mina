@@ -1,4 +1,4 @@
-use algebra::pasta::{
+use mina_curves::pasta::{
     pallas::{Affine as GAffine, PallasParameters},
     fq::Fq,
 };

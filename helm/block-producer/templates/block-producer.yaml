@@ -59,7 +59,7 @@ spec:
         - name: config-dir
           mountPath: /root/.mina-config
         env:
-          - name: CODA_PRIVKEY_PASS
+          - name: MINA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
       {{ if $config.libp2pSecret -}}
       - name: libp2p-perms
@@ -114,7 +114,7 @@ spec:
               secretKeyRef:
                 name: {{ $config.privateKeySecret }}
                 key: pub
-          - name: CODA_PRIVKEY_PASS
+          - name: MINA_PRIVKEY_PASS
             value: {{ $.Values.coda.privkeyPass | quote }}
           - name: PYTHONUNBUFFERED
             value: "1"
@@ -132,9 +132,9 @@ spec:
             cpu: 0.1
         image: {{ $.Values.bots.image }}
         env:
-          - name: CODA_GRAPHQL_HOST
+          - name: MINA_GRAPHQL_HOST
             value: "0.0.0.0"
-          - name: CODA_GRAPHQL_PORT
+          - name: MINA_GRAPHQL_PORT
             value: {{ $.Values.bots.ports.graphql | quote }}
           - name: ECHO_PUBLICKEY
             valueFrom:
@@ -172,6 +172,9 @@ spec:
             memory: 8.0Gi
             cpu: 8.0
         image: {{ $.Values.coda.image }}
+        {{ if $.Values.coda.useCustomEntrypoint -}}
+        command: [{{ $.Values.coda.customEntrypoint }}]
+        {{- end }}
         args: [ "daemon",
           "-log-level", {{ $.Values.coda.logLevel }},
           "-log-json",
@@ -237,10 +240,10 @@ spec:
           value: {{ $.Values.testnetName }}
         - name: GCLOUD_BLOCK_UPLOAD_BUCKET
           value: "mina_network_block_data"
-        - name: CODA_PRIVKEY_PASS
+        - name: MINA_PRIVKEY_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- if $config.libp2pSecret }}
-        - name: CODA_LIBP2P_PASS
+        - name: MINA_LIBP2P_PASS
           value: {{ $.Values.coda.privkeyPass | quote }}
         {{- end }}
         - name: CODA_CLIENT_TRUSTLIST
