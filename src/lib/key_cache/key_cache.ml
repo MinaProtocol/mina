@@ -230,14 +230,16 @@ module Async : S with module M := Async.Deferred.Or_error = struct
                 ; "--show-error"
                 ; "-o"
                 ; file_path
-                ; uri_string ]
+                ; uri_string
+                ]
               ()
             |> Deferred.Result.map_error ~f:(fun err ->
                    [%log debug] "Could not download key to key cache"
                      ~metadata:
                        [ ("url", `String uri_string)
-                       ; ("local_file_path", `String file_path) ] ;
-                   err ) )
+                       ; ("local_file_path", `String file_path)
+                       ] ;
+                   err))
       in
       [%log trace] "Downloaded key to key cache"
         ~metadata:

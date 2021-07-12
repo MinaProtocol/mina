@@ -11,7 +11,7 @@ let dir_exists dir =
 let remove_dir dir =
   let%bind _ =
     Monitor.try_with ~here:[%here] (fun () ->
-        Process.run_exn ~prog:"rm" ~args:["-rf"; dir] () )
+        Process.run_exn ~prog:"rm" ~args:[ "-rf"; dir ] ())
   in
   Deferred.unit
 

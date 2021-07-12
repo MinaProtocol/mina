@@ -370,7 +370,7 @@ let get_status ~flag t =
     | Full full ->
         Some
           (List.map (Hashtbl.to_alist full.states) ~f:(fun (state, hashes) ->
-               (state, State_hash.Set.length hashes) ))
+               (state, State_hash.Set.length hashes)))
     | _ ->
         None
   in

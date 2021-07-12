@@ -1599,8 +1599,7 @@ module T = struct
           in
           check_constraints_and_update ~constraint_constants resources'
             (Option.value_map work_opt ~default:log ~f:(fun work ->
-                 Diff_creation_log.discard_completed_work `Extra_work work log
-             ))
+                 Diff_creation_log.discard_completed_work `Extra_work work log))
         else
           (*Well, there's no space; discard a user command *)
           let resources', uc_opt = Resources.discard_user_command resources in
