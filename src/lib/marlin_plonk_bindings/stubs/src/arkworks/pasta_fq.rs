@@ -18,7 +18,7 @@ use std::{
 /// A wrapper type for [Pasta Fq](mina_curves::pasta::fq::Fq)
 pub struct CamlFq(pub Fq);
 
-unsafe impl ocaml::FromValue for CamlFq {
+unsafe impl<'a> ocaml::FromValue<'a> for CamlFq {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
         x.as_ref().clone()
@@ -26,16 +26,14 @@ unsafe impl ocaml::FromValue for CamlFq {
 }
 
 impl CamlFq {
-    extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
-        let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
-        unsafe {
-            v.drop_in_place();
-        }
+    unsafe extern "C" fn caml_pointer_finalize(v: ocaml::Raw) {
+        let ptr = v.as_pointer::<Self>();
+        ptr.drop_in_place()
     }
 
-    extern "C" fn ocaml_compare(x: ocaml::Value, y: ocaml::Value) -> i32 {
-        let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(x);
-        let y: ocaml::Pointer<Self> = ocaml::FromValue::from_value(y);
+    unsafe extern "C" fn ocaml_compare(x: ocaml::Raw, y: ocaml::Raw) -> i32 {
+        let x = x.as_pointer::<Self>();
+        let y = y.as_pointer::<Self>();
         match x.as_ref().0.cmp(&y.as_ref().0) {
             core::cmp::Ordering::Less => -1,
             core::cmp::Ordering::Equal => 0,
@@ -279,8 +277,8 @@ pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<CamlFq>) -> ocaml::Value {
     let str = unsafe { ocaml::sys::caml_alloc_string(len) };
     unsafe {
         core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+        ocaml::Value::new(str)
     }
-    ocaml::Value(str)
 }
 
 #[ocaml::func]

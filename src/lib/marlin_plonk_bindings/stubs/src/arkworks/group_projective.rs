@@ -9,7 +9,7 @@ use mina_curves::pasta::{
 #[derive(Clone, Copy)]
 pub struct CamlGroupProjectivePallas(pub ProjectivePallas);
 
-unsafe impl ocaml::FromValue for CamlGroupProjectivePallas {
+unsafe impl<'a> ocaml::FromValue<'a> for CamlGroupProjectivePallas {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
         x.as_ref().clone()
@@ -17,11 +17,9 @@ unsafe impl ocaml::FromValue for CamlGroupProjectivePallas {
 }
 
 impl CamlGroupProjectivePallas {
-    extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
-        let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
-        unsafe {
-            v.drop_in_place();
-        }
+    unsafe extern "C" fn caml_pointer_finalize(v: ocaml::Raw) {
+        let ptr = v.as_pointer::<Self>();
+        ptr.drop_in_place()
     }
 }
 
@@ -116,7 +114,7 @@ impl Neg for &CamlGroupProjectivePallas {
 #[derive(Clone, Copy)]
 pub struct CamlGroupProjectiveVesta(pub ProjectiveVesta);
 
-unsafe impl ocaml::FromValue for CamlGroupProjectiveVesta {
+unsafe impl<'a> ocaml::FromValue<'a> for CamlGroupProjectiveVesta {
     fn from_value(value: ocaml::Value) -> Self {
         let x: ocaml::Pointer<Self> = ocaml::FromValue::from_value(value);
         x.as_ref().clone()
@@ -124,11 +122,9 @@ unsafe impl ocaml::FromValue for CamlGroupProjectiveVesta {
 }
 
 impl CamlGroupProjectiveVesta {
-    extern "C" fn caml_pointer_finalize(v: ocaml::Value) {
-        let v: ocaml::Pointer<Self> = ocaml::FromValue::from_value(v);
-        unsafe {
-            v.drop_in_place();
-        }
+    unsafe extern "C" fn caml_pointer_finalize(v: ocaml::Raw) {
+        let ptr = v.as_pointer::<Self>();
+        ptr.drop_in_place()
     }
 }
 
