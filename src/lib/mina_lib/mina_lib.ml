@@ -186,7 +186,7 @@ let log_snark_coordinator_warning (config : Config.t) snark_worker =
         ()
 
 module Snark_worker = struct
-  let run_process ~logger ~proof_level client_port kill_ivar num_threads =
+  let run_process ~logger ~proof_level pids client_port kill_ivar num_threads =
     let env =
       Option.map
         ~f:(fun num -> `Extend [ ("RAYON_NUM_THREADS", string_of_int num) ])
@@ -204,12 +204,21 @@ module Snark_worker = struct
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger
       snark_worker_process ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
+    let close_stdin () =
+      Process.stdin snark_worker_process |> Async.Writer.close
+    in
+    let remove_pid () =
+      let pid = Process.pid snark_worker_process in
+      Child_processes.Termination.remove pids pid
+    in
     don't_wait_for
       ( match%bind
           Monitor.try_with ~here:[%here] (fun () ->
               Process.wait snark_worker_process)
         with
       | Ok signal_or_error -> (
+          let%bind () = close_stdin () in
+          remove_pid () ;
           match signal_or_error with
           | Ok () ->
               [%log info] "Snark worker process died" ;
@@ -229,6 +238,8 @@ module Snark_worker = struct
                 signal ;
               raise (Snark_worker_signal_interrupt signal) )
       | Error exn ->
+          let%bind () = close_stdin () in
+          remove_pid () ;
           [%log info]
             !"Exception when waiting for snark worker process to terminate: \
               $exn"
@@ -255,7 +266,7 @@ module Snark_worker = struct
         log_snark_worker_warning t ;
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
-            ~proof_level:t.config.precomputed_values.proof_level
+            ~proof_level:t.config.precomputed_values.proof_level t.config.pids
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
