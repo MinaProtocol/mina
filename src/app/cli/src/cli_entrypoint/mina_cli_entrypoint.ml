@@ -519,73 +519,7 @@ let setup_daemon logger =
     let time_controller =
       Block_time.Controller.create @@ Block_time.Controller.basic ~logger
     in
-    (* FIXME adapt to new system, move into child_processes lib *)
     let pids = Child_processes.Termination.create_pid_table () in
-    let rec terminated_child_loop () =
-      match
-        try Unix.wait_nohang `Any with
-        | Unix.Unix_error (errno, _, _)
-          when Int.equal (Unix.Error.compare errno Unix.ECHILD) 0
-               (* no child processes exist *) ->
-            None
-        | exn ->
-            [%log fatal] "Saw an unexpected error $exn from wait_nohang."
-              ~metadata:
-                [ ( "exn"
-                  , Error_json.error_to_yojson
-                      (Error.of_exn ~backtrace:`Get exn) )
-                ] ;
-            (* This will now appear in the backtrace for this exception when it
-               reaches the top level, making this very easy to identify.
-            *)
-            raise exn
-      with
-      | None ->
-          (* no children have terminated, wait to check again *)
-          let%bind () = Async.after (Time.Span.of_min 1.) in
-          terminated_child_loop ()
-      | Some (child_pid, exit_or_signal) ->
-          let child_data =
-            Child_processes.Termination.get_child_data pids child_pid
-          in
-          let child_pid_metadata =
-            [ ("child_pid", `Int (Pid.to_int child_pid))
-            ; ( "child_data"
-              , [%to_yojson: Child_processes.Termination.data option] child_data
-              )
-            ]
-          in
-          ( match exit_or_signal with
-          | Ok () ->
-              [%log info]
-                "Daemon child process $child_pid terminated with exit code 0"
-                ~metadata:child_pid_metadata
-          | Error err -> (
-              match err with
-              | `Signal signal ->
-                  [%log error]
-                    "Daemon child process $child_pid terminated after \
-                     receiving signal $signal"
-                    ~metadata:
-                      ( ("signal", `String (Signal.to_string signal))
-                      :: child_pid_metadata ) ;
-                  Option.value_map
-                    (Child_processes.Termination.get_signal_cause_opt signal)
-                    ~default:() ~f:(fun cause ->
-                      [%log error] "Possible reason for signal: $cause"
-                        ~metadata:[ ("cause", `String cause) ])
-              | `Exit_non_zero exit_code ->
-                  [%log error]
-                    "Daemon child process $child_pid terminated with nonzero \
-                     exit code $exit_code"
-                    ~metadata:
-                      (("exit_code", `Int exit_code) :: child_pid_metadata) ) ) ;
-          (* terminate daemon if children registered *)
-          Child_processes.Termination.check_terminated_child pids child_pid
-            logger ;
-          (* check for other terminated children, without waiting *)
-          terminated_child_loop ()
-    in
     let coda_initialization_deferred () =
       let config_file_installed =
         (* Search for config files installed as part of a deb/brew package.
@@ -1104,8 +1038,6 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                 ((module Libp2p), Libp2p.create ~pids gossip_net_params))
         }
       in
-      (* log terminated child processes *)
-      O1trace.trace_task "terminated child loop" terminated_child_loop ;
       let coinbase_receiver : Consensus.Coinbase_receiver.t =
         Option.value_map coinbase_receiver_flag ~default:`Producer ~f:(fun pk ->
             `Other pk)
