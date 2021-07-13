@@ -377,62 +377,87 @@ let start (mina : Mina_lib.t) =
         |> Consensus.Configuration.slot_duration |> Float.of_int
       in
       let five_slots_span = Time.Span.of_ms (slot_duration_ms *. 5.0) in
-      (* every 5 slots, check whether block will be produced *)
-      Async.Clock.every' ~continue_on_error:true five_slots_span (fun () ->
-          [%log' trace config.logger]
-            "Uptime service determining which action to take" ;
-          let now = Time.now () in
-          let five_slots_from_now = Time.add now five_slots_span in
-          let get_next_producer_time_opt () =
-            match Mina_lib.next_producer_timing mina with
-            | None ->
-                [%log' trace config.logger]
-                  "Next producer timing not set for uptime service" ;
-                return None
-            | Some timing -> (
-                let open Daemon_rpcs.Types.Status.Next_producer_timing in
-                match timing.timing with
-                | Check_again _tm ->
-                    [%log' trace config.logger]
-                      "Next producer timing not available for uptime service" ;
-                    return None
-                | Produce prod_tm | Produce_now prod_tm ->
-                    return (Some (Block_time.to_time prod_tm.time)) )
-          in
-          match config.gossip_net_params.addrs_and_ports.peer with
-          | None ->
-              [%log' warn config.logger]
-                "Daemon is not yet a peer in the gossip network, uptime \
-                 service not sending a produced block" ;
-              return ()
-          | Some {peer_id; _} -> (
-              (* daemon startup checked that a keypair was given if URL given *)
-              let submitter_keypair =
-                Option.value_exn config.uptime_submitter_keypair
-              in
-              let block_produced_bvar = Mina_lib.block_produced_bvar mina in
-              let send_just_block next_producer_time =
-                [%log' info config.logger]
-                  "Uptime service will attempt to send the next produced block" ;
-                send_produced_block_at ~logger:config.logger ~url ~peer_id
-                  ~submitter_keypair ~block_produced_bvar next_producer_time
-              in
-              let send_block_and_snark_work () =
-                [%log' info config.logger]
-                  "Uptime service will attempt to send a block and SNARK work" ;
-                let snark_resource_pool =
-                  Mina_lib.snark_pool mina
-                  |> Network_pool.Snark_pool.resource_pool
-                in
-                let snark_work_fee = Mina_lib.snark_work_fee mina in
-                send_block_and_transaction_snark ~logger:config.logger ~url
-                  ~transition_frontier ~peer_id ~submitter_keypair
-                  ~snark_resource_pool ~snark_work_fee
-              in
-              match%bind get_next_producer_time_opt () with
-              | None ->
-                  send_block_and_snark_work ()
-              | Some next_producer_time ->
-                  if Time.( <= ) next_producer_time five_slots_from_now then
-                    send_just_block next_producer_time
-                  else send_block_and_snark_work () ) )
+      don't_wait_for
+        (let next_slot_time =
+           let block_time_ms_int64 =
+             Block_time.now (Mina_lib.time_controller mina)
+             |> Block_time.to_int64
+           in
+           let slot_duration_ms_int64 = Float.to_int64 slot_duration_ms in
+           let next_slot_ms =
+             if
+               Int64.equal Int64.zero
+                 (Int64.(rem) block_time_ms_int64 slot_duration_ms_int64)
+             then block_time_ms_int64
+             else
+               let last_slot_no =
+                 Int64.( / ) block_time_ms_int64 slot_duration_ms_int64
+               in
+               Int64.( * ) (Int64.succ last_slot_no) slot_duration_ms_int64
+           in
+           Block_time.of_int64 next_slot_ms |> Block_time.to_time
+         in
+         [%log' trace config.logger]
+           "Uptime service synchronizing to next slot boundary" ;
+         let%map () = at next_slot_time in
+         (* every 5 slots, check whether block will be produced *)
+         Async.Clock.every' ~continue_on_error:true five_slots_span (fun () ->
+             [%log' trace config.logger]
+               "Uptime service determining which action to take" ;
+             let now = Time.now () in
+             let five_slots_from_now = Time.add now five_slots_span in
+             let get_next_producer_time_opt () =
+               match Mina_lib.next_producer_timing mina with
+               | None ->
+                   [%log' trace config.logger]
+                     "Next producer timing not set for uptime service" ;
+                   return None
+               | Some timing -> (
+                   let open Daemon_rpcs.Types.Status.Next_producer_timing in
+                   match timing.timing with
+                   | Check_again _tm ->
+                       [%log' trace config.logger]
+                         "Next producer timing not available for uptime service" ;
+                       return None
+                   | Produce prod_tm | Produce_now prod_tm ->
+                       return (Some (Block_time.to_time prod_tm.time)) )
+             in
+             match config.gossip_net_params.addrs_and_ports.peer with
+             | None ->
+                 [%log' warn config.logger]
+                   "Daemon is not yet a peer in the gossip network, uptime \
+                    service not sending a produced block" ;
+                 return ()
+             | Some {peer_id; _} -> (
+                 (* daemon startup checked that a keypair was given if URL given *)
+                 let submitter_keypair =
+                   Option.value_exn config.uptime_submitter_keypair
+                 in
+                 let block_produced_bvar = Mina_lib.block_produced_bvar mina in
+                 let send_just_block next_producer_time =
+                   [%log' info config.logger]
+                     "Uptime service will attempt to send the next produced \
+                      block" ;
+                   send_produced_block_at ~logger:config.logger ~url ~peer_id
+                     ~submitter_keypair ~block_produced_bvar next_producer_time
+                 in
+                 let send_block_and_snark_work () =
+                   [%log' info config.logger]
+                     "Uptime service will attempt to send a block and SNARK \
+                      work" ;
+                   let snark_resource_pool =
+                     Mina_lib.snark_pool mina
+                     |> Network_pool.Snark_pool.resource_pool
+                   in
+                   let snark_work_fee = Mina_lib.snark_work_fee mina in
+                   send_block_and_transaction_snark ~logger:config.logger ~url
+                     ~transition_frontier ~peer_id ~submitter_keypair
+                     ~snark_resource_pool ~snark_work_fee
+                 in
+                 match%bind get_next_producer_time_opt () with
+                 | None ->
+                     send_block_and_snark_work ()
+                 | Some next_producer_time ->
+                     if Time.( <= ) next_producer_time five_slots_from_now then
+                       send_just_block next_producer_time
+                     else send_block_and_snark_work () ) ))
