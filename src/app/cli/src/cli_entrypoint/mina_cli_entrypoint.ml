@@ -1113,7 +1113,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       | Some _, Some _ | None, None ->
           ()
       | _ ->
-          failwith "Must provide both --uptime-url and --uptime-submitter" ) ;
+          Mina_user_error.raise
+            "Must provide both --uptime-url and --uptime-submitter" ) ;
       let uptime_url =
         Option.map uptime_url_string ~f:(fun s -> Uri.of_string s)
       in
@@ -1130,7 +1131,8 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                      decompress)"
                     s () )
             | Error err ->
-                failwithf "Invalid public key %s for uptime submitter, %s" s
+                Mina_user_error.raisef
+                  "Invalid public key %s for uptime submitter, %s" s
                   (Error.to_string_hum err) () )
       in
       let%bind uptime_submitter_keypair =

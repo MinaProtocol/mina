@@ -60,13 +60,18 @@ type components =
   ; snark_pool: Network_pool.Snark_pool.t
   ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
   ; most_recent_valid_block:
-      External_transition.Initial_validated.t Broadcast_pipe.Reader.t }
+      External_transition.Initial_validated.t Broadcast_pipe.Reader.t
+  ; block_produced_bvar: (Transition_frontier.Breadcrumb.t, read_write) Bvar.t
+  }
 
 type pipes =
   { validated_transitions_reader:
       External_transition.Validated.t Strict_pipe.Reader.t
   ; producer_transition_writer:
-      (Transition_frontier.Breadcrumb.t, synchronous, unit Deferred.t) Writer.t
+      ( Transition_frontier.Breadcrumb.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
@@ -680,6 +685,8 @@ let top_level_logger t = t.config.logger
 
 let most_recent_valid_transition t = t.components.most_recent_valid_block
 
+let block_produced_bvar t = t.components.block_produced_bvar
+
 let staged_ledger_ledger_proof t =
   let open Option.Let_syntax in
   let%bind sl = best_staged_ledger_opt t in
@@ -1068,7 +1075,8 @@ let start t =
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
     ~precomputed_values:t.config.precomputed_values
-    ~block_reward_threshold:t.config.block_reward_threshold ;
+    ~block_reward_threshold:t.config.block_reward_threshold
+    ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
   Snark_worker.start t
 
@@ -1489,6 +1497,7 @@ let create ?wallets (config : Config.t) =
           let local_snark_work_reader, local_snark_work_writer =
             Strict_pipe.(create ~name:"local snark work" Synchronous)
           in
+          let block_produced_bvar = Bvar.create () in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
@@ -1822,7 +1831,8 @@ let create ?wallets (config : Config.t) =
                 ; transaction_pool
                 ; snark_pool
                 ; transition_frontier= frontier_broadcast_pipe_r
-                ; most_recent_valid_block= most_recent_valid_block_reader }
+                ; most_recent_valid_block= most_recent_valid_block_reader
+                ; block_produced_bvar }
             ; pipes=
                 { validated_transitions_reader= valid_transitions_for_api
                 ; producer_transition_writer

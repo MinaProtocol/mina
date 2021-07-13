@@ -136,47 +136,34 @@ let block_base64_of_breadcrumb ~logger breadcrumb =
           ; ("error", `String err) ] ;
       None
 
-let send_produced_block_at ~logger ~url ~transition_frontier ~peer_id
-    ~(submitter_keypair : Keypair.t) tm =
-  (* give block production some time *)
-  let%bind () = at (Time.add tm @@ Time.Span.of_min 3.0) in
-  match Block_producer.last_block_produced_opt () with
-  | None ->
+let send_produced_block_at ~logger ~url ~peer_id
+    ~(submitter_keypair : Keypair.t) ~block_produced_bvar tm =
+  let timeout_min = 5.0 in
+  let%bind () = at tm in
+  match%bind
+    with_timeout (Time.Span.of_min timeout_min) (Bvar.wait block_produced_bvar)
+  with
+  | `Timeout ->
       [%log error]
-        "State hash of last block produced unavailable for uptime service"
-        ~metadata:
-          [ ( "expected_block_production_time"
-            , `String (Time.to_string_abs ~zone:Time.Zone.utc tm) ) ] ;
+        "Uptime service did not get a produced block within %0.01f minutes \
+         after schedule"
+        timeout_min ;
       return ()
-  | Some state_hash -> (
-    match Broadcast_pipe.Reader.peek transition_frontier with
+  | `Result breadcrumb -> (
+    match block_base64_of_breadcrumb ~logger breadcrumb with
+    | Some block_base64 ->
+        let state_hash =
+          Transition_frontier.Breadcrumb.state_hash breadcrumb
+        in
+        let block_data =
+          { block= block_base64
+          ; created_at= get_rfc3339_time ()
+          ; peer_id
+          ; snark_work= None }
+        in
+        send_uptime_data ~logger ~submitter_keypair ~url ~state_hash block_data
     | None ->
-        [%log error]
-          "Transition frontier not available to obtain produced block with \
-           state hash $state_hash for uptime service"
-          ~metadata:[("state_hash", State_hash.to_yojson state_hash)] ;
-        return ()
-    | Some tf -> (
-      match Transition_frontier.find tf state_hash with
-      | None ->
-          [%log error]
-            "Produced block with state hash $state_hash not found in \
-             transition frontier for uptime service"
-            ~metadata:[("state_hash", State_hash.to_yojson state_hash)] ;
-          return ()
-      | Some breadcrumb -> (
-        match block_base64_of_breadcrumb ~logger breadcrumb with
-        | Some block_base64 ->
-            let block_data =
-              { block= block_base64
-              ; created_at= get_rfc3339_time ()
-              ; peer_id
-              ; snark_work= None }
-            in
-            send_uptime_data ~logger ~submitter_keypair ~url ~state_hash
-              block_data
-        | None ->
-            return () ) ) )
+        return () )
 
 let send_block_and_transaction_snark ~logger ~url ~transition_frontier ~peer_id
     ~(submitter_keypair : Keypair.t) ~snark_resource_pool ~snark_work_fee =
@@ -412,27 +399,23 @@ let start (mina : Mina_lib.t) =
                 | Produce prod_tm | Produce_now prod_tm ->
                     return (Some (Block_time.to_time prod_tm.time)) )
           in
-          match
-            ( config.gossip_net_params.addrs_and_ports.peer
-            , config.uptime_submitter_keypair )
-          with
-          | None, _ ->
+          match config.gossip_net_params.addrs_and_ports.peer with
+          | None ->
               [%log' warn config.logger]
                 "Daemon is not yet a peer in the gossip network, uptime \
                  service not sending a produced block" ;
               return ()
-          | Some _, None ->
-              (* should be unreachable *)
-              failwith
-                "No uptime service submitter keypair, though a submitter URL \
-                 was given"
-          | Some {peer_id; _}, Some submitter_keypair -> (
+          | Some {peer_id; _} -> (
+              (* daemon startup checked that a keypair was given if URL given *)
+              let submitter_keypair =
+                Option.value_exn config.uptime_submitter_keypair
+              in
+              let block_produced_bvar = Mina_lib.block_produced_bvar mina in
               let send_just_block next_producer_time =
                 [%log' info config.logger]
                   "Uptime service will attempt to send the next produced block" ;
-                send_produced_block_at ~logger:config.logger ~url
-                  ~transition_frontier ~peer_id ~submitter_keypair
-                  next_producer_time
+                send_produced_block_at ~logger:config.logger ~url ~peer_id
+                  ~submitter_keypair ~block_produced_bvar next_producer_time
               in
               let send_block_and_snark_work () =
                 [%log' info config.logger]
