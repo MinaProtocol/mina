@@ -1626,12 +1626,13 @@ let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
       ~stderr:(`Don't_log, `Pipe, `Filter_empty)
       ~termination:
         (`Handler
-          (fun ~killed e ->
+          (fun ~killed process e ->
             Hashtbl.iter outstanding_requests ~f:(fun iv ->
                 Ivar.fill_if_empty iv
                   (Or_error.error_string
                      "libp2p_helper process died before answering")) ;
             Hashtbl.clear outstanding_requests ;
+            Child_processes.Termination.remove pids (Process.pid process) ;
             if
               (not killed)
               && not
@@ -1691,8 +1692,7 @@ let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
               to `make libp2p_helper` and set CODA_LIBP2P_HELPER_PATH? Try \
               CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper.")
   | Ok subprocess ->
-      Child_processes.register_process ~termination_expected:true pids
-        subprocess Libp2p_helper ;
+      Child_processes.register_process pids subprocess Libp2p_helper ;
       let t : Helper.t =
         { subprocess
         ; conf_dir
