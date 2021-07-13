@@ -415,3 +415,51 @@ var caml_pasta_fq_of_bytes = function(ocaml_bytes) {
 // Provides: caml_pasta_fq_deep_copy
 // Requires: plonk_wasm
 var caml_pasta_fq_deep_copy = plonk_wasm.caml_pasta_fq_deep_copy
+
+
+
+
+
+// Provides: caml_pasta_fp_vector_create
+var caml_pasta_fp_vector_create = function() {
+    return [];
+};
+
+// Provides: caml_pasta_fp_vector_length
+var caml_pasta_fp_vector_length = function (v) {
+    return v.length;
+};
+
+// Provides: caml_pasta_fp_vector_emplace_back
+var caml_pasta_fp_vector_emplace_back = function (v, x) {
+    v.push(x);
+}
+
+// Provides: caml_pasta_fp_vector_get
+var caml_pasta_fp_vector_get = function (v, i) {
+    return v[i];
+}
+
+
+
+
+
+// Provides: caml_pasta_fq_vector_create
+var caml_pasta_fq_vector_create = function() {
+    return [];
+};
+
+// Provides: caml_pasta_fq_vector_length
+var caml_pasta_fq_vector_length = function (v) {
+    return v.length;
+};
+
+// Provides: caml_pasta_fq_vector_emplace_back
+var caml_pasta_fq_vector_emplace_back = function (v, x) {
+    v.push(x);
+}
+
+// Provides: caml_pasta_fq_vector_get
+var caml_pasta_fq_vector_get = function (v, i) {
+    return v[i];
+}
