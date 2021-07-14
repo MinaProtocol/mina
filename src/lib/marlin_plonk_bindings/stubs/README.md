@@ -79,5 +79,5 @@ pub fn set(&mut self, x: T) {
 ## Conventions
 
 * To ease FFI code, we use the `Caml` prefix whenever we're dealing with types that OCaml will be able to understand. This allows to quickly read a function's signature and see that there are only types that support `ocaml::FromValue` and `ocaml::ToValue`.
-* You should not include a custom type within another custom type, otherwise it won't get free'ed by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
+* You should not include any value allocated on the OCaml heap within a custom type, otherwise it won't get free'ed by OCaml's GC when the host type gets free'ed. Now, I'm not sure how you could achieve that, but if you end up there think about what you're doing.
 * You should implement a `drop_in_place` finalizer for all custom types. Better be safe than sorry.
