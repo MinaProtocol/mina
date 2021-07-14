@@ -1,0 +1,49 @@
+# kubectl apply -f helm/cron_jobs/devnet-txn-burst-cronjob.yaml
+# the above command, with this accompanying file, needs only be run once.  it does not get run in CI.  this file is provided here for future reference
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: devnet-txn-burst-cronjob
+spec:
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /bin/bash
+            - -c
+            - '
+            
+
+            '
+            env:
+            - name: GCLOUD_KEYFILE
+              value: /gcloud/keyfile.json
+            image: minaprotocol/mina-daemon-baked:1.1.5-a42bdee
+            imagePullPolicy: IfNotPresent
+            name: devnet-txn-burst-cronjob
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /gcloud/
+              name: gcloud-keyfile
+          dnsPolicy: ClusterFirst
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: gcloud-keyfile
+            secret:
+              defaultMode: 256
+              items:
+              - key: keyfile
+                path: keyfile.json
+              secretName: gcloud-keyfile
+  schedule: 0 0 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
