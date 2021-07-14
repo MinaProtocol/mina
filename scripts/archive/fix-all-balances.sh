@@ -25,14 +25,14 @@ REPLAYER_INPUT=replayer_input.json
 # Download the network configuration and rewrite it as replayer input
 curl -s "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/genesis_ledgers/${NETWORK}.json" | jq '{target_epoch_ledgers_state_hash:"'${STATE_HASH}'",genesis_ledger:{add_genesis_winner: true, accounts: .ledger.accounts}}' > $REPLAYER_INPUT
 
-echo "---- Running replayer (takes several minutes)"
+echo "---- Running replayer (takes over an hour, please be patient. Run tail -f ${REPLAYER_LOG} in another terminal to follow along.)"
 $REPLAYER --archive-uri "${ARCHIVE_URI}" --input-file replayer_input.json --output-file /dev/null > ${REPLAYER_LOG}
 
 rm -f $REPLAYER_INPUT
 
 echo "---- Finding swapped balances"
 
-awk -e "$(curl -s https://raw.githubusercontent.com/MinaProtocol/mina/compatible/scripts/archive/find-swapped-balances.awk)" "${REPLAYER_LOG}" > "${LOG_FILE}"
+awk "$(curl -s https://raw.githubusercontent.com/MinaProtocol/mina/compatible/scripts/archive/find-swapped-balances.awk)" "${REPLAYER_LOG}" > "${LOG_FILE}"
 
 BAD_COUNT=$(grep -- "-----" "${LOG_FILE}" | wc -l)
 
