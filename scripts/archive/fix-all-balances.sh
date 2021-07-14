@@ -17,14 +17,13 @@ REPLAYER=mina-replayer
 # binary name/location for the mina swap bad balances tool
 SWAPPER=mina-swap-bad-balances
 
-REPLAYER_TEMPLATE=scripts/archive/replayer_template.json
-REPLAYER_INPUT=replayer_input.json
-
 read -p "State hash from canonical chain: " STATE_HASH
 
-cp $REPLAYER_TEMPLATE $REPLAYER_INPUT
+NETWORK=${NETWORK:-mainnet}
+REPLAYER_INPUT=replayer_input.json
 
-sed --in-place s/REPLACETHIS/$STATE_HASH/ $REPLAYER_INPUT
+# Download the network configuration and rewrite it as replayer input
+curl -s "https://raw.githubusercontent.com/MinaProtocol/mina/compatible/genesis_ledgers/${NETWORK}.json" | jq '{target_epoch_ledgers_state_hash:"'${STATE_HASH}'",genesis_ledger:{add_genesis_winner: true, accounts: .ledger.accounts}}' > $REPLAYER_INPUT
 
 echo "---- Running replayer (takes several minutes)"
 $REPLAYER --archive-uri "${ARCHIVE_URI}" --input-file replayer_input.json --output-file /dev/null > ${REPLAYER_LOG}
@@ -32,9 +31,10 @@ $REPLAYER --archive-uri "${ARCHIVE_URI}" --input-file replayer_input.json --outp
 rm -f $REPLAYER_INPUT
 
 echo "---- Finding swapped balances"
-awk -f scripts/archive/find-swapped-balances.awk ${REPLAYER_LOG} > ${LOG_FILE}
 
-BAD_COUNT=$(grep -- "-----" $LOG_FILE | wc -l)
+awk -e "$(curl -s https://raw.githubusercontent.com/MinaProtocol/mina/compatible/scripts/archive/find-swapped-balances.awk)" "${REPLAYER_LOG}" > "${LOG_FILE}"
+
+BAD_COUNT=$(grep -- "-----" "${LOG_FILE}" | wc -l)
 
 echo "Found $BAD_COUNT swapped balances"
 
