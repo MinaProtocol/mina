@@ -14,7 +14,7 @@ spec:
       labels:
         app: {{ template "foundation-delegation.fullname" . }}-backend
         role: backend
-        version: {{ trunc 6 (split ":" .Values.backend.image)._1 | trimSuffix "-" }}
+        version: {{ trunc 8 (split ":" .Values.backend.image)._1 | trimSuffix "-" }}
     spec:
       containers:
       - name: backend
