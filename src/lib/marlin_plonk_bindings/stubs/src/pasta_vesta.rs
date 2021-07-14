@@ -49,7 +49,8 @@ pub fn caml_pasta_vesta_scale(
     y: ocaml::Pointer<CamlFp>,
 ) -> CamlGroupProjectiveVesta {
     let y: &Fp = &y.as_ref().0;
-    x.as_ref().mul(&y.0).into()
+    let y: ark_ff::BigInteger256 = (*y).into();
+    x.as_ref().mul(&y).into()
 }
 
 #[ocaml::func]
