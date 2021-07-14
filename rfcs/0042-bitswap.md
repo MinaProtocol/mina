@@ -1,12 +1,3 @@
-<!-- 
-- TODO:
-  - call out inefficiency in design caused by only having a single writer to the Bitswap block cache
-    - WAIT: I think this needs addressed
-    - options:
-      - 2 writer db model
-      - writer proxy process
--->
-
 ## Summary
 [summary]: #summary
 
@@ -15,14 +6,14 @@ This RFC proposes adding Bitswap to our libp2p networking stack in order to addr
 ## Motivation
 [motivation]: #motivation
 
-Mina has very large messages that are broadcast over the gossip net pub/sub layer. This incurs a high bandwidth cost due to the nature of our pub/sub rebroadcast cycles work in order to consistently broadcast messages throughout the network. For example, we observer blocks on mainnet as large as 15mb. This would represent only a single block, and each block broadcast message has a multiplicative cost on bandwidth as it's being broadcast throughout the network. This bandwidth cost also translates into CPU cost due to the cost of hashing incoming messages to check against the de-duplication cache before processing them. We currently observe behaviors where the libp2p helper process can be pegged at 100% CPU on certain hardware setups when there is high pub/sub throughput on the network. Since gossip pub/sub is used not only for blocks, but also transactions and snark work, the broadcasting of each of these simultaneously ends up compounding the issue.
+Mina has very large messages that are broadcast over the gossip net pub/sub layer. This incurs a high bandwidth cost due to the nature of our pub/sub rebroadcast cycles work in order to consistently broadcast messages throughout the network. For example, we observer blocks on mainnet as large as ~2mb. This would represent only a single block, and each block broadcast message has a multiplicative cost on bandwidth as it's being broadcast throughout the network. This bandwidth cost also translates into CPU cost due to the cost of hashing incoming messages to check against the de-duplication cache before processing them. We currently observe behaviors where the libp2p helper process can be pegged at 100% CPU on certain hardware setups when there is high pub/sub throughput on the network. Since gossip pub/sub is used not only for blocks, but also transactions and snark work, the broadcasting of each of these simultaneously ends up compounding the issue.
 
 Implementing Bitswap in our libp2p layer will address this issue by allowing us to immediately reduce our pub/sub message size, while making the larger data referenced by pub/sub messages available upon request. It provides a mechanism for breaking up large data into chunks that can be distributed throughout the network (streamed back from multiple peers), and a system for finding peers on the network who are able to serve that data.
 
 ## Detailed design
 [detailed-design]: #detailed-design
 
-[Bitswap](https://docs.ipfs.io/concepts/bitswap/) is a module provided by [libp2p](https://libp2p.io/) that enables distributed data synchronization over a p2p network, somewhat comparable to how [BitTorrent](https://en.wikipedia.org/wiki/BitTorrent) works. It works by splitting up data into chunks called blocks (we will explicitly refer to these as "Bitswap blocks" to disambiguate them from "blockchain blocks"), which are structured into a tree or DAG with a single root. When a node on the network wants to download to some data, it asks it's peers to see which (if any) have the root Bitswap block corresponding to that data. If none of the peers have the data, it falls back to querying the gossip network's [DHT](https://docs.ipfs.io/concepts/dht/#kademlia) to find a suitable node that can serve the data.
+[Bitswap](https://docs.ipfs.io/concepts/bitswap/) is a module provided by [libp2p](https://libp2p.io/) that enables distributed data synchronization over a p2p network, somewhat comparable to how [BitTorrent](https://en.wikipedia.org/wiki/BitTorrent) works. It works by splitting up data into chunks called blocks (we will explicitly refer to these as "Bitswap blocks" to disambiguate them from "blockchain blocks"), which are structured into a DAG with a single root. When a node on the network wants to download to some data, it asks it's peers to see which (if any) have the root Bitswap block corresponding to that data. If none of the peers have the data, it falls back to querying the gossip network's [DHT](https://docs.ipfs.io/concepts/dht/#kademlia) to find a suitable node that can serve the data.
 
 In this design, we will lay out an architecture to support Bitswap in our Mina implementation, along with a strategy for migrating Mina blocks into Bitswap to reduce current gossip pub/sub pressure. We limit the scope of migrating Mina data to Bitswap only to blocks for the context of this RFC, but in the future, we will also investigate moving snark work, transactions, and ledger data into Bitswap. Snark work and transactions will likely be modeled similarly to Mina blocks with respect to Bitswap, but ledger data will require some special thought since it's Bitswap block representation will have overlapping Bitswap blocks across different ledgers.
 
@@ -36,7 +27,7 @@ In order to allow the libp2p helper process to serve Bitswap blocks without putt
 
 Bitswap blocks are chunks of arbitrary binary data which are content addressed by [IPFS CIDs](https://docs.ipfs.io/concepts/content-addressing/#cid-conversion). There is no pre-defined maximum size of each Bitswap block, but IPFS uses 256kb, and the maximum recommended size of a Bitswap block is 1mb. Realistically, we want Bitswap blocks to be as small as possible, so we should start at 256kb for our maximum size, but keep the size of Bitswap blocks as a parameter we can tune so that we can optimize for block size vs block count.
 
-While the Bitswap specification does not care about what data is stored in each block, we do require each block have a commonly-defined format that we can parse from the libp2p helper so that we can piece together a series of blocks into a single larger binary blob. In order to do this, we structure Bitswap blocks as trees of binary data. We advertise the "root" block of each tree as the initial block to download for each resource we store in Bitswap, and the libp2p helper process will automatically explore all the child blocks referenced throughout the tree. To construct the full binary blob from this tree, We do a depth first left fold over the tree and stitch each splice of binary data together in that order. Dependent on our maximum resource binary size, it may be possible that every tree we would want to advertise over Bitswap would be at most depth = 2, which could reduce complexity from the implementation. However, without having a good maximum resource binary size for that at the moment, we will initially support a more generic solution that technically allows for trees of unbounded sizes.
+While the Bitswap specification does not care about what data is stored in each block, we do require each block have a commonly-defined format that we can parse from the libp2p helper so that we can piece together a series of blocks into a single larger binary blob. In order to do this, we structure Bitswap blocks as DAGs, where nodes can contain both pointers to successors and binary data. We advertise the "root" block of each DAG as the initial block to download for each resource we store in Bitswap, and the libp2p helper process will automatically explore all the child blocks referenced throughout the DAG. To construct the full binary blob from this DAG, We do a depth first left fold over the DAG and stitch each splice of binary data together in that order. Dependent on our maximum resource binary size, it may be possible that every DAG we would want to advertise over Bitswap would be at most depth = 2, which could reduce complexity from the implementation. However, without having a good maximum resource binary size for that at the moment, we will initially support a more generic solution that technically allows for DAGs of unbounded sizes.
 
 Below is a proposed representation of Bitswap blocks. In this example, we use bin_io to serialize the block format (since it's a simple enough message format that likely won't change regularly, seems not too difficult to implement some Go code to parse this data). However, should we have the networking refactor in place before we implement Bitswap, it would make more sense to use Cap'N Proto.
 
@@ -67,7 +58,7 @@ The algorithm for projecting a resource's binary representation into Bitswap blo
       - `let base_block_size = max_block_size - max_overhead_size`
       - `let leftover_space s = s mod base_block_size`
       - `let num_blocks s = s / base_block_size + if leftover_space s = 0 then 0 else 1`
-      - `let blob_cids_size = num_blocks blob_size - 1 * cid_size` (we subtract 1 here because we do not store a reference to the root block in a block tree)
+      - `let blob_cids_size = num_blocks blob_size - 1 * cid_size` (we subtract 1 here because we do not store a reference to the root block in a DAG)
       - `let num_overflow_cids_size = min 0 (blob_cid_size - leftover_space blob_size)`
       - `num_blocks blob_size + num_blocks num_overflow_cids_size`
 - generate a block tree layout based on how many CIDs we need to store to refer to all the blocks (minus the root block)
@@ -126,14 +117,14 @@ When the daemon is in the participation state, all Bitswap advertisable resource
 - perform "add resource" for all resources in memory, but not in cache
 - for all resources both in memory and in cache
   - read `res:${mina_cid}` to get the list of block CIDs associated with the resource in the cache
-  - sanity check that all reference block CIDs exist in cache (check tree integrity)
+  - sanity check that all reference block CIDs exist in cache (check DAG integrity)
   - record block CIDs in memory to avoid computing block data projection for relevant resources
 
 #### Synchronization Subsystem
 
 The daemon will have a new subsystem which will track the creation/destruction of resources, and perform the necessary caching protocols. Tracking the destruction of resources will be done using a GC finalizer. We cannot perform the "remove resource" caching protocol from inside of a finalizer, so the finalizer will merely mark removed resources for the subsystem to later remove from the Bitswap block cache when the Async scheduler schedules the subsystem to run.
 
-**NB:** _This proposed model of how the subsystem will track resources in relation to Bitswap block CIDs does not mesh well with the world in which we store ledgers (which are trees that will likely share blocks across various roots). We will need to layer a refcounting solution on top of this to support that use case, when the time comes._
+**NB:** _This proposed model makes an assumption that each DAG stored in Bitswap will not have any cross references (that is, no 2 DAGs will contain any of the same Bitswap blocks).This model simplifies the initial implementation for storing Mina block bodies, but does not mesh well with the world in which we store ledgers (where it is likely that multiple ledger DAGs share blocks across various roots). We will need to layer a refcounting solution on top of this to support that use case, when the time comes, which will involve adding an extra key-value table to the Bitswap block cache schema._
 
 ```ocaml
 module Bitswap = struct
@@ -150,7 +141,7 @@ module Bitswap = struct
     val create : create_args -> t
 
     (* mapping from an object to a mina cid *)
-    val id : t -> string 
+    val id : t -> Mina_cid.t 
 
     val project_bitswap_blocks : t -> block_tree
   end
@@ -159,7 +150,7 @@ module Bitswap = struct
 
   module Sync_state = struct
     (* global sync state *)
-    let sync_table = String.Table.create ()
+    let sync_table = Mina_cid.Table.create ()
 
     (* runs a continuous background task to synchronize resources tracked in the daemon with the Bitswap cache *)
     let run_sync_task () =
@@ -187,7 +178,7 @@ end
 
 ### Libp2p Helper IPC Modifications
 
-New IPC messages are required in order to support the daemon requesting resources stored in Bitswap blocks from the helper process. When the daemon needs to acquire a resource that is stored in Bitswap, it will send a message to the libp2p helper process asking it to download all the blocks associated with that resource (identified by the root Bitswap block CID). The helper process will begin the process of downloading all Bitswap blocks in the tree pointed to by the root Bitswap block, and will inform the helper upon success or failure of that operation.
+New IPC messages are required in order to support the daemon requesting resources stored in Bitswap blocks from the helper process. When the daemon needs to acquire a resource that is stored in Bitswap, it will send a message to the libp2p helper process asking it to download all the blocks associated with that resource (identified by the root Bitswap block CID). The helper process will begin the process of downloading all Bitswap blocks in the tree pointed to by the root Bitswap block, and will inform the helper upon success or failure of that operation. The helper process will be responsible for tracking a timeout of the download operation, and fail the operation if that timeout is exceeded.
 
 Whenever new Bitswap blocks are available to the node, the libp2p helper needs to mark an entry in the DHT saying that our node can provide this block of data. When the blocks in question are downloaded from another peer in the network, this is done [automatically by the libp2p Bitswap implementation](https://github.com/ipfs/go-bitswap/blob/0fa397581ca6197c6c4ca17842719370f6596e95/bitswap.go#L254). However, we still need to have custom logic for adding new DHT provision keys for data we broadcast from out node locally, and when a node restarts from with a pre-existing Bitswap block cache.
 
@@ -258,9 +249,13 @@ This adds significant complexity to how the protocol gossips around information.
 - it would be possible to download larger data from peers via RPC and still reduce the pub/sub message size, though there are some issues with this approach
   - it is not guaranteed that any of your peers will have the data you need, in which case you need some alternative mechanism to discover who does have it
   - puts a lot of bandwidth pressure on individual peers rather than spreading the load between multiple peers (which helps with both bandwidth pressure and data redundancy for increase availability)
-- one alternative to using LMDB as the Bitswap cache would be to use [SQLite](https://www.sqlite.org/index.html)
-  - even though all we need is a key/value db, not a relational db, SQLite is portable and performant
-  - would require us to enable both the [write-ahead logging](https://sqlite.org/wal.html) and use [memory-mapped I/O](https://www.sqlite.org/mmap.html) features in order to use it the way we would like to
+- alternatives to using LMDB as the Bitswap cache
+  - use [SQLite](https://www.sqlite.org/index.html)
+    - even though all we need is a key/value db, not a relational db, SQLite is portable and performant
+    - would require us to enable both the [write-ahead logging](https://sqlite.org/wal.html) and use [memory-mapped I/O](https://www.sqlite.org/mmap.html) features in order to use it the way we would like to
+  - use raw Linux filesystem (from @georgeee)
+    - would use a lot of inodes and file descriptors if we do not build a mechanism that stores multiple key-value pairs in shared files, which could prove tricky to implement
+    - would need to solve concurrency problems related to concurrent readers/writers, which could be tricky to get correct and have confidence in
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
