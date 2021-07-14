@@ -11,5 +11,5 @@ spec:
   ports:
   - name: delegation-backend
     port: {{ .Values.backend.port }}
-    targetPort: backend-endpoint
+    targetPort: backend
     protocol: TCP

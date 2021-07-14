@@ -21,7 +21,7 @@ spec:
         image: {{ .Values.backend.image }}
         imagePullPolicy: Always
         ports:
-        - name: backend-endpoint
+        - name: backend
           protocol: TCP
           containerPort: 8080
       {{- if .Values.backend.secret }}
