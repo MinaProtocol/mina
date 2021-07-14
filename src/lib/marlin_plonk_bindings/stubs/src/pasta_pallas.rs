@@ -50,7 +50,8 @@ pub fn caml_pasta_pallas_scale(
     y: ocaml::Pointer<CamlFq>,
 ) -> CamlGroupProjectivePallas {
     let y: &Fq = &y.as_ref().0;
-    x.as_ref().mul(&y.0).into()
+    let y: ark_ff::BigInteger256 = (*y).into();
+    x.as_ref().mul(&y).into()
 }
 
 #[ocaml::func]
