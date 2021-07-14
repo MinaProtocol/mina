@@ -20,6 +20,9 @@ spec:
       - name: backend
         image: {{ .Values.backend.image }}
         imagePullPolicy: Always
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /creds/creds.json
         ports:
         - name: backend
           protocol: TCP
