@@ -142,6 +142,7 @@ module Cmd = struct
       ; "-peer"
       ; Peer.default
       ; "-log-json"
+      ; "--insecure-rest-server"
       ]
 
     let default_cmd ~config_file = default ~config_file |> to_string

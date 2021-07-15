@@ -17,7 +17,22 @@ let mina_create_schema = "create_schema.sql"
 module Network_config = struct
   module Cli_inputs = Cli_inputs
 
+  module Port = struct
+    type t = string list
+
+    let get_new_port t =
+      match t with [] -> [ 7000 ] | x :: xs -> [ x + 1 ] @ [ x ] @ xs
+
+    let get_latest_port t = match t with [] -> 7000 | x :: _ -> x
+
+    let create_rest_port t =
+      match t with [] -> "7000:3085" | x :: _ -> Int.to_string x ^ ":3085"
+  end
+
   type docker_volume_configs = { name : string; data : string }
+  [@@deriving to_yojson]
+
+  type seed_config = { name : string; ports : (string * string) list }
   [@@deriving to_yojson]
 
   type block_producer_config =
@@ -28,6 +43,7 @@ module Network_config = struct
     ; private_key : string
     ; keypair_secret : string
     ; libp2p_secret : string
+    ; ports : (string * string) list
     }
   [@@deriving to_yojson]
 
@@ -36,10 +52,16 @@ module Network_config = struct
     ; id : string
     ; public_key : string
     ; snark_worker_fee : string
+    ; ports : (string * string) list
     }
   [@@deriving to_yojson]
 
-  type archive_node_configs = { name : string; id : string; schema : string }
+  type archive_node_configs =
+    { name : string
+    ; id : string
+    ; schema : string
+    ; ports : (string * string) list
+    }
   [@@deriving to_yojson]
 
   type docker_config =
@@ -48,6 +70,7 @@ module Network_config = struct
     ; mina_image : string
     ; mina_archive_image : string
     ; docker_volume_configs : docker_volume_configs list
+    ; seed_configs : seed_config list
     ; block_producer_configs : block_producer_config list
     ; snark_coordinator_configs : snark_coordinator_configs list
     ; archive_node_configs : archive_node_configs list
@@ -201,8 +224,11 @@ module Network_config = struct
       { constraints = constraint_constants; genesis = genesis_constants }
     in
     let open Docker_node_config.Services in
+    let available_host_ports_ref = ref [] in
     (* BLOCK PRODUCER CONFIG *)
     let block_producer_config index keypair =
+      available_host_ports_ref := Port.get_new_port !available_host_ports_ref ;
+      let rest_port = Port.create_rest_port !available_host_ports_ref in
       { name = Block_producer.name ^ "-" ^ Int.to_string (index + 1)
       ; id = Int.to_string index
       ; keypair
@@ -210,21 +236,36 @@ module Network_config = struct
       ; public_key = keypair.public_key_file
       ; private_key = keypair.private_key_file
       ; libp2p_secret = ""
+      ; ports = [ ("rest-port", rest_port) ]
       }
     in
     let block_producer_configs =
       List.mapi block_producer_keypairs ~f:block_producer_config
     in
+    (* SEED NODE CONFIG *)
+    available_host_ports_ref := Port.get_new_port !available_host_ports_ref ;
+    let seed_rest_port = Port.create_rest_port !available_host_ports_ref in
+    let seed_configs =
+      [ { name = Seed.name; ports = [ ("rest-port", seed_rest_port) ] } ]
+    in
     (* SNARK COORDINATOR CONFIG *)
+    available_host_ports_ref := Port.get_new_port !available_host_ports_ref ;
+    let snark_coord_rest_port =
+      Port.create_rest_port !available_host_ports_ref
+    in
     let snark_coordinator_configs =
       if num_snark_workers > 0 then
         List.mapi
           (List.init num_snark_workers ~f:(const 0))
           ~f:(fun index _ ->
+            available_host_ports_ref :=
+              Port.get_new_port !available_host_ports_ref ;
+            let rest_port = Port.create_rest_port !available_host_ports_ref in
             { name = Snark_worker.name ^ "-" ^ Int.to_string (index + 1)
             ; id = Int.to_string index
             ; snark_worker_fee
             ; public_key = snark_worker_public_key
+            ; ports = [ ("rest_port", rest_port) ]
             })
         (* Add one snark coordinator for all workers *)
         |> List.append
@@ -232,6 +273,7 @@ module Network_config = struct
                ; id = "1"
                ; snark_worker_fee
                ; public_key = snark_worker_public_key
+               ; ports = [ ("rest-port", snark_coord_rest_port) ]
                }
              ]
       else []
@@ -242,9 +284,13 @@ module Network_config = struct
         List.mapi
           (List.init num_archive_nodes ~f:(const 0))
           ~f:(fun index _ ->
+            available_host_ports_ref :=
+              Port.get_new_port !available_host_ports_ref ;
+            let rest_port = Port.create_rest_port !available_host_ports_ref in
             { name = Archive_node.name ^ "-" ^ Int.to_string (index + 1)
             ; id = Int.to_string index
             ; schema = mina_archive_schema
+            ; ports = [ ("rest-port", rest_port) ]
             })
       else []
     in
@@ -271,6 +317,7 @@ module Network_config = struct
         ; mina_archive_image = images.archive_node
         ; docker_volume_configs
         ; runtime_config = Runtime_config.to_yojson runtime_config
+        ; seed_configs
         ; block_producer_configs
         ; snark_coordinator_configs
         ; archive_node_configs
@@ -312,10 +359,17 @@ module Network_config = struct
                 (Block_producer.default
                    ~private_key_config:private_key_config.target))
           in
+          let rest_port =
+            List.find
+              ~f:(fun ports -> String.equal (fst ports) "rest-port")
+              config.ports
+            |> Option.value_exn |> snd
+          in
           ( config.name
           , { Service.image = network_config.docker.mina_image
             ; volumes = [ private_key_config; runtime_config ]
             ; command = Cmd.create_cmd cmd ~config_file:runtime_config.target
+            ; ports = [ rest_port ]
             ; environment = Service.Environment.create Envs.base_node_envs
             } ))
       |> StringMap.of_alist_exn
@@ -360,15 +414,22 @@ module Network_config = struct
                 let worker_environment = Service.Environment.create [] in
                 (worker_command, worker_environment)
           in
+          let rest_port =
+            List.find
+              ~f:(fun ports -> String.equal (fst ports) "rest-port")
+              config.ports
+            |> Option.value_exn |> snd
+          in
           ( config.name
           , { Service.image = network_config.docker.mina_image
             ; volumes = [ runtime_config ]
             ; command
+            ; ports = [ rest_port ]
             ; environment
             } ))
       |> StringMap.of_alist_exn
     in
-    (* ARCHIVE_NODE SERVICE *)
+    (* ARCHIVE NODE SERVICE *)
     let archive_node_configs =
       List.mapi network_config.docker.archive_node_configs
         ~f:(fun index config ->
@@ -384,10 +445,17 @@ module Network_config = struct
             let server_port = Archive_node.server_port in
             Cmd.(Archive_node { Archive_node.postgres_uri; server_port })
           in
+          let rest_port =
+            List.find
+              ~f:(fun ports -> String.equal (fst ports) "rest-port")
+              config.ports
+            |> Option.value_exn |> snd
+          in
           ( config.name
           , { Service.image = network_config.docker.mina_archive_image
             ; volumes = [ runtime_config ]
             ; command = Cmd.create_cmd cmd ~config_file:runtime_config.target
+            ; ports = [ rest_port ]
             ; environment = Service.Environment.create Envs.base_node_envs
             } ))
       (* Add an equal number of postgres containers as archive nodes *)
@@ -402,6 +470,7 @@ module Network_config = struct
             , { Service.image = postgres_image
               ; volumes = [ archive_config ]
               ; command = []
+              ; ports = []
               ; environment =
                   Service.Environment.create
                     (Envs.postgres_envs ~username:pg_config.username
@@ -410,23 +479,33 @@ module Network_config = struct
               } ))
       |> StringMap.of_alist_exn
     in
-    (* SEED DOCKER SERVICE *)
+    (* SEED NODE DOCKER SERVICE *)
     let seed_map =
-      [ (let command =
-           if List.length network_config.docker.archive_node_configs > 0 then
-             (* If an archive node is specified in the test plan, use the seed node to connect to the first mina-archive process *)
-             Cmd.create_cmd Seed ~config_file:runtime_config.target
-             @ Cmd.Seed.connect_to_archive
-                 ~archive_node:("archive-1:" ^ Services.Archive_node.server_port)
-           else Cmd.create_cmd Seed ~config_file:runtime_config.target
-         in
-         ( Seed.name
-         , { Service.image = network_config.docker.mina_image
-           ; volumes = [ runtime_config ]
-           ; command
-           ; environment = Service.Environment.create Envs.base_node_envs
-           } ))
-      ]
+      List.mapi network_config.docker.seed_configs ~f:(fun index config ->
+          let command =
+            if List.length network_config.docker.archive_node_configs > 0 then
+              (* If an archive node is specified in the test plan, use the seed node to connect to the first mina-archive process *)
+              Cmd.create_cmd Seed ~config_file:runtime_config.target
+              @ Cmd.Seed.connect_to_archive
+                  ~archive_node:
+                    ( "archive-"
+                    ^ Int.to_string (index + 1)
+                    ^ ":" ^ Services.Archive_node.server_port )
+            else Cmd.create_cmd Seed ~config_file:runtime_config.target
+          in
+          let rest_port =
+            List.find
+              ~f:(fun ports -> String.equal (fst ports) "rest-port")
+              config.ports
+            |> Option.value_exn |> snd
+          in
+          ( Seed.name
+          , { Service.image = network_config.docker.mina_image
+            ; volumes = [ runtime_config ]
+            ; command
+            ; ports = [ rest_port ]
+            ; environment = Service.Environment.create Envs.base_node_envs
+            } ))
       |> StringMap.of_alist_exn
     in
     let services =
@@ -508,32 +587,32 @@ module Network_manager = struct
         Out_channel.with_file ~fail_if_exists:false (testnet_dir ^/ config.name)
           ~f:(fun ch -> config.data |> Out_channel.output_string ch) ;
         ignore (Util.run_cmd_exn testnet_dir "chmod" [ "600"; config.name ])) ;
-    let cons_node swarm_name service_id network_keypair_opt =
+    let cons_node swarm_name service_id ports network_keypair_opt =
       { Swarm_network.Node.swarm_name
       ; service_id
+      ; ports
       ; graphql_enabled = true
       ; network_keypair = network_keypair_opt
       }
     in
     let seed_nodes =
-      [ cons_node network_config.docker.stack_name
-          ( network_config.docker.stack_name ^ "_"
-          ^ Docker_node_config.Services.Seed.name )
-          None
-      ]
+      List.map network_config.docker.seed_configs ~f:(fun seed_config ->
+          cons_node network_config.docker.stack_name
+            (network_config.docker.stack_name ^ "_" ^ seed_config.name)
+            seed_config.ports None)
     in
     let block_producer_nodes =
       List.map network_config.docker.block_producer_configs ~f:(fun bp_config ->
           cons_node network_config.docker.stack_name
             (network_config.docker.stack_name ^ "_" ^ bp_config.name)
-            (Some bp_config.keypair))
+            bp_config.ports (Some bp_config.keypair))
     in
     let snark_coordinator_nodes =
       List.map network_config.docker.snark_coordinator_configs
         ~f:(fun snark_config ->
           cons_node network_config.docker.stack_name
             (network_config.docker.stack_name ^ "_" ^ snark_config.name)
-            None)
+            snark_config.ports None)
     in
     let%bind _ =
       (* If any archive nodes are specified, write the archive schema to the working directory to use as an entrypoint for postgres *)
@@ -550,7 +629,7 @@ module Network_manager = struct
         ~f:(fun archive_node ->
           cons_node network_config.docker.stack_name
             (network_config.docker.stack_name ^ "_" ^ archive_node.name)
-            None)
+            archive_node.ports None)
     in
     let nodes_by_app_id =
       let all_nodes =

@@ -9,6 +9,7 @@ module Node = struct
   type t =
     { swarm_name : string
     ; service_id : string
+    ; ports : (string * string) list
     ; graphql_enabled : bool
     ; network_keypair : Network_keypair.t option
     }
@@ -63,28 +64,253 @@ module Node = struct
 
   module Decoders = Graphql_lib.Decoders
 
-  let exec_graphql_request ~num_tries:_ ~retry_delay_sec:_ ~initial_delay_sec:_
-      ~logger:_ ~node:_ ~query_name:_ _ : _ =
-    failwith "exec_graphql_request"
+  module Graphql = struct
+    let ingress_uri node =
+      let host = Printf.sprintf "0.0.0.0" in
+      let path = "/graphql" in
+      let rest_port =
+        List.find
+          ~f:(fun ports -> String.equal (fst ports) "rest-port")
+          node.ports
+        |> Option.value_exn |> snd
+      in
+      Uri.make ~scheme:"http" ~host ~path ~port:(int_of_string rest_port) ()
 
-  let get_peer_id ~logger:_ _ = failwith "get_peer_id"
+    module Client = Graphql_lib.Client.Make (struct
+      let preprocess_variables_string = Fn.id
 
-  let must_get_peer_id ~logger:_ _ = failwith "must_get_peer_id"
+      let headers = String.Map.empty
+    end)
 
-  let get_best_chain ~logger:_ _ = failwith "get_best_chain"
+    module Unlock_account =
+    [%graphql
+    {|
+      mutation ($password: String!, $public_key: PublicKey!) {
+        unlockAccount(input: {password: $password, publicKey: $public_key }) {
+          public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+        }
+      }
+    |}]
 
-  let must_get_best_chain ~logger:_ _ = failwith "must_get_best_chain"
+    module Send_payment =
+    [%graphql
+    {|
+      mutation ($sender: PublicKey!,
+      $receiver: PublicKey!,
+      $amount: UInt64!,
+      $token: UInt64,
+      $fee: UInt64!,
+      $nonce: UInt32,
+      $memo: String) {
+        sendPayment(input:
+          {from: $sender, to: $receiver, amount: $amount, token: $token, fee: $fee, nonce: $nonce, memo: $memo}) {
+            payment {
+              id
+            }
+          }
+      }
+    |}]
 
-  let get_balance ~logger:_ _ ~account_id:_ = failwith "get_balance"
+    module Get_balance =
+    [%graphql
+    {|
+      query ($public_key: PublicKey, $token: UInt64) {
+        account(publicKey: $public_key, token: $token) {
+          balance {
+            total @bsDecoder(fn: "Decoders.balance")
+          }
+        }
+      }
+    |}]
+
+    module Query_peer_id =
+    [%graphql
+    {|
+      query {
+        daemonStatus {
+          addrsAndPorts {
+            peer {
+              peerId
+            }
+          }
+          peers {  peerId }
+
+        }
+      }
+    |}]
+
+    module Best_chain =
+    [%graphql
+    {|
+      query {
+        bestChain {
+          stateHash
+        }
+      }
+    |}]
+  end
+
+  let exec_graphql_request ?(num_tries = 10) ?(retry_delay_sec = 30.0)
+      ?(initial_delay_sec = 30.0) ~logger ~node ~query_name query_obj =
+    let open Deferred.Let_syntax in
+    if not node.graphql_enabled then
+      Deferred.Or_error.error_string
+        "graphql is not enabled (hint: set `requires_graphql= true` in the \
+         test config)"
+    else
+      let uri = Graphql.ingress_uri node in
+      let metadata =
+        [ ("query", `String query_name); ("uri", `String (Uri.to_string uri)) ]
+      in
+      [%log info] "Attempting to send GraphQL request \"$query\" to \"$uri\""
+        ~metadata ;
+      let rec retry n =
+        if n <= 0 then (
+          [%log error]
+            "GraphQL request \"$query\" to \"$uri\" failed too many times"
+            ~metadata ;
+          Deferred.Or_error.errorf
+            "GraphQL \"%s\" to \"%s\" request failed too many times" query_name
+            (Uri.to_string uri) )
+        else
+          match%bind Graphql.Client.query query_obj uri with
+          | Ok result ->
+              [%log info] "GraphQL request \"$query\" to \"$uri\" succeeded"
+                ~metadata ;
+              Deferred.Or_error.return result
+          | Error (`Failed_request err_string) ->
+              [%log warn]
+                "GraphQL request \"$query\" to \"$uri\" failed: \"$error\" \
+                 ($num_tries attempts left)"
+                ~metadata:
+                  ( metadata
+                  @ [ ("error", `String err_string)
+                    ; ("num_tries", `Int (n - 1))
+                    ] ) ;
+              let%bind () = after (Time.Span.of_sec retry_delay_sec) in
+              retry (n - 1)
+          | Error (`Graphql_error err_string) ->
+              [%log error]
+                "GraphQL request \"$query\" to \"$uri\" returned an error: \
+                 \"$error\" (this is a graphql error so not retrying)"
+                ~metadata:(metadata @ [ ("error", `String err_string) ]) ;
+              Deferred.Or_error.error_string err_string
+      in
+      let%bind () = after (Time.Span.of_sec initial_delay_sec) in
+      retry num_tries
+
+  let get_peer_id ~logger t =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Getting node's peer_id, and the peer_ids of node's peers"
+      ~metadata:[ ("service_id", `String t.service_id) ] ;
+    let query_obj = Graphql.Query_peer_id.make () in
+    let%bind query_result_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"query_peer_id" query_obj
+    in
+    [%log info] "get_peer_id, finished exec_graphql_request" ;
+    let self_id_obj = query_result_obj#daemonStatus#addrsAndPorts#peer in
+    let%bind self_id =
+      match self_id_obj with
+      | None ->
+          Deferred.Or_error.error_string "Peer not found"
+      | Some peer ->
+          return peer#peerId
+    in
+    let peers = query_result_obj#daemonStatus#peers |> Array.to_list in
+    let peer_ids = List.map peers ~f:(fun peer -> peer#peerId) in
+    [%log info] "get_peer_id, result of graphql query (self_id,[peers]) (%s,%s)"
+      self_id
+      (String.concat ~sep:" " peer_ids) ;
+    return (self_id, peer_ids)
+
+  let must_get_peer_id ~logger t =
+    get_peer_id ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_best_chain ~logger t =
+    let open Deferred.Or_error.Let_syntax in
+    let query = Graphql.Best_chain.make () in
+    let%bind result =
+      exec_graphql_request ~logger ~node:t ~query_name:"best_chain" query
+    in
+    match result#bestChain with
+    | None | Some [||] ->
+        Deferred.Or_error.error_string "failed to get best chains"
+    | Some chain ->
+        return
+        @@ List.map ~f:(fun block -> block#stateHash) (Array.to_list chain)
+
+  let must_get_best_chain ~logger t =
+    get_best_chain ~logger t |> Deferred.bind ~f:Malleable_error.or_hard_error
+
+  let get_balance ~logger t ~account_id =
+    let open Deferred.Or_error.Let_syntax in
+    [%log info] "Getting account balance"
+      ~metadata:
+        [ ("service_id", `String t.service_id)
+        ; ("account_id", Mina_base.Account_id.to_yojson account_id)
+        ] ;
+    let pk = Mina_base.Account_id.public_key account_id in
+    let token = Mina_base.Account_id.token_id account_id in
+    let get_balance_obj =
+      Graphql.Get_balance.make
+        ~public_key:(Graphql_lib.Encoders.public_key pk)
+        ~token:(Graphql_lib.Encoders.token token)
+        ()
+    in
+    let%bind balance_obj =
+      exec_graphql_request ~logger ~node:t ~query_name:"get_balance_graphql"
+        get_balance_obj
+    in
+    match balance_obj#account with
+    | None ->
+        Deferred.Or_error.errorf
+          !"Account with %{sexp:Mina_base.Account_id.t} not found"
+          account_id
+    | Some acc ->
+        return acc#balance#total
 
   let must_get_balance ~logger t ~account_id =
     get_balance ~logger t ~account_id
     |> Deferred.bind ~f:Malleable_error.or_hard_error
 
   (* if we expect failure, might want retry_on_graphql_error to be false *)
-  let send_payment ~logger:_ _ ~sender_pub_key:_ ~receiver_pub_key:_ ~amount:_
-      ~fee:_ =
-    failwith "send_payment"
+  let send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee =
+    [%log info] "Sending a payment"
+      ~metadata:[ ("service_id", `String t.service_id) ] ;
+    let open Deferred.Or_error.Let_syntax in
+    let sender_pk_str =
+      Signature_lib.Public_key.Compressed.to_string sender_pub_key
+    in
+    [%log info] "send_payment: unlocking account"
+      ~metadata:[ ("sender_pk", `String sender_pk_str) ] ;
+    let unlock_sender_account_graphql () =
+      let unlock_account_obj =
+        Graphql.Unlock_account.make ~password:"naughty blue worm"
+          ~public_key:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t
+        ~query_name:"unlock_sender_account_graphql" unlock_account_obj
+    in
+    let%bind _ = unlock_sender_account_graphql () in
+    let send_payment_graphql () =
+      let send_payment_obj =
+        Graphql.Send_payment.make
+          ~sender:(Graphql_lib.Encoders.public_key sender_pub_key)
+          ~receiver:(Graphql_lib.Encoders.public_key receiver_pub_key)
+          ~amount:(Graphql_lib.Encoders.amount amount)
+          ~fee:(Graphql_lib.Encoders.fee fee)
+          ()
+      in
+      exec_graphql_request ~logger ~node:t ~query_name:"send_payment_graphql"
+        send_payment_obj
+    in
+    let%map sent_payment_obj = send_payment_graphql () in
+    let (`UserCommand id_obj) = sent_payment_obj#sendPayment#payment in
+    let user_cmd_id = id_obj#id in
+    [%log info] "Sent payment"
+      ~metadata:[ ("user_command_id", `String user_cmd_id) ] ;
+    ()
 
   let must_send_payment ~logger t ~sender_pub_key ~receiver_pub_key ~amount ~fee
       =

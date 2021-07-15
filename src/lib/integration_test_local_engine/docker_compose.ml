@@ -25,6 +25,7 @@ module Compose = struct
       { image : string
       ; volumes : Volume.t list
       ; command : string list
+      ; ports : string list
       ; environment : Environment.t
       }
     [@@deriving to_yojson]
