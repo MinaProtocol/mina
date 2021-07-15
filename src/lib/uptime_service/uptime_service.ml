@@ -53,7 +53,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     String_sign.Schnorr.sign submitter_keypair.private_key block_data_string
   in
   let json =
-    (* JSON structure in issue 9110 *)
+    (* JSON structure in issue #9110 *)
     `Assoc
       [ ("data", block_data_json)
       ; ("signature", Signature.to_yojson signature)
@@ -152,7 +152,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~block_produced_bvar tm =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
-  let timeout_min = 4.0 in
+  let timeout_min = 3.0 in
   let%bind () = make_interruptible (at tm) in
   match%bind
     make_interruptible
@@ -375,95 +375,119 @@ let start ~logger ~uptime_url ~transition_frontier ~time_controller
           ~protocol_constants:Genesis_constants.compiled.protocol
         |> Consensus.Configuration.slot_duration |> Float.of_int
       in
-      let five_slots_span = Time.Span.of_ms (slot_duration_ms *. 5.0) in
-      let four_slots_span = Time.Span.of_ms (slot_duration_ms *. 4.0) in
-      don't_wait_for
-        (let next_slot_time =
-           let block_time_ms_int64 =
-             Block_time.now time_controller |> Block_time.to_int64
-           in
-           let slot_duration_ms_int64 = Float.to_int64 slot_duration_ms in
-           let next_slot_ms =
-             if
-               Int64.equal Int64.zero
-                 (Int64.(rem) block_time_ms_int64 slot_duration_ms_int64)
-             then block_time_ms_int64
-             else
-               let last_slot_no =
-                 Int64.( / ) block_time_ms_int64 slot_duration_ms_int64
-               in
-               Int64.( * ) (Int64.succ last_slot_no) slot_duration_ms_int64
-           in
-           Block_time.of_int64 next_slot_ms |> Block_time.to_time
-         in
-         let register_iteration =
-           let interrupt_ivar = ref (Ivar.create ()) in
-           fun () ->
-             (* terminate anything running from previous iteration *)
-             Ivar.fill_if_empty !interrupt_ivar () ;
-             Deferred.create (fun ivar -> interrupt_ivar := ivar)
-         in
-         [%log trace] "Uptime service synchronizing to next slot boundary" ;
-         let%map () = at next_slot_time in
-         (* every 5 slots, check whether block will be produced *)
-         Async.Clock.every' ~continue_on_error:true five_slots_span (fun () ->
-             let interruptor = register_iteration () in
-             [%log trace] "Uptime service determining which action to take" ;
-             (* see if block scheduled within 4 slots, allowing a full slot
-                to produce the block within an iteration of the `every'`
-             *)
-             let four_slots_from_now =
-               Time.add (Time.now ()) four_slots_span
-             in
-             let get_next_producer_time_opt () =
-               match get_next_producer_timing () with
-               | None ->
-                   [%log trace]
-                     "Next producer timing not set for uptime service" ;
-                   None
-               | Some timing -> (
-                   let open Daemon_rpcs.Types.Status.Next_producer_timing in
-                   match timing.timing with
-                   | Check_again _tm ->
-                       [%log trace]
-                         "Next producer timing not available for uptime service" ;
-                       None
-                   | Produce prod_tm | Produce_now prod_tm ->
-                       Some (Block_time.to_time prod_tm.time) )
-             in
-             match get_peer () with
-             | None ->
-                 [%log warn]
-                   "Daemon is not yet a peer in the gossip network, uptime \
-                    service not sending a produced block" ;
-                 Deferred.unit
-             | Some ({peer_id; _} : Network_peer.Peer.t) ->
-                 (* daemon startup checked that a keypair was given if URL given *)
-                 let submitter_keypair =
-                   Option.value_exn uptime_submitter_keypair
-                 in
-                 let send_just_block next_producer_time =
-                   [%log info]
-                     "Uptime service will attempt to send the next produced \
-                      block" ;
-                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
-                     ~submitter_keypair ~block_produced_bvar next_producer_time
-                 in
-                 let send_block_and_snark_work () =
-                   [%log info]
-                     "Uptime service will attempt to send a block and SNARK \
-                      work" ;
-                   let snark_work_fee = get_snark_work_fee () in
-                   send_block_and_transaction_snark ~logger ~interruptor ~url
-                     ~transition_frontier ~peer_id ~submitter_keypair
-                     ~snark_work_fee
-                 in
-                 Interruptible.don't_wait_for
-                   ( match get_next_producer_time_opt () with
-                   | None ->
-                       send_block_and_snark_work ()
-                   | Some next_producer_time ->
-                       if Time.( <= ) next_producer_time four_slots_from_now
-                       then send_just_block next_producer_time
-                       else send_block_and_snark_work () ) ;
-                 Deferred.unit ))
+      let make_slots_span min =
+        Block_time.Span.of_time_span
+          (Time.Span.of_ms (slot_duration_ms *. min))
+      in
+      let five_slots_span = make_slots_span 5.0 in
+      let four_slots_span = make_slots_span 4.0 in
+      let wait_until_iteration_start block_tm =
+        let now = Block_time.now time_controller in
+        if Block_time.( < ) now block_tm then at (Block_time.to_time block_tm)
+        else (
+          [%log warn]
+            "In uptime service, current block time is past desired start of \
+             iteration" ;
+          return () )
+      in
+      let register_iteration =
+        let interrupt_ivar = ref (Ivar.create ()) in
+        fun () ->
+          (* terminate any Interruptible code from previous iteration *)
+          Ivar.fill_if_empty !interrupt_ivar () ;
+          Deferred.create (fun ivar -> interrupt_ivar := ivar)
+      in
+      let run_iteration next_block_tm : Block_time.t Deferred.t =
+        let get_next_producer_time_opt () =
+          match get_next_producer_timing () with
+          | None ->
+              [%log trace] "Next producer timing not set for uptime service" ;
+              None
+          | Some timing -> (
+              let open Daemon_rpcs.Types.Status.Next_producer_timing in
+              match timing.timing with
+              | Check_again _tm ->
+                  [%log trace]
+                    "Next producer timing not available for uptime service" ;
+                  None
+              | Produce prod_tm | Produce_now prod_tm ->
+                  Some (Block_time.to_time prod_tm.time) )
+        in
+        [%log trace]
+          "Waiting for next 5-slot boundary to start work in uptime service"
+          ~metadata:
+            [ ("boundary_block_time", Block_time.to_yojson next_block_tm)
+            ; ( "boundary_time"
+              , `String (Block_time.to_time next_block_tm |> Time.to_string) )
+            ] ;
+        (* wait in Async.Deferred monad *)
+        let%bind () = wait_until_iteration_start next_block_tm in
+        (* interrupt previous iteration *)
+        let interruptor = register_iteration () in
+        (* work in Interruptible monad in "background" *)
+        Interruptible.don't_wait_for
+          ( [%log trace] "Determining which action to take in uptime service" ;
+            match get_peer () with
+            | None ->
+                [%log warn]
+                  "Daemon is not yet a peer in the gossip network, uptime \
+                   service not sending a produced block" ;
+                Interruptible.return ()
+            | Some ({peer_id; _} : Network_peer.Peer.t) -> (
+                let submitter_keypair =
+                  (* daemon startup checked that a keypair was given if URL given *)
+                  Option.value_exn uptime_submitter_keypair
+                in
+                let send_just_block next_producer_time =
+                  [%log info]
+                    "Uptime service will attempt to send the next produced \
+                     block" ;
+                  send_produced_block_at ~logger ~interruptor ~url ~peer_id
+                    ~submitter_keypair ~block_produced_bvar next_producer_time
+                in
+                let send_block_and_snark_work () =
+                  [%log info]
+                    "Uptime service will attempt to send a block and SNARK work" ;
+                  let snark_work_fee = get_snark_work_fee () in
+                  send_block_and_transaction_snark ~logger ~interruptor ~url
+                    ~transition_frontier ~peer_id ~submitter_keypair
+                    ~snark_work_fee
+                in
+                match get_next_producer_time_opt () with
+                | None ->
+                    send_block_and_snark_work ()
+                | Some next_producer_time ->
+                    (* we look for block production within 4 slots of the *desired*
+                       iteration start time, so a late iteration won't affect the
+                       time bound on block production
+                      that leaves a full slot to produce the block
+                   *)
+                    let four_slots_from_start =
+                      Block_time.add next_block_tm four_slots_span
+                      |> Block_time.to_time
+                    in
+                    if Time.( <= ) next_producer_time four_slots_from_start
+                    then send_just_block next_producer_time
+                    else send_block_and_snark_work () ) ) ;
+        Deferred.return (Block_time.add next_block_tm five_slots_span)
+      in
+      (* synch to slot boundary *)
+      let next_slot_block_time =
+        let block_time_ms_int64 =
+          Block_time.now time_controller |> Block_time.to_int64
+        in
+        let slot_duration_ms_int64 = Float.to_int64 slot_duration_ms in
+        let next_slot_ms =
+          if
+            Int64.equal Int64.zero
+              (Int64.(rem) block_time_ms_int64 slot_duration_ms_int64)
+          then block_time_ms_int64
+          else
+            let last_slot_no =
+              Int64.( / ) block_time_ms_int64 slot_duration_ms_int64
+            in
+            Int64.( * ) (Int64.succ last_slot_no) slot_duration_ms_int64
+        in
+        Block_time.of_int64 next_slot_ms
+      in
+      Async.Deferred.forever next_slot_block_time run_iteration
