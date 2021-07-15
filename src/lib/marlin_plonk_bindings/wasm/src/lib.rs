@@ -25,8 +25,17 @@ pub fn console_log(s: &str) {
     log(s);
 }
 
+pub use wasm_bindgen_rayon::init_thread_pool;
+
 pub mod bigint_256;
 pub mod pasta_fp;
 pub mod pasta_fq;
 pub mod pasta_pallas;
 pub mod pasta_vesta;
+pub mod wasm_vector;
+pub mod wasm_flat_vector;
+pub mod pasta_vesta_poly_comm;
+pub mod pasta_pallas_poly_comm;
+pub mod pasta_fp_urs;
+pub mod pasta_fq_urs;
+pub mod urs_utils;

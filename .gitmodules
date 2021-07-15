@@ -29,3 +29,6 @@
 	path = src/external/ppx_deriving_yojson
 	url = https://github.com/MinaProtocol/ppx_deriving_yojson.git
 	branch = master
+[submodule "src/lib/marlin_plonk_bindings/wasm-bindgen-rayon"]
+	path = src/external/wasm-bindgen-rayon
+	url = https://github.com/GoogleChromeLabs/wasm-bindgen-rayon.git

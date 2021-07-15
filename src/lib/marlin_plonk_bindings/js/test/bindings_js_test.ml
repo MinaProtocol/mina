@@ -598,3 +598,91 @@ let _ =
          let infinity_copied_ = affine_deep_copy Infinity in
          assert (eq infinity_copied_ Infinity)
     end)
+
+let _ =
+  let open Pasta_fp_urs in
+  Js.export "pasta_fp_urs_test"
+    (object%js (_self)
+       method run =
+         let eq_affine x y =
+           match (x, y) with
+           | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
+               true
+           | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2)
+             ->
+               Pasta_fq.equal x1 x2 && Pasta_fq.equal y1 y2
+           | _ ->
+               false
+         in
+         let eq (x : Poly_comm.t) (y : Poly_comm.t) =
+           Array.for_all2 eq_affine x.unshifted y.unshifted
+           && Option.equal eq_affine x.shifted y.shifted
+         in
+         let first = create 10 in
+         let second = create 16 in
+         let lcomm1 = lagrange_commitment first ~domain_size:8 0 in
+         let lcomm1_again = lagrange_commitment second ~domain_size:8 0 in
+         assert (eq lcomm1 lcomm1_again) ;
+         let inputs = Pasta_fp.[| of_int 1; of_int 2; of_int 3; of_int 4 |] in
+         let commits = commit_evaluations second ~domain_size:8 inputs in
+         let commits_again = commit_evaluations second ~domain_size:8 inputs in
+         assert (eq commits commits_again) ;
+         let inputs2 = Array.init 64 Pasta_fp.of_int in
+         let affines =
+           Array.init 16 (fun i ->
+               try lcomm1.unshifted.(i)
+               with _ -> Pasta_vesta.random () |> Pasta_vesta.to_affine)
+         in
+         let res = batch_accumulator_check second affines inputs2 in
+         assert (res || not res) ;
+         let h_first = h first in
+         let h_second = h second in
+         let h_first_again = Pasta_vesta.affine_deep_copy h_first in
+         let h_second_again = Pasta_vesta.affine_deep_copy h_second in
+         assert (eq_affine h_first h_first_again) ;
+         assert (eq_affine h_second h_second_again)
+    end)
+
+let _ =
+  let open Pasta_fq_urs in
+  Js.export "pasta_fq_urs_test"
+    (object%js (_self)
+       method run =
+         let eq_affine x y =
+           match (x, y) with
+           | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
+               true
+           | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2)
+             ->
+               Pasta_fp.equal x1 x2 && Pasta_fp.equal y1 y2
+           | _ ->
+               false
+         in
+         let eq (x : Poly_comm.t) (y : Poly_comm.t) =
+           Array.for_all2 eq_affine x.unshifted y.unshifted
+           && Option.equal eq_affine x.shifted y.shifted
+         in
+         let first = create 10 in
+         let second = create 16 in
+         let lcomm1 = lagrange_commitment first ~domain_size:8 0 in
+         let lcomm1_again = lagrange_commitment second ~domain_size:8 0 in
+         assert (eq lcomm1 lcomm1_again) ;
+         let inputs = Pasta_fq.[| of_int 1; of_int 2; of_int 3; of_int 4 |] in
+         let commits = commit_evaluations second ~domain_size:8 inputs in
+         let commits_again = commit_evaluations second ~domain_size:8 inputs in
+         assert (eq commits commits_again) ;
+         let inputs2 = Array.init 64 Pasta_fq.of_int in
+         let affines =
+           Array.init 16 (fun i ->
+               try lcomm1.unshifted.(i)
+               with _ -> Pasta_pallas.random () |> Pasta_pallas.to_affine)
+         in
+         let res = batch_accumulator_check second affines inputs2 in
+         assert (res || not res) ;
+         let h_first = h first in
+         let h_second = h second in
+         let h_first_again = Pasta_pallas.affine_deep_copy h_first in
+         let h_second_again = Pasta_pallas.affine_deep_copy h_second in
+         assert (eq_affine h_first h_first_again) ;
+         assert (eq_affine h_second h_second_again)
+    end)

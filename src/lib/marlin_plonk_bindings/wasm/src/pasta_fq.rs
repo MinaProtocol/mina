@@ -16,6 +16,18 @@ use std::cmp::Ordering::{Equal, Greater, Less};
 #[derive(Clone, Copy)]
 pub struct WasmPastaFq(pub Fq);
 
+impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFq {
+    const FLATTENED_SIZE: usize = std::mem::size_of::<Fq>();
+    fn flatten(self) -> Vec<u8> {
+        let mut bytes: Vec<u8> = Vec::with_capacity(Self::FLATTENED_SIZE);
+        self.0.write(&mut bytes);
+        bytes
+    }
+    fn unflatten(flat: Vec<u8>) -> Self {
+        WasmPastaFq(FromBytes::read(flat.as_slice()).unwrap())
+    }
+}
+
 impl wasm_bindgen::describe::WasmDescribe for WasmPastaFq {
     fn describe() { <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe() }
 }
