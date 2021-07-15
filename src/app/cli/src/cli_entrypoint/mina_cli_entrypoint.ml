@@ -1225,7 +1225,6 @@ let daemon logger =
          Block_time.Controller.disable_setting_offset () ;
          let%bind coda = setup_daemon () in
          let%bind () = Mina_lib.start coda in
-         let () = Uptime_service.start coda in
          [%log info] "Daemon ready. Clients can now connect" ;
          Async.never () ))
 

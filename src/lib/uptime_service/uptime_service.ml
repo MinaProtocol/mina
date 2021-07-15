@@ -185,7 +185,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
-    ~snark_resource_pool ~snark_work_fee =
+    ~snark_work_fee =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
       [%log error]
@@ -331,30 +331,6 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url
                           ~metadata:[("error", Error_json.error_to_yojson e)] ;
                         Interruptible.return ()
                     | Ok (proof, proof_time) -> (
-                        let work =
-                          `One
-                            (Snark_work_lib.Work.Single.Spec.statement
-                               single_spec)
-                        in
-                        let fee =
-                          { Fee_with_prover.fee= snark_work_fee
-                          ; prover=
-                              submitter_keypair.public_key
-                              |> Public_key.compress }
-                        in
-                        ( match
-                            Network_pool.Snark_pool.Resource_pool.add_snark
-                              snark_resource_pool ~is_local:true ~work
-                              ~proof:(`One proof) ~fee
-                          with
-                        | `Added ->
-                            [%log info]
-                              "Added work created for uptime service to SNARK \
-                               pool"
-                        | `Statement_not_referenced ->
-                            [%log error]
-                              "Statement not referenced error when trying to \
-                               add SNARK for uptime service to pool" ) ;
                         let proof_data : Proof_data.t =
                           {proof; proof_time; snark_work_fee}
                         in
@@ -383,15 +359,15 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url
                               ~submitter_keypair ~url ~state_hash block_data )
                     ) ) ) )
 
-let start (mina : Mina_lib.t) =
-  let config = Mina_lib.config mina in
-  let transition_frontier = Mina_lib.transition_frontier mina in
-  match config.uptime_url with
+let start ~logger ~uptime_url ~transition_frontier ~time_controller
+    ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
+    ~get_snark_work_fee ~get_peer =
+  match uptime_url with
   | None ->
-      [%log' info config.logger] "Not running uptime service, no URL given" ;
+      [%log info] "Not running uptime service, no URL given" ;
       ()
   | Some url ->
-      [%log' info config.logger] "Starting uptime service using URL $url"
+      [%log info] "Starting uptime service using URL $url"
         ~metadata:[("url", `String (Uri.to_string url))] ;
       let slot_duration_ms =
         Consensus.Configuration.t
@@ -404,8 +380,7 @@ let start (mina : Mina_lib.t) =
       don't_wait_for
         (let next_slot_time =
            let block_time_ms_int64 =
-             Block_time.now (Mina_lib.time_controller mina)
-             |> Block_time.to_int64
+             Block_time.now time_controller |> Block_time.to_int64
            in
            let slot_duration_ms_int64 = Float.to_int64 slot_duration_ms in
            let next_slot_ms =
@@ -428,14 +403,12 @@ let start (mina : Mina_lib.t) =
              Ivar.fill_if_empty !interrupt_ivar () ;
              Deferred.create (fun ivar -> interrupt_ivar := ivar)
          in
-         [%log' trace config.logger]
-           "Uptime service synchronizing to next slot boundary" ;
+         [%log trace] "Uptime service synchronizing to next slot boundary" ;
          let%map () = at next_slot_time in
          (* every 5 slots, check whether block will be produced *)
          Async.Clock.every' ~continue_on_error:true five_slots_span (fun () ->
              let interruptor = register_iteration () in
-             [%log' trace config.logger]
-               "Uptime service determining which action to take" ;
+             [%log trace] "Uptime service determining which action to take" ;
              (* see if block scheduled within 4 slots, allowing a full slot
                 to produce the block within an iteration of the `every'`
              *)
@@ -443,53 +416,47 @@ let start (mina : Mina_lib.t) =
                Time.add (Time.now ()) four_slots_span
              in
              let get_next_producer_time_opt () =
-               match Mina_lib.next_producer_timing mina with
+               match get_next_producer_timing () with
                | None ->
-                   [%log' trace config.logger]
+                   [%log trace]
                      "Next producer timing not set for uptime service" ;
                    None
                | Some timing -> (
                    let open Daemon_rpcs.Types.Status.Next_producer_timing in
                    match timing.timing with
                    | Check_again _tm ->
-                       [%log' trace config.logger]
+                       [%log trace]
                          "Next producer timing not available for uptime service" ;
                        None
                    | Produce prod_tm | Produce_now prod_tm ->
                        Some (Block_time.to_time prod_tm.time) )
              in
-             match config.gossip_net_params.addrs_and_ports.peer with
+             match get_peer () with
              | None ->
-                 [%log' warn config.logger]
+                 [%log warn]
                    "Daemon is not yet a peer in the gossip network, uptime \
                     service not sending a produced block" ;
                  Deferred.unit
-             | Some {peer_id; _} ->
+             | Some ({peer_id; _} : Network_peer.Peer.t) ->
                  (* daemon startup checked that a keypair was given if URL given *)
                  let submitter_keypair =
-                   Option.value_exn config.uptime_submitter_keypair
+                   Option.value_exn uptime_submitter_keypair
                  in
-                 let block_produced_bvar = Mina_lib.block_produced_bvar mina in
                  let send_just_block next_producer_time =
-                   [%log' info config.logger]
+                   [%log info]
                      "Uptime service will attempt to send the next produced \
                       block" ;
-                   send_produced_block_at ~logger:config.logger ~interruptor
-                     ~url ~peer_id ~submitter_keypair ~block_produced_bvar
-                     next_producer_time
+                   send_produced_block_at ~logger ~interruptor ~url ~peer_id
+                     ~submitter_keypair ~block_produced_bvar next_producer_time
                  in
                  let send_block_and_snark_work () =
-                   [%log' info config.logger]
+                   [%log info]
                      "Uptime service will attempt to send a block and SNARK \
                       work" ;
-                   let snark_resource_pool =
-                     Mina_lib.snark_pool mina
-                     |> Network_pool.Snark_pool.resource_pool
-                   in
-                   let snark_work_fee = Mina_lib.snark_work_fee mina in
-                   send_block_and_transaction_snark ~logger:config.logger
-                     ~interruptor ~url ~transition_frontier ~peer_id
-                     ~submitter_keypair ~snark_resource_pool ~snark_work_fee
+                   let snark_work_fee = get_snark_work_fee () in
+                   send_block_and_transaction_snark ~logger ~interruptor ~url
+                     ~transition_frontier ~peer_id ~submitter_keypair
+                     ~snark_work_fee
                  in
                  Interruptible.don't_wait_for
                    ( match get_next_producer_time_opt () with
