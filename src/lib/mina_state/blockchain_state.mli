@@ -39,7 +39,7 @@ include
           ( Staged_ledger_hash.var
           , Frozen_ledger_hash.var
           , Token_id.var
-          , Block_time.Unpacked.var )
+          , Block_time.Checked.t )
           Poly.t
      and type value := Value.t
 

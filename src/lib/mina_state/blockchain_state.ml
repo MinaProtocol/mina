@@ -49,7 +49,7 @@ type var =
   ( Staged_ledger_hash.var
   , Frozen_ledger_hash.var
   , Token_id.var
-  , Block_time.Unpacked.var )
+  , Block_time.Checked.t )
   Poly.t
 
 let create_value ~staged_ledger_hash ~snarked_ledger_hash ~genesis_ledger_hash
@@ -67,7 +67,7 @@ let data_spec =
   ; Frozen_ledger_hash.typ
   ; Frozen_ledger_hash.typ
   ; Token_id.typ
-  ; Block_time.Unpacked.typ
+  ; Block_time.Checked.typ
   ]
 
 let typ : (var, Value.t) Typ.t =
