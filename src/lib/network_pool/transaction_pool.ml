@@ -1001,12 +1001,6 @@ struct
             )
         else Deferred.return ()
 
-      (* TODO: Move the actual verify call to the end for now instead of "pre" doing it *)
-
-      (* TODO:
-         Don't allow arbitrary transactions. Check the account actually has
-         the funds and the nonce is in [current nonce, current nonce + 10] or something. *)
-
       let of_indexed_pool_error e =
         (diff_error_of_indexed_pool_error e, indexed_pool_error_metadata e)
 
@@ -1094,7 +1088,6 @@ struct
         if Indexed_pool.Command_error.grounds_for_diff_rejection e then `Reject
         else `Ignore
 
-      (* Transaction verification currently happens in apply. In the future we could batch it. *)
       let verify' ~allow_failures_for_tests (t : pool)
           (diffs : t Envelope.Incoming.t) :
           verified Envelope.Incoming.t Deferred.Or_error.t =
@@ -1376,7 +1369,7 @@ struct
           Trust_system.record_envelope_sender t.config.trust_system t.logger
             sender
         in
-        let rec go txs (* (accepted, rejected) *) =
+        let rec go txs =
           let open Interruptible.Deferred_let_syntax in
           match txs with
           | [] ->

@@ -494,12 +494,6 @@ module Update = struct
             Map_set.remove_exn acc.applicable_by_fee fee command
         }
 
-  (*
-    | Set_by_sender (id, x) ->
-      { acc with all_by_sender=
-                   Map.change acc.all_by_sender id ~f:(fun _ -> x)
-      } *)
-
   let apply (us : t) t = Writer_result.Tree.fold ~init:t us ~f:apply
 
   let merge (t1 : t) (t2 : t) = Writer_result.Tree.append t1 t2
@@ -602,32 +596,6 @@ let remove_with_dependents_exn' t cmd =
       x
   | Error _ ->
       failwith "remove_with_dependents_exn"
-
-(*
-  let t' =
-    F_sequence.foldl
-      (fun acc cmd' -> remove_all_by_fee_and_hash_and_expiration_exn acc cmd')
-      t drop_queue
-  in
-  ( F_sequence.to_seq drop_queue
-  , { t' with
-      all_by_sender =
-        ( if not (F_sequence.is_empty keep_queue) then
-          Map.set t'.all_by_sender ~key:sender
-            ~data:(keep_queue, reserved_currency')
-        else (
-          assert (Currency.Amount.(equal reserved_currency' zero)) ;
-          Map.remove t'.all_by_sender sender ) )
-    ; applicable_by_fee =
-        ( if
-          Transaction_hash.User_command_with_valid_signature.equal first_cmd cmd
-        then
-          Map_set.remove_exn t'.applicable_by_fee
-            (User_command.fee_exn unchecked)
-            cmd
-        else t'.applicable_by_fee )
-    } )
- *)
 
 (** Drop commands from the end of the queue until the total currency consumed is
     <= the current balance. *)
@@ -957,28 +925,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
         by_sender :=
           { !by_sender with data = Some (F_sequence.singleton cmd, consumed) } ;
         (cmd, Sequence.empty)
-        (*
-        ( 
-        , { t with applicable_by_fee =
-              Map_set.insert
-                (module Transaction_hash.User_command_with_valid_signature)
-                t.applicable_by_fee fee cmd
-          ; all_by_sender =
-              Map.set t.all_by_sender ~key:fee_payer
-                ~data:(F_sequence.singleton cmd, consumed)
-          ; all_by_fee =
-              Map_set.insert
-                (module Transaction_hash.User_command_with_valid_signature)
-                t.all_by_fee fee cmd
-          ; all_by_hash =
-              Map.set t.all_by_hash
-                ~key:(Transaction_hash.User_command_with_valid_signature.hash cmd)
-                ~data:cmd
-          ; transactions_with_expiration =
-              add_to_expiration t.transactions_with_expiration cmd
-          ; size = t.size + 1
-          }
-        , Sequence.empty ) *)
     | Some (queued_cmds, reserved_currency) ->
         (* commands queued for this sender *)
         assert (not @@ F_sequence.is_empty queued_cmds) ;
@@ -1017,26 +963,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
           in
           by_sender := { !by_sender with data = Some new_state } ;
           (cmd, Sequence.empty)
-          (*
-          ( cmd
-          , { t with
-              all_by_sender =
-                Map.set t.all_by_sender ~key:fee_payer
-                  ~data:(F_sequence.snoc queued_cmds cmd, reserved_currency')
-            ; all_by_fee =
-                Map_set.insert
-                  (module Transaction_hash.User_command_with_valid_signature)
-                  t.all_by_fee fee cmd
-            ; all_by_hash =
-                Map.set t.all_by_hash
-                  ~key:
-                    (Transaction_hash.User_command_with_valid_signature.hash cmd)
-                  ~data:cmd
-            ; transactions_with_expiration =
-                add_to_expiration t.transactions_with_expiration cmd
-            ; size = t.size + 1
-            }
-          , Sequence.empty ) *)
           )
         else
           (* we're replacing a command *)
@@ -1102,14 +1028,6 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
             (* We've already removed them, so this should always be empty. *)
             assert (Sequence.is_empty dropped') ;
             (v, dropped)
-            (*
-            with
-            | Ok (v, t'', dropped') ->
-                (* We've already removed them, so this should always be empty. *)
-                assert (Sequence.is_empty dropped') ;
-                Result.Ok (v, t'', dropped)
-            | Error err ->
-                Error err *)
           in
           let drop_head, drop_tail = Option.value_exn (Sequence.next dropped) in
           let increment =
@@ -1120,7 +1038,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
              over the first transaction.
           *)
           let%bind increment, dropped' =
-            let rec go (* t' *) increment dropped dropped' current_nonce : _ M.t
+            let rec go increment dropped dropped' current_nonce : _ M.t
                 =
               match (Sequence.next dropped, dropped') with
               | None, Some dropped' ->
