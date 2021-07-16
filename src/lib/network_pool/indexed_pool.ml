@@ -962,8 +962,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
                  { command = cmd; fee; add_to_applicable_by_fee = false })
           in
           by_sender := { !by_sender with data = Some new_state } ;
-          (cmd, Sequence.empty)
-          )
+          (cmd, Sequence.empty) )
         else
           (* we're replacing a command *)
           let first_queued_nonce =
@@ -1038,8 +1037,7 @@ module Add_from_gossip_exn (M : Writer_result.S) = struct
              over the first transaction.
           *)
           let%bind increment, dropped' =
-            let rec go increment dropped dropped' current_nonce : _ M.t
-                =
+            let rec go increment dropped dropped' current_nonce : _ M.t =
               match (Sequence.next dropped, dropped') with
               | None, Some dropped' ->
                   return (increment, dropped')
