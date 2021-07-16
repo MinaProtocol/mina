@@ -45,6 +45,18 @@ let get_rfc3339_time () =
   | Some ptime ->
       Ptime.to_rfc3339 ~tz_offset_s:0 ptime
 
+let sign_blake2_hash ~private_key s =
+  let module Field = Snark_params.Tick.Field in
+  let blake2 = Blake2.digest_string s in
+  let field_elements = [||] in
+  let bitstrings =
+    [|Blake2.to_raw_string blake2 |> Blake2.string_to_bits |> Array.to_list|]
+  in
+  let input : (Field.t, bool) Random_oracle.Input.t =
+    {field_elements; bitstrings}
+  in
+  Schnorr.sign private_key input
+
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
     ~state_hash block_data =
   let open Interruptible.Let_syntax in
@@ -52,7 +64,8 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
   let block_data_json = block_data_to_yojson block_data in
   let block_data_string = Yojson.Safe.to_string block_data_json in
   let signature =
-    String_sign.Schnorr.sign submitter_keypair.private_key block_data_string
+    sign_blake2_hash ~private_key:submitter_keypair.private_key
+      block_data_string
   in
   let json =
     (* JSON structure in issue #9110 *)
