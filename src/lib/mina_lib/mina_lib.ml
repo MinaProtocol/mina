@@ -39,7 +39,7 @@ exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
 
-(* A way to run a single snark worker for a daemon in a lazy manner. Evaluating
+(* A way to run a single snark worker for a daemon in a lazy manner. Forcing
    this lazy value will run the snark worker process. A snark work is
    assigned to a public key. This public key can change throughout the entire time
    the daemon is running *)
@@ -52,7 +52,8 @@ type processes =
   { prover: Prover.t
   ; verifier: Verifier.t
   ; mutable snark_worker:
-      [`On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t] }
+      [`On of snark_worker * Currency.Fee.t | `Off of Currency.Fee.t]
+  ; uptime_snark_worker_opt: Uptime_service.Uptime_snark_worker.t option }
 
 type components =
   { net: Mina_networking.t
@@ -1086,6 +1087,7 @@ let start t =
     ~block_produced_bvar:t.components.block_produced_bvar ;
   perform_compaction t ;
   Uptime_service.start ~logger:t.config.logger ~uptime_url:t.config.uptime_url
+    ~snark_worker_opt:t.processes.uptime_snark_worker_opt
     ~transition_frontier:t.components.transition_frontier
     ~time_controller:t.config.time_controller
     ~block_produced_bvar:t.components.block_produced_bvar
@@ -1195,6 +1197,26 @@ let create ?wallets (config : Config.t) =
                     ; process= Ivar.create ()
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
+          in
+          let%bind uptime_snark_worker_opt =
+            (* if uptime URL provided, run uptime service SNARK worker *)
+            Option.value_map config.uptime_url ~default:(return None)
+              ~f:(fun _url ->
+                Monitor.try_with ~here:[%here]
+                  ~rest:
+                    (`Call
+                      (fun exn ->
+                        let err = Error.of_exn ~backtrace:`Get exn in
+                        [%log' warn config.logger]
+                          "unhandled exception from uptime service SNARK \
+                           worker: $exn"
+                          ~metadata:[("exn", Error_json.error_to_yojson err)]
+                        ))
+                  (fun () ->
+                    trace "uptime SNARK worker" (fun () ->
+                        Uptime_service.Uptime_snark_worker.create
+                          ~logger:config.logger ~pids:config.pids ) )
+                >>| Result.ok )
           in
           log_snark_coordinator_warning config snark_worker ;
           Protocol_version.set_current config.initial_protocol_version ;
@@ -1839,7 +1861,8 @@ let create ?wallets (config : Config.t) =
           Deferred.return
             { config
             ; next_producer_timing= None
-            ; processes= {prover; verifier; snark_worker}
+            ; processes=
+                {prover; verifier; snark_worker; uptime_snark_worker_opt}
             ; initialization_finish_signal
             ; components=
                 { net

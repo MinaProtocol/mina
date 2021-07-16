@@ -9,6 +9,8 @@ open Signature_lib
 
 module Blake2 = Blake2.Make ()
 
+module Uptime_snark_worker = Uptime_snark_worker
+
 type block_data =
   { block: string
   ; created_at: string
@@ -183,12 +185,13 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     | None ->
         return () )
 
-let send_block_and_transaction_snark ~logger ~interruptor ~url
+let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
     ~snark_work_fee =
   match Broadcast_pipe.Reader.peek transition_frontier with
   | None ->
-      [%log error]
+      (* expected during daemon boot, so not logging as error *)
+      [%log info]
         "Transition frontier not available to send a block to uptime service" ;
       Interruptible.return ()
   | Some tf -> (
@@ -205,15 +208,6 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url
           let message =
             Sok_message.create ~fee:snark_work_fee
               ~prover:(Public_key.compress submitter_keypair.public_key)
-          in
-          (* mimicking code from standalone snark worker *)
-          let module Prod = Snark_worker__Prod.Inputs in
-          let%bind (worker_state : Prod.Worker_state.t) =
-            make_interruptible
-              (Prod.Worker_state.create
-                 ~constraint_constants:
-                   Genesis_constants.Constraint_constants.compiled
-                 ~proof_level:Full ())
           in
           let best_tip = Transition_frontier.best_tip tf in
           let external_transition =
@@ -323,14 +317,23 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url
                 | Some single_spec -> (
                     match%bind
                       make_interruptible
-                        (Prod.perform_single worker_state ~message single_spec)
+                        (Uptime_snark_worker.perform_single snark_worker
+                           (message, single_spec))
                     with
                     | Error e ->
+                        (* error in submitting to process *)
                         [%log error]
-                          "Error when computing SNARK work for uptime service"
+                          "Error when running uptime service SNARK worker on \
+                           a transaction"
                           ~metadata:[("error", Error_json.error_to_yojson e)] ;
                         Interruptible.return ()
-                    | Ok (proof, proof_time) -> (
+                    | Ok (Error e) ->
+                        (* error in creating the SNARK work *)
+                        [%log error]
+                          "Error computing SNARK work for uptime service"
+                          ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                        Interruptible.return ()
+                    | Ok (Ok (proof, proof_time)) -> (
                         let proof_data : Proof_data.t =
                           {proof; proof_time; snark_work_fee}
                         in
@@ -359,9 +362,9 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url
                               ~submitter_keypair ~url ~state_hash block_data )
                     ) ) ) )
 
-let start ~logger ~uptime_url ~transition_frontier ~time_controller
-    ~block_produced_bvar ~uptime_submitter_keypair ~get_next_producer_timing
-    ~get_snark_work_fee ~get_peer =
+let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
+    ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
+    ~get_next_producer_timing ~get_snark_work_fee ~get_peer =
   match uptime_url with
   | None ->
       [%log info] "Not running uptime service, no URL given" ;
@@ -369,6 +372,9 @@ let start ~logger ~uptime_url ~transition_frontier ~time_controller
   | Some url ->
       [%log info] "Starting uptime service using URL $url"
         ~metadata:[("url", `String (Uri.to_string url))] ;
+      let snark_worker : Uptime_snark_worker.t =
+        Option.value_exn snark_worker_opt
+      in
       let slot_duration_ms =
         Consensus.Configuration.t
           ~constraint_constants:Genesis_constants.Constraint_constants.compiled
@@ -450,8 +456,8 @@ let start ~logger ~uptime_url ~transition_frontier ~time_controller
                     "Uptime service will attempt to send a block and SNARK work" ;
                   let snark_work_fee = get_snark_work_fee () in
                   send_block_and_transaction_snark ~logger ~interruptor ~url
-                    ~transition_frontier ~peer_id ~submitter_keypair
-                    ~snark_work_fee
+                    ~snark_worker ~transition_frontier ~peer_id
+                    ~submitter_keypair ~snark_work_fee
                 in
                 match get_next_producer_time_opt () with
                 | None ->
@@ -471,7 +477,7 @@ let start ~logger ~uptime_url ~transition_frontier ~time_controller
                     else send_block_and_snark_work () ) ) ;
         Deferred.return (Block_time.add next_block_tm five_slots_span)
       in
-      (* synch to slot boundary *)
+      (* sync to slot boundary *)
       let next_slot_block_time =
         let block_time_ms_int64 =
           Block_time.now time_controller |> Block_time.to_int64
