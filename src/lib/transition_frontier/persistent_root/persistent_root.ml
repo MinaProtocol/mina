@@ -1,4 +1,3 @@
-open Async_kernel
 open Core
 open Mina_base
 open Frontier_base
