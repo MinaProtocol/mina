@@ -206,11 +206,12 @@ let%test_module "Full_frontier tests" =
                     |> Staged_ledger.scan_state
                     |> Staged_ledger.Scan_state.required_state_hashes
                   in
+                  ignore (
                   List.iter (State_hash.Set.to_list required_state_hashes)
                     ~f:(fun hash ->
                       Full_frontier.For_tests.find_protocol_state_exn frontier
                         hash
-                      |> ignore ) ) ;
+                      ) : Protocol_state.value option list ) );
               clean_up_persistent_root ~frontier ) )
 
     let%test_unit "The length of the longest branch should never be greater \
