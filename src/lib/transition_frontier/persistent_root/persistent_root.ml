@@ -269,9 +269,8 @@ let with_instance_exn t ~f =
   Instance.close instance ; x
 
 let reset_to_genesis_exn t ~precomputed_values =
-  let open Deferred.Let_syntax in
   assert (Option.is_none t.instance) ;
-  let%map () = File_system.remove_dir t.directory in
+  File_system.rmrf t.directory ;
   with_instance_exn t ~f:(fun instance ->
       ignore
         ( Ledger_transfer.transfer_accounts

@@ -201,9 +201,7 @@ let rec load_with_max_length :
         ~root_data:(genesis_root_data ~precomputed_values)
         ~genesis_state_hash:precomputed_values.protocol_state_with_hash.hash
     in
-    let%bind () =
-      Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values
-    in
+    Persistent_root.reset_to_genesis_exn persistent_root ~precomputed_values ;
     let genesis_ledger_hash =
       Precomputed_values.genesis_ledger precomputed_values
       |> Lazy.force |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
