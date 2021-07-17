@@ -58,7 +58,7 @@ let sign_blake2_hash ~private_key s =
   Schnorr.sign private_key input
 
 let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
-    ~state_hash block_data =
+    ~state_hash ~produced block_data =
   let open Interruptible.Let_syntax in
   let make_interruptible f = Interruptible.lift f interruptor in
   let block_data_json = block_data_to_yojson block_data in
@@ -96,6 +96,7 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
                        [ ("state_hash", State_hash.to_yojson state_hash)
                        ; ( "includes_snark_work"
                          , `Bool (Option.is_some block_data.snark_work) )
+                       ; ("is_produced_block", `Bool produced)
                        ; ("url", `String (Uri.to_string url)) ]
                  else
                    let base_metadata =
@@ -194,7 +195,7 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
           ; snark_work= None }
         in
         send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-          ~state_hash block_data
+          ~state_hash ~produced:true block_data
     | None ->
         return () )
 
@@ -247,7 +248,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; snark_work= None }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-              ~state_hash block_data )
+              ~state_hash ~produced:false block_data )
           else
             let best_tip_staged_ledger =
               Transition_frontier.Breadcrumb.staged_ledger best_tip
@@ -287,7 +288,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                   ; snark_work= None }
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-                  ~state_hash block_data
+                  ~state_hash ~produced:false block_data
             | Ok job_one_or_twos -> (
                 let transitions =
                   List.concat_map job_one_or_twos ~f:One_or_two.to_list
@@ -326,7 +327,7 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       ; snark_work= None }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
-                      ~url ~state_hash block_data
+                      ~url ~state_hash ~produced:false block_data
                 | Some single_spec -> (
                     match%bind
                       make_interruptible
@@ -372,8 +373,8 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                               ; snark_work= Some snark_work_base64 }
                             in
                             send_uptime_data ~logger ~interruptor
-                              ~submitter_keypair ~url ~state_hash block_data )
-                    ) ) ) )
+                              ~submitter_keypair ~url ~state_hash
+                              ~produced:false block_data ) ) ) ) )
 
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
