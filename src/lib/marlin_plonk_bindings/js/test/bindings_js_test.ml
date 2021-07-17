@@ -687,6 +687,17 @@ let _ =
          assert (eq_affine h_second h_second_again)
     end)
 
+let mk_wires kind i (r1, c1) (r2, c2) (r3, c3) c : _ Types.Plonk_gate.t =
+  { kind
+  ; wires =
+      { row = i
+      ; l = { row = r1; col = c1 }
+      ; r = { row = r2; col = c2 }
+      ; o = { row = r3; col = c3 }
+      }
+  ; c
+  }
+
 let _ =
   let open Pasta_fp_index.Gate_vector in
   Js.export "pasta_fp_gate_vector_test"
@@ -694,25 +705,19 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let mk_wires kind i (r1, c1) (r2, c2) (r3, c3) c : _ Types.Plonk_gate.t
-             =
-           { kind
-           ; wires =
-               { row = i
-               ; l = { row = r1; col = c1 }
-               ; r = { row = r2; col = c2 }
-               ; o = { row = r3; col = c3 }
-               }
-           ; c
-           }
-         in
          let eq { Types.Plonk_gate.kind = kind1; wires = wires1; c = c1 }
              { Types.Plonk_gate.kind = kind2; wires = wires2; c = c2 } =
            kind1 = kind2 && wires1 = wires2
            && try Array.for_all2 Pasta_fp.equal c1 c2 with _ -> false
          in
          let assert_eq_or_log ?extra ~loc x y =
-           if not (eq x y) then (let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in log loc; Option.iter log extra; log x; log y; assert false)
+           if not (eq x y) then (
+             let log x = (Js.Unsafe.js_expr "console.log" : _ -> unit) x in
+             log loc ;
+             Option.iter log extra ;
+             log x ;
+             log y ;
+             assert false )
          in
          let rand_fields i = Array.init i Pasta_fp.rng in
          let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (rand_fields 0) in
@@ -736,6 +741,9 @@ let _ =
          let endomul4 =
            mk_wires Endomul4 9 (9, L) (9, R) (9, O) (rand_fields 33)
          in
+         let poseidon =
+           mk_wires Poseidon 10 (10, L) (10, R) (10, O) (rand_fields 34)
+         in
          let all =
            [ zero
            ; generic
@@ -748,15 +756,20 @@ let _ =
            ; endomul2
            ; endomul3
            ; endomul4
+           ; poseidon
            ]
          in
          let test_vec vec =
            List.iter (add vec) all ;
-           List.iteri (fun i x -> assert_eq_or_log ~extra:i ~loc:__LOC__ x (get vec i)) all ;
+           List.iteri
+             (fun i x -> assert_eq_or_log ~extra:i ~loc:__LOC__ x (get vec i))
+             all ;
            wrap vec zero.wires.l zero.wires.r ;
-           assert_eq_or_log ~loc:__LOC__ (get vec 0) (mk_wires Zero 0 (0, R) (0, R) (0, O) zero.c) ;
+           assert_eq_or_log ~loc:__LOC__ (get vec 0)
+             (mk_wires Zero 0 (0, R) (0, R) (0, O) zero.c) ;
            wrap vec zero.wires.o zero.wires.l ;
-           assert_eq_or_log ~loc:__LOC__ (get vec 0) (mk_wires Zero 0 (0, R) (0, R) (0, L) zero.c)
+           assert_eq_or_log ~loc:__LOC__ (get vec 0)
+             (mk_wires Zero 0 (0, R) (0, R) (0, L) zero.c)
          in
          test_vec vec1 ; test_vec vec2
     end)
@@ -768,18 +781,6 @@ let _ =
        method run =
          let vec1 = create () in
          let vec2 = create () in
-         let mk_wires kind i (r1, c1) (r2, c2) (r3, c3) c : _ Types.Plonk_gate.t
-             =
-           { kind
-           ; wires =
-               { row = i
-               ; l = { row = r1; col = c1 }
-               ; r = { row = r2; col = c2 }
-               ; o = { row = r3; col = c3 }
-               }
-           ; c
-           }
-         in
          let eq { Types.Plonk_gate.kind = kind1; wires = wires1; c = c1 }
              { Types.Plonk_gate.kind = kind2; wires = wires2; c = c2 } =
            kind1 = kind2 && wires1 = wires2
@@ -807,6 +808,9 @@ let _ =
          let endomul4 =
            mk_wires Endomul4 9 (9, L) (9, R) (9, O) (rand_fields 33)
          in
+         let poseidon =
+           mk_wires Poseidon 10 (10, L) (10, R) (10, O) (rand_fields 34)
+         in
          let all =
            [ zero
            ; generic
@@ -819,6 +823,7 @@ let _ =
            ; endomul2
            ; endomul3
            ; endomul4
+           ; poseidon
            ]
          in
          let test_vec vec =
@@ -830,4 +835,138 @@ let _ =
            assert (eq (get vec 0) (mk_wires Zero 0 (0, R) (0, R) (0, L) zero.c))
          in
          test_vec vec1 ; test_vec vec2
+    end)
+
+let _ =
+  let open Pasta_fp_index in
+  Js.export "pasta_fp_index_test"
+    (object%js (_self)
+       method run =
+         let gate_vector =
+           let open Gate_vector in
+           let vec = create () in
+           let fields = Array.map Pasta_fp.of_int in
+           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let generic =
+             mk_wires Generic 1 (1, L) (1, R) (1, O)
+               (fields [| 0; 0; 0; 0; 0 |])
+           in
+           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
+           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
+           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
+           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
+           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let endomul1 =
+             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           in
+           let endomul2 =
+             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           in
+           let endomul3 =
+             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           in
+           let endomul4 =
+             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
+           in
+           let poseidon =
+             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
+           in
+           let all =
+             [ zero
+             ; generic
+             ; add1
+             ; add2
+             ; vbmul1
+             ; vbmul2
+             ; vbmul3
+             ; endomul1
+             ; endomul2
+             ; endomul3
+             ; endomul4
+             ; poseidon
+             ]
+           in
+           List.iter (add vec) all ;
+           vec
+         in
+         let urs = Pasta_fp_urs.create 16 in
+         let index0 = create gate_vector 0 urs in
+         let index2 = create gate_vector 2 urs in
+         assert (max_degree index0 = 16) ;
+         assert (max_degree index2 = 16) ;
+         assert (public_inputs index0 = 0) ;
+         assert (public_inputs index2 = 2) ;
+         assert (domain_d1_size index0 = 16) ;
+         assert (domain_d1_size index2 = 16) ;
+         assert (domain_d4_size index0 = 64) ;
+         assert (domain_d4_size index2 = 64) ;
+         assert (domain_d8_size index0 = 128) ;
+         assert (domain_d8_size index2 = 128)
+    end)
+
+let _ =
+  let open Pasta_fq_index in
+  Js.export "pasta_fq_index_test"
+    (object%js (_self)
+       method run =
+         let gate_vector =
+           let open Gate_vector in
+           let vec = create () in
+           let fields = Array.map Pasta_fq.of_int in
+           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let generic =
+             mk_wires Generic 1 (1, L) (1, R) (1, O)
+               (fields [| 0; 0; 0; 0; 0 |])
+           in
+           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
+           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
+           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
+           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
+           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let endomul1 =
+             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           in
+           let endomul2 =
+             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           in
+           let endomul3 =
+             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           in
+           let endomul4 =
+             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
+           in
+           let poseidon =
+             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
+           in
+           let all =
+             [ zero
+             ; generic
+             ; add1
+             ; add2
+             ; vbmul1
+             ; vbmul2
+             ; vbmul3
+             ; endomul1
+             ; endomul2
+             ; endomul3
+             ; endomul4
+             ; poseidon
+             ]
+           in
+           List.iter (add vec) all ;
+           vec
+         in
+         let urs = Pasta_fq_urs.create 16 in
+         let index0 = create gate_vector 0 urs in
+         let index2 = create gate_vector 2 urs in
+         assert (max_degree index0 = 16) ;
+         assert (max_degree index2 = 16) ;
+         assert (public_inputs index0 = 0) ;
+         assert (public_inputs index2 = 2) ;
+         assert (domain_d1_size index0 = 16) ;
+         assert (domain_d1_size index2 = 16) ;
+         assert (domain_d4_size index0 = 64) ;
+         assert (domain_d4_size index2 = 64) ;
+         assert (domain_d8_size index0 = 128) ;
+         assert (domain_d8_size index2 = 128)
     end)

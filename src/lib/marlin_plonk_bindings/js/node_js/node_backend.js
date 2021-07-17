@@ -15,7 +15,7 @@ var plonk_wasm = (function() {
         rayon_js_stubs.memory ?
             rayon_js_stubs.memory :
             new joo_global_object.WebAssembly.Memory({
-                initial: 18,
+                initial: 19,
                 maximum: 16384,
                 shared: true});
     joo_global_object.startWorkers = rayon_js_stubs.startWorkers;

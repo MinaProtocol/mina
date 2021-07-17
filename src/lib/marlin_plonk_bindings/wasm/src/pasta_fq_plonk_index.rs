@@ -143,7 +143,7 @@ impl Drop for WasmPastaFqPlonkIndex {
 pub fn caml_pasta_fq_plonk_index_create(
     gates: &WasmPastaFqPlonkGateVector,
     public: i32,
-    urs: WasmPastaFqUrs,
+    urs: &WasmPastaFqUrs,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
     let n = match Domain::<Fq>::compute_size_of_domain(gates.0.len()) {
         None => Err(JsValue::from_str("caml_pasta_fq_plonk_index_create"))?,
@@ -180,8 +180,8 @@ pub fn caml_pasta_fq_plonk_index_create(
             ))?,
             Some(cs) => cs,
         };
-    let urs_copy = Rc::clone(&*urs);
-    let urs_copy_outer = Rc::clone(&*urs);
+    let urs_copy = Rc::clone(&**urs);
+    let urs_copy_outer = Rc::clone(&**urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.
@@ -226,7 +226,7 @@ pub fn caml_pasta_fq_plonk_index_domain_d8_size(index: &WasmPastaFqPlonkIndex) -
 #[wasm_bindgen]
 pub fn caml_pasta_fq_plonk_index_read(
     offset: Option<i32>,
-    urs: WasmPastaFqUrs,
+    urs: &WasmPastaFqUrs,
     path: String,
 ) -> Result<WasmPastaFqPlonkIndex, JsValue> {
     let file = match File::open(path) {
@@ -244,8 +244,8 @@ pub fn caml_pasta_fq_plonk_index_read(
         }
         None => (),
     };
-    let urs_copy = Rc::clone(&*urs);
-    let urs_copy_outer = Rc::clone(&*urs);
+    let urs_copy = Rc::clone(&**urs);
+    let urs_copy_outer = Rc::clone(&**urs);
     let srs = {
         // We know that the underlying value is still alive, because we never convert any of our
         // Rc<_>s into weak pointers.

@@ -580,6 +580,7 @@ var free_on_finalize = function (x) {
     // least-brittle way to free once the original class instance gets collected.
     var instance_representative = x.constructor.__wrap(x.ptr)
     free_finalization_registry.register(x, instance_representative, x);
+    return x;
 };
 
 
@@ -1102,8 +1103,10 @@ var caml_fq_plonk_gate_to_rust = function(gate) {
 
 
 // Provides: caml_pasta_fp_plonk_gate_vector_create
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_gate_vector_create = plonk_wasm.caml_pasta_fp_plonk_gate_vector_create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_pasta_fp_plonk_gate_vector_create = function() {
+    return free_on_finalize(plonk_wasm.caml_pasta_fp_plonk_gate_vector_create());
+};
 
 // Provides: caml_pasta_fp_plonk_gate_vector_add
 // Requires: plonk_wasm, caml_fp_plonk_gate_to_rust
@@ -1128,8 +1131,10 @@ var caml_pasta_fp_plonk_gate_vector_wrap = function(v, x, y) {
 
 
 // Provides: caml_pasta_fq_plonk_gate_vector_create
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_gate_vector_create = plonk_wasm.caml_pasta_fq_plonk_gate_vector_create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_pasta_fq_plonk_gate_vector_create = function() {
+    return free_on_finalize(plonk_wasm.caml_pasta_fq_plonk_gate_vector_create());
+};
 
 // Provides: caml_pasta_fq_plonk_gate_vector_add
 // Requires: plonk_wasm, caml_fq_plonk_gate_to_rust
@@ -1154,8 +1159,10 @@ var caml_pasta_fq_plonk_gate_vector_wrap = function(v, x, y) {
 
 
 // Provides: caml_pasta_fp_plonk_index_create
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_create = plonk_wasm.caml_pasta_fp_plonk_index_create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_pasta_fp_plonk_index_create = function(gates, public_inputs, urs) {
+    return free_on_finalize(plonk_wasm.caml_pasta_fp_plonk_index_create(gates, public_inputs, urs));
+};
 
 // Provides: caml_pasta_fp_plonk_index_max_degree
 // Requires: plonk_wasm
@@ -1190,8 +1197,10 @@ var caml_pasta_fp_plonk_index_write = plonk_wasm.caml_pasta_fp_plonk_index_write
 
 
 // Provides: caml_pasta_fq_plonk_index_create
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_create = plonk_wasm.caml_pasta_fq_plonk_index_create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_pasta_fq_plonk_index_create = function(gates, public_inputs, urs) {
+    return free_on_finalize(plonk_wasm.caml_pasta_fq_plonk_index_create(gates, public_inputs, urs));
+}
 
 // Provides: caml_pasta_fq_plonk_index_max_degree
 // Requires: plonk_wasm
