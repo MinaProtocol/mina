@@ -74,7 +74,7 @@ pub fn caml_pasta_fp_urs_write(
     path: String,
 ) -> Result<(), JsValue> {
     match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
-        Err(_) => Err(JsValue::from_str("caml_pasta_fp_urs_write")),
+        Err(err) => Err(JsValue::from_str(format!("caml_pasta_fp_urs_write: {}", err).as_str())),
         Ok(file) => {
             let file = BufWriter::new(file);
             let urs: &SRS<GAffine> = &*urs;
@@ -90,12 +90,12 @@ pub fn caml_pasta_fp_urs_read(
     path: String,
 ) -> Result<Option<WasmPastaFpUrs>, JsValue> {
     match File::open(path) {
-        Err(_) => Err(JsValue::from_str("caml_pasta_fp_urs_read")),
+        Err(err) => Err(JsValue::from_str(format!("caml_pasta_fp_urs_read: {}", err).as_str())),
         Ok(file) => {
             let mut file = BufReader::new(file);
             match offset {
                 Some(offset) => {
-                    file.seek(Start(offset as u64)).map_err(|_| JsValue::from_str("caml_pasta_fq_urs_read"))?;
+                    file.seek(Start(offset as u64)).map_err(|err| JsValue::from_str(format!("caml_pasta_fp_urs_read: {}", err).as_str()))?;
                 }
                 None => (),
             };

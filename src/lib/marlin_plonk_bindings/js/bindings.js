@@ -932,17 +932,31 @@ var caml_pasta_pallas_poly_comm_to_rust = function(x) {
 
 
 // Provides: caml_pasta_fp_urs_create
-// Requires: plonk_wasm
-var caml_pasta_fp_urs_create = plonk_wasm.caml_pasta_fp_urs_create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_pasta_fp_urs_create = function(i) {
+    return free_on_finalize(plonk_wasm.caml_pasta_fp_urs_create(i));
+};
 
 // Provides: caml_pasta_fp_urs_write
-// Requires: plonk_wasm
-var caml_pasta_fp_urs_write = plonk_wasm.caml_pasta_fp_urs_write;
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_pasta_fp_urs_write = function(append, t, path) {
+    if (append === 0) {
+        append = undefined;
+    } else {
+        append = append[1];
+    }
+    return plonk_wasm.caml_pasta_fp_urs_write(append, t, caml_jsstring_of_string(path));
+};
 
 // Provides: caml_pasta_fp_urs_read
-// Requires: plonk_wasm
+// Requires: plonk_wasm, caml_jsstring_of_string
 var caml_pasta_fp_urs_read = function (offset, path) {
-    var res = plonk_wasm.caml_pasta_fp_urs_read;
+    if (offset === 0) {
+        offset = undefined;
+    } else {
+        offset = offset[1];
+    }
+    var res = plonk_wasm.caml_pasta_fp_urs_read(offset, caml_jsstring_of_string(path));
     if (res) {
         return [0, res]; // Some(res)
     } else {
@@ -991,17 +1005,31 @@ var caml_pasta_fp_urs_h = function (t) {
 
 
 // Provides: caml_pasta_fq_urs_create
-// Requires: plonk_wasm
-var caml_pasta_fq_urs_create = plonk_wasm.caml_pasta_fq_urs_create;
+// Requires: plonk_wasm, free_on_finalize
+var caml_pasta_fq_urs_create = function(i) {
+    return free_on_finalize(plonk_wasm.caml_pasta_fq_urs_create(i));
+};
 
 // Provides: caml_pasta_fq_urs_write
-// Requires: plonk_wasm
-var caml_pasta_fq_urs_write = plonk_wasm.caml_pasta_fq_urs_write;
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_pasta_fq_urs_write = function(append, t, path) {
+    if (append === 0) {
+        append = undefined;
+    } else {
+        append = append[1];
+    }
+    return plonk_wasm.caml_pasta_fq_urs_write(append, t,  caml_jsstring_of_string(path));
+};
 
 // Provides: caml_pasta_fq_urs_read
-// Requires: plonk_wasm
+// Requires: plonk_wasm, caml_jsstring_of_string
 var caml_pasta_fq_urs_read = function (offset, path) {
-    var res = plonk_wasm.caml_pasta_fq_urs_read;
+    if (offset === 0) {
+        offset = undefined;
+    } else {
+        offset = offset[1];
+    }
+    var res = plonk_wasm.caml_pasta_fq_urs_read(offset, caml_jsstring_of_string(path));
     if (res) {
         return [0, res]; // Some(res)
     } else {
@@ -1185,12 +1213,26 @@ var caml_pasta_fp_plonk_index_domain_d4_size = plonk_wasm.caml_pasta_fp_plonk_in
 var caml_pasta_fp_plonk_index_domain_d8_size = plonk_wasm.caml_pasta_fp_plonk_index_domain_d8_size;
 
 // Provides: caml_pasta_fp_plonk_index_read
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_read = plonk_wasm.caml_pasta_fp_plonk_index_read;
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_pasta_fp_plonk_index_read = function (offset, urs, path) {
+    if (offset === 0) {
+        offset = undefined;
+    } else {
+        offset = offset[1];
+    }
+    return plonk_wasm.caml_pasta_fp_plonk_index_read(offset, urs, caml_jsstring_of_string(path));
+};
 
 // Provides: caml_pasta_fp_plonk_index_write
-// Requires: plonk_wasm
-var caml_pasta_fp_plonk_index_write = plonk_wasm.caml_pasta_fp_plonk_index_write;
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_pasta_fp_plonk_index_write = function(append, t, path) {
+    if (append === 0) {
+        append = undefined;
+    } else {
+        append = append[1];
+    }
+    return plonk_wasm.caml_pasta_fp_plonk_index_write(append, t, caml_jsstring_of_string(path));
+};
 
 
 
@@ -1223,9 +1265,23 @@ var caml_pasta_fq_plonk_index_domain_d4_size = plonk_wasm.caml_pasta_fq_plonk_in
 var caml_pasta_fq_plonk_index_domain_d8_size = plonk_wasm.caml_pasta_fq_plonk_index_domain_d8_size;
 
 // Provides: caml_pasta_fq_plonk_index_read
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_read = plonk_wasm.caml_pasta_fq_plonk_index_read;
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_pasta_fq_plonk_index_read = function (offset, urs, path) {
+    if (offset === 0) {
+        offset = undefined;
+    } else {
+        offset = offset[1];
+    }
+    return plonk_wasm.caml_pasta_fq_plonk_index_read(offset, urs, caml_jsstring_of_string(path));
+};
 
 // Provides: caml_pasta_fq_plonk_index_write
-// Requires: plonk_wasm
-var caml_pasta_fq_plonk_index_write = plonk_wasm.caml_pasta_fq_plonk_index_write;
+// Requires: plonk_wasm, caml_jsstring_of_string
+var caml_pasta_fq_plonk_index_write = function(append, t, path) {
+    if (append === 0) {
+        append = undefined;
+    } else {
+        append = append[1];
+    }
+    return plonk_wasm.caml_pasta_fq_plonk_index_write(append, t, caml_jsstring_of_string(path));
+};

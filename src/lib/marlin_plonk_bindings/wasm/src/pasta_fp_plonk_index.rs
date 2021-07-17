@@ -230,8 +230,8 @@ pub fn caml_pasta_fp_plonk_index_read(
     path: String,
 ) -> Result<WasmPastaFpPlonkIndex, JsValue> {
     let file = match File::open(path) {
-        Err(_) => Err(
-            JsValue::from_str("caml_pasta_fp_plonk_index_read"),
+        Err(err) => Err(
+            JsValue::from_str(format!("caml_pasta_fp_plonk_index_read: {}", err).as_str()),
         )?,
         Ok(file) => file,
     };
@@ -269,7 +269,7 @@ pub fn caml_pasta_fp_plonk_index_write(
     path: String,
 ) -> Result<(), JsValue> {
     let file = match OpenOptions::new().append(append.unwrap_or(true)).open(path) {
-        Err(_) => Err(JsValue::from_str("caml_pasta_fp_plonk_index_write"))?,
+        Err(err) => Err(JsValue::from_str(format!("caml_pasta_fp_plonk_index_write: {}", err).as_str()))?,
         Ok(file) => file,
     };
     let mut w = BufWriter::new(file);
