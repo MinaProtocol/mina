@@ -424,9 +424,12 @@ var caml_pasta_fq_deep_copy = plonk_wasm.caml_pasta_fq_deep_copy
 var caml_u8array_vector_to_rust_flat_vector = function (v) {
     var i = 1; // The first entry is the OCaml tag for arrays
     var len = v.length - i;
+    if (len === 0) {
+        return new joo_global_object.Uint8Array(0);
+    }
     var inner_len = v[i].length;
     var res = new joo_global_object.Uint8Array(len * inner_len);
-    for (var pos = 0; i < len; i++) {
+    for (var pos = 0; i <= len; i++) {
         for (var j = 0; j < inner_len; j++, pos++) {
             res[pos] = v[i][j];
         }
@@ -437,9 +440,10 @@ var caml_u8array_vector_to_rust_flat_vector = function (v) {
 // Provides: caml_u8array_vector_of_rust_flat_vector
 var caml_u8array_vector_of_rust_flat_vector = function (v, inner_len) {
     var len = v.length;
-    var res = new Array(len + 1)
+    var output_len = len / inner_len;
+    var res = new Array(output_len + 1)
     res[0] = 0 // OCaml tag before array contents, so that we can use this with arrays or vectors
-    for (var i = 0, pos = 0; i < len; i++) {
+    for (var i = 1, pos = 0; i <= output_len; i++) {
         var inner_res = new joo_global_object.Uint8Array(inner_len);
         for (var j = 0; j < inner_len; j++, pos++) {
             inner_res[j] = v[pos];
@@ -1039,3 +1043,180 @@ var caml_pasta_fq_urs_batch_accumulator_check = function (t, affines, fields) {
 var caml_pasta_fq_urs_h = function (t) {
     return rust_affine_to_caml_affine(plonk_wasm.caml_pasta_fq_urs_h(t));
 };
+
+
+
+
+
+// Provides: caml_plonk_wire_of_rust
+var caml_plonk_wire_of_rust = function(wire) {
+    var res = [0, wire.row, wire.col];
+    wire.free();
+    return res;
+};
+
+// Provides: caml_plonk_wire_to_rust
+// Requires: plonk_wasm
+var caml_plonk_wire_to_rust = function(wire) {
+    return new plonk_wasm.WasmPlonkWire(wire[1], wire[2]);
+};
+
+// Provides: caml_plonk_wires_of_rust
+// Requires: caml_plonk_wire_of_rust
+var caml_plonk_wires_of_rust = function(wires) {
+    var res = [0, wires.row, caml_plonk_wire_of_rust(wires.l), caml_plonk_wire_of_rust(wires.r), caml_plonk_wire_of_rust(wires.o)];
+    wires.free();
+    return res;
+};
+
+// Provides: caml_plonk_wires_to_rust
+// Requires: plonk_wasm, caml_plonk_wire_to_rust
+var caml_plonk_wires_to_rust = function(wires) {
+    return new plonk_wasm.WasmPlonkWires(wires[1], caml_plonk_wire_to_rust(wires[2]), caml_plonk_wire_to_rust(wires[3]), caml_plonk_wire_to_rust(wires[4]));
+};
+
+// Provides: caml_plonk_gate_of_rust
+// Requires: caml_plonk_wires_of_rust, caml_u8array_vector_of_rust_flat_vector
+var caml_plonk_gate_of_rust = function(gate) {
+    // TODO: Hardcoding 32 here is a little brittle
+    var res = [0, gate.typ, caml_plonk_wires_of_rust(gate.wires), caml_u8array_vector_of_rust_flat_vector(gate.c, 32)];
+    gate.free();
+    return res;
+};
+
+// Provides: caml_fp_plonk_gate_to_rust
+// Requires: plonk_wasm, caml_plonk_wires_to_rust, caml_u8array_vector_to_rust_flat_vector
+var caml_fp_plonk_gate_to_rust = function(gate) {
+    return new plonk_wasm.WasmPastaFpPlonkGate(gate[1], caml_plonk_wires_to_rust(gate[2]), caml_u8array_vector_to_rust_flat_vector(gate[3]));
+};
+
+// Provides: caml_fq_plonk_gate_to_rust
+// Requires: plonk_wasm, caml_plonk_wires_to_rust, caml_u8array_vector_to_rust_flat_vector
+var caml_fq_plonk_gate_to_rust = function(gate) {
+    // TODO: Hardcoding 32 here is a little brittle
+    return new plonk_wasm.WasmPastaFqPlonkGate(gate[1], caml_plonk_wires_to_rust(gate[2]), caml_u8array_vector_to_rust_flat_vector(gate[3]))
+};
+
+
+
+
+
+// Provides: caml_pasta_fp_plonk_gate_vector_create
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_gate_vector_create = plonk_wasm.caml_pasta_fp_plonk_gate_vector_create;
+
+// Provides: caml_pasta_fp_plonk_gate_vector_add
+// Requires: plonk_wasm, caml_fp_plonk_gate_to_rust
+var caml_pasta_fp_plonk_gate_vector_add = function(v, x) {
+    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_add(v, caml_fp_plonk_gate_to_rust(x));
+};
+
+// Provides: caml_pasta_fp_plonk_gate_vector_get
+// Requires: plonk_wasm, caml_plonk_gate_of_rust
+var caml_pasta_fp_plonk_gate_vector_get = function(v, i) {
+    return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fp_plonk_gate_vector_get(v, i));
+};
+
+// Provides: caml_pasta_fp_plonk_gate_vector_wrap
+// Requires: plonk_wasm, caml_plonk_wire_to_rust
+var caml_pasta_fp_plonk_gate_vector_wrap = function(v, x, y) {
+    return plonk_wasm.caml_pasta_fp_plonk_gate_vector_wrap(v, caml_plonk_wire_to_rust(x), caml_plonk_wire_to_rust(y));
+};
+
+
+
+
+
+// Provides: caml_pasta_fq_plonk_gate_vector_create
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_gate_vector_create = plonk_wasm.caml_pasta_fq_plonk_gate_vector_create;
+
+// Provides: caml_pasta_fq_plonk_gate_vector_add
+// Requires: plonk_wasm, caml_fq_plonk_gate_to_rust
+var caml_pasta_fq_plonk_gate_vector_add = function(v, x) {
+    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_add(v, caml_fq_plonk_gate_to_rust(x));
+};
+
+// Provides: caml_pasta_fq_plonk_gate_vector_get
+// Requires: plonk_wasm, caml_plonk_gate_of_rust
+var caml_pasta_fq_plonk_gate_vector_get = function(v, i) {
+    return caml_plonk_gate_of_rust(plonk_wasm.caml_pasta_fq_plonk_gate_vector_get(v, i));
+};
+
+// Provides: caml_pasta_fq_plonk_gate_vector_wrap
+// Requires: plonk_wasm, caml_plonk_wire_to_rust
+var caml_pasta_fq_plonk_gate_vector_wrap = function(v, x, y) {
+    return plonk_wasm.caml_pasta_fq_plonk_gate_vector_wrap(v, caml_plonk_wire_to_rust(x), caml_plonk_wire_to_rust(y));
+};
+
+
+
+
+
+// Provides: caml_pasta_fp_plonk_index_create
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_create = plonk_wasm.caml_pasta_fp_plonk_index_create;
+
+// Provides: caml_pasta_fp_plonk_index_max_degree
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_max_degree = plonk_wasm.caml_pasta_fp_plonk_index_max_degree;
+
+// Provides: caml_pasta_fp_plonk_index_public_inputs
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_public_inputs = plonk_wasm.caml_pasta_fp_plonk_index_public_inputs;
+
+// Provides: caml_pasta_fp_plonk_index_domain_d1_size
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_domain_d1_size = plonk_wasm.caml_pasta_fp_plonk_index_domain_d1_size;
+
+// Provides: caml_pasta_fp_plonk_index_domain_d4_size
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_domain_d4_size = plonk_wasm.caml_pasta_fp_plonk_index_domain_d4_size;
+
+// Provides: caml_pasta_fp_plonk_index_domain_d8_size
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_domain_d8_size = plonk_wasm.caml_pasta_fp_plonk_index_domain_d8_size;
+
+// Provides: caml_pasta_fp_plonk_index_read
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_read = plonk_wasm.caml_pasta_fp_plonk_index_read;
+
+// Provides: caml_pasta_fp_plonk_index_write
+// Requires: plonk_wasm
+var caml_pasta_fp_plonk_index_write = plonk_wasm.caml_pasta_fp_plonk_index_write;
+
+
+
+
+
+// Provides: caml_pasta_fq_plonk_index_create
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_create = plonk_wasm.caml_pasta_fq_plonk_index_create;
+
+// Provides: caml_pasta_fq_plonk_index_max_degree
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_max_degree = plonk_wasm.caml_pasta_fq_plonk_index_max_degree;
+
+// Provides: caml_pasta_fq_plonk_index_public_inputs
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_public_inputs = plonk_wasm.caml_pasta_fq_plonk_index_public_inputs;
+
+// Provides: caml_pasta_fq_plonk_index_domain_d1_size
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_domain_d1_size = plonk_wasm.caml_pasta_fq_plonk_index_domain_d1_size;
+
+// Provides: caml_pasta_fq_plonk_index_domain_d4_size
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_domain_d4_size = plonk_wasm.caml_pasta_fq_plonk_index_domain_d4_size;
+
+// Provides: caml_pasta_fq_plonk_index_domain_d8_size
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_domain_d8_size = plonk_wasm.caml_pasta_fq_plonk_index_domain_d8_size;
+
+// Provides: caml_pasta_fq_plonk_index_read
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_read = plonk_wasm.caml_pasta_fq_plonk_index_read;
+
+// Provides: caml_pasta_fq_plonk_index_write
+// Requires: plonk_wasm
+var caml_pasta_fq_plonk_index_write = plonk_wasm.caml_pasta_fq_plonk_index_write;

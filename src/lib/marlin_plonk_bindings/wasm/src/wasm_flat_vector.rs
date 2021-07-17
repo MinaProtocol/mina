@@ -46,11 +46,10 @@ impl<T: FlatVectorElem> FromWasmAbi for WasmFlatVector<T> {
         let mut res: Vec<T> = Vec::with_capacity(data.len() / T::FLATTENED_SIZE);
 
         let mut buf = Vec::with_capacity(T::FLATTENED_SIZE);
-        let mut count = 0;
         for x in data.into_iter() {
             assert!(buf.len() < T::FLATTENED_SIZE);
             buf.push(x);
-            if (buf.len() >= T::FLATTENED_SIZE) {
+            if buf.len() >= T::FLATTENED_SIZE {
                 res.push(T::unflatten(buf));
                 buf = Vec::with_capacity(T::FLATTENED_SIZE);
             }
