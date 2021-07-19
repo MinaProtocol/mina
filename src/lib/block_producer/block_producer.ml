@@ -519,20 +519,6 @@ module Vrf_evaluation_state = struct
       | _ ->
           return vrf_result
     in
-    [%log info]
-      !"All lobal slots won: $slots"
-      ~metadata:
-        [ ( "slots"
-          , `List
-              (List.map vrf_result.slots_won ~f:(fun s ->
-                   Mina_numbers.Global_slot.to_yojson s.global_slot )) ) ] ;
-    [%log info]
-      !"Current global slots won: $slots"
-      ~metadata:
-        [ ( "slots"
-          , `List
-              (List.map (Queue.to_list t.queue) ~f:(fun s ->
-                   Mina_numbers.Global_slot.to_yojson s.global_slot )) ) ] ;
     let new_slots_won =
       match (t.last_scheduled, Queue.last t.queue) with
       | _, Some {global_slot; _} | Some global_slot, None ->
@@ -948,7 +934,7 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                         consensus_state ~local_state:consensus_local_state
                         ~logger )
                 in
-                let new_epoch =
+                let next_epoch =
                   Mina_numbers.Length.succ epoch_data_for_vrf.epoch
                 in
                 let new_global_slot = epoch_data_for_vrf.global_slot in
@@ -986,11 +972,12 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                    let%bind () =
                      if
                        Mina_numbers.Length.(
-                         new_epoch > vrf_evaluation_state.current_epoch)
-                     then
+                         next_epoch > vrf_evaluation_state.current_epoch)
+                     then (
+                       vrf_evaluation_state.current_epoch <- next_epoch ;
                        Vrf_evaluation_state.update_epoch_data ~vrf_evaluator
                          ~epoch_data_for_vrf ~logger ~time_controller
-                         vrf_evaluation_state
+                         vrf_evaluation_state )
                      else Deferred.unit
                    in
                    let%bind () =
@@ -1006,7 +993,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                      else Deferred.unit
                    in
                    vrf_evaluation_state.current_slot <- new_global_slot ;
-                   vrf_evaluation_state.current_epoch <- new_epoch ;
                    match
                      Vrf_evaluation_state.next_slot vrf_evaluation_state
                    with

@@ -294,6 +294,10 @@ module Worker_state = struct
           (* TODO: Don't do this, and instead pick the one that has the highest chance of winning. See #2573 *)
           let slot = Consensus_time.slot consensus_time in
           let global_slot = Consensus_time.to_global_slot consensus_time in
+          [%log info] "Checking VRF evaluations at epoch: $epoch, slot: $slot"
+            ~metadata:
+              [ ("epoch", `Int (Epoch.to_int epoch))
+              ; ("slot", `Int (Slot.to_int slot)) ] ;
           let rec go = function
             | [] ->
                 Interruptible.return None
@@ -307,11 +311,6 @@ module Worker_state = struct
                   let global_slot_since_genesis =
                     Global_slot.add global_slot slot_offset_since_genesis
                   in
-                  [%log info]
-                    "Checking VRF evaluations at epoch: $epoch, slot: $slot"
-                    ~metadata:
-                      [ ("epoch", `Int (Epoch.to_int epoch))
-                      ; ("slot", `Int (Slot.to_int slot)) ] ;
                   match%bind
                     Consensus.Data.Vrf.check
                       ~constraint_constants:config.constraint_constants
@@ -600,7 +599,7 @@ module Worker = struct
 
       let init_worker_state (init_arg : Worker_state.init_arg) =
         let logger = init_arg.logger in
-        let max_size = 50 * 1024 * 1024 in
+        let max_size = 200 * 1024 * 1024 in
         let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
