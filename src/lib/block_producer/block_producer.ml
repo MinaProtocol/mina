@@ -509,8 +509,12 @@ module Vrf_evaluation_state = struct
     let%map vrf_result =
       match (vrf_result.evaluator_status, vrf_result.slots_won) with
       | At _, [] ->
-          (*try again after 5 seconds*)
-          let%bind () = Async.after (Core.Time.Span.of_ms 5000.) in
+          (*try again*)
+          let%bind () =
+            Async.after
+              (Core.Time.Span.of_ms
+                 (Mina_compile_config.vrf_poll_interval_ms |> Int.to_float))
+          in
           poll_vrf_evaluator vrf_evaluator ~logger ~time_controller
       | _ ->
           return vrf_result
@@ -1013,7 +1017,10 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                            (Vrf_evaluation_state.finished vrf_evaluation_state)
                        then
                          let%bind () =
-                           Async.after (Core.Time.Span.of_ms 5000.)
+                           Async.after
+                             (Core.Time.Span.of_ms
+                                ( Mina_compile_config.vrf_poll_interval_ms
+                                |> Int.to_float ))
                          in
                          let%map () =
                            Vrf_evaluation_state.poll ~vrf_evaluator ~logger
