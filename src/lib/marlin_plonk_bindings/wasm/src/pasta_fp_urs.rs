@@ -23,7 +23,7 @@ use crate::wasm_flat_vector::WasmFlatVector;
 use crate::pasta_vesta_poly_comm::WasmPastaVestaPolyComm;
 
 #[wasm_bindgen]
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct WasmPastaFpUrs(Rc<SRS<GAffine>>);
 
 impl Deref for WasmPastaFpUrs {

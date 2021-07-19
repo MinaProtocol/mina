@@ -6,14 +6,28 @@ use crate::wasm_vector::WasmVector;
 use std::convert::{Into, From};
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct WasmPastaPallasPolyComm {
-    pub unshifted: *mut WasmVector<WasmPallasGAffine>, // wasm_bindgen requires something copy-able
+    #[wasm_bindgen(skip)]
+    pub unshifted: WasmVector<WasmPallasGAffine>,
     pub shifted: Option<WasmPallasGAffine>,
 }
 
-impl Drop for WasmPastaPallasPolyComm {
-    fn drop(&mut self) {
-        let _unshifted = unsafe { Box::from_raw(self.unshifted) };
+#[wasm_bindgen]
+impl WasmPastaPallasPolyComm {
+    #[wasm_bindgen(constructor)]
+    pub fn new(unshifted: WasmVector<WasmPallasGAffine>, shifted: Option<WasmPallasGAffine>) -> Self {
+        WasmPastaPallasPolyComm { unshifted, shifted }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn unshifted(&self) -> WasmVector<WasmPallasGAffine> {
+        self.unshifted.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_unshifted(&mut self, x: WasmVector<WasmPallasGAffine>) {
+        self.unshifted = x
     }
 }
 
@@ -23,7 +37,7 @@ impl From<PolyComm<GAffine>> for WasmPastaPallasPolyComm {
         let unshifted: Vec<WasmPallasGAffine> =
             unshifted.into_iter().map(|x| x.into()).collect();
         WasmPastaPallasPolyComm {
-            unshifted: Box::into_raw(Box::new(unshifted.into())),
+            unshifted: unshifted.into(),
             shifted: shifted.map(|x| x.into()),
         }
     }
@@ -34,7 +48,7 @@ impl From<&PolyComm<GAffine>> for WasmPastaPallasPolyComm {
         let unshifted: Vec<WasmPallasGAffine> =
             x.unshifted.iter().map(|x| x.into()).collect();
         WasmPastaPallasPolyComm {
-            unshifted: Box::into_raw(Box::new(unshifted.into())),
+            unshifted: unshifted.into(),
             shifted: x.shifted.map(|x| x.into()),
         }
     }
@@ -43,10 +57,8 @@ impl From<&PolyComm<GAffine>> for WasmPastaPallasPolyComm {
 impl From<WasmPastaPallasPolyComm> for PolyComm<GAffine> {
     fn from(x: WasmPastaPallasPolyComm) -> Self {
         let WasmPastaPallasPolyComm {unshifted, shifted} = x;
-        let boxed_unshifted = unsafe { Box::from_raw(unshifted) };
-        let unshifted: &Vec<WasmPallasGAffine> = boxed_unshifted.as_ref();
         PolyComm {
-            unshifted: unshifted.iter().map(|x| x.into()).collect(),
+            unshifted: (*unshifted).iter().map(|x| (*x).into()).collect(),
             shifted: shifted.map(|x| x.into()),
         }
     }
@@ -54,35 +66,9 @@ impl From<WasmPastaPallasPolyComm> for PolyComm<GAffine> {
 
 impl From<&WasmPastaPallasPolyComm> for PolyComm<GAffine> {
     fn from(x: &WasmPastaPallasPolyComm) -> Self {
-        let boxed_unshifted = unsafe { Box::from_raw(x.unshifted) };
-        let unshifted: &Vec<WasmPallasGAffine> = boxed_unshifted.as_ref();
-        let unshifted = unshifted.iter().map(|x| x.into()).collect();
-        let _no_drop = Box::into_raw(boxed_unshifted);
         PolyComm {
-            unshifted: unshifted,
+            unshifted: x.unshifted.iter().map(|x| { (*x).into() }).collect(),
             shifted: x.shifted.map(|x| x.into()),
         }
-    }
-}
-
-#[wasm_bindgen]
-pub fn caml_pasta_pallas_poly_comm_unshifted(x: &mut WasmPastaPallasPolyComm) -> WasmVector<WasmPallasGAffine> {
-    let old_unshifted = x.unshifted;
-    // Clear the pointer to prevent a double-free
-    x.unshifted = Box::into_raw(Box::new((vec![]).into()));
-    unsafe { *Box::from_raw(old_unshifted) }
-}
-
-#[wasm_bindgen]
-pub fn caml_pasta_pallas_poly_comm_set_unshifted(x: &mut WasmPastaPallasPolyComm, unshifted: WasmVector<WasmPallasGAffine>) {
-    let _to_drop = unsafe { Box::from_raw(x.unshifted) };
-    x.unshifted = Box::into_raw(Box::new(unshifted));
-}
-
-#[wasm_bindgen]
-pub fn caml_pasta_pallas_poly_comm_empty() -> WasmPastaPallasPolyComm {
-    WasmPastaPallasPolyComm {
-        unshifted: Box::into_raw(Box::new((vec![]).into())),
-        shifted: None,
     }
 }

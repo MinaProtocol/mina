@@ -421,21 +421,21 @@ let _ =
          assert (Pasta_fq.equal (Pasta_fq.of_int 1) (get second 0))
     end)
 
+let eq_affine ~field_equal x y =
+  match (x, y) with
+  | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
+      true
+  | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2) ->
+      field_equal x1 x2 && field_equal y1 y2
+  | _ ->
+      false
+
 let _ =
   let open Pasta_pallas in
   Js.export "pasta_pallas_test"
     (object%js (_self)
        method run =
-         let eq x y =
-           match (x, y) with
-           | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
-               true
-           | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2)
-             ->
-               Pasta_fp.equal x1 x2 && Pasta_fp.equal y1 y2
-           | _ ->
-               false
-         in
+         let eq x y = eq_affine ~field_equal:Pasta_fp.equal x y in
          let one_ = one () in
          let two = add one_ one_ in
          let infinity = sub one_ one_ in
@@ -515,16 +515,7 @@ let _ =
   Js.export "pasta_vesta_test"
     (object%js (_self)
        method run =
-         let eq x y =
-           match (x, y) with
-           | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
-               true
-           | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2)
-             ->
-               Pasta_fq.equal x1 x2 && Pasta_fq.equal y1 y2
-           | _ ->
-               false
-         in
+         let eq x y = eq_affine ~field_equal:Pasta_fq.equal x y in
          let one_ = one () in
          let two = add one_ one_ in
          let infinity = sub one_ one_ in
@@ -599,25 +590,18 @@ let _ =
          assert (eq infinity_copied_ Infinity)
     end)
 
+let eq_poly_comm ~field_equal (x : _ Types.Poly_comm.t)
+    (y : _ Types.Poly_comm.t) =
+  Array.for_all2 (eq_affine ~field_equal) x.unshifted y.unshifted
+  && Option.equal (eq_affine ~field_equal) x.shifted y.shifted
+
 let _ =
   let open Pasta_fp_urs in
   Js.export "pasta_fp_urs_test"
     (object%js (_self)
        method run =
-         let eq_affine x y =
-           match (x, y) with
-           | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
-               true
-           | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2)
-             ->
-               Pasta_fq.equal x1 x2 && Pasta_fq.equal y1 y2
-           | _ ->
-               false
-         in
-         let eq (x : Poly_comm.t) (y : Poly_comm.t) =
-           Array.for_all2 eq_affine x.unshifted y.unshifted
-           && Option.equal eq_affine x.shifted y.shifted
-         in
+         let eq_affine x y = eq_affine ~field_equal:Pasta_fq.equal x y in
+         let eq = eq_poly_comm ~field_equal:Pasta_fq.equal in
          let first = create 10 in
          let second = create 16 in
          let lcomm1 = lagrange_commitment first ~domain_size:8 0 in
@@ -648,20 +632,8 @@ let _ =
   Js.export "pasta_fq_urs_test"
     (object%js (_self)
        method run =
-         let eq_affine x y =
-           match (x, y) with
-           | Types.Or_infinity.Infinity, Types.Or_infinity.Infinity ->
-               true
-           | Types.Or_infinity.Finite (x1, y1), Types.Or_infinity.Finite (x2, y2)
-             ->
-               Pasta_fp.equal x1 x2 && Pasta_fp.equal y1 y2
-           | _ ->
-               false
-         in
-         let eq (x : Poly_comm.t) (y : Poly_comm.t) =
-           Array.for_all2 eq_affine x.unshifted y.unshifted
-           && Option.equal eq_affine x.shifted y.shifted
-         in
+         let eq_affine x y = eq_affine ~field_equal:Pasta_fp.equal x y in
+         let eq = eq_poly_comm ~field_equal:Pasta_fp.equal in
          let first = create 10 in
          let second = create 16 in
          let lcomm1 = lagrange_commitment first ~domain_size:8 0 in
@@ -969,4 +941,146 @@ let _ =
          assert (domain_d4_size index2 = 64) ;
          assert (domain_d8_size index0 = 128) ;
          assert (domain_d8_size index2 = 128)
+    end)
+
+let eq_verification_shifts ~field_equal
+    { Types.Plonk_verification_shifts.r = r0; o = o0 }
+    { Types.Plonk_verification_shifts.r = r1; o = o1 } =
+  field_equal r0 r1 && field_equal o0 o1
+
+let verification_evals_to_list
+    { Types.Plonk_verification_evals.sigma_comm_0
+    ; sigma_comm_1
+    ; sigma_comm_2
+    ; ql_comm
+    ; qr_comm
+    ; qo_comm
+    ; qm_comm
+    ; qc_comm
+    ; rcm_comm_0
+    ; rcm_comm_1
+    ; rcm_comm_2
+    ; psm_comm
+    ; add_comm
+    ; mul1_comm
+    ; mul2_comm
+    ; emul1_comm
+    ; emul2_comm
+    ; emul3_comm
+    } =
+  [ sigma_comm_0
+  ; sigma_comm_1
+  ; sigma_comm_2
+  ; ql_comm
+  ; qr_comm
+  ; qo_comm
+  ; qm_comm
+  ; qc_comm
+  ; rcm_comm_0
+  ; rcm_comm_1
+  ; rcm_comm_2
+  ; psm_comm
+  ; add_comm
+  ; mul1_comm
+  ; mul2_comm
+  ; emul1_comm
+  ; emul2_comm
+  ; emul3_comm
+  ]
+
+let eq_verifier_index ~field_equal ~other_field_equal
+    { Types.Plonk_verifier_index.domain =
+        { log_size_of_group = i1_1; group_gen = f1 }
+    ; max_poly_size = i1_2
+    ; max_quot_size = i1_3
+    ; urs = _
+    ; evals = evals1
+    ; shifts = shifts1
+    }
+    { Types.Plonk_verifier_index.domain =
+        { log_size_of_group = i2_1; group_gen = f2 }
+    ; max_poly_size = i2_2
+    ; max_quot_size = i2_3
+    ; urs = _
+    ; evals = evals2
+    ; shifts = shifts2
+    } =
+  i1_1 = i2_1 && field_equal f1 f2 && i1_2 = i2_2 && i1_3 = i2_3
+  && List.for_all2
+       (eq_poly_comm ~field_equal:other_field_equal)
+       (verification_evals_to_list evals1)
+       (verification_evals_to_list evals2)
+  && eq_verification_shifts ~field_equal shifts1 shifts2
+
+let _ =
+  let open Pasta_fp_verifier_index in
+  Js.export "pasta_fp_verifier_index_test"
+    (object%js (_self)
+       method run =
+         let gate_vector =
+           let open Pasta_fp_index.Gate_vector in
+           let vec = create () in
+           let fields = Array.map Pasta_fp.of_int in
+           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let generic =
+             mk_wires Generic 1 (1, L) (1, R) (1, O)
+               (fields [| 0; 0; 0; 0; 0 |])
+           in
+           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
+           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
+           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
+           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
+           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let endomul1 =
+             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           in
+           let endomul2 =
+             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           in
+           let endomul3 =
+             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           in
+           let endomul4 =
+             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
+           in
+           let poseidon =
+             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
+           in
+           let all =
+             [ zero
+             ; generic
+             ; add1
+             ; add2
+             ; vbmul1
+             ; vbmul2
+             ; vbmul3
+             ; endomul1
+             ; endomul2
+             ; endomul3
+             ; endomul4
+             ; poseidon
+             ]
+           in
+           List.iter (add vec) all ;
+           vec
+         in
+         let eq =
+           eq_verifier_index ~field_equal:Pasta_fp.equal
+             ~other_field_equal:Pasta_fq.equal
+         in
+         let urs = Pasta_fp_urs.create 16 in
+         let index0 = Pasta_fp_index.create gate_vector 0 urs in
+         let index2 = Pasta_fp_index.create gate_vector 2 urs in
+         let vindex0_0 = create index0 in
+         let vindex0_1 = create index0 in
+         assert (eq vindex0_0 vindex0_1) ;
+         let vindex2_0 = create index2 in
+         let vindex2_1 = create index2 in
+         assert (eq vindex2_0 vindex2_1) ;
+         let dummy0 = dummy () in
+         let dummy1 = dummy () in
+         assert (eq dummy0 dummy1) ;
+         List.iter
+           (fun x -> assert (eq (deep_copy x) x))
+           [ vindex0_0; vindex2_0; dummy0 ]
     end)

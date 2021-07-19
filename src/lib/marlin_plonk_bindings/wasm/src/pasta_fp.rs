@@ -13,7 +13,7 @@ use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct WasmPastaFp(pub Fp);
 
 impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFp {

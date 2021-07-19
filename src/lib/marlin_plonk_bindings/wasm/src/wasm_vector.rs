@@ -3,6 +3,7 @@ use wasm_bindgen::convert::{OptionIntoWasmAbi, IntoWasmAbi, OptionFromWasmAbi, F
 use std::ops::Deref;
 use std::convert::From;
 
+#[derive(Clone)]
 pub struct WasmVector<T>(Vec<T>);
 
 impl<T> Deref for WasmVector<T> {
