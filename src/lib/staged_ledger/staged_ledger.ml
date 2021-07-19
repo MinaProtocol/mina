@@ -995,13 +995,14 @@ module T = struct
 
   [%%if feature_snapps]
 
-  let check_commands ledger ~verifier (cs : User_command.t list) =
+  let check_commands (ledger : t) ~verifier (cs : User_command.t list) =
     match
       Or_error.try_with (fun () ->
           List.map cs
             ~f:
               (let open Ledger in
-              User_command.to_verifiable_exn ~ledger ~get ~location_of_account))
+              User_command.to_verifiable_exn ~ledger:ledger.ledger ~get
+                ~location_of_account))
     with
     | Error e ->
         Deferred.return (Error e)
@@ -1030,8 +1031,9 @@ module T = struct
      queue and 20 in the "already verified, to apply" queue. Those 20 would be
      processed very slowly because each one would have to call the verifier, which
      the other queue was trying to call as well. *)
-  let check_commands _ledger ~verifier:_ (cs : User_command.t list) :
+  let check_commands (ledger : t) ~verifier:_ (cs : User_command.t list) :
       (User_command.Valid.t list, _) result Deferred.Or_error.t =
+    let network_id = ledger.constraint_constants.network_id in
     Result.all
       (List.map cs ~f:(function
         | Snapp_command _ ->
@@ -1039,7 +1041,7 @@ module T = struct
               (Verifier.Failure.Verification_failed
                  (Error.of_string "check_commands: snapp commands disabled"))
         | Signed_command c -> (
-            match Signed_command.check c with
+            match Signed_command.check ~network_id c with
             | Some c ->
                 Ok (User_command.Signed_command c)
             | None ->
@@ -1066,7 +1068,7 @@ module T = struct
     let%bind prediff =
       Pre_diff_info.get witness ~constraint_constants ~coinbase_receiver
         ~supercharge_coinbase
-        ~check:(check_commands t.ledger ~verifier)
+        ~check:(check_commands t ~verifier)
       |> Deferred.map
            ~f:
              (Result.map_error ~f:(fun error ->
@@ -1952,6 +1954,8 @@ let%test_module "test" =
     let constraint_constants =
       Genesis_constants.Constraint_constants.for_unit_tests
 
+    let network_id = constraint_constants.network_id
+
     let logger = Logger.null ()
 
     let verifier =
@@ -2366,8 +2370,8 @@ let%test_module "test" =
       let%bind iters = Int.gen_incl 1 (max_blocks_for_coverage 0) in
       let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
-          ledger_init_state
+        User_command.Valid.Gen.sequence ~network_id ~length:total_cmds
+          ~sign_type:`Real ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -2382,8 +2386,8 @@ let%test_module "test" =
       let iters = max_blocks_for_coverage extra_block_count in
       let total_cmds = transaction_capacity * iters in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
-          ledger_init_state
+        User_command.Valid.Gen.sequence ~network_id ~length:total_cmds
+          ~sign_type:`Real ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.init iters ~f:(Fn.const None))
@@ -2407,8 +2411,8 @@ let%test_module "test" =
       in
       let total_cmds = List.sum (module Int) ~f:Fn.id cmds_per_iter in
       let%bind cmds =
-        User_command.Valid.Gen.sequence ~length:total_cmds ~sign_type:`Real
-          ledger_init_state
+        User_command.Valid.Gen.sequence ~network_id ~length:total_cmds
+          ~sign_type:`Real ledger_init_state
       in
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)

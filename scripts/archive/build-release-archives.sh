@@ -88,8 +88,8 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
-cp ./_build/default/src/app/archive/archive_testnet_signatures.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
-cp ./_build/default/src/app/archive/archive_testnet_signatures.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
 cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"
@@ -135,8 +135,8 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILD_DIR}/usr/local/bin"
 pwd
 ls
-cp ./_build/default/src/app/archive/archive_mainnet_signatures.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
-cp ./_build/default/src/app/archive/archive_mainnet_signatures.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/mina-archive"
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 cp ./_build/default/src/app/archive_blocks/archive_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-archive-blocks"
 cp ./_build/default/src/app/extract_blocks/extract_blocks.exe "${BUILD_DIR}/usr/local/bin/mina-extract-blocks"
 cp ./_build/default/src/app/missing_blocks_auditor/missing_blocks_auditor.exe "${BUILD_DIR}/usr/local/bin/mina-missing-blocks-auditor"

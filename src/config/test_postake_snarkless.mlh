@@ -10,6 +10,7 @@
 [%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
 [%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
+[%%define network_id 0]
 
 [%%define time_offsets true]
 

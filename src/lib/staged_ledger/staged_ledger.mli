@@ -209,7 +209,7 @@ val all_work_pairs :
 val all_work_statements_exn : t -> Transaction_snark_work.Statement.t list
 
 val check_commands :
-     Ledger.t
+     t
   -> verifier:Verifier.t
   -> User_command.t list
   -> (User_command.Valid.t list, Verifier.Failure.t) Result.t

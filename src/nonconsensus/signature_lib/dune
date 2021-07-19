@@ -8,9 +8,9 @@
    blake2
    core_kernel
    hash_prefix_states_nonconsensus
+   hex
    non_zero_curve_point_nonconsensus
    random_oracle_nonconsensus
-   mina_signature_kind
    snark_params_nonconsensus
    js_of_ocaml
    yojson)

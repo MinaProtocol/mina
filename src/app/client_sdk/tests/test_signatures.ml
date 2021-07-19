@@ -17,11 +17,14 @@ module Mina_base = Mina_base_nonconsensus
 module Signature_lib = Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Mina_numbers = Mina_numbers_nonconsensus.Mina_numbers
+module Genesis_constants = Genesis_constants_nonconsensus.Genesis_constants
 
 [%%endif]
 
 open Mina_base
 open Signature_lib
+
+let constraint_constants = Genesis_constants.Constraint_constants.compiled
 
 let signer_pk =
   Public_key.Compressed.of_base58_check_exn
@@ -103,7 +106,9 @@ let transactions = payments @ delegations
 type jsSignature = { privateKey : Field.t; publicKey : Inner_curve.Scalar.t }
 
 let get_signature payload =
-  (Signed_command.sign keypair payload :> Signed_command.With_valid_signature.t)
+  let network_id = constraint_constants.network_id in
+  ( Signed_command.sign ~network_id keypair payload
+    :> Signed_command.With_valid_signature.t )
 
 (* output format matches signatures in client SDK *)
 let print_signature field scalar =
@@ -112,11 +117,12 @@ let print_signature field scalar =
   printf "  },\n%!"
 
 let main () =
+  let network_id = constraint_constants.network_id in
   let signatures = List.map transactions ~f:get_signature in
   (* make sure signatures verify *)
   List.iteri signatures ~f:(fun i signature ->
       let signature = (signature :> Signed_command.t) in
-      if not (Signed_command.check_signature signature) then (
+      if not (Signed_command.check_signature ~network_id signature) then (
         eprintf
           !"Signature (%d) failed to verify: %{sexp: Signed_command.t}\n%!"
           i signature ;

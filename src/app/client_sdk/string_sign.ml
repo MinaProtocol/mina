@@ -53,7 +53,7 @@ module Message = struct
     let open Core_kernel in
     List.(concat_map (String.to_list s) ~f:char_bits)
 
-  let derive t ~private_key ~public_key:pk =
+  let derive ~network_id:_ t ~private_key ~public_key:pk =
     let pk_bits { Public_key.Compressed.Poly.x; is_odd } =
       is_odd :: Field.unpack x
     in
@@ -67,7 +67,7 @@ module Message = struct
     |> Base.(Fn.flip List.take (Int.min 256 (Tock.Field.size_in_bits - 1)))
     |> Tock.Field.project
 
-  let hash t ~public_key ~r =
+  let hash ~(network_id : int) t ~public_key ~r =
     let string_to_input s =
       Random_oracle.Input.
         { field_elements = [||]
@@ -81,7 +81,7 @@ module Message = struct
         { field_elements = [| px; py; r |]; bitstrings = [||] }
     in
     let open Random_oracle in
-    hash ~init:Hash_prefix.signature (pack_input input)
+    hash ~init:(Hash_prefix.signature ~network_id) (pack_input input)
     |> Digest.to_bits |> Inner_curve.Scalar.of_bits
 end
 

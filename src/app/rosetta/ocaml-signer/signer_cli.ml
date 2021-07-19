@@ -18,9 +18,11 @@ let sign_command =
   in
   let open Deferred.Let_syntax in
   fun () ->
+    let network_id =
+      Genesis_constants.Constraint_constants.compiled.network_id in
     let keys = Signer.Keys.of_private_key_bytes private_key in
     match
-      Signer.sign ~keys ~unsigned_transaction_string:unsigned_transaction
+      Signer.sign ~network_id ~keys ~unsigned_transaction_string:unsigned_transaction
     with
     | Ok signature ->
         printf "%s\n" signature ; return ()
@@ -39,8 +41,10 @@ let verify_command =
   in
   let open Deferred.Let_syntax in
   fun () ->
+    let network_id =
+      Genesis_constants.Constraint_constants.compiled.network_id in
     match
-      Signer.verify ~public_key_hex_bytes:public_key
+      Signer.verify ~network_id ~public_key_hex_bytes:public_key
         ~signed_transaction_string:signed_transaction
     with
     | Ok b when b ->

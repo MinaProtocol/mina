@@ -9,6 +9,7 @@
 [%%import "/src/config/amount_defaults/realistic.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
 [%%import "/src/config/supercharged_coinbase_factor/two.mlh"]
+[%%define network_id 0]
 
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]

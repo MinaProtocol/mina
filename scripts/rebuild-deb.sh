@@ -113,8 +113,8 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-sudo cp ./default/src/app/cli/src/mina_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-sudo cp ./default/src/app/rosetta/rosetta_mainnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+sudo cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 
 libp2p_location=../src/app/libp2p_helper/result/bin
 ls -l ../src/app/libp2p_helper/result/bin || libp2p_location=$HOME/app/
@@ -196,8 +196,8 @@ cat "${BUILDDIR}/DEBIAN/control"
 
 echo "------------------------------------------------------------"
 # Overwrite binaries (sudo to fix permissions error)
-sudo cp ./default/src/app/cli/src/mina_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina"
-sudo cp ./default/src/app/rosetta/rosetta_testnet_signatures.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
+sudo cp ./default/src/app/cli/src/mina.exe "${BUILDDIR}/usr/local/bin/mina"
+sudo cp ./default/src/app/rosetta/rosetta.exe "${BUILDDIR}/usr/local/bin/mina-rosetta"
 
 # Switch the default configuration to devnet.json:
 sudo cp ../genesis_ledgers/devnet.json "${BUILDDIR}/var/lib/coda/config_${GITHASH_CONFIG}.json"

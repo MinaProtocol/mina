@@ -22,7 +22,7 @@ make -C src/app/libp2p_helper
 # echo "--- Upload genesis data"
 # ./scripts/upload-genesis.sh
 
-echo "--- Build all major tagets required for packaging"
+echo "--- Build all major targets required for packaging"
 echo "Building from Commit SHA: $MINA_COMMIT_SHA1"
 dune build --profile=${DUNE_PROFILE} \
   src/app/logproc/logproc.exe \
@@ -30,11 +30,7 @@ dune build --profile=${DUNE_PROFILE} \
   src/app/generate_keypair/generate_keypair.exe \
   src/app/validate_keypair/validate_keypair.exe \
   src/app/cli/src/mina.exe \
-  src/app/cli/src/mina_testnet_signatures.exe \
-  src/app/cli/src/mina_mainnet_signatures.exe \
-  src/app/rosetta/rosetta.exe \
-  src/app/rosetta/rosetta_mainnet_signatures.exe \
-  src/app/rosetta/rosetta_testnet_signatures.exe # 2>&1 | tee /tmp/buildocaml.log
+  src/app/rosetta/rosetta.exe # 2>&1 | tee /tmp/buildocaml.log
 
 echo "--- Build deb package without pvkeys"
 make deb

@@ -2,6 +2,12 @@
 
 open Core_kernel
 
+[%%ifndef consensus_mechanism]
+
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
+
 module Proof_level = struct
   type t = Full | Check | None [@@deriving bin_io_unversioned, equal]
 
@@ -24,6 +30,8 @@ module Proof_level = struct
   let for_unit_tests = Check
 end
 
+[%%ifdef consensus_mechanism]
+
 module Fork_constants = struct
   type t =
     { previous_state_hash : Pickles.Backend.Tick.Field.Stable.Latest.t
@@ -33,6 +41,8 @@ module Fork_constants = struct
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 end
 
+[%%endif]
+
 (** Constants that affect the constraint systems for proofs (and thus also key
     generation).
 
@@ -41,6 +51,8 @@ end
     be invalid.
 *)
 module Constraint_constants = struct
+  [%%ifdef consensus_mechanism]
+
   type t =
     { sub_windows_per_window : int
     ; ledger_depth : int
@@ -52,6 +64,7 @@ module Constraint_constants = struct
     ; supercharged_coinbase_factor : int
     ; account_creation_fee : Currency.Fee.Stable.Latest.t
     ; fork : Fork_constants.t option
+    ; network_id : int
     }
   [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
 
@@ -78,6 +91,24 @@ module Constraint_constants = struct
         | None ->
             None )
     }
+
+  [%%else]
+
+  type t =
+    { sub_windows_per_window : int
+    ; ledger_depth : int
+    ; work_delay : int
+    ; block_window_duration_ms : int
+    ; transaction_capacity_log_2 : int
+    ; pending_coinbase_depth : int
+    ; coinbase_amount : Currency.Amount.Stable.Latest.t
+    ; supercharged_coinbase_factor : int
+    ; account_creation_fee : Currency.Fee.Stable.Latest.t
+    ; network_id : int
+    }
+  [@@deriving bin_io_unversioned, sexp, equal, compare, yojson]
+
+  [%%endif]
 
   (* Generate the compile-time constraint constants, using a signature to hide
      the optcomp constants that we import.
@@ -152,6 +183,8 @@ module Constraint_constants = struct
         Core_kernel.Int.ceil_log2
           (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
 
+      [%%ifdef consensus_mechanism]
+
       [%%ifndef fork_previous_length]
 
       let fork = None
@@ -177,6 +210,20 @@ module Constraint_constants = struct
 
       [%%endif]
 
+      [%%endif]
+
+      [%%ifdef network_id]
+
+      [%%inject "network_id", network_id]
+
+      [%%else]
+
+      let network_id = 0
+
+      [%%endif]
+
+      [%%ifdef consensus_mechanism]
+
       let compiled =
         { sub_windows_per_window
         ; ledger_depth
@@ -190,7 +237,27 @@ module Constraint_constants = struct
         ; account_creation_fee =
             Currency.Fee.of_formatted_string account_creation_fee_string
         ; fork
+        ; network_id
         }
+
+      [%%else]
+
+      let compiled =
+        { sub_windows_per_window
+        ; ledger_depth
+        ; work_delay
+        ; block_window_duration_ms
+        ; transaction_capacity_log_2
+        ; pending_coinbase_depth
+        ; coinbase_amount =
+            Currency.Amount.of_formatted_string coinbase_amount_string
+        ; supercharged_coinbase_factor
+        ; account_creation_fee =
+            Currency.Fee.of_formatted_string account_creation_fee_string
+        ; network_id
+        }
+
+      [%%endif]
     end :
       sig
         val compiled : t
@@ -203,11 +270,17 @@ end
 The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
+[%%ifdef consensus_mechanism]
+
 let genesis_timestamp_of_string str =
-  let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+  let default_timezone = Core_kernel.Time.Zone.of_utc_offset ~hours:(-8) in
   Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone) str
 
+[%%endif]
+
 let of_time t = Time.to_span_since_epoch t |> Time.Span.to_ms |> Int64.of_float
+
+[%%ifdef consensus_mechanism]
 
 let validate_time time_str =
   match
@@ -223,10 +296,12 @@ let validate_time time_str =
          %H:%M:%S%z\". For example, \"2019-01-30 12:00:00-0800\" for UTC-08:00 \
          timezone"
 
+[%%endif]
+
 let genesis_timestamp_to_string time =
   Int64.to_float time |> Time.Span.of_ms |> Time.of_span_since_epoch
-  |> Core.Time.to_string_iso8601_basic
-       ~zone:(Core.Time.Zone.of_utc_offset ~hours:(-8))
+  |> Core_kernel.Time.to_string_iso8601_basic
+       ~zone:(Core_kernel.Time.Zone.of_utc_offset ~hours:(-8))
 
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
@@ -269,6 +344,8 @@ module Protocol = struct
                    ~zone:Time.Zone.utc) )
           ]
 
+      [%%ifdef consensus_mechanism]
+
       let of_yojson = function
         | `Assoc
             [ ("k", `Int k)
@@ -290,6 +367,8 @@ module Protocol = struct
                 Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
         | _ ->
             Error "Genesis_constants.Protocol.of_yojson: unexpected JSON"
+
+      [%%endif]
 
       let t_of_sexp _ = failwith "t_of_sexp: not implemented"
 
@@ -355,7 +434,7 @@ module T = struct
           ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string_abs ~zone:Time.Zone.utc
+      ^ Core_kernel.Time.to_string_abs ~zone:Time.Zone.utc
           (Time.of_span_since_epoch
              (Time.Span.of_ms
                 (Int64.to_float t.protocol.genesis_state_timestamp)))
@@ -377,6 +456,8 @@ include T
 
 [%%inject "pool_max_size", pool_max_size]
 
+[%%ifdef consensus_mechanism]
+
 let compiled : t =
   { protocol =
       { k
@@ -391,3 +472,5 @@ let compiled : t =
   }
 
 let for_unit_tests = compiled
+
+[%%endif]
