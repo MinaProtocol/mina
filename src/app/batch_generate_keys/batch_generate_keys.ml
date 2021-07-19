@@ -114,13 +114,11 @@ mutation ($sender: PublicKey!,
 }
 |}]
 
-let make_graphql_signed_transaction ~sender_priv_key ~receiver =
+let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee =
   let sender_pub_key =
     Public_key.of_private_key_exn sender_priv_key |> Public_key.compress
   in
-  let fee = Mina_base.Signed_command.minimum_fee in
   let receiver_pub_key = Public_key.Compressed.of_base58_check_exn receiver in
-  let amount = Currency.Amount.of_formatted_string "1" in
   let field, scalar =
     Mina_base.Signed_command.sign_payload sender_priv_key
       { common =
@@ -229,8 +227,16 @@ let output_there_and_back_cmds =
          else None
        in
        let batch_count = ref 0 in
+       let base_send_amount = Currency.Amount.of_formatted_string "2" in
+       let initial_send_amount =
+         Option.value_exn
+           (Currency.Amount.add base_send_amount
+              (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee))
+       in
+       let fee_amount = Mina_base.Signed_command.minimum_fee in
        let generated_secrets = gen_secret_keys count in
 
+       (* there... *)
        if Option.is_some origin_sender_public_key then
          List.iter generated_secrets ~f:(fun sk ->
              Option.iter rate_limit ~f:(fun rate_limit ->
@@ -242,8 +248,11 @@ let output_there_and_back_cmds =
              let acct_pk = Public_key.of_private_key_exn sk in
              let transaction_command =
                Format.sprintf
-                 "mina client send-payment --amount 1 --receiver %s --sender \
-                  %s@."
+                 "mina client send-payment --amount %s --fee %s --receiver %s \
+                  --sender %s@."
+                 (Currency.Amount.to_formatted_string initial_send_amount)
+                 ( fee_amount |> Currency.Amount.of_fee
+                 |> Currency.Amount.to_formatted_string )
                  Public_key.(Compressed.to_base58_check (compress acct_pk))
                  (Option.value_exn origin_sender_public_key)
              in
@@ -265,10 +274,12 @@ let output_there_and_back_cmds =
                make_graphql_signed_transaction ~sender_priv_key:origin_sender_sk
                  ~receiver:
                    Public_key.(Compressed.to_base58_check (compress acct_pk))
+                 ~amount:initial_send_amount ~fee:fee_amount
              in
              Format.print_string transaction_command)
        else exit 1 ;
 
+       (* and back again... *)
        let origin_pk : string =
          if Option.is_some origin_sender_public_key then
            Option.value_exn origin_sender_public_key
@@ -277,8 +288,7 @@ let output_there_and_back_cmds =
              Private_key.of_base58_check_exn
                (Option.value_exn origin_sender_secret_key)
            in
-
-           Public_key.of_private_key_exn origin_sender_sk
+           origin_sender_sk |> Public_key.of_private_key_exn
            |> Public_key.compress |> Public_key.Compressed.to_base58_check
          else exit 1
        in
@@ -291,7 +301,7 @@ let output_there_and_back_cmds =
                else incr batch_count) ;
            let transaction_command =
              make_graphql_signed_transaction ~sender_priv_key:sk
-               ~receiver:origin_pk
+               ~receiver:origin_pk ~amount:base_send_amount ~fee:fee_amount
            in
            Format.print_string transaction_command))
 
