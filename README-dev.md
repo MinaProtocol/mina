@@ -27,6 +27,11 @@ The short version:
       you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 4.  Run `git config --local --add submodule.recurse true`
 
+### Developer Setup (Docker)
+
+You can build Mina using Docker. This should work in any dev environment.
+Refer to [/dev](/dev).
+
 ### Developer Setup (MacOS)
 
 - Invoke `make macos-setup`
