@@ -92,7 +92,7 @@ let output_cmds =
 
 (* Shamelessly copied from src/app/cli/src/init/graphql_queries.ml and tweaked*)
 
-(* module Send_payment =
+module Send_payment =
 [%graphql
 {|
 mutation ($sender: PublicKey!,
@@ -112,7 +112,7 @@ mutation ($sender: PublicKey!,
     }
   }
 }
-|}] *)
+|}]
 
 let make_graphql_signed_transaction ~sender_priv_key ~receiver =
   let sender_pub_key =
@@ -156,7 +156,7 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver =
       ; ("variables", graphql_query#variables)
       ]
   in
-  Format.printf
+  Format.sprintf
     "curl 'http://127.0.0.1:3085/graphql' -X POST -H 'content-type: \
      application/json' --data '%s'@."
     (Yojson.Basic.to_string graphql_query_json)
@@ -240,10 +240,14 @@ let output_there_and_back_cmds =
                    batch_count := 0 )
                  else incr batch_count) ;
              let acct_pk = Public_key.of_private_key_exn sk in
-             Format.printf
-               "mina client send-payment --amount 1 --receiver %s --sender %s@."
-               Public_key.(Compressed.to_base58_check (compress acct_pk))
-               (Option.value_exn origin_sender_public_key))
+             let transaction_command =
+               Format.sprintf
+                 "mina client send-payment --amount 1 --receiver %s --sender \
+                  %s@."
+                 Public_key.(Compressed.to_base58_check (compress acct_pk))
+                 (Option.value_exn origin_sender_public_key)
+             in
+             Format.print_string transaction_command)
        else if Option.is_some origin_sender_secret_key then
          List.iter generated_secrets ~f:(fun sk ->
              Option.iter rate_limit ~f:(fun rate_limit ->
@@ -257,9 +261,12 @@ let output_there_and_back_cmds =
                Private_key.of_base58_check_exn
                  (Option.value_exn origin_sender_secret_key)
              in
-             make_graphql_signed_transaction ~sender_priv_key:origin_sender_sk
-               ~receiver:
-                 Public_key.(Compressed.to_base58_check (compress acct_pk)))
+             let transaction_command =
+               make_graphql_signed_transaction ~sender_priv_key:origin_sender_sk
+                 ~receiver:
+                   Public_key.(Compressed.to_base58_check (compress acct_pk))
+             in
+             Format.print_string transaction_command)
        else exit 1 ;
 
        let origin_pk : string =
@@ -282,8 +289,11 @@ let output_there_and_back_cmds =
                    Float.(of_int rate_limit_interval /. 1000.) ;
                  batch_count := 0 )
                else incr batch_count) ;
-           make_graphql_signed_transaction ~sender_priv_key:sk
-             ~receiver:origin_pk))
+           let transaction_command =
+             make_graphql_signed_transaction ~sender_priv_key:sk
+               ~receiver:origin_pk
+           in
+           Format.print_string transaction_command))
 
 let () =
   Command.run
