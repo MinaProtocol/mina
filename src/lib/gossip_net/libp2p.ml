@@ -94,6 +94,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
       let rl = Network_pool.Rate_limiter.create ~capacity:budget in
       log_rate_limiter_occasionally rl ;
       let handler (peer : Network_peer.Peer.t) ~version q =
+        Mina_metrics.(Counter.inc_one Network.rpc_requests_received) ;
+        Mina_metrics.(Counter.inc_one Impl.received_counter) ;
         let score = cost q in
         match
           Network_pool.Rate_limiter.add rl (Remote peer) ~now:(Time.now ())
@@ -600,6 +602,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         type r q.
            ?heartbeat_timeout:Time_ns.Span.t
         -> ?timeout:Time.Span.t
+        -> rpc_counter:Mina_metrics.Counter.t
         -> rpc_name:string
         -> t
         -> Peer.t
@@ -607,7 +610,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> (r, q) dispatch
         -> r
         -> q Deferred.Or_error.t =
-     fun ?heartbeat_timeout ?timeout ~rpc_name t peer transport dispatch query ->
+     fun ?heartbeat_timeout ?timeout ~rpc_counter ~rpc_name t peer transport
+         dispatch query ->
       let call () =
         Monitor.try_with ~here:[%here] (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
@@ -623,6 +627,8 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
                 >>=? fun conn' ->
+                Mina_metrics.(Counter.inc_one Network.rpc_requests_sent) ;
+                Mina_metrics.(Counter.inc_one rpc_counter) ;
                 let d = dispatch conn' query in
                 match timeout with
                 | None ->
@@ -725,8 +731,9 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         -> r Deferred.Or_error.t =
      fun ?heartbeat_timeout ?timeout t peer transport rpc query ->
       let (module Impl) = implementation_of_rpc rpc in
-      try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout ~rpc_name:Impl.name
-        t peer transport Impl.dispatch_multi query
+      try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
+        ~rpc_counter:Impl.sent_counter ~rpc_name:Impl.name t peer transport
+        Impl.dispatch_multi query
 
     let query_peer ?heartbeat_timeout ?timeout t (peer_id : Peer.Id.t) rpc
         rpc_input =
@@ -755,7 +762,7 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
           let transport = prepare_stream_transport stream in
           let (module Impl) = implementation_of_rpc rpc in
           try_call_rpc_with_dispatch ?heartbeat_timeout ?timeout
-            ~rpc_name:Impl.name t peer transport
+            ~rpc_counter:Impl.sent_counter ~rpc_name:Impl.name t peer transport
             (fun conn qs ->
               Deferred.Or_error.List.map ?how qs ~f:(fun q ->
                   Impl.dispatch_multi conn q))
