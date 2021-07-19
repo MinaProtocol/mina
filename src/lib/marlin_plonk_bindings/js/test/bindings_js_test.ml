@@ -1084,3 +1084,76 @@ let _ =
            (fun x -> assert (eq (deep_copy x) x))
            [ vindex0_0; vindex2_0; dummy0 ]
     end)
+
+let _ =
+  let open Pasta_fq_verifier_index in
+  Js.export "pasta_fq_verifier_index_test"
+    (object%js (_self)
+       method run =
+         let gate_vector =
+           let open Pasta_fq_index.Gate_vector in
+           let vec = create () in
+           let fields = Array.map Pasta_fq.of_int in
+           let zero = mk_wires Zero 0 (0, L) (0, R) (0, O) (fields [||]) in
+           let generic =
+             mk_wires Generic 1 (1, L) (1, R) (1, O)
+               (fields [| 0; 0; 0; 0; 0 |])
+           in
+           let add1 = mk_wires Add1 1 (1, L) (1, R) (1, O) (fields [||]) in
+           let add2 = mk_wires Add2 2 (2, L) (2, R) (2, O) (fields [||]) in
+           let vbmul1 = mk_wires Vbmul1 3 (3, L) (3, R) (3, O) (fields [||]) in
+           let vbmul2 = mk_wires Vbmul2 4 (4, L) (4, R) (4, O) (fields [||]) in
+           let vbmul3 = mk_wires Vbmul3 5 (5, L) (5, R) (5, O) (fields [||]) in
+           let endomul1 =
+             mk_wires Endomul1 6 (6, L) (6, R) (6, O) (fields [||])
+           in
+           let endomul2 =
+             mk_wires Endomul2 7 (7, L) (7, R) (7, O) (fields [||])
+           in
+           let endomul3 =
+             mk_wires Endomul3 8 (8, L) (8, R) (8, O) (fields [||])
+           in
+           let endomul4 =
+             mk_wires Endomul4 9 (9, L) (9, R) (9, O) (fields [||])
+           in
+           let poseidon =
+             mk_wires Poseidon 10 (10, L) (10, R) (10, O) (fields [| 0; 0; 0 |])
+           in
+           let all =
+             [ zero
+             ; generic
+             ; add1
+             ; add2
+             ; vbmul1
+             ; vbmul2
+             ; vbmul3
+             ; endomul1
+             ; endomul2
+             ; endomul3
+             ; endomul4
+             ; poseidon
+             ]
+           in
+           List.iter (add vec) all ;
+           vec
+         in
+         let eq =
+           eq_verifier_index ~field_equal:Pasta_fq.equal
+             ~other_field_equal:Pasta_fp.equal
+         in
+         let urs = Pasta_fq_urs.create 16 in
+         let index0 = Pasta_fq_index.create gate_vector 0 urs in
+         let index2 = Pasta_fq_index.create gate_vector 2 urs in
+         let vindex0_0 = create index0 in
+         let vindex0_1 = create index0 in
+         assert (eq vindex0_0 vindex0_1) ;
+         let vindex2_0 = create index2 in
+         let vindex2_1 = create index2 in
+         assert (eq vindex2_0 vindex2_1) ;
+         let dummy0 = dummy () in
+         let dummy1 = dummy () in
+         assert (eq dummy0 dummy1) ;
+         List.iter
+           (fun x -> assert (eq (deep_copy x) x))
+           [ vindex0_0; vindex2_0; dummy0 ]
+    end)
