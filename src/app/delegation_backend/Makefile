@@ -1,4 +1,4 @@
-.PHONY: clean build test tidy docker
+.PHONY: clean build test tidy docker docker-run
 
 ifeq ($(GO),)
 GO := go
@@ -16,5 +16,8 @@ tidy:
 test:
 	GO=$(GO) ./scripts/build.sh test
 
+docker-run:
+	./scripts/build.sh docker-run
+
 docker:
-	mkdir -p result && docker build -t delegation-backend-production -f Dockerfile.production . && docker save delegation-backend-production | gzip > result/delegation_backend.tar.gz
+	./scripts/build.sh docker

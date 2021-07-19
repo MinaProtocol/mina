@@ -4,13 +4,17 @@ FROM golang:1.16
 WORKDIR $GOPATH/src/delegation_backend
 
 # Copy everything from the current directory to the PWD (Present Working Directory) inside the container
-COPY src .
+COPY src src
+COPY result/headers src
 
 # Download all the dependencies
-RUN go get -d -v ./...
+RUN cd src && go get -d -v ./...
+
+COPY result/libmina_signer.so result/libmina_signer.so
+ENV LD_LIBRARY_PATH=result
 
 # Install the package
-RUN go install -v ./...
+RUN cd src && go install -v ./...
 
 # This container exposes port 8080 to the outside world
 EXPOSE 8080

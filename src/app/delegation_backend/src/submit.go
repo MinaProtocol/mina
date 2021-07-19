@@ -139,13 +139,6 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  passesAttemptLimit := h.app.SubmitCounter.RecordAttempt(req.Submitter)
-  if !passesAttemptLimit {
-    w.WriteHeader(429)
-    writeErrorResponse(h.app, &w, "Too many requests per hour")
-    return
-  }
-
   submittedAt := h.app.Now()
   if req.Data.CreatedAt.Add(TIME_DIFF_DELTA).After(submittedAt) {
     h.app.Log.Debugf("Field created_at is a timestamp in future: %v", submittedAt)
@@ -153,6 +146,14 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     writeErrorResponse(h.app, &w, "Field created_at is a timestamp in future")
     return
   }
+
+  passesAttemptLimit := h.app.SubmitCounter.RecordAttempt(req.Submitter)
+  if !passesAttemptLimit {
+    w.WriteHeader(429)
+    writeErrorResponse(h.app, &w, "Too many requests per hour")
+    return
+  }
+
   payload, err := makeSignPayload(&req.Data)
   if err != nil {
     h.app.Log.Errorf("Error while unmarshaling JSON of /submit request's body: %v", err)
@@ -160,7 +161,8 @@ func (h *SubmitH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     writeErrorResponse(h.app, &w, "Unexpected server error")
     return
   }
-  if !verifySig(&req.Submitter, &req.Sig, payload, NETWORK_ID) {
+  hash := blake2b.Sum256(payload)
+  if !verifySig(&req.Submitter, &req.Sig, hash[:], NETWORK_ID) {
     w.WriteHeader(401)
     writeErrorResponse(h.app, &w, "Invalid signature")
     return

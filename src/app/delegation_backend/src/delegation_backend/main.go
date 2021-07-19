@@ -33,7 +33,6 @@ func main() {
     return
   }
   gctx := GoogleContext{client.Bucket(CLOUD_BUCKET_NAME), ctx, log}
-  // TODO check that Bucket and Sheets service are ok to be used concurrently
   app.Save = func(objs ObjectsToSave) {
     gctx.GoogleStorageSave(objs)
   }
