@@ -7,58 +7,57 @@ module Global_slot = Mina_numbers.Global_slot
 (*Slot number within an epoch*)
 module Slot = Mina_numbers.Global_slot
 
-(* Can extract both slot numbers and epoch number*)
+(* Can extract both (slot, epoch) and global slot number from Consensus_time*)
 module Consensus_time = Consensus.Data.Consensus_time
 
-module Set_keys_input = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+module Keys_input = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      [@@@no_toplevel_latest_type]
 
-    module V1 = struct
-      type t =
-        { block_producer_keys:
-            (Keypair.Stable.V1.t * Public_key.Compressed.Stable.V1.t) list
-        ; time: Block_time.Stable.V1.t }
-      [@@deriving sexp]
+      module V1 = struct
+        type 'a t =
+          { block_producer_keys:
+              (Keypair.Stable.V1.t * Public_key.Compressed.Stable.V1.t) list
+          ; delegatee_table: 'a
+          ; time: Block_time.Stable.V1.t }
+        [@@deriving sexp]
 
-      let to_latest = Fn.id
-    end
-  end]
+        let to_latest = Fn.id
+      end
+    end]
+  end
 
-  type t = Stable.Latest.t =
-    { block_producer_keys: (Keypair.t * Public_key.Compressed.t) list
-    ; time: Block_time.t }
-  [@@deriving sexp]
-end
+  module Init = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit Poly.Stable.V1.t [@@deriving sexp]
 
-module Update_keys_input = struct
-  [%%versioned
-  module Stable = struct
-    [@@@no_toplevel_latest_type]
+        let to_latest = Fn.id
+      end
+    end]
 
-    module V1 = struct
-      type t =
-        { block_producer_keys:
-            (Keypair.Stable.V1.t * Public_key.Compressed.Stable.V1.t) list
-        ; delegatee_table:
-            Mina_base.Account.Stable.V1.t
-            Mina_base.Account.Index.Stable.V1.Table.t
-            Public_key.Compressed.Stable.V1.Table.t
-        ; time: Block_time.Stable.V1.t }
-      [@@deriving sexp]
+    let create block_producer_keys time : t =
+      {block_producer_keys; delegatee_table= (); time}
+  end
 
-      let to_latest = Fn.id
-    end
-  end]
+  module Update = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Mina_base.Account.Stable.V1.t
+          Mina_base.Account.Index.Stable.V1.Table.t
+          Public_key.Compressed.Stable.V1.Table.t
+          Poly.Stable.V1.t
+        [@@deriving sexp]
 
-  type t = Stable.Latest.t =
-    { block_producer_keys: (Keypair.t * Public_key.Compressed.t) list
-    ; delegatee_table:
-        Mina_base.Account.t Mina_base.Account.Index.Stable.Latest.Table.t
-        Public_key.Compressed.Stable.Latest.Table.t
-    ; time: Block_time.t }
-  [@@deriving sexp]
+        let to_latest = Fn.id
+      end
+    end]
+  end
 end
 
 module Evaluator_status = struct
@@ -189,9 +188,6 @@ module Worker_state = struct
     ; logger: Logger.Stable.Latest.t }
   [@@deriving bin_io_unversioned]
 
-  (*type delegate_progress = {last_checked = Epoch.t * Slot.t
-    ; slots_won: }*)
-
   type t =
     { config: init_arg
     ; slots_won: Consensus.Data.Slot_won.t Queue.t
@@ -205,7 +201,6 @@ module Worker_state = struct
         (Epoch.t * Slot.t) Public_key.Compressed.Table.t }
 
   let update_last_checked_slot_and_epoch_table t new_keys ~now =
-    (* TODO: Be smarter so that we don't have to look at the slot before again *)
     let global_slot =
       Consensus.Data.Consensus_time.(
         of_time_exn now ~constants:t.config.consensus_constants)
@@ -222,13 +217,8 @@ module Worker_state = struct
         Public_key.Compressed.Table.t}%!"
       t.last_checked_slot_and_epoch
 
-  let seen_slot last_checked_slot_and_epoch epoch slot ~logger =
+  let seen_slot last_checked_slot_and_epoch epoch slot =
     let module Table = Public_key.Compressed.Table in
-    [%log info] "checking seen keys" ;
-    [%log info]
-      !"last checked epoch slots %{sexp: (Epoch.t * Slot.t) \
-        Public_key.Compressed.Table.t}%!"
-      last_checked_slot_and_epoch ;
     let unseens =
       Table.to_alist last_checked_slot_and_epoch
       |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
@@ -236,10 +226,6 @@ module Worker_state = struct
                Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Slot.compare
                  last_checked_epoch_and_slot (epoch, slot)
              in
-             [%log info]
-               !"last checked epoch slot %{sexp: Epoch.t * Slot.t}, current \
-                 epoch slot %{sexp: Epoch.t*Slot.t},i: %d"
-               last_checked_epoch_and_slot (epoch, slot) i ;
              if i > 0 then None
              else (
                Table.set last_checked_slot_and_epoch ~key:pk ~data:(epoch, slot) ;
@@ -285,16 +271,11 @@ module Worker_state = struct
         let epoch = epoch_data.epoch in
         [%log info] "Starting VRF evaluation for epoch: $epoch"
           ~metadata:[("epoch", Epoch.to_yojson epoch)] ;
-        [%log info]
-          !"last checked epoch slots %{sexp: (Epoch.t * Slot.t) \
-            Public_key.Compressed.Table.t}%!"
-          last_checked_slot_and_epoch ;
         let keypairs = block_producer_keys in
         let logger = config.logger in
         let start_global_slot =
           Consensus_time.to_global_slot consensus_time_now
         in
-        (*delete *)
         Slots_won.delete_all_before ~slot:start_global_slot slots_won_staged ;
         let slot_offset_since_genesis =
           match
@@ -302,7 +283,7 @@ module Worker_state = struct
               epoch_data.global_slot
           with
           | None ->
-              failwith "Global slot > Global slot since genesis "
+              failwith "Global slot > Global slot since genesis"
           | Some diff ->
               diff
         in
@@ -360,18 +341,17 @@ module Worker_state = struct
         in
         let curr_slot_won = ref (Slots_won.first_elt slots_won_staged) in
         let rec find_winning_slot (consensus_time : Consensus_time.t) =
-          Core.printf !"slots list: %{sexp: Slots_won.t}\n%!" slots_won_staged ;
           let slot = Consensus_time.slot consensus_time in
           let global_slot = Consensus_time.to_global_slot consensus_time in
           t.current_slot <- Some global_slot ;
           let epoch' = Consensus_time.epoch consensus_time in
-          [%log info] "Slot in an epoch: $slot"
+          [%log info] "Slot in the epoch: $slot"
             ~metadata:[("slot", Slot.to_yojson slot)] ;
           let find f =
             let start = Time.now () in
             let%bind () =
               match%bind
-                seen_slot last_checked_slot_and_epoch epoch' slot ~logger
+                seen_slot last_checked_slot_and_epoch epoch' slot
                 |> Interruptible.return
               with
               | `All_seen ->
@@ -399,22 +379,17 @@ module Worker_state = struct
             find_winning_slot (Consensus_time.succ consensus_time)
           in
           if Epoch.(epoch' > epoch) then (
-            (*TODO: Delete later*)
-            Slots_won.check slots_won_staged ;
             t.current_slot <- None ;
             Interruptible.return () )
           else
             match !curr_slot_won with
             | None ->
-                [%log info] "No slots won yet%!" ;
                 find (fun a -> Slots_won.insert_last slots_won_staged a)
             | Some computed_win ->
-                [%log info] "Some slot won" ;
                 if
                   Global_slot.(
                     global_slot = Slots_won.Slot_won.global_slot computed_win)
                 then (
-                  [%log info] "current slot won" ;
                   if
                     (*Slot already won; check if the block producer is still applicable*)
                     List.mem (List.map keypairs ~f:fst)
@@ -515,13 +490,6 @@ module Functions = struct
   let slots_won_so_far =
     create Vrf_evaluation.Input.Stable.Latest.bin_t
       Vrf_evaluation.Result.Stable.Latest.bin_t (fun w _now ->
-        (*let global_slot =
-          Consensus.Data.Consensus_time.(
-            of_time_exn now ~constants:w.config.consensus_constants
-            |> to_global_slot)
-        in*)
-        (*Slots_won.delete_all_before ~slot:global_slot w.slots_won ;
-        let slots_won = Slots_won.all ~from:global_slot w.slots_won in*)
         let slots_won = Queue.to_list w.slots_won in
         [%log' info w.config.logger]
           !"Slots won: %{sexp: Consensus.Data.Slot_won.t list}"
@@ -536,13 +504,15 @@ module Functions = struct
         return Vrf_evaluation.Result.{slots_won; evaluator_status} )
 
   let update_block_producer_keys =
-    create Update_keys_input.Stable.Latest.bin_t Unit.bin_t
+    create Keys_input.Update.Stable.Latest.bin_t Unit.bin_t
       (fun w {block_producer_keys; delegatee_table; time} ->
         let logger = w.config.logger in
-        [%log info]
-          !"Updating block producer keys %{sexp: (Keypair.t * \
-            Signature_lib.Public_key.Compressed.t) list}"
-          block_producer_keys ;
+        [%log info] "Updating block producer keys $keys"
+          ~metadata:
+            [ ( "keys"
+              , `List
+                  (List.map block_producer_keys ~f:(fun (_, pk) ->
+                       Public_key.Compressed.to_yojson pk )) ) ] ;
         let update_keys () =
           w.block_producer_keys <- block_producer_keys ;
           Worker_state.update_last_checked_slot_and_epoch_table w
@@ -560,7 +530,6 @@ module Functions = struct
             let global_slot_now =
               Consensus_time.to_global_slot consensus_time_now
             in
-            (*If current time is *)
             let interrupt_vrf_evaluation = Epoch.(epoch_now = e.epoch) in
             if interrupt_vrf_evaluation then (
               (*Update keys after stopping the evaluation*)
@@ -577,13 +546,12 @@ module Functions = struct
             Deferred.unit )
 
   let set_block_producer_keys =
-    create Set_keys_input.Stable.Latest.bin_t Unit.bin_t
-      (fun w {block_producer_keys; time} ->
+    create Keys_input.Init.Stable.Latest.bin_t Unit.bin_t (fun w k ->
         let logger = w.config.logger in
         [%log info] "Setting block producer keys" ;
-        w.block_producer_keys <- block_producer_keys ;
+        w.block_producer_keys <- k.block_producer_keys ;
         Worker_state.update_last_checked_slot_and_epoch_table w
-          block_producer_keys ~now:time ;
+          k.block_producer_keys ~now:k.time ;
         Deferred.unit )
 end
 
@@ -601,9 +569,9 @@ module Worker = struct
           , Vrf_evaluation.Result.t )
           Rpc_parallel.Function.t
       ; update_block_producer_keys:
-          ('worker, Update_keys_input.t, unit) Rpc_parallel.Function.t
+          ('worker, Keys_input.Update.t, unit) Rpc_parallel.Function.t
       ; set_block_producer_keys:
-          ('worker, Set_keys_input.t, unit) Rpc_parallel.Function.t }
+          ('worker, Keys_input.Init.t, unit) Rpc_parallel.Function.t }
 
     module Worker_state = Worker_state
 
@@ -655,8 +623,9 @@ type t = {connection: Worker.Connection.t; process: Process.t}
 let set_block_producer_keys {connection; process= _} ~keypairs ~now =
   Worker.Connection.run connection ~f:Worker.functions.set_block_producer_keys
     ~arg:
-      { block_producer_keys= Keypair.And_compressed_pk.Set.to_list keypairs
-      ; time= now }
+      (Keys_input.Init.create
+         (Keypair.And_compressed_pk.Set.to_list keypairs)
+         now)
 
 let update_block_producer_keys {connection; process= _} ~keypairs
     ~delegatee_table ~now =

@@ -917,7 +917,6 @@ let run ~logger ~vrf_evaluator ~prover ~verifier ~trust_system
                     |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
                     (Time.now time_controller) ;
                   update_keys := true ;
-                  (*TODO: propagate updated delegatee table to the VRF evaluator*)
                   keypairs
               | keypairs, `Same ->
                   keypairs
