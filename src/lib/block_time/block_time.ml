@@ -78,7 +78,13 @@ module Time = struct
               match Core.Sys.getenv env with
               | Some tm ->
                   Int.of_string tm
-              | None ->
+              | _, Some tm ->
+                  [%log warn]
+                    "Using deprecated environment variable %s, please use %s \
+                     instead"
+                    env_deprecated env ;
+                  Int.of_string tm
+              | None, None ->
                   [%log debug]
                     "Environment variable %s not found, using default of 0" env ;
                   0

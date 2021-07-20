@@ -1,8 +1,8 @@
 use crate::bigint_256;
 use algebra::biginteger::BigInteger256;
+use mina_curves::pasta::fq::{Fq, FqParameters as Fq_params};
 use algebra::{
     fields::{Field, FpParameters, PrimeField, SquareRootField},
-    pasta::fq::{Fq, FqParameters as Fq_params},
     FftField, One, UniformRand, Zero,
 };
 use ff_fft::{EvaluationDomain, Radix2EvaluationDomain as Domain};
@@ -176,8 +176,8 @@ pub fn caml_pasta_fq_to_bytes(x: ocaml::Pointer<Fq>) -> ocaml::Value {
     let str = unsafe { ocaml::sys::caml_alloc_string(len) };
     unsafe {
         core::ptr::copy_nonoverlapping(x.as_ptr() as *const u8, ocaml::sys::string_val(str), len);
+        ocaml::Value::new(str)
     }
-    ocaml::Value(str)
 }
 
 #[ocaml::func]

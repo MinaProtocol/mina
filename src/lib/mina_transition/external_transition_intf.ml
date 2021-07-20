@@ -57,9 +57,9 @@ module type External_transition_common_intf = sig
 
   val proposed_protocol_version_opt : t -> Protocol_version.t option
 
-  val broadcast : t -> unit
+  val accept : t -> unit
 
-  val don't_broadcast : t -> unit
+  val reject : t -> unit
 
   val poke_validation_callback : t -> Mina_net2.Validation_callback.t -> unit
 end

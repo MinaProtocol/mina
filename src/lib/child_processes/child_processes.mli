@@ -54,7 +54,10 @@ val start_custom :
        [ `Always_raise
        | `Raise_on_failure
        | `Handler of
-         killed:bool -> Unix.Exit_or_signal.t Or_error.t -> unit Deferred.t
+            killed:bool
+         -> Process.t
+         -> Unix.Exit_or_signal.t Or_error.t
+         -> unit Deferred.t
        | `Ignore ]
        (** What to do when the process exits. Note that an exception will not be
          raised after you run [kill] on it, regardless of this value.
@@ -72,9 +75,4 @@ val kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t
 
 module Termination : module type of Termination
 
-val register_process :
-     ?termination_expected:bool
-  -> Termination.t
-  -> t
-  -> Termination.process_kind
-  -> unit
+val register_process : Termination.t -> t -> Termination.process_kind -> unit
