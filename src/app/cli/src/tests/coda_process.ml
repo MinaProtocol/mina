@@ -50,11 +50,7 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
         , List.map
             ~f:(List.map ~f:Node_addrs_and_ports.to_display)
             all_peers_list )
-<<<<<<< HEAD
-    ; env=
-=======
     ; env =
->>>>>>> develop
         ( "MINA_TIME_OFFSET"
         , Time.Span.to_int63_seconds_round_down_exn offset
           |> Int63.to_int

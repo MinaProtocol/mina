@@ -125,7 +125,7 @@ let get_time_offset_graphql =
             MINA_TIME_OFFSET environment variable in the shell before \
             executing them:\n\
             export MINA_TIME_OFFSET=%i\n"
-           time_offset time_offset ))
+           time_offset time_offset))
 
 let print_trust_statuses statuses json =
   if json then
