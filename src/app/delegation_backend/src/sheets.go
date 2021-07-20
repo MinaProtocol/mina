@@ -3,7 +3,6 @@ package delegation_backend
 import (
   sheets "google.golang.org/api/sheets/v4"
   logging "github.com/ipfs/go-log/v2"
-  "github.com/btcsuite/btcutil/base58"
 )
 
 func processRows (rows [][](interface{})) Whitelist {
@@ -12,10 +11,9 @@ func processRows (rows [][](interface{})) Whitelist {
     if len(row) > 0 {
       switch v := row[0].(type) {
         case string:
-          bs, ver, err := base58.CheckDecode(v)
-          if err == nil && ver == BASE58CHECK_VERSION_PK && len(bs) == PK_LENGTH {
-            var pk Pk
-            copy(pk[:], bs)
+          var pk Pk
+          err := StringToPk(&pk, v)
+          if err == nil {
             wl[pk] = true // we need something to be provided as value
           }
       }

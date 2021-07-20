@@ -18,14 +18,14 @@ func randBytes(n int, r *rand.Rand) []byte {
   return b
 }
 
-func randB58(n int, ver byte, r *rand.Rand) ([]byte, string) {
-  bs := randBytes(n, r)
+func randB58(prefix []byte, n int, ver byte, r *rand.Rand) ([]byte, string) {
+  bs := append(prefix, randBytes(n, r)...)
   return bs, base58.CheckEncode(bs, ver)
 }
 
-func randB58WithWrongCheck(n int, ver byte, r *rand.Rand) string {
+func randB58WithWrongCheck(prefix []byte, n int, ver byte, r *rand.Rand) string {
   var v2 string
-  _, v2 = randB58(PK_LENGTH, BASE58CHECK_VERSION_PK, r)
+  _, v2 = randB58(prefix, n, ver, r)
   return randReplaceOneChar(v2, B58_ALPHABET, r)
 }
 
@@ -68,33 +68,33 @@ type SigJSONUnmarshalTestData struct {
   sig Sig
 }
 
-func genB58JSONUnmarshalData (bs []byte, ver byte, r *rand.Rand) (string, []string) {
-  good := base58.CheckEncode(bs, ver)
+func genB58JSONUnmarshalData (prefix []byte, bs []byte, ver byte, r *rand.Rand) (string, []string) {
+  fullBs := append(prefix, bs...)
+  good := base58.CheckEncode(fullBs, ver)
   rv := randOther(ver, func () interface{} {
     return byte(r.Uint32()%256)
   }, r).(byte)
-  bad1 := base58.CheckEncode(bs, rv)
+  bad1 := base58.CheckEncode(fullBs, rv)
   bad2 := randReplaceOneChar(good, B58_ALPHABET, r)
   bad3 := randReplaceOneChar(bad1, B58_ALPHABET, r)
   l := randOther(len(bs), func () interface{} {
     return r.Intn(1000)+1
   }, r).(int)
-  _, bad4 := randB58(l, ver, r)
+  _, bad4 := randB58(prefix, l, ver, r)
   return good, []string{ bad1, bad2, bad3, bad4 }
 }
 
 func (PkJSONUnmarshalTestData) Generate(r *rand.Rand, size int) reflect.Value {
   var pk Pk
   r.Read(pk[:])
-  pkBytes := append([]byte{1,1}, pk[:]...)
-  good, bad := genB58JSONUnmarshalData(pkBytes, BASE58CHECK_VERSION_PK, r)
+  good, bad := genB58JSONUnmarshalData(PK_PREFIX[:], pk[:], BASE58CHECK_VERSION_PK, r)
   return reflect.ValueOf(PkJSONUnmarshalTestData{good, bad, pk})
 }
 
 func (SigJSONUnmarshalTestData) Generate(r *rand.Rand, size int) reflect.Value {
   var sig Sig
   r.Read(sig[:])
-  good, bad := genB58JSONUnmarshalData(append([]byte{1}, sig[:]...), BASE58CHECK_VERSION_SIG, r)
+  good, bad := genB58JSONUnmarshalData(SIG_PREFIX[:], sig[:], BASE58CHECK_VERSION_SIG, r)
   return reflect.ValueOf(SigJSONUnmarshalTestData{good, bad, sig})
 }
 

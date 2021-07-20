@@ -26,22 +26,22 @@ func randRow(r *rand.Rand) ([](interface{}), *Pk) {
       v = r.Float64()
     case 2: // Correct base58check-encoded pk
       var bs []byte
-      bs, v = randB58(PK_LENGTH, BASE58CHECK_VERSION_PK, r)
+      bs, v = randB58(PK_PREFIX[:], PK_LENGTH, BASE58CHECK_VERSION_PK, r)
       var pk_ Pk
-      copy(pk_[:], bs)
+      copy(pk_[:], bs[len(PK_PREFIX):])
       pk = &pk_
     case 3: // Correct base58check-encoded bytestring with a random non-pk version byte
       ver := randOther(BASE58CHECK_VERSION_PK, func () interface{} {
         return byte(r.Uint32()%256)
       }, r).(byte)
-      _, v = randB58(PK_LENGTH, ver, r)
+      _, v = randB58(PK_PREFIX[:], PK_LENGTH, ver, r)
     case 4: // Incorrect base58check-encoded (one of the symbols altered, so check won't succeed)
-      v = randB58WithWrongCheck(PK_LENGTH, BASE58CHECK_VERSION_PK, r)
+      v = randB58WithWrongCheck(PK_PREFIX[:], PK_LENGTH, BASE58CHECK_VERSION_PK, r)
     case 8: // Correct base58check-encoded, wrong length
       l := randOther(PK_LENGTH, func () interface{} {
         return r.Intn(1000)+1
       }, r).(int)
-      _, v = randB58(l, BASE58CHECK_VERSION_PK, r)
+      _, v = randB58(PK_PREFIX[:], l, BASE58CHECK_VERSION_PK, r)
   }
   return [](interface{}){v}, pk
 }
