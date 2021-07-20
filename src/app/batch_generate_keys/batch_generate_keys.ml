@@ -1,5 +1,7 @@
 open Core
+open Async
 open Signature_lib
+open Secrets
 
 let gen_secret_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
@@ -159,6 +161,107 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee =
      application/json' --data '%s'@."
     (Yojson.Basic.to_string graphql_query_json)
 
+let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
+    ~rate_limit ~rate_limit_level ~rate_limit_interval
+    ~origin_sender_public_key_option ~origin_sender_secret_key_path_option =
+  let rate_limit =
+    if rate_limit then
+      let slot_limit =
+        Float.(
+          of_int txns_per_block /. of_int slot_time *. fill_rate
+          *. of_int rate_limit_interval)
+      in
+      let limit = min (Float.to_int slot_limit) rate_limit_level in
+      Some limit
+    else None
+  in
+  let batch_count = ref 0 in
+  let base_send_amount = Currency.Amount.of_formatted_string "2" in
+  let initial_send_amount =
+    Option.value_exn
+      (Currency.Amount.add base_send_amount
+         (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee))
+  in
+  let fee_amount = Mina_base.Signed_command.minimum_fee in
+  let generated_secrets = gen_secret_keys count in
+
+  let open Deferred.Let_syntax in
+  let%bind (use_graphql, origin_sk_option)
+             : bool * Marlin_plonk_bindings_pasta_fq.t option =
+    if Option.is_some origin_sender_public_key_option then
+      Deferred.return (false, None)
+    else if Option.is_some origin_sender_secret_key_path_option then
+      let%bind keypair =
+        Secrets.Keypair.read_exn'
+          (Option.value_exn origin_sender_secret_key_path_option)
+      in
+      let origin_sk = keypair.private_key in
+      Deferred.return (true, Some origin_sk)
+    else exit 1
+  in
+  let origin_pk : string =
+    if not use_graphql then Option.value_exn origin_sender_public_key_option
+    else
+      let origin_sk = Option.value_exn origin_sk_option in
+      origin_sk |> Public_key.of_private_key_exn |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check
+  in
+
+  (* there... *)
+  if not use_graphql then
+    List.iter generated_secrets ~f:(fun sk ->
+        Option.iter rate_limit ~f:(fun rate_limit ->
+            if !batch_count >= rate_limit then (
+              Format.printf "sleep %f@."
+                Float.(of_int rate_limit_interval /. 1000.) ;
+              batch_count := 0 )
+            else incr batch_count) ;
+        let acct_pk =
+          Public_key.of_private_key_exn sk
+          |> Public_key.compress |> Public_key.Compressed.to_base58_check
+        in
+        let transaction_command =
+          Format.sprintf
+            "mina client send-payment --amount %s --fee %s --receiver %s \
+             --sender %s@."
+            (initial_send_amount |> Currency.Amount.to_formatted_string)
+            ( fee_amount |> Currency.Amount.of_fee
+            |> Currency.Amount.to_formatted_string )
+            acct_pk origin_pk
+        in
+        Format.print_string transaction_command)
+  else
+    List.iter generated_secrets ~f:(fun sk ->
+        Option.iter rate_limit ~f:(fun rate_limit ->
+            if !batch_count >= rate_limit then (
+              Format.printf "sleep %f@."
+                Float.(of_int rate_limit_interval /. 1000.) ;
+              batch_count := 0 )
+            else incr batch_count) ;
+        let acct_pk = Public_key.of_private_key_exn sk in
+        let origin_sk = Option.value_exn origin_sk_option in
+        let transaction_command =
+          make_graphql_signed_transaction ~sender_priv_key:origin_sk
+            ~receiver:Public_key.(Compressed.to_base58_check (compress acct_pk))
+            ~amount:initial_send_amount ~fee:fee_amount
+        in
+        Format.print_string transaction_command) ;
+
+  (* and back again... *)
+  Deferred.return
+    (List.iter generated_secrets ~f:(fun sk ->
+         Option.iter rate_limit ~f:(fun rate_limit ->
+             if !batch_count >= rate_limit then (
+               Format.printf "sleep %f@."
+                 Float.(of_int rate_limit_interval /. 1000.) ;
+               batch_count := 0 )
+             else incr batch_count) ;
+         let transaction_command =
+           make_graphql_signed_transaction ~sender_priv_key:sk
+             ~receiver:origin_pk ~amount:base_send_amount ~fee:fee_amount
+         in
+         Format.print_string transaction_command))
+
 let output_there_and_back_cmds =
   let open Command.Let_syntax in
   Command.basic
@@ -204,106 +307,18 @@ let output_there_and_back_cmds =
            "NUM_MILLISECONDS Interval that the rate-limiter is applied over \
             (default: 300000)"
          (optional_with_default 300000 int)
-     and origin_sender_public_key =
+     and origin_sender_public_key_option =
        flag "--origin-sender-pk" ~aliases:[ "origin-sender-pk" ]
          ~doc:"PUBLIC_KEY Public key to send the transactions from"
          (optional string)
-     and origin_sender_secret_key =
-       (* TODO: this probably needs to be read in from a file instead of just stuck in plaintext in an argument*)
-       flag "--origin-sender-sk" ~aliases:[ "origin-sender-sk" ]
-         ~doc:"PRIVATE_KEY Private key to send the transactions from"
+     and origin_sender_secret_key_path_option =
+       flag "--origin-sender-sk-path" ~aliases:[ "origin-sender-sk" ]
+         ~doc:"PRIVATE_KEY Path to Private key to send the transactions from"
          (optional string)
      in
-     fun () ->
-       let rate_limit =
-         if rate_limit then
-           let slot_limit =
-             Float.(
-               of_int txns_per_block /. of_int slot_time *. fill_rate
-               *. of_int rate_limit_interval)
-           in
-           let limit = min (Float.to_int slot_limit) rate_limit_level in
-           Some limit
-         else None
-       in
-       let batch_count = ref 0 in
-       let base_send_amount = Currency.Amount.of_formatted_string "2" in
-       let initial_send_amount =
-         Option.value_exn
-           (Currency.Amount.add base_send_amount
-              (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee))
-       in
-       let fee_amount = Mina_base.Signed_command.minimum_fee in
-       let generated_secrets = gen_secret_keys count in
-
-       (* there... *)
-       if Option.is_some origin_sender_public_key then
-         List.iter generated_secrets ~f:(fun sk ->
-             Option.iter rate_limit ~f:(fun rate_limit ->
-                 if !batch_count >= rate_limit then (
-                   Format.printf "sleep %f@."
-                     Float.(of_int rate_limit_interval /. 1000.) ;
-                   batch_count := 0 )
-                 else incr batch_count) ;
-             let acct_pk = Public_key.of_private_key_exn sk in
-             let transaction_command =
-               Format.sprintf
-                 "mina client send-payment --amount %s --fee %s --receiver %s \
-                  --sender %s@."
-                 (Currency.Amount.to_formatted_string initial_send_amount)
-                 ( fee_amount |> Currency.Amount.of_fee
-                 |> Currency.Amount.to_formatted_string )
-                 Public_key.(Compressed.to_base58_check (compress acct_pk))
-                 (Option.value_exn origin_sender_public_key)
-             in
-             Format.print_string transaction_command)
-       else if Option.is_some origin_sender_secret_key then
-         List.iter generated_secrets ~f:(fun sk ->
-             Option.iter rate_limit ~f:(fun rate_limit ->
-                 if !batch_count >= rate_limit then (
-                   Format.printf "sleep %f@."
-                     Float.(of_int rate_limit_interval /. 1000.) ;
-                   batch_count := 0 )
-                 else incr batch_count) ;
-             let acct_pk = Public_key.of_private_key_exn sk in
-             let origin_sender_sk =
-               Private_key.of_base58_check_exn
-                 (Option.value_exn origin_sender_secret_key)
-             in
-             let transaction_command =
-               make_graphql_signed_transaction ~sender_priv_key:origin_sender_sk
-                 ~receiver:
-                   Public_key.(Compressed.to_base58_check (compress acct_pk))
-                 ~amount:initial_send_amount ~fee:fee_amount
-             in
-             Format.print_string transaction_command)
-       else exit 1 ;
-
-       (* and back again... *)
-       let origin_pk : string =
-         if Option.is_some origin_sender_public_key then
-           Option.value_exn origin_sender_public_key
-         else if Option.is_some origin_sender_secret_key then
-           let origin_sender_sk =
-             Private_key.of_base58_check_exn
-               (Option.value_exn origin_sender_secret_key)
-           in
-           origin_sender_sk |> Public_key.of_private_key_exn
-           |> Public_key.compress |> Public_key.Compressed.to_base58_check
-         else exit 1
-       in
-       List.iter generated_secrets ~f:(fun sk ->
-           Option.iter rate_limit ~f:(fun rate_limit ->
-               if !batch_count >= rate_limit then (
-                 Format.printf "sleep %f@."
-                   Float.(of_int rate_limit_interval /. 1000.) ;
-                 batch_count := 0 )
-               else incr batch_count) ;
-           let transaction_command =
-             make_graphql_signed_transaction ~sender_priv_key:sk
-               ~receiver:origin_pk ~amount:base_send_amount ~fee:fee_amount
-           in
-           Format.print_string transaction_command))
+     there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
+       ~rate_limit ~rate_limit_level ~rate_limit_interval
+       ~origin_sender_public_key_option ~origin_sender_secret_key_path_option)
 
 let () =
   Command.run
