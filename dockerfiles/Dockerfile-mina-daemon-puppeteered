@@ -3,7 +3,7 @@
 # for more details.
 
 # This dockerfile needs to be run with `dockerfiles/puppeteer-context` as the
-# build context.
+# build context. 
 
 ARG MINA_VERSION
 FROM codaprotocol/mina-daemon:${MINA_VERSION}
