@@ -16,6 +16,9 @@ tidy:
 test:
 	GO=$(GO) ./scripts/build.sh test
 
+docker-upload:
+	./scripts/build.sh docker-upload
+
 docker-run:
 	./scripts/build.sh docker-run
 
