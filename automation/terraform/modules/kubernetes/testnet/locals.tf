@@ -12,7 +12,7 @@ locals {
 
   coda_vars = {
     runtimeConfig        = var.runtime_config
-    image                = var.coda_image
+    image                = var.mina_image
     useCustomEntrypoint  = var.use_custom_entrypoint
     customEntrypoint     = var.custom_entrypoint
     privkeyPass          = var.block_producer_key_pass
@@ -37,7 +37,7 @@ locals {
     testnetName = var.testnet_name
     coda = {
       runtimeConfig = local.coda_vars.runtimeConfig
-      image         = var.coda_image
+      image         = var.mina_image
       useCustomEntrypoint  = var.use_custom_entrypoint
       customEntrypoint     = var.custom_entrypoint
       privkeyPass   = var.block_producer_key_pass
@@ -81,7 +81,7 @@ locals {
     healthcheck = local.healthcheck_vars
 
     userAgent = {
-      image         = var.coda_agent_image
+      image         = var.mina_agent_image
       minFee        = var.agent_min_fee
       maxFee        = var.agent_max_fee
       minTx         = var.agent_min_tx
@@ -92,7 +92,7 @@ locals {
     }
 
     bots = {
-      image = var.coda_bots_image
+      image = var.mina_bots_image
       faucet = {
         amount = var.coda_faucet_amount
         fee    = var.coda_faucet_fee
@@ -120,7 +120,7 @@ locals {
   archive_vars = [for item in var.archive_configs : {
       testnetName = var.testnet_name
       coda        = {
-        image         = var.coda_image
+        image         = var.mina_image
         seedPeers     = local.peers
         runtimeConfig = local.coda_vars.runtimeConfig
         seedPeersURL  = var.seed_peers_url
@@ -177,7 +177,7 @@ locals {
     testnetName = var.testnet_name
     image       = var.watchdog_image
     coda = {
-      image                = var.coda_image
+      image                = var.mina_image
       ports                = { metrics : 8000 }
       uploadBlocksToGCloud = var.upload_blocks_to_gcloud
     }

@@ -14,8 +14,8 @@
     },
     "environment" : [
         { "name" : "DISCORD_API_KEY", "value" : "${discord_api_key}" },
-        { "name" : "CODA_GRAPHQL_HOST", "value" : "${coda_graphql_host}" },
-        { "name" : "CODA_GRAPHQL_PORT", "value" : "${coda_graphql_port}" },
+        { "name" : "MINA_GRAPHQL_HOST", "value" : "${coda_graphql_host}" },
+        { "name" : "MINA_GRAPHQL_PORT", "value" : "${coda_graphql_port}" },
         { "name" : "FAUCET_PUBLICKEY", "value" : "${faucet_public_key}" },
         { "name" : "FAUCET_PASSWORD", "value" : "${faucet_password}" },
         { "name" : "ECHO_PUBLICKEY", "value" : "${echo_public_key}" },
