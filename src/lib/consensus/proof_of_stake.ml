@@ -2693,6 +2693,8 @@ module Hooks = struct
             ; type_decl=
                 "( Mina_base.Sparse_ledger.Stable.V1.t , string ) \
                  Result.Stable.V1.t"
+            ; module_path=
+                "Consensus.Proof_of_stake.Hooks.Rpc.Get_epoch_ledger.V1"
             ; bin_io_derived= true
             ; bin_prot_rule=
                 Bin_prot_layouts.make_result_v1_rule

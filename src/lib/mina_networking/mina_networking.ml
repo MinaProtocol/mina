@@ -207,6 +207,7 @@ module Rpcs = struct
           { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
           ; version_opt= None
           ; type_decl= "Sync_ledger.Answer.Stable.V1.t Or_error.Stable.V1.t"
+          ; module_path= "Mina_networking.Answer_sync_ledger_query.V1"
           ; bin_io_derived= true
           ; bin_prot_rule=
               Bin_prot_layouts.make_or_error_v1_rule
@@ -698,6 +699,7 @@ module Rpcs = struct
           { layout_loc= __LOC__
           ; version_opt= None
           ; type_decl= "Node_status.Stable.V2.t Or_error.Stable.V1.t"
+          ; module_path= "Mina_networking.Get_node_status.V2"
           ; bin_io_derived= true
           ; bin_prot_rule=
               Bin_prot_layouts.make_or_error_v1_rule
@@ -736,6 +738,7 @@ module Rpcs = struct
           { layout_loc= __LOC__
           ; version_opt= None
           ; type_decl= "Node_status.Stable.V1.t Or_error.Stable.V1.t"
+          ; module_path= "Mina_networking.Get_node_status.V1"
           ; bin_io_derived= true
           ; bin_prot_rule=
               Bin_prot_layouts.make_or_error_v1_rule

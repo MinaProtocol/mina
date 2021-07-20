@@ -107,6 +107,7 @@ module UInt64 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= Some 1
         ; type_decl= "Unsigned.UInt64.t"
+        ; module_path= "Unsigned_extended.UInt64"
         ; bin_io_derived= false
         ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Int64 }
 
@@ -164,6 +165,7 @@ module UInt32 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= Some 1
         ; type_decl= "Unsigned.UInt32.t"
+        ; module_path= "Unsigned_extended.UInt32"
         ; bin_io_derived= false
         ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Int32 }
 

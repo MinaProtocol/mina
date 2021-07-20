@@ -4,6 +4,7 @@ let time_option_layout =
   { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
   ; version_opt= None
   ; type_decl= "Core.Time.Stable.V1.t Core_kernel.Option.Stable.V1.t"
+  ; module_path= "Trust_system.Record"
   ; bin_io_derived= true
   ; bin_prot_rule=
       Ppx_version_runtime.Bin_prot_rule.(

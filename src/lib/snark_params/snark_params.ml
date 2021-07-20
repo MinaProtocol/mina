@@ -192,6 +192,7 @@ module Tick = struct
       { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
       ; version_opt= None
       ; type_decl= "Tick.Field.t"
+      ; module_path= "Snark_params.Tick"
       ; bin_io_derived= false
       ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
 

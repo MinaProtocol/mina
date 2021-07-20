@@ -23,7 +23,8 @@ module Validate_content = struct
   let bin_layout_t =
     { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
     ; version_opt= None
-    ; type_decl= "Mina_net2.Validation_callback.t"
+    ; type_decl= "Mina_transition.External_transition.Validate_callback.t"
+    ; module_path= "Mina_transition.External_transition.Validate_callback"
     ; bin_io_derived= false
     ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Unit }
 
@@ -118,6 +119,19 @@ type t_ = Raw_versioned__.t =
   ; current_protocol_version: Protocol_version.t
   ; proposed_protocol_version_opt: Protocol_version.t option
   ; mutable validation_callback: Validate_content.t }
+*)
+
+(* let _ =
+  let layout = Stable.Latest.bin_layout_t in
+  let layout_compressed =
+    { layout with
+      bin_prot_rule=
+        Ppx_version_runtime.Bin_prot_rule.compress_references
+          layout.bin_prot_rule }
+  in
+  Format.eprintf "LAYOUT: %s@."
+    ( Ppx_version_runtime.Bin_prot_layout.to_yojson layout_compressed
+    |> Yojson.Safe.pretty_to_string )
 *)
 
 module Precomputed_block = struct

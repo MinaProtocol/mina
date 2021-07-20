@@ -445,6 +445,7 @@ module Vector_2 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N2.n) vec"
+        ; module_path= "Pickles_type.Vector.Vector2"
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.Type_abstraction
@@ -484,6 +485,7 @@ module Vector_4 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N4.n) vec"
+        ; module_path= "Pickles_types.Vector.Vector4"
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
@@ -523,6 +525,7 @@ module Vector_8 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N17.n) vec"
+        ; module_path= "Pickles_types.Vector.Vector8"
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
@@ -562,6 +565,7 @@ module Vector_17 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N17.n) vec"
+        ; module_path= "Pickles_types.Vector.Vector17"
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
@@ -601,6 +605,7 @@ module Vector_18 = struct
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "'a t = ('a, Nat.N17.n) vec"
+        ; module_path= "Pickles_types.Vector.Vector18"
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
