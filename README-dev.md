@@ -27,11 +27,16 @@ The short version:
       you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
 4.  Run `git config --local --add submodule.recurse true`
 
+### Developer Setup (Docker)
+
+You can build Mina using Docker. This should work in any dev environment.
+Refer to [/dev](/dev).
+
 ### Developer Setup (MacOS)
 
 - Invoke `make macos-setup`
   - If this is your first time using OCaml, be sure to run `eval $(opam config env)`
-- Invoke `rustup default 1.45.2`
+- Invoke `rustup toolchain install 1.52.1`
 - Invoke `make build`
 - Jump to [customizing your editor for autocomplete](#dev-env)
 
