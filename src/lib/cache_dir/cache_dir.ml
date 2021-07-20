@@ -35,9 +35,7 @@ let env_path =
   match Sys.getenv "MINA_KEYS_PATH" with
   | Some path ->
       path
-  | None, Some path ->
-      path
-  | None, None ->
+  | None ->
       manual_install_path
 
 let possible_paths base =
