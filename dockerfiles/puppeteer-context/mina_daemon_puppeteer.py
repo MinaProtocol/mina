@@ -75,7 +75,7 @@ def start_daemon():
   global mina_process
   with open('mina.log', 'a') as f:
     mina_process = subprocess.Popen(
-        ['mina'] + daemon_args,
+        ['sh -c mina'] + daemon_args,
         stdout=f,
         stderr=subprocess.STDOUT
     )
