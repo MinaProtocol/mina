@@ -41,7 +41,7 @@ variable "deploy_watchdog" {
   default = true
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type    = string
   default = "codaprotocol/coda-daemon:0.0.13-beta-master-99d1e1f"
 }
@@ -56,7 +56,7 @@ variable "custom_entrypoint" {
   default = ""
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type    = string
   default = ""
 }
@@ -71,7 +71,7 @@ variable "archive_node_count" {
   default = 0
 }
 
-variable "coda_agent_image" {
+variable "mina_agent_image" {
   type    = string
   default = "codaprotocol/coda-user-agent:0.1.4"
 }
@@ -81,12 +81,12 @@ variable "coda_agent_active" {
   default = "true"
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type    = string
   default = ""
 }
 
-variable "coda_points_image" {
+variable "mina_points_image" {
   type    = string
   default = ""
 }
