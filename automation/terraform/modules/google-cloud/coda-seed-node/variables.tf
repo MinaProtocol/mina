@@ -48,7 +48,7 @@ variable "discovery_keypair" {
   description = "The LibP2P Keypair to use when launching the seed node."
 }
 
-variable "coda_image" {
+variable "mina_image" {
   description = "The docker image to deploy."
 }
 
