@@ -17,6 +17,11 @@ spec:
             - /bin/bash
             - -c
             - "
+
+batch_generate_keys.exe gen-there-and-back-txns -count 10 --origin-sender-sk-path /keys/key > txn_burst.sh
+chmod 777 txn_burst.sh
+./txn_burst.sh
+
 mina accounts unlock --password adsfasdfasdf B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV #can also be done via graphql
 
 # obtained originally with 
@@ -46,15 +51,15 @@ curl 'http://127.0.0.1:3085/graphql' -X POST -H 'content-type: application/json'
             env:
             - name: GCLOUD_KEYFILE
               value: /gcloud/keyfile.json
-            image: minaprotocol/mina-daemon-baked:1.1.5-a42bdee
+            image: adsfljkhasdfkljhasdfkljhasdfkljhasldkjfhzxcadsfaslkjhasdflkjdhasfkljasdhfdjsfkldjs
             imagePullPolicy: IfNotPresent
             name: devnet-txn-burst-cronjob
             resources: {}
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
-            - mountPath: /gcloud/
-              name: gcloud-keyfile
+            - mountPath: /keys/
+              name: private-keys
           dnsPolicy: ClusterFirst
           restartPolicy: Never
           schedulerName: default-scheduler
