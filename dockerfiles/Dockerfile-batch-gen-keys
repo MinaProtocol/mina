@@ -1,0 +1,17 @@
+ARG deb_codename=stretch
+FROM debian:${deb_codename}-slim
+# Run with `docker build --build-arg deb_version=<version>`
+ARG deb_version
+ARG deb_release=alpha
+ARG deb_codename=stretch
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get -y update && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
+  DEBIAN_FRONTEND=noninteractive apt-get -y install && \
+  rm -rf /var/lib/apt/lists/*
+
+COPY ./_build/default/src/app/batch_generate_keys/batch_generate_keys.exe /batch_generate_keys
+
+ENTRYPOINT ["/batch_generate_keys"]

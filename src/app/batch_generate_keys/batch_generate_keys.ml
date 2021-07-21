@@ -1,7 +1,6 @@
 open Core
 open Async
 open Signature_lib
-open Secrets
 
 let gen_secret_keys count =
   Quickcheck.random_value ~seed:`Nondeterministic
@@ -93,7 +92,6 @@ let output_cmds =
              sender_key))
 
 (* Shamelessly copied from src/app/cli/src/init/graphql_queries.ml and tweaked*)
-
 module Send_payment =
 [%graphql
 {|
@@ -163,7 +161,7 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee =
 
 let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
     ~rate_limit ~rate_limit_level ~rate_limit_interval
-    ~origin_sender_public_key_option ~origin_sender_secret_key_path_option =
+    ~origin_sender_public_key_option ~origin_sender_secret_key_path_option () =
   let rate_limit =
     if rate_limit then
       let slot_limit =
@@ -264,7 +262,7 @@ let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
 
 let output_there_and_back_cmds =
   let open Command.Let_syntax in
-  Command.basic
+  Command.async
     ~summary:
       "Generate commands to send funds from a single account to many accounts, \
        then transfer them back again. The 'back again' commands are expressed \
