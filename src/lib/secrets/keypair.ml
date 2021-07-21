@@ -7,9 +7,12 @@ open Keypair_common
 module T = struct
   type t = Keypair.t
 
-  let env = "CODA_PRIVKEY_PASS"
+  let env = "MINA_PRIVKEY_PASS"
 
-  let which = "coda keypair"
+  (* TODO: remove eventually *)
+  let env_deprecated = "CODA_PRIVKEY_PASS"
+
+  let which = "Mina keypair"
 
   (** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
   let write_exn { Keypair.private_key; public_key } ~(privkey_path : string)
@@ -69,8 +72,21 @@ module T = struct
         Privkey_error.raise ~which priv_key_error
 
   let read_exn' path =
-    read_exn ~privkey_path:path
-      ~password:(lazy (Password.hidden_line_or_env "Secret key password: " ~env))
+    let password =
+      let env_value = Sys.getenv env in
+      let env_deprecated_value = Sys.getenv env_deprecated in
+      match (env_value, env_deprecated_value) with
+      | Some v, _ | None, Some v ->
+          lazy (return @@ Bytes.of_string v)
+      | None, None ->
+          let error_help_message =
+            sprintf "Set the %s environment variable to the password" env
+          in
+          lazy
+            (Password.read_hidden_line ~error_help_message
+               "Secret key password: ")
+    in
+    read_exn ~privkey_path:path ~password
 end
 
 include T

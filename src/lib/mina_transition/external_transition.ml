@@ -324,10 +324,10 @@ let payments t =
     | _ ->
         None)
 
-let broadcast t =
+let accept t =
   Mina_net2.Validation_callback.fire_exn (validation_callback t) `Accept
 
-let don't_broadcast t =
+let reject t =
   Mina_net2.Validation_callback.fire_exn (validation_callback t) `Reject
 
 let poke_validation_callback t cb = set_validation_callback t cb
@@ -909,9 +909,9 @@ module With_validation = struct
 
   let protocol_version_status t = lift protocol_version_status t
 
-  let broadcast t = lift broadcast t
+  let accept t = lift accept t
 
-  let don't_broadcast t = lift don't_broadcast t
+  let reject t = lift reject t
 
   let poke_validation_callback t = lift poke_validation_callback t
 end
@@ -1046,8 +1046,8 @@ module Validated = struct
     , current_protocol_version
     , proposed_protocol_version_opt
     , protocol_version_status
-    , broadcast
-    , don't_broadcast
+    , accept
+    , reject
     , poke_validation_callback
     , protocol_state_proof
     , blockchain_state
