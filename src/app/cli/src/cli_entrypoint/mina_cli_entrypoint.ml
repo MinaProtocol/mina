@@ -846,25 +846,27 @@ let setup_daemon logger =
           let cidrs =
             String.split ~on:',' env_str
             |> List.filter_map ~f:(fun str ->
-                try Some (Unix.Cidr.of_string str)
-                with _ ->
-                  [%log warn]
-                    "Could not parse address $address in \
-                     %s" env_var
-                    ~metadata:[("address", `String str)] ;
-                  None )
+                   try Some (Unix.Cidr.of_string str)
+                   with _ ->
+                     [%log warn] "Could not parse address $address in %s"
+                       env_var
+                       ~metadata:[ ("address", `String str) ] ;
+                     None)
           in
-          Some
-            (List.append cidrs (Option.value ~default:[] client_trustlist))
+          Some (List.append cidrs (Option.value ~default:[] client_trustlist))
         in
-        match Unix.getenv mina_client_trustlist,Unix.getenv coda_client_trustlist with
-        | Some env_str,_ -> cidrs_of_env_str env_str mina_client_trustlist
-        | None,Some env_str ->
-          [%log warn] "Using deprecated environment variable %s, please use %s instead"
-            coda_client_trustlist mina_client_trustlist;
-          cidrs_of_env_str env_str coda_client_trustlist
-        | None,None ->
-          client_trustlist
+        match
+          (Unix.getenv mina_client_trustlist, Unix.getenv coda_client_trustlist)
+        with
+        | Some env_str, _ ->
+            cidrs_of_env_str env_str mina_client_trustlist
+        | None, Some env_str ->
+            [%log warn]
+              "Using deprecated environment variable %s, please use %s instead"
+              coda_client_trustlist mina_client_trustlist ;
+            cidrs_of_env_str env_str coda_client_trustlist
+        | None, None ->
+            client_trustlist
       in
       Stream.iter
         (Async_kernel.Async_kernel_scheduler.long_cycles_with_context
