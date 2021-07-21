@@ -3,6 +3,7 @@ use wasm_bindgen::convert::{OptionIntoWasmAbi, IntoWasmAbi, OptionFromWasmAbi, F
 use std::ops::Deref;
 use std::convert::{From};
 
+#[derive(Clone, Debug)]
 pub struct WasmFlatVector<T>(Vec<T>);
 
 pub trait FlatVectorElem {
@@ -32,6 +33,41 @@ impl<T> From<WasmFlatVector<T>> for Vec<T> {
 impl<'a, T> From<&'a WasmFlatVector<T>> for &'a Vec<T> {
     fn from(x: &'a WasmFlatVector<T>) -> Self {
         &x.0
+    }
+}
+
+impl<T> std::iter::IntoIterator for WasmFlatVector<T> {
+    type Item = <Vec<T> as std::iter::IntoIterator>::Item;
+    type IntoIter = <Vec<T> as std::iter::IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, T> std::iter::IntoIterator for &'a WasmFlatVector<T> {
+    type Item = <&'a Vec<T> as std::iter::IntoIterator>::Item;
+    type IntoIter = <&'a Vec<T> as std::iter::IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
+impl<T> std::iter::FromIterator<T> for WasmFlatVector<T> {
+    fn from_iter<I>(iter: I) -> WasmFlatVector<T>
+    where I: IntoIterator<Item = T> {
+        WasmFlatVector(std::iter::FromIterator::from_iter(iter))
+    }
+}
+
+impl<T> std::default::Default for WasmFlatVector<T> {
+    fn default() -> Self {
+        WasmFlatVector(std::default::Default::default())
+    }
+}
+
+impl<T> std::iter::Extend<T> for WasmFlatVector<T> {
+    fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item = T> {
+        self.0.extend(iter)
     }
 }
 

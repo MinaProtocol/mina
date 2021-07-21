@@ -53,7 +53,7 @@ impl<'a> From<&'a WasmPallasGProjective> for &'a GProjective {
 }
 
 #[wasm_bindgen]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct WasmPallasGAffine {
     pub x: WasmPastaFp,
     pub y: WasmPastaFp,

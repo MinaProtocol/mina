@@ -28,6 +28,24 @@ impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFp {
     }
 }
 
+impl From<Fp> for WasmPastaFp {
+    fn from(x: Fp) -> Self {
+        WasmPastaFp(x)
+    }
+}
+
+impl From<WasmPastaFp> for Fp {
+    fn from(x: WasmPastaFp) -> Self {
+        x.0
+    }
+}
+
+impl<'a> From<&'a WasmPastaFp> for &'a Fp {
+    fn from(x: &'a WasmPastaFp) -> Self {
+        &x.0
+    }
+}
+
 impl wasm_bindgen::describe::WasmDescribe for WasmPastaFp {
     fn describe() { <Vec<u8> as wasm_bindgen::describe::WasmDescribe>::describe() }
 }

@@ -3,7 +3,7 @@ use wasm_bindgen::convert::{OptionIntoWasmAbi, IntoWasmAbi, OptionFromWasmAbi, F
 use std::ops::Deref;
 use std::convert::From;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WasmVector<T>(Vec<T>);
 
 impl<T> Deref for WasmVector<T> {
@@ -27,6 +27,41 @@ impl<T> From<WasmVector<T>> for Vec<T> {
 impl<'a, T> From<&'a WasmVector<T>> for &'a Vec<T> {
     fn from(x: &'a WasmVector<T>) -> Self {
         &x.0
+    }
+}
+
+impl<T> std::iter::IntoIterator for WasmVector<T> {
+    type Item = <Vec<T> as std::iter::IntoIterator>::Item;
+    type IntoIter = <Vec<T> as std::iter::IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, T> std::iter::IntoIterator for &'a WasmVector<T> {
+    type Item = <&'a Vec<T> as std::iter::IntoIterator>::Item;
+    type IntoIter = <&'a Vec<T> as std::iter::IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.0).into_iter()
+    }
+}
+
+impl<T> std::iter::FromIterator<T> for WasmVector<T> {
+    fn from_iter<I>(iter: I) -> WasmVector<T>
+    where I: IntoIterator<Item = T> {
+        WasmVector(std::iter::FromIterator::from_iter(iter))
+    }
+}
+
+impl<T> std::default::Default for WasmVector<T> {
+    fn default() -> Self {
+        WasmVector(std::default::Default::default())
+    }
+}
+
+impl<T> std::iter::Extend<T> for WasmVector<T> {
+    fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item = T> {
+        self.0.extend(iter)
     }
 }
 

@@ -13,7 +13,7 @@ use num_bigint::BigUint;
 use rand::rngs::StdRng;
 use std::cmp::Ordering::{Equal, Greater, Less};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct WasmPastaFq(pub Fq);
 
 impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFq {
@@ -25,6 +25,24 @@ impl crate::wasm_flat_vector::FlatVectorElem for WasmPastaFq {
     }
     fn unflatten(flat: Vec<u8>) -> Self {
         WasmPastaFq(FromBytes::read(flat.as_slice()).unwrap())
+    }
+}
+
+impl From<Fq> for WasmPastaFq {
+    fn from(x: Fq) -> Self {
+        WasmPastaFq(x)
+    }
+}
+
+impl From<WasmPastaFq> for Fq {
+    fn from(x: WasmPastaFq) -> Self {
+        x.0
+    }
+}
+
+impl<'a> From<&'a WasmPastaFq> for &'a Fq {
+    fn from(x: &'a WasmPastaFq) -> Self {
+        &x.0
     }
 }
 
