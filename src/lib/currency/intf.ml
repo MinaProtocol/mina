@@ -115,6 +115,12 @@ module type Signed_intf = sig
 
   val zero : t
 
+  val is_zero : t -> bool
+
+  val is_positive : t -> bool
+
+  val is_negative : t -> bool
+
   val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option

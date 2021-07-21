@@ -1668,6 +1668,8 @@ func newApp() *app {
 		ValidatorMutex:           &sync.Mutex{},
 		Validators:               make(map[int]*validationStatus),
 		Streams:                  make(map[int]net.Stream),
+		StreamStates:             make(map[int]streamState),
+		StreamsMutex:             sync.Mutex{},
 		OutChan:                  make(chan interface{}, 4096),
 		Out:                      bufio.NewWriter(os.Stdout),
 		AddedPeers:               []peer.AddrInfo{},
