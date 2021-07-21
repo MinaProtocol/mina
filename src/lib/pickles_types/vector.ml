@@ -440,7 +440,6 @@ module Vector_2 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N2.n) vec
 
-      (* TODO: what's the actual rule? *)
       let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
@@ -448,8 +447,8 @@ module Vector_2 = struct
         ; module_path= "Pickles_type.Vector.Vector2"
         ; bin_io_derived= false
         ; bin_prot_rule=
-            Ppx_version_runtime.Bin_prot_rule.Type_abstraction
-              (["a"], Type_var "a") }
+            Ppx_version_runtime.Bin_prot_rule.(
+              Type_abstraction (["a"], Custom)) }
 
       include Make.Binable (Nat.N2)
 
@@ -480,7 +479,6 @@ module Vector_4 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N4.n) vec
 
-      (* TODO : what's the actual rule? *)
       let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
@@ -489,7 +487,7 @@ module Vector_4 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Type_var "a")) }
+              Type_abstraction (["a"], Custom)) }
 
       include Make.Binable (Nat.N4)
 
@@ -520,7 +518,6 @@ module Vector_8 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N8.n) vec
 
-      (* TODO : what's the actual rule? *)
       let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
@@ -529,7 +526,7 @@ module Vector_8 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Type_var "a")) }
+              Type_abstraction (["a"], Custom)) }
 
       include Make.Binable (Nat.N8)
 
@@ -560,7 +557,6 @@ module Vector_17 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N17.n) vec
 
-      (* TODO : what's the actual rule? *)
       let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
@@ -569,7 +565,7 @@ module Vector_17 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Type_var "a")) }
+              Type_abstraction (["a"], Custom)) }
 
       include Make.Binable (Nat.N17)
 
@@ -600,7 +596,6 @@ module Vector_18 = struct
     module V1 = struct
       type 'a t = ('a, Nat.N18.n) vec
 
-      (* TODO : what's the actual rule? *)
       let bin_layout_t =
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
@@ -609,7 +604,7 @@ module Vector_18 = struct
         ; bin_io_derived= false
         ; bin_prot_rule=
             Ppx_version_runtime.Bin_prot_rule.(
-              Type_abstraction (["a"], Type_var "a")) }
+              Type_abstraction (["a"], Custom)) }
 
       include Make.Binable (Nat.N18)
 

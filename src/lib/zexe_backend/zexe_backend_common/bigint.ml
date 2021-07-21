@@ -111,14 +111,13 @@ module Make
       of_bytes bytes
   end)
 
-  (* TODO : real layout *)
   let bin_layout_t =
     { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
     ; type_decl= "type t = type for bigint"
     ; module_path= "Zexe_backend.Zexe_backend_common.Bigint"
     ; version_opt= None
     ; bin_io_derived= false
-    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
+    ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
 
   let of_numeral s ~base = of_numeral s (String.length s) base
 end

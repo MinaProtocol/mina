@@ -167,13 +167,12 @@ module Make (F : Input_intf) :
       *)
 
       let bin_layout_t =
-        (* TODO : what's the actual rule? *)
         { Ppx_version_runtime.Bin_prot_layout.layout_loc= __LOC__
         ; version_opt= None
         ; type_decl= "Field.t"
         ; module_path= "Zexe_backend.Zexe_backend_common.Stable.Field"
         ; bin_io_derived= false
-        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.String }
+        ; bin_prot_rule= Ppx_version_runtime.Bin_prot_rule.Custom }
 
       include Sexpable.Of_sexpable
                 (Bigint)
