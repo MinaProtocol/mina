@@ -551,7 +551,8 @@ let setup_daemon logger =
         match Sys.getenv "MINA_CONFIG_FILE" with
         | Some config_file ->
             Some (config_file, `Must_exist)
-        | None -> None
+        | None ->
+            None
       in
       let config_files =
         Option.to_list config_file_installed

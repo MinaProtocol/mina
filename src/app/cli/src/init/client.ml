@@ -1924,7 +1924,8 @@ let compile_time_constants =
            match Sys.getenv "MINA_CONFIG_FILE" with
            | Some config_file ->
                config_file
-           | None -> conf_dir ^/ "daemon.json"
+           | None ->
+               conf_dir ^/ "daemon.json"
          in
          let open Async in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
