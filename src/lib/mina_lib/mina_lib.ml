@@ -11,9 +11,9 @@ open Otp_lib
 open Network_peer
 module Archive_client = Archive_client
 module Config = Config
-module Conf_dir = Conf_dir
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
+module State_dir = State_dir
 module Timeout = Timeout_lib.Core_time
 
 type Structured_log_events.t += Connecting
@@ -1168,7 +1168,7 @@ let create ?wallets (config : Config.t) =
                     Prover.create ~logger:config.logger
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants ~pids:config.pids
-                      ~conf_dir:config.conf_dir))
+                      ~state_dir:config.state_dir))
             >>| Result.ok_exn
           in
           let%bind verifier =
@@ -1187,7 +1187,7 @@ let create ?wallets (config : Config.t) =
                       ~proof_level:config.precomputed_values.proof_level
                       ~constraint_constants:
                         config.precomputed_values.constraint_constants
-                      ~pids:config.pids ~conf_dir:(Some config.conf_dir)))
+                      ~pids:config.pids ~state_dir:(Some config.state_dir)))
             >>| Result.ok_exn
           in
           let snark_worker =
@@ -1753,7 +1753,7 @@ let create ?wallets (config : Config.t) =
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
-              ~disk_location:config.snark_pool_disk_location
+              ~runtime_dir:config.snark_pool_disk_location
           in
           let%bind snark_pool =
             Network_pool.Snark_pool.load ~config:snark_pool_config

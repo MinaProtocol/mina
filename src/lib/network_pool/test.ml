@@ -22,7 +22,7 @@ let%test_module "network pool test" =
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+            ~state_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()))
 
     module Mock_snark_pool =
@@ -31,7 +31,7 @@ let%test_module "network pool test" =
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~runtime_dir:"/tmp/snark-pool"
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =

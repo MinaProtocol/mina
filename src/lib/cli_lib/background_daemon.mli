@@ -3,6 +3,7 @@ open Async
 
 val rpc_init :
      f:(Host_and_port.t -> 'a -> unit Deferred.t)
+  -> ?state_dir:string
   -> 'a Command.Param.t
   -> (unit -> unit Deferred.t) Command.Param.t
 

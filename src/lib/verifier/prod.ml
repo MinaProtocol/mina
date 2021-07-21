@@ -31,7 +31,7 @@ module Worker_state = struct
 
   (* bin_io required by rpc_parallel *)
   type init_arg =
-    { conf_dir : string option
+    { state_dir : string option
     ; logger : Logger.Stable.Latest.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -207,19 +207,20 @@ module Worker = struct
         }
 
       let init_worker_state
-          Worker_state.{ conf_dir; logger; proof_level; constraint_constants } =
-        ( if Option.is_some conf_dir then
+          Worker_state.{ state_dir; logger; proof_level; constraint_constants }
+          =
+        ( if Option.is_some state_dir then
           let max_size = 256 * 1024 * 512 in
           let num_rotate = 1 in
           Logger.Consumer_registry.register ~id:"default"
             ~processor:(Logger.Processor.raw ())
             ~transport:
               (Logger.Transport.File_system.dumb_logrotate
-                 ~directory:(Option.value_exn conf_dir)
+                 ~directory:(Option.value_exn state_dir)
                  ~log_filename:"mina-verifier.log" ~max_size ~num_rotate) ) ;
         [%log info] "Verifier started" ;
         Worker_state.create
-          { conf_dir; logger; proof_level; constraint_constants }
+          { state_dir; logger; proof_level; constraint_constants }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -240,7 +241,7 @@ let plus_or_minus initial ~delta =
   initial +. (Random.float (2. *. delta) -. delta)
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
+let create ~logger ~proof_level ~constraint_constants ~pids ~state_dir :
     t Deferred.t =
   let on_failure err =
     [%log error] "Verifier process failed with error $err"
@@ -273,7 +274,7 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
           Worker.spawn_in_foreground_exn
             ~connection_timeout:(Time.Span.of_min 1.) ~on_failure
             ~shutdown_on:Disconnect ~connection_state_init_arg:()
-            { conf_dir; logger; proof_level; constraint_constants })
+            { state_dir; logger; proof_level; constraint_constants })
       |> Deferred.Result.map_error ~f:Error.of_exn
     in
     Child_processes.Termination.wait_for_process_log_errors ~logger process

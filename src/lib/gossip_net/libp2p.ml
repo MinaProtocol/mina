@@ -23,7 +23,7 @@ module Config = struct
     ; initial_peers : Mina_net2.Multiaddr.t list
     ; addrs_and_ports : Node_addrs_and_ports.t
     ; metrics_port : string option
-    ; conf_dir : string
+    ; runtime_dir : string
     ; chain_id : string
     ; logger : Logger.t
     ; unsafe_no_trust_ip : bool
@@ -150,19 +150,19 @@ module Make (Rpc_intf : Mina_base.Rpc_intf.Rpc_interface_intf) :
         Error.tag err ~tag:"Failed to connect to libp2p_helper process"
         |> Error.raise
       in
-      let conf_dir = config.conf_dir ^/ "mina_net2" in
-      let%bind () = Unix.mkdir ~p:() conf_dir in
+      let runtime_dir = config.runtime_dir ^/ "mina_net2" in
+      let%bind () = Unix.mkdir ~p:() runtime_dir in
       match%bind
         Monitor.try_with ~here:[%here] ~rest:`Raise (fun () ->
             trace "mina_net2" (fun () ->
                 Mina_net2.create
                   ~all_peers_seen_metric:config.all_peers_seen_metric
-                  ~logger:config.logger ~conf_dir ~pids
+                  ~logger:config.logger ~runtime_dir ~pids
                   ~on_unexpected_termination))
       with
       | Ok (Ok net2) -> (
           let open Mina_net2 in
-          (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+          (* Make an ephemeral keypair for this session TODO: persist *)
           let%bind me =
             match config.keypair with
             | Some kp ->

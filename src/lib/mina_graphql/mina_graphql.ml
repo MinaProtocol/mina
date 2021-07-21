@@ -375,7 +375,8 @@ module Types = struct
                ~next_block_production:(id ~typ:block_producer_timing)
                ~blockchain_length:int ~uptime_secs:nn_int
                ~ledger_merkle_root:string ~state_hash:string
-               ~commit_id:nn_string ~conf_dir:nn_string
+               ~commit_id:nn_string ~user_conf_dir:nn_string
+               ~state_dir:nn_string
                ~peers:(id ~typ:(non_null (list (non_null peer))))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
@@ -2856,8 +2857,8 @@ module Mutations = struct
 
   let export_logs ~coda basename_opt =
     let open Mina_lib in
-    let Config.{ conf_dir; _ } = Mina_lib.config coda in
-    Conf_dir.export_logs_to_tar ?basename:basename_opt ~conf_dir
+    let state_dir = (Mina_lib.config coda).state_dir in
+    State_dir.export_logs_to_tar ?basename:basename_opt ~state_dir
 
   let send_delegation =
     io_field "sendDelegation"

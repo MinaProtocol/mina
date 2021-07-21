@@ -10,7 +10,15 @@ val privkey_write_path : string Command.Param.t
 
 val privkey_read_path : string Command.Param.t
 
-val conf_dir : string option Command.Param.t
+val app_data_dir : string option Command.Param.t
+
+val runtime_dir : string option Command.Param.t
+
+val state_dir : string option Command.Param.t
+
+val user_conf_dir : string option Command.Param.t
+
+val user_data_dir : string option Command.Param.t
 
 module Types : sig
   type 'a with_name = { name : string; value : 'a }

@@ -817,11 +817,13 @@ module Export_logs = struct
            pp_export_result response#exportLogs#exportLogs#tarfile))
 
   let export_locally =
-    let run ~tarfile ~conf_dir =
+    let run ~tarfile ?state_dir =
       let open Mina_lib in
-      let conf_dir = Conf_dir.compute_conf_dir conf_dir in
+      let state_dir =
+        Option.value ~default:Cli_lib.Default.state_dir state_dir
+      in
       fun () ->
-        match%map Conf_dir.export_logs_to_tar ?basename:tarfile ~conf_dir with
+        match%map State_dir.export_logs_to_tar ?basename:tarfile ~state_dir with
         | Ok result ->
             pp_export_result result
         | Error err ->
@@ -831,8 +833,8 @@ module Export_logs = struct
     in
     let open Command.Let_syntax in
     Command.async ~summary:"Export local logs (no daemon) to tar archive"
-      (let%map tarfile = tarfile_flag and conf_dir = Cli_lib.Flag.conf_dir in
-       run ~tarfile ~conf_dir)
+      (let%map tarfile = tarfile_flag and state_dir = Cli_lib.Flag.state_dir in
+       run ~tarfile ?state_dir)
 end
 
 let get_transaction_status =
@@ -1372,8 +1374,11 @@ let import_key =
          ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
-         ; Cli_lib.Flag.conf_dir
-           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir))
+         ; Cli_lib.Flag.user_data_dir
+           |> map
+                ~f:
+                  (Option.map ~f:(fun user_data_dir ->
+                       `User_data_dir user_data_dir))
          ]
      and privkey_path = Cli_lib.Flag.privkey_read_path in
      fun () ->
@@ -1406,8 +1411,8 @@ let import_key =
          | Error (`Graphql_error _ as err) ->
              Ok err
        in
-       let do_local conf_dir =
-         let wallets_disk_location = conf_dir ^/ "wallets" in
+       let do_local user_data_dir =
+         let wallets_disk_location = user_data_dir ^/ "wallets" in
          let%bind ({ Keypair.public_key; _ } as keypair) =
            let rec go () =
              match !initial_password with
@@ -1468,8 +1473,8 @@ let import_key =
                print_result res
            | Error err ->
                don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
-       | `Conf_dir conf_dir ->
-           let%map res = do_local conf_dir in
+       | `User_data_dir user_data_dir ->
+           let%map res = do_local user_data_dir in
            print_result res
        | `None -> (
            let default_graphql_endpoint =
@@ -1479,12 +1484,12 @@ let import_key =
            | Ok res ->
                Deferred.return (print_result res)
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let user_data_dir = Cli_lib.Default.user_data_dir in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
-                  Importing to local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
-               let%map res = do_local conf_dir in
+                  Importing from user data directory %s%s\n"
+                 Bash_colors.orange user_data_dir Bash_colors.none ;
+               let%map res = do_local user_data_dir in
                print_result res ))
 
 let export_key =
@@ -1495,8 +1500,7 @@ let export_key =
       ~doc:"PUBLICKEY Public key of account to be exported"
       (required Cli_lib.Arg_type.public_key_compressed)
   in
-  let conf_dir = Cli_lib.Flag.conf_dir in
-  let flags = Args.zip3 privkey_path pk_flag conf_dir in
+  let flags = Args.zip3 privkey_path pk_flag Cli_lib.Flag.user_data_dir in
   Command.async
     ~summary:
       "Export a tracked account so that it can be saved or transferred between \
@@ -1504,15 +1508,12 @@ let export_key =
       \ Set MINA_PRIVKEY_PASS environment variable to use non-interactively \
        (key will be exported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
-       ~f:(fun _ (export_path, pk, conf_dir) ->
+       ~f:(fun _ (export_path, pk, user_data_dir) ->
          let open Deferred.Let_syntax in
-         let%bind home = Sys.home_directory () in
-         let conf_dir =
-           Option.value
-             ~default:(home ^/ Cli_lib.Default.conf_dir_name)
-             conf_dir
+         let user_data_dir =
+           Option.value ~default:Cli_lib.Default.user_data_dir user_data_dir
          in
-         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let wallets_disk_location = user_data_dir ^/ "wallets" in
          let%bind wallets =
            Secrets.Wallets.load ~logger:(Logger.create ())
              ~disk_location:wallets_disk_location
@@ -1574,8 +1575,11 @@ let list_accounts =
          ~if_nothing_chosen:(Default_to `None)
          [ Cli_lib.Flag.Uri.Client.rest_graphql_opt
            |> map ~f:(Option.map ~f:(fun port -> `GraphQL port))
-         ; Cli_lib.Flag.conf_dir
-           |> map ~f:(Option.map ~f:(fun conf_dir -> `Conf_dir conf_dir))
+         ; Cli_lib.Flag.user_data_dir
+           |> map
+                ~f:
+                  (Option.map ~f:(fun user_data_dir ->
+                       `User_data_dir user_data_dir))
          ]
      in
      fun () ->
@@ -1610,8 +1614,8 @@ let list_accounts =
              don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) ;
              Ok ()
        in
-       let do_local conf_dir =
-         let wallets_disk_location = conf_dir ^/ "wallets" in
+       let do_local user_data_dir =
+         let wallets_disk_location = user_data_dir ^/ "wallets" in
          let%map wallets =
            Secrets.Wallets.load ~logger:(Logger.create ())
              ~disk_location:wallets_disk_location
@@ -1633,8 +1637,8 @@ let list_accounts =
                ()
            | Error err ->
                don't_wait_for (Graphql_lib.Client.Connection_error.ok_exn err) )
-       | `Conf_dir conf_dir ->
-           do_local conf_dir
+       | `User_data_dir user_data_dir ->
+           do_local user_data_dir
        | `None -> (
            let default_graphql_endpoint =
              Cli_lib.Flag.(Uri.Client.{ Types.name; value = default })
@@ -1643,12 +1647,12 @@ let list_accounts =
            | Ok () ->
                Deferred.unit
            | Error _res ->
-               let conf_dir = Mina_lib.Conf_dir.compute_conf_dir None in
+               let user_data_dir = Cli_lib.Default.user_data_dir in
                eprintf
                  "%sWarning: Could not connect to a running daemon.\n\
-                  Listing from local directory %s%s\n"
-                 Bash_colors.orange conf_dir Bash_colors.none ;
-               do_local conf_dir ))
+                  Listing from user data directory %s%s\n"
+                 Bash_colors.orange user_data_dir Bash_colors.none ;
+               do_local user_data_dir ))
 
 let create_account =
   let open Command.Param in
@@ -1762,7 +1766,8 @@ let generate_libp2p_keypair =
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
           match%bind
-            Mina_net2.create ~logger ~conf_dir:tmpd ~all_peers_seen_metric:false
+            Mina_net2.create ~logger ~runtime_dir:tmpd
+              ~all_peers_seen_metric:false
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~on_unexpected_termination:(fun () ->
                 raise Child_processes.Child_died)
@@ -1914,12 +1919,8 @@ let compile_time_constants =
   Command.async
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
-         let home = Core.Sys.home_directory () in
-         let conf_dir = home ^/ Cli_lib.Default.conf_dir_name in
-         let genesis_dir =
-           let home = Core.Sys.home_directory () in
-           home ^/ Cli_lib.Default.conf_dir_name
-         in
+         (* FIXME: try to read from all app_data_dirs *)
+         let app_data_dir = Cli_lib.Default.app_data_dir in
          let config_file =
            (* TODO: eventually, remove CODA_ variable *)
            let mina_config_file = "MINA_CONFIG_FILE" in
@@ -1931,7 +1932,7 @@ let compile_time_constants =
                (* we print a deprecation warning on daemon startup, don't print here *)
                config_file
            | None, None ->
-               conf_dir ^/ "daemon.json"
+               app_data_dir ^/ "daemon.json"
          in
          let open Async in
          let%map ({ consensus_constants; _ } as precomputed_values), _ =
@@ -1939,8 +1940,9 @@ let compile_time_constants =
            >>| Option.value ~default:(`Assoc [])
            >>| Runtime_config.of_yojson >>| Result.ok
            >>| Option.value ~default:Runtime_config.default
-           >>= Genesis_ledger_helper.init_from_config_file ~genesis_dir
-                 ~logger:(Logger.null ()) ~proof_level:None
+           >>= Genesis_ledger_helper.init_from_config_file
+                 ~genesis_dir:app_data_dir ~logger:(Logger.null ())
+                 ~proof_level:None
            >>| Or_error.ok_exn
          in
          let all_constants =

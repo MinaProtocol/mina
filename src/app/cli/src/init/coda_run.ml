@@ -16,9 +16,9 @@ let snark_pool_list t =
   |> Network_pool.Snark_pool.Resource_pool.snark_pool_json
   |> Yojson.Safe.to_string
 
-(* create reader, writer for protocol versions, but really for any one-line item in conf_dir *)
-let make_conf_dir_item_io ~conf_dir ~filename =
-  let item_file = conf_dir ^/ filename in
+(* create reader, writer for protocol versions, but really for any one-line item in app_data_dir *)
+let make_app_data_dir_item_io ~app_data_dir ~filename =
+  let item_file = app_data_dir ^/ filename in
   let read_item () =
     let open Stdlib in
     let inp = open_in item_file in
@@ -34,9 +34,9 @@ let make_conf_dir_item_io ~conf_dir ~filename =
   (read_item, write_item)
 
 let get_current_protocol_version ~compile_time_current_protocol_version
-    ~conf_dir ~logger =
+    ~app_data_dir ~logger =
   let read_protocol_version, write_protocol_version =
-    make_conf_dir_item_io ~conf_dir ~filename:"current_protocol_version"
+    make_app_data_dir_item_io ~app_data_dir ~filename:"current_protocol_version"
   in
   function
   | None -> (
@@ -93,9 +93,10 @@ let get_current_protocol_version ~compile_time_current_protocol_version
               ~metadata:[ ("protocol_version", `String protocol_version) ] ;
             pv ) )
 
-let get_proposed_protocol_version_opt ~conf_dir ~logger =
+let get_proposed_protocol_version_opt ~app_data_dir ~logger =
   let read_protocol_version, write_protocol_version =
-    make_conf_dir_item_io ~conf_dir ~filename:"proposed_protocol_version"
+    make_app_data_dir_item_io ~app_data_dir
+      ~filename:"proposed_protocol_version"
   in
   function
   | None -> (
@@ -150,13 +151,13 @@ let get_proposed_protocol_version_opt ~conf_dir ~logger =
         Some (Protocol_version.of_string_exn protocol_version) )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
-let log_shutdown ~conf_dir ~top_logger coda_ref =
+let log_shutdown ~report_dir ~top_logger coda_ref =
   let logger =
     Logger.extend top_logger
       [ ("coda_run", `String "Logging state before program ends") ]
   in
-  let frontier_file = conf_dir ^/ "frontier.dot" in
-  let mask_file = conf_dir ^/ "registered_masks.dot" in
+  let frontier_file = report_dir ^/ "frontier.dot" in
+  let mask_file = report_dir ^/ "registered_masks.dot" in
   (* ledger visualization *)
   [%log debug] "%s" (Visualization_message.success "registered masks" mask_file) ;
   Mina_base.Ledger.Debug.visualize ~filename:mask_file ;
@@ -174,8 +175,8 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           [%log debug] "%s"
             (Visualization_message.bootstrap "transition frontier") )
 
-let remove_prev_crash_reports ~conf_dir =
-  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" conf_dir)
+let remove_prev_crash_reports ~state_dir =
+  Core.Sys.command (sprintf "rm -rf %s/coda_crash_report*" state_dir)
 
 let summary exn_json =
   let uname = Core.Unix.uname () in
@@ -201,28 +202,28 @@ let coda_status coda_ref =
       Mina_commands.get_status ~flag:`Performance t
       >>| Daemon_rpcs.Types.Status.to_yojson)
 
-let make_report exn_json ~conf_dir ~top_logger coda_ref =
+let make_report exn_json ~state_dir ~top_logger coda_ref =
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: enter" ;
-  ignore (remove_prev_crash_reports ~conf_dir : int) ;
+  ignore (remove_prev_crash_reports ~state_dir : int) ;
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
-  let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
-  let () = Core.Unix.mkdir temp_config in
+  let report_dir = state_dir ^/ "coda_crash_report_" ^ crash_time in
+  let () = Core.Unix.mkdir report_dir in
   (*Transition frontier and ledger visualization*)
-  log_shutdown ~conf_dir:temp_config ~top_logger coda_ref ;
-  let report_file = temp_config ^ ".tar.gz" in
+  log_shutdown ~report_dir ~top_logger coda_ref ;
+  let report_file = report_dir ^ ".tar.gz" in
   (*Coda status*)
-  let status_file = temp_config ^/ "coda_status.json" in
+  let status_file = report_dir ^/ "coda_status.json" in
   let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
   (* TEMP MAKE REPORT TRACE *)
   [%log' trace top_logger] "make_report: acquired and wrote status" ;
   (*coda logs*)
-  let coda_log = conf_dir ^/ "mina.log" in
+  let coda_log = state_dir ^/ "mina.log" in
   let () =
     match Core.Sys.file_exists coda_log with
     | `Yes ->
-        let coda_short_log = temp_config ^/ "coda_short.log" in
+        let coda_short_log = report_dir ^/ "coda_short.log" in
         (*get the last 4MB of the log*)
         let log_size = 4 * 1024 * 1024 |> Int64.of_int in
         let log =
@@ -238,15 +239,15 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
   in
   (*System info/crash summary*)
   let summary = summary exn_json in
-  Yojson.Safe.to_file (temp_config ^/ "crash_summary.json") summary ;
+  Yojson.Safe.to_file (report_dir ^/ "crash_summary.json") summary ;
   (*copy daemon_json to the temp dir *)
-  let daemon_config = conf_dir ^/ "daemon.json" in
+  let daemon_config = state_dir ^/ "daemon.json" in
   let eq = [%equal: [ `Yes | `Unknown | `No ]] in
   let () =
     if eq (Core.Sys.file_exists daemon_config) `Yes then
       ignore
         ( Core.Sys.command
-            (sprintf "cp %s %s" daemon_config (temp_config ^/ "daemon.json"))
+            (sprintf "cp %s %s" daemon_config (report_dir ^/ "daemon.json"))
           : int )
   in
   (*Zip them all up*)
@@ -259,17 +260,17 @@ let make_report exn_json ~conf_dir ~top_logger coda_ref =
     ; "daemon.json"
     ]
     |> List.filter ~f:(fun f ->
-           eq (Core.Sys.file_exists (temp_config ^/ f)) `Yes)
+           eq (Core.Sys.file_exists (report_dir ^/ f)) `Yes)
   in
   let files = tmp_files |> String.concat ~sep:" " in
   let tar_command =
-    sprintf "tar  -C %s -czf %s %s" temp_config report_file files
+    sprintf "tar  -C %s -czf %s %s" report_dir report_file files
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then (
     [%log' fatal top_logger] "Error making the crash report. Exit code: %d" exit ;
     None )
-  else Some (report_file, temp_config)
+  else Some (report_file, report_dir)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
 let setup_local_server ?(client_trustlist = []) ?rest_server_port
@@ -375,7 +376,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (snark_pool_list coda))
     ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
           let open Mina_lib.Config in
-          Coda_tracing.start (Mina_lib.config coda).conf_dir)
+          Coda_tracing.start (Mina_lib.config coda).state_dir)
     ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
           Coda_tracing.stop () ; Deferred.unit)
     ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
@@ -606,18 +607,19 @@ let coda_crash_message ~log_issue ~action ~error =
   %s
 %!|err} error followup
 
-let no_report exn_json status =
+let no_report ~state_dir exn_json status =
   sprintf
-    "include the last 20 lines from .mina-config/mina.log and then paste the \
-     following:\n\
+    "include the last 20 lines from %s/mina.log and then paste the following:\n\
      Summary:\n\
      %s\n\
      Status:\n\
      %s\n"
+    state_dir
     (Yojson.Safe.to_string status)
     (Yojson.Safe.to_string (summary exn_json))
 
-let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
+let handle_crash e ~time_controller ~state_dir ~child_pids ~top_logger coda_ref
+    =
   (* attempt to free up some memory before handling crash *)
   (* this circumvents using Child_processes.kill, and instead sends SIGKILL to all children *)
   Hashtbl.keys child_pids
@@ -636,7 +638,7 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
         ~timeout_duration:(Block_time.Span.of_ms 30_000L)
         time_controller
         ( try
-            make_report exn_json ~conf_dir coda_ref ~top_logger
+            make_report exn_json ~state_dir coda_ref ~top_logger
             >>| fun k -> Ok k
           with exn -> return (Error (Error.of_exn exn)) )
     with
@@ -646,21 +648,21 @@ let handle_crash e ~time_controller ~conf_dir ~child_pids ~top_logger coda_ref =
         sprintf "attach the crash report %s" report_file
     | `Ok (Ok None) ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
-        no_report exn_json status
+        no_report ~state_dir exn_json status
     | `Ok (Error e) ->
         [%log' fatal top_logger] "Exception when generating crash report: $exn"
           ~metadata:[ ("exn", Error_json.error_to_yojson e) ] ;
-        no_report exn_json status
+        no_report ~state_dir exn_json status
     | `Timeout ->
         [%log' fatal top_logger] "Timed out while generated crash report" ;
-        no_report exn_json status
+        no_report ~state_dir exn_json status
   in
   let message =
     coda_crash_message ~error:"crashed" ~action:action_string ~log_issue:true
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
+let handle_shutdown ~monitor ~time_controller ~state_dir ~child_pids ~top_logger
     coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
@@ -683,7 +685,8 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                  coda_crash_message
                    ~error:"failed to initialize the genesis state"
                    ~action:
-                     "include the last 50 lines from .mina-config/mina.log"
+                     (Printf.sprintf
+                        "include the last 50 lines from %s/mina.log" state_dir)
                    ~log_issue:true
                in
                Core.print_string message ; Deferred.unit
@@ -702,13 +705,13 @@ let handle_shutdown ~monitor ~time_controller ~conf_dir ~child_pids ~top_logger
                in
                Core.print_string message ; Deferred.unit
            | _exn ->
-               handle_crash exn ~time_controller ~conf_dir ~child_pids
+               handle_crash exn ~time_controller ~state_dir ~child_pids
                  ~top_logger coda_ref
          in
          Stdlib.exit 1)) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
-        log_shutdown ~conf_dir ~top_logger coda_ref ;
+        log_shutdown ~report_dir:state_dir ~top_logger coda_ref ;
         let logger =
           Logger.extend top_logger
             [ ("coda_run", `String "Program was killed by signal") ]

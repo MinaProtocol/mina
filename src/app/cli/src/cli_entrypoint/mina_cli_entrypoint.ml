@@ -49,7 +49,11 @@ let plugin_flag = Command.Param.return []
 let setup_daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
-  let%map_open conf_dir = Cli_lib.Flag.conf_dir
+  let%map_open app_data_dir = Cli_lib.Flag.app_data_dir
+  and runtime_dir = Cli_lib.Flag.runtime_dir
+  and state_dir = Cli_lib.Flag.state_dir
+  and user_conf_dir = Cli_lib.Flag.user_conf_dir
+  and user_data_dir = Cli_lib.Flag.user_data_dir
   and block_production_key =
     flag "--block-producer-key" ~aliases:[ "block-producer-key" ]
       ~doc:
@@ -372,12 +376,26 @@ let setup_daemon logger =
   in
   fun () ->
     let open Deferred.Let_syntax in
-    let conf_dir = Mina_lib.Conf_dir.compute_conf_dir conf_dir in
-    let%bind () = File_system.create_dir conf_dir in
+    let app_data_dir =
+      Option.value ~default:Cli_lib.Default.app_data_dir app_data_dir
+    in
+    let runtime_dir =
+      Option.value ~default:Cli_lib.Default.runtime_dir runtime_dir
+    in
+    let state_dir = Option.value ~default:Cli_lib.Default.state_dir state_dir in
+    let user_conf_dir =
+      Option.value ~default:Cli_lib.Default.user_conf_dir user_conf_dir
+    in
+    let user_data_dir =
+      Option.value ~default:Cli_lib.Default.user_data_dir user_data_dir
+    in
+    [ app_data_dir; runtime_dir; state_dir; user_conf_dir; user_data_dir ]
+    |> Deferred.List.iter ~f:File_system.create_dir
+    >>= fun () ->
     let () =
       if is_background then (
         Core.printf "Starting background mina daemon. (Log Dir: %s)\n%!"
-          conf_dir ;
+          state_dir ;
         Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
           ~redirect_stderr:`Dev_null () )
       else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
@@ -389,21 +407,21 @@ let setup_daemon logger =
     Logger.Consumer_registry.register ~id:Logger.Logger_id.mina
       ~processor:(Logger.Processor.raw ~log_level:file_log_level ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger.Transport.File_system.dumb_logrotate ~directory:state_dir
            ~log_filename:"mina.log" ~max_size:logrotate_max_size
            ~num_rotate:logrotate_num_rotate) ;
     let best_tip_diff_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.best_tip_diff
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger.Transport.File_system.dumb_logrotate ~directory:state_dir
            ~log_filename:"mina-best-tip.log" ~max_size:best_tip_diff_log_size
            ~num_rotate:1) ;
     let rejected_blocks_log_size = 1024 * 1024 * 5 in
     Logger.Consumer_registry.register ~id:Logger.Logger_id.rejected_blocks
       ~processor:(Logger.Processor.raw ())
       ~transport:
-        (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+        (Logger.Transport.File_system.dumb_logrotate ~directory:state_dir
            ~log_filename:"mina-rejected-blocks.log"
            ~max_size:rejected_blocks_log_size ~num_rotate:50) ;
     let version_metadata =
@@ -416,7 +434,9 @@ let setup_daemon logger =
     [%log info]
       "Coda daemon is booting up; built with commit $commit on branch $branch"
       ~metadata:version_metadata ;
-    let%bind () = Mina_lib.Conf_dir.check_and_set_lockfile ~logger conf_dir in
+    let%bind () =
+      Mina_lib.State_dir.check_and_set_lockfile ~logger ~state_dir
+    in
     if not @@ String.equal daemon_expiry "never" then (
       [%log info] "Daemon will expire at $exp"
         ~metadata:[ ("exp", `String daemon_expiry) ] ;
@@ -432,7 +452,7 @@ let setup_daemon logger =
           Core.exit 0)
         () ) ;
     [%log info] "Booting may take several seconds, please wait" ;
-    let wallets_disk_location = conf_dir ^/ "wallets" in
+    let wallets_disk_location = user_data_dir ^/ "wallets" in
     let%bind wallets =
       (* Load wallets early, to give user errors before expensive
          initialization starts.
@@ -465,11 +485,11 @@ let setup_daemon logger =
               |> Deferred.map ~f:Option.some )
     in
     let%bind () =
-      let version_filename = conf_dir ^/ "mina.version" in
+      let version_filename = app_data_dir ^/ "mina.version" in
       let make_version () =
         let%map () =
           (*Delete any trace files if version changes. TODO: Implement rotate logic similar to log files*)
-          File_system.remove_dir (conf_dir ^/ "trace")
+          File_system.remove_dir (state_dir ^/ "trace")
         in
         Yojson.Safe.to_file version_filename (`Assoc version_metadata)
       in
@@ -490,17 +510,17 @@ let setup_daemon logger =
           if String.equal c Mina_version.commit_id then return ()
           else (
             [%log warn]
-              "Different version of Mina detected in config directory \
-               $config_directory, removing existing configuration"
-              ~metadata:[ ("config_directory", `String conf_dir) ] ;
+              "Different version of Mina detected in application data \
+               directory $app_data_dir, removing existing configuration"
+              ~metadata:[ ("app_data_dir", `String app_data_dir) ] ;
             make_version () )
       | Error e ->
           [%log debug]
-            "Error reading $file: $error. Cleaning up the config directory \
-             $config_directory"
+            "Error reading $file: $error. Cleaning up the application data \
+             directory $app_data_dir"
             ~metadata:
               [ ("error", `String (Error.to_string_mach e))
-              ; ("config_directory", `String conf_dir)
+              ; ("app_data_dir", `String app_data_dir)
               ; ("file", `String version_filename)
               ] ;
           make_version ()
@@ -545,7 +565,7 @@ let setup_daemon logger =
             None
       in
       let config_file_configdir =
-        (conf_dir ^/ "daemon.json", `May_be_missing)
+        (app_data_dir ^/ "daemon.json", `May_be_missing)
       in
       let config_file_envvar =
         (* TODO: remove deprecated variable, eventually *)
@@ -614,7 +634,7 @@ let setup_daemon logger =
                 failwithf "Could not parse configuration file: %s" err ())
       in
       let genesis_dir =
-        Option.value ~default:(conf_dir ^/ "genesis") genesis_dir
+        Option.value ~default:(app_data_dir ^/ "genesis") genesis_dir
       in
       let%bind precomputed_values =
         match%map
@@ -823,7 +843,8 @@ let setup_daemon logger =
             Some kp
         | _, Some tracked_pubkey ->
             let%bind wallets =
-              Secrets.Wallets.load ~logger ~disk_location:(conf_dir ^/ "wallets")
+              Secrets.Wallets.load ~logger
+                ~disk_location:(user_data_dir ^/ "wallets")
             in
             let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
             let%map kp =
@@ -834,7 +855,7 @@ let setup_daemon logger =
       in
       let%bind client_trustlist =
         Reader.load_sexp
-          (conf_dir ^/ "client_trustlist")
+          (app_data_dir ^/ "client_trustlist")
           [%of_sexp: Unix.Cidr.t list]
         >>| Or_error.ok
       in
@@ -904,7 +925,7 @@ let setup_daemon logger =
         Logger.trace logger ~module_:__MODULE__ "Creating %s at %s" ~location
           typ
       in
-      let trust_dir = conf_dir ^/ "trust" in
+      let trust_dir = app_data_dir ^/ "trust" in
       let%bind () = Async.Unix.mkdir ~p:() trust_dir in
       let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
@@ -918,7 +939,7 @@ let setup_daemon logger =
       let initial_block_production_keypairs =
         block_production_keypair |> Option.to_list |> Keypair.Set.of_list
       in
-      let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+      let epoch_ledger_location = app_data_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           ~genesis_ledger:(Precomputed_values.genesis_ledger precomputed_values)
@@ -979,7 +1000,7 @@ let setup_daemon logger =
         or_from_config YJ.Util.to_int_option "validation-queue-size"
           ~default:Cli_lib.Default.validation_queue_size validation_queue_size
       in
-      if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+      if enable_tracing then Coda_tracing.start state_dir |> don't_wait_for ;
       let seed_peer_list_url =
         Option.value_map seed_peer_list_url ~f:Option.some
           ~default:
@@ -1004,7 +1025,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
         Gossip_net.Libp2p.Config.
           { timeout = Time.Span.of_sec 3.
           ; logger
-          ; conf_dir
+          ; runtime_dir
           ; chain_id
           ; unsafe_no_trust_ip = false
           ; seed_peer_list_url = Option.map seed_peer_list_url ~f:Uri.of_string
@@ -1044,17 +1065,18 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       in
       let current_protocol_version =
         Coda_run.get_current_protocol_version
-          ~compile_time_current_protocol_version ~conf_dir ~logger
+          ~compile_time_current_protocol_version ~app_data_dir ~logger
           curr_protocol_version
       in
       let proposed_protocol_version_opt =
-        Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+        Coda_run.get_proposed_protocol_version_opt ~app_data_dir ~logger
           proposed_protocol_version
       in
       let start_time = Time.now () in
       let%map coda =
         Mina_lib.create ~wallets
-          (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir ~chain_id
+          (Mina_lib.Config.make ~logger ~pids ~trust_system ~app_data_dir
+             ~runtime_dir ~state_dir ~user_conf_dir ~user_data_dir ~chain_id
              ~is_seed ~super_catchup:(not no_super_catchup) ~disable_node_status
              ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
              ~initial_protocol_version:current_protocol_version
@@ -1069,10 +1091,10 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
                ; num_threads = snark_worker_parallelism_flag
                }
              ~snark_coordinator_key:run_snark_coordinator_flag
-             ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-             ~wallets_disk_location:(conf_dir ^/ "wallets")
-             ~persistent_root_location:(conf_dir ^/ "root")
-             ~persistent_frontier_location:(conf_dir ^/ "frontier")
+             ~snark_pool_disk_location:(runtime_dir ^/ "snark_pool")
+             ~wallets_disk_location:(user_data_dir ^/ "wallets")
+             ~persistent_root_location:(app_data_dir ^/ "root")
+             ~persistent_frontier_location:(app_data_dir ^/ "frontier")
              ~epoch_ledger_location ~snark_work_fee:snark_work_fee_flag
              ~time_controller ~initial_block_production_keypairs ~monitor
              ~consensus_local_state ~is_archive_rocksdb ~work_reassignment_wait
@@ -1088,7 +1110,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
     in
     (* Breaks a dependency cycle with monitor initilization and coda *)
     let coda_ref : Mina_lib.t option ref = ref None in
-    Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+    Coda_run.handle_shutdown ~monitor ~time_controller ~state_dir
       ~child_pids:pids ~top_logger:logger coda_ref ;
     Async.Scheduler.within' ~monitor
     @@ fun () ->
@@ -1288,23 +1310,27 @@ let internal_commands logger =
   ; ( "run-prover"
     , Command.async
         ~summary:"Run prover on a sexp provided on a single line of stdin"
-        (Command.Param.return (fun () ->
-             let logger = Logger.create () in
-             Parallel.init_master () ;
-             match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
-             | `Ok sexp ->
-                 let%bind conf_dir = Unix.mkdtemp "/tmp/mina-prover" in
-                 [%log info] "Prover state being logged to %s" conf_dir ;
-                 let%bind prover =
-                   Prover.create ~logger
-                     ~proof_level:Genesis_constants.Proof_level.compiled
-                     ~constraint_constants:
-                       Genesis_constants.Constraint_constants.compiled
-                     ~pids:(Pid.Table.create ()) ~conf_dir
-                 in
-                 Prover.prove_from_input_sexp prover sexp >>| ignore
-             | `Eof ->
-                 failwith "early EOF while reading sexp")) )
+        ( Command.Param.( >>| ) Cli_lib.Flag.state_dir
+        @@ fun state_dir () ->
+        let logger = Logger.create () in
+        Parallel.init_master () ;
+        match%bind Reader.read_sexp (Lazy.force Reader.stdin) with
+        | `Ok sexp ->
+            let state_dir =
+              Option.value ~default:Cli_lib.Default.state_dir state_dir
+            in
+            let prover_state_log_dir = state_dir ^/ "mina-prover" in
+            [%log info] "Prover state being logged to %s" state_dir ;
+            let%bind prover =
+              Prover.create ~logger
+                ~proof_level:Genesis_constants.Proof_level.compiled
+                ~constraint_constants:
+                  Genesis_constants.Constraint_constants.compiled
+                ~pids:(Pid.Table.create ()) ~state_dir:prover_state_log_dir
+            in
+            Prover.prove_from_input_sexp prover sexp >>| ignore
+        | `Eof ->
+            failwith "early EOF while reading sexp" ) )
   ; ( "run-verifier"
     , Command.async
         ~summary:"Run verifier on a proof provided on a single line of stdin"
@@ -1315,12 +1341,15 @@ let internal_commands logger =
         and format =
           flag "--format" ~aliases:[ "-format" ] (optional string)
             ~doc:"sexp/json the format to parse input in"
-        in
+        and state_dir = Cli_lib.Flag.state_dir in
         fun () ->
           let open Async in
           let logger = Logger.create () in
           Parallel.init_master () ;
-          let%bind conf_dir = Unix.mkdtemp "/tmp/mina-verifier" in
+          let state_dir =
+            Option.value ~default:Cli_lib.Default.state_dir state_dir
+          in
+          let verifier_state_log_dir = state_dir ^/ "mina-verifier" in
           let mode =
             match mode with
             | "transaction" ->
@@ -1398,7 +1427,8 @@ let internal_commands logger =
               ~proof_level:Genesis_constants.Proof_level.compiled
               ~constraint_constants:
                 Genesis_constants.Constraint_constants.compiled
-              ~pids:(Pid.Table.create ()) ~conf_dir:(Some conf_dir)
+              ~pids:(Pid.Table.create ())
+              ~state_dir:(Some verifier_state_log_dir)
           in
           let%bind result =
             match input with

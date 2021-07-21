@@ -20,7 +20,11 @@ module Input = struct
     ; block_production_key : int option
     ; work_selection_method :
         Cli_lib.Arg_type.Work_selection_method.Stable.Latest.t
-    ; conf_dir : string
+    ; app_data_dir : string
+    ; runtime_dir : string
+    ; state_dir : string
+    ; user_conf_dir : string
+    ; user_data_dir : string
     ; trace_dir : string option
     ; program_dir : string
     ; acceptable_delay : Time.Span.t
@@ -337,7 +341,11 @@ module T = struct
         ; block_production_key
         ; snark_worker_key
         ; work_selection_method
-        ; conf_dir
+        ; app_data_dir
+        ; runtime_dir
+        ; state_dir
+        ; user_conf_dir
+        ; user_data_dir
         ; trace_dir
         ; chain_id
         ; peers
@@ -371,9 +379,9 @@ module T = struct
             Coda_tracing.start d)
           ~default:Deferred.unit
       in
-      let%bind () = File_system.create_dir conf_dir in
+      let%bind () = File_system.create_dir app_data_dir in
       O1trace.trace "worker_main" (fun () ->
-          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
+          let%bind trust_dir = Unix.mkdtemp (app_data_dir ^/ "trust") in
           let trace_database_initialization typ location =
             (* can't use %log because location is passed-in *)
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
@@ -399,7 +407,7 @@ module T = struct
                     Public_key.compress keypair.public_key)
               |> Option.to_list )
           in
-          let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
+          let epoch_ledger_location = app_data_dir ^/ "epoch_ledger" in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
               ~genesis_ledger:Genesis_ledger.t
@@ -416,7 +424,7 @@ module T = struct
               ; addrs_and_ports =
                   Node_addrs_and_ports.of_display addrs_and_ports
               ; metrics_port = None
-              ; conf_dir
+              ; runtime_dir
               ; chain_id
               ; logger
               ; seed_peer_list_url = None
@@ -460,7 +468,8 @@ module T = struct
           let start_time = Time.now () in
           let coda_deferred () =
             Mina_lib.create
-              (Mina_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+              (Mina_lib.Config.make ~app_data_dir ~runtime_dir ~state_dir
+                 ~user_conf_dir ~user_data_dir ~logger ~pids ~trust_system
                  ~chain_id ~is_seed ~disable_node_status:true
                  ~super_catchup:true ~coinbase_receiver:`Producer ~net_config
                  ~gossip_net_params
@@ -475,12 +484,12 @@ module T = struct
                      ; shutdown_on_disconnect = true
                      ; num_threads = None
                      }
-                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                 ~persistent_root_location:(conf_dir ^/ "root")
-                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
+                 ~snark_pool_disk_location:(runtime_dir ^/ "snark_pool")
+                 ~persistent_root_location:(app_data_dir ^/ "root")
+                 ~persistent_frontier_location:(app_data_dir ^/ "frontier")
                  ~epoch_ledger_location
-                 ~wallets_disk_location:(conf_dir ^/ "wallets") ~time_controller
-                 ~snark_work_fee:(Currency.Fee.of_int 0)
+                 ~wallets_disk_location:(user_data_dir ^/ "wallets")
+                 ~time_controller ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~is_archive_rocksdb
                  ~work_reassignment_wait:420000 ~precomputed_values ~start_time
@@ -492,7 +501,7 @@ module T = struct
                  ~log_precomputed_blocks:false ())
           in
           let coda_ref : Mina_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+          Coda_run.handle_shutdown ~monitor ~time_controller ~state_dir
             ~child_pids:pids ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor

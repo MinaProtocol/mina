@@ -10,7 +10,8 @@ let does_daemon_exist host_and_port =
   in
   Result.is_ok result
 
-let run ~f (t : Host_and_port.t Flag.Types.with_name) arg =
+let run ~f ?(state_dir = Default.state_dir)
+    (t : Host_and_port.t Flag.Types.with_name) arg =
   let rec go = function
     | Start ->
         let%bind has_daemon = does_daemon_exist t.value in
@@ -18,14 +19,15 @@ let run ~f (t : Host_and_port.t Flag.Types.with_name) arg =
     | No_daemon ->
         Print.printf
           !"Error: Unable to connect to Mina daemon.\n\
-            - The daemon might not be running. See logs (in \
-            `~/.mina-config/mina.log`) for details under the host:%s.\n\
+            - The daemon might not be running. See logs (in `%s/mina.log`) for \
+            details under the host:%s.\n\
            \  Run `mina daemon -help` to see how to start daemon.\n\
             - If you just started the daemon, wait a minute for the RPC server \
             to start.\n\
             - Alternatively, the daemon may not be running the RPC server on \
             %{sexp:Host_and_port.t}.\n\
            \  If so, add flag `-%s` with correct port when running this command.\n"
+          state_dir
           (Host_and_port.host t.value)
           t.value t.name ;
         go Abort
@@ -36,9 +38,9 @@ let run ~f (t : Host_and_port.t Flag.Types.with_name) arg =
   in
   go Start
 
-let rpc_init ~f arg_flag =
+let rpc_init ~f ?(state_dir = Default.state_dir) arg_flag =
   let open Command.Param.Applicative_infix in
-  Command.Param.return (fun port arg () -> run ~f port arg)
+  Command.Param.return (fun port arg () -> run ~f ~state_dir port arg)
   <*> Flag.Host_and_port.Client.daemon <*> arg_flag
 
 let graphql_init ~f arg_flag =

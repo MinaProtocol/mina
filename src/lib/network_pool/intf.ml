@@ -198,7 +198,7 @@ module type Snark_resource_pool_intf = sig
   val make_config :
        trust_system:Trust_system.t
     -> verifier:Verifier.t
-    -> disk_location:string
+    -> runtime_dir:string
     -> Config.t
 
   val add_snark :

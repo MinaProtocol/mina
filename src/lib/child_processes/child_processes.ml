@@ -236,7 +236,7 @@ let start_custom :
        logger:Logger.t
     -> name:string
     -> git_root_relative_path:string
-    -> conf_dir:string
+    -> runtime_dir:string
     -> args:string list
     -> stdout:output_handling
     -> stderr:output_handling
@@ -250,19 +250,19 @@ let start_custom :
            -> unit Deferred.t
          | `Ignore ]
     -> t Deferred.Or_error.t =
- fun ~logger ~name ~git_root_relative_path ~conf_dir ~args ~stdout ~stderr
+ fun ~logger ~name ~git_root_relative_path ~runtime_dir ~args ~stdout ~stderr
      ~termination ->
   let open Deferred.Or_error.Let_syntax in
   let%bind () =
-    Sys.is_directory conf_dir
+    Sys.is_directory runtime_dir
     |> Deferred.bind ~f:(function
          | `Yes ->
              Deferred.Or_error.return ()
          | _ ->
-             Deferred.Or_error.errorf "Config directory %s does not exist"
-               conf_dir)
+             Deferred.Or_error.errorf "Runtime directory %s does not exist"
+               runtime_dir)
   in
-  let lock_path = conf_dir ^/ name ^ ".lock" in
+  let lock_path = runtime_dir ^/ name ^ ".lock" in
   let%bind () =
     Deferred.map ~f:Or_error.return
     @@ maybe_kill_and_unlock name lock_path logger
@@ -410,10 +410,10 @@ let%test_module _ =
     let process_wait_timeout = Time.Span.of_sec 2.1
 
     let%test_unit "can launch and get stdout" =
-      async_with_temp_dir (fun conf_dir ->
+      async_with_temp_dir (fun runtime_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
-            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
+            start_custom ~logger ~name ~git_root_relative_path ~runtime_dir
               ~args:[ "exit" ]
               ~stdout:(`Log Logger.Level.Debug, `Pipe, `Keep_empty)
               ~stderr:(`Log Logger.Level.Error, `No_pipe, `Keep_empty)
@@ -434,10 +434,10 @@ let%test_module _ =
           Deferred.unit)
 
     let%test_unit "killing works" =
-      async_with_temp_dir (fun conf_dir ->
+      async_with_temp_dir (fun runtime_dir ->
           let open Deferred.Let_syntax in
           let%bind process =
-            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
+            start_custom ~logger ~name ~git_root_relative_path ~runtime_dir
               ~args:[ "loop" ]
               ~stdout:(`Don't_log, `Pipe, `Keep_empty)
               ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
@@ -446,7 +446,7 @@ let%test_module _ =
           in
           let lock_exists () =
             Deferred.map
-              (Sys.file_exists (conf_dir ^/ name ^ ".lock"))
+              (Sys.file_exists (runtime_dir ^/ name ^ ".lock"))
               ~f:(function `Yes -> true | _ -> false)
           in
           let assert_lock_exists () =
@@ -478,10 +478,10 @@ let%test_module _ =
           Deferred.unit)
 
     let%test_unit "if you spawn two processes it kills the earlier one" =
-      async_with_temp_dir (fun conf_dir ->
+      async_with_temp_dir (fun runtime_dir ->
           let open Deferred.Let_syntax in
           let mk_process () =
-            start_custom ~logger ~name ~git_root_relative_path ~conf_dir
+            start_custom ~logger ~name ~git_root_relative_path ~runtime_dir
               ~args:[ "loop" ]
               ~stdout:(`Don't_log, `No_pipe, `Keep_empty)
               ~stderr:(`Don't_log, `No_pipe, `Keep_empty)

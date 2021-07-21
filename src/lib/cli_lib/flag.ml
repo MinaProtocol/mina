@@ -28,10 +28,29 @@ let privkey_read_path =
   flag "--privkey-path" ~aliases:[ "privkey-path" ]
     ~doc:"FILE File to read private key from" (required string)
 
-let conf_dir =
+let app_data_dir =
   let open Command.Param in
-  flag "--config-directory" ~aliases:[ "config-directory" ]
-    ~doc:"DIR Configuration directory" (optional string)
+  flag "--app-data-dir" ~aliases:[] ~doc:"DIR Application data directory"
+    (optional string)
+
+let runtime_dir =
+  let open Command.Param in
+  flag "--runtime-dir" ~aliases:[] ~doc:"DIR Runtime directory"
+    (optional string)
+
+let state_dir =
+  let open Command.Param in
+  flag "--state-dir" ~aliases:[] ~doc:"DIR State directory" (optional string)
+
+let user_conf_dir =
+  let open Command.Param in
+  flag "--user-config-dir" ~aliases:[] ~doc:"DIR User configuration directory"
+    (optional string)
+
+let user_data_dir =
+  let open Command.Param in
+  flag "--user-data-dir" ~aliases:[] ~doc:"DIR User data directory"
+    (optional string)
 
 module Doc_builder = struct
   type 'value t =

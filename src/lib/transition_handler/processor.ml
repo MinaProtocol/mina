@@ -367,7 +367,7 @@ let%test_module "Transition_handler.Processor tests" =
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+            ~state_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()))
 
     let downcast_breadcrumb breadcrumb =

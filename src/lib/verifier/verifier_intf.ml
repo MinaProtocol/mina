@@ -40,6 +40,6 @@ module type S = sig
     -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> pids:Child_processes.Termination.t
-    -> conf_dir:string option
+    -> state_dir:string option
     -> t Deferred.t
 end

@@ -23,23 +23,29 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
     ~program_dir ~block_production_key ~snark_worker_key ~work_selection_method
     ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb
     ~archive_process_location ~runtime_config () =
-  let conf_dir =
-    match Sys.getenv "MINA_INTEGRATION_TEST_DIR" with
-    | Some dir ->
-        dir
-        ^/ Network_peer.Peer.Id.to_string
-             (Mina_net2.Keypair.to_peer_id libp2p_keypair)
-    | None ->
-        Filename.temp_dir_name
-        ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+  (* random 16-char identifier composing hex digits *)
+  let random_ident =
+    Printf.sprintf "%08Lx%08Lx"
+      (Random.int64 0x1_0000_0000L)
+      (Random.int64 0x1_0000_0000L)
   in
-  if
-    not
-      ([%equal: [ `Yes | `No | `Unknown ]] (Core.Sys.file_exists conf_dir) `No)
-  then
-    failwithf
-      "cannot configure Mina process because directory already exists: %s"
-      conf_dir () ;
+  let tmpdir = Filename.temp_dir_name ^/ random_ident in
+  let app_data_dir = tmpdir ^/ "app_data" in
+  let runtime_dir = tmpdir ^/ "runtime" in
+  let state_dir = tmpdir ^/ "state" in
+  let user_conf_dir = tmpdir ^/ "user_conf" in
+  let user_data_dir = tmpdir ^/ "user_data" in
+  [ app_data_dir; runtime_dir; state_dir; user_conf_dir; user_data_dir ]
+  |> List.iter ~f:(fun dir ->
+         match Core.Sys.file_exists dir with
+         | `No ->
+             ()
+         | `Yes | `Unknown ->
+             failwithf
+               "cannot configure Mina process because directory already \
+                exists: %s"
+               dir ())
+  |> fun () ->
   let config =
     { Coda_worker.Input.addrs_and_ports
     ; libp2p_keypair
@@ -65,7 +71,11 @@ let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
     ; block_production_key
     ; snark_worker_key
     ; work_selection_method
-    ; conf_dir
+    ; app_data_dir
+    ; runtime_dir
+    ; state_dir
+    ; user_conf_dir
+    ; user_data_dir
     ; chain_id
     ; peers
     ; trace_dir

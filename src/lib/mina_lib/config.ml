@@ -14,7 +14,11 @@ end
 
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
 type t =
-  { conf_dir : string
+  { app_data_dir : string
+  ; runtime_dir : string
+  ; state_dir : string
+  ; user_conf_dir : string
+  ; user_data_dir : string
   ; chain_id : string
   ; logger : Logger.t
   ; pids : Child_processes.Termination.t

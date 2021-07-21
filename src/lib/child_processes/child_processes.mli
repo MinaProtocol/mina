@@ -45,8 +45,7 @@ val start_custom :
   -> git_root_relative_path:string
        (** Path to the built executable, relative to the root of a source checkout
      *)
-  -> conf_dir:string
-       (** Absolute path to the configuration directory for Coda *)
+  -> runtime_dir:string (** Absolute path to the runtime directory for Coda *)
   -> args:string list (** Arguments to the process *)
   -> stdout:output_handling (** What to do with process standard out *)
   -> stderr:output_handling (** What to do with process standard error *)

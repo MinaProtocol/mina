@@ -21,7 +21,7 @@ let%test_module "Command line tests" =
     *)
     let coda_exe = "../../app/cli/src/mina.exe"
 
-    let start_daemon config_dir genesis_ledger_dir port =
+    let start_daemon ~app_data_dir ~state_dir port =
       let%bind working_dir = Sys.getcwd () in
       Core.printf "Starting daemon inside %s\n" working_dir ;
       let%map _ =
@@ -35,10 +35,10 @@ let%test_module "Command line tests" =
               ; "-background"
               ; "-client-port"
               ; sprintf "%d" port
-              ; "-config-directory"
-              ; config_dir
-              ; "-genesis-ledger-dir"
-              ; genesis_ledger_dir
+              ; "--app-data-dir"
+              ; app_data_dir
+              ; "--state-dir"
+              ; state_dir
               ; "-current-protocol-version"
               ; "0.0.0"
               ]
@@ -60,15 +60,17 @@ let%test_module "Command line tests" =
         ~args:[ "client"; "status"; "-daemon-port"; sprintf "%d" port ]
         ()
 
-    let create_config_directories () =
-      (* create empty config dir to avoid any issues with the default config dir *)
-      let conf = Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" "" in
-      let genesis = Filename.temp_dir ~in_dir:"/tmp" "coda_genesis_state" "" in
-      (conf, genesis)
+    let create_directories () =
+      (* create empty dirs to avoid any issues with the default dirs *)
+      let app_data_dir = Filename.temp_dir ~in_dir:"/tmp" "mina_spun_test" "" in
+      let state_dir = Filename.temp_dir ~in_dir:"/tmp" "mina_state" "" in
+      (app_data_dir, state_dir)
 
-    let remove_config_directory config_dir genesis_dir =
-      let%bind _ = Process.run_exn ~prog:"rm" ~args:[ "-rf"; config_dir ] () in
-      Process.run_exn ~prog:"rm" ~args:[ "-rf"; genesis_dir ] ()
+    let remove_directories ~app_data_dir ~state_dir =
+      let%bind _ =
+        Process.run_exn ~prog:"rm" ~args:[ "-rf"; app_data_dir ] ()
+      in
+      Process.run_exn ~prog:"rm" ~args:[ "-rf"; state_dir ] ()
       |> Deferred.ignore_m
 
     let test_background_daemon () =
@@ -77,22 +79,21 @@ let%test_module "Command line tests" =
       let client_delay = 40. in
       let retry_delay = 15. in
       let retry_attempts = 15 in
-      let config_dir, genesis_ledger_dir = create_config_directories () in
+      let app_data_dir, state_dir = create_directories () in
       Monitor.protect
         ~finally:(fun () ->
           ( if !test_failed then
             let contents =
-              Core.In_channel.(
-                with_file (config_dir ^/ "mina.log") ~f:input_all)
+              Core.In_channel.(with_file (state_dir ^/ "mina.log") ~f:input_all)
             in
             Core.Printf.printf
               !"**** DAEMON CRASHED (OUTPUT BELOW) ****\n%s\n************\n%!"
               contents ) ;
-          remove_config_directory config_dir genesis_ledger_dir)
+          remove_directories ~app_data_dir ~state_dir)
         (fun () ->
           match%map
             let open Deferred.Or_error.Let_syntax in
-            let%bind _ = start_daemon config_dir genesis_ledger_dir port in
+            let%bind _ = start_daemon ~app_data_dir ~state_dir port in
             (* It takes a while for the daemon to become available. *)
             let%bind () =
               Deferred.map

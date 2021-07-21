@@ -178,6 +178,7 @@ RUN opam install \
   ppx_derivers \
   re \
   result \
+  fileutils \
   stringext) \
   && opam switch import src/opam.export
 
@@ -190,6 +191,7 @@ RUN eval $(opam config env) \
   && opam pin add src/external/async_kernel \
   && opam pin add src/external/coda_base58 \
   && opam pin add src/external/graphql_ppx \
+  && opam pin add src/external/ocaml-xdg-basedir \
   && opam clean --logs -cs
 
 

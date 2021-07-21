@@ -9,10 +9,10 @@ module Client = Graphql_lib.Client.Make (struct
   let headers = String.Map.empty
 end)
 
-let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
+let run_exn ~f ~state_dir query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   let log_location_detail =
     if Cli_lib.Flag.Uri.is_localhost uri.value then
-      " (in `~/.mina-config/mina.log`)"
+      Printf.sprintf " (in `%s/mina.log`)" state_dir
     else ""
   in
   match%bind f query_obj uri.value with
@@ -39,7 +39,8 @@ let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
 let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
   Client.query query_obj uri.value
 
-let query_exn query_obj port = run_exn ~f:Client.query query_obj port
+let query_exn ?(state_dir = Cli_lib.Default.state_dir) query_obj port =
+  run_exn ~f:Client.query ~state_dir query_obj port
 
 module Signed_command = struct
   type t =

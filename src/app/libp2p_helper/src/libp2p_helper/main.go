@@ -256,7 +256,7 @@ var (
 )
 
 type configureMsg struct {
-	Statedir            string             `json:"statedir"`
+	RuntimeDir          string             `json:"runtime_dir"`
 	Privk               string             `json:"privk"`
 	NetworkID           string             `json:"network_id"`
 	ListenOn            []string           `json:"ifaces"`
@@ -333,7 +333,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.Statedir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange)
+	helper, err := codanet.MakeHelper(app.Ctx, maddrs, externalMaddr, m.RuntimeDir, privk, m.NetworkID, seeds, gatingConfig, m.MaxConnections, m.MinaPeerExchange)
 	if err != nil {
 		return nil, badHelper(err)
 	}

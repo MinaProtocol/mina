@@ -204,7 +204,7 @@ module Pubsub : sig
     -> 'a Subscription.t Deferred.Or_error.t
 end
 
-(** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
+(** [create ~logger ~runtime_dir] starts a new [net] storing its child process locks in [runtime_dir].
   *
   * The new [net] isn't connected to any network until [configure] is called.
   *
@@ -215,7 +215,7 @@ val create :
   -> on_unexpected_termination:(unit -> unit Deferred.t)
   -> logger:Logger.t
   -> pids:Child_processes.Termination.t
-  -> conf_dir:string
+  -> runtime_dir:string
   -> net Deferred.Or_error.t
 
 (** State for the connection gateway. It will disallow connections from IPs

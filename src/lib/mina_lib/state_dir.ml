@@ -1,13 +1,9 @@
-(* conf_dir.ml -- config directory management *)
+(** Operations concerning the state directory. *)
 
 open Core
 
-let compute_conf_dir conf_dir_opt =
-  let home = Sys.home_directory () in
-  Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir_opt
-
-let check_and_set_lockfile ~logger conf_dir =
-  let lockfile = conf_dir ^/ ".mina-lock" in
+let check_and_set_lockfile ~logger ~state_dir =
+  let lockfile = state_dir ^/ ".mina-lock" in
   match Sys.file_exists lockfile with
   | `No -> (
       let open Async in
@@ -64,8 +60,8 @@ let check_and_set_lockfile ~logger conf_dir =
                   else
                     Mina_user_error.raisef
                       "A daemon (process id %d) is already running with the \
-                       current configuration directory (%s)"
-                      (Pid.to_int pid) conf_dir
+                       current state directory (%s)"
+                      (Pid.to_int pid) state_dir
                 else (
                   [%log info] "Removing lockfile for terminated process"
                     ~metadata:
@@ -85,7 +81,7 @@ let check_and_set_lockfile ~logger conf_dir =
         ("lockfile", lockfile) [%sexp_of: string * string]
       |> Error.raise
 
-let export_logs_to_tar ?basename ~conf_dir =
+let export_logs_to_tar ?basename ~state_dir =
   let open Async in
   let open Deferred.Result.Let_syntax in
   let basename =
@@ -97,7 +93,7 @@ let export_logs_to_tar ?basename ~conf_dir =
     | Some basename ->
         basename
   in
-  let export_dir = conf_dir ^/ "exported_logs" in
+  let export_dir = state_dir ^/ "exported_logs" in
   ( match Core.Sys.file_exists export_dir with
   | `No ->
       Core.Unix.mkdir export_dir
@@ -105,7 +101,7 @@ let export_logs_to_tar ?basename ~conf_dir =
       () ) ;
   let tarfile = export_dir ^/ basename ^ ".tar.gz" in
   let log_files =
-    Core.Sys.ls_dir conf_dir
+    Core.Sys.ls_dir state_dir
     |> List.filter ~f:(String.is_substring ~substring:".log")
   in
   let%bind.Deferred linux_info =
@@ -151,7 +147,7 @@ let export_logs_to_tar ?basename ~conf_dir =
     if Option.is_some hw_info_opt then
       let open Async in
       let hw_info = "hardware.info" in
-      let hw_info_file = conf_dir ^/ hw_info in
+      let hw_info_file = state_dir ^/ hw_info in
       match%map
         Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true hw_info_file ~f:(fun writer ->
@@ -172,9 +168,9 @@ let export_logs_to_tar ?basename ~conf_dir =
   in
   let tmp_dir = Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) "" in
   let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in
-  let conf_dir_files = files_in_dir conf_dir in
+  let state_dir_files = files_in_dir state_dir in
   let%bind _result0 =
-    Process.run ~prog:"cp" ~args:(("-p" :: conf_dir_files) @ [ tmp_dir ]) ()
+    Process.run ~prog:"cp" ~args:(("-p" :: state_dir_files) @ [ tmp_dir ]) ()
   in
   let%bind _result1 =
     Process.run ~prog:"tar"

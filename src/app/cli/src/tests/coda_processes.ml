@@ -12,8 +12,8 @@ let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
         Mina_net2.create ~pids:(Child_processes.Termination.create_pid_table ())
-          ~logger:(Logger.create ()) ~conf_dir:tmpd ~all_peers_seen_metric:false
-          ~on_unexpected_termination:(fun () ->
+          ~logger:(Logger.create ()) ~runtime_dir:tmpd
+          ~all_peers_seen_metric:false ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died)
       in
       let net = Or_error.ok_exn net in

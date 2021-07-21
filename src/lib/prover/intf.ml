@@ -18,7 +18,7 @@ module type S = sig
   val create :
        logger:Logger.t
     -> pids:Child_processes.Termination.t
-    -> conf_dir:string
+    -> state_dir:string
     -> proof_level:Genesis_constants.Proof_level.t
     -> constraint_constants:Genesis_constants.Constraint_constants.t
     -> t Deferred.t

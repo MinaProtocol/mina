@@ -250,7 +250,7 @@ end
 module Helper = struct
   type t =
     { subprocess : Child_processes.t
-    ; conf_dir : string
+    ; runtime_dir : string
     ; outstanding_requests : (int, Yojson.Safe.t Or_error.t Ivar.t) Hashtbl.t
           (**
        seqno is used to assign unique IDs to our outbound requests and index the
@@ -441,7 +441,7 @@ module Helper = struct
     module Configure = struct
       type input =
         { privk : string
-        ; statedir : string
+        ; runtime_dir : string
         ; ifaces : string list
         ; metrics_port : string
         ; external_maddr : string
@@ -1427,7 +1427,7 @@ let configure net ~logger:_ ~me ~external_maddr ~maddrs ~network_id
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
       { privk = Keypair.secret_key_base64 me
-      ; statedir = net.conf_dir
+      ; runtime_dir = net.runtime_dir
       ; ifaces = List.map ~f:Multiaddr.to_string maddrs
       ; metrics_port = Option.value metrics_port ~default:""
       ; external_maddr = Multiaddr.to_string external_maddr
@@ -1615,13 +1615,13 @@ let set_connection_gating_config net (config : connection_gating) =
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
 let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
-    ~conf_dir =
+    ~runtime_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
     Child_processes.start_custom ~logger ~name:"libp2p_helper"
       ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
-      ~conf_dir ~args:[]
+      ~runtime_dir ~args:[]
       ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
       ~stderr:(`Don't_log, `Pipe, `Filter_empty)
       ~termination:
@@ -1695,7 +1695,7 @@ let create ~all_peers_seen_metric ~on_unexpected_termination ~logger ~pids
       Child_processes.register_process pids subprocess Libp2p_helper ;
       let t : Helper.t =
         { subprocess
-        ; conf_dir
+        ; runtime_dir
         ; logger
         ; banned_ips = []
         ; connection_gating =
@@ -1816,7 +1816,7 @@ let%test_module "coda network tests" =
       let%bind a =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "a") ])
-          ~conf_dir:a_tmp ~pids
+          ~runtime_dir:a_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died)
         >>| Or_error.ok_exn
@@ -1824,7 +1824,7 @@ let%test_module "coda network tests" =
       let%bind b =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "b") ])
-          ~conf_dir:b_tmp ~pids
+          ~runtime_dir:b_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died)
         >>| Or_error.ok_exn
@@ -1832,7 +1832,7 @@ let%test_module "coda network tests" =
       let%bind c =
         create ~all_peers_seen_metric:false
           ~logger:(Logger.extend logger [ ("name", `String "c") ])
-          ~conf_dir:c_tmp ~pids
+          ~runtime_dir:c_tmp ~pids
           ~on_unexpected_termination:(fun () ->
             raise Child_processes.Child_died)
         >>| Or_error.ok_exn

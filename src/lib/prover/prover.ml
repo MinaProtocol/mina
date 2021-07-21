@@ -56,7 +56,7 @@ module Worker_state = struct
 
   (* bin_io required by rpc_parallel *)
   type init_arg =
-    { conf_dir : string
+    { state_dir : string
     ; logger : Logger.Stable.Latest.t
     ; proof_level : Genesis_constants.Proof_level.t
     ; constraint_constants : Genesis_constants.Constraint_constants.t
@@ -274,17 +274,18 @@ module Worker = struct
         }
 
       let init_worker_state
-          Worker_state.{ conf_dir; logger; proof_level; constraint_constants } =
+          Worker_state.{ state_dir; logger; proof_level; constraint_constants }
+          =
         let max_size = 256 * 1024 * 512 in
         let num_rotate = 1 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
           ~transport:
-            (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+            (Logger.Transport.File_system.dumb_logrotate ~directory:state_dir
                ~log_filename:"mina-prover.log" ~max_size ~num_rotate) ;
         [%log info] "Prover started" ;
         Worker_state.create
-          { conf_dir; logger; proof_level; constraint_constants }
+          { state_dir; logger; proof_level; constraint_constants }
 
       let init_connection_state ~connection:_ ~worker_state:_ () = Deferred.unit
     end
@@ -296,7 +297,7 @@ end
 type t =
   { connection : Worker.Connection.t; process : Process.t; logger : Logger.t }
 
-let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
+let create ~logger ~pids ~state_dir ~proof_level ~constraint_constants =
   let on_failure err =
     [%log error] "Prover process failed with error $err"
       ~metadata:[ ("err", Error_json.error_to_yojson err) ] ;
@@ -306,7 +307,7 @@ let create ~logger ~pids ~conf_dir ~proof_level ~constraint_constants =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
-      { conf_dir; logger; proof_level; constraint_constants }
+      { state_dir; logger; proof_level; constraint_constants }
   in
   [%log info]
     "Daemon started process of kind $process_kind with pid $prover_pid"

@@ -157,7 +157,7 @@ struct
         type t =
           { trust_system : (Trust_system.t[@sexp.opaque])
           ; verifier : (Verifier.t[@sexp.opaque])
-          ; disk_location : string
+          ; runtime_dir : string
           }
         [@@deriving sexp, make]
       end
@@ -582,7 +582,7 @@ struct
     Clock.every' (Time.Span.of_min 3.) (fun () ->
         let before = Time.now () in
         let%map () =
-          Writer.save_bin_prot t.config.disk_location
+          Writer.save_bin_prot t.config.runtime_dir
             Snark_tables.Serializable.Stable.Latest.bin_writer_t
             (Snark_tables.to_serializable t.snark_tables)
         in
@@ -607,7 +607,7 @@ struct
     in
     let%map res =
       match%map
-        Async.Reader.load_bin_prot config.Resource_pool.Config.disk_location
+        Async.Reader.load_bin_prot config.Resource_pool.Config.runtime_dir
           Snark_tables.Serializable.Stable.Latest.bin_reader_t
       with
       | Ok snark_table ->
@@ -698,7 +698,7 @@ let%test_module "random set test" =
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+            ~state_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()))
 
     module Mock_snark_pool =
@@ -724,7 +724,7 @@ let%test_module "random set test" =
 
     let config =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system
-        ~disk_location:"/tmp/snark-pool"
+        ~runtime_dir:"/tmp/snark-pool"
 
     let gen ?length () =
       let open Quickcheck.Generator.Let_syntax in

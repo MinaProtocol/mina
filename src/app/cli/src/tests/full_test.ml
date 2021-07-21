@@ -85,8 +85,8 @@ let run_test () : unit Deferred.t =
   setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
-  File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
-    ~f:(fun temp_conf_dir ->
+  File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test")
+    ~f:(fun temp_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "MINA_TRACING" with
@@ -101,11 +101,16 @@ let run_test () : unit Deferred.t =
         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
           typ
       in
-      let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
+      let%bind app_data_dir = Async.Unix.mkdtemp (temp_dir ^/ "app_data") in
+      let%bind runtime_dir = Async.Unix.mkdtemp (temp_dir ^/ "runtime") in
+      let%bind state_dir = Async.Unix.mkdtemp (temp_dir ^/ "state") in
+      let%bind user_conf_dir = Async.Unix.mkdtemp (temp_dir ^/ "user_conf") in
+      let%bind user_data_dir = Async.Unix.mkdtemp (temp_dir ^/ "user_data") in
+      let%bind trust_dir = Async.Unix.mkdtemp (app_data_dir ^/ "trust_db") in
       let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
-      let epoch_ledger_location = temp_conf_dir ^/ "epoch_ledger" in
+      let epoch_ledger_location = temp_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
           ~genesis_epoch_data:precomputed_values.genesis_epoch_data
@@ -127,7 +132,7 @@ let run_test () : unit Deferred.t =
           ; unsafe_no_trust_ip = true
           ; isolate = false
           ; metrics_port = None
-          ; conf_dir = temp_conf_dir
+          ; runtime_dir = temp_dir
           ; chain_id
           ; flooding = false
           ; direct_peers = []
@@ -189,8 +194,9 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Mina_lib.create
           (Mina_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~chain_id ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~is_seed:true ~disable_node_status:true
+             ~chain_id ~coinbase_receiver:`Producer ~app_data_dir ~runtime_dir
+             ~state_dir ~user_conf_dir ~user_data_dir ~gossip_net_params
+             ~is_seed:true ~disable_node_status:true
              ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None ~super_catchup:true
              ~work_selection_method:
@@ -204,10 +210,10 @@ let run_test () : unit Deferred.t =
                  ; shutdown_on_disconnect = true
                  ; num_threads = None
                  }
-             ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-             ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
-             ~persistent_root_location:(temp_conf_dir ^/ "root")
-             ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
+             ~snark_pool_disk_location:(runtime_dir ^/ "snark_pool")
+             ~wallets_disk_location:(user_data_dir ^/ "wallets")
+             ~persistent_root_location:(app_data_dir ^/ "root")
+             ~persistent_frontier_location:(app_data_dir ^/ "frontier")
              ~epoch_ledger_location ~time_controller ~snark_work_fee
              ~consensus_local_state ~work_reassignment_wait:420000
              ~precomputed_values ~start_time ~log_precomputed_blocks:false

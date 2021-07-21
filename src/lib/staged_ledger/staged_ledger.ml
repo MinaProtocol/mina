@@ -1957,7 +1957,7 @@ let%test_module "test" =
     let verifier =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Verifier.create ~logger ~proof_level ~constraint_constants
-            ~conf_dir:None
+            ~state_dir:None
             ~pids:(Child_processes.Termination.create_pid_table ()))
 
     let supercharge_coinbase ~ledger ~winner ~global_slot =

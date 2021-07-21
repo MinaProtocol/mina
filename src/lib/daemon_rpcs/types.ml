@@ -234,7 +234,9 @@ module Status = struct
 
     let commit_id = string_entry "Git SHA-1"
 
-    let conf_dir = string_entry "Configuration directory"
+    let user_conf_dir = string_entry "User configuration directory"
+
+    let state_dir = string_entry "State directory"
 
     let peers field =
       Some ("Peers", string_of_int @@ List.length (FieldT.get field))
@@ -393,7 +395,8 @@ module Status = struct
     ; state_hash : string option
     ; chain_id : string
     ; commit_id : Git_sha.Stable.Latest.t
-    ; conf_dir : string
+    ; user_conf_dir : string
+    ; state_dir : string
     ; peers : Network_peer.Peer.Display.Stable.Latest.t list
     ; user_commands_sent : int
     ; snark_worker : string option
@@ -426,11 +429,11 @@ module Status = struct
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_unvalidated_block_length_received ~highest_block_length_received
       ~uptime_secs ~ledger_merkle_root ~state_hash ~chain_id ~commit_id
-      ~conf_dir ~peers ~user_commands_sent ~snark_worker ~block_production_keys
-      ~coinbase_receiver ~histograms ~consensus_time_best_tip
-      ~global_slot_since_genesis_best_tip ~consensus_time_now
-      ~consensus_mechanism ~consensus_configuration ~next_block_production
-      ~snark_work_fee ~addrs_and_ports ~catchup_status
+      ~user_conf_dir ~state_dir ~peers ~user_commands_sent ~snark_worker
+      ~block_production_keys ~coinbase_receiver ~histograms
+      ~consensus_time_best_tip ~global_slot_since_genesis_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_block_production ~snark_work_fee ~addrs_and_ports ~catchup_status
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

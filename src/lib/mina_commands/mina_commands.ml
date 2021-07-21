@@ -199,7 +199,8 @@ let get_status ~flag t =
     |> Time_ns.Span.to_sec |> Int.of_float
   in
   let commit_id = Mina_version.commit_id in
-  let conf_dir = config.conf_dir in
+  let user_conf_dir = config.user_conf_dir in
+  let state_dir = config.state_dir in
   let%map peers =
     let%map undisplay_peers = Mina_lib.peers t in
     List.map ~f:Network_peer.Peer.to_display undisplay_peers
@@ -390,7 +391,8 @@ let get_status ~flag t =
   ; consensus_time_best_tip
   ; global_slot_since_genesis_best_tip
   ; commit_id
-  ; conf_dir
+  ; user_conf_dir
+  ; state_dir
   ; peers
   ; user_commands_sent
   ; snark_worker
