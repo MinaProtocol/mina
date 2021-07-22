@@ -159,8 +159,8 @@ let make_graphql_signed_transaction ~sender_priv_key ~receiver ~amount ~fee =
      application/json' --data '%s'@."
     (Yojson.Basic.to_string graphql_query_json)
 
-let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
-    ~rate_limit ~rate_limit_level ~rate_limit_interval
+let there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block ~slot_time
+    ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
     ~origin_sender_public_key_option ~origin_sender_secret_key_path_option () =
   let rate_limit =
     if rate_limit then
@@ -174,15 +174,35 @@ let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
     else None
   in
   let batch_count = ref 0 in
-  let base_send_amount = Currency.Amount.of_formatted_string "2" in
-  let initial_send_amount =
-    Option.value_exn
-      (Currency.Amount.add base_send_amount
-         (Currency.Amount.of_fee Mina_base.Signed_command.minimum_fee))
-  in
+  let base_send_amount = Currency.Amount.of_formatted_string "0" in
   let fee_amount = Mina_base.Signed_command.minimum_fee in
-  let generated_secrets = gen_secret_keys count in
+  let acct_creation_fee = Currency.Amount.of_formatted_string "1" in
+  let initial_send_amount =
+    (* min_fee*num_txn_per_accts + base_send_amount*num_txn_per_accts + acct_creation_fee *)
+    let total_send_value =
+      Option.value_exn (Currency.Amount.scale base_send_amount num_txn_per_acct)
+    in
+    let total_fees =
+      Option.value_exn
+        (Currency.Amount.scale
+           (Currency.Amount.of_fee fee_amount)
+           num_txn_per_acct)
+    in
+    Option.value_exn
+      (Currency.Amount.add total_fees
+         (Option.value_exn
+            (Currency.Amount.add total_send_value acct_creation_fee)))
+  in
+  let generated_secrets = gen_secret_keys num_accts in
+  let limit =
+    Option.iter rate_limit ~f:(fun rate_limit ->
+        if !batch_count >= rate_limit then (
+          Format.printf "sleep %f@." Float.(of_int rate_limit_interval /. 1000.) ;
+          batch_count := 0 )
+        else incr batch_count)
+  in
 
+  (* get the origin_pk and the origin_sk if possible *)
   let open Deferred.Let_syntax in
   let%bind (use_graphql, origin_sk_option)
              : bool * Marlin_plonk_bindings_pasta_fq.t option =
@@ -208,12 +228,6 @@ let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
   (* there... *)
   if not use_graphql then
     List.iter generated_secrets ~f:(fun sk ->
-        Option.iter rate_limit ~f:(fun rate_limit ->
-            if !batch_count >= rate_limit then (
-              Format.printf "sleep %f@."
-                Float.(of_int rate_limit_interval /. 1000.) ;
-              batch_count := 0 )
-            else incr batch_count) ;
         let acct_pk =
           Public_key.of_private_key_exn sk
           |> Public_key.compress |> Public_key.Compressed.to_base58_check
@@ -227,15 +241,10 @@ let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
             |> Currency.Amount.to_formatted_string )
             acct_pk origin_pk
         in
-        Format.print_string transaction_command)
+        Format.print_string transaction_command ;
+        limit)
   else
     List.iter generated_secrets ~f:(fun sk ->
-        Option.iter rate_limit ~f:(fun rate_limit ->
-            if !batch_count >= rate_limit then (
-              Format.printf "sleep %f@."
-                Float.(of_int rate_limit_interval /. 1000.) ;
-              batch_count := 0 )
-            else incr batch_count) ;
         let acct_pk = Public_key.of_private_key_exn sk in
         let origin_sk = Option.value_exn origin_sk_option in
         let transaction_command =
@@ -243,22 +252,22 @@ let there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
             ~receiver:Public_key.(Compressed.to_base58_check (compress acct_pk))
             ~amount:initial_send_amount ~fee:fee_amount
         in
-        Format.print_string transaction_command) ;
+        Format.print_string transaction_command ;
+        limit) ;
 
   (* and back again... *)
   Deferred.return
     (List.iter generated_secrets ~f:(fun sk ->
-         Option.iter rate_limit ~f:(fun rate_limit ->
-             if !batch_count >= rate_limit then (
-               Format.printf "sleep %f@."
-                 Float.(of_int rate_limit_interval /. 1000.) ;
-               batch_count := 0 )
-             else incr batch_count) ;
-         let transaction_command =
-           make_graphql_signed_transaction ~sender_priv_key:sk
-             ~receiver:origin_pk ~amount:base_send_amount ~fee:fee_amount
+         let rec do_command n =
+           let transaction_command =
+             make_graphql_signed_transaction ~sender_priv_key:sk
+               ~receiver:origin_pk ~amount:base_send_amount ~fee:fee_amount
+           in
+           Format.print_string transaction_command ;
+           limit ;
+           if n > 1 then do_command (n - 1)
          in
-         Format.print_string transaction_command))
+         do_command num_txn_per_acct))
 
 let output_there_and_back_cmds =
   let open Command.Let_syntax in
@@ -268,24 +277,31 @@ let output_there_and_back_cmds =
        then transfer them back again. The 'back again' commands are expressed \
        as GraphQL commands, so that we can pass a signature, rather than \
        having to load the secret key for each account"
-    (let%map_open count =
-       flag "--count" ~aliases:[ "count" ] ~doc:"NUM Number of keys to generate"
+    (let%map_open num_accts =
+       flag "--num-accts" ~aliases:[ "num-accts" ]
+         ~doc:"NUM Number of keys to generate" (required int)
+     and num_txn_per_acct =
+       flag "--num-txn-per-acct" ~aliases:[ "num-txn-per-acct" ]
+         ~doc:"NUM Number of transactions to run for each generated key"
          (required int)
      and txns_per_block =
        flag "--txn-capacity-per-block"
          ~aliases:[ "txn-capacity-per-block" ]
          ~doc:
-           "NUM Transaction capacity per block. Used for rate limiting. \
-            (default: 128)"
+           "NUM Number of transaction that a single block can hold.  Used for \
+            rate limiting (default: 128)"
          (optional_with_default 128 int)
      and slot_time =
        flag "--slot-time" ~aliases:[ "slot-time" ]
          ~doc:
-           "NUM_MILLISECONDS Slot duration in milliseconds. (default: 180000)"
+           "NUM_MILLISECONDS Slot duration in milliseconds. Used for rate \
+            limiting (default: 180000)"
          (optional_with_default 180000 int)
      and fill_rate =
        flag "--fill-rate" ~aliases:[ "fill-rate" ]
-         ~doc:"FILL_RATE Fill rate (default: 0.75)"
+         ~doc:
+           "FILL_RATE The average rate of blocks per slot. Used for rate \
+            limiting (default: 0.75)"
          (optional_with_default 0.75 float)
      and rate_limit =
        flag "--apply-rate-limit" ~aliases:[ "apply-rate-limit" ]
@@ -297,13 +313,14 @@ let output_there_and_back_cmds =
        flag "--rate-limit-level" ~aliases:[ "rate-limit-level" ]
          ~doc:
            "NUM Number of transactions that can be sent in a time interval \
-            before hitting the rate limit (default: 200)"
+            before hitting the rate limit. Used for rate limiting (default: \
+            200)"
          (optional_with_default 200 int)
      and rate_limit_interval =
        flag "--rate-limit-interval" ~aliases:[ "rate-limit-interval" ]
          ~doc:
-           "NUM_MILLISECONDS Interval that the rate-limiter is applied over \
-            (default: 300000)"
+           "NUM_MILLISECONDS Interval that the rate-limiter is applied over. \
+            Used for rate limiting (default: 300000)"
          (optional_with_default 300000 int)
      and origin_sender_public_key_option =
        flag "--origin-sender-pk" ~aliases:[ "origin-sender-pk" ]
@@ -314,8 +331,8 @@ let output_there_and_back_cmds =
          ~doc:"PRIVATE_KEY Path to Private key to send the transactions from"
          (optional string)
      in
-     there_and_back_again ~count ~txns_per_block ~slot_time ~fill_rate
-       ~rate_limit ~rate_limit_level ~rate_limit_interval
+     there_and_back_again ~num_accts ~num_txn_per_acct ~txns_per_block
+       ~slot_time ~fill_rate ~rate_limit ~rate_limit_level ~rate_limit_interval
        ~origin_sender_public_key_option ~origin_sender_secret_key_path_option)
 
 let () =
