@@ -1,0 +1,12 @@
+(library
+ (name libp2p_ipc)
+ (public_name libp2p_ipc)
+ (flags -w -53)
+ (libraries core_kernel capnp)
+ (instrumentation (backend bisect_ppx)))
+
+(rule
+ (targets libp2p_ipc.ml libp2p_ipc.mli)
+ (deps Makefile libp2p_ipc.capnp)
+ (action
+  (run make %{targets})))
