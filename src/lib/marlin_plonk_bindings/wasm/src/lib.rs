@@ -42,6 +42,8 @@ pub mod pasta_fq_urs;
 pub mod plonk_gate;
 pub mod pasta_fp_plonk_index;
 pub mod pasta_fq_plonk_index;
+pub mod pasta_fp_plonk_oracles;
+pub mod pasta_fq_plonk_oracles;
 pub mod pasta_fp_plonk_proof;
 pub mod pasta_fq_plonk_proof;
 pub mod pasta_fp_plonk_verifier_index;
