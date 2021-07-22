@@ -130,19 +130,24 @@ type Config struct {
 // == It contains metrics and statistics relevant to the helper process,
 // == to be further exposed by the daemon as prometheus metrics.
 
+type MinMaxAvg struct {
+  min float64
+  max float64
+  avg float64
+}
+
+type InOut struct {
+  in  float64
+  out float64
+}
+
 type Stats struct {
   storedPeerCount       int
   connectedPeerCount    int
-  messageMinSize        float64
-  messageMaxSize        float64
-  messageAvgSize        float64
-  latencyMin            float64
-  latencyMax            float64
-  latencyAvg            float64
-  totalBandwidthIn      float64
-  totalBandwidthOut     float64
-  totalBandwidthRateIn  float64
-  totalBandwidthRateOut float64
+  messageSize           MinMaxAvg
+  latency               MinMaxAvg
+  totalBandwidthUsage   InOut
+  totalBandwidthRate    InOut
 }
 
 // == A `ValidationStatus` notifies the helper process of whether or not
@@ -159,6 +164,9 @@ const (
 // == describes a peer traversal algorithm for the helper to perform
 // == as when finding a successful response to an RPC query.
 
+// Alternative (safer) representations are possible, but this is
+// simplest to encode in the Cap'N Proto shared schema language.
+
 // Each node of the graph either allows any peer to query, or it
 // identifies a specific node to query..
 type AbstractPeerType int
@@ -168,7 +176,8 @@ const (
 )
 
 // This is essentially an ADT, but we cannot encode an ADT directly
-// in Go or Cap'N Proto. An equivalent ADT definition would be:
+// in Go (though we can use tagged unions when we describe this in
+// Cap'N Proto). An equivalent ADT definition would be:
 //   type abstract_peer_node =
 //     | AnyPeer
 //     | SpecificPeer of Peer
@@ -182,11 +191,16 @@ type AbstractPeerEdge struct {
   dst int
 }
 
-// Alternative (safer) representations are possible, but this is
-// simplest to encode in the Cap'N Proto shared schema language.
+// A graph is interpreted by starting (in parallel) at the source
+// nodes. When a node is interpreted, a request is sent to the peer
+// identified by the node. If the request for a node fails, then the
+// algorithm begins interpreting the successors of that node (also in
+// parallel). Interpretation halts when either a single request is
+// successful, or all requests fail after traversing the entire graph.
 type AbstractPeerGraph struct {
-  nodes []AbstractPeerNode
-  edges []AbstractPeerEdge
+  sources []int
+  nodes   []AbstractPeerNode
+  edges   []AbstractPeerEdge
 }
 ```
 
@@ -314,6 +328,21 @@ The Go implementation will be fairly similar to how it's structured today. The s
 
 One notable change that can be made is that, since we are moving to a push-based model for libp2p helper metrics, we no longer need to host a prometheus server from Go. However, we will still want the ability to optionally host an http server that exposes the [pprof](https://golang.org/pkg/net/http/pprof/) debugger interface, which we currently support in the metrics server we run.
 
+## Execution
+[execution]: #execution
+
+In order to execute on this refactor in a fashion where we can make incremental improvements on the networking layer, we will break the work up as follows:
+
+1. Migrate existing IPC messages to Cap'N Proto.
+2. Migrate to Unix pipes; split data streams up, except for per-gossip message data streams (which requires message type awareness).
+3. Migrate IPC messages to new protocol design.
+4. Add message type awareness, and split up per-gossip message data streams.
+
+## Test Plan
+[test-plan]: #test-plan
+
+In order to test this thoroughly, we need to run the software in a realistic networking scenario and exercise all IPC messages. This would involve connecting a node running this upgrade to a testnet, and monitoring the types of IPC messages we transmit while the node is running to ensure we hit them all. We would want to run this on a block producer with some stake, a snark coordinator, and some node that we send transactions through so that we properly test the broadcast logic. Additionally, we should exercise some bans in order to verify that our gating reconfiguration logic works as expected. Otherwise, we will use the monitoring output to inform us of any missed surface area in testing.
+
 ## Drawbacks
 [drawbacks]: #drawbacks
 
@@ -328,6 +357,12 @@ One notable change that can be made is that, since we are moving to a push-based
   - certainly less bugs, but certainly harder to build
   - this would be a lot more work and would likely take even longer to test
   - more risk associated with this route
+- [ZMQ](https://zeromq.org/) could be an alternative for bounded-queue IPC
+  - benchmarks seem promising, but more research needs to be done
+- Unix sockets could be an alternative to Unix pipes
+  - has the advantage that we can move processes across devices and the IPC will still work
+  - more overhead than Unix pipes
+  - with the data stream generalization, we can always swap this in if and when we decide to move processes around
 - [flatbuffers](https://google.github.io/flatbuffers/) could be an alternative serialization format (with some advantages and tradeoffs vs Cap'N Proto)
   - there are no existing OCaml libraries for this
 
