@@ -1777,6 +1777,7 @@ let%test_module _ =
         ; timing = Account.Timing.Untimed
         ; permissions = Permissions.user_default
         ; snapp = None
+        ; snapp_uri = ""
         } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =

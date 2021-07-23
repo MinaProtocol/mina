@@ -2430,6 +2430,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
+             ; snapp_uri = account.snapp_uri
              }))
     in
     let%bind receiver_increase =
@@ -2620,6 +2621,7 @@ module Base = struct
              ; timing = account.timing
              ; permissions = account.permissions
              ; snapp = account.snapp
+             ; snapp_uri = account.snapp_uri
              }))
     in
     let%bind user_command_fails =
@@ -2768,6 +2770,7 @@ module Base = struct
              ; timing
              ; permissions = account.permissions
              ; snapp = account.snapp
+             ; snapp_uri = account.snapp_uri
              }))
     in
     let%bind fee_excess =

@@ -1456,7 +1456,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ; transaction_commitment = ()
           ; inclusion_proof = loc
           } -> (
-          if is_start then
+          if (is_start : bool) then
             [%test_eq: Control.Tag.t] Signature (Control.tag p.authorization) ;
           match
             apply_body ~constraint_constants ~state_view
@@ -2153,7 +2153,8 @@ module For_tests = struct
       , State_hash.t
       , Account_timing.t
       , Permissions.t
-      , Snapp_account.t option )
+      , Snapp_account.t option
+      , string )
       Account.Poly.t
     [@@deriving sexp, compare]
   end

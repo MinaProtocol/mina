@@ -98,7 +98,8 @@ module Poly = struct
            , 'state_hash
            , 'timing
            , 'permissions
-           , 'snapp_opt )
+           , 'snapp_opt
+           , 'snapp_uri )
            t =
         { public_key : 'pk
         ; token_id : 'tid
@@ -111,8 +112,11 @@ module Poly = struct
         ; timing : 'timing
         ; permissions : 'permissions
         ; snapp : 'snapp_opt
+        ; snapp_uri : 'snapp_uri
         }
       [@@deriving sexp, equal, compare, hash, yojson, fields, hlist]
+
+      let to_latest = Fn.id
     end
   end]
 end
@@ -150,7 +154,8 @@ module Binable_arg = struct
         , State_hash.Stable.V1.t
         , Timing.Stable.V1.t
         , Permissions.Stable.V1.t
-        , Snapp_account.Stable.V1.t option )
+        , Snapp_account.Stable.V1.t option
+        , string )
         (* TODO: Cache the digest of this? *)
         Poly.Stable.V1.t
       [@@deriving sexp, equal, hash, compare, yojson]
@@ -225,7 +230,8 @@ type value =
   , State_hash.t
   , Timing.t
   , Permissions.t
-  , Snapp_account.t option )
+  , Snapp_account.t option
+  , string )
   Poly.t
 [@@deriving sexp]
 
@@ -249,6 +255,7 @@ let initialize account_id : t =
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
   ; snapp = None
+  ; snapp_uri = ""
   }
 
 let hash_snapp_account_opt = function
@@ -256,6 +263,22 @@ let hash_snapp_account_opt = function
       Lazy.force Snapp_account.default_digest
   | Some (a : Snapp_account.t) ->
       Snapp_account.digest a
+
+let hash_snapp_uri (snapp_uri : string) =
+  (* We use [length*8 + 1] to pass a final [true] after the end of the string,
+     to ensure that trailing null bytes don't alias in the hash preimage.
+  *)
+  let bits = Array.create ~len:((String.length snapp_uri * 8) + 1) true in
+  String.foldi snapp_uri ~init:() ~f:(fun i () c ->
+      let c = Char.to_int c in
+      (* Insert the bits into [bits], LSB order. *)
+      for j = 0 to 7 do
+        (* [Int.test_bit c j] *)
+        bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
+      done) ;
+  Random_oracle_input.bitstring (Array.to_list bits)
+  |> Random_oracle.pack_input
+  |> Random_oracle.hash ~init:Hash_prefix_states.snapp_uri
 
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
@@ -273,6 +296,7 @@ let to_input (t : t) =
     ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
     ~snapp:(f (Fn.compose field hash_snapp_account_opt))
     ~permissions:(f Permissions.to_input)
+    ~snapp_uri:(f (Fn.compose field hash_snapp_uri))
   |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -296,7 +320,7 @@ type var =
   , Permissions.Checked.t
   , Field.Var.t * Snapp_account.t option As_prover.Ref.t
   (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
-  )
+  , Field.Var.t * string As_prover.Ref.t )
   Poly.t
 
 let identifier_of_var ({ public_key; token_id; _ } : var) =
@@ -319,6 +343,10 @@ let typ' snapp =
       ; Timing.typ
       ; Permissions.typ
       ; snapp
+      ; Typ.transport
+          Typ.(Field.typ * Internal.ref ())
+          ~there:(fun s -> (hash_snapp_uri s, s))
+          ~back:(fun (_, s) -> s)
       ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
@@ -362,6 +390,7 @@ let var_of_t
      ; timing
      ; permissions
      ; snapp
+     ; snapp_uri
      } :
       value) =
   { Poly.public_key = Public_key.Compressed.var_of_t public_key
@@ -375,6 +404,7 @@ let var_of_t
   ; timing = Timing.var_of_t timing
   ; permissions = Permissions.Checked.constant permissions
   ; snapp = Field.Var.constant (hash_snapp_account_opt snapp)
+  ; snapp_uri = Field.Var.constant (hash_snapp_uri snapp_uri)
   }
 
 module Checked = struct
@@ -390,7 +420,8 @@ module Checked = struct
       , State_hash.var
       , Timing.var
       , Permissions.Checked.t
-      , Snapp_account.Checked.t )
+      , Snapp_account.Checked.t
+      , Field.Var.t * string As_prover.Ref.t )
       Poly.t
 
     let typ : (t, Stable.Latest.t) Typ.t =
@@ -425,7 +456,8 @@ module Checked = struct
              ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
              ~delegate:(f Public_key.Compressed.Checked.to_input)
              ~voting_for:(f State_hash.var_to_input)
-             ~timing:(bits Timing.var_to_bits)))
+             ~timing:(bits Timing.var_to_bits)
+             ~snapp_uri:(f (fun (hash, _) -> field hash))))
 
   let digest t =
     make_checked (fun () ->
@@ -515,6 +547,7 @@ let empty =
       Permissions.user_default
       (* TODO: This should maybe be Permissions.empty *)
   ; snapp = None
+  ; snapp_uri = ""
   }
 
 let empty_digest = digest empty
@@ -537,6 +570,7 @@ let create account_id balance =
   ; timing = Timing.Untimed
   ; permissions = Permissions.user_default
   ; snapp = None
+  ; snapp_uri = ""
   }
 
 let create_timed account_id balance ~initial_minimum_balance ~cliff_time
@@ -572,6 +606,7 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
             ; vesting_period
             ; vesting_increment
             }
+      ; snapp_uri = ""
       }
 
 (* no vesting after cliff time + 1 slot *)

@@ -88,3 +88,5 @@ let party = create "MinaParty"
 let party_cons = create "MinaPartyCons"
 
 let party_with_protocol_state_predicate = create "MinaPartyStatePred"
+
+let snapp_uri = create "MinaSnappUri"

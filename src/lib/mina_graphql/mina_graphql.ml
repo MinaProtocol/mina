@@ -787,6 +787,7 @@ module Types = struct
           ; timing
           ; permissions
           ; snapp
+          ; snapp_uri
           } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
@@ -797,7 +798,8 @@ module Types = struct
         let%bind voting_for = voting_for in
         let%bind timing = timing in
         let%bind permissions = permissions in
-        let%map snapp = snapp in
+        let%bind snapp = snapp in
+        let%map snapp_uri = snapp_uri in
         { Account.Poly.public_key
         ; token_id
         ; token_permissions
@@ -809,6 +811,7 @@ module Types = struct
         ; timing
         ; permissions
         ; snapp
+        ; snapp_uri
         }
 
       let of_full_account ?breadcrumb
@@ -823,6 +826,7 @@ module Types = struct
           ; timing
           ; permissions
           ; snapp
+          ; snapp_uri
           } =
         { Account.Poly.public_key
         ; token_id
@@ -840,6 +844,7 @@ module Types = struct
         ; timing
         ; permissions = Some permissions
         ; snapp
+        ; snapp_uri = Some snapp_uri
         }
 
       let of_account_id coda account_id =
@@ -875,6 +880,7 @@ module Types = struct
               ; timing = Timing.Untimed
               ; permissions = None
               ; snapp = None
+              ; snapp_uri = None
               }
 
       let of_pk coda pk =
@@ -893,7 +899,8 @@ module Types = struct
           , State_hash.t option
           , Account.Timing.t
           , Permissions.t option
-          , Snapp_account.t option )
+          , Snapp_account.t option
+          , string option )
           Account.Poly.t
       ; locked : bool option
       ; is_actively_staking : bool
@@ -1164,6 +1171,13 @@ module Types = struct
                     ledger"
                  ~args:Arg.[]
                  ~resolve:(fun _ { index; _ } -> index)
+             ; field "snappUri" ~typ:string
+                 ~doc:
+                   "The URI associated with this account, usually pointing to \
+                    the snapp source code"
+                 ~args:Arg.[]
+                 ~resolve:(fun _ { account; _ } ->
+                   account.Account.Poly.snapp_uri)
              ]))
 
     let account = Lazy.force account
