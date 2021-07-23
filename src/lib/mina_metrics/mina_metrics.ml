@@ -1,5 +1,4 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Prometheus
@@ -47,7 +46,7 @@ module TextFormat_0_0_4 = struct
     match Float.classify v with
     | Normal | Subnormal | Zero ->
         Fmt.float f v
-    | Infinite when v > 0.0 ->
+    | Infinite when Float.(v > 0.) ->
         Fmt.string f "+Inf"
     | Infinite ->
         Fmt.string f "-Inf"
@@ -69,7 +68,7 @@ module TextFormat_0_0_4 = struct
         Fmt.pf f "{%a}" output_pairs (label_names, label_values)
 
   let output_sample ~base ~label_names ~label_values f
-      {Sample_set.ext; value; bucket} =
+      { Sample_set.ext; value; bucket } =
     let label_names, label_values =
       match bucket with
       | None ->
@@ -83,17 +82,15 @@ module TextFormat_0_0_4 = struct
       label_values output_value value
 
   let output_metric ~name ~label_names f (label_values, samples) =
-    List.iter samples
-      ~f:(output_sample ~base:name ~label_names ~label_values f)
+    List.iter samples ~f:(output_sample ~base:name ~label_names ~label_values f)
 
   let output f =
     MetricFamilyMap.iter (fun metric samples ->
-        let {MetricInfo.name; metric_type; help; label_names} = metric in
+        let { MetricInfo.name; metric_type; help; label_names } = metric in
         Fmt.pf f "#HELP %a %a@.#TYPE %a %a@.%a" MetricName.pp name
-          output_unquoted help MetricName.pp name output_metric_type
-          metric_type
+          output_unquoted help MetricName.pp name output_metric_type metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
-          samples )
+          samples)
 end
 
 module Runtime = struct
@@ -128,9 +125,13 @@ module Runtime = struct
   let simple_metric ~metric_type ~help name fn =
     let name = Printf.sprintf "%s_%s_%s" namespace subsystem name in
     let info =
-      {MetricInfo.name= MetricName.v name; help; metric_type; label_names= []}
+      { MetricInfo.name = MetricName.v name
+      ; help
+      ; metric_type
+      ; label_names = []
+      }
     in
-    let collect () = LabelSetMap.singleton [] [Sample_set.sample (fn ())] in
+    let collect () = LabelSetMap.singleton [] [ Sample_set.sample (fn ()) ] in
     (info, collect)
 
   let ocaml_gc_allocated_bytes =
@@ -228,7 +229,7 @@ module Runtime = struct
   let process_uptime_ms_total =
     simple_metric ~metric_type:Counter "process_uptime_ms_total"
       (fun () ->
-        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time) )
+        Core.Time.Span.to_ms (Core.Time.diff (Core.Time.now ()) start_time))
       ~help:"Total time the process has been running for in milliseconds."
 
   let metrics =
@@ -249,13 +250,14 @@ module Runtime = struct
     ; jemalloc_allocated_bytes
     ; jemalloc_mapped_bytes
     ; process_cpu_seconds_total
-    ; process_uptime_ms_total ]
+    ; process_uptime_ms_total
+    ]
 
   let () =
     let open CollectorRegistry in
     register_pre_collect default update ;
     List.iter metrics ~f:(fun (info, collector) ->
-        register default info collector )
+        register default info collector)
 end
 
 module Cryptography = struct
@@ -286,9 +288,9 @@ module Cryptography = struct
       ~subsystem
 
   (* TODO:
-  let transaction_proving_time_ms =
-    let help = "time elapsed while proving most recently generated transaction snark" in
-    Gauge.v "transaction_proving_time_ms" ~help ~namespace ~subsystem
+     let transaction_proving_time_ms =
+       let help = "time elapsed while proving most recently generated transaction snark" in
+       Gauge.v "transaction_proving_time_ms" ~help ~namespace ~subsystem
   *)
 end
 
@@ -308,6 +310,10 @@ module Transaction_pool = struct
       "Time at which useful transactions were seen (seconds since 1/1/1970)"
     in
     Gauge.v "useful_transactions_received_time_sec" ~help ~namespace ~subsystem
+
+  let pool_size : Gauge.t =
+    let help = "Number of transactions in the pool" in
+    Gauge.v "size" ~help ~namespace ~subsystem
 end
 
 module Metric_map (Metric : sig
@@ -330,9 +336,7 @@ struct
   let add t ~name ~help : Metric.t =
     if Metric_name_map.mem t name then Metric_name_map.find_exn t name
     else
-      let metric =
-        Metric.v ~help ~namespace ~subsystem:Metric.subsystem name
-      in
+      let metric = Metric.v ~help ~namespace ~subsystem:Metric.subsystem name in
       Metric_name_map.add_exn t ~key:name ~data:metric ;
       metric
 end
@@ -343,6 +347,10 @@ module Network = struct
   let peers : Gauge.t =
     let help = "# of peers seen through gossip net" in
     Gauge.v "peers" ~help ~namespace ~subsystem
+
+  let all_peers : Gauge.t =
+    let help = "# of peers ever seen through gossip net" in
+    Gauge.v "all_peers" ~help ~namespace ~subsystem
 
   let gossip_messages_received : Counter.t =
     let help = "# of messages received" in
@@ -398,8 +406,7 @@ module Network = struct
 
   let rpc_latency_ms_summary : Rpc_latency_histogram.t =
     let help = "A histogram for all RPC call latencies" in
-    Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace
-      ~subsystem
+    Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
 end
 
 module Snark_work = struct
@@ -413,8 +420,7 @@ module Snark_work = struct
 
   let completed_snark_work_received_gossip : Counter.t =
     let help = "# of completed snark work bundles received from peers" in
-    Counter.v "completed_snark_work_received_gossip" ~help ~namespace
-      ~subsystem
+    Counter.v "completed_snark_work_received_gossip" ~help ~namespace ~subsystem
 
   let completed_snark_work_received_rpc : Counter.t =
     let help = "# of completed snark work bundles received via rpc" in
@@ -523,9 +529,9 @@ module Consensus = struct
   let subsystem = "Consensus"
 
   (* TODO:
-  let vrf_threshold =
-    let help = "vrf threshold expressed as % to win (in range 0..1)" in
-    Gauge.v "vrf_threshold" ~help ~namespace ~subsystem
+     let vrf_threshold =
+       let help = "vrf threshold expressed as % to win (in range 0..1)" in
+       Gauge.v "vrf_threshold" ~help ~namespace ~subsystem
   *)
 
   let vrf_evaluations : Counter.t =
@@ -590,8 +596,8 @@ module Transition_frontier = struct
 
   let slot_fill_rate : Gauge.t =
     let help =
-      "fill rate for the last k slots (or fewer if there have not been k \
-       slots between the best tip and the frontier root)"
+      "fill rate for the last k slots (or fewer if there have not been k slots \
+       between the best tip and the frontier root)"
     in
     Gauge.v "slot_fill_rate" ~help ~namespace ~subsystem
 
@@ -620,7 +626,8 @@ module Transition_frontier = struct
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
   module TPS_30min =
-    Moving_bucketed_average (struct
+    Moving_bucketed_average
+      (struct
         let bucket_interval = Core.Time.Span.of_min 3.0
 
         let num_buckets = 10
@@ -684,13 +691,13 @@ module Transition_frontier = struct
     Gauge.v "best_tip_slot_time_sec" ~help ~namespace ~subsystem
 
   (* TODO:
-  let recently_finalized_snarked_txns : Gauge.t =
-    let help = "toal # of snarked txns that have been finalized" in
-    Gauge.v "finalized_snarked_txns" ~help ~namespace ~subsystem
+     let recently_finalized_snarked_txns : Gauge.t =
+       let help = "toal # of snarked txns that have been finalized" in
+       Gauge.v "finalized_snarked_txns" ~help ~namespace ~subsystem
 
-  let recently_finalized_snarked_txns : Gauge.t =
-    let help = "# of snarked txns that were finalized during the last transition frontier root transition" in
-    Gauge.v "recently_finalized_snarked_txns" ~help ~namespace ~subsystem
+     let recently_finalized_snarked_txns : Gauge.t =
+       let help = "# of snarked txns that were finalized during the last transition frontier root transition" in
+       Gauge.v "recently_finalized_snarked_txns" ~help ~namespace ~subsystem
   *)
 
   let root_snarked_ledger_accounts : Gauge.t =
@@ -702,13 +709,13 @@ module Transition_frontier = struct
     Gauge.v "root_snarked_ledger_total_currency" ~help ~namespace ~subsystem
 
   (* TODO:
-  let root_staged_ledger_accounts : Gauge.t =
-    let help = "# of accounts in transition frontier root staged ledger" in
-    Gauge.v "root_staged_ledger_accounts" ~help ~namespace ~subsystem
+     let root_staged_ledger_accounts : Gauge.t =
+       let help = "# of accounts in transition frontier root staged ledger" in
+       Gauge.v "root_staged_ledger_accounts" ~help ~namespace ~subsystem
 
-  let root_staged_ledger_total_currency : Gauge.t =
-    let help = "total amount of currency in root staged ledger" in
-    Gauge.v "root_staged_ledger_total_currency" ~help ~namespace ~subsystem
+     let root_staged_ledger_total_currency : Gauge.t =
+       let help = "total amount of currency in root staged ledger" in
+       Gauge.v "root_staged_ledger_total_currency" ~help ~namespace ~subsystem
   *)
 end
 
@@ -753,8 +760,7 @@ module Block_latency = struct
       Gauge.v "upload_to_gcloud_blocks" ~help ~namespace ~subsystem
   end
 
-  [%%inject
-  "block_window_duration", block_window_duration]
+  [%%inject "block_window_duration", block_window_duration]
 
   module Latency_time_spec = struct
     let tick_interval =
@@ -765,7 +771,8 @@ module Block_latency = struct
   end
 
   module Gossip_slots =
-    Moving_bucketed_average (struct
+    Moving_bucketed_average
+      (struct
         let bucket_interval =
           Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
 
@@ -782,14 +789,15 @@ module Block_latency = struct
           let total_sum, count_sum =
             List.fold buckets ~init:(0.0, 0)
               ~f:(fun (total_sum, count_sum) (total, count) ->
-                (total_sum +. total, count_sum + count) )
+                (total_sum +. total, count_sum + count))
           in
           total_sum /. Float.of_int count_sum
       end)
       ()
 
   module Gossip_time =
-    Moving_time_average (struct
+    Moving_time_average
+      (struct
         include Latency_time_spec
 
         let subsystem = subsystem
@@ -802,7 +810,8 @@ module Block_latency = struct
       ()
 
   module Inclusion_time =
-    Moving_time_average (struct
+    Moving_time_average
+      (struct
         include Latency_time_spec
 
         let subsystem = subsystem
@@ -810,10 +819,44 @@ module Block_latency = struct
         let name = "inclusion_time"
 
         let help =
-          "average delay, in seconds, after which produced blocks are \
-           included into our frontier"
+          "average delay, in seconds, after which produced blocks are included \
+           into our frontier"
       end)
       ()
+end
+
+module Rejected_blocks = struct
+  let subsystem = "Rejected_blocks"
+
+  let worse_than_root =
+    let help =
+      "The number of blocks rejected due to the blocks are not selected over \
+       our root"
+    in
+    Counter.v "worse_than_root" ~help ~namespace ~subsystem
+
+  let no_common_ancestor =
+    let help =
+      "The number of blocks rejected due to the blocks do not share a common \
+       ancestor with our root"
+    in
+    Counter.v "no_common_ancestor" ~help ~namespace ~subsystem
+
+  let invalid_proof =
+    let help = "The number of blocks rejected due to invalid proof" in
+    Counter.v "invalid_proof" ~help ~namespace ~subsystem
+
+  let received_late =
+    let help =
+      "The number of blocks rejected due to blocks being received too late"
+    in
+    Counter.v "received_late" ~help ~namespace ~subsystem
+
+  let received_early =
+    let help =
+      "The number of blocks rejected due to blocks being received too early"
+    in
+    Counter.v "received_early" ~help ~namespace ~subsystem
 end
 
 module Object_lifetime_statistics = struct
@@ -880,20 +923,46 @@ module Object_lifetime_statistics = struct
     Gauge_map.add lifetime_quartile_ms_table ~name ~help
 end
 
-let generic_server ~port ~logger ~registry =
+let generic_server ?forward_uri ~port ~logger ~registry () =
   let open Cohttp in
   let open Cohttp_async in
   let handle_error _ exn =
     [%log error]
-      ~metadata:[("error", `String (Exn.to_string exn))]
+      ~metadata:[ ("error", `String (Exn.to_string exn)) ]
       "Encountered error while handling request to prometheus server: $error"
   in
   let callback ~body:_ _ req =
     let uri = Request.uri req in
     match (Request.meth req, Uri.path uri) with
     | `GET, "/metrics" ->
+        let%bind other_data =
+          match forward_uri with
+          | Some uri ->
+              let%bind resp, body = Client.get uri in
+              let status = Response.status resp in
+              if Code.is_success (Code.code_of_status status) then
+                let%map body = Body.to_string body in
+                Some body
+              else (
+                [%log error] "Could not forward request to $url, got: $status"
+                  ~metadata:
+                    [ ("url", `String (Uri.to_string uri))
+                    ; ("status_code", `Int (Code.code_of_status status))
+                    ; ("status", `String (Code.string_of_status status))
+                    ] ;
+                return None )
+          | None ->
+              return None
+        in
         let data = CollectorRegistry.(collect registry) in
         let body = Fmt.to_to_string TextFormat_0_0_4.output data in
+        let body =
+          match other_data with
+          | Some other_data ->
+              body ^ "\n" ^ other_data
+          | None ->
+              body
+        in
         let headers =
           Header.init_with "Content-Type" "text/plain; version=0.0.4"
         in
@@ -902,24 +971,25 @@ let generic_server ~port ~logger ~registry =
         Server.respond_string ~status:`Bad_request "Bad request"
   in
   Server.create ~mode:`TCP ~on_handler_error:(`Call handle_error)
-    (Async_extra.Tcp.Where_to_listen.of_port port)
+    (Async.Tcp.Where_to_listen.of_port port)
     callback
 
-let server ~port ~logger =
-  generic_server ~port ~logger ~registry:CollectorRegistry.default
+let server ?forward_uri ~port ~logger () =
+  generic_server ?forward_uri ~port ~logger ~registry:CollectorRegistry.default
+    ()
 
 module Archive = struct
   type t =
-    {registry: CollectorRegistry.t; gauge_metrics: (string, Gauge.t) Hashtbl.t}
+    { registry : CollectorRegistry.t
+    ; gauge_metrics : (string, Gauge.t) Hashtbl.t
+    }
 
   let subsystem = "Archive"
 
   let find_or_add t ~name ~help ~subsystem =
     match Hashtbl.find t.gauge_metrics name with
     | None ->
-        let g =
-          Gauge.v name ~help ~namespace ~subsystem ~registry:t.registry
-        in
+        let g = Gauge.v name ~help ~namespace ~subsystem ~registry:t.registry in
         Hashtbl.add_exn t.gauge_metrics ~key:name ~data:g ;
         g
     | Some m ->
@@ -944,11 +1014,15 @@ module Archive = struct
     let name = "missing_blocks" in
     find_or_add t ~name ~help ~subsystem
 
-  let create_archive_server ~port ~logger =
+  let create_archive_server ?forward_uri ~port ~logger () =
     let open Async_kernel.Deferred.Let_syntax in
     let archive_registry = CollectorRegistry.create () in
-    let%map _ = generic_server ~port ~logger ~registry:archive_registry in
-    {registry= archive_registry; gauge_metrics= Hashtbl.create (module String)}
+    let%map _ =
+      generic_server ?forward_uri ~port ~logger ~registry:archive_registry ()
+    in
+    { registry = archive_registry
+    ; gauge_metrics = Hashtbl.create (module String)
+    }
 end
 
 (* re-export a constrained subset of prometheus to keep consumers of this module abstract over implementation *)

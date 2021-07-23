@@ -137,9 +137,12 @@ module Timing_info = struct
     let%bind pk_id = Public_key.find (module Conn) acc.public_key in
     Conn.find
       (Caqti_request.find Caqti_type.int typ
-         "SELECT public_key_id, token, initial_balance, \
-          initial_minimum_balance, cliff_time, cliff_amount, vesting_period, \
-          vesting_increment FROM timing_info WHERE public_key_id = ?")
+         {sql| SELECT public_key_id, token, initial_balance,
+                      initial_minimum_balance, cliff_time, cliff_amount,
+                      vesting_period, vesting_increment
+               FROM timing_info
+               WHERE public_key_id = ?
+         |sql})
       pk_id
 
   let find_by_pk_opt (module Conn : CONNECTION) public_key =
@@ -147,9 +150,12 @@ module Timing_info = struct
     let%bind pk_id = Public_key.find (module Conn) public_key in
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.int typ
-         "SELECT public_key_id, token, initial_balance, \
-          initial_minimum_balance, cliff_time, cliff_amount, vesting_period, \
-          vesting_increment FROM timing_info WHERE public_key_id = ?")
+         {sql| SELECT public_key_id, token, initial_balance,
+                     initial_minimum_balance, cliff_time, cliff_amount,
+                     vesting_period, vesting_increment
+               FROM timing_info
+               WHERE public_key_id = ?
+         |sql})
       pk_id
 
   let add_if_doesn't_exist (module Conn : CONNECTION) (acc : Account.t) =
@@ -389,7 +395,7 @@ module User_command = struct
                {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
                       receiver_id, fee_token, token, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id |sql})
             { typ=
                 ( match via with
@@ -483,7 +489,7 @@ module User_command = struct
          {sql| INSERT INTO user_commands (type, fee_payer_id, source_id,
                       receiver_id, fee_token, token, nonce, amount, fee,
                       valid_until, memo, hash)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?::user_command_type, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     RETURNING id
          |sql})
       { typ= user_cmd.typ
@@ -534,7 +540,7 @@ module Internal_command = struct
       (Caqti_request.find_opt
          Caqti_type.(tup2 string string)
          Caqti_type.int
-         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2")
+         "SELECT id FROM internal_commands WHERE hash = $1 AND type = $2::internal_command_type")
       (Transaction_hash.to_base58_check transaction_hash, typ)
 
   let load (module Conn : CONNECTION) ~(id : int) =
@@ -564,7 +570,7 @@ module Internal_command = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token,hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { typ= internal_cmd.typ
@@ -634,7 +640,7 @@ module Fee_transfer = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token, hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { kind
@@ -682,7 +688,7 @@ module Coinbase = struct
           (Caqti_request.find typ Caqti_type.int
              {sql| INSERT INTO internal_commands
                     (type, receiver_id, fee, token, hash)
-                   VALUES (?, ?, ?, ?, ?)
+                   VALUES (?::internal_command_type, ?, ?, ?, ?)
                    RETURNING id
              |sql})
           { receiver_id
@@ -745,17 +751,34 @@ module Balance = struct
 end
 
 module Block_and_internal_command = struct
+  type t =
+    { block_id: int
+    ; internal_command_id: int
+    ; sequence_no: int
+    ; secondary_sequence_no: int
+    ; receiver_balance_id: int }
+  [@@deriving hlist]
+
+  let typ =
+    let open Caqti_type_spec in
+    let spec = Caqti_type.[int; int; int; int; int] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
   let add (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no ~receiver_balance_id =
     Conn.exec
-      (Caqti_request.exec
-         Caqti_type.(tup2 (tup4 int int int int) int)
+      (Caqti_request.exec typ
          {sql| INSERT INTO blocks_internal_commands
                 (block_id, internal_command_id, sequence_no, secondary_sequence_no, receiver_balance)
                 VALUES (?, ?, ?, ?, ?)
          |sql})
-      ( (block_id, internal_command_id, sequence_no, secondary_sequence_no)
-      , receiver_balance_id )
+      { block_id
+      ; internal_command_id
+      ; sequence_no
+      ; secondary_sequence_no
+      ; receiver_balance_id }
 
   let find (module Conn : CONNECTION) ~block_id ~internal_command_id
       ~sequence_no ~secondary_sequence_no =
@@ -858,7 +881,7 @@ module Block_and_signed_command = struct
                  fee_payer_balance,
                  source_balance,
                  receiver_balance)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?::user_command_status, ?, ?, ?, ?, ?, ?, ?)
          |sql})
       { block_id
       ; user_command_id
@@ -1174,6 +1197,10 @@ module Block = struct
                 let fee_transfers =
                   Mina_base.Fee_transfer.to_numbered_list fee_transfer_bundled
                 in
+                (* balances.receiver1_balance is for receiver of head of fee_transfers
+                   balances.receiver2_balance, if it exists, is for receiver of
+                     next element of fee_transfers
+                *)
                 let%bind fee_transfer_infos =
                   deferred_result_list_fold fee_transfers ~init:[]
                     ~f:(fun acc (secondary_sequence_no, fee_transfer) ->
@@ -1185,11 +1212,12 @@ module Block = struct
                       (id, secondary_sequence_no, fee_transfer.receiver_pk)
                       :: acc )
                 in
-                let fee_transfer_infos =
+                let fee_transfer_infos_with_balances =
                   match fee_transfer_infos with
                   | [id] ->
                       [(id, balances.receiver1_balance)]
-                  | [id1; id2] ->
+                  | [id2; id1] ->
+                      (* the fold reverses the order of the infos from the fee transfers *)
                       [ (id1, balances.receiver1_balance)
                       ; (id2, Option.value_exn balances.receiver2_balance) ]
                   | _ ->
@@ -1198,7 +1226,8 @@ module Block = struct
                          transfer transaction"
                 in
                 let%map () =
-                  deferred_result_list_fold fee_transfer_infos ~init:()
+                  deferred_result_list_fold fee_transfer_infos_with_balances
+                    ~init:()
                     ~f:(fun ()
                        ( (fee_transfer_id, secondary_sequence_no, receiver_pk)
                        , balance )
@@ -1731,7 +1760,7 @@ let create_metrics_server ~logger ~metrics_server_port ~missing_blocks_width
           missing_blocks_width
       in
       let%bind metric_server =
-        Mina_metrics.Archive.create_archive_server ~port ~logger
+        Mina_metrics.Archive.create_archive_server ~port ~logger ()
       in
       let interval =
         Float.of_int (Mina_compile_config.block_window_duration_ms * 2)
@@ -1813,7 +1842,7 @@ let setup_server ~metrics_server_port ~constraint_constants ~logger
           | Ok () ->
               () )
       |> don't_wait_for ;
-      Deferred.ignore
+      Deferred.ignore_m
       @@ Tcp.Server.create
            ~on_handler_error:
              (`Call

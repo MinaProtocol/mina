@@ -26,7 +26,11 @@ let add_account pk =
   | `Duplicate ->
       false
 
-let valid_pk pk = Or_error.is_ok @@ Public_key.Compressed.of_base58_check pk
+let valid_pk pk =
+  try
+    Public_key.of_base58_check_decompress_exn pk |> ignore ;
+    true
+  with _ -> false
 
 let no_delegatee pk = String.is_empty pk || String.equal pk "0"
 
@@ -44,9 +48,9 @@ let slots_per_month_float = Float.of_int slots_per_month
 let valid_mina_amount amount =
   let is_num_string s = String.for_all s ~f:Char.is_digit in
   match String.split ~on:'.' amount with
-  | [whole] ->
+  | [ whole ] ->
       is_num_string whole
-  | [whole; decimal] when String.length decimal <= 9 ->
+  | [ whole; decimal ] when String.length decimal <= 9 ->
       is_num_string whole && is_num_string decimal
   | _ ->
       false
@@ -63,7 +67,7 @@ let amount_geq_min_balance ~amount ~initial_min_balance =
 *)
 let generate_delegate_account ~logger delegatee_pk =
   [%log info] "Generating account for delegatee $delegatee"
-    ~metadata:[("delegatee", `String delegatee_pk)] ;
+    ~metadata:[ ("delegatee", `String delegatee_pk) ] ;
   let pk = Some delegatee_pk in
   let balance = Currency.Balance.zero in
   let timing = None in
@@ -72,7 +76,8 @@ let generate_delegate_account ~logger delegatee_pk =
     pk
   ; balance
   ; timing
-  ; delegate }
+  ; delegate
+  }
 
 let generate_missing_delegate_accounts ~logger =
   (* for each delegate that doesn't have a corresponding account,
@@ -81,7 +86,7 @@ let generate_missing_delegate_accounts ~logger =
   let delegates = String.Table.keys delegates_tbl in
   let missing_delegates =
     List.filter delegates ~f:(fun delegate ->
-        not (String.Table.mem accounts_tbl delegate) )
+        not (String.Table.mem accounts_tbl delegate))
   in
   let delegate_accounts =
     List.map missing_delegates ~f:(generate_delegate_account ~logger)
@@ -92,7 +97,7 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
     ~delegatee_pk =
   [%log info] "Processing record for $wallet_pk"
-    ~metadata:[("wallet_pk", `String wallet_pk)] ;
+    ~metadata:[ ("wallet_pk", `String wallet_pk) ] ;
   let pk = Some wallet_pk in
   let balance = Currency.Balance.of_formatted_string amount in
   let initial_minimum_balance =
@@ -132,7 +137,8 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
         ; cliff_time
         ; cliff_amount
         ; vesting_period
-        ; vesting_increment }
+        ; vesting_increment
+        }
   in
   let delegate =
     (* 0 or empty string denotes "no delegation" *)
@@ -142,7 +148,8 @@ let runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
     pk
   ; balance
   ; timing
-  ; delegate }
+  ; delegate
+  }
 
 let account_of_tsv ~logger tsv =
   match String.split tsv ~on:'\t' with
@@ -155,15 +162,15 @@ let account_of_tsv ~logger tsv =
     ; cliff_amount
     ; unlock_frequency
     ; unlock_amount
-    ; delegatee_pk ] ->
+    ; delegatee_pk
+    ] ->
       Some
         (runtime_config_account ~logger ~wallet_pk ~amount ~initial_min_balance
            ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
            ~delegatee_pk)
   | _ ->
       (* should not occur, we've already validated the record *)
-      failwithf "TSV line does not contain expected number of fields: %s" tsv
-        ()
+      failwithf "TSV line does not contain expected number of fields: %s" tsv ()
 
 let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
     ~cliff_amount ~unlock_frequency ~unlock_amount ~delegatee_pk =
@@ -183,7 +190,7 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
   in
   let valid_cliff_amount = valid_mina_amount cliff_amount in
   let valid_unlock_frequency =
-    List.mem ["0"; "1"] unlock_frequency ~equal:String.equal
+    List.mem [ "0"; "1" ] unlock_frequency ~equal:String.equal
   in
   let valid_unlock_amount = valid_mina_amount unlock_amount in
   let valid_delegatee_pk =
@@ -218,12 +225,13 @@ let validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
     ; ("timing", valid_timing)
     ; ("unlock_frequency", valid_unlock_frequency)
     ; ("unlock_amount", valid_unlock_amount)
-    ; ("delegatee_pk", valid_delegatee_pk) ]
+    ; ("delegatee_pk", valid_delegatee_pk)
+    ]
   in
   let valid_str = "VALID" in
   let invalid_fields =
     List.map valid_field_descs ~f:(fun (field, valid) ->
-        if valid then valid_str else field )
+        if valid then valid_str else field)
     |> List.filter ~f:(fun field -> not (String.equal field valid_str))
     |> String.concat ~sep:","
   in
@@ -240,10 +248,10 @@ let validate_record tsv =
     ; cliff_amount
     ; unlock_frequency
     ; unlock_amount
-    ; delegatee_pk ] ->
-      validate_fields ~wallet_pk ~amount ~initial_min_balance
-        ~cliff_time_months ~cliff_amount ~unlock_frequency ~unlock_amount
-        ~delegatee_pk
+    ; delegatee_pk
+    ] ->
+      validate_fields ~wallet_pk ~amount ~initial_min_balance ~cliff_time_months
+        ~cliff_amount ~unlock_frequency ~unlock_amount ~delegatee_pk
   | _ ->
       Some "TSV line does not contain expected number of fields"
 
@@ -255,7 +263,7 @@ let main ~tsv_file ~output_file () =
   let validation_errors =
     In_channel.with_file tsv_file ~f:(fun in_channel ->
         [%log info] "Opened TSV file $tsv_file for validation"
-          ~metadata:[("tsv_file", `String tsv_file)] ;
+          ~metadata:[ ("tsv_file", `String tsv_file) ] ;
         let rec go num_accounts validation_errors =
           match In_channel.input_line in_channel with
           | Some line ->
@@ -270,7 +278,8 @@ let main ~tsv_file ~output_file () =
                        $invalid_fields"
                       ~metadata:
                         [ ("row", `Int (num_accounts + 2))
-                        ; ("invalid_fields", `String invalid_fields) ] ;
+                        ; ("invalid_fields", `String invalid_fields)
+                        ] ;
                     true
               in
               go (num_accounts + 1) validation_errors
@@ -279,7 +288,7 @@ let main ~tsv_file ~output_file () =
         in
         (* skip first line *)
         let _headers = In_channel.input_line in_channel in
-        go 0 false )
+        go 0 false)
   in
   if validation_errors then (
     [%log fatal] "Input has validation errors, exiting" ;
@@ -289,7 +298,7 @@ let main ~tsv_file ~output_file () =
   let provided_accounts, num_accounts =
     In_channel.with_file tsv_file ~f:(fun in_channel ->
         [%log info] "Opened TSV file $tsv_file for translation"
-          ~metadata:[("tsv_file", `String tsv_file)] ;
+          ~metadata:[ ("tsv_file", `String tsv_file) ] ;
         let rec go accounts num_accounts =
           match In_channel.input_line in_channel with
           | Some line -> (
@@ -304,7 +313,7 @@ let main ~tsv_file ~output_file () =
         in
         (* skip first line *)
         let _headers = In_channel.input_line in_channel in
-        go [] 0 )
+        go [] 0)
   in
   [%log info] "Processed %d records" num_accounts ;
   let generated_accounts, num_generated =
@@ -320,7 +329,7 @@ let main ~tsv_file ~output_file () =
       List.iter jsons ~f:(fun json ->
           Out_channel.output_string out_channel
             (Yojson.Safe.pretty_to_string json) ;
-          Out_channel.newline out_channel ) ) ;
+          Out_channel.newline out_channel)) ;
   return ()
 
 let () =

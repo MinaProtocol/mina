@@ -6,14 +6,14 @@ let name = "coda-long-fork"
 let main n waiting_time () =
   let precomputed_values =
     (* TODO: Load for this specific test. *)
-    Lazy.force Precomputed_values.compiled
+    Lazy.force Precomputed_values.compiled_inputs
   in
   let consensus_constants = precomputed_values.consensus_constants in
   let logger = Logger.create () in
   let public_keys =
     List.map
-      (Lazy.force (Precomputed_values.accounts precomputed_values))
-      ~f:Precomputed_values.pk_of_account_record
+      (Lazy.force (Genesis_proof.Inputs.accounts precomputed_values))
+      ~f:Genesis_proof.Inputs.pk_of_account_record
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
@@ -40,10 +40,10 @@ let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that one worker goes offline for a long time"
     (let%map_open num_block_producers =
-       flag "--num-block-producers" ~aliases:["num-block-producers"]
+       flag "--num-block-producers" ~aliases:[ "num-block-producers" ]
          ~doc:"NUM number of block producers to have" (required int)
      and waiting_time =
-       flag "--waiting-time" ~aliases:["waiting-time"]
+       flag "--waiting-time" ~aliases:[ "waiting-time" ]
          ~doc:"the waiting time after the nodes coming back alive"
          (optional_with_default 120 int)
      in

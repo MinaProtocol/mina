@@ -2,7 +2,6 @@
     (name rocks)
     (public_name rocks)
     (no_dynlink)
-    (modes native)
     (libraries ctypes ctypes.foreign)
     (modules (:standard \ rocks_linker_flags_gen rocks_test))
     (c_library_flags (:standard (:include flags.sexp)))

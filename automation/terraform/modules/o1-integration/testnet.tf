@@ -2,22 +2,25 @@ module "kubernetes_testnet" {
   providers = { google = google.gke }
   source    = "../kubernetes/testnet"
 
-  use_local_charts = true
-  deploy_watchdog  = false
+  use_local_charts    = true
+  expose_graphql      = var.deploy_graphql_ingress
+  healthcheck_enabled = false
+  deploy_watchdog     = false
 
   cluster_name   = var.cluster_name
   cluster_region = var.cluster_region
   k8s_context    = var.k8s_context
   testnet_name   = var.testnet_name
 
-  coda_image         = var.coda_image
-  coda_archive_image = var.coda_archive_image
-  coda_agent_image   = var.coda_agent_image
-  coda_bots_image    = var.coda_bots_image
-  coda_points_image  = var.coda_points_image
+  mina_image         = var.mina_image
+  use_custom_entrypoint = true
+  custom_entrypoint = "/mina_daemon_puppeteer.py"
+  mina_archive_image = var.mina_archive_image
+  mina_agent_image   = var.mina_agent_image
+  mina_bots_image    = var.mina_bots_image
+  mina_points_image  = var.mina_points_image
 
   log_level             = "Trace"
-  log_txn_pool_gossip   = true
   log_snark_work_gossip = true
 
   additional_peers = [local.seed_peer.multiaddr]
@@ -30,6 +33,7 @@ module "kubernetes_testnet" {
   archive_configs = local.archive_node_configs
 
   log_precomputed_blocks = var.log_precomputed_blocks
+  log_txn_pool_gossip = true
 
   archive_node_count   = var.archive_node_count
   mina_archive_schema  = var.mina_archive_schema

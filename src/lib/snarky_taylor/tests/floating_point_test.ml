@@ -6,7 +6,7 @@ open Util
 open Snarky_taylor.Floating_point
 
 let%test_unit "of-quotient" =
-  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) (Unit) in
+  let module M = Snark_params.Tick.Run in
   let m : M.field m = (module M) in
   let gen =
     let open Quickcheck in
@@ -26,7 +26,7 @@ let%test_unit "of-quotient" =
               of_quotient ~m ~precision ~top:(Integer.constant ~m a)
                 ~bottom:(Integer.constant ~m b) ~top_is_less_than_bottom:()
             in
-            to_bignum ~m t )
+            to_bignum ~m t)
           ()
         |> Or_error.ok_exn
       in
@@ -37,4 +37,4 @@ let%test_unit "of-quotient" =
       if not good then
         failwithf "got %s, expected %s\n" (Bignum.to_string_hum res)
           (Bignum.to_string_hum actual)
-          () )
+          ())

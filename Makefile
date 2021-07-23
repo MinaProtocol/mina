@@ -2,24 +2,8 @@
 ## Docker Wrapper
 ## Hint: export USEDOCKER=TRUE
 
-GITHASH = $(shell git rev-parse --short=8 HEAD)
-GITLONGHASH = $(shell git rev-parse HEAD)
-
 MYUID = $(shell id -u)
-DOCKERNAME = codabuilder-$(MYUID)
-
-# Unique signature of libp2p code tree
-LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
-
-ifeq ($(DUNE_PROFILE),)
-DUNE_PROFILE := dev
-endif
-
-ifeq ($(GO),)
-GO := go
-endif
-
-TMPDIR ?= /tmp
+DOCKERNAME = minabuilder-$(MYUID)
 
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
@@ -31,9 +15,37 @@ else
 endif
 
 ########################################
-## Coverage directory
+## Configuration
 
+# Current OCaml version
+OCAML_VERSION = "4.11.2"
+
+# machine word size
+WORD_SIZE = "64"
+
+# Default profile
+ifeq ($(DUNE_PROFILE),)
+DUNE_PROFILE := dev
+endif
+
+# Temp directory
+TMPDIR ?= /tmp
+
+# Genesis dir
+GENESIS_DIR := $(TMPDIR)/coda_cache_dir
+
+# Coverage directory
 COVERAGE_DIR=_coverage
+
+########################################
+## Handy variables
+
+# This commit hash
+GITHASH = $(shell git rev-parse --short=8 HEAD)
+GITLONGHASH = $(shell git rev-parse HEAD)
+
+# Unique signature of libp2p code tree
+LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ########################################
 ## Git hooks
@@ -57,7 +69,7 @@ git_hooks: $(wildcard scripts/git_hooks/*)
 ########################################
 ## Code
 
-all: clean codabuilder containerstart build
+all: clean minabuilder containerstart build
 
 clean:
 	$(info Removing previous build artifacts)
@@ -65,93 +77,130 @@ clean:
 	@rm -rf src/$(COVERAGE_DIR)
 	@rm -rf src/app/libp2p_helper/result
 
-# TEMP HACK (for circle-ci)
+# enforces the OCaml version being used
+ocaml_version:
+	@if ! ocamlopt -config | grep "version:" | grep $(OCAML_VERSION); then echo "incorrect OCaml version, expected version $(OCAML_VERSION)" ; exit 1; fi
+
+# enforce machine word size
+ocaml_word_size:
+	@if ! ocamlopt -config | grep "word_size:" | grep $(WORD_SIZE); then echo "invalid machine word size, expected $(WORD_SIZE)" ; exit 1; fi
+
+ocaml_checks: ocaml_version ocaml_word_size
+
 libp2p_helper:
 	make -C src/app/libp2p_helper
 
-GENESIS_DIR := $(TMPDIR)/coda_cache_dir
-
-genesis_ledger:
+genesis_ledger: ocaml_checks
 	$(info Building runtime_genesis_ledger)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -- --genesis-dir $(GENESIS_DIR)
 	$(info Genesis ledger and genesis proof generated)
 
-build: git_hooks reformat-diff libp2p_helper
+build: ocaml_checks git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_archive: git_hooks reformat-diff
+build_all_sigs: ocaml_checks git_hooks reformat-diff libp2p_helper
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env MINA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/mina.exe src/app/cli/src/mina_testnet_signatures.exe src/app/cli/src/mina_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+build_archive: ocaml_checks git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_rosetta:
+build_archive_all_sigs: ocaml_checks git_hooks reformat-diff
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+build_rosetta: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/rosetta/rosetta.exe src/app/rosetta/ocaml-signer/signer.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-build_intgtest:
+build_rosetta_all_sigs: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe src/app/archive/archive_testnet_signatures.exe src/app/archive/archive_mainnet_signatures.exe src/app/rosetta/rosetta.exe src/app/rosetta/rosetta_testnet_signatures.exe src/app/rosetta/rosetta_mainnet_signatures.exe src/app/rosetta/ocaml-signer/signer.exe src/app/rosetta/ocaml-signer/signer_testnet_signatures.exe src/app/rosetta/ocaml-signer/signer_mainnet_signatures.exe --profile=$(DUNE_PROFILE)
+	$(info Build complete)
+
+build_intgtest: ocaml_checks
 	$(info Starting Build)
 	dune build --profile=integration_tests src/app/test_executive/test_executive.exe src/app/logproc/logproc.exe
 	$(info Build complete)
 
-client_sdk :
+client_sdk: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_mainnet
 	$(info Build complete)
 
-client_sdk_test_sigs :
+client_sdk_test_sigs: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=mainnet
 	$(info Build complete)
 
-client_sdk_test_sigs_nonconsensus :
+client_sdk_test_sigs_nonconsensus: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
-rosetta_lib_encodings :
+rosetta_lib_encodings: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/lib/rosetta_lib/test/test_encodings.exe --profile=mainnet
 	$(info Build complete)
 
-rosetta_lib_encodings_nonconsensus :
+rosetta_lib_encodings_nonconsensus: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/nonconsensus/rosetta_lib/test/test_encodings.exe --profile=nonconsensus_mainnet
 	$(info Build complete)
 
-dhall_types :
+dhall_types: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/dhall_types/dump_dhall_types.exe --profile=dev
 	$(info Build complete)
 
-replayer :
+replayer: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/replayer/replayer.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-missing_blocks_auditor :
+delegation_compliance: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/delegation_compliance/delegation_compliance.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+missing_blocks_auditor: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_blocks_auditor/missing_blocks_auditor.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-missing_subchain :
+extract_blocks: ocaml_checks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/missing_subchain/missing_subchain.exe --profile=testnet_postake_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/extract_blocks/extract_blocks.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-archive_blocks :
+archive_blocks: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive_blocks/archive_blocks.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-genesis_ledger_from_tsv :
+patch_archive_test: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/patch_archive_test/patch_archive_test.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+genesis_ledger_from_tsv: ocaml_checks
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/genesis_ledger_from_tsv/genesis_ledger_from_tsv.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
-dev: codabuilder containerstart build
+swap_bad_balances: ocaml_checks
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/swap_bad_balances/swap_bad_balances.exe --profile=testnet_postake_medium_curves
+	$(info Build complete)
+
+dev: minabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
 update-opam:
@@ -167,18 +216,18 @@ macos-portable:
 
 update-graphql:
 	@echo Make sure that the daemon is running with -rest-port 8080
-	python scripts/introspection_query.py > graphql_schema.json
+	python3 scripts/introspection_query.py > graphql_schema.json
 
 ########################################
 ## Lint
 
-reformat: git_hooks
+reformat: ocaml_checks git_hooks
 	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
 
 reformat-diff:
-	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	@ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
-check-format:
+check-format: ocaml_checks
 	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
 
 check-snarky-submodule:
@@ -191,7 +240,7 @@ macos-setup-download:
 	./scripts/macos-setup-brew.sh
 
 setup-opam:
-	./scripts/setup-opam.sh
+	eval $$(opam config env) && ./scripts/setup-opam.sh
 
 macos-setup:
 	./scripts/macos-setup-brew.sh
@@ -199,7 +248,6 @@ macos-setup:
 
 ########################################
 ## Containers and container management
-
 
 # push steps require auth on docker hub
 docker-toolchain:
@@ -224,22 +272,20 @@ docker-toolchain-rust:
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
-	make render-circleci
 
 update-rust-deps:
 	./scripts/update-rust-toolchain-references.sh $(GITLONGHASH)
-	make render-circleci
 
-# Local 'codabuilder' docker image (based off docker-toolchain)
-codabuilder: git_hooks
-	docker build --file dockerfiles/Dockerfile --tag codabuilder .
+# Local 'minabuilder' docker image (based off docker-toolchain)
+minabuilder: git_hooks
+	docker build --file dockerfiles/Dockerfile-toolchain --tag minabuilder .
 
-# Restarts codabuilder
+# Restarts minabuilder
 containerstart: git_hooks
 	@./scripts/container.sh restart
 
 docker-rosetta:
-	docker build --file dockerfiles/Dockerfile-rosetta --tag codaprotocol/coda:rosetta-$(GITLONGHASH) .
+	docker build --file dockerfiles/Dockerfile-rosetta --tag codaprotocol/mina:rosetta-$(GITLONGHASH) .
 
 ########################################
 ## Artifacts
@@ -257,14 +303,14 @@ deb_optimized:
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
-build_pv_keys:
+build_pv_keys: ocaml_checks
 	$(info Building keys)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
 
-build_or_download_pv_keys:
+build_or_download_pv_keys: ocaml_checks
 	$(info Building keys)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env MINA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
 	$(info Keys built)
 
 publish_deb:
@@ -278,12 +324,6 @@ genesiskeys:
 	@cp _build/default/src/lib/mina_base/sample_keypairs.ml /tmp/artifacts/.
 	@cp _build/default/src/lib/mina_base/sample_keypairs.json /tmp/artifacts/.
 
-codaslim:
-	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp _build/coda.deb .
-	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
-	@rm coda.deb
-
 ##############################################
 ## Genesis ledger in OCaml from running daemon
 
@@ -293,22 +333,17 @@ genesis-ledger-ocaml:
 ########################################
 ## Tests
 
-render-circleci:
-	./scripts/test.py render .circleci/config.yml.jinja .mergify.yml.jinja
-
 test-ppx:
 	$(MAKE) -C src/lib/ppx_coda/tests
 
 web:
 	./scripts/web.sh
 
-
 ########################################
 ## Benchmarks
 
-benchmarks:
+benchmarks: ocaml_checks
 	dune build src/app/benchmarks/main.exe
-
 
 ########################################
 # Coverage testing and output
@@ -331,7 +366,6 @@ ifeq ($(shell find _build/default -name bisect\*.out),"")
 else
 	bisect-ppx-report summary --coverage-path=_build/default --per-file
 endif
-
 
 ########################################
 # Diagrams for documentation
@@ -356,7 +390,7 @@ doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources)))
 ########################################
 # Generate odoc documentation
 
-ml-docs:
+ml-docs: ocaml_checks
 	$(WRAPAPP) dune build --profile=$(DUNE_PROFILE) @doc
 
 ########################################
@@ -365,4 +399,4 @@ ml-docs:
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
 
-.PHONY: all build check-format clean client_sdk client_sdk_test_sigs codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor missing_subchain archive_blocks genesis_ledger_from_tsv
+.PHONY: all build check-format clean client_sdk client_sdk_test_sigs containerstart deb dev minabuilder mina-docker reformat update-deps docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download setup-opam libp2p_helper dhall_types replayer missing_blocks_auditor extract_blocks archive_blocks genesis_ledger_from_tsv ocaml_version ocaml_word_size ocaml_checks

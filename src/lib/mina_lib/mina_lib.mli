@@ -18,7 +18,7 @@ type Structured_log_events.t +=
   | Bootstrapping
   | Ledger_catchup
   | Synced
-  | Rebroadcast_transition of {state_hash: State_hash.t}
+  | Rebroadcast_transition of { state_hash : State_hash.t }
   [@@deriving register_event]
 
 exception Snark_worker_error of int
@@ -86,7 +86,7 @@ val snark_job_state : t -> Work_selector.State.t
 val get_current_nonce :
      t
   -> Account_id.t
-  -> ([> `Min of Account.Nonce.t] * Account.Nonce.t, string) result
+  -> ([> `Min of Account.Nonce.t ] * Account.Nonce.t, string) result
 
 val add_transactions :
      t
@@ -137,8 +137,9 @@ module Root_diff : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { commands: User_command.Stable.V1.t With_status.Stable.V1.t list
-        ; root_length: int }
+        { commands : User_command.Stable.V1.t With_status.Stable.V1.t list
+        ; root_length : int
+        }
     end
   end]
 end
@@ -172,7 +173,9 @@ val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 val transition_frontier :
   t -> Transition_frontier.t option Broadcast_pipe.Reader.t
 
-val get_ledger : t -> State_hash.t option -> Account.t list Deferred.Or_error.t
+val get_ledger : t -> State_hash.t option -> Account.t list Or_error.t
+
+val get_snarked_ledger : t -> State_hash.t option -> Account.t list Or_error.t
 
 val wallets : t -> Secrets.Wallets.t
 
@@ -186,3 +189,5 @@ val top_level_logger : t -> Logger.t
 val config : t -> Config.t
 
 val net : t -> Mina_networking.t
+
+val runtime_config : t -> Runtime_config.t

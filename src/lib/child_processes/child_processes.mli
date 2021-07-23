@@ -31,9 +31,9 @@ val termination_status : t -> Unix.Exit_or_signal.t Or_error.t option
     exception.
 *)
 type output_handling =
-  [`Log of Logger.Level.t | `Don't_log]
-  * [`Pipe | `No_pipe]
-  * [`Keep_empty | `Filter_empty]
+  [ `Log of Logger.Level.t | `Don't_log ]
+  * [ `Pipe | `No_pipe ]
+  * [ `Keep_empty | `Filter_empty ]
 
 (** Start a process, handling a lock file, termination, optional logging, and
     the standard in, out and error fds. This is for "custom" processes, as
@@ -41,23 +41,25 @@ type output_handling =
 val start_custom :
      logger:Logger.t
   -> name:string
-     (** The name of the executable file, without any coda- prefix *)
+       (** The name of the executable file, without any coda- prefix *)
   -> git_root_relative_path:string
-     (** Path to the built executable, relative to the root of a source checkout
+       (** Path to the built executable, relative to the root of a source checkout
      *)
   -> conf_dir:string
-     (** Absolute path to the configuration directory for Coda *)
+       (** Absolute path to the configuration directory for Coda *)
   -> args:string list (** Arguments to the process *)
   -> stdout:output_handling (** What to do with process standard out *)
   -> stderr:output_handling (** What to do with process standard error *)
-  -> termination:[ `Always_raise
-                 | `Raise_on_failure
-                 | `Handler of
-                      killed:bool
-                   -> Unix.Exit_or_signal.t Or_error.t
-                   -> unit Deferred.t
-                 | `Ignore ]
-     (** What to do when the process exits. Note that an exception will not be
+  -> termination:
+       [ `Always_raise
+       | `Raise_on_failure
+       | `Handler of
+            killed:bool
+         -> Process.t
+         -> Unix.Exit_or_signal.t Or_error.t
+         -> unit Deferred.t
+       | `Ignore ]
+       (** What to do when the process exits. Note that an exception will not be
          raised after you run [kill] on it, regardless of this value.
          An [Error _] passed to a [`Handler _] indicates that there was an
          error monitoring the process, and that it is unknown whether the
@@ -72,3 +74,5 @@ val kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t
 (* val start_rpc_worker : ... *)
 
 module Termination : module type of Termination
+
+val register_process : Termination.t -> t -> Termination.process_kind -> unit

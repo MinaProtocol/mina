@@ -10,7 +10,7 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Mina_intf.Best_tip_prover_intf
-  with type transition_frontier := Inputs.Transition_frontier.t = struct
+    with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   module Merkle_list_prover = Merkle_list_prover.Make_ident (struct
@@ -35,13 +35,13 @@ module Make (Inputs : Inputs_intf) :
   end)
 
   module Merkle_list_verifier = Merkle_list_verifier.Make (struct
-    type hash = State_hash.t [@@deriving eq]
+    type hash = State_hash.t [@@deriving equal]
 
     type proof_elem = State_body_hash.t
 
     let hash acc body_hash =
       Protocol_state.hash_abstract ~hash_body:Fn.id
-        {previous_state_hash= acc; body= body_hash}
+        { previous_state_hash = acc; body = body_hash }
   end)
 
   let prove ~logger frontier =
@@ -78,13 +78,14 @@ module Make (Inputs : Inputs_intf) :
     [%log debug]
       ~metadata:
         [ ( "merkle_list"
-          , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
+          , `List (List.map ~f:State_body_hash.to_yojson merkle_list) )
+        ]
       "Best tip prover produced a merkle list of $merkle_list" ;
     Proof_carrying_data.
-      { data= best_tip
-      ; proof=
-          ( merkle_list
-          , root |> External_transition.Validation.forget_validation ) }
+      { data = best_tip
+      ; proof =
+          (merkle_list, root |> External_transition.Validation.forget_validation)
+      }
 
   let validate_proof ~verifier transition_with_hash =
     let open Deferred.Result.Monad_infix in
@@ -96,16 +97,15 @@ module Make (Inputs : Inputs_intf) :
            `This_transition_was_generated_internally
       |> skip_protocol_versions_validation
            `This_transition_has_valid_protocol_versions
-      |> (fun x -> validate_proofs ~verifier [x] >>| List.hd_exn)
+      |> (fun x -> validate_proofs ~verifier [ x ] >>| List.hd_exn)
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation
                `This_transition_was_not_received_via_gossip)
       |> Deferred.map
-           ~f:
-             (Result.map_error ~f:(Fn.const (Error.of_string "invalid proof"))))
+           ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof"))))
 
   let verify ~verifier ~genesis_constants ~precomputed_values
-      {Proof_carrying_data.data= best_tip; proof= merkle_list, root} =
+      { Proof_carrying_data.data = best_tip; proof = merkle_list, root } =
     let open Deferred.Or_error.Let_syntax in
     let merkle_list_length = List.length merkle_list in
     let max_length = Transition_frontier.global_max_length genesis_constants in

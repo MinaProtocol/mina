@@ -21,7 +21,7 @@ include Codable.S with type t := t
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+    [@@deriving bin_io, sexp, compare, equal, hash, yojson, version]
   end
 
   module Latest = V1
@@ -45,17 +45,16 @@ val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   module Poly : sig
-    type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
+    type ('field, 'boolean) t = { x : 'field; is_odd : 'boolean }
 
-    module Stable :
-      sig
-        module V1 : sig
-          type ('field, 'boolean) t
-        end
-
-        module Latest = V1
+    module Stable : sig
+      module V1 : sig
+        type ('field, 'boolean) t
       end
-      with type ('field, 'boolean) V1.t = ('field, 'boolean) t
+
+      module Latest = V1
+    end
+    with type ('field, 'boolean) V1.t = ('field, 'boolean) t
   end
 
   type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
@@ -64,7 +63,7 @@ module Compressed : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, version]
+      type nonrec t = t [@@deriving sexp, bin_io, equal, compare, hash, version]
 
       include Codable.S with type t := t
     end
@@ -124,6 +123,9 @@ val compress : t -> Compressed.t
 val decompress : Compressed.t -> t option
 
 val decompress_exn : Compressed.t -> t
+
+(** Same as [Compressed.of_base58_check_exn] except that [of_base58_check_decompress_exn] fails if [decompress_exn] fails *)
+val of_base58_check_decompress_exn : string -> Compressed.t
 
 [%%ifdef consensus_mechanism]
 

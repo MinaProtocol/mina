@@ -12,21 +12,21 @@ let check_and_set_lockfile ~logger conf_dir =
   | `No -> (
       let open Async in
       match%map
-        Monitor.try_with ~extract_exn:true (fun () ->
+        Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true lockfile ~f:(fun writer ->
                 let pid = Unix.getpid () in
-                return (Writer.writef writer "%d\n" (Pid.to_int pid)) ) )
+                return (Writer.writef writer "%d\n" (Pid.to_int pid))))
       with
       | Ok () ->
           [%log info] "Created daemon lockfile $lockfile"
-            ~metadata:[("lockfile", `String lockfile)] ;
+            ~metadata:[ ("lockfile", `String lockfile) ] ;
           Exit_handlers.register_async_shutdown_handler ~logger
             ~description:"Remove daemon lockfile" (fun () ->
               match%bind Sys.file_exists lockfile with
               | `Yes ->
                   Unix.unlink lockfile
               | _ ->
-                  return () )
+                  return ())
       | Error exn ->
           Error.tag_arg (Error.of_exn exn)
             "Could not create the daemon lockfile" ("lockfile", lockfile)
@@ -35,7 +35,7 @@ let check_and_set_lockfile ~logger conf_dir =
   | `Yes -> (
       let open Async in
       match%map
-        Monitor.try_with ~extract_exn:true (fun () ->
+        Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Reader.with_file ~exclusive:true lockfile ~f:(fun reader ->
                 let%bind pid =
                   let rm_and_raise () =
@@ -45,7 +45,7 @@ let check_and_set_lockfile ~logger conf_dir =
                   in
                   match%map Reader.read_line reader with
                   | `Ok s -> (
-                    try Pid.of_string s with _ -> rm_and_raise () )
+                      try Pid.of_string s with _ -> rm_and_raise () )
                   | `Eof ->
                       rm_and_raise ()
                 in
@@ -70,8 +70,9 @@ let check_and_set_lockfile ~logger conf_dir =
                   [%log info] "Removing lockfile for terminated process"
                     ~metadata:
                       [ ("lockfile", `String lockfile)
-                      ; ("pid", `Int (Pid.to_int pid)) ] ;
-                  Unix.unlink lockfile ) ) )
+                      ; ("pid", `Int (Pid.to_int pid))
+                      ] ;
+                  Unix.unlink lockfile )))
       with
       | Ok () ->
           ()
@@ -91,7 +92,7 @@ let export_logs_to_tar ?basename ~conf_dir =
     match basename with
     | None ->
         let date, day = Time.(now () |> to_date_ofday ~zone:Zone.utc) in
-        let Time.Span.Parts.{hr; min; sec; _} = Time.Ofday.to_parts day in
+        let Time.Span.Parts.{ hr; min; sec; _ } = Time.Ofday.to_parts day in
         sprintf "%s_%02d-%02d-%02d" (Date.to_string date) hr min sec
     | Some basename ->
         basename
@@ -107,26 +108,25 @@ let export_logs_to_tar ?basename ~conf_dir =
     Core.Sys.ls_dir conf_dir
     |> List.filter ~f:(String.is_substring ~substring:".log")
   in
-  let%bind.Deferred.Let_syntax linux_info =
+  let%bind.Deferred linux_info =
     if String.equal Sys.os_type "Unix" then
-      match%map.Deferred.Let_syntax
-        Process.run ~prog:"uname" ~args:["-a"] ()
-      with
+      match%map.Deferred Process.run ~prog:"uname" ~args:[ "-a" ] () with
       | Ok s when String.is_prefix s ~prefix:"Linux" ->
           Some s
       | _ ->
           None
     else Deferred.return None
   in
-  let%bind.Deferred.Let_syntax hw_info_opt =
+  let%bind.Deferred hw_info_opt =
     if Option.is_some linux_info then
       let open Deferred.Let_syntax in
       let linux_hw_progs =
-        [ ("cat", ["/etc/os-release"])
+        [ ("cat", [ "/etc/os-release" ])
         ; ("lscpu", [])
         ; ("lsgpu", [])
         ; ("lsmem", [])
-        ; ("lsblk", []) ]
+        ; ("lsblk", [])
+        ]
       in
       let%map outputs =
         Deferred.List.map linux_hw_progs ~f:(fun (prog, args) ->
@@ -139,24 +139,24 @@ let export_logs_to_tar ?basename ~conf_dir =
               | Ok lines ->
                   lines
               | Error err ->
-                  [sprintf "Error: %s" (Error.to_string_hum err)]
+                  [ sprintf "Error: %s" (Error.to_string_hum err) ]
             in
-            return ((header :: output) @ [""]) )
+            return ((header :: output) @ [ "" ]))
       in
       Some (Option.value_exn linux_info :: List.concat outputs)
     else (* TODO: Mac, other Unixes *)
       Deferred.return None
   in
-  let%bind.Deferred.Let_syntax hw_file_opt =
+  let%bind.Deferred hw_file_opt =
     if Option.is_some hw_info_opt then
       let open Async in
       let hw_info = "hardware.info" in
       let hw_info_file = conf_dir ^/ hw_info in
       match%map
-        Monitor.try_with ~extract_exn:true (fun () ->
+        Monitor.try_with ~here:[%here] ~extract_exn:true (fun () ->
             Writer.with_file ~exclusive:true hw_info_file ~f:(fun writer ->
-                Deferred.List.map (Option.value_exn hw_info_opt)
-                  ~f:(fun line -> return (Writer.write_line writer line)) ) )
+                Deferred.List.map (Option.value_exn hw_info_opt) ~f:(fun line ->
+                    return (Writer.write_line writer line))))
       with
       | Ok _units ->
           Some hw_info
@@ -168,20 +168,23 @@ let export_logs_to_tar ?basename ~conf_dir =
   let base_files = "mina.version" :: log_files in
   let files =
     Option.value_map hw_file_opt ~default:base_files ~f:(fun hw_file ->
-        hw_file :: base_files )
+        hw_file :: base_files)
   in
-  let tmp_dir =
-    Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) ""
-  in
+  let tmp_dir = Filename.temp_dir ~in_dir:"/tmp" ("mina-logs_" ^ basename) "" in
   let files_in_dir dir = List.map files ~f:(fun file -> dir ^/ file) in
   let conf_dir_files = files_in_dir conf_dir in
   let%bind _result0 =
-    Process.run ~prog:"cp" ~args:(("-p" :: conf_dir_files) @ [tmp_dir]) ()
+    Process.run ~prog:"cp" ~args:(("-p" :: conf_dir_files) @ [ tmp_dir ]) ()
   in
   let%bind _result1 =
     Process.run ~prog:"tar"
       ~args:
-        ( ["-C"; tmp_dir; (* Create gzipped tar file [file]. *) "-czf"; tarfile]
+        ( [ "-C"
+          ; tmp_dir
+          ; (* Create gzipped tar file [file]. *)
+            "-czf"
+          ; tarfile
+          ]
         @ files )
       ()
   in

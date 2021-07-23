@@ -51,7 +51,7 @@ type payment = {
 };
 
 type codaSDK;
-[@bs.module "./client_sdk.bc.js"] external codaSDK: codaSDK = "codaSDK";
+[@bs.module "./client_sdk.bc.js"] external codaSDK: codaSDK = "minaSDK";
 
 [@bs.send] external genKeys: (codaSDK, unit) => keypair = "genKeys";
 /**
@@ -404,4 +404,37 @@ let verifyStakeDelegationSignature =
       },
     },
   );
+};
+
+[@bs.send]
+external signedRosettaTransactionToSignedCommand: (codaSDK, string) => string =
+  "signedRosettaTransactionToSignedCommand";
+
+/**
+  * Converts a Rosetta signed transaction to a JSON string that is
+  * compatible with GraphQL. The JSON string is a representation of
+  * a `Signed_command` which is what our GraphQL expects.
+  *
+  * @param signedRosettaTxn - A signed Rosetta transaction
+  * @returns A string that represents the JSON conversion of a signed Rosetta transaction`.
+  */
+[@genType]
+let signedRosettaTransactionToSignedCommand = (signedRosettaTxn: string) => {
+  signedRosettaTransactionToSignedCommand(codaSDK, signedRosettaTxn);
+};
+
+[@bs.send]
+external rawPublicKeyOfPublicKey: (codaSDK, publicKey) => string =
+  "rawPublicKeyOfPublicKey";
+
+/**
+  * Return the hex-encoded format of a valid public key. This will throw an exception if
+  * the key is invalid or the conversion fails.
+  *
+  * @param publicKey - A valid public key
+  * @returns A string that represents the hex encoding of a public key.
+  */
+[@genType]
+let publicKeyToRaw = (publicKey: string) => {
+  rawPublicKeyOfPublicKey(codaSDK, publicKey);
 };

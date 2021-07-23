@@ -1,10 +1,10 @@
+use mina_curves::pasta::{
+    pallas::{Affine as GAffine, Projective as GProjective},
+    fp::Fp,
+    fq::Fq,
+};
 use algebra::{
     curves::{AffineCurve, ProjectiveCurve},
-    pasta::{
-        pallas::{Affine as GAffine, Projective as GProjective},
-        fp::Fp,
-        fq::Fq,
-    },
     One, UniformRand,
 };
 use rand::rngs::StdRng;

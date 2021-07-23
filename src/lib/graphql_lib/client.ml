@@ -12,16 +12,16 @@ let make_local_uri port address =
 
 module type S = sig
   val query_or_error :
-       < parse: Yojson.Basic.t -> 'response
-       ; query: string
-       ; variables: Yojson.Basic.t >
+       < parse : Yojson.Basic.t -> 'response
+       ; query : string
+       ; variables : Yojson.Basic.t >
     -> int
     -> 'response Deferred.Or_error.t
 
   val query :
-       < parse: Yojson.Basic.t -> 'response
-       ; query: string
-       ; variables: Yojson.Basic.t >
+       < parse : Yojson.Basic.t -> 'response
+       ; query : string
+       ; variables : Yojson.Basic.t >
     -> int
     -> 'response Deferred.t
 end
@@ -48,7 +48,7 @@ let graphql_error_to_string e =
       error_obj_to_string e
 
 module Connection_error = struct
-  type t = [`Failed_request of Error.t | `Graphql_error of Error.t]
+  type t = [ `Failed_request of Error.t | `Graphql_error of Error.t ]
 
   let ok_exn = function
     | `Failed_request e ->
@@ -82,15 +82,15 @@ module Make (Config : Config_intf) = struct
         ( ("Accept", "application/json")
         :: ("Content-Type", "application/json")
         :: Map.to_alist Config.headers ) ~f:(fun header (key, value) ->
-          Cohttp.Header.add header key value )
+          Cohttp.Header.add header key value)
     in
     let%bind response, body =
-      Deferred.Or_error.try_with ~extract_exn:true (fun () ->
+      Deferred.Or_error.try_with ~here:[%here] ~extract_exn:true (fun () ->
           Cohttp_async.Client.post ~headers
             ~body:(Cohttp_async.Body.of_string body_string)
-            uri )
+            uri)
       |> Deferred.Result.map_error ~f:(fun e ->
-             `Failed_request (Error.to_string_hum e) )
+             `Failed_request (Error.to_string_hum e))
     in
     let%bind body_str =
       Cohttp_async.Body.to_string body |> Deferred.map ~f:Result.return
@@ -119,7 +119,7 @@ module Make (Config : Config_intf) = struct
                `Graphql_error
                  (Printf.sprintf
                     "Problem parsing graphql response\nError message: %s"
-                    (Exn.to_string e)) ) )
+                    (Exn.to_string e))) )
     |> Deferred.return
 
   let query_exn query_obj port =

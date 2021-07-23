@@ -19,7 +19,7 @@ Pipeline.build
   Pipeline.Config::{
     spec = JobSpec::{
       dirtyWhen = [
-        S.exactly "automation/terraform/modules/testnet-alerts/templates/testnet-alert-rules.yml" "tpl",
+        S.strictlyStart (S.contains "automation/terraform/modules/testnet-alerts"),
         S.exactly "automation/terraform/monitoring/o1-testnet-alerts" "tf",
         S.strictlyStart (S.contains "buildkite/src/Jobs/Release/TestnetAlerts")
       ],
@@ -39,6 +39,7 @@ Pipeline.build
           , target = Size.Medium
           , depends_on = [ { name = "TestnetAlerts", key = "lint-testnet-alerts" } ]
           , docker = None Docker.Type
+          , if = Some "build.branch == 'compatible' || build.env('DEPLOY_ALERTS') == 'true'"
         }
     ]
   }

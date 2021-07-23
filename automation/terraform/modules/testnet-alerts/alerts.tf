@@ -3,9 +3,10 @@
 data "template_file" "testnet_alerts" {
   template = file("${path.module}/templates/testnet-alert-rules.yml.tpl")
   vars = {
-    rule_namespace     = var.rule_namespace
-    rule_filter        = var.rule_filter
-    alerting_timeframe = var.rule_timeframe
+    rule_namespace            = var.rule_namespace
+    rule_filter               = var.rule_filter
+    alert_timeframe           = var.alert_timeframe
+    alert_evaluation_duration = var.alert_duration
   }
 }
 
@@ -16,6 +17,7 @@ data "template_file" "testnet_alert_receivers" {
     pagerduty_alert_filter = var.pagerduty_alert_filter
 
     discord_alert_webhook = data.aws_secretsmanager_secret_version.discord_testnet_alerts_webhook.secret_string
+    slack_alert_webhook = data.aws_secretsmanager_secret_version.slack_testnet_alerts_webhook.secret_string
   }
 }
 

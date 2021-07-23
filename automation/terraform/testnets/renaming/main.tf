@@ -20,14 +20,14 @@ provider "google" {
   zone    = "us-west1-a"
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
 
   description = "Mina daemon image to use in provisioning a ci-net"
   default     = "gcr.io/o1labs-192920/coda-daemon:0.4.2-renaming-mina-binary-and-mina-config-87e6365"
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type = string
 
   description = "Mina archive node image to use in provisioning a ci-net"
@@ -87,11 +87,11 @@ module "ci_testnet" {
   k8s_context           = var.ci_k8s_ctx
   testnet_name          = "renaming"
 
-  coda_image            = var.coda_image
-  coda_archive_image    = var.coda_archive_image
-  coda_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image       = "codaprotocol/bots:1.0.0"
-  coda_points_image     = "codaprotocol/coda-points-hack:32b.4"
+  mina_image            = var.mina_image
+  mina_archive_image    = var.mina_archive_image
+  mina_agent_image      = "codaprotocol/coda-user-agent:0.1.8"
+  mina_bots_image       = "codaprotocol/bots:1.0.0"
+  mina_points_image     = "codaprotocol/coda-points-hack:32b.4"
 
   coda_faucet_amount    = "10000000000"
   coda_faucet_fee       = "100000000"

@@ -22,7 +22,13 @@ let%test_module "Full_frontier tests" =
 
     let ledger_depth = constraint_constants.ledger_depth
 
-    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+    let proof_level = precomputed_values.proof_level
+
+    let verifier =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Verifier.create ~logger ~proof_level ~constraint_constants
+            ~conf_dir:None
+            ~pids:(Child_processes.Termination.create_pid_table ()) )
 
     module Genesis_ledger = (val precomputed_values.genesis_ledger)
 
@@ -31,11 +37,11 @@ let%test_module "Full_frontier tests" =
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ~precomputed_values ?verifier:None
+      Breadcrumb.For_tests.gen ~logger ~precomputed_values ~verifier
         ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ?verifier:None
+      Breadcrumb.For_tests.gen_seq ~logger ~precomputed_values ~verifier
         ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
@@ -43,8 +49,10 @@ let%test_module "Full_frontier tests" =
     let add_breadcrumb frontier breadcrumb =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
       ignore
-        (Full_frontier.apply_diffs frontier diffs ~has_long_catchup_job:false
-           ~enable_epoch_ledger_sync:`Disabled)
+        ( Full_frontier.apply_diffs frontier diffs ~has_long_catchup_job:false
+            ~enable_epoch_ledger_sync:`Disabled
+          : [ `New_root_and_diffs_with_mutants of
+              Root_identifier.t option * Diff.Full.With_mutant.t list ] )
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
@@ -182,9 +190,10 @@ let%test_module "Full_frontier tests" =
                   in
                   List.iter (State_hash.Set.to_list required_state_hashes)
                     ~f:(fun hash ->
-                      Full_frontier.For_tests.find_protocol_state_exn frontier
-                        hash
-                      |> ignore ) ) ) )
+                      ignore
+                        ( Full_frontier.For_tests.find_protocol_state_exn
+                            frontier hash
+                          : Mina_state.Protocol_state.value ) ) ) ) )
 
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =

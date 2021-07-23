@@ -1,13 +1,11 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 open Fold_lib
 include Intf
 module Intf = Intf
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_bits
 
@@ -38,7 +36,7 @@ struct
   let to_input t =
     Checked.map (to_bits t) ~f:(fun bits ->
         Random_oracle.Input.bitstring
-          (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
+          (Bitstring_lib.Bitstring.Lsb_first.to_list bits))
 
   let constant n = Integer.constant ~length:N.length_in_bits ~m (N.to_bigint n)
 
@@ -58,11 +56,11 @@ struct
         let bs = List.take (Field.unpack x) N.length_in_bits in
         (* TODO: Make this efficient *)
         List.foldi bs ~init:N.zero ~f:(fun i acc b ->
-            if b then N.(logor (shift_left one i) acc) else acc )
+            if b then N.(logor (shift_left one i) acc) else acc)
       in
       Typ.Read.map (Field.typ.read (Integer.to_field v)) ~f:of_field_elt
     in
-    {alloc; store; check; read}
+    { alloc; store; check; read }
 
   type t = var
 
@@ -79,12 +77,12 @@ struct
   let succ_if t c =
     make_checked (fun () ->
         let t = Integer.succ_if ~m t c in
-        t )
+        t)
 
   let succ t =
     make_checked (fun () ->
         let t = Integer.succ ~m t in
-        t )
+        t)
 
   let op op a b = make_checked (fun () -> op ~m a b)
 
@@ -143,8 +141,7 @@ struct
 
   let sub x y = if x < y then None else Some (N.sub x y)
 
-  [%%ifdef
-  consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Checked = Make_checked (N) (Bits)
 
@@ -191,13 +188,15 @@ module Make32 () : UInt32 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = UInt32.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+      type t = UInt32.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  include Make (struct
+  include Make
+            (struct
               include UInt32
 
               let random () =
@@ -222,13 +221,15 @@ module Make64 () : UInt64 = struct
     [@@@no_toplevel_latest_type]
 
     module V1 = struct
-      type t = UInt64.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+      type t = UInt64.Stable.V1.t
+      [@@deriving sexp, equal, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  include Make (struct
+  include Make
+            (struct
               include UInt64
 
               let random () =

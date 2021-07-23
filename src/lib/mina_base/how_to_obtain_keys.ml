@@ -2,7 +2,7 @@ open Core
 open Snark_params
 
 module T = struct
-  type t = Load_both of {step: string; wrap: string} | Generate_both
+  type t = Load_both of { step : string; wrap : string } | Generate_both
   [@@deriving sexp]
 end
 
@@ -25,5 +25,5 @@ let obtain_keys (type vk pk kp)
     | Generate_both ->
         let ks = f () in
         (Impl.Keypair.vk ks, Impl.Keypair.pk ks)
-    | Load_both {step; _} ->
+    | Load_both { step; _ } ->
         Sexp.load_sexp_conv_exn step keypair_of_sexp )

@@ -1,5 +1,5 @@
 locals {
-  base_graphql_dns = "${var.testnet_name}.graphql.o1test.net"
+  graphql_ingress_dns = "${var.testnet_name}.graphql.test.o1test.net"
   snark_worker_host_port            = 10001
   block_producer_starting_host_port = 10010
 
@@ -26,7 +26,7 @@ locals {
   snark_coordinator_name = "snark-coordinator-${lower(substr(var.snark_worker_public_key, length(var.snark_worker_public_key) - 6, 6))}"
 
   default_archive_node = {
-    image                   = var.coda_archive_image
+    image                   = var.mina_archive_image
     serverPort              = "3086"
     externalPort            = "11010"
     enableLocalDaemon       = true

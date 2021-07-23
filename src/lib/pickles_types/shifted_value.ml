@@ -29,15 +29,14 @@ open Core_kernel
 module Stable = struct
   module V1 = struct
     type 'f t = Shifted_value of 'f
-    [@@deriving sexp, compare, eq, yojson, hash]
+    [@@deriving sexp, compare, equal, yojson, hash]
   end
 end]
 
 let typ f =
   let there (Shifted_value x) = x in
   let back x = Shifted_value x in
-  Snarky_backendless.Typ.(
-    transport_var (transport f ~there ~back) ~there ~back)
+  Snarky_backendless.Typ.(transport_var (transport f ~there ~back) ~there ~back)
 
 let map (Shifted_value x) ~f = Shifted_value (f x)
 

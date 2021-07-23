@@ -5,15 +5,15 @@ let name = "coda-shared-prefix-multiproducer-test"
 
 let main n enable_payments () =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
   let keypairs =
     List.map
-      (Lazy.force (Precomputed_values.accounts precomputed_values))
-      ~f:Precomputed_values.keypair_of_account_record_exn
+      (Lazy.force (Genesis_proof.Inputs.accounts precomputed_values))
+      ~f:Genesis_proof.Inputs.keypair_of_account_record_exn
   in
   let public_keys =
-    List.map ~f:Precomputed_values.pk_of_account_record
-      (Lazy.force (Precomputed_values.accounts precomputed_values))
+    List.map ~f:Genesis_proof.Inputs.pk_of_account_record
+      (Lazy.force (Genesis_proof.Inputs.accounts precomputed_values))
   in
   let snark_work_public_keys i = Some (List.nth_exn public_keys i) in
   let%bind testnet =
@@ -33,10 +33,10 @@ let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that workers share prefixes"
     (let%map_open num_block_producers =
-       flag "--num-block-producers" ~aliases:["num-block-producers"]
+       flag "--num-block-producers" ~aliases:[ "num-block-producers" ]
          ~doc:"NUM number of block producers to have" (required int)
      and enable_payments =
-       flag "--payments" ~aliases:["payments"] no_arg
+       flag "--payments" ~aliases:[ "payments" ] no_arg
          ~doc:"enable the payment check"
      in
      main num_block_producers enable_payments)

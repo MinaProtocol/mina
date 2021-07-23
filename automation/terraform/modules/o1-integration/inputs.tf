@@ -2,6 +2,10 @@ provider "google" {
   alias = "gke"
 }
 
+variable "deploy_graphql_ingress" {
+  type = bool
+}
+
 variable "aws_route53_zone_id" {
   type = string
 }
@@ -22,23 +26,23 @@ variable "testnet_name" {
   type = string
 }
 
-variable "coda_image" {
+variable "mina_image" {
   type = string
 }
 
-variable "coda_archive_image" {
+variable "mina_archive_image" {
   type = string
 }
 
-variable "coda_agent_image" {
+variable "mina_agent_image" {
   type = string
 }
 
-variable "coda_bots_image" {
+variable "mina_bots_image" {
   type = string
 }
 
-variable "coda_points_image" {
+variable "mina_points_image" {
   type = string
 }
 

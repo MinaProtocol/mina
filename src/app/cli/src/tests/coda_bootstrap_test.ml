@@ -8,8 +8,7 @@ let runtime_config = Runtime_config.Test_configs.bootstrap
 let main () =
   let logger = Logger.create () in
   let%bind precomputed_values, _runtime_config =
-    Genesis_ledger_helper.init_from_config_file ~logger ~may_generate:false
-      ~proof_level:None
+    Genesis_ledger_helper.inputs_from_config_file ~logger ~proof_level:None
       (Lazy.force runtime_config)
     >>| Or_error.ok_exn
   in
@@ -17,7 +16,7 @@ let main () =
   let block_production_keys i = Some i in
   let snark_work_public_keys i =
     if i = 0 then
-      Some (Precomputed_values.largest_account_pk_exn precomputed_values)
+      Some (Genesis_proof.Inputs.largest_account_pk_exn precomputed_values)
     else None
   in
   let%bind testnet =
@@ -33,17 +32,17 @@ let main () =
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
        [%log trace]
-         ~metadata:[("status", Sync_status.to_yojson sync_status)]
+         ~metadata:[ ("status", Sync_status.to_yojson sync_status) ]
          "Bootstrap node received status: $status" ;
        Hash_set.add previous_status sync_status ;
-       Deferred.unit ))
+       Deferred.unit))
   |> don't_wait_for ;
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:bootstrapping_node
   in
   (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip
-    coda.transition_frontier never gets set to None *)
+     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 

@@ -8,7 +8,7 @@ let main () =
   let postgres_address =
     Uri.of_string "postgres://admin:codarules@localhost:5432/archiver"
   in
-  let precomputed_values = Lazy.force Precomputed_values.compiled in
+  let precomputed_values = Lazy.force Precomputed_values.compiled_inputs in
   let constraint_constants = precomputed_values.constraint_constants in
   let%bind conn =
     match%map Caqti_async.connect postgres_address with
@@ -26,7 +26,7 @@ let main () =
       (Some (Lazy.force Runtime_config.Test_configs.transactions))
   |> don't_wait_for ;
   let public_key =
-    Precomputed_values.largest_account_pk_exn precomputed_values
+    Genesis_proof.Inputs.largest_account_pk_exn precomputed_values
   in
   let n = 2 in
   let block_production_keys i = if i = 0 then Some i else None in
@@ -49,18 +49,18 @@ let main () =
   let%bind _, observed_transitions =
     Pipe.fold new_block_pipe ~init:(0, []) ~f:(fun (i, acc) transition ->
         if i >= num_blocks_to_wait then Pipe.close_read new_block_pipe ;
-        Deferred.return (i + 1, transition :: acc) )
+        Deferred.return (i + 1, transition :: acc))
   in
   let%bind () = after (Time.Span.of_sec 10.) in
   Deferred.List.iter observed_transitions
-    ~f:(fun With_hash.{hash; data= transition} ->
+    ~f:(fun With_hash.{ hash; data = transition } ->
       match%map
         let open Deferred.Result.Let_syntax in
         match%bind
           Archive_lib.Processor.Block.find_opt conn ~state_hash:hash
         with
         | Some id ->
-            let%bind Archive_lib.Processor.Block.{parent_id; _} =
+            let%bind Archive_lib.Processor.Block.{ parent_id; _ } =
               Archive_lib.Processor.Block.load conn ~id
             in
             Archive_lib.Processor.For_test.assert_parent_exist conn ~parent_id
@@ -73,7 +73,7 @@ let main () =
       | Ok () ->
           ()
       | Error e ->
-          failwith @@ Caqti_error.show e )
+          failwith @@ Caqti_error.show e)
 
 let command =
   Command.async

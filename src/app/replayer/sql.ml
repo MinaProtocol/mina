@@ -3,24 +3,34 @@
 open Core_kernel
 
 module Block_info = struct
+  type t =
+    { id : int; global_slot : int64; state_hash : string; ledger_hash : string }
+  [@@deriving hlist]
+
+  let typ =
+    let open Archive_lib.Processor.Caqti_type_spec in
+    let spec = Caqti_type.[ int; int64; string; string ] in
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
+
   (* find all blocks, working back from block with given state hash *)
   let query =
-    Caqti_request.collect Caqti_type.string
-      Caqti_type.(tup3 int int64 string)
+    Caqti_request.collect Caqti_type.string typ
       {sql| WITH RECURSIVE chain AS (
 
-              SELECT id,parent_id,global_slot,ledger_hash FROM blocks b WHERE b.state_hash = ?
+              SELECT id,parent_id,global_slot,state_hash,ledger_hash FROM blocks b WHERE b.state_hash = ?
 
               UNION ALL
 
-              SELECT b.id,b.parent_id,b.global_slot,b.ledger_hash FROM blocks b
+              SELECT b.id,b.parent_id,b.global_slot,b.state_hash,b.ledger_hash FROM blocks b
 
               INNER JOIN chain
 
               ON b.id = chain.parent_id AND chain.id <> chain.parent_id
            )
 
-           SELECT id,global_slot,ledger_hash FROM chain c
+           SELECT id,global_slot,state_hash,ledger_hash FROM chain c
 
       |sql}
 
@@ -56,6 +66,26 @@ let find_command_ids_query s =
      |sql}
     s s
 
+module Block = struct
+  let state_hash_query =
+    Caqti_request.find Caqti_type.int Caqti_type.string
+      {sql| SELECT state_hash FROM blocks
+            WHERE id = ?
+      |sql}
+
+  let get_state_hash (module Conn : Caqti_async.CONNECTION) id =
+    Conn.find state_hash_query id
+
+  let unparented_query =
+    Caqti_request.collect Caqti_type.unit Caqti_type.int
+      {sql| SELECT id FROM blocks
+            WHERE parent_id IS NULL
+      |sql}
+
+  let get_unparented (module Conn : Caqti_async.CONNECTION) () =
+    Conn.collect_list unparented_query ()
+end
+
 module User_command_ids = struct
   let query =
     Caqti_request.collect Caqti_type.string Caqti_type.int
@@ -67,26 +97,27 @@ end
 
 module User_command = struct
   type t =
-    { type_: string
-    ; fee_payer_id: int
-    ; source_id: int
-    ; receiver_id: int
-    ; fee: int64
-    ; fee_token: int64
-    ; token: int64
-    ; amount: int64 option
-    ; valid_until: int64 option
-    ; memo: string
-    ; nonce: int64
-    ; block_id: int
-    ; global_slot: int64
-    ; txn_global_slot: int64
-    ; sequence_no: int
-    ; status: string
-    ; created_token: int64 option
-    ; fee_payer_balance: int
-    ; source_balance: int option
-    ; receiver_balance: int option }
+    { type_ : string
+    ; fee_payer_id : int
+    ; source_id : int
+    ; receiver_id : int
+    ; fee : int64
+    ; fee_token : int64
+    ; token : int64
+    ; amount : int64 option
+    ; valid_until : int64 option
+    ; memo : string
+    ; nonce : int64
+    ; block_id : int
+    ; global_slot : int64
+    ; txn_global_slot : int64
+    ; sequence_no : int
+    ; status : string
+    ; created_token : int64 option
+    ; fee_payer_balance : int
+    ; source_balance : int option
+    ; receiver_balance : int option
+    }
   [@@deriving hlist]
 
   let typ =
@@ -112,7 +143,8 @@ module User_command = struct
         ; option int64
         ; int
         ; option int
-        ; option int ]
+        ; option int
+        ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
@@ -156,28 +188,29 @@ end
 
 module Internal_command = struct
   type t =
-    { type_: string
-    ; receiver_id: int
-    ; receiver_balance: int
-    ; fee: int64
-    ; token: int64
-    ; block_id: int
-    ; global_slot: int64
-    ; txn_global_slot: int64
-    ; sequence_no: int
-    ; secondary_sequence_no: int }
+    { type_ : string
+    ; receiver_id : int
+    ; receiver_balance : int
+    ; fee : int64
+    ; token : int64
+    ; block_id : int
+    ; global_slot : int64
+    ; txn_global_slot : int64
+    ; sequence_no : int
+    ; secondary_sequence_no : int
+    }
   [@@deriving hlist]
 
   let typ =
     let open Archive_lib.Processor.Caqti_type_spec in
     let spec =
-      Caqti_type.[string; int; int; int64; int64; int; int64; int64; int; int]
+      Caqti_type.[ string; int; int; int64; int64; int; int64; int64; int; int ]
     in
     let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
     let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
     Caqti_type.custom ~encode ~decode (to_rep spec)
 
-  (* the transaction global slot is taken from the user command's parent block, mirroring
+  (* the transaction global slot is taken from the internal command's parent block, mirroring
      the call to Staged_ledger.apply in Block_producer
   *)
   let query =
@@ -217,12 +250,12 @@ module Public_key = struct
 end
 
 module Epoch_data = struct
-  type epoch_data = {epoch_ledger_hash: string; epoch_data_seed: string}
+  type epoch_data = { epoch_ledger_hash : string; epoch_data_seed : string }
 
   let epoch_data_typ =
     let encode t = Ok (t.epoch_ledger_hash, t.epoch_data_seed) in
     let decode (epoch_ledger_hash, epoch_data_seed) =
-      Ok {epoch_ledger_hash; epoch_data_seed}
+      Ok { epoch_ledger_hash; epoch_data_seed }
     in
     let rep = Caqti_type.(tup2 string string) in
     Caqti_type.custom ~encode ~decode rep
@@ -263,14 +296,13 @@ module Epoch_data = struct
             WHERE state_hash = ?
       |sql}
 
-  let get_next_epoch_data_id (module Conn : Caqti_async.CONNECTION) state_hash
-      =
+  let get_next_epoch_data_id (module Conn : Caqti_async.CONNECTION) state_hash =
     Conn.find query_next_epoch_data_id state_hash
 end
 
-module Fork_block = struct
+module Parent_block = struct
   (* fork block is parent of block with the given state hash *)
-  let query_state_hash =
+  let query_parent_state_hash =
     Caqti_request.find Caqti_type.string Caqti_type.string
       {sql| SELECT parent.state_hash FROM blocks AS parent
 
@@ -281,9 +313,9 @@ module Fork_block = struct
             ON epoch_ledgers_block.parent_id = parent.id
       |sql}
 
-  let get_state_hash (module Conn : Caqti_async.CONNECTION)
+  let get_parent_state_hash (module Conn : Caqti_async.CONNECTION)
       epoch_ledgers_state_hash =
-    Conn.find query_state_hash epoch_ledgers_state_hash
+    Conn.find query_parent_state_hash epoch_ledgers_state_hash
 end
 
 module Balance = struct
