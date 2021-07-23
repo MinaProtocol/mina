@@ -6,7 +6,7 @@
    mina_base
    crypto_params
    dummy_values
-   genesis_proof
+   mina_genesis_proof
    snarky.backendless)
  (ppx_runtime_libraries base)
  (preprocess

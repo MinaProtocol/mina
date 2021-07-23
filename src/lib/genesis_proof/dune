@@ -1,12 +1,12 @@
 (library
  (name genesis_proof)
- (public_name coda_genesis_proof)
+ (public_name mina_genesis_proof)
  (libraries
    mina_base
    mina_state
    blockchain_snark
    genesis_constants
-   runtime_config
+   mina_runtime_config
    with_hash)
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_version ppx_let)))

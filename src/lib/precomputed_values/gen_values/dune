@@ -7,7 +7,7 @@
    ;; libraries
    blockchain_snark
    mina_base
-   genesis_proof
+   mina_genesis_proof
    global_signer_private_key
    ppxlib
    ppx_util

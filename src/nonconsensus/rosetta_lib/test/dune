@@ -1,5 +1,5 @@
 (executable
- (package rosetta_lib)
+ (package rosetta_lib_nonconsensus)
  (name test_encodings)
  (public_name test_encodings)
  (modes native)
