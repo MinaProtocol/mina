@@ -117,6 +117,12 @@ let create ~logger ~pids : t Deferred.t =
         ) ] ;
   Child_processes.Termination.register_process pids process
     Child_processes.Termination.Uptime_snark_worker ;
+  (* the wait loop in the daemon will terminate the daemon if this SNARK worker
+     process dies
+
+     when this code is migrated to `compatible`, please follow the strategy
+     used in prover.ml to call Async.exit when the prover terminates
+  *)
   don't_wait_for
   @@ Pipe.iter
        (Process.stdout process |> Reader.pipe)

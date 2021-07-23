@@ -142,27 +142,15 @@ let send_uptime_data ~logger ~interruptor ~(submitter_keypair : Keypair.t) ~url
           ; ("payload", json)
           ; ("error", `String (Exn.to_string exn)) ]
 
-let block_base64_of_breadcrumb ~logger breadcrumb =
+let block_base64_of_breadcrumb breadcrumb =
   let external_transition = external_transition_of_breadcrumb breadcrumb in
   let block_string =
     Binable.to_string
       (module External_transition.Stable.Latest)
       external_transition
   in
-  let block_base64_result = Base64.encode block_string in
-  match block_base64_result with
-  | Ok block_base64 ->
-      Some block_base64
-  | Error (`Msg err) ->
-      [%log error]
-        "Could not Base64-encode block with state hash $state_hash for uptime \
-         service"
-        ~metadata:
-          [ ( "state_hash"
-            , State_hash.to_yojson
-              @@ External_transition.state_hash external_transition )
-          ; ("error", `String err) ] ;
-      None
+  (* raises only on errors from invalid optional arguments *)
+  Base64.encode_exn block_string
 
 let send_produced_block_at ~logger ~interruptor ~url ~peer_id
     ~(submitter_keypair : Keypair.t) ~block_produced_bvar tm =
@@ -182,22 +170,17 @@ let send_produced_block_at ~logger ~interruptor ~url ~peer_id
          after scheduled time"
         timeout_min ;
       return ()
-  | `Result breadcrumb -> (
-    match block_base64_of_breadcrumb ~logger breadcrumb with
-    | Some block_base64 ->
-        let state_hash =
-          Transition_frontier.Breadcrumb.state_hash breadcrumb
-        in
-        let block_data =
-          { block= block_base64
-          ; created_at= get_rfc3339_time ()
-          ; peer_id
-          ; snark_work= None }
-        in
-        send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-          ~state_hash ~produced:true block_data
-    | None ->
-        return () )
+  | `Result breadcrumb ->
+      let block_base64 = block_base64_of_breadcrumb breadcrumb in
+      let state_hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+      let block_data =
+        { block= block_base64
+        ; created_at= get_rfc3339_time ()
+        ; peer_id
+        ; snark_work= None }
+      in
+      send_uptime_data ~logger ~interruptor ~submitter_keypair ~url ~state_hash
+        ~produced:true block_data
 
 let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
     ~transition_frontier ~peer_id ~(submitter_keypair : Keypair.t)
@@ -211,33 +194,63 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
   | Some tf -> (
       let make_interruptible f = Interruptible.lift f interruptor in
       let breadcrumb = Transition_frontier.best_tip tf in
-      match block_base64_of_breadcrumb ~logger breadcrumb with
-      | None ->
-          [%log info]
-            "Could not Base64-encode block, not sending block or SNARK work \
-             to uptime service" ;
-          Interruptible.return ()
-      | Some block_base64 -> (
-          let open Interruptible.Let_syntax in
-          let message =
-            Sok_message.create ~fee:snark_work_fee
-              ~prover:(Public_key.compress submitter_keypair.public_key)
-          in
-          let best_tip = Transition_frontier.best_tip tf in
-          let external_transition =
-            Transition_frontier.Breadcrumb.validated_transition best_tip
-            |> External_transition.Validation.forget_validation
-          in
-          if
-            List.is_empty
-              (External_transition.transactions
-                 ~constraint_constants:
-                   Genesis_constants.Constraint_constants.compiled
-                 external_transition)
-          then (
+      let block_base64 = block_base64_of_breadcrumb breadcrumb in
+      let open Interruptible.Let_syntax in
+      let message =
+        Sok_message.create ~fee:snark_work_fee
+          ~prover:(Public_key.compress submitter_keypair.public_key)
+      in
+      let best_tip = Transition_frontier.best_tip tf in
+      let external_transition =
+        Transition_frontier.Breadcrumb.validated_transition best_tip
+        |> External_transition.Validation.forget_validation
+      in
+      if
+        List.is_empty
+          (External_transition.transactions
+             ~constraint_constants:
+               Genesis_constants.Constraint_constants.compiled
+             external_transition)
+      then (
+        [%log info]
+          "No transactions in block, sending block without SNARK work to \
+           uptime service" ;
+        let state_hash = Transition_frontier.Breadcrumb.state_hash best_tip in
+        let block_data =
+          { block= block_base64
+          ; created_at= get_rfc3339_time ()
+          ; peer_id
+          ; snark_work= None }
+        in
+        send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
+          ~state_hash ~produced:false block_data )
+      else
+        let best_tip_staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger best_tip
+        in
+        match
+          Staged_ledger.all_work_pairs best_tip_staged_ledger
+            ~get_state:(fun state_hash ->
+              match Transition_frontier.find_protocol_state tf state_hash with
+              | None ->
+                  Error
+                    (Error.createf
+                       "Could not find state_hash %s in transition frontier \
+                        for uptime service"
+                       (State_hash.to_base58_check state_hash))
+              | Some protocol_state ->
+                  Ok protocol_state )
+        with
+        | Error e ->
+            [%log error]
+              "Could not get SNARK work from best tip staged ledger for \
+               uptime service"
+              ~metadata:[("error", Error_json.error_to_yojson e)] ;
+            Interruptible.return ()
+        | Ok [] ->
             [%log info]
-              "No transactions in block, sending block without SNARK work to \
-               uptime service" ;
+              "No SNARK jobs available for uptime service, sending just the \
+               block" ;
             let state_hash =
               Transition_frontier.Breadcrumb.state_hash best_tip
             in
@@ -248,36 +261,35 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
               ; snark_work= None }
             in
             send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
-              ~state_hash ~produced:false block_data )
-          else
-            let best_tip_staged_ledger =
-              Transition_frontier.Breadcrumb.staged_ledger best_tip
+              ~state_hash ~produced:false block_data
+        | Ok job_one_or_twos -> (
+            let transitions =
+              List.concat_map job_one_or_twos ~f:One_or_two.to_list
+              |> List.filter ~f:(function
+                   | Snark_work_lib.Work.Single.Spec.Transition _ ->
+                       true
+                   | Merge _ ->
+                       false )
+            in
+            let staged_ledger_hash =
+              Transition_frontier.Breadcrumb.blockchain_state best_tip
+              |> Mina_state.Blockchain_state.staged_ledger_hash
             in
             match
-              Staged_ledger.all_work_pairs best_tip_staged_ledger
-                ~get_state:(fun state_hash ->
-                  match
-                    Transition_frontier.find_protocol_state tf state_hash
-                  with
-                  | None ->
-                      Error
-                        (Error.createf
-                           "Could not find state_hash %s in transition \
-                            frontier for uptime service"
-                           (State_hash.to_base58_check state_hash))
-                  | Some protocol_state ->
-                      Ok protocol_state )
+              List.find transitions ~f:(fun transition ->
+                  match transition with
+                  | Snark_work_lib.Work.Single.Spec.Transition
+                      ({target; _}, _, _) ->
+                      Marlin_plonk_bindings_pasta_fp.equal target
+                        (Staged_ledger_hash.ledger_hash staged_ledger_hash)
+                  | Merge _ ->
+                      (* unreachable *)
+                      failwith "Expected Transition work, not Merge" )
             with
-            | Error e ->
-                [%log error]
-                  "Could not get SNARK work from best tip staged ledger for \
-                   uptime service"
-                  ~metadata:[("error", Error_json.error_to_yojson e)] ;
-                Interruptible.return ()
-            | Ok [] ->
+            | None ->
                 [%log info]
-                  "No SNARK jobs available for uptime service, sending just \
-                   the block" ;
+                  "No transactions in block match staged ledger hash, sending \
+                   block without SNARK work" ;
                 let state_hash =
                   Transition_frontier.Breadcrumb.state_hash best_tip
                 in
@@ -289,34 +301,34 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                 in
                 send_uptime_data ~logger ~interruptor ~submitter_keypair ~url
                   ~state_hash ~produced:false block_data
-            | Ok job_one_or_twos -> (
-                let transitions =
-                  List.concat_map job_one_or_twos ~f:One_or_two.to_list
-                  |> List.filter ~f:(function
-                       | Snark_work_lib.Work.Single.Spec.Transition _ ->
-                           true
-                       | Merge _ ->
-                           false )
-                in
-                let staged_ledger_hash =
-                  Transition_frontier.Breadcrumb.blockchain_state best_tip
-                  |> Mina_state.Blockchain_state.staged_ledger_hash
-                in
-                match
-                  List.find transitions ~f:(fun transition ->
-                      match transition with
-                      | Snark_work_lib.Work.Single.Spec.Transition
-                          ({target; _}, _, _) ->
-                          Marlin_plonk_bindings_pasta_fp.equal target
-                            (Staged_ledger_hash.ledger_hash staged_ledger_hash)
-                      | Merge _ ->
-                          (* unreachable *)
-                          failwith "Expected Transition work, not Merge" )
+            | Some single_spec -> (
+                match%bind
+                  make_interruptible
+                    (Uptime_snark_worker.perform_single snark_worker
+                       (message, single_spec))
                 with
-                | None ->
-                    [%log info]
-                      "No transactions in block match staged ledger hash, \
-                       sending block without SNARK work" ;
+                | Error e ->
+                    (* error in submitting to process *)
+                    [%log error]
+                      "Error when running uptime service SNARK worker on a \
+                       transaction"
+                      ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                    Interruptible.return ()
+                | Ok (Error e) ->
+                    (* error in creating the SNARK work *)
+                    [%log error]
+                      "Error computing SNARK work for uptime service"
+                      ~metadata:[("error", Error_json.error_to_yojson e)] ;
+                    Interruptible.return ()
+                | Ok (Ok (proof, proof_time)) ->
+                    let proof_data : Proof_data.t =
+                      {proof; proof_time; snark_work_fee}
+                    in
+                    let proof_string =
+                      Binable.to_string (module Proof_data) proof_data
+                    in
+                    (* raises only on errors from invalid optional arguments *)
+                    let snark_work_base64 = Base64.encode_exn proof_string in
                     let state_hash =
                       Transition_frontier.Breadcrumb.state_hash best_tip
                     in
@@ -324,57 +336,10 @@ let send_block_and_transaction_snark ~logger ~interruptor ~url ~snark_worker
                       { block= block_base64
                       ; created_at= get_rfc3339_time ()
                       ; peer_id
-                      ; snark_work= None }
+                      ; snark_work= Some snark_work_base64 }
                     in
                     send_uptime_data ~logger ~interruptor ~submitter_keypair
-                      ~url ~state_hash ~produced:false block_data
-                | Some single_spec -> (
-                    match%bind
-                      make_interruptible
-                        (Uptime_snark_worker.perform_single snark_worker
-                           (message, single_spec))
-                    with
-                    | Error e ->
-                        (* error in submitting to process *)
-                        [%log error]
-                          "Error when running uptime service SNARK worker on \
-                           a transaction"
-                          ~metadata:[("error", Error_json.error_to_yojson e)] ;
-                        Interruptible.return ()
-                    | Ok (Error e) ->
-                        (* error in creating the SNARK work *)
-                        [%log error]
-                          "Error computing SNARK work for uptime service"
-                          ~metadata:[("error", Error_json.error_to_yojson e)] ;
-                        Interruptible.return ()
-                    | Ok (Ok (proof, proof_time)) -> (
-                        let proof_data : Proof_data.t =
-                          {proof; proof_time; snark_work_fee}
-                        in
-                        let proof_string =
-                          Binable.to_string (module Proof_data) proof_data
-                        in
-                        match Base64.encode proof_string with
-                        | Error (`Msg err) ->
-                            [%log error]
-                              "Could not Base64-encode SNARK work for uptime \
-                               service"
-                              ~metadata:[("error", `String err)] ;
-                            Interruptible.return ()
-                        | Ok snark_work_base64 ->
-                            let state_hash =
-                              Transition_frontier.Breadcrumb.state_hash
-                                best_tip
-                            in
-                            let block_data =
-                              { block= block_base64
-                              ; created_at= get_rfc3339_time ()
-                              ; peer_id
-                              ; snark_work= Some snark_work_base64 }
-                            in
-                            send_uptime_data ~logger ~interruptor
-                              ~submitter_keypair ~url ~state_hash
-                              ~produced:false block_data ) ) ) ) )
+                      ~url ~state_hash ~produced:false block_data ) ) )
 
 let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
     ~time_controller ~block_produced_bvar ~uptime_submitter_keypair
@@ -440,9 +405,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
             ; ( "boundary_time"
               , `String (Block_time.to_time next_block_tm |> Time.to_string) )
             ] ;
-        (* wait in Async.Deferred monad *)
+        (* wait in Deferred monad *)
         let%bind () = wait_until_iteration_start next_block_tm in
-        (* interrupt previous iteration *)
         let interruptor = register_iteration () in
         (* work in Interruptible monad in "background" *)
         Interruptible.don't_wait_for
@@ -480,8 +444,8 @@ let start ~logger ~uptime_url ~snark_worker_opt ~transition_frontier
                     (* we look for block production within 4 slots of the *desired*
                        iteration start time, so a late iteration won't affect the
                        time bound on block production
-                      that leaves a full slot to produce the block
-                   *)
+                       that leaves a full slot to produce the block
+                    *)
                     let four_slots_from_start =
                       Block_time.add next_block_tm four_slots_span
                       |> Block_time.to_time
