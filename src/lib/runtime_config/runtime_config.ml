@@ -121,6 +121,7 @@ module Json_layout = struct
           ; set_delegate : Auth_required.t [@default None]
           ; set_permissions : Auth_required.t [@default None]
           ; set_verification_key : Auth_required.t [@default None]
+          ; set_snapp_uri : Auth_required.t [@default None]
           }
         [@@deriving yojson, dhall_type, sexp, bin_io_unversioned]
 
@@ -132,6 +133,7 @@ module Json_layout = struct
            ; "set_delegate"
            ; "set_permissions"
            ; "set_verification_key"
+           ; "set_snapp_uri"
           |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json

@@ -1218,7 +1218,13 @@ module Base = struct
         ({ body =
              { pk
              ; token_id = _
-             ; update = { app_state; delegate; verification_key; permissions }
+             ; update =
+                 { app_state
+                 ; delegate
+                 ; verification_key
+                 ; permissions
+                 ; snapp_uri
+                 }
              ; delta
              }
          ; predicate
@@ -1327,6 +1333,25 @@ module Base = struct
         ; app_state
         }
       in
+      let snapp_uri =
+        let if_ b ~then_ ~else_ =
+          let hash = Field.if_ b ~then_:(fst then_) ~else_:(fst else_) in
+          let ref =
+            As_prover.Ref.create
+              As_prover.(
+                fun () ->
+                  let ref =
+                    if read Boolean.typ b then snd then_ else snd else_
+                  in
+                  As_prover.Ref.get ref)
+          in
+          (hash, ref)
+        in
+        update_authorized a.permissions.set_snapp_uri
+          ~is_keep:(Set_or_keep.Checked.is_keep snapp_uri)
+          ~updated:
+            (`Ok (Set_or_keep.Checked.set_or_keep ~if_ snapp_uri a.snapp_uri))
+      in
       let delegate =
         let base_delegate =
           (* New accounts should have the delegate equal to the public key of the account. *)
@@ -1366,6 +1391,7 @@ module Base = struct
         ; timing
         ; nonce
         ; public_key = pk
+        ; snapp_uri
         }
       in
       (a, `proof_must_verify proof_must_verify)
@@ -3764,6 +3790,7 @@ let%test_module "transaction_snark" =
                       ; delegate = Keep
                       ; verification_key = Keep
                       ; permissions = Keep
+                      ; snapp_uri = Keep
                       }
                   ; token_id = Token_id.default
                   ; delta =

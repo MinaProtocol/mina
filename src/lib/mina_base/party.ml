@@ -32,11 +32,12 @@ module Update = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('state_element, 'pk, 'vk, 'perms) t =
+        type ('state_element, 'pk, 'vk, 'perms, 'snapp_uri) t =
           { app_state : 'state_element Snapp_state.V.Stable.V1.t
           ; delegate : 'pk
           ; verification_key : 'vk
           ; permissions : 'perms
+          ; snapp_uri : 'snapp_uri
           }
         [@@deriving compare, equal, sexp, hash, yojson, hlist]
       end
@@ -56,7 +57,8 @@ module Update = struct
           , F.Stable.V1.t )
           With_hash.Stable.V1.t
           Set_or_keep.Stable.V1.t
-        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t )
+        , Permissions.Stable.V1.t Set_or_keep.Stable.V1.t
+        , string Set_or_keep.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving compare, equal, sexp, hash, yojson]
 
@@ -71,10 +73,13 @@ module Update = struct
       ( Field.t Set_or_keep.Checked.t
       , Public_key.Compressed.var Set_or_keep.Checked.t
       , Field.t Set_or_keep.Checked.t
-      , Permissions.Checked.t Set_or_keep.Checked.t )
+      , Permissions.Checked.t Set_or_keep.Checked.t
+      , (Field.t * string As_prover.Ref.t) Set_or_keep.Checked.t )
       Poly.t
 
-    let to_input ({ app_state; delegate; verification_key; permissions } : t) =
+    let to_input
+        ({ app_state; delegate; verification_key; permissions; snapp_uri } : t)
+        =
       let open Random_oracle_input in
       List.reduce_exn ~f:append
         [ Snapp_state.to_input app_state
@@ -84,6 +89,8 @@ module Update = struct
         ; Set_or_keep.Checked.to_input verification_key ~f:field
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
+        ; Set_or_keep.Checked.to_input snapp_uri ~f:(fun (hash, _) ->
+              field hash)
         ]
   end
 
@@ -93,11 +100,13 @@ module Update = struct
     ; delegate = Keep
     ; verification_key = Keep
     ; permissions = Keep
+    ; snapp_uri = Keep
     }
 
   let dummy = noop
 
-  let to_input ({ app_state; delegate; verification_key; permissions } : t) =
+  let to_input
+      ({ app_state; delegate; verification_key; permissions; snapp_uri } : t) =
     let open Random_oracle_input in
     List.reduce_exn ~f:append
       [ Snapp_state.to_input app_state
@@ -110,6 +119,9 @@ module Update = struct
           ~dummy:Field.zero ~f:field
       ; Set_or_keep.to_input permissions ~dummy:Permissions.user_default
           ~f:Permissions.to_input
+      ; Set_or_keep.to_input
+          (Set_or_keep.map ~f:Account.hash_snapp_uri snapp_uri)
+          ~dummy:Field.zero ~f:field
       ]
 
   let typ () : (Checked.t, t) Typ.t =
@@ -124,6 +136,22 @@ module Update = struct
              ~there:(Set_or_keep.map ~f:With_hash.hash)
              ~back:(Set_or_keep.map ~f:(fun _ -> failwith "vk typ"))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
+      ; (* We have to do this unfortunate dance to provide an [As_prover.ref]
+           for the dummy value.
+           TODO: find a way to make this less horrible.
+        *)
+        Set_or_keep.typ ~dummy:None
+          (Typ.transport
+             Typ.(Field.typ * Internal.ref ())
+             ~there:(function
+               | None ->
+                   (Field.Constant.zero, "")
+               | Some s ->
+                   (Account.hash_snapp_uri s, s))
+             ~back:(fun (_, s) -> Some s))
+        |> Typ.transport
+             ~there:(Set_or_keep.map ~f:Option.some)
+             ~back:(Set_or_keep.map ~f:(fun x -> Option.value_exn x))
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist

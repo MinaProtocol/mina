@@ -55,6 +55,7 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
+            ; set_snapp_uri
             } ->
             let auth_required a =
               match a with
@@ -78,6 +79,7 @@ module Accounts = struct
             ; set_delegate = auth_required set_delegate
             ; set_permissions = auth_required set_permissions
             ; set_verification_key = auth_required set_verification_key
+            ; set_snapp_uri = auth_required set_snapp_uri
             }
       in
       let token_permissions =
@@ -204,6 +206,7 @@ module Accounts = struct
             ; set_delegate
             ; set_permissions
             ; set_verification_key
+            ; set_snapp_uri
             } =
           account.permissions
         in
@@ -215,6 +218,7 @@ module Accounts = struct
           ; set_delegate = auth_required set_delegate
           ; set_permissions = auth_required set_permissions
           ; set_verification_key = auth_required set_verification_key
+          ; set_snapp_uri = auth_required set_snapp_uri
           }
       in
       let snapp =

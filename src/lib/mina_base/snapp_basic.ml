@@ -68,6 +68,8 @@ module Flagged_option = struct
 
   let to_option { is_some; data } = Option.some_if is_some data
 
+  let map ~f { is_some; data } = { is_some; data = f data }
+
   [%%ifdef consensus_mechanism]
 
   let typ t =
@@ -118,6 +120,8 @@ module Set_or_keep = struct
     val typ :
       dummy:'a -> ('a_var, 'a) Typ.t -> ('a_var t, 'a Stable.Latest.t) Typ.t
 
+    val map : f:('a -> 'b) -> 'a t -> 'b t
+
     val to_input :
          'a t
       -> f:('a -> ('f, Boolean.var) Random_oracle_input.t)
@@ -133,6 +137,8 @@ module Set_or_keep = struct
     let is_set = Flagged_option.is_some
 
     let is_keep x = Boolean.not (Flagged_option.is_some x)
+
+    let map = Flagged_option.map
 
     let typ ~dummy t =
       Typ.transport

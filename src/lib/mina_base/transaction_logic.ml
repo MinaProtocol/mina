@@ -1184,7 +1184,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ({ body =
            { pk = _
            ; token_id
-           ; update = { app_state; delegate; verification_key; permissions }
+           ; update =
+               { app_state; delegate; verification_key; permissions; snapp_uri }
            ; delta
            }
        ; predicate
@@ -1259,6 +1260,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let t : Snapp_account.t = { app_state; verification_key } in
       if Snapp_account.(equal default t) then None else Some t
     in
+    let%bind snapp_uri =
+      update a.permissions.set_snapp_uri snapp_uri a.snapp_uri
+        ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
+          match u with Keep -> x | Set x -> x)
+    in
     let%bind permissions =
       update a.permissions.set_delegate permissions a.permissions
         ~is_keep:Set_or_keep.is_keep ~update:Set_or_keep.set_or_keep
@@ -1271,7 +1277,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Full _ | Nonce _ ->
           Account.Nonce.succ a.nonce
     in
-    Ok { a with balance; snapp; delegate; permissions; timing; nonce }
+    Ok
+      { a with balance; snapp; delegate; permissions; timing; nonce; snapp_uri }
 
   let apply_parties_unchecked
       ~(constraint_constants : Genesis_constants.Constraint_constants.t)

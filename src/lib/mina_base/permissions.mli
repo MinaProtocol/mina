@@ -53,6 +53,7 @@ module Poly : sig
         ; set_delegate : 'controller
         ; set_permissions : 'controller
         ; set_verification_key : 'controller
+        ; set_snapp_uri : 'controller
         }
       [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
     end
