@@ -68,6 +68,7 @@ module "kubernetes_testnet" {
   block_producer_configs = concat(
     [
       for i in range(var.whale_count) : {
+        # for j in range (var.whale.duplicates):
         name                   = local.whale_block_producer_names[i]
         class                  = "whale"
         id                     = i + 1
@@ -85,6 +86,7 @@ module "kubernetes_testnet" {
     ],
     [
       for i in range(var.fish_count) : {
+        # for j in range (var.fish.duplicates):
         name                   = local.fish_block_producer_names[i]
         class                  = "fish"
         id                     = i + 1
