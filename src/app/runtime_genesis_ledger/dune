@@ -8,10 +8,10 @@
    ;; libraries
    blockchain_snark
    mina_base
-   coda_genesis_proof
+   mina_genesis_proof
    mina_state
    genesis_ledger_helper
-   coda_runtime_config
+   mina_runtime_config
    snark_params
    snarky.backendless
    staged_ledger)
