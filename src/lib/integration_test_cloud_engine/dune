@@ -5,5 +5,6 @@
  (instrumentation (backend bisect_ppx))
  (preprocess (pps ppx_coda ppx_version ppx_optcomp graphql_ppx ppx_let ppx_inline_test ppx_custom_printf ppx_deriving_yojson lens.ppx_deriving ppx_pipebang ppx_sexp_conv))
  (libraries
-   core async lens mina_base pipe_lib runtime_config genesis_constants graphql_lib transition_frontier user_command_input genesis_ledger_helper integration_test_lib block_time interruptible exit_handlers transition_router block_producer)
+   core async lens mina_base pipe_lib mina_runtime_config genesis_constants graphql_lib transition_frontier user_command_input genesis_ledger_helper
+   integration_test_lib block_time interruptible exit_handlers transition_router block_producer)
 )
