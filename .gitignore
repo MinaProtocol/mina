@@ -13,7 +13,7 @@ result
 *.aux
 src/config.mlh
 src/config/config.mlh
-src/external/ocaml-rocksdb/rocksdb
+src/lib/rocksdb/ocaml-rocksdb/rocksdb
 .stack-work/
 /wallet-keys/
 test_output
