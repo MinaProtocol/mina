@@ -38,7 +38,7 @@ module Make (Inputs : Intf.Test.Inputs_intf) = struct
     Malleable_error.List.iter expected_peers ~f:(fun p ->
         let error =
           Printf.sprintf "node %s (id=%s) is not connected to node %s (id=%s)"
-            (get_node_id peer_id) peer_id p (get_node_id p)
+            (get_node_id peer_id) peer_id (get_node_id p) p
           |> Error.of_string
         in
         Malleable_error.ok_if_true
