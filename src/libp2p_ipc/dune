@@ -3,6 +3,7 @@
  (public_name libp2p_ipc)
  (flags -w -53)
  (libraries core_kernel capnp)
+ (preprocess (pps ppx_version))
  (instrumentation (backend bisect_ppx)))
 
 (rule
