@@ -5,6 +5,8 @@ import (
   logging "github.com/ipfs/go-log/v2"
 )
 
+// Process rows retrieved from Google spreadsheet
+// and extract public keys from the first column.
 func processRows (rows [][](interface{})) Whitelist {
   wl := make(Whitelist)
   for _, row := range rows {
@@ -22,6 +24,9 @@ func processRows (rows [][](interface{})) Whitelist {
   return wl
 }
 
+// Retrieve data from delegation program spreadsheet
+// and extract public keys out of the column containing
+// public keys of program participants.
 func RetrieveWhitelist (service *sheets.Service, log *logging.ZapEventLogger) Whitelist {
   col := DELEGATION_WHITELIST_COLUMN
   readRange := DELEGATION_WHITELIST_LIST + "!" + col + ":" + col
