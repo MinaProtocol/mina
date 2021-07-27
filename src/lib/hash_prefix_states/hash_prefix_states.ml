@@ -105,3 +105,7 @@ let party_with_protocol_state_predicate =
   salt party_with_protocol_state_predicate
 
 let snapp_uri = salt snapp_uri
+
+let snapp_event = salt snapp_event
+
+let snapp_events = salt snapp_events

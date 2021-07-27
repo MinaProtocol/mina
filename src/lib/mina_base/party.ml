@@ -148,21 +148,92 @@ module Update = struct
       ~value_of_hlist:of_hlist
 end
 
+module Events = struct
+  module Event = struct
+    (* Arbitrary hash input, encoding determined by the snapp's developer. *)
+    type t = Field.t array
+
+    type var = Field.Var.t array
+
+    let hash (x : t) = Random_oracle.hash ~init:Hash_prefix_states.snapp_event x
+
+    let hash_var (x : Field.Var.t array) =
+      Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_event x
+  end
+
+  type t = Event.t list
+
+  type var = t Data_as_hash.t
+
+  let empty_hash = lazy Random_oracle.(salt "MinaSnappEventsEmpty" |> digest)
+
+  let push_hash acc hash =
+    Random_oracle.hash ~init:Hash_prefix_states.snapp_events [| acc; hash |]
+
+  let push_event acc event = push_hash acc (Event.hash event)
+
+  let hash (x : t) = List.fold ~init:(Lazy.force empty_hash) ~f:push_event x
+
+  let to_input (x : t) = Random_oracle_input.field (hash x)
+
+  let var_to_input (x : var) = Data_as_hash.to_input x
+
+  let typ = Data_as_hash.typ ~hash
+
+  let pop_checked (events : var) : Event.t Data_as_hash.t * var =
+    let open Run in
+    let hd, tl =
+      exists
+        Typ.(Data_as_hash.typ ~hash:Event.hash * typ)
+        ~compute:(fun () ->
+          match As_prover.read typ events with
+          | [] ->
+              failwith "Attempted to pop an empty stack"
+          | event :: events ->
+              (event, events))
+    in
+    Field.Assert.equal
+      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
+         [| Data_as_hash.hash tl; Data_as_hash.hash hd |])
+      (Data_as_hash.hash events) ;
+    (hd, tl)
+
+  let push_checked (events : var) (e : Event.var) : var =
+    let open Run in
+    let res =
+      exists typ ~compute:(fun () ->
+          let tl = As_prover.read typ events in
+          let hd =
+            As_prover.read (Typ.array ~length:(Array.length e) Field.typ) e
+          in
+          hd :: tl)
+    in
+    Field.Assert.equal
+      (Random_oracle.Checked.hash ~init:Hash_prefix_states.snapp_events
+         [| Data_as_hash.hash events; Event.hash_var e |])
+      (Data_as_hash.hash res) ;
+    res
+end
+
 module Body = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'signed_amount) t =
+        type ('pk, 'update, 'token_id, 'signed_amount, 'events) t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
           ; delta : 'signed_amount
+          ; events : 'events
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
     end]
   end
+
+  (* Why isn't this derived automatically? *)
+  let hash_fold_array f init x = Array.fold ~init ~f x
 
   [%%versioned
   module Stable = struct
@@ -171,7 +242,8 @@ module Body = struct
         ( Public_key.Compressed.Stable.V1.t
         , Update.Stable.V1.t
         , Token_id.Stable.V1.t
-        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t )
+        , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
+        , Pickles.Backend.Tick.Field.Stable.V1.t array list )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -184,15 +256,17 @@ module Body = struct
       ( Public_key.Compressed.var
       , Update.Checked.t
       , Token_id.Checked.t
-      , Amount.Signed.var )
+      , Amount.Signed.var
+      , Events.var )
       Poly.t
 
-    let to_input ({ pk; update; token_id; delta } : t) =
+    let to_input ({ pk; update; token_id; delta; events } : t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
+        ; Events.var_to_input events
         ]
 
     let digest (t : t) =
@@ -207,6 +281,7 @@ module Body = struct
       ; Update.typ ()
       ; Token_id.typ
       ; Amount.Signed.typ
+      ; Events.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -216,14 +291,16 @@ module Body = struct
     ; update = Update.dummy
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
+    ; events = []
     }
 
-  let to_input ({ pk; update; token_id; delta } : t) =
+  let to_input ({ pk; update; token_id; delta; events } : t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
+      ; Events.to_input events
       ]
 
   let digest (t : t) =

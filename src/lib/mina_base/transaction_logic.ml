@@ -1187,6 +1187,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            ; update =
                { app_state; delegate; verification_key; permissions; snapp_uri }
            ; delta
+           ; events = _ (* This is for the snapp to use, we don't need it. *)
            }
        ; predicate
        } :
@@ -2309,6 +2310,7 @@ module For_tests = struct
                   ; update = Party.Update.noop
                   ; token_id = Token_id.default
                   ; delta = Amount.Signed.(negate (of_unsigned total))
+                  ; events = []
                   }
               ; predicate = sender_nonce
               }
@@ -2322,6 +2324,7 @@ module For_tests = struct
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned amount)
+                    ; events = []
                     }
                 ; predicate = Accept
                 }

@@ -1226,6 +1226,7 @@ module Base = struct
                  ; snapp_uri
                  }
              ; delta
+             ; events = _ (* This is for the snapp to use, we don't need it. *)
              }
          ; predicate
          } :
@@ -3785,6 +3786,7 @@ let%test_module "transaction_snark" =
                   ; delta =
                       Amount.(
                         Signed.(negate (of_unsigned (of_int full_amount))))
+                  ; events = []
                   }
               ; predicate = acct1.account.nonce
               }
@@ -3797,6 +3799,7 @@ let%test_module "transaction_snark" =
                     ; update = Party.Update.noop
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned receiver_amount)
+                    ; events = []
                     }
                 ; predicate = Accept
                 }
