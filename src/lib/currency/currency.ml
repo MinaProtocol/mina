@@ -192,8 +192,36 @@ end = struct
       { magnitude : 'magnitude; sgn : 'sgn }
     [@@deriving sexp, hash, compare, yojson, hlist]
 
-    type t = (Unsigned.t, Sgn.t) Signed_poly.t
-    [@@deriving sexp, hash, compare, equal, yojson]
+    type t = (Unsigned.t, Sgn.t) Signed_poly.t [@@deriving sexp, hash, yojson]
+
+    let compare : t -> t -> int =
+      let cmp = [%compare: (Unsigned.t, Sgn.t) Signed_poly.t] in
+      fun t1 t2 ->
+        if Unsigned.(equal t1.magnitude zero && equal t2.magnitude zero) then 0
+        else cmp t1 t2
+
+    let equal : t -> t -> bool =
+      let eq = [%equal: (Unsigned.t, Sgn.t) Signed_poly.t] in
+      fun t1 t2 ->
+        if Unsigned.(equal t1.magnitude zero && equal t2.magnitude zero) then
+          true
+        else eq t1 t2
+
+    let is_zero (t : t) : bool = Unsigned.(equal t.magnitude zero)
+
+    let is_positive (t : t) : bool =
+      match t.sgn with
+      | Pos ->
+          not Unsigned.(equal zero t.magnitude)
+      | Neg ->
+          false
+
+    let is_negative (t : t) : bool =
+      match t.sgn with
+      | Neg ->
+          not Unsigned.(equal zero t.magnitude)
+      | Pos ->
+          false
 
     type magnitude = Unsigned.t [@@deriving sexp, compare]
 

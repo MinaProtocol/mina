@@ -1948,7 +1948,7 @@ module Base = struct
               | None_given | Signature ->
                   printf "reached line %s\n%!" __LOC__
                   |> fun () ->
-                  ( if auth_type = None_given then
+                  ( if Control.Tag.equal auth_type None_given then
                     printf "auth_type = NONE_GIVEN\n%!"
                   else
                     printf "auth_type = Signature\n%!"
@@ -4308,82 +4308,345 @@ let%test_module "transaction_snark" =
                 |> Fn.flip run_and_check () |> Or_error.ok_exn |> snd)
         end
 
-        let%test_unit "FIXME: wip" =
+        (* test with a trivial predicate *)
+        let%test_unit "trivial snapp predicate" =
           let open Transaction_logic.For_tests in
-          Quickcheck.test ~trials:15 Test_spec.gen
-            ~f:(fun { init_ledger; specs = _ } ->
+          let gen =
+            let open Quickcheck.Generator.Let_syntax in
+            let%map test_spec = Test_spec.gen in
+            test_spec
+          in
+          Quickcheck.test ~trials:1 gen ~f:(fun { init_ledger; specs } ->
               Ledger.with_ledger ~depth:ledger_depth ~f:(fun ledger ->
                   Init_ledger.init
                     (module Ledger.Ledger_inner)
                     init_ledger ledger ;
-                  let witness : Parties_segment.Witness.t =
-                    let global_ledger : _ =
-                      failwith @@ "FIXME: not implemented @" ^ __LOC__
+                  let local_dummy_constraints () =
+                    let open Run in
+                    let b =
+                      exists Boolean.typ_unchecked ~compute:(fun _ -> true)
                     in
-                    let local_state_init : _ =
-                      failwith @@ "FIXME: not implemented @" ^ __LOC__
+                    let g =
+                      exists Pickles.Step_main_inputs.Inner_curve.typ
+                        ~compute:(fun _ -> Tick.Inner_curve.(to_affine_exn one))
                     in
-                    let start_parties : _ =
-                      failwith @@ "FIXME: not implemented @" ^ __LOC__
+                    let (_ : _) =
+                      Pickles.Step_main_inputs.Ops.scale_fast g
+                        (`Plus_two_to_len [| b; b |])
                     in
-                    { global_ledger
-                    ; local_state_init
-                    ; start_parties
+                    let (_ : _) =
+                      Pickles.Pairing_main.Scalar_challenge.endo g
+                        (Scalar_challenge [ b ])
+                    in
+                    ()
+                  in
+                  let spec = List.hd_exn specs in
+                  let tag, _, (module P), Pickles.Provers.[ trivial_prover; _ ]
+                      =
+                    let trivial_rule : _ Pickles.Inductive_rule.t =
+                      let trivial_main
+                          (tx_commitment : Snapp_statement.Checked.t) :
+                          (unit, _) Checked.t =
+                        local_dummy_constraints ()
+                        |> fun () ->
+                        Snapp_statement.Checked.Assert.equal tx_commitment
+                          tx_commitment
+                        |> return
+                      in
+                      { identifier = "trivial-rule"
+                      ; prevs = []
+                      ; main =
+                          (fun [] x ->
+                            trivial_main x |> Run.run_checked
+                            |> fun _ :
+                                   unit
+                                   Pickles_types.Hlist0.H1
+                                     (Pickles_types.Hlist.E01
+                                        (Pickles.Inductive_rule.B))
+                                   .t ->
+                            [])
+                      ; main_value = (fun [] _ -> [])
+                      }
+                    in
+                    Pickles.compile ~cache:Cache_dir.cache
+                      (module Snapp_statement.Checked)
+                      (module Snapp_statement)
+                      ~typ:Snapp_statement.typ
+                      ~branches:(module Nat.N2)
+                      ~max_branching:
+                        (module Nat.N2) (* You have to put 2 here... *)
+                      ~name:"trivial"
+                      ~constraint_constants:
+                        (Genesis_constants.Constraint_constants
+                         .to_snark_keys_header constraint_constants)
+                      ~choices:(fun ~self ->
+                        [ trivial_rule
+                        ; { identifier = "dummy"
+                          ; prevs = [ self; self ]
+                          ; main_value = (fun [ _; _ ] _ -> [ true; true ])
+                          ; main =
+                              (fun [ _; _ ] _ ->
+                                printf "reached line %s\n%!" __LOC__
+                                |> fun () ->
+                                local_dummy_constraints ()
+                                |> fun () ->
+                                (* Unsatisfiable. *)
+                                Run.exists Field.typ ~compute:(fun () ->
+                                    Run.Field.Constant.zero)
+                                |> fun s ->
+                                printf "reached line %s\n%!" __LOC__
+                                |> fun () ->
+                                Run.Field.(Assert.equal s (s + one))
+                                |> fun () :
+                                       ( Snapp_statement.Checked.t
+                                       * (Snapp_statement.Checked.t * unit) )
+                                       Pickles_types.Hlist0.H1
+                                         (Pickles_types.Hlist.E01
+                                            (Pickles.Inductive_rule.B))
+                                       .t ->
+                                [ Boolean.true_; Boolean.true_ ])
+                          }
+                        ])
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let vk =
+                    Pickles.Side_loaded.Verification_key.of_compiled tag
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let { Transaction_logic.For_tests.Transaction_spec.fee
+                      ; sender = sender, sender_nonce
+                      ; receiver = trivial_account_pk
+                      ; amount
+                      } =
+                    spec
+                  in
+                  printf "AMOUNT = %d" @@ Amount.to_int amount
+                  |> fun () ->
+                  let vk =
+                    With_hash.of_data ~hash_data:Snapp_account.digest_vk vk
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  (let _is_new, _loc =
+                     let id =
+                       Public_key.compress sender.public_key
+                       |> fun pk -> Account_id.create pk Token_id.default
+                     in
+                     Ledger.get_or_create_account ledger id
+                       (Account.create id Balance.(of_int 888_888))
+                     |> Or_error.ok_exn
+                   in
+                   let _is_new, loc =
+                     let id =
+                       Account_id.create trivial_account_pk Token_id.default
+                     in
+                     Ledger.get_or_create_account ledger id
+                       (Account.create id Balance.(of_int 234234234234))
+                     |> Or_error.ok_exn
+                   in
+                   let a = Ledger.get ledger loc |> Option.value_exn in
+                   Ledger.set ledger loc
+                     { a with
+                       permissions = Permissions.empty
+                     ; snapp =
+                         Some
+                           { (Option.value ~default:Snapp_account.default
+                                a.snapp)
+                             with
+                             verification_key = Some vk
+                           }
+                     }) ;
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let total = Option.value_exn (Amount.add fee amount) in
+                  let update_empty_permissions =
+                    let permissions =
+                      Permissions.empty
+                      (*{
+                        Permissions.user_default with
+                          send=Permissions.Auth_required.Both
+
+                        }*)
+                      |> Snapp_basic.Set_or_keep.Set
+                    in
+                    { Party.Update.dummy with permissions }
+                  in
+                  let fee_payer =
+                    { Party.Signed.data =
+                        { body =
+                            { pk = sender.public_key |> Public_key.compress
+                            ; update = update_empty_permissions
+                            ; token_id = Token_id.default
+                            ; delta = Amount.Signed.(negate (of_unsigned total))
+                            }
+                        ; predicate = sender_nonce
+                        }
+                        (* Real signature added in below *)
+                    ; authorization = Signature.dummy
+                    }
+                  in
+                  let snapp_party_data : Party.Predicated.t =
+                    { Party.Predicated.Poly.body =
+                        { pk = trivial_account_pk
+                        ; update = update_empty_permissions
+                        ; token_id = Token_id.default
+                        ; delta = Amount.Signed.(of_unsigned amount)
+                        }
+                    ; predicate = Accept
+                    }
+                  in
+                  let protocol_state = Snapp_predicate.Protocol_state.accept in
+                  let other_parties_hash =
+                    Party.Predicated.digest snapp_party_data
+                    |> Parties.With_hashes.(Fn.flip cons_hash empty)
+                  in
+                  let protocol_state_predicate_hash =
+                    (*FIXME: is this ok? *)
+                    Snapp_predicate.Protocol_state.digest protocol_state
+                  in
+                  let transaction : Parties.Transaction_commitment.t =
+                    (*FIXME: is this correct? *)
+                    Parties.Transaction_commitment.create ~other_parties_hash
+                      ~protocol_state_predicate_hash
+                  in
+                  let at_party =
+                    Party.Predicated.digest snapp_party_data
+                    |> Parties.With_hashes.(Fn.flip cons_hash empty)
+                  in
+                  let tx_statement : Snapp_statement.t =
+                    { transaction; at_party }
+                  in
+                  let handler
+                      (Snarky_backendless.Request.With { request; respond }) =
+                    match request with _ -> respond Unhandled
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let pi : Pickles.Side_loaded.Proof.t =
+                    (fun () -> trivial_prover ~handler [] tx_statement)
+                    |> Async.Thread_safe.block_on_async_exn
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let parties : Parties.t =
+                    { fee_payer
+                    ; other_parties =
+                        [ { data = snapp_party_data; authorization = Proof pi }
+                        ]
+                    ; protocol_state
+                    }
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let w : Parties_segment.Witness.t =
+                    { global_ledger =
+                        Sparse_ledger.of_ledger_subset_exn ledger
+                          (Parties.accounts_accessed parties)
+                    ; local_state_init =
+                        { Local_state.dummy with
+                          parties = []
+                        ; ledger =
+                            Sparse_ledger.of_root ~depth:ledger_depth
+                              ~next_available_token:Token_id.(next default)
+                              Local_state.dummy.ledger
+                        }
+                    ; start_parties =
+                        [ { will_succeed = true
+                          ; protocol_state_predicate =
+                              Snapp_predicate.Protocol_state.accept
+                          ; parties
+                          }
+                        ]
                     ; state_body
                     }
                   in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let _, (local_state_post, excess) =
+                    Ledger.apply_parties_unchecked ledger ~constraint_constants
+                      ~state_view:
+                        (Mina_state.Protocol_state.Body.view state_body)
+                      parties
+                    |> Or_error.ok_exn
+                  in
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
                   let statement : Statement.With_sok.t =
-                    let source : (_, _, _, _) Registers.t =
-                      let ledger : Frozen_ledger_hash.t =
-                        failwith @@ "FIXME: not implemented @" ^ __LOC__
-                      in
-                      let pending_coinbase_stack : Pending_coinbase.Stack.t =
-                        failwith @@ "FIXME: not implemented @" ^ __LOC__
-                      in
-                      let next_available_token : Token_id.t =
-                        failwith @@ "FIXME: not implemented @" ^ __LOC__
-                      in
-                      let local_state : Local_state.t =
-                        failwith @@ "FIXME: not implemented @" ^ __LOC__
-                      in
-                      { ledger
-                      ; pending_coinbase_stack
-                      ; next_available_token
-                      ; local_state
-                      }
-                    in
-                    let target : (_, _, _, _) Registers.t =
-                      failwith @@ "FIXME: not implemented @" ^ __LOC__
-                    in
-                    let supply_increase : Currency.Amount.t =
-                      failwith @@ "FIXME: not implemented @" ^ __LOC__
-                    in
-                    let fee_excess : Fee_excess.t =
-                      failwith @@ "FIXME: not implemented @" ^ __LOC__
-                    in
-                    let sok_digest : Sok_message.Digest.t =
-                      let sok_message : Sok_message.t =
-                        let fee : Currency.Fee.Stable.V1.t =
-                          failwith @@ "FIXME: not implemented @" ^ __LOC__
-                        in
-                        let prover : Public_key.Compressed.Stable.V1.t =
-                          failwith @@ "FIXME: not implemented @" ^ __LOC__
-                        in
-                        { fee; prover }
-                      in
-                      Sok_message.digest sok_message
-                    in
-                    { source; target; supply_increase; fee_excess; sok_digest }
+                    { source =
+                        { ledger = Sparse_ledger.merkle_root w.global_ledger
+                        ; next_available_token =
+                            Sparse_ledger.next_available_token w.global_ledger
+                        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                        ; local_state =
+                            { w.local_state_init with
+                              parties =
+                                Parties.With_hashes.digest
+                                  w.local_state_init.parties
+                            ; ledger =
+                                Sparse_ledger.merkle_root
+                                  w.local_state_init.ledger
+                            }
+                        }
+                    ; target =
+                        { ledger = Ledger.merkle_root ledger
+                        ; next_available_token =
+                            Ledger.next_available_token ledger
+                        ; pending_coinbase_stack = Pending_coinbase.Stack.empty
+                        ; local_state =
+                            { local_state_post with
+                              parties =
+                                List.fold (List.rev local_state_post.parties)
+                                  ~init:Parties.With_hashes.empty
+                                  ~f:(fun acc p ->
+                                    Parties.With_hashes.cons_hash
+                                      (Party.Predicated.digest p.data)
+                                      acc)
+                            ; ledger =
+                                (* TODO: This won't quite work when the transaction fails. *)
+                                Ledger.merkle_root local_state_post.ledger
+                            ; transaction_commitment =
+                                w.local_state_init.transaction_commitment
+                            }
+                        }
+                    ; supply_increase = Amount.zero
+                    ; fee_excess =
+                        { fee_token_l = Token_id.default
+                        ; fee_excess_l =
+                            Fee.Signed.of_unsigned (Amount.to_fee excess)
+                        ; fee_token_r = Token_id.default
+                        ; fee_excess_r = Fee.Signed.zero
+                        }
+                    ; sok_digest = Sok_message.Digest.default
+                    }
                   in
-                  let parties_segment_basic :
-                      (_, _, _, _) Parties_segment.Basic.t =
-                    Proved
-                  in
-                  let _proof =
-                    of_parties_segment_exn ~statement ~witness
-                      parties_segment_basic
-                  in
-                  failwith @@ "FIXME: not implemented @" ^ __LOC__))
+                  printf "reached line %s\n%!" __LOC__
+                  |> fun () ->
+                  let open Impl in
+                  run_and_check
+                    (fun () ->
+                      let s =
+                        exists Statement.With_sok.typ ~compute:(fun () ->
+                            statement)
+                      in
+                      printf "reached line %s\n%!" __LOC__
+                      |> fun () ->
+                      Base.Parties_snark.main ~constraint_constants
+                        [ { predicate_type = `Nonce_or_accept
+                          ; auth_type = Signature
+                          ; is_start = `Yes
+                          }
+                        ; { predicate_type = `Full
+                          ; auth_type = Proof
+                          ; is_start = `No
+                          }
+                        ]
+                        [] s ~witness:w ;
+                      fun () -> ())
+                    ())
+              |> Or_error.ok_exn
+              |> fun ((), ()) -> ())
 
         type _ Snarky_backendless.Request.t +=
           | Pubkey : int -> Inner_curve.t Snarky_backendless.Request.t
