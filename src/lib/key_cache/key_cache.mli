@@ -6,8 +6,6 @@ module Spec : sig
     | S3 of { bucket_prefix : string; install_path : string }
 end
 
-val set_downloads_enabled : bool -> unit
-
 module T (M : sig
   type _ t
 end) : sig
@@ -57,7 +55,3 @@ module type S = sig
 
   val write : Spec.t list -> ('k, 'v) Disk_storable.t -> 'k -> 'v -> unit M.t
 end
-
-module Sync : S with module M := Or_error
-
-module Async : S with module M := Async.Deferred.Or_error
