@@ -3,6 +3,10 @@ open Mina_base
 open Currency
 open Signature_lib
 
+let all_equal ~equal ~compare ls =
+  Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
+      List.equal equal [ h ] (List.find_all_dups ~compare ls))
+
 module Make
     (Engine : Intf.Engine.S)
     (Event_router : Intf.Dsl.Event_router_intf with module Engine := Engine)
@@ -85,17 +89,19 @@ struct
     }
 
   let nodes_to_synchronize (nodes : Node.t list) =
-    let all_equal ls =
-      Option.value_map (List.hd ls) ~default:true ~f:(fun h ->
-          [%equal: State_hash.t list] [ h ]
-            (List.find_all_dups ~compare:State_hash.compare ls))
-    in
     let check () state =
+      let all_best_tips_equal =
+        all_equal ~equal:[%equal: State_hash.t option]
+          ~compare:[%compare: State_hash.t option]
+      in
       let best_tips =
         List.map nodes ~f:(fun node ->
-            String.Map.find_exn state.best_tips_by_node (Node.id node))
+            String.Map.find state.best_tips_by_node (Node.id node))
       in
-      if all_equal best_tips then Predicate_passed
+      if
+        List.for_all best_tips ~f:Option.is_some
+        && all_best_tips_equal best_tips
+      then Predicate_passed
       else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 * 3 in
