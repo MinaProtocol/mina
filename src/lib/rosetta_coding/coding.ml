@@ -1,12 +1,10 @@
 (* coding.ml -- hex encoding/decoding for Rosetta *)
 
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 module Field = Snark_params.Tick.Field
 module Scalar = Snark_params.Tick.Inner_curve.Scalar
@@ -24,37 +22,37 @@ open Signature_lib_nonconsensus
 
 let hex_char_to_bits4 = function
   | '0' ->
-      [false; false; false; false]
+      [ false; false; false; false ]
   | '1' ->
-      [false; false; false; true]
+      [ false; false; false; true ]
   | '2' ->
-      [false; false; true; false]
+      [ false; false; true; false ]
   | '3' ->
-      [false; false; true; true]
+      [ false; false; true; true ]
   | '4' ->
-      [false; true; false; false]
+      [ false; true; false; false ]
   | '5' ->
-      [false; true; false; true]
+      [ false; true; false; true ]
   | '6' ->
-      [false; true; true; false]
+      [ false; true; true; false ]
   | '7' ->
-      [false; true; true; true]
+      [ false; true; true; true ]
   | '8' ->
-      [true; false; false; false]
+      [ true; false; false; false ]
   | '9' ->
-      [true; false; false; true]
+      [ true; false; false; true ]
   | 'A' | 'a' ->
-      [true; false; true; false]
+      [ true; false; true; false ]
   | 'B' | 'b' ->
-      [true; false; true; true]
+      [ true; false; true; true ]
   | 'C' | 'c' ->
-      [true; true; false; false]
+      [ true; true; false; false ]
   | 'D' | 'd' ->
-      [true; true; false; true]
+      [ true; true; false; true ]
   | 'E' | 'e' ->
-      [true; true; true; false]
+      [ true; true; true; false ]
   | 'F' | 'f' ->
-      [true; true; true; true]
+      [ true; true; true; true ]
   | _ ->
       failwith "Expected hex character"
 
@@ -157,19 +155,19 @@ let%test "field_hex round-trip" = field_hex_roundtrip_test ()
 
 let%test "public key round-trip" = pk_roundtrip_test ()
 
-[%%ifndef
-consensus_mechanism]
+[%%ifndef consensus_mechanism]
 
 (* for running tests from JS *)
 
 let unit_tests =
   [ ("field example", field_example_test)
   ; ("field-hex round-trip", field_hex_roundtrip_test)
-  ; ("public key round-trip", pk_roundtrip_test) ]
+  ; ("public key round-trip", pk_roundtrip_test)
+  ]
 
 let run_unit_tests () =
   List.iter unit_tests ~f:(fun (name, test) ->
       printf "Running %s test\n%!" name ;
-      assert (test ()) )
+      assert (test ()))
 
 [%%endif]

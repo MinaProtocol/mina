@@ -10,7 +10,7 @@ module Raw_versioned__ = struct
   module Stable = struct
     module V1 = struct
       type t =
-        {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
+        { state : Protocol_state.Value.Stable.V1.t; proof : Proof.Stable.V1.t }
       [@@deriving fields, sexp, yojson]
 
       let to_latest = Fn.id
@@ -19,15 +19,14 @@ module Raw_versioned__ = struct
 
       let map_creator c ~f ~state ~proof = f (c ~state ~proof)
 
-      let create ~state ~proof = {state; proof}
+      let create ~state ~proof = { state; proof }
     end
   end]
 end
 
 include Allocation_functor.Make.Versioned_v1.Full (Raw_versioned__)
 
-[%%define_locally
-Raw_versioned__.(state, proof)]
+[%%define_locally Raw_versioned__.(state, proof)]
 
 include (
   Stable.Latest :
@@ -36,5 +35,4 @@ include (
     end
     with type t := t )
 
-[%%define_locally
-Stable.Latest.(create)]
+[%%define_locally Stable.Latest.(create)]

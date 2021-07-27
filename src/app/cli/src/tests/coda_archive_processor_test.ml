@@ -49,18 +49,18 @@ let main () =
   let%bind _, observed_transitions =
     Pipe.fold new_block_pipe ~init:(0, []) ~f:(fun (i, acc) transition ->
         if i >= num_blocks_to_wait then Pipe.close_read new_block_pipe ;
-        Deferred.return (i + 1, transition :: acc) )
+        Deferred.return (i + 1, transition :: acc))
   in
   let%bind () = after (Time.Span.of_sec 10.) in
   Deferred.List.iter observed_transitions
-    ~f:(fun With_hash.{hash; data= transition} ->
+    ~f:(fun With_hash.{ hash; data = transition } ->
       match%map
         let open Deferred.Result.Let_syntax in
         match%bind
           Archive_lib.Processor.Block.find_opt conn ~state_hash:hash
         with
         | Some id ->
-            let%bind Archive_lib.Processor.Block.{parent_id; _} =
+            let%bind Archive_lib.Processor.Block.{ parent_id; _ } =
               Archive_lib.Processor.Block.load conn ~id
             in
             Archive_lib.Processor.For_test.assert_parent_exist conn ~parent_id
@@ -73,7 +73,7 @@ let main () =
       | Ok () ->
           ()
       | Error e ->
-          failwith @@ Caqti_error.show e )
+          failwith @@ Caqti_error.show e)
 
 let command =
   Command.async

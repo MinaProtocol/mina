@@ -55,8 +55,8 @@ variable "seed_count" {
 
 locals {
   testnet_name = "watchdog-test"
-  coda_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-watchdog-test-88a86bc"
-  coda_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
+  mina_image = "gcr.io/o1labs-192920/coda-daemon-baked:0.4.2-245a3f7-watchdog-test-88a86bc"
+  mina_archive_image = "gcr.io/o1labs-192920/coda-archive:0.4.2-245a3f7"
   seed_region = "us-east4"
   seed_zone = "us-east4-b"
 
@@ -83,11 +83,11 @@ module "testnet_east" {
   k8s_context    = "gke_o1labs-192920_us-east4_coda-infra-east4"
   testnet_name   = local.testnet_name
 
-  coda_image         = local.coda_image
-  coda_archive_image = local.coda_archive_image
-  coda_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
-  coda_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
-  coda_points_image  = "codaprotocol/coda-points-hack:32b.4"
+  mina_image         = local.mina_image
+  mina_archive_image = local.mina_archive_image
+  mina_agent_image   = "codaprotocol/coda-user-agent:0.1.8"
+  mina_bots_image    = "codaprotocol/coda-bots:0.0.13-beta-1"
+  mina_points_image  = "codaprotocol/coda-points-hack:32b.4"
   watchdog_image     = "gcr.io/o1labs-192920/watchdog:0.3.9"
 
   coda_faucet_amount = "10000000000"

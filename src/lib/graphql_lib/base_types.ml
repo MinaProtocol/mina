@@ -30,4 +30,4 @@ let token_id () =
 
 let epoch_seed () =
   scalar "EpochSeed" ~doc:"Base58Check-encoded epoch seed" ~coerce:(fun seed ->
-      `String (Mina_base.Epoch_seed.to_base58_check seed) )
+      `String (Mina_base.Epoch_seed.to_base58_check seed))

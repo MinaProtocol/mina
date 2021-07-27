@@ -14,7 +14,7 @@ val add : m:'f m -> 'f t -> 'f t -> 'f t
 
 val sub : m:'f m -> 'f t -> 'f t -> 'f t
 
-val add_signed : m:'f m -> 'f t -> [`Pos | `Neg] * 'f t -> 'f t
+val add_signed : m:'f m -> 'f t -> [ `Pos | `Neg ] * 'f t -> 'f t
 
 val of_quotient :
      m:'f m

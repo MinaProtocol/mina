@@ -71,7 +71,7 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
           Gauge.set v (render_average buckets_val) ;
           buckets :=
             Some (empty_bucket_entry :: List.take buckets_val (num_buckets - 1)) ;
-          tick () )
+          tick ())
     in
     tick ()
 end
@@ -89,7 +89,8 @@ module Moving_time_average (Spec : Time_average_spec_intf) () :
         "invalid intervals provided to Moving_time_average -- the \
          tick_interval does not evenly divide the rolling_interval"
 
-  include Moving_bucketed_average (struct
+  include Moving_bucketed_average
+            (struct
               include Spec
 
               let bucket_interval = tick_interval
@@ -103,7 +104,7 @@ module Moving_time_average (Spec : Time_average_spec_intf) () :
                 let total_sum, count_sum =
                   List.fold buckets ~init:(0.0, 0)
                     ~f:(fun (total_sum, count_sum) (total, count) ->
-                      (total_sum +. total, count_sum + count) )
+                      (total_sum +. total, count_sum + count))
                 in
                 total_sum /. Float.of_int count_sum
             end)

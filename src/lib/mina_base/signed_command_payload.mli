@@ -53,12 +53,13 @@ module Common : sig
     module Stable : sig
       module V1 : sig
         type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
-          { fee: 'fee
-          ; fee_token: 'token_id
-          ; fee_payer_pk: 'public_key
-          ; nonce: 'nonce
-          ; valid_until: 'global_slot
-          ; memo: 'memo }
+          { fee : 'fee
+          ; fee_token : 'token_id
+          ; fee_payer_pk : 'public_key
+          ; nonce : 'nonce
+          ; valid_until : 'global_slot
+          ; memo : 'memo
+          }
         [@@deriving equal, sexp, hash, yojson]
       end
     end]
@@ -113,7 +114,7 @@ module Poly : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type ('common, 'body) t = {common: 'common; body: 'body}
+      type ('common, 'body) t = { common : 'common; body : 'body }
       [@@deriving equal, sexp, hash, yojson, compare, hlist]
 
       val of_latest :

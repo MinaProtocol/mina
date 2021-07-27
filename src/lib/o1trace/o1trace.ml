@@ -1,8 +1,6 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
-[%%if
-tracing]
+[%%if tracing]
 
 open Core
 open Async
@@ -27,16 +25,17 @@ let tid_names = ref []
 let remember_tid name tid = tid_names := (name, tid) :: !tid_names
 
 let new_event (k : event_kind) : event =
-  { name= ""
-  ; categories= []
-  ; phase= k
-  ; timestamp= timestamp ()
-  ; pid= our_pid
-  ; tid= 0 }
+  { name = ""
+  ; categories = []
+  ; phase = k
+  ; timestamp = timestamp ()
+  ; pid = our_pid
+  ; tid = 0
+  }
 
 let log_thread_existence name tid =
   Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr {(new_event New_thread) with name; tid} )
+      emit_event wr { (new_event New_thread) with name; tid })
 
 let trace_new_thread (name : string) (tid : int) =
   remember_tid name tid ;
@@ -44,21 +43,22 @@ let trace_new_thread (name : string) (tid : int) =
 
 let trace_thread_switch (new_ctx : Execution_context.t) =
   Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr {(new_event Thread_switch) with tid= new_ctx.tid} )
+      emit_event wr { (new_event Thread_switch) with tid = new_ctx.tid })
 
 let () =
   Async_kernel.Tracing.fns :=
     { trace_thread_switch
-    ; trace_new_thread= (fun name ctx -> trace_new_thread name ctx.tid) }
+    ; trace_new_thread = (fun name ctx -> trace_new_thread name ctx.tid)
+    }
 
 let trace_event (name : string) =
   Option.iter !current_wr ~f:(fun wr ->
-      emit_event wr {(new_event Event) with name} )
+      emit_event wr { (new_event Event) with name })
 
 let trace (name : string) (f : unit -> 'a) =
   let new_ctx =
     Execution_context.with_tid
-      Scheduler.(t () |> current_execution_context)
+      Scheduler.(current_execution_context ())
       !next_tid
   in
   next_tid := !next_tid + 1 ;
@@ -80,12 +80,12 @@ let trace_recurring name f = trace (recurring_prefix name) f
 let trace_recurring_task (name : string) (f : unit -> unit Deferred.t) =
   trace_task (recurring_prefix name) (fun () ->
       trace_event "started another" ;
-      f () )
+      f ())
 
 let measure (name : string) (f : unit -> 'a) : 'a =
   match !current_wr with
   | Some wr ->
-      emit_event wr {(new_event Measure_start) with name} ;
+      emit_event wr { (new_event Measure_start) with name } ;
       let res = f () in
       emit_event wr (new_event Measure_end) ;
       res
@@ -94,7 +94,7 @@ let measure (name : string) (f : unit -> 'a) : 'a =
 
 let forget_tid (f : unit -> 'a) =
   let new_ctx =
-    Execution_context.with_tid Scheduler.(t () |> current_execution_context) 0
+    Execution_context.with_tid Scheduler.(current_execution_context ()) 0
   in
   let res = Scheduler.within_context new_ctx f |> Result.ok in
   Option.value_exn res
@@ -102,22 +102,22 @@ let forget_tid (f : unit -> 'a) =
 let start_tracing wr =
   current_wr := Some wr ;
   let sch = Scheduler.t () in
-  Scheduler.set_on_end_of_cycle sch (fun () ->
+  Scheduler.Expert.set_on_end_of_cycle (fun () ->
       if not sch.cycle_started then
         emit_event wr
-          {(new_event Cycle_end) with tid= sch.current_execution_context.tid} ;
-      sch.cycle_started <- true ) ;
+          { (new_event Cycle_end) with tid = sch.current_execution_context.tid } ;
+      sch.cycle_started <- true) ;
   emit_event wr (new_event Pid_is) ;
   List.iter !tid_names ~f:(fun (name, tid) -> log_thread_existence name tid) ;
   emit_event wr
-    {(new_event Thread_switch) with tid= sch.current_execution_context.tid}
+    { (new_event Thread_switch) with tid = sch.current_execution_context.tid }
 
 let stop_tracing () =
   let sch = Scheduler.t () in
-  Scheduler.set_on_end_of_cycle sch Fn.id ;
+  Scheduler.Expert.set_on_end_of_cycle Fn.id ;
   Option.iter !current_wr ~f:(fun wr ->
       emit_event wr
-        {(new_event Trace_end) with tid= sch.current_execution_context.tid} ) ;
+        { (new_event Trace_end) with tid = sch.current_execution_context.tid }) ;
   current_wr := None
 
 [%%else]

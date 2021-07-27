@@ -15,7 +15,7 @@ open! Core
 *)
 val memoize :
      ?destruct:('b -> unit)
-  -> ?expire:[`Lru of int | `Keep_all | `Keep_one]
+  -> ?expire:[ `Lru of int | `Keep_all | `Keep_one ]
   -> ('a -> 'b)
   -> 'a
   -> 'b

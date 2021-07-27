@@ -58,8 +58,6 @@ let snapp_command : t = '\x1A'
 
 let private_key : t = '\x5A'
 
-let non_zero_curve_point : t = '\xCE'
-
 let non_zero_curve_point_compressed : t = '\xCB'
 
 let signature : t = '\x9A'

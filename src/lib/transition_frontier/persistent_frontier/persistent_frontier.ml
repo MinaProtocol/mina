@@ -55,7 +55,7 @@ let construct_staged_ledger_at_root
     Deferred.Or_error.List.iter transactions_with_protocol_state
       ~f:(fun (txn, protocol_state) ->
         Deferred.return
-        @@ let%bind.Or_error.Let_syntax txn_with_info =
+        @@ let%bind.Or_error txn_with_info =
              Ledger.apply_transaction
                ~constraint_constants:precomputed_values.constraint_constants
                mask

@@ -26,8 +26,8 @@ pg_ctlcluster 11 main start
 # wait for it to settle
 sleep 3
 
-export CODA_PRIVKEY_PASS=""
-export CODA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
+export MINA_PRIVKEY_PASS=""
+export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
 export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/data/config.json}
 export PEER_ID=${PEER_ID:=/ip4/34.74.175.158/tcp/10001/ipfs/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr/}
@@ -64,4 +64,3 @@ sleep 3
 
 # wait for a signal
 sleep infinity
-

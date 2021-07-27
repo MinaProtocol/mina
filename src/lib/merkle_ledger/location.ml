@@ -118,8 +118,7 @@ module T = struct
 
   let next : t -> t Option.t = function
     | Generic _ ->
-        raise
-          (Invalid_argument "next: generic locations have no next location")
+        raise (Invalid_argument "next: generic locations have no next location")
     | Account path ->
         Addr.next path |> Option.map ~f:(fun next -> Account next)
     | Hash path ->
@@ -127,8 +126,7 @@ module T = struct
 
   let prev : t -> t Option.t = function
     | Generic _ ->
-        raise
-          (Invalid_argument "prev: generic locations have no prev location")
+        raise (Invalid_argument "prev: generic locations have no prev location")
     | Account path ->
         Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
     | Hash path ->
