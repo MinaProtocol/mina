@@ -1,3 +1,12 @@
+(**
+  This module defines an interface for applying operations such as
+  transactions and coinbase mints to a Merkle set of accounts.
+  This interface is parameterized by a module defining the Merkle set of
+  accounts, as well as some basic imperative operations on the merkle set.
+  This module defines for each operation a corresponding type
+  that details the result of applying that operation.
+*)
+
 open Core_kernel
 open Currency
 open Signature_lib
@@ -5,34 +14,64 @@ module Global_slot = Mina_numbers.Global_slot
 
 type account_state = [ `Added | `Existed ] [@@deriving equal]
 
+(**
+  An interface for 'ledger's, where a ledger is defined as follows:
+  * There exists some type `t` and an associated type `location`.
+  * Elements of `t` can be manipulated as a mutable key-value map,
+    in which the keys are elements of `location`,
+    and the values are elements of `Account.t`
+  * It is possible to query elements of `t` by an `Account_id.t`,
+    such that the result of the query is a `location` value,
+    such that the `Account.t` associated with this `location` value in `t`
+    is equivalent to the `Account.t` associated with the `Account_id.t` used
+    in the query, if such an element of `Account.t` exists.
+  * It is possible to compute a unique merkle root,
+    corresponding to each unique element of `t`.
+  * TODO: with_ledger
+  * TODO: next_available_token
+*)
 module type Ledger_intf = sig
   type t
 
+  (** The type of merkle paths in `t` *)
   type location
 
+  (** Lookup an element of a set via merkle path. *)
   val get : t -> location -> Account.t option
 
+  (** Compute the merkle path corresponding to a particular `Account_id.t` in
+      a set, if it is a member of that set. *)
   val location_of_account : t -> Account_id.t -> location option
 
+  (** Modify an element of the set with a particular merkle path.
+      TODO: is this safe? *)
   val set : t -> location -> Account.t -> unit
 
+  (** TODO: what does this do? *)
   val get_or_create :
     t -> Account_id.t -> (account_state * Account.t * location) Or_error.t
 
+  (** TODO: what does this do? *)
   val get_or_create_account :
     t -> Account_id.t -> Account.t -> (account_state * location) Or_error.t
 
+  (** Remove the supplied accounts from the set. *)
   val remove_accounts_exn : t -> Account_id.t list -> unit
 
+  (** Compute the merkle root of the set. *)
   val merkle_root : t -> Ledger_hash.t
 
+  (** DEPRECATED: apply an operation on an empty set. *)
   val with_ledger : depth:int -> f:(t -> 'a) -> 'a
 
+  (** DEPRECATED *)
   val next_available_token : t -> Token_id.t
 
+  (** DEPRECATED *)
   val set_next_available_token : t -> Token_id.t -> unit
 end
 
+(** TODO: What is this for? *)
 module Transaction_applied = struct
   module UC = Signed_command
 
@@ -178,6 +217,10 @@ module Transaction_applied = struct
   end]
 end
 
+(** This module defines for each operation a corresponding type,
+    to be used as the codomain for functions applying the operation.
+    These types are used to express the changes to the state machine
+    resultant from applying their corresponding operations. *)
 module type S = sig
   type ledger
 
@@ -304,12 +347,14 @@ module type S = sig
     -> Signed_command.With_valid_signature.t
     -> Ledger_hash.t * [ `Next_available_token of Token_id.t ]
 
+  (** Undo an operation on the state machine *)
   val undo :
        constraint_constants:Genesis_constants.Constraint_constants.t
     -> ledger
     -> Transaction_applied.t
     -> unit Or_error.t
 
+  (** DEPRECATED *)
   val has_locked_tokens :
        global_slot:Global_slot.t
     -> account_id:Account_id.t
@@ -408,6 +453,9 @@ let validate_timing ~account ~txn_amount ~txn_global_slot =
   in
   timing
 
+(** This functor is instantiated with a 'ledger interface', and defines
+    functions to apply operations to the merkle set of accounts defined
+    by `L.t`. *)
 module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   open L
 
