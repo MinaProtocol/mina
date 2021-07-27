@@ -1,0 +1,12 @@
+(library
+  (inline_tests)
+  (name zexe_backend_js)
+  (public_name zexe_backend.js)
+  (flags -warn-error -27)
+  (instrumentation (backend bisect_ppx))
+  (preprocess (pps ppx_version ppx_jane ppx_deriving_yojson ppx_deriving.std))
+  (libraries
+    key_cache_js
+    zexe_backend
+    core_kernel))
+
