@@ -45,6 +45,7 @@
     }
   ],
   "devDependencies": {
+    "@babel/preset-env": "^7.14.8",
     "@size-limit/preset-small-lib": "^5.0.1",
     "husky": "^7.0.1",
     "reflect-metadata": "^0.1.13",
