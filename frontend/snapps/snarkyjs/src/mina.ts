@@ -6,8 +6,7 @@ import { Field, Bool } from './bindings/plonk';
 // TODO. Also, don't make user ever talk about distinction b/w compressed and non-compressed keys
 type PublicKey = void;
 
-class SetOrKeep<_A> extends CircuitValue {
-}
+class SetOrKeep<_A> extends CircuitValue {}
 
 export class OrIgnore<A> extends CircuitValue {
   @prop value: A;
@@ -61,10 +60,9 @@ class Delta<A> extends CircuitValue {
   }
 }
 
-class TokenId extends CircuitValue { };
+class TokenId extends CircuitValue {}
 
-class Predicate extends CircuitValue {
-};
+class Predicate extends CircuitValue {}
 
 class Party extends CircuitValue {
   @prop publicKey: PublicKey;
@@ -125,13 +123,12 @@ export class UInt32 extends CircuitValue {
 export type Amount = UInt32;
 export type Nonce = UInt32;
 
-export class MerkleProof extends CircuitValue { }
+export class MerkleProof extends CircuitValue {}
 
 export class MerkleCollection<T extends CircuitValue> {
   get(_p: MerkleProof): T {
     throw 'unimplemented';
   }
-  
 
   constructor(xs: () => T[]) {
     console.log(xs);
@@ -168,8 +165,7 @@ export class StateSlot extends CircuitValue {
   }
 }
 
-export class VerificationKey extends CircuitValue {
-}
+export class VerificationKey extends CircuitValue {}
 
 export abstract class Snapp {
   state: StateSlot[] = [];
@@ -180,7 +176,7 @@ export abstract class Snapp {
     setDelegate: Permission.Proof,
     modifyState: Permission.Proof,
   };
-  
+
   self(): VerificationKey {
     throw 'unimplemented';
   }

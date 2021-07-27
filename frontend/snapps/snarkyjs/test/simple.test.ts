@@ -5,4 +5,3 @@ describe('five', () => {
     expect(five).toEqual(5);
   });
 });
-

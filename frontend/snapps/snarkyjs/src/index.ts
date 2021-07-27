@@ -13,4 +13,4 @@ import { main as schnorr_sign } from './examples/schnorr_sign';
 exports.schnorr_sign = schnorr_sign;
 
 // for testing tests
-export const five : number = 5;
+export const five: number = 5;

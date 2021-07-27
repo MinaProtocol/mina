@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { Field } from './bindings/plonk';
 
-type Constructor<T> = {new (...args: any[]): T};
+type Constructor<T> = { new (...args: any[]): T };
 
 export type Tuple<A, _N extends number> = Array<A>;
 
@@ -20,7 +20,7 @@ export abstract class CircuitValue {
     for (let i = 0; i < fields.length; ++i) {
       const [key, propType] = fields[i];
       const subElts: Field[] = propType.toFieldElements((v as any)[key]);
-      subElts.forEach(x => res.push(x));
+      subElts.forEach((x) => res.push(x));
     }
     return res;
   }
@@ -51,11 +51,17 @@ export function prop(this: any, target: any, key: string) {
     target._fields = [];
   }
 
-  if (target._sizeInFieldElements === undefined || target._sizeInFieldElements === null) {
+  if (
+    target._sizeInFieldElements === undefined ||
+    target._sizeInFieldElements === null
+  ) {
     target._sizeInFieldElements = 0;
   }
 
-  if (fieldType.prototype.hasOwnProperty('toFieldElements') && fieldType.hasOwnProperty('ofFieldElements')) {
+  if (
+    fieldType.prototype.hasOwnProperty('toFieldElements') &&
+    fieldType.hasOwnProperty('ofFieldElements')
+  ) {
     target._fields.push([key, fieldType]);
     target._sizeInFieldElements += fieldType.sizeInFieldElements();
   } else {
