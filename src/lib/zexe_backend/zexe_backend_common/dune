@@ -15,9 +15,8 @@
     snarky.backendless
     sponge
     snarkette
-    core
-    integers
-    allocation_functor ))
+    core_kernel
+    integers ))
 
 (rule
  (targets version.ml)

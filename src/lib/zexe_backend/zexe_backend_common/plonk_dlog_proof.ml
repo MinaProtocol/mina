@@ -99,12 +99,12 @@ module type Inputs_intf = sig
       -> Scalar_field.Vector.t
       -> Scalar_field.t array
       -> Curve.Affine.Backend.t array
-      -> t Async.Deferred.t
+      -> t Async_kernel.Deferred.t
 
     val verify : Verifier_index.t -> t -> bool
 
     val batch_verify :
-      Verifier_index.t array -> t array -> bool Async.Deferred.t
+      Verifier_index.t array -> t array -> bool Async_kernel.Deferred.t
   end
 end
 
@@ -146,42 +146,38 @@ module Make (Inputs : Inputs_intf) = struct
 
   type message = Challenge_polynomial.t list
 
-  include Allocation_functor.Make.Versioned_v1.Full_compare_eq_hash (struct
-    let id = "plong_dlog_proof_" ^ Inputs.id
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( G.Affine.Stable.V1.t
+        , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
+        , Fq.Stable.V1.t
+        , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
+        Dlog_plonk_types.Proof.Stable.V1.t
+      [@@deriving compare, sexp, yojson, hash, equal]
 
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          ( G.Affine.Stable.V1.t
-          , G.Affine.Stable.V1.t Or_infinity.Stable.V1.t
-          , Fq.Stable.V1.t
-          , Fq.Stable.V1.t Dlog_plonk_types.Pc_array.Stable.V1.t )
-          Dlog_plonk_types.Proof.Stable.V1.t
-        [@@deriving compare, sexp, yojson, hash, equal]
+      let to_latest = Fn.id
 
-        let to_latest = Fn.id
+      type 'a creator =
+           messages:
+             ( G.Affine.t
+             , G.Affine.t Or_infinity.t )
+             Dlog_plonk_types.Messages.Stable.V1.t
+        -> openings:
+             ( G.Affine.t
+             , Fq.t
+             , Fq.t Dlog_plonk_types.Pc_array.t )
+             Dlog_plonk_types.Openings.Stable.V1.t
+        -> 'a
 
-        type 'a creator =
-             messages:
-               ( G.Affine.t
-               , G.Affine.t Or_infinity.t )
-               Dlog_plonk_types.Messages.Stable.V1.t
-          -> openings:
-               ( G.Affine.t
-               , Fq.t
-               , Fq.t Dlog_plonk_types.Pc_array.t )
-               Dlog_plonk_types.Openings.Stable.V1.t
-          -> 'a
+      let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
 
-        let map_creator c ~f ~messages ~openings = f (c ~messages ~openings)
-
-        let create ~messages ~openings =
-          let open Dlog_plonk_types.Proof in
-          { messages; openings }
-      end
-    end]
-  end)
+      let create ~messages ~openings =
+        let open Dlog_plonk_types.Proof in
+        { messages; openings }
+    end
+  end]
 
   include (
     Stable.Latest :
@@ -325,7 +321,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:(fun { Challenge_polynomial.commitment; _ } ->
           G.Affine.to_backend (Finite commitment))
     in
-    let%map.Async.Deferred res =
+    let%map.Async_kernel.Deferred res =
       Backend.create_async pk primary auxiliary challenges commitments
     in
     of_backend res

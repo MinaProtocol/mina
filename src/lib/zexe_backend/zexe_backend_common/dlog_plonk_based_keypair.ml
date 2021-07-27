@@ -32,12 +32,17 @@ module type Inputs_intf = sig
   module Urs : sig
     type t
 
-    val read : ?offset:int -> string -> t option
+    (* TODO
+       val read : ?offset:int -> string -> t option
 
-    val write : ?append:bool -> t -> string -> unit
+       val write : ?append:bool -> t -> string -> unit *)
 
     val create : int -> t
   end
+
+  module Store : Key_cache.S with module M := Core_kernel.Or_error
+
+  val store : (string, Urs.t) Store.Disk_storable.t
 
   module Scalar_field : sig
     include Stable_v1
@@ -108,35 +113,20 @@ module Make (Inputs : Inputs_intf) = struct
             | Some t ->
                 t
           in
-          let store =
-            Key_cache.Sync.Disk_storable.simple
-              (fun () -> name)
-              (fun () ~path ->
-                Or_error.try_with_join (fun () ->
-                    match Urs.read path with
-                    | Some urs ->
-                        Ok urs
-                    | None ->
-                        Or_error.errorf
-                          "Could not read the URS from disk; its format did \
-                           not match the expected format"))
-              (fun _ urs path ->
-                Or_error.try_with (fun () -> Urs.write urs path))
-          in
           let u =
-            match Key_cache.Sync.read specs store () with
+            match Store.read specs store name with
             | Ok (u, _) ->
                 u
             | Error _e ->
                 let urs = Urs.create degree in
                 let (_ : (unit, Error.t) Result.t) =
-                  Key_cache.Sync.write
+                  Store.write
                     (List.filter specs ~f:(function
                       | On_disk _ ->
                           true
                       | S3 _ ->
                           false))
-                    store () urs
+                    store name urs
                 in
                 urs
           in

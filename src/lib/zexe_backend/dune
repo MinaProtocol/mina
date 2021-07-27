@@ -16,5 +16,5 @@
     snarky.backendless
     sponge
     snarkette
-    core
+    core_kernel
     integers ))
