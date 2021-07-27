@@ -264,21 +264,33 @@ let hash_snapp_account_opt = function
   | Some (a : Snapp_account.t) ->
       Snapp_account.digest a
 
-let hash_snapp_uri (snapp_uri : string) =
-  (* We use [length*8 + 1] to pass a final [true] after the end of the string,
-     to ensure that trailing null bytes don't alias in the hash preimage.
-  *)
-  let bits = Array.create ~len:((String.length snapp_uri * 8) + 1) true in
-  String.foldi snapp_uri ~init:() ~f:(fun i () c ->
-      let c = Char.to_int c in
-      (* Insert the bits into [bits], LSB order. *)
-      for j = 0 to 7 do
-        (* [Int.test_bit c j] *)
-        bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
-      done) ;
-  Random_oracle_input.bitstring (Array.to_list bits)
-  |> Random_oracle.pack_input
+let hash_snapp_uri_opt (snapp_uri_opt : string option) =
+  let input =
+    match snapp_uri_opt with
+    | Some snapp_uri ->
+        (* We use [length*8 + 1] to pass a final [true] after the end of the
+           string, to ensure that trailing null bytes don't alias in the hash
+           preimage.
+        *)
+        let bits = Array.create ~len:((String.length snapp_uri * 8) + 1) true in
+        String.foldi snapp_uri ~init:() ~f:(fun i () c ->
+            let c = Char.to_int c in
+            (* Insert the bits into [bits], LSB order. *)
+            for j = 0 to 7 do
+              (* [Int.test_bit c j] *)
+              bits.((i * 8) + j) <- Int.bit_and c (1 lsl j) <> 0
+            done) ;
+        Random_oracle_input.bitstring (Array.to_list bits)
+    | None ->
+        (* This preimage cannot be attained by any string, due to the trailing
+           [true] added above.
+        *)
+        Random_oracle_input.field_elements [| Field.zero; Field.zero |]
+  in
+  Random_oracle.pack_input input
   |> Random_oracle.hash ~init:Hash_prefix_states.snapp_uri
+
+let hash_snapp_uri (snapp_uri : string) = hash_snapp_uri_opt (Some snapp_uri)
 
 let delegate_opt = Option.value ~default:Public_key.Compressed.empty
 
@@ -320,7 +332,7 @@ type var =
   , Permissions.Checked.t
   , Field.Var.t * Snapp_account.t option As_prover.Ref.t
   (* TODO: This is a hack that lets us avoid unhashing snapp accounts when we don't need to *)
-  , Field.Var.t * string As_prover.Ref.t )
+  , string Data_as_hash.t )
   Poly.t
 
 let identifier_of_var ({ public_key; token_id; _ } : var) =
@@ -343,10 +355,7 @@ let typ' snapp =
       ; Timing.typ
       ; Permissions.typ
       ; snapp
-      ; Typ.transport
-          Typ.(Field.typ * Internal.ref ())
-          ~there:(fun s -> (hash_snapp_uri s, s))
-          ~back:(fun (_, s) -> s)
+      ; Data_as_hash.typ ~hash:hash_snapp_uri
       ]
   in
   Typ.of_hlistable spec ~var_to_hlist:Poly.to_hlist ~var_of_hlist:Poly.of_hlist
@@ -421,7 +430,7 @@ module Checked = struct
       , Timing.var
       , Permissions.Checked.t
       , Snapp_account.Checked.t
-      , Field.Var.t * string As_prover.Ref.t )
+      , string Data_as_hash.t )
       Poly.t
 
     let typ : (t, Stable.Latest.t) Typ.t =
@@ -457,7 +466,7 @@ module Checked = struct
              ~delegate:(f Public_key.Compressed.Checked.to_input)
              ~voting_for:(f State_hash.var_to_input)
              ~timing:(bits Timing.var_to_bits)
-             ~snapp_uri:(f (fun (hash, _) -> field hash))))
+             ~snapp_uri:(f Data_as_hash.to_input)))
 
   let digest t =
     make_checked (fun () ->

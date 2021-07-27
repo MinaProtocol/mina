@@ -74,7 +74,7 @@ module Update = struct
       , Public_key.Compressed.var Set_or_keep.Checked.t
       , Field.t Set_or_keep.Checked.t
       , Permissions.Checked.t Set_or_keep.Checked.t
-      , (Field.t * string As_prover.Ref.t) Set_or_keep.Checked.t )
+      , string Data_as_hash.t Set_or_keep.Checked.t )
       Poly.t
 
     let to_input
@@ -89,8 +89,7 @@ module Update = struct
         ; Set_or_keep.Checked.to_input verification_key ~f:field
         ; Set_or_keep.Checked.to_input permissions
             ~f:Permissions.Checked.to_input
-        ; Set_or_keep.Checked.to_input snapp_uri ~f:(fun (hash, _) ->
-              field hash)
+        ; Set_or_keep.Checked.to_input snapp_uri ~f:Data_as_hash.to_input
         ]
   end
 
@@ -136,19 +135,11 @@ module Update = struct
              ~there:(Set_or_keep.map ~f:With_hash.hash)
              ~back:(Set_or_keep.map ~f:(fun _ -> failwith "vk typ"))
       ; Set_or_keep.typ ~dummy:Permissions.user_default Permissions.typ
-      ; (* We have to do this unfortunate dance to provide an [As_prover.ref]
-           for the dummy value.
-           TODO: find a way to make this less horrible.
-        *)
+      ; (* We have to do this unfortunate dance to provide a dummy value. *)
         Set_or_keep.typ ~dummy:None
-          (Typ.transport
-             Typ.(Field.typ * Internal.ref ())
-             ~there:(function
-               | None ->
-                   (Field.Constant.zero, "")
-               | Some s ->
-                   (Account.hash_snapp_uri s, s))
-             ~back:(fun (_, s) -> Some s))
+          (Data_as_hash.optional_typ ~hash:Account.hash_snapp_uri
+             ~non_preimage:(Account.hash_snapp_uri_opt None)
+             ~dummy_value:"")
         |> Typ.transport
              ~there:(Set_or_keep.map ~f:Option.some)
              ~back:(Set_or_keep.map ~f:(fun x -> Option.value_exn x))
