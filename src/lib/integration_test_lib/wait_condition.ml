@@ -91,15 +91,17 @@ struct
   let nodes_to_synchronize (nodes : Node.t list) =
     let check () state =
       let all_best_tips_equal =
-        all_equal
-          ~equal:[%equal: State_hash.t option]
+        all_equal ~equal:[%equal: State_hash.t option]
           ~compare:[%compare: State_hash.t option]
       in
-      let best_tips = 
+      let best_tips =
         List.map nodes ~f:(fun node ->
             String.Map.find state.best_tips_by_node (Node.id node))
       in
-      if List.for_all best_tips ~f:Option.is_some && all_best_tips_equal best_tips then Predicate_passed
+      if
+        List.for_all best_tips ~f:Option.is_some
+        && all_best_tips_equal best_tips
+      then Predicate_passed
       else Predicate_continuation ()
     in
     let soft_timeout_in_slots = 8 * 3 in
