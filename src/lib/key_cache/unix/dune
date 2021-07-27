@@ -1,0 +1,7 @@
+(library
+ (name key_cache_unix)
+ (public_name key_cache.unix)
+ (libraries key_cache core async error_json logger)
+ (preprocessor_deps ../../../config.mlh)
+ (instrumentation (backend bisect_ppx))
+ (preprocess (pps ppx_coda ppx_version ppx_base ppx_let ppx_custom_printf ppx_optcomp)))
