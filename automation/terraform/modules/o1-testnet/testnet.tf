@@ -65,44 +65,62 @@ module "kubernetes_testnet" {
   snark_worker_host_port  = var.snark_worker_host_port
 
   block_producer_key_pass = var.block_producer_key_pass
-  block_producer_configs = concat(
-    [
-      for i in range(var.whale_count) : {
-        # for j in range (var.whale.duplicates):
-        name                   = local.whale_block_producer_names[i]
-        class                  = "whale"
-        id                     = i + 1
-        external_port          = local.static_peers[local.whale_block_producer_names[i]].port
-        private_key_secret     = "online-whale-account-${i + 1}-key"
-        libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
-        enable_gossip_flooding = false
-        run_with_user_agent    = false
-        run_with_bots          = false
-        enable_peer_exchange   = true
-        isolated               = false
-        enableArchive          = false
-        archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
-      }
-    ],
-    [
-      for i in range(var.fish_count) : {
-        # for j in range (var.fish.duplicates):
-        name                   = local.fish_block_producer_names[i]
-        class                  = "fish"
-        id                     = i + 1
-        external_port          = local.static_peers[local.fish_block_producer_names[i]].port
-        private_key_secret     = "online-fish-account-${i + 1}-key"
-        libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
-        enable_gossip_flooding = false
-        run_with_user_agent    = true
-        run_with_bots          = false
-        enable_peer_exchange   = true
-        isolated               = false
-        enableArchive          = false
-        archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
-      }
-    ]
-  )
+  block_producer_configs = [for index, bp in local.block_producer_configs:
+    {
+      name                   = bp.name
+      class                  = bp.class
+      id                     = index + 1
+      external_port          = bp.port
+      #TODO, i've changed the naming convention so these keys and secrets need to be fixed
+      private_key_secret     = "${bp.basename}-account-key"
+      libp2p_secret          = "${bp.basename}-libp2p-key"
+      enable_gossip_flooding = false
+      run_with_user_agent    = bp.class =="whale" ? false : true
+      run_with_bots          = false
+      enable_peer_exchange   = true
+      isolated               = false
+      enableArchive          = false
+      archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""  
+    }
+  ]
+  # block_producer_configs = concat(
+  #   [
+  #     for i in range(var.whale_count) : {
+  #       # for j in range (var.whale.duplicates):
+  #       name                   = local.whale_block_producer_names[i]
+  #       class                  = "whale"
+  #       id                     = i + 1
+  #       external_port          = local.static_peers[local.whale_block_producer_names[i]].port
+  #       private_key_secret     = "online-whale-account-${i + 1}-key"
+  #       libp2p_secret          = "online-whale-libp2p-${i + 1}-key"
+  #       enable_gossip_flooding = false
+  #       run_with_user_agent    = false
+  #       run_with_bots          = false
+  #       enable_peer_exchange   = true
+  #       isolated               = false
+  #       enableArchive          = false
+  #       archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
+  #     }
+  #   ],
+  #   [
+  #     for i in range(var.fish_count) : {
+  #       # for j in range (var.fish.duplicates):
+  #       name                   = local.fish_block_producer_names[i]
+  #       class                  = "fish"
+  #       id                     = i + 1
+  #       external_port          = local.static_peers[local.fish_block_producer_names[i]].port
+  #       private_key_secret     = "online-fish-account-${i + 1}-key"
+  #       libp2p_secret          = "online-fish-libp2p-${i + 1}-key"
+  #       enable_gossip_flooding = false
+  #       run_with_user_agent    = true
+  #       run_with_bots          = false
+  #       enable_peer_exchange   = true
+  #       isolated               = false
+  #       enableArchive          = false
+  #       archiveAddress         = length(local.archive_node_configs) != 0 ? "${element(local.archive_node_configs, i)["name"]}:${element(local.archive_node_configs, i)["serverPort"]}" : ""
+  #     }
+  #   ]
+  # )
 
   seed_configs = [
     for i in range(var.seed_count) : {

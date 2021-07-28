@@ -113,14 +113,19 @@ variable "seed_discovery_keypairs" {
 
 # Block Producer Vars
 
-variable "whale_count" {
-  type    = number
-  default = 1
-}
+# variable "whale_count" {
+#   type    = number
+#   default = 1
+# }
 
-variable "fish_count" {
-  type    = number
-  default = 1
+# variable "fish_count" {
+#   type    = number
+#   default = 1
+# }
+
+variable "block_producer_configs" {
+  description = "individual block producer node deployment configurations"
+  default = null
 }
 
 variable "seed_count" {

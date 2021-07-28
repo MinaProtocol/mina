@@ -137,9 +137,33 @@ module "gossip_qa" {
   snark_worker_fee      = "0.025"
   snark_worker_public_key = "B62qk4nuKn2U5kb4dnZiUwXeRNtP1LncekdAKddnd1Ze8cWZnjWpmMU"
   snark_worker_host_port = 10401
-  whale_count           = var.whale_count
-  fish_count            = var.fish_count
+  # whale_count           = var.whale_count
+  # fish_count            = var.fish_count
   seed_count            = var.seed_count
+
+  block_producer_configs =  [
+    {
+      basename = "whale1"
+      duplicates = 2
+      class  = "whale"
+    },
+    {
+      basename = "whale2"
+      duplicates = 1
+      class  = "whale"
+    },
+    {
+      basename = "fish1"
+      duplicates = 2
+      class  = "fish"
+    },
+    {
+      basename = "fish2"
+      duplicates = 1
+      class  = "fish"
+    }
+
+  ]
 
   upload_blocks_to_gcloud         = true
   restart_nodes                   = false
