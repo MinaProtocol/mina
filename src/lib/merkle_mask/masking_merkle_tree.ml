@@ -535,9 +535,16 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let num_accounts t =
       assert_is_attached t ;
-      let parent_num_accounts = Base.num_accounts (get_parent t) in
-      let mask_num_accounts = Location_binable.Table.length t.account_tbl in
-      parent_num_accounts + mask_num_accounts
+      match t.current_location with
+      | None ->
+          0
+      | Some location -> (
+          match location with
+          | Account addr ->
+              Addr.to_int addr + 1
+          | _ ->
+              failwith "Expected mask current location to represent an account"
+          )
 
     let location_of_account t account_id =
       assert_is_attached t ;
