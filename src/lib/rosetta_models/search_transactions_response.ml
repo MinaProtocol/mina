@@ -14,7 +14,7 @@ type t =
   ; (* next_offset is the next offset to use when paginating through transaction results. If this field is not populated, there are no more transactions to query. *)
     next_offset : int64 option [@default None]
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** SearchTransactionsResponse contains an ordered collection of BlockTransactions that match the query in SearchTransactionsRequest. These BlockTransactions are sorted from most recent block to oldest block. *)
 let create (transactions : Block_transaction.t list) (total_count : int64) : t =

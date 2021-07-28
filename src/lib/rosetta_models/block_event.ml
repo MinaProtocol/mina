@@ -12,7 +12,7 @@ type t =
   ; block_identifier : Block_identifier.t
   ; _type : Enums.blockeventtype
   }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** BlockEvent represents the addition or removal of a BlockIdentifier from storage. Streaming BlockEvents allows lightweight clients to update their own state without needing to implement their own syncing logic. *)
 let create (sequence : int64) (block_identifier : Block_identifier.t)
