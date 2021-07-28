@@ -33,9 +33,8 @@ module Worker_state = struct
   type init_arg =
     { conf_dir : string option
     ; logger : Logger.Stable.Latest.t
-    ; proof_level : Genesis_constants.Proof_level.Stable.Latest.t
-    ; constraint_constants :
-        Genesis_constants.Constraint_constants.Stable.Latest.t
+    ; proof_level : Genesis_constants.Proof_level.t
+    ; constraint_constants : Genesis_constants.Constraint_constants.t
     }
   [@@deriving bin_io_unversioned]
 
@@ -240,47 +239,6 @@ type t = { worker : worker Ivar.t ref; logger : Logger.Stable.Latest.t }
 let plus_or_minus initial ~delta =
   initial +. (Random.float (2. *. delta) -. delta)
 
-(** Call this as early as possible after the process is known, and store the
-    resulting [Deferred.t] somewhere to be used later.
-*)
-let wait_safe ~logger process ~module_ ~location ~here =
-  (* This is a little more nuanced than it may initially seem.
-     - The initial call to [Process.wait] runs a wait syscall -- with the
-       NOHANG flag -- synchronously.
-       * This may raise an error (WNOHANG or otherwise) that we have to handle
-         synchronously at call time.
-     - The [Process.wait] then returns a [Deferred.t] that resolves when a
-       second syscall returns.
-       * This may throw its own errors, so we need to ensure that this is also
-         wrapped to catch them.
-     - Once the child process has died and one or more wait syscalls have
-       resolved, the operating system will drop the process metadata. This
-       means that our wait may hang forever if 1) the process has already died
-       and 2) there was a wait call issued by some other code before we have a
-       chance.
-       * Thus, we should make this initial call while the child process is
-         still alive, preferably on startup, to avoid this hang.
-  *)
-  match
-    Or_error.try_with (fun () ->
-        let deferred_wait =
-          Monitor.try_with ~here ~run:`Now
-            ~rest:
-              (`Call
-                (fun exn ->
-                  Logger.warn logger ~module_ ~location
-                    "Saw an error from Process.wait in wait_safe: $err"
-                    ~metadata:
-                      [ ("err", Error_json.error_to_yojson (Error.of_exn exn)) ]))
-            (fun () -> Process.wait process)
-        in
-        Deferred.Result.map_error ~f:Error.of_exn deferred_wait)
-  with
-  | Ok x ->
-      x
-  | Error err ->
-      Deferred.Or_error.fail err
-
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     t Deferred.t =
@@ -321,8 +279,8 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     Child_processes.Termination.wait_for_process_log_errors ~logger process
       ~module_:__MODULE__ ~location:__LOC__ ~here:[%here] ;
     let exit_or_signal =
-      wait_safe ~logger process ~module_:__MODULE__ ~location:__LOC__
-        ~here:[%here]
+      Child_processes.Termination.wait_safe ~logger process ~module_:__MODULE__
+        ~location:__LOC__ ~here:[%here]
     in
     [%log info]
       "Daemon started process of kind $process_kind with pid $verifier_pid"
@@ -336,8 +294,6 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
     (* Always report termination as expected, and use the restart logic here
        instead.
     *)
-    let pid = Process.pid process in
-    Child_processes.Termination.mark_termination_as_expected pids pid ;
     don't_wait_for
     @@ Pipe.iter
          (Process.stdout process |> Reader.pipe)
@@ -370,7 +326,9 @@ let create ~logger ~proof_level ~constraint_constants ~pids ~conf_dir :
         ]
     in
     upon finished (fun e ->
+        don't_wait_for (Process.stdin process |> Writer.close) ;
         let pid = Process.pid process in
+        Child_processes.Termination.remove pids pid ;
         let create_worker_trigger = Ivar.create () in
         don't_wait_for
           (* If we don't hear back that the process has died after 10 seconds,

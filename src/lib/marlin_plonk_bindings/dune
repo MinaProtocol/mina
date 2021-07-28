@@ -1,3 +1,5 @@
+(data_only_dirs wasm)
+
 (library
  (public_name marlin_plonk_bindings)
  (name marlin_plonk_bindings)
