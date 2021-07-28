@@ -407,9 +407,11 @@ This algorithm initializes the checkpoints for genesis block `G`
 ```rust
 fn initCheckpoints(G) -> ()
 {
+    cState(G).seed = zero
+    cState(G).staking_epoch_data.start_checkpoint = zero
+    cState(G).staking_epoch_data.lock_checkpoint = zero
+
     state_hash = hash(latest state ϵ cState(G).next_epoch_data.seed's update range) ?
-    cState(G).staking_epoch_data.lock_checkpoint = 0 (or empty hash?)
-    cState(G).staking_epoch_data.start_checkpoint = 0 ?
     cState(G).next_epoch_data.start_checkpoint = state_hash ?
     cState(G).next_epoch_data.lock_checkpoint =  state_hash ?
 }
