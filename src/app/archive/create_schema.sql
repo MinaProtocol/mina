@@ -81,6 +81,8 @@ CREATE TABLE blocks
 , timestamp               bigint NOT NULL
 );
 
+CREATE INDEX idx_blocks_id ON blocks(id);
+CREATE INDEX idx_blocks_parent_id ON blocks(parent_id);
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
@@ -106,6 +108,9 @@ CREATE TABLE blocks_user_commands
 , PRIMARY KEY (block_id, user_command_id, sequence_no)
 );
 
+CREATE INDEX idx_blocks_user_commands_block_id ON blocks_user_commands(block_id);
+CREATE INDEX idx_blocks_user_commands_user_command_id ON blocks_user_commands(user_command_id);
+
 CREATE TABLE blocks_internal_commands
 ( block_id              int NOT NULL REFERENCES blocks(id) ON DELETE CASCADE
 , internal_command_id   int NOT NULL REFERENCES internal_commands(id) ON DELETE CASCADE
@@ -114,3 +119,6 @@ CREATE TABLE blocks_internal_commands
 , receiver_balance      int NOT NULL REFERENCES balances(id) ON DELETE CASCADE
 , PRIMARY KEY (block_id, internal_command_id, sequence_no, secondary_sequence_no)
 );
+
+CREATE INDEX idx_blocks_internal_commands_block_id ON blocks_internal_commands(block_id);
+CREATE INDEX idx_blocks_internal_commands_internal_command_id ON blocks_internal_commands(internal_command_id);
