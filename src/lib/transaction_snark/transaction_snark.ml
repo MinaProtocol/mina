@@ -1285,7 +1285,8 @@ module Base = struct
                        ~f:(Set_or_keep.Checked.set_or_keep ~if_:Field.if_))))
         in
         Option.iter tag ~f:(fun t ->
-            Pickles.Side_loaded.in_circuit t a.snapp.verification_key.data) ;
+            Pickles.Side_loaded.in_circuit t
+              (Lazy.force a.snapp.verification_key.data)) ;
         let verification_key =
           update_authorized a.permissions.set_verification_key
             ~is_keep:(Set_or_keep.Checked.is_keep verification_key)
@@ -3710,45 +3711,40 @@ let%test_module "transaction_snark" =
       let new_state : _ Snapp_state.V.t =
         Vector.init Snapp_state.Max_state_size.n ~f:Field.of_int
       in
-      let data1 : Party.Predicated.Signed.t =
-        { predicate = acct1.account.nonce
-        ; body =
-            { pk = acct1.account.public_key
-            ; token_id = Token_id.default
-            ; update =
-                { app_state =
-                    Vector.map new_state ~f:(fun x ->
-                        Snapp_basic.Set_or_keep.Set x)
-                ; delegate = Keep
-                ; verification_key = Keep
-                ; permissions = Keep
-                }
-            ; delta =
-                Amount.Signed.(negate (of_unsigned (Amount.of_int full_amount)))
-            }
-        }
-      in
-      let data2 : Party.t =
-        Party.Signed.create ~private_key:acct2.private_key
-          { predicate = acct2.account.nonce
-          ; body =
-              { pk = acct2.account.public_key
-              ; token_id = Token_id.default
-              ; update =
-                  { app_state =
-                      Vector.map new_state ~f:(fun _ ->
-                          Snapp_basic.Set_or_keep.Keep)
-                  ; delegate = Keep
-                  ; verification_key = Keep
-                  ; permissions = Keep
+      { fee_payer =
+          { Party.Signed.data =
+              { body =
+                  { pk = acct1.account.public_key
+                  ; update =
+                      { app_state =
+                          Vector.map new_state ~f:(fun x ->
+                              Snapp_basic.Set_or_keep.Set x)
+                      ; delegate = Keep
+                      ; verification_key = Keep
+                      ; permissions = Keep
+                      }
+                  ; token_id = Token_id.default
+                  ; delta =
+                      Amount.(
+                        Signed.(negate (of_unsigned (of_int full_amount))))
                   }
-              ; delta = Amount.Signed.of_unsigned receiver_amount
+              ; predicate = acct1.account.nonce
               }
+          ; authorization = Signature.dummy
           }
-        |> Party.of_signed
-      in
-      { fee_payer = Party.Signed.create ~private_key:acct1.private_key data1
-      ; other_parties = [ data2 ]
+      ; other_parties =
+          [ { data =
+                { body =
+                    { pk = acct2.account.public_key
+                    ; update = Party.Update.noop
+                    ; token_id = Token_id.default
+                    ; delta = Amount.Signed.(of_unsigned receiver_amount)
+                    }
+                ; predicate = Accept
+                }
+            ; authorization = None_given
+            }
+          ]
       ; protocol_state = Snapp_predicate.Protocol_state.accept
       }
 

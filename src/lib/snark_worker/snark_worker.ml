@@ -16,12 +16,12 @@ module Worker = struct
     end
 
     module Get_work = struct
-      module V1 = struct
+      module V2 = struct
         module T = struct
           type query = unit [@@deriving bin_io, version { rpc }]
 
           type response =
-            ( ( Transaction.Stable.V1.t
+            ( ( Transaction.Stable.V2.t
               , Transaction_witness.Stable.V1.t
               , Inputs.Ledger_proof.Stable.V1.t )
               Snark_work_lib.Work.Single.Spec.Stable.V1.t
@@ -43,14 +43,14 @@ module Worker = struct
         include Rpcs.Get_work.Register (T)
       end
 
-      module Latest = V1
+      module Latest = V2
     end
 
     module Submit_work = struct
-      module V1 = struct
+      module V2 = struct
         module T = struct
           type query =
-            ( ( Transaction.Stable.V1.t
+            ( ( Transaction.Stable.V2.t
               , Transaction_witness.Stable.V1.t
               , Ledger_proof.Stable.V1.t )
               Snark_work_lib.Work.Single.Spec.Stable.V1.t
@@ -74,7 +74,7 @@ module Worker = struct
         include Rpcs.Submit_work.Register (T)
       end
 
-      module Latest = V1
+      module Latest = V2
     end
   end
 
