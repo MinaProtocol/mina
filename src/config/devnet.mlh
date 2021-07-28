@@ -43,3 +43,7 @@
 [%%import "/src/config/features/public_testnet.mlh"]
 (* 2*block_window_duration *)
 [%%define compaction_interval 360000]
+
+(* FORK CONFIG TEST *)
+[%%import "/src/config/hardforks/devnet_fork_43935.mlh"]
+[%%import "/src/config/hardforks/devnet_version_43935.mlh"]
