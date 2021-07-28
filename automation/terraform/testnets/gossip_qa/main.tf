@@ -35,19 +35,19 @@ provider "google" {
 }
 
 
-variable "whale_count" {
-  type = number
+# variable "whale_count" {
+#   type = number
 
-  description = "Number of online whales for the network to run"
-  default     = 2
-}
+#   description = "Number of online whales for the network to run"
+#   default     = 2
+# }
 
-variable "fish_count" {
-  type = number
+# variable "fish_count" {
+#   type = number
 
-  description = "Number of online fish for the network to run"
-  default     = 2
-}
+#   description = "Number of online fish for the network to run"
+#   default     = 2
+# }
 
 variable "seed_count" {
   default     = 3
@@ -142,6 +142,7 @@ module "gossip_qa" {
   seed_count            = var.seed_count
 
   block_producer_configs =  [
+    # TODO: eventually this will be turned into a loop depending on how many bps we want
     {
       basename = "whale1"
       duplicates = 2
