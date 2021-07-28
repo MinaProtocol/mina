@@ -288,9 +288,11 @@ module Status = struct
       ; sync_status=
           Some
             { Sync_status.current_index=
-                ((latest_block#protocolState)#consensusState)#blockHeight
+                Some ((latest_block#protocolState)#consensusState)#blockHeight
             ; target_index= None
-            ; stage= Some (sync_status_to_string res#syncStatus) } }
+            ; stage= Some (sync_status_to_string res#syncStatus)
+            ; synced = None
+            } }
   end
 
   module Real = Impl (Deferred.Result)
@@ -374,9 +376,11 @@ module Status = struct
                ; oldest_block_identifier= None
                ; sync_status=
                    Some
-                     { Sync_status.current_index= Int64.of_int_exn 4
+                     { Sync_status.current_index= Some (Int64.of_int_exn 4)
                      ; target_index= None
-                     ; stage= Some "Synced" } } )
+                     ; stage= Some "Synced"
+                     ; synced = Some true
+                     } } )
 
       let oldest_block_is_different_env : 'gql Env.Mock.t =
         { gql= (fun () -> Result.return @@ build ~best_chain_missing:false)
@@ -405,9 +409,11 @@ module Status = struct
                      ; hash= "SOME_HASH" }
                ; sync_status=
                    Some
-                     { Sync_status.current_index= Int64.of_int_exn 4
+                     { Sync_status.current_index= Some (Int64.of_int_exn 4)
                      ; target_index= None
-                     ; stage= Some "Synced" } } )
+                     ; stage= Some "Synced"
+                     ; synced = Some true
+                     } } )
     end )
 end
 
