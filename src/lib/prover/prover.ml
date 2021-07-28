@@ -18,7 +18,7 @@ module Extend_blockchain_input = struct
         ; next_state : Protocol_state.Value.Stable.V2.t
         ; block : Snark_transition.Value.Stable.V2.t
         ; ledger_proof : Ledger_proof.Stable.V2.t option
-        ; prover_state : Consensus.Data.Prover_state.Stable.V1.t
+        ; prover_state : Consensus.Data.Prover_state.Stable.V2.t
         ; pending_coinbase : Pending_coinbase_witness.Stable.V1.t
         }
 
@@ -41,7 +41,8 @@ module Extend_blockchain_input = struct
         ; block = Snark_transition.Value.Stable.V1.to_latest t.block
         ; ledger_proof =
             Option.map ~f:Ledger_proof.Stable.V1.to_latest t.ledger_proof
-        ; prover_state = t.prover_state
+        ; prover_state =
+            Consensus.Data.Prover_state.Stable.V1.to_latest t.prover_state
         ; pending_coinbase = t.pending_coinbase
         }
     end

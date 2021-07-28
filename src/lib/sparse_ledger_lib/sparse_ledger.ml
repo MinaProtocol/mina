@@ -11,6 +11,14 @@ module Tree = struct
         | Hash of 'hash
         | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
       [@@deriving equal, sexp, to_yojson]
+
+      let rec to_latest acct_to_latest = function
+        | Account acct ->
+            Account (acct_to_latest acct)
+        | Hash hash ->
+            Hash hash
+        | Node (hash, l, r) ->
+            Node (hash, to_latest acct_to_latest l, to_latest acct_to_latest r)
     end
   end]
 
@@ -34,6 +42,14 @@ module T = struct
         ; next_available_token : 'token_id
         }
       [@@deriving sexp, to_yojson]
+
+      let to_latest acct_to_latest
+          { indexes; depth; tree; next_available_token } =
+        { indexes
+        ; depth
+        ; tree = Tree.Stable.V1.to_latest acct_to_latest tree
+        ; next_available_token
+        }
     end
   end]
 

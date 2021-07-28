@@ -170,10 +170,23 @@ module Json_layout = struct
                 Error "Invalid Field.t runtime config Snapp_account.state"
         end
 
-        type t = { state : Field.t list; verification_key : string option }
+        module Snapp_version = struct
+          type t = Mina_numbers.Snapp_version.Stable.Latest.t
+          [@@deriving bin_io_unversioned]
+
+          include (
+            Mina_numbers.Snapp_version :
+              module type of Mina_numbers.Snapp_version with type t := t )
+        end
+
+        type t =
+          { state : Field.t list
+          ; verification_key : string option
+          ; snapp_version : Snapp_version.t
+          }
         [@@deriving sexp, dhall_type, yojson, bin_io_unversioned]
 
-        let fields = [| "state"; "verification_key" |]
+        let fields = [| "state"; "verification_key"; "snapp_version" |]
 
         let of_yojson json = of_yojson_generic ~fields of_yojson json
       end

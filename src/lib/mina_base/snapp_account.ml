@@ -22,6 +22,15 @@ open Snapp_basic
 module Poly = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type ('app_state, 'vk, 'snapp_version) t =
+        { app_state : 'app_state
+        ; verification_key : 'vk
+        ; snapp_version : 'snapp_version
+        }
+      [@@deriving sexp, equal, compare, hash, yojson, hlist, fields]
+    end
+
     module V1 = struct
       type ('app_state, 'vk) t =
         { app_state : 'app_state; verification_key : 'vk }
@@ -30,11 +39,29 @@ module Poly = struct
   end]
 end
 
-type ('app_state, 'vk) t_ = ('app_state, 'vk) Poly.t =
-  { app_state : 'app_state; verification_key : 'vk }
+type ('app_state, 'vk, 'snapp_version) t_ =
+      ('app_state, 'vk, 'snapp_version) Poly.t =
+  { app_state : 'app_state
+  ; verification_key : 'vk
+  ; snapp_version : 'snapp_version
+  }
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      ( Snapp_state.Value.Stable.V1.t
+      , ( Side_loaded_verification_key.Stable.V1.t
+        , F.Stable.V1.t )
+        With_hash.Stable.V1.t
+        option
+      , Mina_numbers.Snapp_version.Stable.V1.t )
+      Poly.Stable.V2.t
+    [@@deriving sexp, equal, compare, hash, yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       ( Snapp_state.Value.Stable.V1.t
@@ -45,7 +72,11 @@ module Stable = struct
       Poly.Stable.V1.t
     [@@deriving sexp, equal, compare, hash, yojson]
 
-    let to_latest = Fn.id
+    let to_latest ({ app_state; verification_key } : t) : V2.t =
+      { app_state
+      ; verification_key
+      ; snapp_version = Mina_numbers.Snapp_version.zero
+      }
   end
 end]
 
@@ -63,7 +94,8 @@ module Checked = struct
     ( Pickles.Impls.Step.Field.t Snapp_state.V.t
     , ( Pickles.Side_loaded.Verification_key.Checked.t Lazy.t
       , Pickles.Impls.Step.Field.t Lazy.t )
-      With_hash.t )
+      With_hash.t
+    , Mina_numbers.Snapp_version.Checked.t )
     Poly.t
 
   let to_input' (t : _ Poly.t) =
@@ -72,6 +104,9 @@ module Checked = struct
     let app_state v = Random_oracle.Input.field_elements (Vector.to_array v) in
     Poly.Fields.fold ~init:[] ~app_state:(f app_state)
       ~verification_key:(f (fun x -> field x))
+      ~snapp_version:
+        (f (fun x ->
+             Run.run_checked (Mina_numbers.Snapp_version.Checked.to_input x)))
     |> List.reduce_exn ~f:append
 
   let to_input (t : t) =
@@ -108,6 +143,7 @@ let typ : (Checked.t, t) Typ.t =
              With_hash.of_data
                (lazy x)
                ~hash_data:(fun _ -> lazy (Checked.digest_vk x)))
+    ; Mina_numbers.Snapp_version.typ
     ]
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
@@ -126,12 +162,14 @@ let to_input (t : t) =
       (f
          (Fn.compose field
             (Option.value_map ~default:(dummy_vk_hash ()) ~f:With_hash.hash)))
+    ~snapp_version:(f Mina_numbers.Snapp_version.to_input)
   |> List.reduce_exn ~f:append
 
 let default : _ Poly.t =
   (* These are the permissions of a "user"/"non snapp" account. *)
   { app_state = Vector.init Snapp_state.Max_state_size.n ~f:(fun _ -> F.zero)
   ; verification_key = None
+  ; snapp_version = Mina_numbers.Snapp_version.zero
   }
 
 let digest (t : t) =

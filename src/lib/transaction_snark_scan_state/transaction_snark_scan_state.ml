@@ -43,7 +43,7 @@ module Transaction_with_witness = struct
         ; init_stack :
             Transaction_snark.Pending_coinbase_stack_state.Init_stack.Stable.V1
             .t
-        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V1.t [@sexp.opaque]
+        ; ledger_witness : Mina_base.Sparse_ledger.Stable.V2.t [@sexp.opaque]
         }
       [@@deriving sexp]
 
@@ -73,7 +73,8 @@ module Transaction_with_witness = struct
         ; statement =
             Transaction_snark.Statement.Stable.V1.to_latest t.statement
         ; init_stack = t.init_stack
-        ; ledger_witness = t.ledger_witness
+        ; ledger_witness =
+            Mina_base.Sparse_ledger.Stable.V1.to_latest t.ledger_witness
         }
     end
   end]

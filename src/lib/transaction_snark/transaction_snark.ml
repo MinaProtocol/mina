@@ -1324,6 +1324,10 @@ module Base = struct
                 (Set_or_keep.Checked.set_or_keep ~if_:Field.if_ verification_key
                    (Lazy.force a.snapp.verification_key.hash)))
         in
+        let snapp_version =
+          (* Current snapp version. Upgrade mechanism should live here. *)
+          Mina_numbers.Snapp_version.(Checked.constant zero)
+        in
         { Snapp_account.verification_key =
             (* Big hack. This relies on the fact that the "data" is not
                used for computing the hash of the snapp account. We can't
@@ -1332,6 +1336,7 @@ module Base = struct
             ; data = lazy (failwith "unused")
             }
         ; app_state
+        ; snapp_version
         }
       in
       let snapp_uri =
@@ -1698,7 +1703,10 @@ module Base = struct
                         in
                         (* TODO: Refactor. This hacking around the vk is a code smell *)
                         Typ.of_hlistable
-                          [ Snapp_state.typ Field.typ; vk ]
+                          [ Snapp_state.typ Field.typ
+                          ; vk
+                          ; Mina_numbers.Snapp_version.typ
+                          ]
                           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
                           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
                         |> Typ.transport

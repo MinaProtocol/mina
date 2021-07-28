@@ -88,6 +88,17 @@ module Transaction_applied = struct
   module Snapp_command_applied = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { accounts :
+              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
+          ; command : Snapp_command.Stable.V1.t With_status.Stable.V1.t
+          }
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { accounts :
@@ -96,7 +107,14 @@ module Transaction_applied = struct
           }
         [@@deriving sexp]
 
-        let to_latest = Fn.id
+        let to_latest { accounts; command } : V2.t =
+          { accounts =
+              List.map
+                ~f:(fun (aid, account) ->
+                  (aid, Option.map ~f:Account.Stable.V1.to_latest account))
+                accounts
+          ; command
+          }
       end
     end]
   end
@@ -107,7 +125,7 @@ module Transaction_applied = struct
       module V1 = struct
         type t =
           { accounts :
-              (Account_id.Stable.V1.t * Account.Stable.V1.t option) list
+              (Account_id.Stable.V1.t * Account.Stable.V2.t option) list
           ; command : Parties.Stable.V1.t With_status.Stable.V1.t
           }
         [@@deriving sexp]
@@ -1258,7 +1276,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           init.verification_key ~is_keep:Set_or_keep.is_keep ~update:(fun u x ->
             match (u, x) with Keep, _ -> x | Set x, _ -> Some x)
       in
-      let t : Snapp_account.t = { app_state; verification_key } in
+      let snapp_version =
+        (* Current snapp version. Upgrade mechanism should live here. *)
+        Mina_numbers.Snapp_version.zero
+      in
+      let t : Snapp_account.t =
+        { app_state; verification_key; snapp_version }
+      in
       if Snapp_account.(equal default t) then None else Some t
     in
     let%bind snapp_uri =

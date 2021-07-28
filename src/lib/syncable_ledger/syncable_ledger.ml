@@ -41,6 +41,14 @@ module Answer = struct
             (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
       [@@deriving sexp, yojson]
+
+      let to_latest acct_to_latest = function
+        | Child_hashes_are (h1, h2) ->
+            Child_hashes_are (h1, h2)
+        | Contents_are accts ->
+            Contents_are (List.map ~f:acct_to_latest accts)
+        | Num_accounts (i, h) ->
+            Num_accounts (i, h)
     end
   end]
 end

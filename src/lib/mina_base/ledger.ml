@@ -63,8 +63,8 @@ module Ledger_inner = struct
   module Account = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving equal, compare, sexp]
+      module V2 = struct
+        type t = Account.Stable.V2.t [@@deriving equal, compare, sexp]
 
         let to_latest = Fn.id
 
@@ -82,6 +82,12 @@ module Ledger_inner = struct
               true
           | Not_owned _ ->
               false
+      end
+
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving equal, compare, sexp]
+
+        let to_latest = Account.Stable.V1.to_latest
       end
     end]
 

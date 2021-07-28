@@ -93,7 +93,7 @@ module Accounts = struct
         match t.snapp with
         | None ->
             Ok None
-        | Some { state; verification_key } ->
+        | Some { state; verification_key; snapp_version } ->
             let%bind app_state =
               if
                 Pickles_types.Vector.Nat.to_int Snapp_state.Max_state_size.n
@@ -129,7 +129,7 @@ module Accounts = struct
                   in
                   Some (With_hash.of_data ~hash_data:Snapp_account.digest_vk vk))
             in
-            Some { Snapp_account.verification_key; app_state }
+            Some { Snapp_account.verification_key; app_state; snapp_version }
       in
       { account with
         delegate =
@@ -222,7 +222,8 @@ module Accounts = struct
           }
       in
       let snapp =
-        Option.map account.snapp ~f:(fun { app_state; verification_key } ->
+        Option.map account.snapp
+          ~f:(fun { app_state; verification_key; snapp_version } ->
             let state = Snapp_state.V.to_list app_state in
             let verification_key =
               Option.map verification_key ~f:(fun vk ->
@@ -234,6 +235,7 @@ module Accounts = struct
             in
             { Runtime_config.Accounts.Single.Snapp_account.state
             ; verification_key
+            ; snapp_version
             })
       in
       { pk =

@@ -339,8 +339,16 @@ module type S = sig
       module Stable : sig
         [@@@no_toplevel_latest_type]
 
+        module V2 : sig
+          type t
+
+          val to_latest : t -> t
+        end
+
         module V1 : sig
           type t
+
+          val to_latest : t -> V2.t
         end
       end]
 

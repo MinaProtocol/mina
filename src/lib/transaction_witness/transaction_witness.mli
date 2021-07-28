@@ -8,12 +8,12 @@ module Parties_segment_witness : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { global_ledger : Sparse_ledger.Stable.V1.t
+        { global_ledger : Sparse_ledger.Stable.V2.t
         ; local_state_init :
             ( Party.Stable.V1.t Parties.With_hashes.Stable.V1.t
             , Token_id.Stable.V1.t
             , Amount.Stable.V1.t
-            , Sparse_ledger.Stable.V1.t
+            , Sparse_ledger.Stable.V2.t
             , bool
             , Zexe_backend.Pasta.Fp.Stable.V1.t )
             Parties_logic.Local_state.Stable.V1.t
@@ -36,7 +36,7 @@ module Stable : sig
     type t =
       | Non_parties of
           { transaction : Mina_base.Transaction.Stable.V2.t
-          ; ledger : Mina_base.Sparse_ledger.Stable.V1.t
+          ; ledger : Mina_base.Sparse_ledger.Stable.V2.t
           ; protocol_state_body :
               Mina_state.Protocol_state.Body.Value.Stable.V2.t
           ; init_stack : Mina_base.Pending_coinbase.Stack_versioned.Stable.V1.t
