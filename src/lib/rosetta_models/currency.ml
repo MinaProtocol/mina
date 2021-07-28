@@ -14,7 +14,7 @@ type t =
   ; (* Any additional information related to the currency itself. For example, it would be useful to populate this object with the contract address of an ERC-20 token. *)
     metadata : Yojson.Safe.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show, eq]
+[@@deriving yojson { strict = false }, show]
 
 (** Currency is composed of a canonical Symbol and Decimals. This Decimals value is used to convert an Amount.Value from atomic units (Satoshis) to standard units (Bitcoins). *)
 let create (symbol : string) (decimals : int32) : t =
