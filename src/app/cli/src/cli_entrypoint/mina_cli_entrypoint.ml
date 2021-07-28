@@ -1122,12 +1122,7 @@ Pass one of -peer, -peer-list-file, -seed, -peer-list-url.|} ;
       coda ;
     let%bind () =
       Option.map metrics_server_port ~f:(fun port ->
-          let forward_uri =
-            Option.map libp2p_metrics_port ~f:(fun port ->
-                Uri.with_uri ~scheme:(Some "http") ~host:(Some "127.0.0.1")
-                  ~port:(Some port) ~path:(Some "/metrics") Uri.empty)
-          in
-          Mina_metrics.server ?forward_uri ~port ~logger () >>| ignore)
+          Mina_metrics.server ~port ~logger () >>| ignore)
       |> Option.value ~default:Deferred.unit
     in
     let () = Mina_plugins.init_plugins ~logger coda plugins in
