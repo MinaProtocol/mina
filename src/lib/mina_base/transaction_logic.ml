@@ -1206,6 +1206,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                { app_state; delegate; verification_key; permissions; snapp_uri }
            ; delta
            ; events = _ (* This is for the snapp to use, we don't need it. *)
+           ; call_data = _ (* This is for the snapp to use, we don't need it. *)
            }
        ; predicate
        } :
@@ -2335,6 +2336,7 @@ module For_tests = struct
                   ; token_id = Token_id.default
                   ; delta = Amount.Signed.(negate (of_unsigned total))
                   ; events = []
+                  ; call_data = Snark_params.Tick.Field.zero
                   }
               ; predicate = sender_nonce
               }
@@ -2349,6 +2351,7 @@ module For_tests = struct
                     ; token_id = Token_id.default
                     ; delta = Amount.Signed.(of_unsigned amount)
                     ; events = []
+                    ; call_data = Snark_params.Tick.Field.zero
                     }
                 ; predicate = Accept
                 }

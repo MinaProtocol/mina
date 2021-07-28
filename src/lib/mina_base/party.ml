@@ -220,12 +220,13 @@ module Body = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('pk, 'update, 'token_id, 'signed_amount, 'events) t =
+        type ('pk, 'update, 'token_id, 'signed_amount, 'events, 'call_data) t =
           { pk : 'pk
           ; update : 'update
           ; token_id : 'token_id
           ; delta : 'signed_amount
           ; events : 'events
+          ; call_data : 'call_data
           }
         [@@deriving hlist, sexp, equal, yojson, hash, compare]
       end
@@ -243,7 +244,8 @@ module Body = struct
         , Update.Stable.V1.t
         , Token_id.Stable.V1.t
         , (Amount.Stable.V1.t, Sgn.Stable.V1.t) Signed_poly.Stable.V1.t
-        , Pickles.Backend.Tick.Field.Stable.V1.t array list )
+        , Pickles.Backend.Tick.Field.Stable.V1.t array list
+        , Pickles.Backend.Tick.Field.Stable.V1.t (* Opaque to txn logic *) )
         Poly.Stable.V1.t
       [@@deriving sexp, equal, yojson, hash, compare]
 
@@ -257,16 +259,18 @@ module Body = struct
       , Update.Checked.t
       , Token_id.Checked.t
       , Amount.Signed.var
-      , Events.var )
+      , Events.var
+      , Field.Var.t )
       Poly.t
 
-    let to_input ({ pk; update; token_id; delta; events } : t) =
+    let to_input ({ pk; update; token_id; delta; events; call_data } : t) =
       List.reduce_exn ~f:Random_oracle_input.append
         [ Public_key.Compressed.Checked.to_input pk
         ; Update.Checked.to_input update
         ; Impl.run_checked (Token_id.Checked.to_input token_id)
         ; Amount.Signed.Checked.to_input delta
         ; Events.var_to_input events
+        ; Random_oracle_input.field call_data
         ]
 
     let digest (t : t) =
@@ -282,6 +286,7 @@ module Body = struct
       ; Token_id.typ
       ; Amount.Signed.typ
       ; Events.typ
+      ; Field.typ
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
@@ -292,15 +297,17 @@ module Body = struct
     ; token_id = Token_id.default
     ; delta = Amount.Signed.zero
     ; events = []
+    ; call_data = Field.zero
     }
 
-  let to_input ({ pk; update; token_id; delta; events } : t) =
+  let to_input ({ pk; update; token_id; delta; events; call_data } : t) =
     List.reduce_exn ~f:Random_oracle_input.append
       [ Public_key.Compressed.to_input pk
       ; Update.to_input update
       ; Token_id.to_input token_id
       ; Amount.Signed.to_input delta
       ; Events.to_input events
+      ; Random_oracle_input.field call_data
       ]
 
   let digest (t : t) =
