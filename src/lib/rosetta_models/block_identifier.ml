@@ -7,7 +7,8 @@
  *)
 
 type t =
-  { (* This is also known as the block height. *) index : int64; hash : string }
+  { (* This is also known as the block height. *)
+    index : int64; hash : string }
 [@@deriving yojson { strict = false }, show]
 
 (** The block_identifier uniquely identifies a block in a particular network. *)

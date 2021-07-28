@@ -12,7 +12,7 @@ type t =
   ; currency : Currency.t
   ; metadata : Yojson.Safe.t option [@default None]
   }
-[@@deriving yojson { strict = false }, show, eq]
+[@@deriving yojson { strict = false }, show]
 
 (** Amount is some Value of a Currency. It is considered invalid to specify a Value without a Currency. *)
 let create (value : string) (currency : Currency.t) : t =
