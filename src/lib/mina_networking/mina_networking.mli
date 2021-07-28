@@ -145,6 +145,7 @@ module Rpcs : sig
         : ( Get_transition_chain_proof.query
           , Get_transition_chain_proof.response )
           rpc
+    | Get_node_status : (Get_node_status.query, Get_node_status.response) rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
