@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
+  "scripts": {
+    "start": "tsdx watch",
+    "build": "tsdx build",
+    "test": "tsdx test",
+    "format": "prettier --write --ignore-unknown **/*",
+    "lint": "tsdx lint",
+    "prepare": "tsdx build",
+    "size": "size-limit",
+    "analyze": "size-limit --why"
+  },
+  "peerDependencies": {},
+  "name": "httpsnapper",
+  "author": "O(1) Labs",
+  "module": "dist/httpsnapper.esm.js",
+  "size-limit": [
+    {
+      "path": "dist/httpsnapper.cjs.production.min.js",
+      "limit": "10 KB"
+    },
+    {
+      "path": "dist/httpsnapper.esm.js",
+      "limit": "10 KB"
+    }
+  ],
+  "devDependencies": {
+    "@babel/preset-env": "^7.14.8",
+    "@size-limit/preset-small-lib": "^5.0.2",
+    "eslint-plugin-prettier": "^3.4.0",
+    "prettier": "^2.3.2",
+    "size-limit": "^5.0.1",
+    "tsdx": "^0.14.1",
+    "tslib": "^2.3.0",
+    "typescript": "^4.3.5"
+  }
+}
