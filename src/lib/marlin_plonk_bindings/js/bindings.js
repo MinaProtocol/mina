@@ -137,7 +137,7 @@ var caml_pasta_fp_div = plonk_wasm.caml_pasta_fp_div
 // Provides: caml_pasta_fp_inv
 // Requires: plonk_wasm, caml_pasta_fp_option
 var caml_pasta_fp_inv = function(x) {
-    caml_pasta_fp_option(plonk_wasm.caml_pasta_fp_inv(x));
+    return caml_pasta_fp_option(plonk_wasm.caml_pasta_fp_inv(x));
 };
 
 // Provides: caml_pasta_fp_square
@@ -304,7 +304,7 @@ var caml_pasta_fq_div = plonk_wasm.caml_pasta_fq_div
 // Provides: caml_pasta_fq_inv
 // Requires: plonk_wasm, caml_pasta_fq_option
 var caml_pasta_fq_inv = function(x) {
-    caml_pasta_fq_option(plonk_wasm.caml_pasta_fq_inv(x));
+    return caml_pasta_fq_option(plonk_wasm.caml_pasta_fq_inv(x));
 };
 
 // Provides: caml_pasta_fq_square
