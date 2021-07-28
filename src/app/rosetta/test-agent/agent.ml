@@ -417,11 +417,11 @@ let construction_api_transaction_through_mempool ~logger ~rosetta_uri
       ~signed_transaction:combine_res.signed_transaction
   in
   assert (
-    String.equal hash_res.Construction_hash_response.transaction_hash
-      submit_res.transaction_identifier.hash ) ;
+    Transaction_identifier.equal hash_res.Transaction_identifier_response.transaction_identifier
+      submit_res.transaction_identifier ) ;
   [%log debug] "Construction_submit is finalized" ;
   verify_in_mempool_and_block ~logger ~rosetta_uri ~graphql_uri
-    ~txn_hash:hash_res.transaction_hash ~network_response
+    ~txn_hash:hash_res.transaction_identifier.hash ~network_response
     ~operation_expectations
 
 let construction_api_payment_through_mempool =
