@@ -189,6 +189,12 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                           |> Or_error.ok_exn
                       }
                     ~init_stack:coinbase_stack_source
+                    ~next_available_token_before ~next_available_token_after
+                    ~pending_coinbase_stack_state:
+                      { source = coinbase_stack_source
+                      ; target = coinbase_stack_target
+                      }
+                    ~snapp_account1:None ~snapp_account2:None
                     { Transaction_protocol_state.Poly.transaction = t
                     ; block_data = Lazy.force state_body
                     }
