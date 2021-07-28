@@ -20,14 +20,15 @@ module Inputs_common = struct
                 Or_error.errorf
                   "Could not read the URS from disk; its format did not match \
                    the expected format"))
-      (fun _ urs path -> Or_error.try_with (fun () -> write urs path))
+      (fun _ urs path ->
+        Or_error.try_with (fun () ->
+            write urs path))
 end
 
 module Pasta = struct
   open Pasta
 
   module Vesta_based_plonk = Vesta_based_plonk.Make (struct
-    open Core
     include Inputs_common
 
     let store =
@@ -36,7 +37,6 @@ module Pasta = struct
   end)
 
   module Pallas_based_plonk = Pallas_based_plonk.Make (struct
-    open Core
     include Inputs_common
 
     let store =

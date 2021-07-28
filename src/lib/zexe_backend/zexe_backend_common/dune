@@ -7,14 +7,15 @@
   (preprocess (pps ppx_version ppx_coda ppx_jane ppx_deriving_yojson ppx_deriving.std h_list.ppx))
   (libraries
     hex
-    digestif
+    digestif.ocaml
     pickles_types
     marlin_plonk_bindings
-    key_cache
     sgn_type
     snarky.backendless
     sponge
     snarkette
+    async_kernel
+    key_cache
     core_kernel
     integers ))
 
