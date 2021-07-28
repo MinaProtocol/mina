@@ -7,7 +7,7 @@
  *)
 
 type t = { transaction_hash : string }
-[@@deriving yojson { strict = false }, show]
+[@@deriving yojson { strict = false }, show, eq]
 
 (** ConstructionHashResponse is the output of the `/construction/hash` endpoint. *)
 let create (transaction_hash : string) : t = { transaction_hash }
