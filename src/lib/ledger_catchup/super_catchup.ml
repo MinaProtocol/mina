@@ -405,7 +405,7 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
     Peer.Set.to_list preferred_peers @ Peer.Set.to_list unpreferred_peers
   in
   let open Deferred.Result.Let_syntax in
-  find_map_ok ~how:(`Max_concurrent_jobs 12) peers ~f:(fun peer ->
+  find_map_ok ~how:(`Max_concurrent_jobs 5) peers ~f:(fun peer ->
       let%bind transition_chain_proof =
         let open Deferred.Let_syntax in
         match%map
