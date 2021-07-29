@@ -234,13 +234,13 @@ publish-macos:
 
 deb:
 	./scripts/rebuild-deb.sh
-  ./scripts/archive/build-release-archives.sh
+	./scripts/archive/build-release-archives.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
 deb_optimized:
 	./scripts/rebuild-deb.sh "optimized"
-  ./scripts/archive/build-release-archives.sh
+	./scripts/archive/build-release-archives.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/mina*.deb /tmp/artifacts/.
 
