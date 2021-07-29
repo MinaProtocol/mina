@@ -30,7 +30,7 @@ export MINA_PRIVKEY_PASS=""
 export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 
 export MINA_CONFIG_FILE=${MINA_CONFIG_FILE:=/data/config.json}
-export PEER_ID=${PEER_ID:=/ip4/34.74.175.158/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr/}
+export PEER_ID=${PEER_ID:=/ip4/34.74.175.158/tcp/10001/p2p/12D3KooWAFFq2yEQFFzhU5dt64AWqawRuomG9hL8rSmm5vxhAsgr}
 export MINA_PORT=${MINA_DAEMON_PORT:=10101}
 DEFAULT_FLAGS="-generate-genesis-proof true -peer ${PEER_ID} -archive-address 0.0.0.0:3086 -insecure-rest-server -log-level debug -external-port ${MINA_PORT}"
 export MINA_FLAGS=${MINA_FLAGS:=$DEFAULT_FLAGS}
