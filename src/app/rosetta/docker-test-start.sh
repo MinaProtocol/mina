@@ -22,20 +22,22 @@ trap cleanup INT
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # Start postgres
-pg_ctlcluster 11 main start
+pg_ctlcluster 9.6 main start
 
 # wait for it to settle
 sleep 3
 
 # Setup and run demo-node
-PK=${PK:-B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV}
-genesis_time=$(date -d '2019-01-30 20:00:00.000000Z' '+%s')
+export PK=${PK:-B62qmnkbvNpNvxJ9FkSkBy5W6VkquHbgN2MDHh1P8mRVX3FQ1eWtcxV}
+export GENESIS_STATE_TIMESTAMP='2019-01-30 20:00:00.00000Z'
+genesis_time=$(date -d "$GENESIS_STATE_TIMESTAMP" '+%s')
 now_time=$(date +%s)
 export MINA_TIME_OFFSET=$(( $now_time - $genesis_time ))
 export MINA_PRIVKEY_PASS=""
 export MINA_LIBP2P_HELPER_PATH=/mina-bin/libp2p_helper
 MINA_CONFIG_DIR=/root/.mina-config
 
+envsubst < "$MINA_CONFIG_DIR/daemon.json.template" > "$MINA_CONFIG_DIR/daemon.json"
 
 # archive
 /mina-bin/archive/archive.exe run \
