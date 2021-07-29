@@ -53,7 +53,7 @@ sleep 3
 /mina-bin/cli/src/mina.exe daemon \
   -seed \
   -demo-mode \
-  -block-producer-key "MINA_CONFIG_DIR/wallets/store/$PK" \
+  -block-producer-key "$MINA_CONFIG_DIR/wallets/store/$PK" \
   -run-snark-worker $PK \
   -config-file "$MINA_CONFIG_DIR/daemon.json" \
   -config-dir "$MINA_CONFIG_DIR" \
@@ -65,7 +65,7 @@ sleep 3
   -log-level debug &
 
 # wait for it to settle
-sleep 3
+sleep 300
 
 # rosetta
 /mina-bin/rosetta/rosetta.exe \
