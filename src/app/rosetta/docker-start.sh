@@ -11,7 +11,7 @@ function cleanup
   echo "Killing rosetta.exe"
   kill $(ps aux | egrep '/mina-bin/rosetta'       | grep -v grep | awk '{ print $2 }') || true
   echo "Stopping postgres"
-  pg_ctlcluster 11 main stop
+  pg_ctlcluster 9.6 main stop
   exit
 }
 
@@ -21,7 +21,7 @@ trap cleanup INT
 PG_CONN=postgres://$USER:$USER@localhost:5432/archiver
 
 # Start postgres
-pg_ctlcluster 11 main start
+pg_ctlcluster 9.6 main start
 
 # wait for it to settle
 sleep 3
