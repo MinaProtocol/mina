@@ -11,7 +11,6 @@ set -eo pipefail
 DEBS3='deb-s3 upload '\
 '--s3-region=us-west-2 '\
 '--bucket packages.o1test.net '\
-'--preserve-versions '\
 '--lock '\
 '--cache-control=max-age=120 '
 
