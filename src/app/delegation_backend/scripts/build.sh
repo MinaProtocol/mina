@@ -2,22 +2,25 @@
 
 set -e
 
-out="$PWD/result"
+if [[ "$OUT" == "" ]]; then
+  OUT="$PWD/result"
+fi
 
 ref_signer="$PWD/../../external/c-reference-signer"
 
 GCR=gcr.io/o1labs-192920/delegation-backend-production
 
-mkdir -p "$out"/{headers,bin}
-rm -f "$out"/libmina_signer.so # Otherwise re-building without clean causes permissions issue
+mkdir -p "$OUT"/{headers,bin}
+rm -f "$OUT"/libmina_signer.so # Otherwise re-building without clean causes permissions issue
 if [[ "$LIB_MINA_SIGNER" == "" ]]; then
   # No nix
-  make -C "$ref_signer" clean libmina_signer.so
-  cp "$ref_signer/libmina_signer.so" "$out"
+  cp -R "$ref_signer" "$OUT"
+  make -C "$OUT/c-reference-signer" clean libmina_signer.so
+  cp "$OUT/c-reference-signer/libmina_signer.so" "$OUT"
 else
-  cp "$LIB_MINA_SIGNER" "$out"/libmina_signer.so
+  cp "$LIB_MINA_SIGNER" "$OUT"/libmina_signer.so
 fi
-cp "$ref_signer"/*.h "$out/headers"
+cp "$ref_signer"/*.h "$OUT/headers"
 
 docker_build() {
   tag=delegation-backend-production
@@ -30,7 +33,7 @@ docker_build() {
 case "$1" in
   test)
     cd src
-    LD_LIBRARY_PATH="$out" $GO test
+    LD_LIBRARY_PATH="$OUT" $GO test
     ;;
   docker)
     docker_build
@@ -57,7 +60,7 @@ case "$1" in
     ;;
   "")
     cd src/delegation_backend
-    $GO build -o "$out/bin/delegation_backend"
+    $GO build -o "$OUT/bin/delegation_backend"
     echo "to run use cmd: LD_LIBRARY_PATH=result ./result/bin/delegation_backend"
     ;;
   *)

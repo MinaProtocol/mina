@@ -27,7 +27,7 @@ Pipeline.build
       Command.build
         Command.Config::{
           commands = [
-            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.minaToolchain} "GO=/usr/lib/go/bin/go make -C src/app/delegation_backend test"
+            Cmd.runInDocker Cmd.Docker::{image = ContainerImages.minaToolchain} "OUT=/workdir/result GO=/usr/lib/go/bin/go make -C src/app/delegation_backend test"
           ],
           label = "delegation-backend unit-tests",
           key = "delegation-backend-unit-tests",
