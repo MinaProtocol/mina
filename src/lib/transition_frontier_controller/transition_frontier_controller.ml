@@ -45,27 +45,25 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     List.map collected_transitions ~f:(fun envelope ->
         Network_peer.Envelope.Incoming.data envelope
         |> Mina_transition.External_transition.Initial_validated.state_hash)
+    |> Mina_base.State_hash.Set.of_list
   in
   let extensions = Transition_frontier.extensions frontier in
-  let already_reported = ref false in
   don't_wait_for
-  @@ Pipe_lib.Broadcast_pipe.Reader.iter
+  @@ Pipe_lib.Broadcast_pipe.Reader.iter_until
        (Transition_frontier.Extensions.get_view_pipe extensions New_breadcrumbs)
        ~f:(fun new_breadcrumbs ->
+         let open Mina_base.State_hash in
          let new_state_hashes =
            List.map new_breadcrumbs ~f:Transition_frontier.Breadcrumb.state_hash
+           |> Set.of_list
          in
-         List.iter new_state_hashes ~f:(fun new_state_hash ->
-             if
-               (not !already_reported)
-               && List.mem initial_state_hashes new_state_hash
-                    ~equal:Mina_base.State_hash.equal
-             then (
-               Mina_metrics.(
-                 Gauge.set Catchup.initial_catchup_time
-                   Time.(Span.to_min @@ diff (now ()) start_time)) ;
-               already_reported := true )) ;
-         Deferred.unit) ;
+         if Set.is_empty @@ Set.inter initial_state_hashes new_state_hashes then
+           Deferred.return false
+         else (
+           Mina_metrics.(
+             Gauge.set Catchup.initial_catchup_time
+               Time.(Span.to_min @@ diff (now ()) start_time)) ;
+           Deferred.return true )) ;
   trace_recurring "validator" (fun () ->
       Transition_handler.Validator.run
         ~consensus_constants:
