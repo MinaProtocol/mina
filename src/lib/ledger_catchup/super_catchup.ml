@@ -400,9 +400,9 @@ let download_state_hashes t ~logger ~trust_system ~network ~frontier
 
   let%bind all_peers = Mina_networking.peers network >>| Peer.Set.of_list in
 
-  let unpreferred_peers = Peer.Set.diff all_peers preferred_peers in
+  let non_preferred_peers = Peer.Set.diff all_peers preferred_peers in
   let peers =
-    Peer.Set.to_list preferred_peers @ Peer.Set.to_list unpreferred_peers
+    Peer.Set.to_list preferred_peers @ Peer.Set.to_list non_preferred_peers
   in
   let open Deferred.Result.Let_syntax in
   find_map_ok ~how:(`Max_concurrent_jobs 5) peers ~f:(fun peer ->
