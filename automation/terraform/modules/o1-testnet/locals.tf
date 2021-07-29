@@ -1,11 +1,12 @@
 locals {
 
   block_producer_configs = flatten( [
-    for index, bp in var.block_producer_configs :
+    for index, bp in concat(var.whales, var.fishes) :
       [
         for i in range(bp.duplicates) : {
-          name      = "${bp.basename}-${i}"
-          basename = bp.basename
+          name      = "${bp.class}-${index}-${i}"
+          unique_node_index= index
+          total_node_index= index +i
           #TODO: i've changed the naming convention so we won't find "${bp.basename}-${i}" in data.local_file.libp2p_peers as it is
           full_peer = "/dns4/${bp.basename}-${i}.${var.testnet_name}/tcp/${var.block_producer_starting_host_port + index}/p2p/${trimspace(data.local_file.libp2p_peers["${bp.basename}-${i}"].content)}",
           port      = var.block_producer_starting_host_port + index + i
@@ -15,6 +16,8 @@ locals {
     
    ] ])
 
+  whale_count = length(var.whales)
+  fish_count = length(var.fishes)
 
 
   # block_producer_static_peers = {

@@ -1,7 +1,7 @@
 resource "null_resource" "block_producer_key_generation" {
   provisioner "local-exec" {
     working_dir = "${path.module}/../../.."
-    command     = "./scripts/generate-keys-and-ledger.sh --testnet=${var.testnet_name} --sc=${var.seed_count} --wc=${var.whale_count} --fc=${var.fish_count} --reset=false --artifact-path=${var.artifact_path}"
+    command     = "./scripts/generate-keys-and-ledger.sh --testnet=${var.testnet_name} --sc=${var.seed_count} --wc=${local.whale_count} --fc=${local.fish_count} --reset=false --artifact-path=${var.artifact_path}"
   }
 }
 

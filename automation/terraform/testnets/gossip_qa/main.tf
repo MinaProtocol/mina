@@ -141,18 +141,19 @@ module "gossip_qa" {
   # fish_count            = var.fish_count
   seed_count            = var.seed_count
 
-  block_producer_configs =  [
-    # TODO: eventually this will be turned into a loop depending on how many bps we want
+  # TODO: eventually this will be turned into a loop depending on how many bps we want
+  whales= [    
     {
-      basename = "whale1"
       duplicates = 2
       class  = "whale"
     },
     {
-      basename = "whale2"
       duplicates = 1
       class  = "whale"
-    },
+    }
+  ]
+  
+  fishes=[
     {
       basename = "fish1"
       duplicates = 2

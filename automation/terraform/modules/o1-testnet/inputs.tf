@@ -123,8 +123,13 @@ variable "seed_discovery_keypairs" {
 #   default = 1
 # }
 
-variable "block_producer_configs" {
-  description = "individual block producer node deployment configurations"
+variable "whales" {
+  description = "individual whale block producer node deployment configurations"
+  default = null
+}
+
+variable "fishes" {
+  description = "individual fish block producer node deployment configurations"
   default = null
 }
 

@@ -69,11 +69,11 @@ module "kubernetes_testnet" {
     {
       name                   = bp.name
       class                  = bp.class
-      id                     = index + 1
+      id                     = bp.total_node_index
       external_port          = bp.port
       #TODO, i've changed the naming convention so these keys and secrets need to be fixed
-      private_key_secret     = "${bp.basename}-account-key"
-      libp2p_secret          = "${bp.basename}-libp2p-key"
+      private_key_secret     = "online-${bp.class}-${bp.unique_node_index}-account-key"
+      libp2p_secret          = "online-${bp.class}-${bp.total_node_index}-account-key"
       enable_gossip_flooding = false
       run_with_user_agent    = bp.class =="whale" ? false : true
       run_with_bots          = false
